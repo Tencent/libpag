@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { openAndSettlePage } = require('../lib/page-loader');
 
 function parseArgs(argv) {
   const opts = {
@@ -83,34 +84,19 @@ async function main() {
   }
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
   try {
-    const page = await browser.newPage();
-    await page.setViewport({
-      width: opts.viewportWidth,
-      height: opts.viewportHeight,
-      deviceScaleFactor: 1,
+    const page = await openAndSettlePage(browser, opts.input, {
+      viewportWidth: opts.viewportWidth,
+      viewportHeight: opts.viewportHeight,
+      waitMs: opts.waitMs,
+      selector: opts.selector,
+      onPageError: (err) => {
+        console.error(`page exception: ${err.message}`);
+      },
     });
-    page.on('pageerror', (err) => {
-      console.error(`page exception: ${err.message}`);
-    });
-    const url = 'file://' + opts.input;
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    if (opts.selector) {
-      await page.waitForSelector(opts.selector, { timeout: 15000 });
-    } else {
-      try {
-        await page.waitForFunction(
-          'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true',
-          { timeout: 10000 },
-        );
-      } catch (_) { /* not fatal */ }
-    }
-    if (opts.waitMs > 0) {
-      await new Promise((r) => setTimeout(r, opts.waitMs));
-    }
     const { width, height } = await captureBodyRect(page);
     // Re-set the viewport to the captured size so the screenshot is taken at
     // the canvas dimensions (matches `pagx render --scale 1` output size).

@@ -7,15 +7,44 @@
 
 const path = require('path');
 
+// Convert a flag's argument to a positive number; abort with a clear error
+// message when the value is missing, NaN, or non-positive. Without this,
+// `--viewport-width foo` would silently send NaN to puppeteer's setViewport.
+function parsePositiveNumber(flagName, value) {
+  if (value === undefined) {
+    console.error(`html-snapshot: '${flagName}' requires a numeric argument`);
+    process.exit(2);
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`html-snapshot: '${flagName}' expects a positive number, got '${value}'`);
+    process.exit(2);
+  }
+  return n;
+}
+
+function parseNonNegativeNumber(flagName, value) {
+  if (value === undefined) {
+    console.error(`html-snapshot: '${flagName}' requires a numeric argument`);
+    process.exit(2);
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(`html-snapshot: '${flagName}' expects a non-negative number, got '${value}'`);
+    process.exit(2);
+  }
+  return n;
+}
+
 // Long-option flag table. Each entry lists the names the user can type and a
 // setter that mutates `opts` with the next argv token. `-h` / `--help` and
 // positional handling stay inline in `parseArgs` since they affect control
 // flow rather than just options.
 const FLAGS = [
   { names: ['-o', '--output'],     set: (o, v) => { o.output = v; } },
-  { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = Number(v); } },
-  { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = Number(v); } },
-  { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = Number(v); } },
+  { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parsePositiveNumber('--viewport-width', v); } },
+  { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parsePositiveNumber('--viewport-height', v); } },
+  { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = parseNonNegativeNumber('--wait-ms', v); } },
   { names: ['--selector'],         set: (o, v) => { o.selector = v; } },
 ];
 

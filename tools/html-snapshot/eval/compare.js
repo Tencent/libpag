@@ -49,31 +49,35 @@ function padToCommon(a, b) {
   return [padOne(a), padOne(b), w, h];
 }
 
-function meanRgbDelta(aData, bData, w, h) {
-  let total = 0;
+// Single-pass image metrics: walks both buffers exactly once and emits the
+// mean per-channel RGB delta together with luma-only SSIM. Caching luma into
+// Float32Arrays during the first pass lets the variance step skip the second
+// luma recomputation. Luma weights match BT.709 (matching previous behaviour).
+//
+// SSIM is computed over a single global window — the dependency-free,
+// approximate form chosen for this codebase. It tracks structural mismatches
+// well enough to rank cases relative to one another but does not match the
+// canonical 8x8 sliding-window value.
+function imageMetrics(aData, bData, w, h) {
   const n = w * h;
-  for (let i = 0; i < n; i++) {
-    const j = i * 4;
-    const dr = Math.abs(aData[j] - bData[j]);
-    const dg = Math.abs(aData[j + 1] - bData[j + 1]);
-    const db = Math.abs(aData[j + 2] - bData[j + 2]);
-    total += (dr + dg + db) / 3;
-  }
-  return total / n;
-}
-
-// Luma-only single-window SSIM. We deliberately avoid the standard 8x8 sliding
-// window to keep this dependency-free and still get a usable structural metric;
-// the SSIM contribution is dominated by global mean/variance, which the single-
-// window form captures well enough to rank cases relative to one another.
-function lumaSsim(aData, bData, w, h) {
-  const n = w * h;
+  const lumaA = new Float32Array(n);
+  const lumaB = new Float32Array(n);
+  let rgbDeltaTotal = 0;
   let sumA = 0;
   let sumB = 0;
   for (let i = 0; i < n; i++) {
     const j = i * 4;
-    const lA = 0.2126 * aData[j] + 0.7152 * aData[j + 1] + 0.0722 * aData[j + 2];
-    const lB = 0.2126 * bData[j] + 0.7152 * bData[j + 1] + 0.0722 * bData[j + 2];
+    const ar = aData[j];
+    const ag = aData[j + 1];
+    const ab = aData[j + 2];
+    const br = bData[j];
+    const bg = bData[j + 1];
+    const bb = bData[j + 2];
+    rgbDeltaTotal += (Math.abs(ar - br) + Math.abs(ag - bg) + Math.abs(ab - bb)) / 3;
+    const lA = 0.2126 * ar + 0.7152 * ag + 0.0722 * ab;
+    const lB = 0.2126 * br + 0.7152 * bg + 0.0722 * bb;
+    lumaA[i] = lA;
+    lumaB[i] = lB;
     sumA += lA;
     sumB += lB;
   }
@@ -83,12 +87,11 @@ function lumaSsim(aData, bData, w, h) {
   let varB = 0;
   let covAB = 0;
   for (let i = 0; i < n; i++) {
-    const j = i * 4;
-    const lA = 0.2126 * aData[j] + 0.7152 * aData[j + 1] + 0.0722 * aData[j + 2];
-    const lB = 0.2126 * bData[j] + 0.7152 * bData[j + 1] + 0.0722 * bData[j + 2];
-    varA += (lA - muA) * (lA - muA);
-    varB += (lB - muB) * (lB - muB);
-    covAB += (lA - muA) * (lB - muB);
+    const dA = lumaA[i] - muA;
+    const dB = lumaB[i] - muB;
+    varA += dA * dA;
+    varB += dB * dB;
+    covAB += dA * dB;
   }
   varA /= n;
   varB /= n;
@@ -97,8 +100,10 @@ function lumaSsim(aData, bData, w, h) {
   const c2 = (0.03 * 255) * (0.03 * 255);
   const num = (2 * muA * muB + c1) * (2 * covAB + c2);
   const den = (muA * muA + muB * muB + c1) * (varA + varB + c2);
-  if (den === 0) return 1;
-  return num / den;
+  return {
+    meanRgbDelta: rgbDeltaTotal / n,
+    ssim: den === 0 ? 1 : num / den,
+  };
 }
 
 function pixelMetrics(baselinePath, subsetPath, diffPath) {
@@ -113,12 +118,13 @@ function pixelMetrics(baselinePath, subsetPath, diffPath) {
   if (diffPath) {
     fs.writeFileSync(diffPath, PNG.sync.write(diff));
   }
+  const m = imageMetrics(pa.data, pb.data, w, h);
   return {
     width: w,
     height: h,
     pixelDiffRatio: diffPixels / (w * h),
-    meanRgbDelta: meanRgbDelta(pa.data, pb.data, w, h),
-    ssim: lumaSsim(pa.data, pb.data, w, h),
+    meanRgbDelta: m.meanRgbDelta,
+    ssim: m.ssim,
   };
 }
 

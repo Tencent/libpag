@@ -28,6 +28,7 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { parseArgs } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages } = require('./lib/browser-snapshot');
+const { openAndSettlePage } = require('./lib/page-loader');
 
 async function main() {
   const opts = parseArgs(process.argv);
@@ -38,44 +39,24 @@ async function main() {
   }
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
   try {
-    const page = await browser.newPage();
-    await page.setViewport({
-      width: opts.viewportWidth,
-      height: opts.viewportHeight,
-      deviceScaleFactor: 1,
+    const page = await openAndSettlePage(browser, opts.input, {
+      viewportWidth: opts.viewportWidth,
+      viewportHeight: opts.viewportHeight,
+      waitMs: opts.waitMs,
+      selector: opts.selector,
+      onConsole: (msg) => {
+        if (msg.type() === 'error') {
+          console.error(`page error: ${msg.text()}`);
+        }
+      },
+      onPageError: (err) => {
+        console.error(`page exception: ${err.message}`);
+      },
     });
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        console.error(`page error: ${msg.text()}`);
-      }
-    });
-    page.on('pageerror', (err) => {
-      console.error(`page exception: ${err.message}`);
-    });
-
-    const url = 'file://' + opts.input;
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-
-    if (opts.selector) {
-      await page.waitForSelector(opts.selector, { timeout: 15000 });
-    } else {
-      // Heuristic: many React-CDN apps mount into <div id="root">. Wait for at least
-      // one child if that root exists.
-      try {
-        await page.waitForFunction(
-          'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true',
-          { timeout: 10000 },
-        );
-      } catch (_) { /* not fatal */ }
-    }
-
-    if (opts.waitMs > 0) {
-      await new Promise((r) => setTimeout(r, opts.waitMs));
-    }
 
     // PAGX's renderer can read `data:` URIs and local files but not `http(s)://`
     // URLs. Inline every external image into a base64 data URI here so the
@@ -84,7 +65,10 @@ async function main() {
     // (which has already settled around the original image) is left untouched.
     await page.evaluate(inlineExternalImages);
 
-    const result = await page.evaluate(takeSnapshot, { /* config placeholder */ });
+    // `takeSnapshot` is a self-contained IIFE string assembled from the
+    // helpers in lib/browser-snapshot.js; `page.evaluate` accepts strings
+    // and returns the expression's result.
+    const result = await page.evaluate(takeSnapshot);
     fs.writeFileSync(opts.output, result.html, 'utf8');
     console.log(`html-snapshot: wrote ${opts.output} (${result.width}x${result.height})`);
   } finally {

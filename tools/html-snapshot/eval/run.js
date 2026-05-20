@@ -27,7 +27,7 @@ const compare = require('./compare');
 
 function parseArgs(argv) {
   const opts = {
-    corpus: '/Users/yucong/Desktop/tmp_pagx',
+    corpus: process.env.EVAL_CORPUS || '',
     outDir: '',
     pagxBin: process.env.PAGX_BIN || '',
     inferFlex: true,
@@ -57,7 +57,7 @@ function parseArgs(argv) {
 
 const USAGE = `Usage: node run.js [options]
 
-  --corpus <dir>      Directory of original HTML files (default: /Users/yucong/Desktop/tmp_pagx)
+  --corpus <dir>      Directory of original HTML files (required; or set $EVAL_CORPUS)
   --out <dir>         Output directory (default: tools/html-snapshot/eval/out/<label>)
   --pagx-bin <path>   pagx binary (default: \$PAGX_BIN or repo cmake-build-debug/pagx)
   --no-infer-flex     Disable C++ AbsoluteToFlexInferencePass
@@ -460,6 +460,10 @@ ${cards}
 
 async function main() {
   const opts = parseArgs(process.argv);
+  if (!opts.corpus) {
+    console.error('run: --corpus <dir> is required (or set EVAL_CORPUS)');
+    process.exit(2);
+  }
   if (!opts.pagxBin) opts.pagxBin = defaultPagxBin();
   if (!opts.outDir) opts.outDir = path.join(SCRIPT_DIR, 'out', opts.label);
   ensureDir(opts.outDir);
@@ -478,7 +482,7 @@ async function main() {
   // A single browser instance is reused for both the live and subset flex
   // counts across every case. Launching once shaves ~1s per case.
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
 

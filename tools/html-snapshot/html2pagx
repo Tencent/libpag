@@ -20,7 +20,7 @@
 #   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
 #   -h, --help                 Show this help
 
-set -u
+set -eu
 set -o pipefail
 
 #--------------------------------------------------------------------------------------------------
@@ -170,18 +170,26 @@ fi
 #--------------------------------------------------------------------------------------------------
 # Step 1: snapshot
 #--------------------------------------------------------------------------------------------------
-echo "[1/$([[ $DO_RENDER -eq 1 ]] && echo 4 || ([[ $DO_RESOLVE -eq 1 ]] && echo 3 || echo 2))] snapshot  $INPUT_ABS"
+# Total steps depends on which terminal step the user selected; pre-compute the
+# count so the per-step prefix stays readable.
+TOTAL_STEPS=2
+[[ "$DO_RESOLVE" -eq 1 ]] && TOTAL_STEPS=3
+[[ "$DO_RENDER" -eq 1 ]] && TOTAL_STEPS=4
+
+echo "[1/$TOTAL_STEPS] snapshot  $INPUT_ABS"
 node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}" \
   || { echo "html2pagx: snapshot failed" >&2; exit 1; }
 
 #--------------------------------------------------------------------------------------------------
 # Step 2: pagx import
 #--------------------------------------------------------------------------------------------------
-echo "[2] import    $SUBSET_HTML"
+echo "[2/$TOTAL_STEPS] import    $SUBSET_HTML"
 IMPORT_ARGS=(--input "$SUBSET_HTML" --output "$SUBSET_PAGX")
 if [[ "$INFER_FLEX" -eq 1 ]]; then
   IMPORT_ARGS+=(--html-infer-flex)
 fi
+# `set -e` would abort on a non-zero `pagx import` exit, but we want to surface
+# the failure with our own message; wrap the call to control the contract.
 "$PAGX_BIN" import "${IMPORT_ARGS[@]}" 2>&1 \
   | grep -v "warning: html: position: absolute on text leaf" \
   || true
@@ -199,7 +207,7 @@ fi
 #--------------------------------------------------------------------------------------------------
 # Step 3: pagx resolve
 #--------------------------------------------------------------------------------------------------
-echo "[3] resolve   $SUBSET_PAGX"
+echo "[3/$TOTAL_STEPS] resolve   $SUBSET_PAGX"
 "$PAGX_BIN" resolve "$SUBSET_PAGX" \
   || { echo "html2pagx: pagx resolve failed" >&2; exit 1; }
 
@@ -211,7 +219,7 @@ fi
 #--------------------------------------------------------------------------------------------------
 # Step 4: pagx render
 #--------------------------------------------------------------------------------------------------
-echo "[4] render    $SUBSET_PAGX  ->  $SUBSET_PNG (scale=$SCALE)"
+echo "[4/$TOTAL_STEPS] render    $SUBSET_PAGX  ->  $SUBSET_PNG (scale=$SCALE)"
 "$PAGX_BIN" render "$SUBSET_PAGX" --output "$SUBSET_PNG" --scale "$SCALE" \
   || { echo "html2pagx: pagx render failed" >&2; exit 1; }
 
