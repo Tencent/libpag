@@ -454,6 +454,154 @@ function borderOverlayHTML(computed, width, height) {
   return out;
 }
 
+// Resolve the alpha channel of a computed colour string. `transparent` and
+// `rgba(..., 0)` both round-trip to alpha 0; opaque keywords / `rgb(...)`
+// resolve to 1. Used to tell whether a border / background colour actually
+// paints anything.
+function colorAlpha(colorStr) {
+  if (!colorStr) return 0;
+  const s = colorStr.trim().toLowerCase();
+  if (s === 'transparent' || s === 'none') return 0;
+  const m = s.match(/^rgba?\(([^)]+)\)$/);
+  if (!m) return 1;
+  const parts = m[1].split(',').map((p) => p.trim());
+  if (parts.length < 4) return 1;
+  const a = parseFloat(parts[3]);
+  return Number.isFinite(a) ? a : 1;
+}
+
+// Parse the computed `transform-origin` (e.g. "100px 140px" or "50% 50%")
+// against an element box of size (w, h). Returns the origin in element-box
+// coordinates. Modern browsers always resolve transform-origin to absolute
+// pixels in the computed style, but we still accept percentages defensively.
+function transformOriginXY(computed, w, h) {
+  const raw = (computed.transformOrigin || '').trim();
+  if (!raw) return [w / 2, h / 2];
+  const parts = raw.split(/\s+/);
+  function resolve(token, total) {
+    if (!token) return total / 2;
+    if (token.endsWith('%')) return total * (parseFloat(token) || 0) / 100;
+    return parseFloat(token) || 0;
+  }
+  return [resolve(parts[0], w), resolve(parts[1], h)];
+}
+
+// Build a DOMMatrix from a computed `transform` string. `none` (the default)
+// returns the identity matrix.
+function transformMatrix(computed) {
+  const t = (computed.transform || '').trim();
+  if (!t || t === 'none') return new DOMMatrix();
+  return new DOMMatrix(t);
+}
+
+// Detect the classic "0×0 element + asymmetric borders to paint a triangle"
+// pattern. The CSS rules look like:
+//   width: 0; height: 0;
+//   border-left: 100px solid transparent;
+//   border-right: 100px solid transparent;
+//   border-bottom: 280px solid #3a5afd;
+// The element box is degenerate, but the four border regions form four
+// triangles meeting at the (BL, BT) corner; the visible border-colour sides
+// paint the visible parts of the shape. We can't represent this with a single
+// `border` shorthand or an axis-aligned overlay rectangle, so we render the
+// element as an inline <svg> with one <polygon> per visible side.
+function isCssBorderTrianglePattern(el, computed) {
+  if (elementHasChildren(el)) return false;
+  if (gatherDirectText(el)) return false;
+  // The element's *content* area must be empty for the four border regions to
+  // collapse into the four-triangles-meet-at-(BL,BT) configuration that the
+  // CSS triangle hack relies on. `clientWidth`/`clientHeight` report the
+  // padding-box size (content + padding, no border), so they are zero exactly
+  // when the box has no content area regardless of `box-sizing`. Reading
+  // `width` from computed style is unreliable here: under `box-sizing:
+  // border-box` (Tailwind's preflight default) Chromium clamps `width: 0` up
+  // to `border-left + border-right`, so the computed width on a triangle host
+  // is its full border span (e.g. 200px), not 0.
+  if (el.clientWidth !== 0 || el.clientHeight !== 0) return false;
+  // Defence in depth: if the author added padding the four triangles would
+  // get pushed apart and the shape would no longer be a clean triangle.
+  const pad = readPadding(computed);
+  if (pad.top !== 0 || pad.right !== 0 || pad.bottom !== 0 || pad.left !== 0) return false;
+  let visibleSides = 0;
+  for (const side of SIDES) {
+    if (borderWidthOf(computed, side) <= 0) continue;
+    const style = computed.getPropertyValue(`border-${side}-style`);
+    if (style !== 'solid') return false;
+    if (colorAlpha(computed.getPropertyValue(`border-${side}-color`)) > 0) visibleSides++;
+  }
+  if (visibleSides === 0) return false;
+  if (colorAlpha(computed.getPropertyValue('background-color')) > 0) return false;
+  const bgImage = (computed.getPropertyValue('background-image') || '').trim();
+  if (bgImage && bgImage !== 'none') return false;
+  return true;
+}
+
+// Render a CSS-triangle element as an absolutely-positioned wrapper containing
+// an inline <svg>. The svg's viewBox matches the host's paint-box rect (which
+// is the transform-aware bounding rect that `getBoundingClientRect()` reports).
+// Each visible border side becomes one <polygon> with three vertices in the
+// unrotated element coordinates, then run through the element's own CSS
+// `transform` so the rotation / skew / scale gets baked into the polygon
+// points. We do this baking here because PAGX's HTML subset has no model for
+// CSS `transform`; without baking, the snapshot would lose the rotation and
+// the triangle would land axis-aligned inside an oversized paint-box wrapper.
+function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
+  const BL = borderWidthOf(computed, 'left');
+  const BR = borderWidthOf(computed, 'right');
+  const BT = borderWidthOf(computed, 'top');
+  const BB = borderWidthOf(computed, 'bottom');
+  const unrotW = BL + BR;
+  const unrotH = BT + BB;
+  const paintW = rect.width;
+  const paintH = rect.height;
+  const m = transformMatrix(computed);
+  const [ox, oy] = transformOriginXY(computed, unrotW, unrotH);
+
+  // Project the four corners of the unrotated element box through the
+  // transform to find the paint-box's top-left in pre-transform world units.
+  // The wrapper is sized to the paint box, so subtracting (minX, minY) lands
+  // every transformed point inside the wrapper's local (0,0)-(paintW, paintH).
+  const corners = [[0, 0], [unrotW, 0], [unrotW, unrotH], [0, unrotH]];
+  let minX = Infinity;
+  let minY = Infinity;
+  for (const [cx, cy] of corners) {
+    const p = m.transformPoint(new DOMPoint(cx - ox, cy - oy));
+    const qx = p.x + ox;
+    const qy = p.y + oy;
+    if (qx < minX) minX = qx;
+    if (qy < minY) minY = qy;
+  }
+  function mapPoint(ux, uy) {
+    const p = m.transformPoint(new DOMPoint(ux - ox, uy - oy));
+    return [p.x + ox - minX, p.y + oy - minY];
+  }
+  const triangles = {
+    top:    [[0, 0],      [unrotW, 0],      [BL, BT]],
+    right:  [[unrotW, 0], [unrotW, unrotH], [BL, BT]],
+    bottom: [[0, unrotH], [unrotW, unrotH], [BL, BT]],
+    left:   [[0, 0],      [BL, BT],         [0, unrotH]],
+  };
+  const polys = [];
+  for (const side of SIDES) {
+    const tw = borderWidthOf(computed, side);
+    if (tw <= 0) continue;
+    const color = computed.getPropertyValue(`border-${side}-color`).trim();
+    if (colorAlpha(color) <= 0) continue;
+    const pts = triangles[side]
+      .map(([x, y]) => mapPoint(x, y))
+      .map(([x, y]) => `${roundPx(x)},${roundPx(y)}`)
+      .join(' ');
+    polys.push(`<polygon points="${pts}" fill="${color}"/>`);
+  }
+  const wrapperStyle = buildStyle(left, top, paintW, paintH, computed, {
+    box: true, ...opts,
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${px(paintW)}" `
+    + `height="${px(paintH)}" viewBox="0 0 ${roundPx(paintW)} ${roundPx(paintH)}">`
+    + polys.join('') + `</svg>`;
+  return `<div style="${wrapperStyle}">${svg}</div>`;
+}
+
 // Style of the inner <img> element. Under absolute mode it pins itself to the
 // wrapper's (0,0) and inherits the wrapper's size; under flex mode the
 // wrapper is no longer absolutely positioned, so the image fills the wrapper
@@ -1182,6 +1330,15 @@ function render(el, parentRect, opts, precomputed) {
   const handler = KIND_DISPATCH[kind];
   if (handler) return handler(el, parentRect, rect, left, top, computed, opts);
 
+  // CSS triangle hack (`width:0; height:0` + asymmetric solid borders) doesn't
+  // fit any of the box renderers — the host has zero content area but its
+  // paint box is filled by border triangles. Emit it as an inline <svg> with
+  // one <polygon> per visible side so the shape (and any `transform: rotate`
+  // baked into the polygon coordinates) survives the trip to PAGX.
+  if (isCssBorderTrianglePattern(el, computed)) {
+    return renderBorderTriangle(el, parentRect, rect, left, top, computed, opts);
+  }
+
   const directText = gatherDirectText(el);
   if (!elementHasChildren(el) && directText) {
     return renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts);
@@ -1422,6 +1579,11 @@ const HELPER_FNS = [
   appendBoxShadow,
   buildStyle,
   borderOverlayHTML,
+  colorAlpha,
+  transformOriginXY,
+  transformMatrix,
+  isCssBorderTrianglePattern,
+  renderBorderTriangle,
   imageInnerStyle,
   freezeSvg,
   splitTextNodeIntoLines,
