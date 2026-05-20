@@ -15,12 +15,21 @@
  * launching per task, while the periodic roll absorbs the "Connection closed" bursts that
  * used to sink the second half of the suite on macOS.
  *
- * Prerequisites: npx puppeteer browsers install chrome
+ * Dependencies are auto-installed on first run via `npm ci`.
  */
 
-const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
+
+// Auto-install puppeteer if node_modules is missing (fresh clone without manual npm ci).
+const nodeModulesDir = path.join(__dirname, 'node_modules', 'puppeteer');
+if (!fs.existsSync(nodeModulesDir)) {
+  console.log('puppeteer not found, running npm ci...');
+  execSync('npm ci', { cwd: __dirname, stdio: 'inherit' });
+}
+
+const puppeteer = require('puppeteer');
 
 const SINGLE_TASK_TIMEOUT_MS = 60000;
 const PROTOCOL_TIMEOUT_MS = 180000;
