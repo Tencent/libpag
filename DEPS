@@ -11,8 +11,8 @@
         "dir": "third_party/vendor_tools"
       },
       {
-        "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "5342bbae5a2a297b8b1e23935f7f0b87cac39345",
+        "url": "https://github.com/Tencent/tgfx.git",
+        "commit": "f22a528000d7b8dea2850133544858e72c7f935f",
         "dir": "third_party/tgfx"
       },
       {
