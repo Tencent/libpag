@@ -255,9 +255,21 @@ function takeSnapshot(config) {
     if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
   }
 
+  // Preserve sub-pixel precision (one decimal). Authors regularly use
+  // half-pixel values like Tailwind's `inset-[1.5px]`; combined with an
+  // integer parent border the child's measured offset becomes 2.5px, which
+  // a plain `Math.round` would snap to 3px and introduce a visible 0.5px
+  // shift on every such element. One decimal place is enough to round-trip
+  // the common 0.5/1.5/2.5 cases while still snapping cleanly when the
+  // browser reports a noisy measurement like 19.99998.
+  function roundPx(n) {
+    if (!isFinite(n)) return 0;
+    return Math.round(n * 10) / 10;
+  }
+
   function px(n) {
     if (!isFinite(n)) return '0px';
-    return `${Math.round(n)}px`;
+    return `${roundPx(n)}px`;
   }
 
   function escapeHtml(s) {
@@ -304,6 +316,30 @@ function takeSnapshot(config) {
 
   function borderWidthOf(computed, side) {
     return parseFloat(computed.getPropertyValue(`border-${side}-width`)) || 0;
+  }
+
+  // Resolve the origin used for measuring an element's children's `left`/`top`.
+  // CSS positions `position: absolute` descendants relative to the containing
+  // block's PADDING BOX, not its border box; `getBoundingClientRect()` reports
+  // the border box, so we shift inward by the parent's top/left border widths
+  // before passing the rect down to children. Without this shift, an
+  // absolutely-positioned child of a bordered ancestor lands one border-width
+  // too deep when the snapshot is reopened in a browser or fed to pagx
+  // (e.g. Tailwind's `border` + `inset-[1.5px]` battery icon: the inner fill
+  // bar should sit 1.5px from the inner padding edge, but emitting the raw
+  // border-box-relative offset (2.5px) drifts it by the 1px border).
+  function paddingBoxOrigin(rect, computed) {
+    const bt = borderWidthOf(computed, 'top');
+    const bl = borderWidthOf(computed, 'left');
+    if (bt === 0 && bl === 0) return rect;
+    return {
+      left: rect.left + bl,
+      top: rect.top + bt,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    };
   }
 
   function firstTextNodeChild(el) {
@@ -716,10 +752,10 @@ function takeSnapshot(config) {
 
   // Collapse 4 px sides into the shortest CSS shorthand.
   function paddingShorthand(t, r, b, l) {
-    const a = Math.max(0, Math.round(t));
-    const rr = Math.max(0, Math.round(r));
-    const bb = Math.max(0, Math.round(b));
-    const ll = Math.max(0, Math.round(l));
+    const a = Math.max(0, roundPx(t));
+    const rr = Math.max(0, roundPx(r));
+    const bb = Math.max(0, roundPx(b));
+    const ll = Math.max(0, roundPx(l));
     if (a === rr && rr === bb && bb === ll) return `${a}px`;
     if (a === bb && ll === rr) return `${a}px ${rr}px`;
     if (ll === rr) return `${a}px ${rr}px ${bb}px`;
@@ -736,7 +772,7 @@ function takeSnapshot(config) {
     const main = direction === 'column' ? rowRaw : colRaw;
     const v = parseFloat(main);
     if (!isFinite(v) || v <= 0) return '';
-    return `${Math.round(v)}px`;
+    return `${roundPx(v)}px`;
   }
 
   // Reads the live flex configuration of `el` and serialises it to a subset-shaped
@@ -1087,7 +1123,9 @@ function takeSnapshot(config) {
       return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
     }
     const textNode = firstTextNodeChild(el);
-    const lineSpans = textNode ? emitTextSpans(textNode, rect, computed) : [];
+    const lineSpans = textNode
+      ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+      : [];
     return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
   }
 
@@ -1157,7 +1195,7 @@ function takeSnapshot(config) {
   // the bg, etc. Asymmetric border overlays paint *on top* of all children to match
   // CSS, which renders borders after content.
   function renderContainer(el, parentRect, rect, left, top, computed, opts) {
-    const childHTML = renderChildrenInto(el, rect);
+    const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed));
     const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
     const style = buildStyle(left, top, rect.width, rect.height, computed, {
       box: true, ...opts,
