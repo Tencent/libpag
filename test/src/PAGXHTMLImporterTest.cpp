@@ -130,7 +130,7 @@ inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
 // Unit tests: CSS property mapping
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, ParsesCanvasSizeFromBody) {
+PAG_TEST(PAGXHTMLImporterTest, ParsesCanvasSizeFromBody) {
   auto doc =
       ParseFromString(R"HTML(<html><body style="width:200px;height:100px"></body></html>)HTML");
   ASSERT_NE(doc, nullptr);
@@ -139,12 +139,12 @@ PAG_TEST(PAGXHTMLTest, ParsesCanvasSizeFromBody) {
   EXPECT_EQ(doc->layers.size(), 1u);
 }
 
-PAG_TEST(PAGXHTMLTest, RejectsMissingCanvas) {
+PAG_TEST(PAGXHTMLImporterTest, RejectsMissingCanvas) {
   auto doc = ParseFromString(R"HTML(<html><body></body></html>)HTML");
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, BackgroundColorBecomesRectangleAndFill) {
+PAG_TEST(PAGXHTMLImporterTest, BackgroundColorBecomesRectangleAndFill) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:50px">
       <div style="width:80px;height:40px;background-color:#FF0000"></div>
@@ -168,7 +168,7 @@ PAG_TEST(PAGXHTMLTest, BackgroundColorBecomesRectangleAndFill) {
   EXPECT_FLOAT_EQ(div->height, 40.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, BorderRadiusMapsToRoundness) {
+PAG_TEST(PAGXHTMLImporterTest, BorderRadiusMapsToRoundness) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#000;border-radius:12px"></div>
@@ -186,7 +186,7 @@ PAG_TEST(PAGXHTMLTest, BorderRadiusMapsToRoundness) {
 // known px dimensions (using min(width, height) since PAGX Rectangle exposes a
 // single uniform corner radius), so a 12x12 element with `border-radius: 50%`
 // becomes a true circle (roundness = 6).
-PAG_TEST(PAGXHTMLTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
+PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:24px;height:24px">
       <div style="width:12px;height:12px;background-color:#FF5F57;border-radius:50%"></div>
@@ -203,7 +203,7 @@ PAG_TEST(PAGXHTMLTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
 // PAGX Rectangle only supports a single uniform radius. We resolve against the
 // shorter side so the result becomes the closest pill shape the primitive can
 // render (here: 40x12 -> roundness 6, i.e. semicircular ends, no over-rounding).
-PAG_TEST(PAGXHTMLTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
+PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:60px;height:20px">
       <div style="width:40px;height:12px;background-color:#28C840;border-radius:50%"></div>
@@ -219,7 +219,7 @@ PAG_TEST(PAGXHTMLTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
 // A percentage radius on an element whose width/height is not given in px
 // cannot be resolved at parse time (the parent's layout would be needed) — the
 // importer drops the value with a warning rather than rendering a wrong shape.
-PAG_TEST(PAGXHTMLTest, BorderRadiusPercentWithoutFixedSizeIsDropped) {
+PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentWithoutFixedSizeIsDropped) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50%;height:50%;background-color:#000;border-radius:50%"></div>
@@ -232,7 +232,7 @@ PAG_TEST(PAGXHTMLTest, BorderRadiusPercentWithoutFixedSizeIsDropped) {
   EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, BorderProducesStroke) {
+PAG_TEST(PAGXHTMLImporterTest, BorderProducesStroke) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:60px;height:60px">
       <div style="width:60px;height:60px;border:3px solid #00FF00"></div>
@@ -254,7 +254,7 @@ PAG_TEST(PAGXHTMLTest, BorderProducesStroke) {
 // (inside the border). The importer must shift the child's left/right/top/bottom
 // constraints by the parent's border width so the child does not overlap the inside
 // stroke.
-PAG_TEST(PAGXHTMLTest, BorderShiftsAbsoluteChildren) {
+PAG_TEST(PAGXHTMLImporterTest, BorderShiftsAbsoluteChildren) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="position:relative;width:60px;height:60px;border:10px solid #000">
@@ -275,7 +275,7 @@ PAG_TEST(PAGXHTMLTest, BorderShiftsAbsoluteChildren) {
 // border. The importer reserves the border width as additional padding on the
 // container so that flex children align with the inner edge of the stroke rather
 // than the outer edge.
-PAG_TEST(PAGXHTMLTest, BorderExpandsLayoutPadding) {
+PAG_TEST(PAGXHTMLImporterTest, BorderExpandsLayoutPadding) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="display:flex;flex-direction:column;width:60px;height:60px;
@@ -295,7 +295,7 @@ PAG_TEST(PAGXHTMLTest, BorderExpandsLayoutPadding) {
   EXPECT_FLOAT_EQ(host->padding.left, 9.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, BoxShadowProducesDropShadowStyle) {
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <div style="width:80px;height:80px;background-color:#FFF;box-shadow:0 2px 8px #00000033"></div>
@@ -313,7 +313,7 @@ PAG_TEST(PAGXHTMLTest, BoxShadowProducesDropShadowStyle) {
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000, 0.2f), 0.02f));
 }
 
-PAG_TEST(PAGXHTMLTest, InsetBoxShadowProducesInnerShadowStyle) {
+PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#FFF;box-shadow:inset 2px 2px 4px #000"></div>
@@ -329,7 +329,7 @@ PAG_TEST(PAGXHTMLTest, InsetBoxShadowProducesInnerShadowStyle) {
   EXPECT_FLOAT_EQ(inner->blurX, 4.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, MultipleBoxShadows) {
+PAG_TEST(PAGXHTMLImporterTest, MultipleBoxShadows) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#FFF;
@@ -341,7 +341,7 @@ PAG_TEST(PAGXHTMLTest, MultipleBoxShadows) {
   EXPECT_EQ(div->styles.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLTest, OpacityMapsToLayerAlpha) {
+PAG_TEST(PAGXHTMLImporterTest, OpacityMapsToLayerAlpha) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;opacity:0.5"></div>
@@ -352,7 +352,7 @@ PAG_TEST(PAGXHTMLTest, OpacityMapsToLayerAlpha) {
   EXPECT_FLOAT_EQ(div->alpha, 0.5f);
 }
 
-PAG_TEST(PAGXHTMLTest, MixBlendModeMapsToBlendMode) {
+PAG_TEST(PAGXHTMLImporterTest, MixBlendModeMapsToBlendMode) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#000;mix-blend-mode:multiply"></div>
@@ -363,7 +363,7 @@ PAG_TEST(PAGXHTMLTest, MixBlendModeMapsToBlendMode) {
   EXPECT_EQ(div->blendMode, pagx::BlendMode::Multiply);
 }
 
-PAG_TEST(PAGXHTMLTest, FlexLayoutMapping) {
+PAG_TEST(PAGXHTMLImporterTest, FlexLayoutMapping) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
       <div style="display:flex;flex-direction:row;gap:8px;padding:6px;
@@ -385,7 +385,7 @@ PAG_TEST(PAGXHTMLTest, FlexLayoutMapping) {
   EXPECT_FLOAT_EQ(container->children[1]->flex, 2.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, PaddingShorthandFourValues) {
+PAG_TEST(PAGXHTMLImporterTest, PaddingShorthandFourValues) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="display:flex;padding:1px 2px 3px 4px;width:50px;height:50px"></div>
@@ -399,7 +399,7 @@ PAG_TEST(PAGXHTMLTest, PaddingShorthandFourValues) {
   EXPECT_FLOAT_EQ(div->padding.left, 4.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, AbsolutePositionMapping) {
+PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionMapping) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="position:absolute;left:10px;top:-6px;width:20px;height:20px;
@@ -413,7 +413,7 @@ PAG_TEST(PAGXHTMLTest, AbsolutePositionMapping) {
   EXPECT_FLOAT_EQ(div->top, -6.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, OuterBackgroundInnerPaddedSplit) {
+PAG_TEST(PAGXHTMLImporterTest, OuterBackgroundInnerPaddedSplit) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="display:flex;flex-direction:column;padding:10px;gap:4px;
@@ -438,7 +438,7 @@ PAG_TEST(PAGXHTMLTest, OuterBackgroundInnerPaddedSplit) {
   EXPECT_FLOAT_EQ(inner->padding.left, 10.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, LinearGradientAngleConversion) {
+PAG_TEST(PAGXHTMLImporterTest, LinearGradientAngleConversion) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:linear-gradient(90deg, #FF0000 0%, #0000FF 100%)"></div>
@@ -460,7 +460,7 @@ PAG_TEST(PAGXHTMLTest, LinearGradientAngleConversion) {
   EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, HexColor(0x0000FF)));
 }
 
-PAG_TEST(PAGXHTMLTest, RadialGradient) {
+PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:radial-gradient(circle at center, #FFFFFF 0%, #000000 100%)"></div>
@@ -475,7 +475,7 @@ PAG_TEST(PAGXHTMLTest, RadialGradient) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLTest, ConicGradientAngleOffset) {
+PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;
@@ -492,7 +492,7 @@ PAG_TEST(PAGXHTMLTest, ConicGradientAngleOffset) {
   EXPECT_TRUE(NearlyEqual(cg->startAngle, -90.0f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLTest, FilterBlurAndDropShadow) {
+PAG_TEST(PAGXHTMLImporterTest, FilterBlurAndDropShadow) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#000;
@@ -511,7 +511,7 @@ PAG_TEST(PAGXHTMLTest, FilterBlurAndDropShadow) {
   EXPECT_FLOAT_EQ(drop->offsetY, 1.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, BackdropFilterMapsToBackgroundBlurStyle) {
+PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#FFF8;backdrop-filter:blur(6px)"></div>
@@ -529,7 +529,7 @@ PAG_TEST(PAGXHTMLTest, BackdropFilterMapsToBackgroundBlurStyle) {
   EXPECT_TRUE(foundBlur);
 }
 
-PAG_TEST(PAGXHTMLTest, OverflowHiddenMapsToClipToBounds) {
+PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;overflow:hidden;background-color:#000"></div>
@@ -540,7 +540,7 @@ PAG_TEST(PAGXHTMLTest, OverflowHiddenMapsToClipToBounds) {
   EXPECT_TRUE(div->clipToBounds);
 }
 
-PAG_TEST(PAGXHTMLTest, SimpleTextLeafSingleStyle) {
+PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000">Hello</span>
@@ -560,7 +560,7 @@ PAG_TEST(PAGXHTMLTest, SimpleTextLeafSingleStyle) {
   EXPECT_FALSE(hasTextBox);
 }
 
-PAG_TEST(PAGXHTMLTest, RichTextSpansEmitTextBoxFragments) {
+PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="font-size:14px;color:#111">Hi <span style="color:#F00;font-weight:bold">World</span></p>
@@ -579,7 +579,7 @@ PAG_TEST(PAGXHTMLTest, RichTextSpansEmitTextBoxFragments) {
   EXPECT_EQ(groupCount, 1u);
 }
 
-PAG_TEST(PAGXHTMLTest, TextDecorationUnderlineOverlay) {
+PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000;text-decoration:underline">Hello</span>
@@ -597,7 +597,7 @@ PAG_TEST(PAGXHTMLTest, TextDecorationUnderlineOverlay) {
   EXPECT_FLOAT_EQ(rect->percentWidth, 100.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, BrTagInsertsNewline) {
+PAG_TEST(PAGXHTMLImporterTest, BrTagInsertsNewline) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="font-size:14px;color:#000">Line one<br/>Line two</p>
@@ -610,7 +610,7 @@ PAG_TEST(PAGXHTMLTest, BrTagInsertsNewline) {
   EXPECT_NE(text->text.find('\n'), std::string::npos);
 }
 
-PAG_TEST(PAGXHTMLTest, ImageRegistersImageResource) {
+PAG_TEST(PAGXHTMLImporterTest, ImageRegistersImageResource) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="logo.png" style="width:80px;height:80px"/>
@@ -626,7 +626,7 @@ PAG_TEST(PAGXHTMLTest, ImageRegistersImageResource) {
   EXPECT_FALSE(pattern->image->filePath.empty());
 }
 
-PAG_TEST(PAGXHTMLTest, InlineSvgPassedAsImportDirective) {
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgPassedAsImportDirective) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="#F00"/></svg>
@@ -646,7 +646,7 @@ PAG_TEST(PAGXHTMLTest, InlineSvgPassedAsImportDirective) {
 // during `pagx resolve` looks up the attribute case-sensitively. If the
 // importer lowercases `viewBox`, the inline content fails to parse because the
 // SVG has no fallback width/height.
-PAG_TEST(PAGXHTMLTest, InlineSvgPreservesCamelCaseAttributes) {
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesCamelCaseAttributes) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <svg viewBox="0 0 16 16" preserveAspectRatio="xMidYMid meet">
@@ -670,7 +670,7 @@ PAG_TEST(PAGXHTMLTest, InlineSvgPreservesCamelCaseAttributes) {
   EXPECT_EQ(content.find("<lineargradient"), std::string::npos);
 }
 
-PAG_TEST(PAGXHTMLTest, StyleClassRulesApply) {
+PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.box{background-color:#123456;border-radius:8px}</style></head>
       <body style="width:50px;height:50px">
@@ -689,7 +689,7 @@ PAG_TEST(PAGXHTMLTest, StyleClassRulesApply) {
   EXPECT_FLOAT_EQ(rect->roundness, 8.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, UnknownElementWarningEmitted) {
+PAG_TEST(PAGXHTMLImporterTest, UnknownElementWarningEmitted) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <canvas width="50" height="50"></canvas>
@@ -703,7 +703,7 @@ PAG_TEST(PAGXHTMLTest, UnknownElementWarningEmitted) {
   EXPECT_TRUE(hasWarning);
 }
 
-PAG_TEST(PAGXHTMLTest, MarginEmitsWarning) {
+PAG_TEST(PAGXHTMLImporterTest, MarginEmitsWarning) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="margin:8px;width:30px;height:30px;background-color:#000"></div>
@@ -717,7 +717,7 @@ PAG_TEST(PAGXHTMLTest, MarginEmitsWarning) {
   EXPECT_TRUE(hasWarning);
 }
 
-PAG_TEST(PAGXHTMLTest, DisallowedSizingPropertiesEmitWarnings) {
+PAG_TEST(PAGXHTMLImporterTest, DisallowedSizingPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="min-width:10px;max-width:40px;aspect-ratio:1/1;width:50px;height:50px;
@@ -736,7 +736,7 @@ PAG_TEST(PAGXHTMLTest, DisallowedSizingPropertiesEmitWarnings) {
   EXPECT_TRUE(aspectWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, DisallowedLayoutPropertiesEmitWarnings) {
+PAG_TEST(PAGXHTMLImporterTest, DisallowedLayoutPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="display:flex;align-self:center;align-content:center;flex-grow:1;flex-basis:auto;
@@ -757,7 +757,7 @@ PAG_TEST(PAGXHTMLTest, DisallowedLayoutPropertiesEmitWarnings) {
   EXPECT_TRUE(basisWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, DisallowedVisualPropertiesEmitWarnings) {
+PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;clip-path:circle(20px);transform-origin:center;
@@ -778,7 +778,7 @@ PAG_TEST(PAGXHTMLTest, DisallowedVisualPropertiesEmitWarnings) {
   EXPECT_TRUE(bgSizeWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, DisallowedTextPropertiesEmitWarnings) {
+PAG_TEST(PAGXHTMLImporterTest, DisallowedTextPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="text-transform:uppercase;text-indent:10px;text-overflow:ellipsis;
@@ -799,7 +799,7 @@ PAG_TEST(PAGXHTMLTest, DisallowedTextPropertiesEmitWarnings) {
   EXPECT_TRUE(variantWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, BoxSizingNonBorderBoxWarns) {
+PAG_TEST(PAGXHTMLImporterTest, BoxSizingNonBorderBoxWarns) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="box-sizing:content-box;width:30px;height:30px;background-color:#000"></div>
@@ -813,7 +813,7 @@ PAG_TEST(PAGXHTMLTest, BoxSizingNonBorderBoxWarns) {
   EXPECT_TRUE(boxSizingWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, UniversalSelectorWarnsAndDoesNotApply) {
+PAG_TEST(PAGXHTMLImporterTest, UniversalSelectorWarnsAndDoesNotApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>* { background-color:#FF0000 }</style></head>
       <body style="width:50px;height:50px">
@@ -830,7 +830,7 @@ PAG_TEST(PAGXHTMLTest, UniversalSelectorWarnsAndDoesNotApply) {
   EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x00FF00)));
 }
 
-PAG_TEST(PAGXHTMLTest, FlexShorthandWithDisallowedFormWarns) {
+PAG_TEST(PAGXHTMLImporterTest, FlexShorthandWithDisallowedFormWarns) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="display:flex;width:50px;height:50px">
@@ -846,7 +846,7 @@ PAG_TEST(PAGXHTMLTest, FlexShorthandWithDisallowedFormWarns) {
   EXPECT_TRUE(flexWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, AbsoluteOnTextLeafEmitsWarning) {
+PAG_TEST(PAGXHTMLImporterTest, AbsoluteOnTextLeafEmitsWarning) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="position:absolute;top:0;left:0;font-size:14px">Hi</span>
@@ -860,7 +860,7 @@ PAG_TEST(PAGXHTMLTest, AbsoluteOnTextLeafEmitsWarning) {
   EXPECT_TRUE(downgradeWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, TextLeafWithBlockChildFallsBackToContainer) {
+PAG_TEST(PAGXHTMLImporterTest, TextLeafWithBlockChildFallsBackToContainer) {
   // Regression: <span> / <p> with block-level children used to drop the children with the
   // warning "<div> not supported inside text leaf; skipped". HTML allows mixed inline/block
   // content, and the snapshot emitter for tools/html-snapshot frequently produces it (e.g.
@@ -892,12 +892,12 @@ PAG_TEST(PAGXHTMLTest, TextLeafWithBlockChildFallsBackToContainer) {
   EXPECT_TRUE(foundBlockChild);
 }
 
-PAG_TEST(PAGXHTMLTest, MissingCanvasReportsHardError) {
+PAG_TEST(PAGXHTMLImporterTest, MissingCanvasReportsHardError) {
   auto doc = ParseFromString(R"HTML(<html><body></body></html>)HTML");
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, RootLevelExtraElementWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RootLevelExtraElementWarns) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <body style="width:50px;height:50px"></body>
@@ -912,7 +912,7 @@ PAG_TEST(PAGXHTMLTest, RootLevelExtraElementWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, HeadDisallowedChildrenWarn) {
+PAG_TEST(PAGXHTMLImporterTest, HeadDisallowedChildrenWarn) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <head><script>var x=1;</script></head>
@@ -927,7 +927,7 @@ PAG_TEST(PAGXHTMLTest, HeadDisallowedChildrenWarn) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, ExternalStylesheetLinkWarns) {
+PAG_TEST(PAGXHTMLImporterTest, ExternalStylesheetLinkWarns) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <head><link rel="stylesheet" href="theme.css"/></head>
@@ -944,7 +944,7 @@ PAG_TEST(PAGXHTMLTest, ExternalStylesheetLinkWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, TextDecorationColorDifferingWrapsInGroup) {
+PAG_TEST(PAGXHTMLImporterTest, TextDecorationColorDifferingWrapsInGroup) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000;
@@ -974,7 +974,7 @@ PAG_TEST(PAGXHTMLTest, TextDecorationColorDifferingWrapsInGroup) {
 // Document-level + style-block tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, TitleStoredAsDataTitle) {
+PAG_TEST(PAGXHTMLImporterTest, TitleStoredAsDataTitle) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <head><title>Canvas Title</title></head>
@@ -987,7 +987,7 @@ PAG_TEST(PAGXHTMLTest, TitleStoredAsDataTitle) {
   EXPECT_EQ(it->second, "Canvas Title");
 }
 
-PAG_TEST(PAGXHTMLTest, MetaTagIgnoredSilently) {
+PAG_TEST(PAGXHTMLImporterTest, MetaTagIgnoredSilently) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <head><meta charset="utf-8"/></head>
@@ -1000,12 +1000,12 @@ PAG_TEST(PAGXHTMLTest, MetaTagIgnoredSilently) {
   }
 }
 
-PAG_TEST(PAGXHTMLTest, RejectsMissingBody) {
+PAG_TEST(PAGXHTMLImporterTest, RejectsMissingBody) {
   auto doc = ParseFromString(R"HTML(<html><head></head></html>)HTML");
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, CommaSeparatedClassRulesApply) {
+PAG_TEST(PAGXHTMLImporterTest, CommaSeparatedClassRulesApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.a, .b { background-color:#112233; border-radius:6px }</style></head>
       <body style="width:80px;height:40px">
@@ -1027,7 +1027,7 @@ PAG_TEST(PAGXHTMLTest, CommaSeparatedClassRulesApply) {
   }
 }
 
-PAG_TEST(PAGXHTMLTest, MultipleClassesMergeWithLastWinning) {
+PAG_TEST(PAGXHTMLImporterTest, MultipleClassesMergeWithLastWinning) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>
       .base { background-color:#000000; border-radius:4px }
@@ -1049,7 +1049,7 @@ PAG_TEST(PAGXHTMLTest, MultipleClassesMergeWithLastWinning) {
   EXPECT_FLOAT_EQ(rect->roundness, 4.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, InlineStyleBeatsClassRule) {
+PAG_TEST(PAGXHTMLImporterTest, InlineStyleBeatsClassRule) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.box { background-color:#111111 }</style></head>
       <body style="width:50px;height:50px">
@@ -1065,7 +1065,7 @@ PAG_TEST(PAGXHTMLTest, InlineStyleBeatsClassRule) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x22AAEE)));
 }
 
-PAG_TEST(PAGXHTMLTest, ElementSelectorAppliesToTag) {
+PAG_TEST(PAGXHTMLImporterTest, ElementSelectorAppliesToTag) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>p { color:#33CC44 }</style></head>
       <body style="width:200px;height:40px">
@@ -1081,7 +1081,7 @@ PAG_TEST(PAGXHTMLTest, ElementSelectorAppliesToTag) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x33CC44)));
 }
 
-PAG_TEST(PAGXHTMLTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
+PAG_TEST(PAGXHTMLImporterTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>
       div > .child { background-color:#FF0000 }
@@ -1105,7 +1105,7 @@ PAG_TEST(PAGXHTMLTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
 // Sizing / positioning / element type tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, PercentSizingMapsToPercentFields) {
+PAG_TEST(PAGXHTMLImporterTest, PercentSizingMapsToPercentFields) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:100px">
       <div style="width:50%;height:25%;background-color:#000"></div>
@@ -1119,7 +1119,7 @@ PAG_TEST(PAGXHTMLTest, PercentSizingMapsToPercentFields) {
   EXPECT_TRUE(std::isnan(div->height));
 }
 
-PAG_TEST(PAGXHTMLTest, SemanticContainersMapToLayer) {
+PAG_TEST(PAGXHTMLImporterTest, SemanticContainersMapToLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <header style="width:100px;height:20px"></header>
@@ -1131,7 +1131,7 @@ PAG_TEST(PAGXHTMLTest, SemanticContainersMapToLayer) {
   EXPECT_EQ(doc->layers.front()->children.size(), 3u);
 }
 
-PAG_TEST(PAGXHTMLTest, NonStaticPositionDowngradesAbsolute) {
+PAG_TEST(PAGXHTMLImporterTest, NonStaticPositionDowngradesAbsolute) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="position:fixed;top:5px;left:5px;width:10px;height:10px;background-color:#000"></div>
@@ -1151,7 +1151,7 @@ PAG_TEST(PAGXHTMLTest, NonStaticPositionDowngradesAbsolute) {
 // Layout / arrangement / alignment tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, FlexDirectionColumn) {
+PAG_TEST(PAGXHTMLImporterTest, FlexDirectionColumn) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:200px">
       <div style="display:flex;flex-direction:column;width:50px;height:200px"></div>
@@ -1162,7 +1162,7 @@ PAG_TEST(PAGXHTMLTest, FlexDirectionColumn) {
   EXPECT_EQ(div->layout, pagx::LayoutMode::Vertical);
 }
 
-PAG_TEST(PAGXHTMLTest, AlignItemsAndJustifyContentVariants) {
+PAG_TEST(PAGXHTMLImporterTest, AlignItemsAndJustifyContentVariants) {
   struct Pair {
     const char* css;
     pagx::Alignment expected;
@@ -1199,7 +1199,7 @@ PAG_TEST(PAGXHTMLTest, AlignItemsAndJustifyContentVariants) {
   }
 }
 
-PAG_TEST(PAGXHTMLTest, PaddingShorthandTwoAndThreeValues) {
+PAG_TEST(PAGXHTMLImporterTest, PaddingShorthandTwoAndThreeValues) {
   auto two = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="display:flex;padding:4px 6px;width:50px;height:50px"></div>
@@ -1229,7 +1229,7 @@ PAG_TEST(PAGXHTMLTest, PaddingShorthandTwoAndThreeValues) {
 // Color parsing tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, NamedColorAccepted) {
+PAG_TEST(PAGXHTMLImporterTest, NamedColorAccepted) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:red"></div>
@@ -1243,7 +1243,7 @@ PAG_TEST(PAGXHTMLTest, NamedColorAccepted) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
 }
 
-PAG_TEST(PAGXHTMLTest, ShortHexBackgroundColorAccepted) {
+PAG_TEST(PAGXHTMLImporterTest, ShortHexBackgroundColorAccepted) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:#0F0"></div>
@@ -1254,7 +1254,7 @@ PAG_TEST(PAGXHTMLTest, ShortHexBackgroundColorAccepted) {
       ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x00FF00)));
 }
 
-PAG_TEST(PAGXHTMLTest, RgbaTextColorParsed) {
+PAG_TEST(PAGXHTMLImporterTest, RgbaTextColorParsed) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="color:rgba(0,0,255,0.5)">Hi</span>
@@ -1265,7 +1265,7 @@ PAG_TEST(PAGXHTMLTest, RgbaTextColorParsed) {
       ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x0000FF, 0.5f)));
 }
 
-PAG_TEST(PAGXHTMLTest, RgbBackgroundColorParsed) {
+PAG_TEST(PAGXHTMLImporterTest, RgbBackgroundColorParsed) {
   // Regression: `background-color` used to skip any value containing '(', which silently
   // dropped functional color literals like rgb()/rgba() emitted by browsers and authoring
   // tools. parseColor handles them fine, so the only thing the importer should reject for
@@ -1280,7 +1280,7 @@ PAG_TEST(PAGXHTMLTest, RgbBackgroundColorParsed) {
       ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0xFF2442)));
 }
 
-PAG_TEST(PAGXHTMLTest, RgbaBackgroundColorParsed) {
+PAG_TEST(PAGXHTMLImporterTest, RgbaBackgroundColorParsed) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:rgba(0, 0, 0, 0.4)"></div>
@@ -1295,7 +1295,7 @@ PAG_TEST(PAGXHTMLTest, RgbaBackgroundColorParsed) {
 // Text tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, BodyDefaultsArial14Color) {
+PAG_TEST(PAGXHTMLImporterTest, BodyDefaultsArial14Color) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span>Hello</span>
@@ -1314,7 +1314,7 @@ PAG_TEST(PAGXHTMLTest, BodyDefaultsArial14Color) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x1E293B)));
 }
 
-PAG_TEST(PAGXHTMLTest, HeadingDefaultFontSizes) {
+PAG_TEST(PAGXHTMLImporterTest, HeadingDefaultFontSizes) {
   struct Row {
     const char* tag;
     float size;
@@ -1334,7 +1334,7 @@ PAG_TEST(PAGXHTMLTest, HeadingDefaultFontSizes) {
   }
 }
 
-PAG_TEST(PAGXHTMLTest, FontWeightNumericMapsToBold) {
+PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:700">Heavy</span>
@@ -1346,7 +1346,7 @@ PAG_TEST(PAGXHTMLTest, FontWeightNumericMapsToBold) {
   EXPECT_EQ(text->fontStyle, "Bold");
 }
 
-PAG_TEST(PAGXHTMLTest, FontWeightUnder600IsNotBold) {
+PAG_TEST(PAGXHTMLImporterTest, FontWeightUnder600IsNotBold) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:500">Medium</span>
@@ -1358,7 +1358,7 @@ PAG_TEST(PAGXHTMLTest, FontWeightUnder600IsNotBold) {
   EXPECT_TRUE(text->fontStyle.empty());
 }
 
-PAG_TEST(PAGXHTMLTest, BoldItalicCombined) {
+PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:bold;font-style:italic">Hi</span>
@@ -1370,7 +1370,7 @@ PAG_TEST(PAGXHTMLTest, BoldItalicCombined) {
   EXPECT_EQ(text->fontStyle, "Bold Italic");
 }
 
-PAG_TEST(PAGXHTMLTest, FontFamilyAndLetterSpacing) {
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyAndLetterSpacing) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-family:Helvetica;letter-spacing:2px">Hi</span>
@@ -1383,7 +1383,7 @@ PAG_TEST(PAGXHTMLTest, FontFamilyAndLetterSpacing) {
   EXPECT_FLOAT_EQ(text->letterSpacing, 2.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, TextAlignAndLineHeightOnParagraph) {
+PAG_TEST(PAGXHTMLImporterTest, TextAlignAndLineHeightOnParagraph) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
       <p style="text-align:center;line-height:20px">Hi <span>World</span></p>
@@ -1397,7 +1397,7 @@ PAG_TEST(PAGXHTMLTest, TextAlignAndLineHeightOnParagraph) {
   EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, TextAlignJustifyMapped) {
+PAG_TEST(PAGXHTMLImporterTest, TextAlignJustifyMapped) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
       <p style="text-align:justify">Hi <span>World</span></p>
@@ -1409,7 +1409,7 @@ PAG_TEST(PAGXHTMLTest, TextAlignJustifyMapped) {
   EXPECT_EQ(tb->textAlign, pagx::TextAlign::Justify);
 }
 
-PAG_TEST(PAGXHTMLTest, WhiteSpaceNowrapDisablesWrap) {
+PAG_TEST(PAGXHTMLImporterTest, WhiteSpaceNowrapDisablesWrap) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="white-space:nowrap">Hi <span>World</span></p>
@@ -1421,7 +1421,7 @@ PAG_TEST(PAGXHTMLTest, WhiteSpaceNowrapDisablesWrap) {
   EXPECT_FALSE(tb->wordWrap);
 }
 
-PAG_TEST(PAGXHTMLTest, OverflowHiddenOnTextContainerHidesText) {
+PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenOnTextContainerHidesText) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="overflow:hidden">Hi <span>World</span></p>
@@ -1433,7 +1433,7 @@ PAG_TEST(PAGXHTMLTest, OverflowHiddenOnTextContainerHidesText) {
   EXPECT_EQ(tb->overflow, pagx::Overflow::Hidden);
 }
 
-PAG_TEST(PAGXHTMLTest, TextDecorationLineThroughOverlay) {
+PAG_TEST(PAGXHTMLImporterTest, TextDecorationLineThroughOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000;text-decoration:line-through">Hello</span>
@@ -1452,7 +1452,7 @@ PAG_TEST(PAGXHTMLTest, TextDecorationLineThroughOverlay) {
 // Gradients / Anchor / data-* / id tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, LinearGradientToBottomRight) {
+PAG_TEST(PAGXHTMLImporterTest, LinearGradientToBottomRight) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:linear-gradient(to bottom right, #F00, #00F)"></div>
@@ -1468,7 +1468,7 @@ PAG_TEST(PAGXHTMLTest, LinearGradientToBottomRight) {
   EXPECT_GT(lg->endPoint.y, lg->startPoint.y);
 }
 
-PAG_TEST(PAGXHTMLTest, LinearGradientThreeStopsInterpolatesMiddleOffset) {
+PAG_TEST(PAGXHTMLImporterTest, LinearGradientThreeStopsInterpolatesMiddleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:linear-gradient(90deg,#F00,#0F0,#00F)"></div>
@@ -1484,7 +1484,7 @@ PAG_TEST(PAGXHTMLTest, LinearGradientThreeStopsInterpolatesMiddleOffset) {
   EXPECT_TRUE(NearlyEqual(lg->colorStops[2]->offset, 1.0f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLTest, ConicGradientFrom90DegMapsToZero) {
+PAG_TEST(PAGXHTMLImporterTest, ConicGradientFrom90DegMapsToZero) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:conic-gradient(from 90deg, #F00, #00F)"></div>
@@ -1501,7 +1501,7 @@ PAG_TEST(PAGXHTMLTest, ConicGradientFrom90DegMapsToZero) {
 // Verifies CSS `background-clip: text` combined with a gradient `background-image` redirects
 // the gradient onto the descendant text fill. The element's own rectangle gradient must be
 // suppressed, and a `<TextBox>`-level `<Fill>` with the same `LinearGradient` must appear.
-PAG_TEST(PAGXHTMLTest, BackgroundClipTextRoutesGradientToTextFill) {
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesGradientToTextFill) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:240px;height:80px">
       <div style="position:absolute;left:0;top:0;width:240px;height:80px;
@@ -1538,7 +1538,7 @@ PAG_TEST(PAGXHTMLTest, BackgroundClipTextRoutesGradientToTextFill) {
 
 // Negative control: without `background-clip: text` the same gradient must still paint a
 // rectangle on the wrapper element (the existing behaviour must not regress).
-PAG_TEST(PAGXHTMLTest, GradientBackgroundWithoutClipKeepsRectangle) {
+PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:240px;height:80px">
       <div style="position:absolute;left:0;top:0;width:240px;height:80px;
@@ -1556,7 +1556,7 @@ PAG_TEST(PAGXHTMLTest, GradientBackgroundWithoutClipKeepsRectangle) {
   EXPECT_NE(dynamic_cast<pagx::LinearGradient*>(fill->color), nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, AnchorHrefStoredAsCustomData) {
+PAG_TEST(PAGXHTMLImporterTest, AnchorHrefStoredAsCustomData) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <a href="https://example.com" style="font-size:14px">Link</a>
@@ -1569,7 +1569,7 @@ PAG_TEST(PAGXHTMLTest, AnchorHrefStoredAsCustomData) {
   EXPECT_EQ(it->second, "https://example.com");
 }
 
-PAG_TEST(PAGXHTMLTest, AnchorDefaultsBlueAndUnderline) {
+PAG_TEST(PAGXHTMLImporterTest, AnchorDefaultsBlueAndUnderline) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <a href="https://e.test">Link</a>
@@ -1586,7 +1586,7 @@ PAG_TEST(PAGXHTMLTest, AnchorDefaultsBlueAndUnderline) {
   EXPECT_GE(CountElements<pagx::Rectangle>(leaf->contents), 1u);
 }
 
-PAG_TEST(PAGXHTMLTest, DataStarAttributesPropagate) {
+PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagate) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div data-role="primary" data-label="hi" style="width:50px;height:50px;background-color:#000"></div>
@@ -1598,7 +1598,7 @@ PAG_TEST(PAGXHTMLTest, DataStarAttributesPropagate) {
   EXPECT_EQ(div->customData["label"], "hi");
 }
 
-PAG_TEST(PAGXHTMLTest, IdAttributePropagatesToLayer) {
+PAG_TEST(PAGXHTMLImporterTest, IdAttributePropagatesToLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div id="hero" style="width:50px;height:50px;background-color:#000"></div>
@@ -1613,7 +1613,7 @@ PAG_TEST(PAGXHTMLTest, IdAttributePropagatesToLayer) {
 // Image / SVG / Options tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, ImgWithSvgSrcBecomesImportDirective) {
+PAG_TEST(PAGXHTMLImporterTest, ImgWithSvgSrcBecomesImportDirective) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="logo.svg" style="width:80px;height:80px"/>
@@ -1634,7 +1634,7 @@ PAG_TEST(PAGXHTMLTest, ImgWithSvgSrcBecomesImportDirective) {
 // `clipToBounds` clips to rectangular bounds only, so the image's square geometry
 // leaked past the wrapper's rounded corners (square avatars inside circular rings).
 // The importer now folds the <img> into the wrapper's rounded Rectangle directly.
-PAG_TEST(PAGXHTMLTest, RoundedImageWrapperFoldsIntoRectangle) {
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoRectangle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:64px">
       <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
@@ -1668,7 +1668,7 @@ PAG_TEST(PAGXHTMLTest, RoundedImageWrapperFoldsIntoRectangle) {
 // the browser stretches it edge-to-edge. The default must be Stretch, and the
 // `object-fit` keyword must drive the mode through both the regular image path
 // and the rounded-wrapper fold path.
-PAG_TEST(PAGXHTMLTest, ImageDefaultObjectFitIsStretch) {
+PAG_TEST(PAGXHTMLImporterTest, ImageDefaultObjectFitIsStretch) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="logo.png" style="width:80px;height:80px"/>
@@ -1683,7 +1683,7 @@ PAG_TEST(PAGXHTMLTest, ImageDefaultObjectFitIsStretch) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
-PAG_TEST(PAGXHTMLTest, ImageObjectFitContainMapsToLetterBox) {
+PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitContainMapsToLetterBox) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="logo.png" style="width:80px;height:80px;object-fit:contain"/>
@@ -1698,7 +1698,7 @@ PAG_TEST(PAGXHTMLTest, ImageObjectFitContainMapsToLetterBox) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
 }
 
-PAG_TEST(PAGXHTMLTest, ImageObjectFitCoverMapsToZoom) {
+PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="logo.png" style="width:80px;height:80px;object-fit:cover"/>
@@ -1713,7 +1713,7 @@ PAG_TEST(PAGXHTMLTest, ImageObjectFitCoverMapsToZoom) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
 
-PAG_TEST(PAGXHTMLTest, RoundedImageWrapperRespectsObjectFit) {
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRespectsObjectFit) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:64px">
       <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
@@ -1734,7 +1734,7 @@ PAG_TEST(PAGXHTMLTest, RoundedImageWrapperRespectsObjectFit) {
 // clip. A wrapper with multiple children must keep the standard container layout
 // even when it carries `border-radius` + `overflow: hidden` (the image stays in
 // its own child Layer so neighbouring content paints normally above it).
-PAG_TEST(PAGXHTMLTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:80px">
       <div style="width:64px;height:80px;border-radius:9999px;overflow:hidden">
@@ -1750,7 +1750,7 @@ PAG_TEST(PAGXHTMLTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
   EXPECT_FALSE(wrapper->children.empty());
 }
 
-PAG_TEST(PAGXHTMLTest, RepeatedImageSourceDeduplicated) {
+PAG_TEST(PAGXHTMLImporterTest, RepeatedImageSourceDeduplicated) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:80px">
       <img src="logo.png" style="width:80px;height:80px"/>
@@ -1771,7 +1771,7 @@ PAG_TEST(PAGXHTMLTest, RepeatedImageSourceDeduplicated) {
   EXPECT_EQ(patA->image, patB->image);
 }
 
-PAG_TEST(PAGXHTMLTest, StrictModeRejectsUnsupportedElement) {
+PAG_TEST(PAGXHTMLImporterTest, StrictModeRejectsUnsupportedElement) {
   pagx::HTMLImporter::Options opts;
   opts.strict = true;
   std::string html =
@@ -1780,7 +1780,7 @@ PAG_TEST(PAGXHTMLTest, StrictModeRejectsUnsupportedElement) {
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, PreserveUnknownElementsKeepsPlaceholder) {
+PAG_TEST(PAGXHTMLImporterTest, PreserveUnknownElementsKeepsPlaceholder) {
   pagx::HTMLImporter::Options opts;
   opts.preserveUnknownElements = true;
   std::string html =
@@ -1794,7 +1794,7 @@ PAG_TEST(PAGXHTMLTest, PreserveUnknownElementsKeepsPlaceholder) {
   EXPECT_EQ(it->second, "foo");
 }
 
-PAG_TEST(PAGXHTMLTest, TargetSizeOverridesBody) {
+PAG_TEST(PAGXHTMLImporterTest, TargetSizeOverridesBody) {
   pagx::HTMLImporter::Options opts;
   opts.targetWidth = 400.0f;
   opts.targetHeight = 200.0f;
@@ -1805,7 +1805,7 @@ PAG_TEST(PAGXHTMLTest, TargetSizeOverridesBody) {
   EXPECT_FLOAT_EQ(doc->height, 200.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, PreferBodySizeWinsOverTarget) {
+PAG_TEST(PAGXHTMLImporterTest, PreferBodySizeWinsOverTarget) {
   pagx::HTMLImporter::Options opts;
   opts.targetWidth = 400.0f;
   opts.targetHeight = 200.0f;
@@ -1817,7 +1817,7 @@ PAG_TEST(PAGXHTMLTest, PreferBodySizeWinsOverTarget) {
   EXPECT_FLOAT_EQ(doc->height, 50.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, TargetUsedWhenBodyMissingSize) {
+PAG_TEST(PAGXHTMLImporterTest, TargetUsedWhenBodyMissingSize) {
   pagx::HTMLImporter::Options opts;
   opts.targetWidth = 320.0f;
   opts.targetHeight = 96.0f;
@@ -1832,24 +1832,24 @@ PAG_TEST(PAGXHTMLTest, TargetUsedWhenBodyMissingSize) {
 // HTMLImporter error / boundary tests
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, ParseEmptyDataReturnsNullptr) {
+PAG_TEST(PAGXHTMLImporterTest, ParseEmptyDataReturnsNullptr) {
   auto doc = pagx::HTMLImporter::Parse(nullptr, 0);
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, ParseGarbageDataReturnsNullptr) {
+PAG_TEST(PAGXHTMLImporterTest, ParseGarbageDataReturnsNullptr) {
   std::string garbage = "this is not html at all <<<>>>";
   auto doc = pagx::HTMLImporter::ParseString(garbage);
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, ParseNonHtmlRootReturnsNullptr) {
+PAG_TEST(PAGXHTMLImporterTest, ParseNonHtmlRootReturnsNullptr) {
   // The importer rejects documents whose root element is not <html>.
   auto doc = pagx::HTMLImporter::ParseString(R"XML(<svg><body></body></svg>)XML");
   EXPECT_EQ(doc, nullptr);
 }
 
-PAG_TEST(PAGXHTMLTest, ParseMissingFileReturnsNullptr) {
+PAG_TEST(PAGXHTMLImporterTest, ParseMissingFileReturnsNullptr) {
   auto doc = pagx::HTMLImporter::Parse("/this/path/does/not/exist.html");
   EXPECT_EQ(doc, nullptr);
 }
@@ -1858,7 +1858,7 @@ PAG_TEST(PAGXHTMLTest, ParseMissingFileReturnsNullptr) {
 // autoNormalize=false: exercises HTMLParserContext's own CSS cascade implementation
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, RawClassRuleAppliedWithoutSubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, RawClassRuleAppliedWithoutSubsetTransformer) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1876,7 +1876,7 @@ PAG_TEST(PAGXHTMLTest, RawClassRuleAppliedWithoutSubsetTransformer) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawElementRuleAppliedWithoutSubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, RawElementRuleAppliedWithoutSubsetTransformer) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1889,7 +1889,7 @@ PAG_TEST(PAGXHTMLTest, RawElementRuleAppliedWithoutSubsetTransformer) {
   EXPECT_TRUE(ColorNear(SolidFillColorOf(leaf), HexColor(0x33CC44)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTransformer) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1910,7 +1910,7 @@ PAG_TEST(PAGXHTMLTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTransformer) 
   }
 }
 
-PAG_TEST(PAGXHTMLTest, RawUniversalSelectorWarnsWithoutSubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, RawUniversalSelectorWarnsWithoutSubsetTransformer) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1926,7 +1926,7 @@ PAG_TEST(PAGXHTMLTest, RawUniversalSelectorWarnsWithoutSubsetTransformer) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawUnsupportedSelectorWarnsWithoutSubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedSelectorWarnsWithoutSubsetTransformer) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1942,7 +1942,7 @@ PAG_TEST(PAGXHTMLTest, RawUnsupportedSelectorWarnsWithoutSubsetTransformer) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawAtRuleSurvivesAndIsHandledByCascade) {
+PAG_TEST(PAGXHTMLImporterTest, RawAtRuleSurvivesAndIsHandledByCascade) {
   // Without the subset transformer, the parser context tokenizes the style sheet itself; at-rules
   // are skipped via SkipBalancedBlock so subsequent rules still apply.
   pagx::HTMLImporter::Options opts;
@@ -1965,7 +1965,7 @@ PAG_TEST(PAGXHTMLTest, RawAtRuleSurvivesAndIsHandledByCascade) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xAABBCC)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawAtRuleNoBlockSkipped) {
+PAG_TEST(PAGXHTMLImporterTest, RawAtRuleNoBlockSkipped) {
   // A no-block at-rule (terminated by `;`) must not consume the following rule.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -1987,7 +1987,7 @@ PAG_TEST(PAGXHTMLTest, RawAtRuleNoBlockSkipped) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x446688)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawCssCommentsStripped) {
+PAG_TEST(PAGXHTMLImporterTest, RawCssCommentsStripped) {
   // CSS comments outside selectors and rule bodies must be skipped by the cascade tokenizer.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2010,7 +2010,7 @@ PAG_TEST(PAGXHTMLTest, RawCssCommentsStripped) {
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x225588)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawDoubleHeadElementWarnsForUnknownChild) {
+PAG_TEST(PAGXHTMLImporterTest, RawDoubleHeadElementWarnsForUnknownChild) {
   // Without the subset transformer, the parser sees the unknown <foo> tag inside <head>
   // and emits a warning rather than silently dropping.
   pagx::HTMLImporter::Options opts;
@@ -2030,7 +2030,7 @@ PAG_TEST(PAGXHTMLTest, RawDoubleHeadElementWarnsForUnknownChild) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawFlexShorthandValueWithUnitWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawFlexShorthandValueWithUnitWarns) {
   // Without the subset transformer, parseBoxLayout sees a `flex` value that does not parse
   // as a clean number and emits a warning.
   pagx::HTMLImporter::Options opts;
@@ -2051,7 +2051,7 @@ PAG_TEST(PAGXHTMLTest, RawFlexShorthandValueWithUnitWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawDisplayInlineBlockWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawDisplayInlineBlockWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2068,7 +2068,7 @@ PAG_TEST(PAGXHTMLTest, RawDisplayInlineBlockWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawFlexWrapWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawFlexWrapWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2085,7 +2085,7 @@ PAG_TEST(PAGXHTMLTest, RawFlexWrapWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawMarginTopBottomWarn) {
+PAG_TEST(PAGXHTMLImporterTest, RawMarginTopBottomWarn) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2109,7 +2109,7 @@ PAG_TEST(PAGXHTMLTest, RawMarginTopBottomWarn) {
   EXPECT_TRUE(right);
 }
 
-PAG_TEST(PAGXHTMLTest, RawGridTemplateWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawGridTemplateWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2126,7 +2126,7 @@ PAG_TEST(PAGXHTMLTest, RawGridTemplateWarns) {
   EXPECT_TRUE(gridWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, RawTransformWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawTransformWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2143,7 +2143,7 @@ PAG_TEST(PAGXHTMLTest, RawTransformWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawEllipticalBorderRadiusDropped) {
+PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusDropped) {
   // Elliptical syntax `<h>/<v>` cannot be expressed with PAGX's uniform roundness; warn and skip.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2165,7 +2165,7 @@ PAG_TEST(PAGXHTMLTest, RawEllipticalBorderRadiusDropped) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2185,7 +2185,7 @@ PAG_TEST(PAGXHTMLTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawBorderDashedWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2202,7 +2202,7 @@ PAG_TEST(PAGXHTMLTest, RawBorderDashedWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawOverflowAutoWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawOverflowAutoWarns) {
   // Only `hidden` and `visible` are silent; everything else emits a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2220,7 +2220,7 @@ PAG_TEST(PAGXHTMLTest, RawOverflowAutoWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawBackgroundUrlWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawBackgroundUrlWarns) {
   // Without the subset transformer, the layer builder receives the raw `url(...)` and warns.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2238,7 +2238,7 @@ PAG_TEST(PAGXHTMLTest, RawBackgroundUrlWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawUnsupportedFilterWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2257,7 +2257,7 @@ PAG_TEST(PAGXHTMLTest, RawUnsupportedFilterWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawBackdropFilterDropShadowUnsupportedWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterDropShadowUnsupportedWarns) {
   // `backdrop-filter` only models blur(); other functions emit a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2280,7 +2280,7 @@ PAG_TEST(PAGXHTMLTest, RawBackdropFilterDropShadowUnsupportedWarns) {
 // HTMLValueParser internals: colour, length, line-height, shadow edge cases
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLTest, ShortHexAlphaColorRecognized) {
+PAG_TEST(PAGXHTMLImporterTest, ShortHexAlphaColorRecognized) {
   // 4-char `#RGBA` form expands to `#RRGGBBAA`.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2292,7 +2292,7 @@ PAG_TEST(PAGXHTMLTest, ShortHexAlphaColorRecognized) {
   EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x00FF00, 0x88 / 255.0f)));
 }
 
-PAG_TEST(PAGXHTMLTest, FullHexAlphaColorRecognized) {
+PAG_TEST(PAGXHTMLImporterTest, FullHexAlphaColorRecognized) {
   // 8-char `#RRGGBBAA` form keeps the alpha byte.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2304,7 +2304,7 @@ PAG_TEST(PAGXHTMLTest, FullHexAlphaColorRecognized) {
   EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0xFF0000, 0x7F / 255.0f), 0.02f));
 }
 
-PAG_TEST(PAGXHTMLTest, UnrecognisedColorFallsBackToBlackAndWarns) {
+PAG_TEST(PAGXHTMLImporterTest, UnrecognisedColorFallsBackToBlackAndWarns) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="color:not-a-color">Hi</span>
@@ -2320,7 +2320,7 @@ PAG_TEST(PAGXHTMLTest, UnrecognisedColorFallsBackToBlackAndWarns) {
       ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x000000)));
 }
 
-PAG_TEST(PAGXHTMLTest, RawPxLengthEmRemWarnsThroughPadding) {
+PAG_TEST(PAGXHTMLImporterTest, RawPxLengthEmRemWarnsThroughPadding) {
   // Without the subset transformer, padding tokens flow through parsePxLength which warns on
   // em/rem and treats them as 16px each.
   pagx::HTMLImporter::Options opts;
@@ -2341,7 +2341,7 @@ PAG_TEST(PAGXHTMLTest, RawPxLengthEmRemWarnsThroughPadding) {
   EXPECT_TRUE(emWarn);
 }
 
-PAG_TEST(PAGXHTMLTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
+PAG_TEST(PAGXHTMLImporterTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
   // `pt` is not a unit parsePxLength understands; it falls back with a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -2359,7 +2359,7 @@ PAG_TEST(PAGXHTMLTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawLineHeightUnitless) {
+PAG_TEST(PAGXHTMLImporterTest, RawLineHeightUnitless) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2374,7 +2374,7 @@ PAG_TEST(PAGXHTMLTest, RawLineHeightUnitless) {
   EXPECT_FLOAT_EQ(tb->lineHeight, 21.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, RawLineHeightPercent) {
+PAG_TEST(PAGXHTMLImporterTest, RawLineHeightPercent) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2389,7 +2389,7 @@ PAG_TEST(PAGXHTMLTest, RawLineHeightPercent) {
   EXPECT_FLOAT_EQ(tb->lineHeight, 30.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, RawLineHeightEm) {
+PAG_TEST(PAGXHTMLImporterTest, RawLineHeightEm) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2404,7 +2404,7 @@ PAG_TEST(PAGXHTMLTest, RawLineHeightEm) {
   EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, RawLineHeightUnknownUnitWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawLineHeightUnknownUnitWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2421,7 +2421,7 @@ PAG_TEST(PAGXHTMLTest, RawLineHeightUnknownUnitWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, BoxShadowSpreadIsIgnoredWithWarning) {
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowSpreadIsIgnoredWithWarning) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <div style="width:80px;height:80px;background-color:#FFF;
@@ -2436,7 +2436,7 @@ PAG_TEST(PAGXHTMLTest, BoxShadowSpreadIsIgnoredWithWarning) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, BoxShadowMalformedSkippedWithWarning) {
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowMalformedSkippedWithWarning) {
   // A shadow with fewer than two length tokens is malformed.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2452,7 +2452,7 @@ PAG_TEST(PAGXHTMLTest, BoxShadowMalformedSkippedWithWarning) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
   // No colour token → the shadow keeps the default opaque-black colour.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2468,7 +2468,7 @@ PAG_TEST(PAGXHTMLTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000), 0.02f));
 }
 
-PAG_TEST(PAGXHTMLTest, GradientWithRadAngle) {
+PAG_TEST(PAGXHTMLImporterTest, GradientWithRadAngle) {
   // CSS angle accepts `rad` in addition to `deg`/`turn`.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2484,7 +2484,7 @@ PAG_TEST(PAGXHTMLTest, GradientWithRadAngle) {
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
 
-PAG_TEST(PAGXHTMLTest, GradientWithTurnAngle) {
+PAG_TEST(PAGXHTMLImporterTest, GradientWithTurnAngle) {
   // 0.25turn = 90deg → identical layout to the deg test.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2500,7 +2500,7 @@ PAG_TEST(PAGXHTMLTest, GradientWithTurnAngle) {
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
 
-PAG_TEST(PAGXHTMLTest, RadialGradientWithEllipseDescriptor) {
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithEllipseDescriptor) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;
@@ -2515,7 +2515,7 @@ PAG_TEST(PAGXHTMLTest, RadialGradientWithEllipseDescriptor) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLTest, GradientThreeStopsImplicitMiddleInterpolated) {
+PAG_TEST(PAGXHTMLImporterTest, GradientThreeStopsImplicitMiddleInterpolated) {
   // A middle stop with no explicit offset must be filled in via interpolation.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2531,7 +2531,7 @@ PAG_TEST(PAGXHTMLTest, GradientThreeStopsImplicitMiddleInterpolated) {
   EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLTest, FontStyleItalicOnlyProducesItalicLabel) {
+PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesItalicLabel) {
   // Pure italic without bold yields the standalone "Italic" font-style label.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -2544,7 +2544,7 @@ PAG_TEST(PAGXHTMLTest, FontStyleItalicOnlyProducesItalicLabel) {
   EXPECT_EQ(text->fontStyle, "Italic");
 }
 
-PAG_TEST(PAGXHTMLTest, ImageMissingSrcWarnsAndIsSkipped) {
+PAG_TEST(PAGXHTMLImporterTest, ImageMissingSrcWarnsAndIsSkipped) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img style="width:80px;height:80px"/>
@@ -2558,7 +2558,7 @@ PAG_TEST(PAGXHTMLTest, ImageMissingSrcWarnsAndIsSkipped) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, TransparentColorIsTreatedAsNoFill) {
+PAG_TEST(PAGXHTMLImporterTest, TransparentColorIsTreatedAsNoFill) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-color:transparent"></div>
@@ -2570,7 +2570,7 @@ PAG_TEST(PAGXHTMLTest, TransparentColorIsTreatedAsNoFill) {
   EXPECT_FLOAT_EQ(color.alpha, 0.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, NoneColorIsTreatedAsNoFill) {
+PAG_TEST(PAGXHTMLImporterTest, NoneColorIsTreatedAsNoFill) {
   // Regression: `color: none` is non-standard but appears occasionally; treat it as transparent.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -2583,7 +2583,7 @@ PAG_TEST(PAGXHTMLTest, NoneColorIsTreatedAsNoFill) {
   EXPECT_FLOAT_EQ(color.alpha, 0.0f);
 }
 
-PAG_TEST(PAGXHTMLTest, MalformedHexColorWarns) {
+PAG_TEST(PAGXHTMLImporterTest, MalformedHexColorWarns) {
   // 2-char hex (`#FF`) does not match any valid form and falls back to opaque black with a warning.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -2598,7 +2598,7 @@ PAG_TEST(PAGXHTMLTest, MalformedHexColorWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RgbWithoutParensFallsBackToBlackAndWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RgbWithoutParensFallsBackToBlackAndWarns) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="color:rgb-broken">Hi</span>
@@ -2612,7 +2612,7 @@ PAG_TEST(PAGXHTMLTest, RgbWithoutParensFallsBackToBlackAndWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RawPxLengthPercentReturnsNanThroughPadding) {
+PAG_TEST(PAGXHTMLImporterTest, RawPxLengthPercentReturnsNanThroughPadding) {
   // `padding:50%` on a flex container — parsePxLength rejects `%` so each token is dropped,
   // and the importer warns about the invalid token.
   pagx::HTMLImporter::Options opts;
@@ -2631,7 +2631,7 @@ PAG_TEST(PAGXHTMLTest, RawPxLengthPercentReturnsNanThroughPadding) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLTest, RadialGradientWithCenterOnly) {
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithCenterOnly) {
   // The leading shape token may be just `at center` without `circle`/`ellipse`.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2647,7 +2647,7 @@ PAG_TEST(PAGXHTMLTest, RadialGradientWithCenterOnly) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLTest, ConicGradientWithExplicitDegOffsetPerStop) {
+PAG_TEST(PAGXHTMLImporterTest, ConicGradientWithExplicitDegOffsetPerStop) {
   // The conic gradient stop offsets are interpreted as angles when written with `deg`.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -2665,7 +2665,7 @@ PAG_TEST(PAGXHTMLTest, ConicGradientWithExplicitDegOffsetPerStop) {
   EXPECT_TRUE(NearlyEqual(cg->colorStops.back()->offset, 1.0f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLTest, LinearGradientWithExplicitPxOffsetPerStop) {
+PAG_TEST(PAGXHTMLImporterTest, LinearGradientWithExplicitPxOffsetPerStop) {
   // For linear gradients the stop offset is interpreted as a px length; non-percent tokens are
   // accepted via parsePxLength.
   auto doc = ParseFromString(R"HTML(
@@ -2682,7 +2682,7 @@ PAG_TEST(PAGXHTMLTest, LinearGradientWithExplicitPxOffsetPerStop) {
   ASSERT_EQ(lg->colorStops.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLTest, DuplicateHeadIsMergedBySubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, DuplicateHeadIsMergedBySubsetTransformer) {
   // The transformer must merge multiple <head> elements into one. Both <title>s should survive
   // (the importer uses the first one for data-title).
   auto doc = ParseFromString(R"HTML(
@@ -2698,7 +2698,7 @@ PAG_TEST(PAGXHTMLTest, DuplicateHeadIsMergedBySubsetTransformer) {
   EXPECT_EQ(it->second, "Primary");
 }
 
-PAG_TEST(PAGXHTMLTest, DuplicateBodyIsMergedBySubsetTransformer) {
+PAG_TEST(PAGXHTMLImporterTest, DuplicateBodyIsMergedBySubsetTransformer) {
   auto doc = ParseFromString(R"HTML(
     <html>
       <body style="width:50px;height:50px">
@@ -2731,23 +2731,23 @@ static void RunFixture(const std::string& name) {
   pagx::PAGXOptimizer::Optimize(doc.get());
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   ASSERT_FALSE(xml.empty());
-  auto outPath = SaveFile(xml, "PAGXHTMLTest/" + name + ".pagx");
+  auto outPath = SaveFile(xml, "PAGXHTMLImporterTest/" + name + ".pagx");
   VerifyFile(outPath, name);
 }
 
-PAG_TEST(PAGXHTMLTest, FixtureCard) {
+PAG_TEST(PAGXHTMLImporterTest, FixtureCard) {
   RunFixture("card");
 }
 
-PAG_TEST(PAGXHTMLTest, FixtureTabBar) {
+PAG_TEST(PAGXHTMLImporterTest, FixtureTabBar) {
   RunFixture("tab_bar");
 }
 
-PAG_TEST(PAGXHTMLTest, FixtureLogin) {
+PAG_TEST(PAGXHTMLImporterTest, FixtureLogin) {
   RunFixture("login");
 }
 
-PAG_TEST(PAGXHTMLTest, FixtureTableVisual) {
+PAG_TEST(PAGXHTMLImporterTest, FixtureTableVisual) {
   RunFixture("table_visual");
 }
 
