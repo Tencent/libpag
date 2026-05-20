@@ -1,5 +1,5 @@
 // Shared puppeteer page-loading flow used by snapshot.js and eval/baseline.js.
-// Both callers need the same sequence (set viewport, navigate to file://, wait
+// Both callers need the same sequence (set viewport, navigate to a URL, wait
 // for networkidle, optionally wait for a #root child to appear, optionally
 // wait an extra settle delay), so the steps live here in one place.
 
@@ -13,15 +13,18 @@ function rootHasChildrenScript() {
   return 'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
 }
 
-// Open a fresh page on `browser`, navigate to file://`absolutePath`, and apply
-// the standard wait strategy. Returns the page; the caller is responsible for
-// closing it.
-async function openAndSettlePage(browser, absolutePath, opts) {
+// Open a fresh page on `browser`, navigate to `url`, and apply the standard
+// wait strategy. `url` must already be a fully-qualified URL — callers are
+// responsible for prepending `file://` when the input is a local path. Returns
+// the page; the caller is responsible for closing it.
+async function openAndSettlePage(browser, url, opts) {
   const {
     viewportWidth = 1400,
     viewportHeight = 900,
     waitMs = 800,
     selector = '',
+    cookies = [],
+    headers = [],
     onConsole = null,
     onPageError = null,
   } = opts || {};
@@ -35,7 +38,19 @@ async function openAndSettlePage(browser, absolutePath, opts) {
   if (onConsole) page.on('console', onConsole);
   if (onPageError) page.on('pageerror', onPageError);
 
-  await page.goto('file://' + absolutePath, { waitUntil: 'networkidle0', timeout: 30000 });
+  if (headers.length > 0) {
+    const headerMap = {};
+    for (const [key, value] of headers) headerMap[key] = value;
+    await page.setExtraHTTPHeaders(headerMap);
+  }
+  if (cookies.length > 0) {
+    // page.setCookie expects each cookie scoped to a URL or domain. Scope to
+    // the navigation target so the cookie travels on the very first request.
+    const scoped = cookies.map((c) => ({ ...c, url }));
+    await page.setCookie(...scoped);
+  }
+
+  await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
 
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });

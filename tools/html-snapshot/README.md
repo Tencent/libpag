@@ -68,21 +68,25 @@ PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \
 ## Usage
 
 ```bash
-node snapshot.js <input.html> [-o <out.html>]
+node snapshot.js <input.html | http(s)://url> [-o <out.html>]
 ```
 
-By default the output is written next to the input with a `.subset.html`
+For local files, the output defaults to a sibling with a `.subset.html`
 suffix, e.g. `xiaohongshu_react.html` → `xiaohongshu_react.subset.html`.
+For URL inputs `-o` is **required** — there is no source path to derive an
+output name from.
 
 Options:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-o, --output <file>` | `<input>.subset.html` | Output path |
+| `-o, --output <file>` | `<input>.subset.html` (file mode); required for URLs | Output path |
 | `--viewport-width <px>` | `1400` | Headless viewport width |
 | `--viewport-height <px>` | `900` | Headless viewport height |
 | `--wait-ms <ms>` | `800` | Extra settle delay after `networkidle0` |
 | `--selector <css>` | _(auto)_ | Wait for this selector before snapshotting |
+| `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
+| `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 
 ### One-shot pipeline
 
@@ -94,6 +98,12 @@ tools/html-snapshot/html2pagx /path/to/page.html
 # → page.subset.html  (flat, subset-compliant)
 # → page.subset.pagx  (after import + resolve)
 # → page.subset.png   (rendered at scale=1)
+
+# URL input: --output-name is required (URLs have no filesystem basename)
+tools/html-snapshot/html2pagx https://example.com/demo \
+  --output-name demo --output-dir /tmp/out \
+  --cookie session=abc123 --header 'X-User: alice'
+# → /tmp/out/demo.subset.html / .pagx / .png
 ```
 
 Options:
@@ -101,10 +111,12 @@ Options:
 | Flag | Description |
 |------|-------------|
 | `-o, --output-dir <dir>` | Write outputs to a different directory |
+| `--output-name <name>` | Base name for outputs (required when input is a URL) |
 | `--pagx-bin <path>` | Path to the `pagx` CLI binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
 | `--scale <N>` | PNG render scale (default 1) |
 | `--no-render` | Stop after `pagx resolve` |
 | `--no-resolve` | Stop after `pagx import` |
+| `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
 
 ### Manual pipeline (for debugging individual steps)

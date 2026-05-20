@@ -8,16 +8,19 @@
 #   4. pagx render     <input>.subset.pagx → <input>.subset.png
 #
 # Usage:
-#   html2pagx <input.html> [options]
+#   html2pagx <input.html | http(s)://url> [options]
 #
 # Options (any unknown flag is forwarded to snapshot.js):
 #   -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
+#   --output-name <name>       Base name for outputs (required when input is a URL)
 #   --pagx-bin <path>          Path to the pagx CLI (default: $PAGX_BIN or
 #                              ../../cmake-build-debug/pagx relative to this script)
 #   --scale <N>                Render scale factor (default: 2)
 #   --no-render                Stop after pagx resolve; do not produce PNG
 #   --no-resolve               Stop after pagx import; do not run resolve/render
 #   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
+#   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+#   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   -h, --help                 Show this help
 
 set -eu
@@ -40,6 +43,7 @@ print_usage() {
 #--------------------------------------------------------------------------------------------------
 INPUT=""
 OUTPUT_DIR=""
+OUTPUT_NAME=""
 PAGX_BIN="$DEFAULT_PAGX_BIN"
 SCALE="2"
 DO_RESOLVE=1
@@ -55,6 +59,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -o|--output-dir)
       OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    --output-name)
+      OUTPUT_NAME="$2"
       shift 2
       ;;
     --pagx-bin)
@@ -78,7 +86,7 @@ while [[ $# -gt 0 ]]; do
       INFER_FLEX=0
       shift
       ;;
-    --viewport-width|--viewport-height|--wait-ms|--selector)
+    --viewport-width|--viewport-height|--wait-ms|--selector|--cookie|--header)
       SNAPSHOT_EXTRA_ARGS+=("$1" "$2")
       shift 2
       ;;
@@ -115,20 +123,41 @@ fi
 #--------------------------------------------------------------------------------------------------
 # Resolve absolute paths
 #--------------------------------------------------------------------------------------------------
-if [[ ! -f "$INPUT" ]]; then
-  echo "html2pagx: input not found: $INPUT" >&2
-  exit 1
+IS_URL=0
+if [[ "$INPUT" =~ ^https?:// ]]; then
+  IS_URL=1
 fi
 
-INPUT_ABS="$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")"
-INPUT_DIR="$(dirname "$INPUT_ABS")"
-INPUT_BASE="$(basename "$INPUT_ABS" .html)"
-INPUT_BASE="${INPUT_BASE%.htm}"
-
-OUT_DIR="${OUTPUT_DIR:-$INPUT_DIR}"
-if [[ -n "$OUTPUT_DIR" ]]; then
+if [[ "$IS_URL" -eq 1 ]]; then
+  if [[ -z "$OUTPUT_NAME" ]]; then
+    echo "html2pagx: --output-name <name> is required when input is a URL" >&2
+    exit 2
+  fi
+  INPUT_ABS="$INPUT"
+  INPUT_BASE="$OUTPUT_NAME"
+  OUT_DIR="${OUTPUT_DIR:-$(pwd)}"
   mkdir -p "$OUT_DIR"
   OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+else
+  if [[ ! -f "$INPUT" ]]; then
+    echo "html2pagx: input not found: $INPUT" >&2
+    exit 1
+  fi
+
+  INPUT_ABS="$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")"
+  INPUT_DIR="$(dirname "$INPUT_ABS")"
+  if [[ -n "$OUTPUT_NAME" ]]; then
+    INPUT_BASE="$OUTPUT_NAME"
+  else
+    INPUT_BASE="$(basename "$INPUT_ABS" .html)"
+    INPUT_BASE="${INPUT_BASE%.htm}"
+  fi
+
+  OUT_DIR="${OUTPUT_DIR:-$INPUT_DIR}"
+  if [[ -n "$OUTPUT_DIR" ]]; then
+    mkdir -p "$OUT_DIR"
+    OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+  fi
 fi
 
 SUBSET_HTML="$OUT_DIR/${INPUT_BASE}.subset.html"

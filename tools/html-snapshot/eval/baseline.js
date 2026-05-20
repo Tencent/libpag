@@ -88,7 +88,7 @@ async function main() {
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
   try {
-    const page = await openAndSettlePage(browser, opts.input, {
+    const page = await openAndSettlePage(browser, `file://${opts.input}`, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,

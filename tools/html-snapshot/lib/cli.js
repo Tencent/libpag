@@ -36,6 +36,51 @@ function parseNonNegativeNumber(flagName, value) {
   return n;
 }
 
+// Match `http://` and `https://` only. We deliberately reject other schemes
+// (file:, data:, ftp:, ...) so that a typo like `htttp://...` or a stray local
+// path with a colon never silently hits the network.
+function isHttpUrl(s) {
+  return /^https?:\/\//i.test(s);
+}
+
+// Parse `name=value` into a puppeteer-compatible cookie descriptor. The URL
+// must be filled in by the caller (we do that once we know the page URL) so
+// the cookie is scoped to the right origin.
+function parseCookie(flagName, value) {
+  if (value === undefined) {
+    console.error(`html-snapshot: '${flagName}' requires a 'name=value' argument`);
+    process.exit(2);
+  }
+  const eq = value.indexOf('=');
+  if (eq <= 0) {
+    console.error(`html-snapshot: '${flagName}' expects 'name=value', got '${value}'`);
+    process.exit(2);
+  }
+  return { name: value.slice(0, eq), value: value.slice(eq + 1) };
+}
+
+// Parse `Key: Value` (or `Key:Value`) into a [key, value] pair. The colon
+// after the key is the separator; any further colons are part of the value
+// (so `Authorization: Bearer xyz:abc` works as expected).
+function parseHeader(flagName, value) {
+  if (value === undefined) {
+    console.error(`html-snapshot: '${flagName}' requires a 'Key: Value' argument`);
+    process.exit(2);
+  }
+  const colon = value.indexOf(':');
+  if (colon <= 0) {
+    console.error(`html-snapshot: '${flagName}' expects 'Key: Value', got '${value}'`);
+    process.exit(2);
+  }
+  const key = value.slice(0, colon).trim();
+  const val = value.slice(colon + 1).trim();
+  if (!key) {
+    console.error(`html-snapshot: '${flagName}' has empty header name in '${value}'`);
+    process.exit(2);
+  }
+  return [key, val];
+}
+
 // Long-option flag table. Each entry lists the names the user can type and a
 // setter that mutates `opts` with the next argv token. `-h` / `--help` and
 // positional handling stay inline in `parseArgs` since they affect control
@@ -46,6 +91,8 @@ const FLAGS = [
   { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parsePositiveNumber('--viewport-height', v); } },
   { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = parseNonNegativeNumber('--wait-ms', v); } },
   { names: ['--selector'],         set: (o, v) => { o.selector = v; } },
+  { names: ['--cookie'],           set: (o, v) => { o.cookies.push(parseCookie('--cookie', v)); } },
+  { names: ['--header'],           set: (o, v) => { o.headers.push(parseHeader('--header', v)); } },
 ];
 
 const FLAG_BY_NAME = new Map();
@@ -57,10 +104,13 @@ function parseArgs(argv) {
   const opts = {
     input: '',
     output: '',
+    isUrl: false,
     viewportWidth: 1400,
     viewportHeight: 900,
     waitMs: 800,
     selector: '',
+    cookies: [],
+    headers: [],
   };
   const positional = [];
   for (let i = 2; i < argv.length; i++) {
@@ -84,29 +134,53 @@ function parseArgs(argv) {
     printUsage();
     process.exit(2);
   }
-  opts.input = path.resolve(positional[0]);
-  if (!opts.output) {
-    const dir = path.dirname(opts.input);
-    const base = path.basename(opts.input, path.extname(opts.input));
-    opts.output = path.join(dir, `${base}.subset.html`);
-  } else {
+  const inputArg = positional[0];
+  opts.isUrl = isHttpUrl(inputArg);
+  if (opts.isUrl) {
+    // Remote pages have no filesystem location to derive a sibling name from,
+    // so we require an explicit -o. Letting it default to a magic name in cwd
+    // would silently overwrite a previous run.
+    opts.input = inputArg;
+    if (!opts.output) {
+      console.error(`html-snapshot: -o/--output is required when input is a URL`);
+      process.exit(2);
+    }
     opts.output = path.resolve(opts.output);
+  } else {
+    if (opts.cookies.length || opts.headers.length) {
+      console.error(`html-snapshot: --cookie / --header are only supported with URL inputs`);
+      process.exit(2);
+    }
+    opts.input = path.resolve(inputArg);
+    if (!opts.output) {
+      const dir = path.dirname(opts.input);
+      const base = path.basename(opts.input, path.extname(opts.input));
+      opts.output = path.join(dir, `${base}.subset.html`);
+    } else {
+      opts.output = path.resolve(opts.output);
+    }
   }
   return opts;
 }
 
 function printUsage() {
-  console.log(`Usage: html-snapshot <input.html> [-o <out.html>] [options]
+  console.log(`Usage: html-snapshot <input.html | http(s)://url> -o <out.html> [options]
 
-Render <input.html> in a headless browser and emit a flat, absolute-positioned
-snapshot suitable for 'pagx import --format html'.
+Render <input> in a headless browser and emit a flat, absolute-positioned
+snapshot suitable for 'pagx import --format html'. <input> may be a local
+HTML file or an http(s) URL; -o is required for URL inputs.
 
 Options:
-  -o, --output <file>        Output path (default: <input>.subset.html)
+  -o, --output <file>        Output path (required for URL inputs;
+                             defaults to <input>.subset.html for files)
   --viewport-width <px>      Headless viewport width (default 1400)
   --viewport-height <px>     Headless viewport height (default 900)
   --wait-ms <ms>             Extra settle delay after networkidle (default 800)
-  --selector <css>           Wait for this selector before snapshotting`);
+  --selector <css>           Wait for this selector before snapshotting
+  --cookie <name=value>      Set a cookie on the target URL (URL inputs only;
+                             repeatable)
+  --header <Key: Value>      Set an extra HTTP request header (URL inputs only;
+                             repeatable)`);
 }
 
-module.exports = { parseArgs, printUsage };
+module.exports = { parseArgs, printUsage, isHttpUrl };

@@ -33,21 +33,27 @@ const { openAndSettlePage } = require('./lib/page-loader');
 async function main() {
   const opts = parseArgs(process.argv);
 
-  if (!fs.existsSync(opts.input)) {
+  if (!opts.isUrl && !fs.existsSync(opts.input)) {
     console.error(`html-snapshot: input not found: ${opts.input}`);
     process.exit(1);
   }
+
+  // page-loader expects a fully-qualified URL. Local paths become file:// URLs
+  // here so the loader stays scheme-agnostic.
+  const targetUrl = opts.isUrl ? opts.input : `file://${opts.input}`;
 
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
   try {
-    const page = await openAndSettlePage(browser, opts.input, {
+    const page = await openAndSettlePage(browser, targetUrl, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
+      cookies: opts.cookies,
+      headers: opts.headers,
       onConsole: (msg) => {
         if (msg.type() === 'error') {
           console.error(`page error: ${msg.text()}`);
