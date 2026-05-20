@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "pagx/html/HTMLTransformContext.h"
+#include "pagx/html/importer/HTMLTransformContext.h"
 
 namespace pagx::html {
 

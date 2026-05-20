@@ -18,8 +18,8 @@
 
 #include <string>
 #include "base/utils/MathUtil.h"
-#include "pagx/html/HTMLDetail.h"
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {

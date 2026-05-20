@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLCssCascade.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 #include <cctype>
-#include "pagx/html/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDetail.h"
 
 namespace pagx::html {
 

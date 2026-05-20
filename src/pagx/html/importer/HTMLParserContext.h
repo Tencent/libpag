@@ -27,8 +27,8 @@
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/html/HTMLBoxAttributes.h"
-#include "pagx/html/HTMLDetail.h"
+#include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"

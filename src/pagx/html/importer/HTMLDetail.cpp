@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDetail.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -24,7 +24,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <utility>
-#include "pagx/html/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLBoxAttributes.h"
 
 namespace pagx::html {
 

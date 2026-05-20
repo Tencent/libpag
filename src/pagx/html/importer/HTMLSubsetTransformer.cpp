@@ -20,8 +20,8 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include "pagx/html/HTMLTransformContext.h"
-#include "pagx/html/HTMLTransformPasses.h"
+#include "pagx/html/importer/HTMLTransformContext.h"
+#include "pagx/html/importer/HTMLTransformPasses.h"
 
 namespace pagx {
 

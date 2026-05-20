@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLTransformPasses.h"
+#include "pagx/html/importer/HTMLTransformPasses.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -28,9 +28,9 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "pagx/html/HTMLCssCascade.h"
-#include "pagx/html/HTMLDetail.h"
-#include "pagx/html/HTMLSubsetPropertyTable.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
+#include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLSubsetPropertyTable.h"
 
 namespace pagx::html {
 

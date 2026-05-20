@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLSubsetPropertyTable.h"
+#include "pagx/html/importer/HTMLSubsetPropertyTable.h"
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "pagx/html/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDetail.h"
 
 namespace pagx::html {
 

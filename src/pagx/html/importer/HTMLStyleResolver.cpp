@@ -20,9 +20,9 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
-#include "pagx/html/HTMLCssCascade.h"
-#include "pagx/html/HTMLDetail.h"
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
+#include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLParserContext.h"
 
 namespace pagx {
 

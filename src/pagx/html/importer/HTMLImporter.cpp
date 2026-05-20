@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/HTMLImporter.h"
-#include "pagx/html/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLParserContext.h"
 
 namespace pagx {
 
