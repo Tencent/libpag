@@ -741,4 +741,449 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, IdempotentOnAlreadySubsetInput) {
   EXPECT_TRUE(resultB.diagnostics.empty());
 }
 
+//==================================================================================================
+// Per-property transforms: keyword fallbacks and edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayInlineDowngradesToBlock) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: inline"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "display: block"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayInlineBlockDowngradesToBlock) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: inline-block"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "display: block"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayUnknownDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: grid"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "display:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionRowReverseFallsBackToRow) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:row-reverse">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  EXPECT_FALSE(StyleContains(body, "row-reverse"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionColumnReverseFallsBackToColumn) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:column-reverse">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_FALSE(StyleContains(body, "column-reverse"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionUnknownDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:diagonal">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "flex-direction:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, AlignItemsBaselineKept) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;align-items:baseline">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(root->getFirstChild("body"), "align-items: baseline"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, AlignItemsInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;align-items:floaty">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "align-items:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, JustifyContentInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;justify-content:bouncy">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "justify-content:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShrinkZeroDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex-shrink: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "flex-shrink"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShrinkNonzeroWarns) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex-shrink: 2"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexNoneMapsToZero) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "flex: 0"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexAutoMapsToOne) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: auto"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "flex: 1"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexUnknownKeywordDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: stretchy"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "flex:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexWithUnitOnGrowWarns) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: 2px"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionStickyDowngradedToAbsolute) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: sticky; top: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "position: absolute"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionStaticDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: static"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "position:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: floating"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "position:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageUrlDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: url(image.png)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageNoneDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: weirdvalue"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: padding-box"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: weird-clip"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDashedDowngradedToSolid) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px dashed #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderNoneDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "border:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityNonNumberDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: invalid"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "opacity:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityPercentNormalised) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: 50%"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // Internally clamps to [0,1]; 50% becomes 0.5.
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "opacity: 0.5"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityClampedAbove1) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: 2"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "opacity: 1"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitNoneDowngradedToContain) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: none"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitScaleDownDowngraded) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: scale-down"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: zoomy"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "img"), "object-fit"));
+}
+
+//==================================================================================================
+// Length resolution
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthCalcDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: calc(100% - 10px)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthVarDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: var(--w)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthClampDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: clamp(10px, 50%, 200px)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthMinDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: min(10px, 50%)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthAutoDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: auto; height: inherit"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "width:"));
+  EXPECT_FALSE(StyleContains(div, "height:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthPtConvertedToPx) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="font-size: 12pt"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // 12pt = 16px (12 * 4 / 3).
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "font-size: 16px"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unit-coerced"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthVwWithoutCanvasDropped) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  // Default canvasWidth/canvasHeight = 0 → vw/vh cannot resolve.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:200px">
+               <div style="width: 50vw"></div></body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthInvalidUnitDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: 5xq"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthMalformedDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: notalength"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthShorthandResolvesEachToken) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="padding: 1rem 2pt"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // 1rem -> 16px, 2pt -> 2.667px.
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "padding: 16px"));
+}
+
 }  // namespace pag

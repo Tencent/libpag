@@ -1829,6 +1829,895 @@ PAG_TEST(PAGXHTMLTest, TargetUsedWhenBodyMissingSize) {
 }
 
 //==================================================================================================
+// HTMLImporter error / boundary tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, ParseEmptyDataReturnsNullptr) {
+  auto doc = pagx::HTMLImporter::Parse(nullptr, 0);
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, ParseGarbageDataReturnsNullptr) {
+  std::string garbage = "this is not html at all <<<>>>";
+  auto doc = pagx::HTMLImporter::ParseString(garbage);
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, ParseNonHtmlRootReturnsNullptr) {
+  // The importer rejects documents whose root element is not <html>.
+  auto doc = pagx::HTMLImporter::ParseString(R"XML(<svg><body></body></svg>)XML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLTest, ParseMissingFileReturnsNullptr) {
+  auto doc = pagx::HTMLImporter::Parse("/this/path/does/not/exist.html");
+  EXPECT_EQ(doc, nullptr);
+}
+
+//==================================================================================================
+// autoNormalize=false: exercises HTMLParserContext's own CSS cascade implementation
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, RawClassRuleAppliedWithoutSubsetTransformer) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>.box { background-color:#123456 }</style></head>
+      <body style="width:50px;height:50px">
+        <div class="box" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawElementRuleAppliedWithoutSubsetTransformer) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>p { color:#33CC44 }</style></head>
+      <body style="width:200px;height:40px"><p>Hi</p></body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(leaf), HexColor(0x33CC44)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTransformer) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>.a, .b { background-color:#114455 }</style></head>
+      <body style="width:80px;height:40px">
+        <div class="a" style="width:20px;height:20px"></div>
+        <div class="b" style="width:20px;height:20px"></div>
+      </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (auto* div : doc->layers.front()->children) {
+    auto* fill = FindElementOfType<pagx::Fill>(div);
+    ASSERT_NE(fill, nullptr);
+    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    ASSERT_NE(solid, nullptr);
+    EXPECT_TRUE(ColorNear(solid->color, HexColor(0x114455)));
+  }
+}
+
+PAG_TEST(PAGXHTMLTest, RawUniversalSelectorWarnsWithoutSubsetTransformer) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>* { padding:0 }</style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("universal selector") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawUnsupportedSelectorWarnsWithoutSubsetTransformer) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>.a > .b { color:red }</style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("unsupported selector") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawAtRuleSurvivesAndIsHandledByCascade) {
+  // Without the subset transformer, the parser context tokenizes the style sheet itself; at-rules
+  // are skipped via SkipBalancedBlock so subsequent rules still apply.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @media (max-width:600px) { .ignored { color:red } }
+      .real { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="real" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xAABBCC)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawAtRuleNoBlockSkipped) {
+  // A no-block at-rule (terminated by `;`) must not consume the following rule.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @charset "utf-8";
+      .x { background-color:#446688 }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="x" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x446688)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawCssCommentsStripped) {
+  // CSS comments outside selectors and rule bodies must be skipped by the cascade tokenizer.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      /* leading comment */
+      .x { background-color:#225588 }
+      /* trailing comment */
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="x" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x225588)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawDoubleHeadElementWarnsForUnknownChild) {
+  // Without the subset transformer, the parser sees the unknown <foo> tag inside <head>
+  // and emits a warning rather than silently dropping.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><foo></foo></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("foo") != std::string::npos && msg.find("head") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawFlexShorthandValueWithUnitWarns) {
+  // Without the subset transformer, parseBoxLayout sees a `flex` value that does not parse
+  // as a clean number and emits a warning.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;width:50px;height:50px">
+        <div style="flex:1 1 auto;background-color:#000"></div>
+      </div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("flex shorthand") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawDisplayInlineBlockWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:inline-block;width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("inline-block") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawFlexWrapWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;flex-wrap:wrap;width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("flex-wrap") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawMarginTopBottomWarn) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="margin-top:5px;margin-bottom:6px;margin-left:7px;margin-right:8px;
+                  width:30px;height:30px;background-color:#000"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool top = false, bottom = false, left = false, right = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("margin-top") != std::string::npos) top = true;
+    if (msg.find("margin-bottom") != std::string::npos) bottom = true;
+    if (msg.find("margin-left") != std::string::npos) left = true;
+    if (msg.find("margin-right") != std::string::npos) right = true;
+  }
+  EXPECT_TRUE(top);
+  EXPECT_TRUE(bottom);
+  EXPECT_TRUE(left);
+  EXPECT_TRUE(right);
+}
+
+PAG_TEST(PAGXHTMLTest, RawGridTemplateWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="grid-template-columns:1fr 1fr;grid-template-rows:auto;width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool gridWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("grid") != std::string::npos) gridWarn = true;
+  }
+  EXPECT_TRUE(gridWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, RawTransformWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:rotate(45deg);width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("transform") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawEllipticalBorderRadiusDropped) {
+  // Elliptical syntax `<h>/<v>` cannot be expressed with PAGX's uniform roundness; warn and skip.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#000;border-radius:10px / 5px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("elliptical border-radius") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#000;border-radius:4px 12px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* rect = FindElementOfType<pagx::Rectangle>(doc->layers.front()->children.front());
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 12.0f);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("per-corner border-radius") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawBorderDashedWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border:2px dashed #000"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("dashed") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawOverflowAutoWarns) {
+  // Only `hidden` and `visible` are silent; everything else emits a warning.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="overflow:auto;width:50px;height:50px;background-color:#000"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("overflow") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawBackgroundUrlWarns) {
+  // Without the subset transformer, the layer builder receives the raw `url(...)` and warns.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url(theme.png)"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("url") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawUnsupportedFilterWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#000;filter:grayscale(50%)"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("filter") != std::string::npos && msg.find("grayscale") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawBackdropFilterDropShadowUnsupportedWarns) {
+  // `backdrop-filter` only models blur(); other functions emit a warning.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#FFF8;
+                  backdrop-filter:saturate(180%)"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("backdrop-filter") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+//==================================================================================================
+// HTMLValueParser internals: colour, length, line-height, shadow edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLTest, ShortHexAlphaColorRecognized) {
+  // 4-char `#RGBA` form expands to `#RRGGBBAA`.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#0F08"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x00FF00, 0x88 / 255.0f)));
+}
+
+PAG_TEST(PAGXHTMLTest, FullHexAlphaColorRecognized) {
+  // 8-char `#RRGGBBAA` form keeps the alpha byte.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#FF00007F"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0xFF0000, 0x7F / 255.0f), 0.02f));
+}
+
+PAG_TEST(PAGXHTMLTest, UnrecognisedColorFallsBackToBlackAndWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="color:not-a-color">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("unrecognised color") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  EXPECT_TRUE(
+      ColorNear(SolidFillColorOf(doc->layers.front()->children.front()), HexColor(0x000000)));
+}
+
+PAG_TEST(PAGXHTMLTest, RawPxLengthEmRemWarnsThroughPadding) {
+  // Without the subset transformer, padding tokens flow through parsePxLength which warns on
+  // em/rem and treats them as 16px each.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="display:flex;padding:1em;width:200px;height:200px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(div->padding.top, 16.0f);
+  bool emWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("em/rem") != std::string::npos) emWarn = true;
+  }
+  EXPECT_TRUE(emWarn);
+}
+
+PAG_TEST(PAGXHTMLTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
+  // `pt` is not a unit parsePxLength understands; it falls back with a warning.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;padding:5pt;width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("length unit") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawLineHeightUnitless) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="font-size:14px;line-height:1.5">Hi <span>World</span></p>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 21.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, RawLineHeightPercent) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="font-size:20px;line-height:150%">Hi <span>World</span></p>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 30.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, RawLineHeightEm) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="font-size:10px;line-height:2em">Hi <span>World</span></p>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, RawLineHeightUnknownUnitWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="font-size:14px;line-height:5cm">Hi <span>World</span></p>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("line-height unit") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, BoxShadowSpreadIsIgnoredWithWarning) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <div style="width:80px;height:80px;background-color:#FFF;
+                  box-shadow:0 1px 2px 3px #000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("box-shadow spread") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, BoxShadowMalformedSkippedWithWarning) {
+  // A shadow with fewer than two length tokens is malformed.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#FFF;
+                  box-shadow:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("malformed box-shadow") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
+  // No colour token → the shadow keeps the default opaque-black colour.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#FFF;
+                  box-shadow:0 2px 4px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_EQ(div->styles.size(), 1u);
+  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(div->styles.front());
+  ASSERT_NE(drop, nullptr);
+  EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000), 0.02f));
+}
+
+PAG_TEST(PAGXHTMLTest, GradientWithRadAngle) {
+  // CSS angle accepts `rad` in addition to `deg`/`turn`.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(1.5708rad, #F00, #00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
+}
+
+PAG_TEST(PAGXHTMLTest, GradientWithTurnAngle) {
+  // 0.25turn = 90deg → identical layout to the deg test.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(0.25turn, #F00, #00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
+}
+
+PAG_TEST(PAGXHTMLTest, RadialGradientWithEllipseDescriptor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:radial-gradient(ellipse at center, #FFF, #000)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  EXPECT_EQ(rg->colorStops.size(), 2u);
+}
+
+PAG_TEST(PAGXHTMLTest, GradientThreeStopsImplicitMiddleInterpolated) {
+  // A middle stop with no explicit offset must be filled in via interpolation.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(90deg,#F00,#0F0,#00F)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 3u);
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLTest, FontStyleItalicOnlyProducesItalicLabel) {
+  // Pure italic without bold yields the standalone "Italic" font-style label.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:14px;color:#000;font-style:italic">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontStyle, "Italic");
+}
+
+PAG_TEST(PAGXHTMLTest, ImageMissingSrcWarnsAndIsSkipped) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("missing src") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, TransparentColorIsTreatedAsNoFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:transparent"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto color = SolidFillColorOf(div);
+  EXPECT_FLOAT_EQ(color.alpha, 0.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, NoneColorIsTreatedAsNoFill) {
+  // Regression: `color: none` is non-standard but appears occasionally; treat it as transparent.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="color:none">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* span = doc->layers.front()->children.front();
+  auto color = SolidFillColorOf(span);
+  EXPECT_FLOAT_EQ(color.alpha, 0.0f);
+}
+
+PAG_TEST(PAGXHTMLTest, MalformedHexColorWarns) {
+  // 2-char hex (`#FF`) does not match any valid form and falls back to opaque black with a warning.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="color:#FF">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("unrecognised color") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RgbWithoutParensFallsBackToBlackAndWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="color:rgb-broken">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("unrecognised color") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RawPxLengthPercentReturnsNanThroughPadding) {
+  // `padding:50%` on a flex container — parsePxLength rejects `%` so each token is dropped,
+  // and the importer warns about the invalid token.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="display:flex;padding:50%;width:50px;height:50px"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("invalid padding token") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLTest, RadialGradientWithCenterOnly) {
+  // The leading shape token may be just `at center` without `circle`/`ellipse`.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:radial-gradient(at center, #FFF, #000)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  EXPECT_EQ(rg->colorStops.size(), 2u);
+}
+
+PAG_TEST(PAGXHTMLTest, ConicGradientWithExplicitDegOffsetPerStop) {
+  // The conic gradient stop offsets are interpreted as angles when written with `deg`.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:conic-gradient(from 0deg, #F00 0deg, #00F 360deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  ASSERT_NE(cg, nullptr);
+  ASSERT_EQ(cg->colorStops.size(), 2u);
+  EXPECT_TRUE(NearlyEqual(cg->colorStops.front()->offset, 0.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(cg->colorStops.back()->offset, 1.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLTest, LinearGradientWithExplicitPxOffsetPerStop) {
+  // For linear gradients the stop offset is interpreted as a px length; non-percent tokens are
+  // accepted via parsePxLength.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:100px;height:50px;
+                  background-image:linear-gradient(90deg, #F00 0px, #00F 100px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 2u);
+}
+
+PAG_TEST(PAGXHTMLTest, DuplicateHeadIsMergedBySubsetTransformer) {
+  // The transformer must merge multiple <head> elements into one. Both <title>s should survive
+  // (the importer uses the first one for data-title).
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><title>Primary</title></head>
+      <head><meta charset="utf-8"/></head>
+      <body style="width:50px;height:50px"></body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto it = doc->customData.find("title");
+  ASSERT_NE(it, doc->customData.end());
+  EXPECT_EQ(it->second, "Primary");
+}
+
+PAG_TEST(PAGXHTMLTest, DuplicateBodyIsMergedBySubsetTransformer) {
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <body style="width:50px;height:50px">
+        <div style="width:10px;height:10px;background-color:#000"></div>
+      </body>
+      <body>
+        <div style="width:10px;height:10px;background-color:#FFF"></div>
+      </body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  // After merging, the canvas keeps the dimensions from the first <body> and contains both
+  // children.
+  EXPECT_FLOAT_EQ(doc->width, 50.0f);
+  EXPECT_FLOAT_EQ(doc->height, 50.0f);
+  EXPECT_EQ(doc->layers.front()->children.size(), 2u);
+}
+
+//==================================================================================================
 // End-to-end fixture tests
 //==================================================================================================
 
