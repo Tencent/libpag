@@ -389,18 +389,6 @@ function classify(el, computed) {
 
 // ===== Style emission =====
 
-// Strip from text leaves whose computed value equals the CSS default — keeps
-// the output close to the hand-authored subset shape.
-function isDefault(prop, value) {
-  const e = STYLE_SCHEMA_BY_PROP.get(prop);
-  return e && e.defaults ? e.defaults.includes(value) : false;
-}
-
-function normalizeValue(prop, value) {
-  const e = STYLE_SCHEMA_BY_PROP.get(prop);
-  return e && e.normalize ? e.normalize(value) : value;
-}
-
 // Append a single schema-driven CSS declaration to `parts` if its computed
 // value isn't a default and survives normalisation. `ctx.textColor` (when
 // provided) is consulted by entries flagged `skipIfEqualsTextColor`.
@@ -1759,8 +1747,6 @@ const HELPER_FNS = [
   imgSrc,
   syntheticText,
   classify,
-  isDefault,
-  normalizeValue,
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
