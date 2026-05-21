@@ -53,23 +53,23 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   ~PAGFile();
 
   /**
-   * Returns the names of all top-level animations in the source document, preserving declaration
+   * Returns the ids of all top-level animations in the source document, preserving declaration
    * order. Animations declared inside child Compositions are not included.
    */
-  std::vector<std::string> getTimelineNames() const;
+  std::vector<std::string> getTimelineIds() const;
 
   /**
    * Returns the PAGTimeline driving the named top-level animation. Repeated calls with the same
-   * name return the same instance, so playback state is shared across all callers driving that
+   * id return the same instance, so playback state is shared across all callers driving that
    * animation.
-   * @param name an animation name from getTimelineNames(). Returns nullptr if no top-level
-   *             Animation matches the given name.
+   * @param id an animation id from getTimelineIds(). Returns nullptr if no top-level
+   *           Animation matches the given id.
    */
-  std::shared_ptr<PAGTimeline> getTimeline(const std::string& name);
+  std::shared_ptr<PAGTimeline> getTimeline(const std::string& id);
 
   /**
    * Returns the PAGTimeline for the first top-level animation, or nullptr if the document has no
-   * top-level animations. Equivalent to getTimeline(getTimelineNames().front()).
+   * top-level animations. Equivalent to getTimeline(getTimelineIds().front()).
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 

@@ -29,6 +29,7 @@
 #include "pagx/animation/Animation.h"
 #include "pagx/animation/AnimationObject.h"
 #include "pagx/animation/Property.h"
+#include "pagx/timeline/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -137,6 +138,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
 static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
@@ -498,21 +500,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   } else if (!compositionAttr.empty()) {
     ReportError(doc, node, "External composition paths are not supported until PR10.");
   }
-  auto timelinesAttr = GetAttribute(node, "timelines");
   layer->timelines.clear();
-  size_t start = 0;
-  while (start < timelinesAttr.size()) {
-    auto comma = timelinesAttr.find(',', start);
-    auto token =
-        timelinesAttr.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
-    if (!token.empty()) {
-      layer->timelines.push_back(token);
-    }
-    if (comma == std::string::npos) {
-      break;
-    }
-    start = comma + 1;
-  }
 
   // Build directive attributes.
   layer->importDirective.source = GetAttribute(node, "import");
@@ -544,6 +532,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       if (childLayer) {
         layer->children.push_back(childLayer);
       }
+      continue;
+    }
+    if (current->name == "Timelines") {
+      ParseLayerTimelines(current.get(), layer, doc);
       continue;
     }
     if (current->name == "svg") {
@@ -650,6 +642,33 @@ static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                       "' is not allowed in 'filters'."
                       " Expected: BlurFilter, DropShadowFilter,"
                       " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
+    }
+  }
+}
+
+static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
+  auto child = node->firstChild;
+  while (child) {
+    auto current = child;
+    child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    if (current->name == "Animation") {
+      auto refAttr = GetAttribute(current.get(), "ref");
+      if (refAttr.empty() || refAttr[0] != '@') {
+        ReportError(doc, current.get(),
+                    "Timelines/Animation requires 'ref' attribute starting with '@'.");
+        continue;
+      }
+      auto driver = std::make_unique<AnimationTimeline>();
+      driver->animationId = refAttr.substr(1);
+      driver->playing = GetBoolAttribute(current.get(), "playing", true, doc);
+      layer->timelines.push_back(std::move(driver));
+    } else {
+      ReportError(doc, current.get(),
+                  "Element '" + current->name + "' is not allowed in 'Timelines'."
+                  " Expected: Animation.");
     }
   }
 }
@@ -1694,10 +1713,6 @@ static Animation* ParseAnimation(const DOMNode* node, PAGXDocument* doc) {
   auto animation = makeNodeFromXML<Animation>(node, doc);
   if (!animation) {
     return nullptr;
-  }
-  animation->name = GetAttribute(node, "name");
-  if (animation->name.empty()) {
-    ReportError(doc, node, "Animation requires a non-empty 'name' attribute.");
   }
   animation->duration = GetIntAttribute(node, "duration", 0, doc);
   animation->frameRate = GetFloatAttribute(node, "frameRate", 60.0f, doc);

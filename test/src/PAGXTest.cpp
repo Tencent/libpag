@@ -40,6 +40,7 @@
 #include "pagx/animation/Animation.h"
 #include "pagx/animation/AnimationObject.h"
 #include "pagx/animation/Property.h"
+#include "pagx/timeline/AnimationTimeline.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -5313,8 +5314,7 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   auto solid = doc->makeNode<pagx::SolidColor>("targetSolid");
   (void)solid;
 
-  auto animation = doc->makeNode<pagx::Animation>();
-  animation->name = "main";
+  auto animation = doc->makeNode<pagx::Animation>("main");
   animation->duration = 120;
   animation->frameRate = 60;
   animation->loop = pagx::LoopMode::PingPong;
@@ -5376,7 +5376,7 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   ASSERT_EQ(loaded->animations.size(), 1u);
 
   auto* anim2 = loaded->animations[0];
-  EXPECT_EQ(anim2->name, "main");
+  EXPECT_EQ(anim2->id, "main");
   EXPECT_EQ(anim2->duration, 120);
   EXPECT_FLOAT_EQ(anim2->frameRate, 60.0f);
   EXPECT_EQ(anim2->loop, pagx::LoopMode::PingPong);
@@ -5425,8 +5425,7 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   auto layer = doc->makeNode<pagx::Layer>("L");
   doc->layers.push_back(layer);
 
-  auto animation = doc->makeNode<pagx::Animation>();
-  animation->name = "ease";
+  auto animation = doc->makeNode<pagx::Animation>("ease");
   animation->duration = 60;
   doc->animations.push_back(animation);
 
@@ -5476,14 +5475,24 @@ PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
   card->width = 80;
   card->height = 40;
 
-  auto cardAnim = doc->makeNode<pagx::Animation>();
-  cardAnim->name = "enter";
+  auto cardAnim = doc->makeNode<pagx::Animation>("enter");
   cardAnim->duration = 30;
   card->animations.push_back(cardAnim);
 
+  auto idleAnim = doc->makeNode<pagx::Animation>("idle");
+  idleAnim->duration = 60;
+  card->animations.push_back(idleAnim);
+
   auto slot = doc->makeNode<pagx::Layer>("slot");
   slot->composition = card;
-  slot->timelines = {"enter", "idle"};
+  auto enterDriver = std::make_unique<pagx::AnimationTimeline>();
+  enterDriver->animationId = "enter";
+  enterDriver->playing = true;
+  slot->timelines.push_back(std::move(enterDriver));
+  auto idleDriver = std::make_unique<pagx::AnimationTimeline>();
+  idleDriver->animationId = "idle";
+  idleDriver->playing = false;
+  slot->timelines.push_back(std::move(idleDriver));
   doc->layers.push_back(slot);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
@@ -5496,10 +5505,16 @@ PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
   ASSERT_TRUE(slot2->composition != nullptr);
   EXPECT_EQ(slot2->composition->id, "card");
   ASSERT_EQ(slot2->timelines.size(), 2u);
-  EXPECT_EQ(slot2->timelines[0], "enter");
-  EXPECT_EQ(slot2->timelines[1], "idle");
-  ASSERT_EQ(slot2->composition->animations.size(), 1u);
-  EXPECT_EQ(slot2->composition->animations[0]->name, "enter");
+  ASSERT_EQ(slot2->timelines[0]->timelineType(), pagx::TimelineType::Animation);
+  auto* loadedEnter = static_cast<pagx::AnimationTimeline*>(slot2->timelines[0].get());
+  EXPECT_EQ(loadedEnter->animationId, "enter");
+  EXPECT_TRUE(loadedEnter->playing);
+  auto* loadedIdle = static_cast<pagx::AnimationTimeline*>(slot2->timelines[1].get());
+  EXPECT_EQ(loadedIdle->animationId, "idle");
+  EXPECT_FALSE(loadedIdle->playing);
+  ASSERT_EQ(slot2->composition->animations.size(), 2u);
+  EXPECT_EQ(slot2->composition->animations[0]->id, "enter");
+  EXPECT_EQ(slot2->composition->animations[1]->id, "idle");
 }
 
 /**
@@ -5552,14 +5567,12 @@ PAGX_TEST(PAGXTest, PAGFileLiveFileRegistration) {
 PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
-  auto main = doc->makeNode<pagx::Animation>();
-  main->name = "main";
+  auto main = doc->makeNode<pagx::Animation>("main");
   main->duration = 60;
   main->frameRate = 60;
   doc->animations.push_back(main);
 
-  auto hint = doc->makeNode<pagx::Animation>();
-  hint->name = "hint";
+  auto hint = doc->makeNode<pagx::Animation>("hint");
   hint->duration = 30;
   hint->frameRate = 60;
   doc->animations.push_back(hint);
@@ -5567,16 +5580,16 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  auto names = file->getTimelineNames();
-  ASSERT_EQ(names.size(), 2u);
-  EXPECT_EQ(names[0], "main");
-  EXPECT_EQ(names[1], "hint");
+  auto ids = file->getTimelineIds();
+  ASSERT_EQ(ids.size(), 2u);
+  EXPECT_EQ(ids[0], "main");
+  EXPECT_EQ(ids[1], "hint");
 
   auto t1 = file->getTimeline("main");
   auto t1Again = file->getTimeline("main");
   ASSERT_TRUE(t1 != nullptr);
   EXPECT_EQ(t1.get(), t1Again.get());
-  EXPECT_EQ(t1->getName(), "main");
+  EXPECT_EQ(t1->getId(), "main");
   EXPECT_EQ(t1->getDuration(), 1'000'000);
 
   auto t2 = file->getTimeline("hint");
@@ -5596,8 +5609,7 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
 PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
 
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "loop";
+  auto anim = doc->makeNode<pagx::Animation>("loop");
   anim->duration = 60;
   anim->frameRate = 60;
   anim->loop = pagx::LoopMode::Loop;
@@ -5635,8 +5647,7 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   EXPECT_FALSE(timeline->isPlaying());
   EXPECT_EQ(timeline->currentTime(), 0);
 
-  auto onceAnim = doc->makeNode<pagx::Animation>();
-  onceAnim->name = "once";
+  auto onceAnim = doc->makeNode<pagx::Animation>("once");
   onceAnim->duration = 60;
   onceAnim->frameRate = 60;
   onceAnim->loop = pagx::LoopMode::Once;
@@ -5650,11 +5661,16 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
 }
 
 /**
- * Test case: PAGSurface skeleton currently returns nullptr for offscreen creation (PR5).
+ * Test case: PAGSurface::MakeOffscreen creates a real GPU-backed surface with the requested size.
  */
-PAGX_TEST(PAGXTest, PAGSurfaceSkeleton) {
-  auto surface = pagx::PAGSurface::MakeOffscreen(64, 64);
-  EXPECT_EQ(surface, nullptr);
+PAGX_TEST(PAGXTest, PAGSurfaceMakeOffscreen) {
+  auto surface = pagx::PAGSurface::MakeOffscreen(64, 48);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), 64);
+  EXPECT_EQ(surface->height(), 48);
+
+  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(0, 48), nullptr);
+  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(64, -1), nullptr);
 }
 
 /**
@@ -5666,8 +5682,7 @@ PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
   layer->width = 50;
   layer->height = 50;
   doc->layers.push_back(layer);
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "anim";
+  auto anim = doc->makeNode<pagx::Animation>("anim");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5714,8 +5729,7 @@ PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
   layer->width = 10;
   layer->height = 10;
   doc->layers.push_back(layer);
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "anim";
+  auto anim = doc->makeNode<pagx::Animation>("anim");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5753,8 +5767,7 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   layer->width = 10;
   layer->height = 10;
   doc->layers.push_back(layer);
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "anim";
+  auto anim = doc->makeNode<pagx::Animation>("anim");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5795,8 +5808,7 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
   fill->color = solid;
   layer->contents.push_back(fill);
 
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "a";
+  auto anim = doc->makeNode<pagx::Animation>("a");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5857,8 +5869,7 @@ PAGX_TEST(PAGXTest, ChannelColorStop) {
   fill->color = gradient;
   layer->contents.push_back(fill);
 
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "a";
+  auto anim = doc->makeNode<pagx::Animation>("a");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5906,8 +5917,7 @@ PAGX_TEST(PAGXTest, ChannelBlurFilter) {
   blur->blurY = 2.0f;
   layer->filters.push_back(blur);
 
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "a";
+  auto anim = doc->makeNode<pagx::Animation>("a");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -5961,8 +5971,7 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   dsStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
   layer->styles.push_back(dsStyle);
 
-  auto anim = doc->makeNode<pagx::Animation>();
-  anim->name = "a";
+  auto anim = doc->makeNode<pagx::Animation>("a");
   anim->duration = 60;
   anim->frameRate = 60;
   doc->animations.push_back(anim);
@@ -6003,6 +6012,24 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   EXPECT_FLOAT_EQ(sIt->second->blurrinessY(), 12.0f);
 }
 
+namespace {
+static pagx::Animation* MakeAlphaAnim(pagx::PAGXDocument* doc, const std::string& id,
+                                      float value) {
+  auto anim = doc->makeNode<pagx::Animation>(id);
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "L";
+  anim->objects.push_back(obj);
+  auto* p = doc->makeNode<pagx::TypedProperty<float>>();
+  p->channel = "alpha";
+  p->keyframes.push_back({0, value, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(p);
+  return anim;
+}
+}  // namespace
+
 /**
  * Test case: Two timelines targeting the same channel stack in apply() order; later writer mixes
  * against the earlier writer's result.
@@ -6014,23 +6041,8 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
   layer->height = 10;
   doc->layers.push_back(layer);
 
-  auto makeAlphaAnim = [&](const std::string& name, float value) {
-    auto anim = doc->makeNode<pagx::Animation>();
-    anim->name = name;
-    anim->duration = 60;
-    anim->frameRate = 60;
-    doc->animations.push_back(anim);
-    auto* obj = doc->makeNode<pagx::AnimationObject>();
-    obj->target = "L";
-    anim->objects.push_back(obj);
-    auto* p = doc->makeNode<pagx::TypedProperty<float>>();
-    p->channel = "alpha";
-    p->keyframes.push_back({0, value, pagx::KeyframeInterpolationType::Hold, {}, {}});
-    obj->properties.push_back(p);
-    return anim;
-  };
-  makeAlphaAnim("base", 0.0f);
-  makeAlphaAnim("hint", 1.0f);
+  MakeAlphaAnim(doc.get(), "base", 0.0f);
+  MakeAlphaAnim(doc.get(), "hint", 1.0f);
 
   auto file = pagx::PAGFile::Make(doc);
   auto& tree = file->layerTree->tree;
@@ -6045,6 +6057,64 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
   EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.0f);
   hint->apply(0.3f);
   EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+}
+
+/**
+ * Test case: end-to-end PAGFile::draw renders a SolidColor layer into a PAGSurface and the
+ * resulting pixels match the channel-applied color.
+ */
+PAGX_TEST(PAGXTest, PAGFileDrawAndReadPixels) {
+  auto doc = pagx::PAGXDocument::Make(8, 8);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 8;
+  layer->height = 8;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 8;
+  rect->size.height = 8;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  prop->channel = "color";
+  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(prop);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
+  ASSERT_TRUE(surface != nullptr);
+
+  ASSERT_TRUE(file->draw(surface));
+
+  std::vector<uint8_t> pixels(8 * 8 * 4, 0);
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
+
+  // Inspect the center pixel; the layer covers the whole 8x8 surface so any inner pixel works.
+  size_t i = (4 * 8 + 4) * 4;
+  EXPECT_EQ(pixels[i + 0], 255);
+  EXPECT_EQ(pixels[i + 1], 0);
+  EXPECT_EQ(pixels[i + 2], 0);
+  EXPECT_EQ(pixels[i + 3], 255);
 }
 
 }  // namespace pag

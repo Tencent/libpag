@@ -20,6 +20,7 @@
 
 #include "pagx/PAGFile.h"
 #include "renderer/LayerBuilder.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
 
@@ -28,6 +29,8 @@ namespace pagx {
 // pulling tgfx layer types into the public API.
 struct PAGFile::LayerTreeStorage {
   PAGLayerTree tree = {};
+  tgfx::DisplayList displayList;
+  bool rootAttached = false;
 };
 
 }  // namespace pagx

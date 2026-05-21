@@ -23,6 +23,7 @@
 #include "pagx/runtime/AnimContext.h"
 #include "pagx/runtime/ChannelRegistry.h"
 #include "pagx/runtime/PAGFileInternal.h"
+#include "pagx/runtime/PAGSurfaceImpl.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
@@ -50,27 +51,27 @@ PAGFile::~PAGFile() {
   }
 }
 
-std::vector<std::string> PAGFile::getTimelineNames() const {
-  std::vector<std::string> names = {};
+std::vector<std::string> PAGFile::getTimelineIds() const {
+  std::vector<std::string> ids = {};
   if (document == nullptr) {
-    return names;
+    return ids;
   }
-  names.reserve(document->animations.size());
+  ids.reserve(document->animations.size());
   for (auto* animation : document->animations) {
     if (animation != nullptr) {
-      names.push_back(animation->name);
+      ids.push_back(animation->id);
     }
   }
-  return names;
+  return ids;
 }
 
-std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& name) {
+std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& id) {
   if (document == nullptr) {
     return nullptr;
   }
   Animation* matched = nullptr;
   for (auto* animation : document->animations) {
-    if (animation != nullptr && animation->name == name) {
+    if (animation != nullptr && animation->id == id) {
       matched = animation;
       break;
     }
@@ -96,12 +97,27 @@ std::shared_ptr<PAGTimeline> PAGFile::getDefaultTimeline() {
   if (first == nullptr) {
     return nullptr;
   }
-  return getTimeline(first->name);
+  return getTimeline(first->id);
 }
 
-bool PAGFile::draw(const std::shared_ptr<PAGSurface>& /*surface*/) {
-  // TODO(PR5/PR6): wire to tgfx::DisplayList draw against the surface backend.
-  return false;
+bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
+  if (surface == nullptr || surface->impl == nullptr || surface->impl->surface == nullptr) {
+    return false;
+  }
+  if (layerTree == nullptr || layerTree->tree.root == nullptr) {
+    return false;
+  }
+  if (!layerTree->rootAttached) {
+    layerTree->displayList.root()->addChild(layerTree->tree.root);
+    layerTree->rootAttached = true;
+  }
+  auto* context = surface->impl->device->lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  layerTree->displayList.render(surface->impl->surface.get());
+  surface->impl->device->unlock();
+  return true;
 }
 
 float PAGFile::getWidth() const {

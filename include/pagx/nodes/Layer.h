@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/nodes/LayoutNode.h"
@@ -26,6 +27,7 @@
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/timeline/Timeline.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
@@ -141,11 +143,12 @@ class Layer : public Node, public LayoutNode {
   Composition* composition = nullptr;
 
   /**
-   * The names of timelines (animations defined inside the referenced composition) to activate when
-   * this layer references a composition. Empty list means the composition is rendered statically
-   * with no internal timeline running.
+   * Timeline entries to activate when this layer references a Composition. Each entry is a
+   * polymorphic Timeline subclass (AnimationTimeline in v1) describing a time-driven behavior to
+   * attach to the runtime sub-tree. An empty list means the composition is rendered statically
+   * with no timeline running.
    */
-  std::vector<std::string> timelines = {};
+  std::vector<std::unique_ptr<Timeline>> timelines = {};
 
   /**
    * The vector elements contained in this layer (geometry, painters, modifiers, etc.).

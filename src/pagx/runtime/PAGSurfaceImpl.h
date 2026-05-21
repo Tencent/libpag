@@ -18,36 +18,18 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/animation/Keyframe.h"
-#include "pagx/nodes/Node.h"
+#include <memory>
+#include "pagx/PAGSurface.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Device.h"
 
 namespace pagx {
 
-class AnimationObject;
-
-enum class LoopMode { Once, Loop, PingPong };
-
-/**
- * Animation defines a named timeline composed of Object/Property/Keyframe entries. The animation
- * is identified by Node::id, which must be unique within the owning PAGXDocument. References from
- * Layer.timelines drivers look up animations via this id.
- */
-class Animation : public Node {
- public:
-  Frame duration = 0;
-  float frameRate = 60.0f;
-  LoopMode loop = LoopMode::Once;
-  std::vector<AnimationObject*> objects = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Animation;
-  }
-
- private:
-  Animation() = default;
-
-  friend class PAGXDocument;
+// Concrete definition of the opaque PAGSurface::Impl forward-declared in PAGSurface.h. Internal
+// to the runtime layer; not exposed in any public header.
+struct PAGSurface::Impl {
+  std::shared_ptr<tgfx::Device> device = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
 };
 
 }  // namespace pagx

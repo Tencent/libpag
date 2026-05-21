@@ -23,6 +23,7 @@
 #include "pagx/animation/Animation.h"
 #include "pagx/animation/AnimationObject.h"
 #include "pagx/animation/Property.h"
+#include "pagx/timeline/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -248,7 +249,7 @@ static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& anim
   xml.closeElementStart();
   for (const auto* animation : animations) {
     xml.openElement("Animation");
-    xml.addRequiredAttribute("name", animation->name);
+    xml.addAttribute("id", animation->id);
     xml.addRequiredAttribute("duration", animation->duration);
     xml.addAttribute("frameRate", animation->frameRate, 60.0f);
     xml.addAttribute("loop", LoopModeToString(animation->loop));
@@ -1248,16 +1249,6 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (node->composition != nullptr && !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
   }
-  if (!node->timelines.empty()) {
-    std::string timelines;
-    for (size_t i = 0; i < node->timelines.size(); ++i) {
-      if (i > 0) {
-        timelines += ",";
-      }
-      timelines += node->timelines[i];
-    }
-    xml.addAttribute("timelines", timelines);
-  }
 
   // Build directive attributes.
   xml.addAttribute("import", node->importDirective.source);
@@ -1267,7 +1258,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty() || !node->importDirective.content.empty() ||
+                     !node->children.empty() || !node->timelines.empty() ||
+                     !node->importDirective.content.empty() ||
                      !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
@@ -1299,6 +1291,25 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   // Write LayerFilter (filters) directly without container node.
   for (const auto& filter : node->filters) {
     WriteLayerFilter(xml, filter);
+  }
+
+  // Write Timelines container with one child per Timeline driver.
+  if (!node->timelines.empty()) {
+    xml.openElement("Timelines");
+    xml.closeElementStart();
+    for (const auto& timeline : node->timelines) {
+      switch (timeline->timelineType()) {
+        case TimelineType::Animation: {
+          auto* anim = static_cast<const AnimationTimeline*>(timeline.get());
+          xml.openElement("Animation");
+          xml.addRequiredAttribute("ref", "@" + anim->animationId);
+          xml.addAttribute("playing", anim->playing, true);
+          xml.closeElementSelfClosing();
+          break;
+        }
+      }
+    }
+    xml.closeElement();
   }
 
   // Write child Layers.

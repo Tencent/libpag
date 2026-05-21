@@ -40,9 +40,9 @@ class PAGTimeline {
   ~PAGTimeline() = default;
 
   /**
-   * Returns the animation name. Equal to the corresponding Animation::name in the source document.
+   * Returns the animation id. Equal to the corresponding Animation::id in the source document.
    */
-  const std::string& getName() const;
+  const std::string& getId() const;
 
   /**
    * Returns the animation duration in microseconds, derived from Animation::duration (in frames)

@@ -39,9 +39,9 @@ PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim)
     : ownerFile(std::move(file)), animation(anim) {
 }
 
-const std::string& PAGTimeline::getName() const {
+const std::string& PAGTimeline::getId() const {
   static const std::string kEmpty;
-  return animation != nullptr ? animation->name : kEmpty;
+  return animation != nullptr ? animation->id : kEmpty;
 }
 
 int64_t PAGTimeline::getDuration() const {

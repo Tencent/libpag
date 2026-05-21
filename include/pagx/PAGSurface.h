@@ -18,13 +18,17 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 namespace pagx {
 
+class PAGFile;
+
 /**
- * PAGSurface is a render target that PAGFile draws into. It is a thin opaque wrapper around the
- * underlying graphics surface; no platform or rendering backend types are exposed by this header.
+ * PAGSurface is a render target that PAGFile draws into. It is a thin opaque wrapper around an
+ * underlying tgfx::Surface and the GPU device that owns it; no platform or rendering backend
+ * types are exposed by this header.
  *
  * A PAGSurface is passive: it never advances time or owns a PAGFile, and the same PAGSurface may
  * be drawn into by multiple PAGFile instances in sequence.
@@ -33,13 +37,16 @@ class PAGSurface {
  public:
   /**
    * Creates an offscreen surface with the given pixel dimensions. Returns nullptr if the size is
-   * invalid or the platform backend is unavailable.
+   * invalid or no GPU backend is available on the calling thread.
    * @param width  surface width in pixels, must be greater than zero.
    * @param height surface height in pixels, must be greater than zero.
    */
   static std::shared_ptr<PAGSurface> MakeOffscreen(int width, int height);
 
-  virtual ~PAGSurface() = default;
+  ~PAGSurface();
+
+  PAGSurface(const PAGSurface&) = delete;
+  PAGSurface& operator=(const PAGSurface&) = delete;
 
   /**
    * Returns the surface width in pixels.
@@ -55,13 +62,26 @@ class PAGSurface {
     return surfaceHeight;
   }
 
- protected:
-  PAGSurface(int width, int height) : surfaceWidth(width), surfaceHeight(height) {
-  }
+  /**
+   * Copies pixels from the surface into dstPixels. Pixels are written as RGBA_8888 with
+   * premultiplied alpha and rowBytes equal to the row stride of the destination buffer.
+   * The destination buffer must hold at least height() * dstRowBytes bytes, with
+   * dstRowBytes >= width() * 4. Returns true on success.
+   * @param dstPixels   pointer to destination buffer, must not be null.
+   * @param dstRowBytes number of bytes per destination row.
+   */
+  bool readPixels(void* dstPixels, size_t dstRowBytes);
 
  private:
+  struct Impl;
+
+  PAGSurface(std::unique_ptr<Impl> impl, int width, int height);
+
+  std::unique_ptr<Impl> impl;
   int surfaceWidth = 0;
   int surfaceHeight = 0;
+
+  friend class PAGFile;
 };
 
 }  // namespace pagx
