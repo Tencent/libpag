@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -68,42 +67,12 @@ class TypedProperty : public Property {
   std::vector<Keyframe<T>> keyframes = {};
 
  private:
-  KeyValue onEvaluateAtFrame(Frame frame) const override {
-    if (keyframes.empty()) {
-      return T{};
-    }
-    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), frame,
-                               [](Frame value, const Keyframe<T>& keyframe) {
-                                 return value < keyframe.time;
-                               });
-    if (it == keyframes.begin()) {
-      return it->value;
-    }
-    --it;
-    return it->value;
-  }
-
-  KeyValue onEvaluateAtMicros(int64_t microseconds, float frameRate) const override {
-    if (keyframes.empty()) {
-      return T{};
-    }
-    // Compute continuous frame position in double precision so callers driving the timeline by
-    // microsecond deltas don't lose precision in the floor-to-Frame conversion.
-    double framePosition = frameRate > 0.0f ? static_cast<double>(microseconds) *
-                                                  static_cast<double>(frameRate) / 1.0e6
-                                            : 0.0;
-    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
-                               [](double value, const Keyframe<T>& keyframe) {
-                                 return value < static_cast<double>(keyframe.time);
-                               });
-    if (it == keyframes.begin()) {
-      return it->value;
-    }
-    --it;
-    // PR8 will replace this Hold-only baseline with Linear/Bezier interpolation that uses
-    // framePosition for high precision.
-    return it->value;
-  }
+  // Defined in src/pagx/animation/Property.cpp with explicit instantiations for each KeyValue
+  // alternative (float, bool, int, std::string, ImageRef, Color). The implementation runs through
+  // the runtime KeyframeEvaluator helper so that bezier easing and Color/float lerp logic stay
+  // out of this public header.
+  KeyValue onEvaluateAtFrame(Frame frame) const override;
+  KeyValue onEvaluateAtMicros(int64_t microseconds, float frameRate) const override;
 
   friend class PAGXDocument;
 };

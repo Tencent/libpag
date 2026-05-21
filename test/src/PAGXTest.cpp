@@ -6117,4 +6117,127 @@ PAGX_TEST(PAGXTest, PAGFileDrawAndReadPixels) {
   EXPECT_EQ(pixels[i + 3], 255);
 }
 
+/**
+ * Test case: Linear interpolation between two float keyframes returns midpoint values at half
+ * progress and exact endpoints at the boundaries.
+ */
+PAGX_TEST(PAGXTest, KeyframeLinearFloat) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0, 60.0f)), 0.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(500'000, 60.0f)), 0.5f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(1'000'000, 60.0f)), 1.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(2'000'000, 60.0f)), 1.0f);   // clamp end
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(-100'000, 60.0f)), 0.0f);    // clamp start
+}
+
+/**
+ * Test case: Hold interpolation returns the start value across the entire segment.
+ */
+PAGX_TEST(PAGXTest, KeyframeHoldFloat) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  prop->keyframes.push_back({60, 0.75f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0, 60.0f)), 0.25f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(300'000, 60.0f)), 0.25f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(900'000, 60.0f)), 0.25f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(1'000'000, 60.0f)), 0.75f);
+}
+
+/**
+ * Test case: Bezier interpolation with the standard ease curve cubic-bezier(0.42,0,0.58,1) is
+ * monotonic, anchored at endpoints, and crosses 0.5 near the midpoint of the segment.
+ */
+PAGX_TEST(PAGXTest, KeyframeBezierFloatStandardEase) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Bezier,
+                             pagx::Point{0.42f, 0.0f}, {}});
+  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::None, {},
+                             pagx::Point{0.58f, 1.0f}});
+
+  // Endpoints anchor exactly.
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0, 60.0f)), 0.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(1'000'000, 60.0f)), 1.0f);
+
+  // Symmetric ease should pass through 0.5 at the temporal midpoint.
+  auto mid = std::get<float>(prop->evaluateAt(500'000, 60.0f));
+  EXPECT_NEAR(mid, 0.5f, 1.0e-3f);
+
+  // Monotonic increasing.
+  auto q1 = std::get<float>(prop->evaluateAt(250'000, 60.0f));
+  auto q3 = std::get<float>(prop->evaluateAt(750'000, 60.0f));
+  EXPECT_GT(q1, 0.0f);
+  EXPECT_LT(q1, mid);
+  EXPECT_GT(q3, mid);
+  EXPECT_LT(q3, 1.0f);
+}
+
+/**
+ * Test case: Color keyframes lerp per RGBA component with linear interpolation.
+ */
+PAGX_TEST(PAGXTest, KeyframeLinearColor) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto* prop = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  prop->keyframes.push_back({60, blue, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto mid = std::get<pagx::Color>(prop->evaluateAt(500'000, 60.0f));
+  EXPECT_FLOAT_EQ(mid.red, 0.5f);
+  EXPECT_FLOAT_EQ(mid.green, 0.0f);
+  EXPECT_FLOAT_EQ(mid.blue, 0.5f);
+  EXPECT_FLOAT_EQ(mid.alpha, 1.0f);
+}
+
+/**
+ * Test case: Discrete keyframe types (bool, int, std::string) ignore Linear/Bezier interpolation
+ * and fall back to Hold semantics — value jumps at the segment boundary instead of blending.
+ */
+PAGX_TEST(PAGXTest, KeyframeDiscreteHold) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+
+  auto* boolProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  boolProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  boolProp->keyframes.push_back({60, true, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  EXPECT_FALSE(std::get<bool>(boolProp->evaluateAt(500'000, 60.0f)));
+  EXPECT_TRUE(std::get<bool>(boolProp->evaluateAt(1'000'000, 60.0f)));
+
+  auto* intProp = doc->makeNode<pagx::TypedProperty<int>>();
+  intProp->keyframes.push_back({0, 1, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  intProp->keyframes.push_back({60, 4, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  EXPECT_EQ(std::get<int>(intProp->evaluateAt(500'000, 60.0f)), 1);
+  EXPECT_EQ(std::get<int>(intProp->evaluateAt(1'000'000, 60.0f)), 4);
+
+  auto* strProp = doc->makeNode<pagx::TypedProperty<std::string>>();
+  strProp->keyframes.push_back(
+      {0, std::string("a"), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  strProp->keyframes.push_back(
+      {60, std::string("b"), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  EXPECT_EQ(std::get<std::string>(strProp->evaluateAt(500'000, 60.0f)), "a");
+  EXPECT_EQ(std::get<std::string>(strProp->evaluateAt(1'000'000, 60.0f)), "b");
+}
+
+/**
+ * Test case: evaluateAt(microseconds, frameRate) is consistent with evaluateAt(frame) at exact
+ * keyframe times for Linear interpolation, and continuous in between for the float path.
+ */
+PAGX_TEST(PAGXTest, KeyframeMicrosVsFrameAlignment) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  // Frame 30 corresponds to 500_000 microseconds at 60 fps.
+  auto byMicros = std::get<float>(prop->evaluateAt(500'000, 60.0f));
+  auto byFrame = std::get<float>(prop->evaluateAt(30));
+  EXPECT_NEAR(byMicros, byFrame, 1.0e-6f);
+}
+
 }  // namespace pag
