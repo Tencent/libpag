@@ -121,6 +121,14 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _canvasHeight = canvasH;
   _document = PAGXDocument::Make(canvasResolved ? canvasW : 0.0f, canvasResolved ? canvasH : 0.0f);
 
+  // Seed the document's font registry from the caller-supplied FontConfig before any
+  // discovery happens, so registered typefaces and pre-configured fallbacks are in place
+  // when `flushFontFallbacksToDocument()` later layers the CSS-discovered family names on
+  // top as additional deferred fallbacks.
+  if (_options.fontConfig != nullptr) {
+    _document->fontConfig() = *_options.fontConfig;
+  }
+
   // Now that the document exists, flush any pending diagnostics gathered before its creation.
   for (auto& msg : _pendingDiagnostics) {
     _document->errors.push_back(std::move(msg));

@@ -25,6 +25,8 @@
 
 namespace pagx {
 
+class FontConfig;
+
 /**
  * HTMLImporter converts a restricted subset of HTML/CSS to a PAGX Document.
  *
@@ -92,6 +94,21 @@ class HTMLImporter {
      * heuristic — opt in explicitly). No effect when `autoNormalize` is false.
      */
     bool inferFlexFromAbsolute = false;
+
+    /**
+     * Optional FontConfig seeded into the produced document's `fontConfig()`. When provided,
+     * the entire config (registered typefaces, deferred fallback fonts, raw fallback typefaces)
+     * is copied onto the new document before traversal begins, so the caller's custom fonts
+     * are available at layout time. The importer then layers the concrete family names it
+     * discovers in CSS `font-family` stacks on top as additional deferred fallbacks (so
+     * per-glyph fallback in `LayoutContext` can still find them). Pass nullptr (default) to
+     * start the document with an empty font config — the importer will still populate it with
+     * the discovered fallback families.
+     *
+     * Note: only the contents at call time are copied; the pointer does not need to outlive
+     * the returned document.
+     */
+    FontConfig* fontConfig = nullptr;
 
     Options() {
     }
