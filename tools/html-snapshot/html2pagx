@@ -3,9 +3,9 @@
 # rendered PAGX. Wraps four steps:
 #
 #   1. snapshot.js     <input>.html        → <input>.subset.html
-#   2. pagx import     <input>.subset.html → <input>.subset.pagx
-#   3. pagx resolve    <input>.subset.pagx
-#   4. pagx render     <input>.subset.pagx → <input>.subset.png
+#   2. pagx import     <input>.subset.html → <input>.pagx
+#   3. pagx resolve    <input>.pagx
+#   4. pagx render     <input>.pagx        → <input>.png
 #
 # Usage:
 #   html2pagx <input.html | http(s)://url> [options]
@@ -19,6 +19,8 @@
 #   --no-render                Stop after pagx resolve; do not produce PNG
 #   --no-resolve               Stop after pagx import; do not run resolve/render
 #   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
+#   --no-subset-html           Do not write <input>.subset.html (use a temp file
+#                              that is removed after import); default keeps it
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   -h, --help                 Show this help
@@ -49,6 +51,7 @@ SCALE="2"
 DO_RESOLVE=1
 DO_RENDER=1
 INFER_FLEX=1
+KEEP_SUBSET_HTML=1
 SNAPSHOT_EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -84,6 +87,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-infer-flex)
       INFER_FLEX=0
+      shift
+      ;;
+    --no-subset-html)
+      KEEP_SUBSET_HTML=0
       shift
       ;;
     --viewport-width|--viewport-height|--wait-ms|--selector|--cookie|--header)
@@ -161,8 +168,16 @@ else
 fi
 
 SUBSET_HTML="$OUT_DIR/${INPUT_BASE}.subset.html"
-SUBSET_PAGX="$OUT_DIR/${INPUT_BASE}.subset.pagx"
-SUBSET_PNG="$OUT_DIR/${INPUT_BASE}.subset.png"
+PAGX_FILE="$OUT_DIR/${INPUT_BASE}.pagx"
+PNG_FILE="$OUT_DIR/${INPUT_BASE}.png"
+
+# When the user opts out of keeping the subset HTML on disk, redirect it into a
+# self-cleaning temp directory so the pagx import step still has a file to read.
+if [[ "$KEEP_SUBSET_HTML" -ne 1 ]]; then
+  TMP_DIR="$(mktemp -d -t html2pagx)"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  SUBSET_HTML="$TMP_DIR/${INPUT_BASE}.subset.html"
+fi
 
 #--------------------------------------------------------------------------------------------------
 # Pre-flight
@@ -213,7 +228,7 @@ node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" "${SNAPSHOT_EXTRA_
 # Step 2: pagx import
 #--------------------------------------------------------------------------------------------------
 echo "[2/$TOTAL_STEPS] import    $SUBSET_HTML"
-IMPORT_ARGS=(--input "$SUBSET_HTML" --output "$SUBSET_PAGX")
+IMPORT_ARGS=(--input "$SUBSET_HTML" --output "$PAGX_FILE")
 if [[ "$INFER_FLEX" -eq 1 ]]; then
   IMPORT_ARGS+=(--html-infer-flex)
 fi
@@ -223,33 +238,33 @@ fi
   | grep -v "warning: html: position: absolute on text leaf" \
   || true
 
-if [[ ! -f "$SUBSET_PAGX" ]]; then
-  echo "html2pagx: pagx import did not produce $SUBSET_PAGX" >&2
+if [[ ! -f "$PAGX_FILE" ]]; then
+  echo "html2pagx: pagx import did not produce $PAGX_FILE" >&2
   exit 1
 fi
 
 if [[ "$DO_RESOLVE" -ne 1 ]]; then
-  echo "[done] wrote $SUBSET_PAGX (skipped resolve+render)"
+  echo "[done] wrote $PAGX_FILE (skipped resolve+render)"
   exit 0
 fi
 
 #--------------------------------------------------------------------------------------------------
 # Step 3: pagx resolve
 #--------------------------------------------------------------------------------------------------
-echo "[3/$TOTAL_STEPS] resolve   $SUBSET_PAGX"
-"$PAGX_BIN" resolve "$SUBSET_PAGX" \
+echo "[3/$TOTAL_STEPS] resolve   $PAGX_FILE"
+"$PAGX_BIN" resolve "$PAGX_FILE" \
   || { echo "html2pagx: pagx resolve failed" >&2; exit 1; }
 
 if [[ "$DO_RENDER" -ne 1 ]]; then
-  echo "[done] wrote $SUBSET_PAGX (skipped render)"
+  echo "[done] wrote $PAGX_FILE (skipped render)"
   exit 0
 fi
 
 #--------------------------------------------------------------------------------------------------
 # Step 4: pagx render
 #--------------------------------------------------------------------------------------------------
-echo "[4/$TOTAL_STEPS] render    $SUBSET_PAGX  ->  $SUBSET_PNG (scale=$SCALE)"
-"$PAGX_BIN" render "$SUBSET_PAGX" --output "$SUBSET_PNG" --scale "$SCALE" \
+echo "[4/$TOTAL_STEPS] render    $PAGX_FILE  ->  $PNG_FILE (scale=$SCALE)"
+"$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE" \
   || { echo "html2pagx: pagx render failed" >&2; exit 1; }
 
-echo "[done] $SUBSET_PNG"
+echo "[done] $PNG_FILE"

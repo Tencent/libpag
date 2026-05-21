@@ -95,15 +95,15 @@ one call:
 
 ```bash
 tools/html-snapshot/html2pagx /path/to/page.html
-# → page.subset.html  (flat, subset-compliant)
-# → page.subset.pagx  (after import + resolve)
-# → page.subset.png   (rendered at scale=1)
+# → page.subset.html  (flat, subset-compliant; suppress with --no-subset-html)
+# → page.pagx         (after import + resolve)
+# → page.png          (rendered at scale=2)
 
 # URL input: --output-name is required (URLs have no filesystem basename)
 tools/html-snapshot/html2pagx https://example.com/demo \
   --output-name demo --output-dir /tmp/out \
   --cookie session=abc123 --header 'X-User: alice'
-# → /tmp/out/demo.subset.html / .pagx / .png
+# → /tmp/out/demo.subset.html / demo.pagx / demo.png
 ```
 
 Options:
@@ -113,9 +113,10 @@ Options:
 | `-o, --output-dir <dir>` | Write outputs to a different directory |
 | `--output-name <name>` | Base name for outputs (required when input is a URL) |
 | `--pagx-bin <path>` | Path to the `pagx` CLI binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
-| `--scale <N>` | PNG render scale (default 1) |
+| `--scale <N>` | PNG render scale (default 2) |
 | `--no-render` | Stop after `pagx resolve` |
 | `--no-resolve` | Stop after `pagx import` |
+| `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
 
@@ -123,9 +124,9 @@ Options:
 
 ```bash
 node tools/html-snapshot/snapshot.js xiaohongshu_react.html
-pagx import --format html --input xiaohongshu_react.subset.html
-pagx resolve xiaohongshu_react.subset.pagx
-pagx render xiaohongshu_react.subset.pagx -o xiaohongshu_react.subset.png --scale 2
+pagx import --format html --input xiaohongshu_react.subset.html --output xiaohongshu_react.pagx
+pagx resolve xiaohongshu_react.pagx
+pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
 ```
 
 ## Limitations
