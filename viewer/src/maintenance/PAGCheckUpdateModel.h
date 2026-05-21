@@ -38,6 +38,8 @@ class PAGCheckUpdateModel : public QObject {
   QMap<QString, QString> availableUpdates = {};
 
  private:
+  void finalizeUpdateCheck(const QString& selectedUrl);
+
   bool isUseBeta = false;
   bool keepSilent = false;
   bool fetchingAppcast = false;

@@ -74,6 +74,9 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
     availableUpdateUrls.push_back(updateUrl);
   }
 
+  // Each PAGUpdateVersionFetcherTask::parseAppcast always emits versionFound (with fallback
+  // version "0" on parse failure), ensuring getUpdateVersion collects all responses and resets
+  // fetchingAppcast. If parseAppcast is modified, this invariant must be preserved.
   for (const auto& url : availableUpdateUrls) {
     auto* task = new PAGUpdateVersionFetcherTask(url);
     task->setAutoDelete(false);
@@ -106,12 +109,14 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
     }
   }
 
-  QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
-    availableUpdates.clear();
-    availableUpdateUrls.clear();
-    fetchingAppcast = false;
-    CheckForUpdates(keepSilent, selectedUrl.toStdString());
-  });
+  finalizeUpdateCheck(selectedUrl);
+}
+
+void PAGCheckUpdateModel::finalizeUpdateCheck(const QString& selectedUrl) {
+  availableUpdates.clear();
+  availableUpdateUrls.clear();
+  fetchingAppcast = false;
+  CheckForUpdates(keepSilent, selectedUrl.toStdString());
 }
 
 int PAGCheckUpdateModel::CompareAppVersion(const QString& version1, const QString& version2) {
