@@ -45,7 +45,9 @@ const libDir = path.resolve(__dirname, '../lib');
 
 // Copy the wasm next to the bundle. For the single-threaded build, the wasm is renamed
 // with the `.st` infix; the emcc glue's hard-coded `new URL("pagx-viewer.wasm", ...)` is
-// rewritten to the matching name later by script/fix-wasm-imports.js.
+// rewritten to the matching name later by script/fix-wasm-imports.js. The matching
+// `*.wasm.symbols` map (release builds only) is copied alongside for stack-trace
+// symbolization; debug builds don't emit one, so its absence is silently ignored.
 const copyWasmPlugin = {
   name: 'copy-wasm',
   writeBundle() {
@@ -55,24 +57,30 @@ const copyWasmPlugin = {
       mkdirSync(libDir, { recursive: true });
     }
 
-    // Copy wasm file
-    const wasmFile = path.join(wasmDir, 'pagx-viewer.wasm');
-    if (existsSync(wasmFile)) {
-      copyFileSync(wasmFile, path.join(libDir, `pagx-viewer${nameInfix}.wasm`));
+    const artifacts = [
+      { src: 'pagx-viewer.wasm', dst: `pagx-viewer${nameInfix}.wasm` },
+      { src: 'pagx-viewer.wasm.symbols', dst: `pagx-viewer${nameInfix}.wasm.symbols` },
+    ];
+    for (const { src, dst } of artifacts) {
+      const srcPath = path.join(wasmDir, src);
+      if (existsSync(srcPath)) {
+        copyFileSync(srcPath, path.join(libDir, dst));
+      }
     }
   },
 };
 
 const plugins = [
   // MUST stay before resolve()/esbuild() — see PR #3436. Otherwise node-resolve will
-  // resolve `../../wasm-mt/pagx-viewer` to a concrete file before alias rewrites it,
-  // and the single-threaded bundle will silently inline the multi-threaded glue.
+  // resolve the `pagx-glue` import to a concrete file before alias rewrites it, and
+  // the single-threaded bundle will silently inline the multi-threaded glue.
   alias({
     entries: [
       { find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') },
-      // Redirect the wasm glue import in pagx.ts to the requested arch's output directory.
+      // Redirect the virtual `pagx-glue` import in pagx.ts to the requested arch's output
+      // directory. The same module name is mapped via tsconfig `paths` for type generation.
       {
-        find: '../../wasm-mt/pagx-viewer',
+        find: 'pagx-glue',
         replacement: path.resolve(__dirname, `../${arch}/pagx-viewer`),
       },
     ],
