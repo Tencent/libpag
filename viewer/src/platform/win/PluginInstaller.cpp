@@ -380,10 +380,8 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   for (const QString& plugin : plugins) {
     auto permission = getPluginPermission(plugin);
     if (permission == PluginPermission::User) {
-      if (plugin == "H264EncoderTools") {
-        if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
-          userPluginSuccess = false;
-        }
+      if (!copyUserPluginWithRetry(plugin, MaxCopyRetries)) {
+        userPluginSuccess = false;
       }
       continue;
     }
@@ -529,30 +527,21 @@ bool PluginInstaller::shouldExcludeDir(const QString& dirName) const {
   return excludedDirs.contains(dirName, Qt::CaseInsensitive);
 }
 
-QString PluginInstaller::getH264EncoderToolsInstallDir() const {
-  // Install to %APPDATA%\H264EncoderTools\ to match exporter's GetRoamingPath()
-  QString roaming = QString::fromLocal8Bit(qgetenv("APPDATA"));
-  if (roaming.isEmpty()) {
-    return {};
-  }
-  return roaming + "/H264EncoderTools";
-}
-
-bool PluginInstaller::copyH264EncoderToolsWithRetry(int maxRetries) const {
-  QString sourcePath = getPluginSourcePath("H264EncoderTools");
+bool PluginInstaller::copyUserPluginWithRetry(const QString& plugin, int maxRetries) const {
+  QString sourcePath = getPluginSourcePath(plugin);
   if (!QFile::exists(sourcePath)) {
     return false;
   }
 
-  QString installDir = getH264EncoderToolsInstallDir();
-  if (installDir.isEmpty()) {
+  QString targetPath = getPluginInstallPath(plugin);
+  if (targetPath.isEmpty()) {
     return false;
   }
-  QString targetPath = installDir + "/H264EncoderTools.exe";
 
+  QString targetDir = QFileInfo(targetPath).absolutePath();
   QDir dir;
-  if (!dir.exists(installDir)) {
-    if (!dir.mkpath(installDir)) {
+  if (!dir.exists(targetDir)) {
+    if (!dir.mkpath(targetDir)) {
       return false;
     }
   }

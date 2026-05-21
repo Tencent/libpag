@@ -435,7 +435,7 @@ PAGWindow {
 
         pagWindow.requestOpenFile.connect(mainForm.loadFile);
 
-        if (isFirstWindow) {
+        if (shouldRunStartupTasks) {
             startupTimer.start();
             updateTimer.start();
         }

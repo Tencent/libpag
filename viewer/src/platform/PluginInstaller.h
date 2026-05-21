@@ -107,8 +107,7 @@ class PluginInstaller : public QObject {
 
   void storeViewerPathForPlugin() const;
 
-  bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
-  QString getH264EncoderToolsInstallDir() const;
+  bool copyUserPluginWithRetry(const QString& plugin, int maxRetries = 5) const;
 
   void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;

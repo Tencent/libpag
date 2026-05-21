@@ -168,7 +168,7 @@ void PAGWindow::open(const QString& initialViewType) {
   context->setContextProperty("pagWindow", this);
   context->setContextProperty("initialViewType", initialViewType);
   static bool startupTasksDone = false;
-  context->setContextProperty("isFirstWindow", !startupTasksDone);
+  context->setContextProperty("shouldRunStartupTasks", !startupTasksDone);
   startupTasksDone = true;
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
