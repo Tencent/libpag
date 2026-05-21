@@ -104,6 +104,13 @@ function parseArgs(argv) {
   const opts = {
     input: '',
     output: '',
+    // When true, the HTML is written to process.stdout and the
+    // "wrote ..." log line is routed to process.stderr so the two
+    // streams don't get mixed. Triggered by `-o -`. Used by pagx's
+    // `--html-snapshot` integration in src/cli/CommandImport.cpp so
+    // the importer can read the snapshot output through a pipe
+    // instead of a temp file on disk.
+    outputToStdout: false,
     isUrl: false,
     viewportWidth: 1400,
     viewportHeight: 900,
@@ -134,25 +141,34 @@ function parseArgs(argv) {
     printUsage();
     process.exit(2);
   }
+  // `-o -` is the sentinel for "write HTML to stdout"; detect it here so the
+  // URL/file branches below skip both their own default-output logic and the
+  // path.resolve() call (which would turn `-` into an absolute path).
+  if (opts.output === '-') {
+    opts.outputToStdout = true;
+    opts.output = '';
+  }
   const inputArg = positional[0];
   opts.isUrl = isHttpUrl(inputArg);
   if (opts.isUrl) {
     // Remote pages have no filesystem location to derive a sibling name from,
-    // so we require an explicit -o. Letting it default to a magic name in cwd
-    // would silently overwrite a previous run.
+    // so we require an explicit -o (or `-o -` for stdout). Letting it default
+    // to a magic name in cwd would silently overwrite a previous run.
     opts.input = inputArg;
-    if (!opts.output) {
+    if (!opts.output && !opts.outputToStdout) {
       console.error(`html-snapshot: -o/--output is required when input is a URL`);
       process.exit(2);
     }
-    opts.output = path.resolve(opts.output);
+    if (opts.output) opts.output = path.resolve(opts.output);
   } else {
     if (opts.cookies.length || opts.headers.length) {
       console.error(`html-snapshot: --cookie / --header are only supported with URL inputs`);
       process.exit(2);
     }
     opts.input = path.resolve(inputArg);
-    if (!opts.output) {
+    if (opts.outputToStdout) {
+      // No output file to derive; the script writes to process.stdout.
+    } else if (!opts.output) {
       const dir = path.dirname(opts.input);
       const base = path.basename(opts.input, path.extname(opts.input));
       opts.output = path.join(dir, `${base}.subset.html`);
@@ -171,7 +187,8 @@ snapshot suitable for 'pagx import --format html'. <input> may be a local
 HTML file or an http(s) URL; -o is required for URL inputs.
 
 Options:
-  -o, --output <file>        Output path (required for URL inputs;
+  -o, --output <file|->      Output path; use '-' to write the HTML to stdout
+                             (required for URL inputs;
                              defaults to <input>.subset.html for files)
   --viewport-width <px>      Headless viewport width (default 1400)
   --viewport-height <px>     Headless viewport height (default 900)

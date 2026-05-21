@@ -75,8 +75,17 @@ async function main() {
     // helpers in lib/browser-snapshot.js; `page.evaluate` accepts strings
     // and returns the expression's result.
     const result = await page.evaluate(takeSnapshot);
-    fs.writeFileSync(opts.output, result.html, 'utf8');
-    console.log(`html-snapshot: wrote ${opts.output} (${result.width}x${result.height})`);
+    if (opts.outputToStdout) {
+      // Stdout mode (triggered by `-o -`, used by pagx's `--html-snapshot`
+      // integration): the HTML is the sole stdout payload, and the
+      // "wrote ..." progress line goes to stderr so the parent process can
+      // read stdout as a pure HTML string without parsing.
+      process.stdout.write(result.html);
+      console.error(`html-snapshot: wrote stdout (${result.width}x${result.height})`);
+    } else {
+      fs.writeFileSync(opts.output, result.html, 'utf8');
+      console.log(`html-snapshot: wrote ${opts.output} (${result.width}x${result.height})`);
+    }
   } finally {
     await browser.close();
   }
