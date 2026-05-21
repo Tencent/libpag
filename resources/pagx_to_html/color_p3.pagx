@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Display P3 wide gamut colors: p3(r,g,b) and p3(r,g,b,a) formats,
+     comparison between sRGB and P3 colors -->
+<pagx version="1.0" width="380" height="280">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Display P3 Colors" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Wide gamut vs sRGB comparison" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="16,20,16,20" alignment="center" arrangement="center">
+
+      <!-- P3 gradient strip -->
+      <Layer width="280" height="10">
+        <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="1,0">
+            <ColorStop offset="0" color="p3(1.0, 0.0, 0.5)"/>
+            <ColorStop offset="0.5" color="p3(0.0, 1.0, 0.3)"/>
+            <ColorStop offset="1" color="p3(0.2, 0.1, 1.0)"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+
+      <!-- P3 row -->
+      <Layer layout="horizontal" gap="15" arrangement="center" alignment="center">
+        <Layer width="30" height="14">
+          <Text text="P3" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill>
+            <SolidColor color="p3(1.0, 0.0, 0.0)"/>
+          </Fill>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill>
+            <SolidColor color="p3(0.0, 1.0, 0.0)"/>
+          </Fill>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill>
+            <SolidColor color="p3(0.0, 0.0, 1.0)"/>
+          </Fill>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill>
+            <SolidColor color="p3(1.0, 0.3, 0.0, 0.7)"/>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- sRGB row -->
+      <Layer layout="horizontal" gap="15" arrangement="center" alignment="center">
+        <Layer width="30" height="14">
+          <Text text="sRGB" fontFamily="Arial" fontStyle="Bold" fontSize="10"/>
+          <Fill color="#64748B"/>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#FF0000"/>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#00FF00"/>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill color="#0000FF"/>
+        </Layer>
+        <Layer width="50" height="50">
+          <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+          <Fill>
+            <SolidColor color="srgb(1.0, 0.3, 0.0, 0.7)"/>
+          </Fill>
+        </Layer>
+      </Layer>
+
+      <!-- Column labels -->
+      <Layer layout="horizontal" gap="15" arrangement="center">
+        <Layer width="30" height="10"/>
+        <Layer width="50" height="10">
+          <Text text="Red" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer width="50" height="10">
+          <Text text="Green" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer width="50" height="10">
+          <Text text="Blue" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer width="50" height="10">
+          <Text text="Alpha" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+      </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

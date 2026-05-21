@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Image resource referenced two ways in one document. Left tile uses an external file
+     path (resolved by PAGXImporter::FromFile against this PAGX file's directory); right tile
+     uses an inline base64 data URI. Both should render identically across pagx render and the
+     HTML exporter, verifying that GetImageSrc handles both forms transparently. -->
+<pagx version="1.0" width="420" height="220">
+  <Resources>
+    <!-- External file: a 256x256 photographic PNG that lives under resources/apitest/. -->
+    <Image id="external" source="../apitest/test_timestretch.png"/>
+    <!-- Inline base64: the 110x110 image_as_mask.png embedded directly. -->
+    <Image id="embedded" source="data:image/png;base64,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"/>
+  </Resources>
+
+  <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="10,20,10,20" gap="20" alignment="center" arrangement="center">
+    <!-- Left: external file path -->
+    <Layer layout="vertical" gap="4" alignment="center">
+      <Layer height="14">
+        <Text text="external file" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+      <Layer width="160" height="160">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill>
+          <ImagePattern image="@external" scaleMode="letterBox"/>
+        </Fill>
+        <Stroke color="#CBD5E1" width="1"/>
+      </Layer>
+    </Layer>
+
+    <!-- Right: inline base64 -->
+    <Layer layout="vertical" gap="4" alignment="center">
+      <Layer height="14">
+        <Text text="base64 inline" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#64748B"/>
+      </Layer>
+      <Layer width="160" height="160">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill>
+          <ImagePattern image="@embedded" scaleMode="letterBox"/>
+        </Fill>
+        <Stroke color="#CBD5E1" width="1"/>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

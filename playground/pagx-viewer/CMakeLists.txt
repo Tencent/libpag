@@ -42,15 +42,28 @@ if (DEFINED EMSCRIPTEN)
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency
                 -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=dlmalloc)
         list(APPEND VIEWER_COMPILE_OPTIONS -fPIC -pthread)
+        set(VIEWER_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm-mt)
     else ()
         list(APPEND VIEWER_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1)
+        set(VIEWER_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm)
     endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND VIEWER_COMPILE_OPTIONS -O0 -g3)
         list(APPEND VIEWER_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
     else ()
         list(APPEND VIEWER_COMPILE_OPTIONS -Oz)
-        list(APPEND VIEWER_LINK_OPTIONS -Oz)
+        list(APPEND VIEWER_LINK_OPTIONS -Oz --emit-symbol-map)
+        # vendor_tools/lib-build wipes the intermediate build dir and only copies *.js / *.wasm
+        # to the arch output dir, so the emscripten-generated *.symbols would be lost. Copy it
+        # out manually right after link (POST_BUILD) so subsequent cleanup can't reach it.
+        # TODO(symbols): drop this workaround once vendor_tools exposes an extension point for
+        # extra artifacts (or once *.symbols is added to the web copy whitelist upstream).
+        add_custom_command(TARGET pagx-viewer POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${VIEWER_OUTPUT_DIR}
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        $<TARGET_FILE_DIR:pagx-viewer>/pagx-viewer.js.symbols
+                        ${VIEWER_OUTPUT_DIR}/pagx-viewer.wasm.symbols
+                COMMENT "Copying wasm symbol map to ${VIEWER_OUTPUT_DIR}/")
     endif ()
 else ()
     add_library(pagx-viewer SHARED ${VIEWER_FILES})

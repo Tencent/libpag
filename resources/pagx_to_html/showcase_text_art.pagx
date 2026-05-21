@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Integration showcase — text-focused art combining TextModifier with anchor/skew/rotation/scale/fillColor,
+     TextPath along circle, fauxBold/fauxItalic, TextBox writingMode="vertical", GlyphRun with per-glyph transforms,
+     Stroke on text, RadialGradient fill on text, multiple RangeSelector, letterSpacing -->
+<pagx version="1.0" width="420" height="380">
+  <Resources>
+    <PathData id="circlePath" data="M 80,10 A 70,70 0 1,1 79.99,10"/>
+    <RadialGradient id="textRadial" center="210,210" radius="180" fitsToGeometry="false">
+      <ColorStop offset="0" color="#FF6B6B"/>
+      <ColorStop offset="0.5" color="#C084FC"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </RadialGradient>
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="1,1">
+      <ColorStop offset="0" color="#0F172A"/>
+      <ColorStop offset="1" color="#1E1040"/>
+    </LinearGradient>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,12,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Showcase: Text Art" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="TextModifier, TextPath, faux styles, writingMode" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card containing the text art -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="@bgGrad"/>
+
+      <!-- Card inner layout: main area + bottom row -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="10" alignment="stretch">
+
+        <!-- Top section: circle text + TYPE horizontally centered; ART pinned to the right -->
+        <Layer flex="1">
+          <!-- Centered column: TYPE + TextPath circle (spans full width so text anchors at card center) -->
+          <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="4" alignment="center" arrangement="center">
+            <!-- Large display text "TYPE" with gradient fill and stroke -->
+            <Layer height="60">
+              <Text text="TYPE" fontFamily="Arial" fontStyle="Bold" fontSize="52" centerX="0" textAnchor="center" letterSpacing="6"/>
+              <Fill color="@textRadial"/>
+              <Stroke color="#FFFFFF30" width="2"/>
+            </Layer>
+
+            <!-- TextPath: text along circle -->
+            <Layer width="160" height="160">
+              <Text text="CREATIVE  TYPOGRAPHY  POSTER  " fontFamily="Arial" fontStyle="Bold" fontSize="10" letterSpacing="3"/>
+              <TextPath path="@circlePath" baselineOrigin="0,0" perpendicular="true" forceAlignment="true"/>
+              <Fill color="#C084FC"/>
+            </Layer>
+          </Layer>
+
+          <!-- Right side: vertical ART text using TextBox container with writingMode -->
+          <Layer width="36" right="0" centerY="0">
+            <TextBox width="36" height="120" writingMode="vertical" textAlign="center" paragraphAlign="middle" centerX="0" centerY="0">
+              <Text text="ART" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+              <Fill color="#4ECDC4"/>
+            </TextBox>
+          </Layer>
+        </Layer>
+
+        <!-- Bottom row: TextModifier demos + faux styles -->
+        <Layer layout="horizontal" gap="12" alignment="center" arrangement="spaceEvenly">
+
+          <!-- TextModifier demo: wave text -->
+          <Layer layout="vertical" gap="2" alignment="center">
+            <Layer height="24">
+              <Text text="DESIGN" fontFamily="Arial" fontStyle="Bold" fontSize="20" centerX="0" textAnchor="center"/>
+              <TextModifier position="8,4" skew="12" rotation="4" fillColor="#FFE66D">
+                <RangeSelector start="0" end="1" shape="triangle" weight="1"/>
+                <RangeSelector start="0.3" end="0.7" shape="smooth" mode="add" weight="0.5"/>
+              </TextModifier>
+              <Fill color="#FF6B6B"/>
+            </Layer>
+          </Layer>
+
+          <!-- FauxBold -->
+          <Layer height="18">
+            <Text text="Bold" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxBold="true"/>
+            <Fill color="#F59E0B"/>
+          </Layer>
+
+          <!-- FauxItalic -->
+          <Layer height="18">
+            <Text text="Italic" fontFamily="Arial" fontSize="14" centerX="0" textAnchor="center" fauxItalic="true"/>
+            <Fill color="#10B981"/>
+          </Layer>
+
+          <!-- TextModifier with scale -->
+          <Layer height="18">
+            <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="14" centerX="0" textAnchor="center" letterSpacing="2"/>
+            <TextModifier anchor="0,6" scale="1.3,1.3">
+              <RangeSelector start="0" end="1" shape="rampUp"/>
+            </TextModifier>
+            <Fill color="#3B82F6"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

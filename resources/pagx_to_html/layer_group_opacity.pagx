@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: groupOpacity=false → alpha distributed to children; groupOpacity=true → alpha on parent -->
+<pagx version="1.0" width="400" height="300">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Group Opacity" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Per-child vs composited alpha" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Two columns: left = groupOpacity false, right = groupOpacity true -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" gap="8" alignment="stretch">
+        <!-- Left column: groupOpacity=false -->
+        <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="groupOpacity=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <!-- Overlapping shapes with per-child alpha -->
+          <Layer width="120" height="90">
+            <Layer left="0" right="0" top="0" bottom="0" alpha="0.5" groupOpacity="false">
+              <Rectangle position="40,45" size="80,80" roundness="8"/>
+              <Fill color="#EF4444"/>
+              <Layer>
+                <Ellipse position="80,45" size="80,80"/>
+                <Fill color="#3B82F6"/>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Divider -->
+        <Layer width="1">
+          <Rectangle left="0" right="0" top="8" bottom="8"/>
+          <Fill color="#CBD5E1"/>
+        </Layer>
+
+        <!-- Right column: groupOpacity=true -->
+        <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="groupOpacity=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <!-- Overlapping shapes with composited alpha -->
+          <Layer width="120" height="90">
+            <Layer left="0" right="0" top="0" bottom="0" alpha="0.5" groupOpacity="true">
+              <Rectangle position="40,45" size="80,80" roundness="8"/>
+              <Fill color="#EF4444"/>
+              <Layer>
+                <Ellipse position="80,45" size="80,80"/>
+                <Fill color="#3B82F6"/>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox → div with text-align, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, size -->
+<pagx version="1.0" width="450" height="480">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Text Box Layout" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Alignment, writing mode, overflow, and wrapping" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="12" alignment="stretch">
+
+        <!-- Row 1: center+middle | justify+lineHeight -->
+        <Layer layout="horizontal" gap="16" alignment="stretch" arrangement="center">
+
+          <!-- textAlign=center, paragraphAlign=middle -->
+          <Layer flex="1" layout="vertical" gap="4" alignment="center">
+            <Layer width="160" height="100">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" textAlign="center" paragraphAlign="middle">
+                <Text text="Centered in Box" fontFamily="Arial" fontSize="18"/>
+                <Fill color="#1F2937"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="center + middle" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- textAlign=justify + lineHeight -->
+          <Layer flex="1" layout="vertical" gap="4" alignment="center">
+            <Layer width="160" height="100">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" textAlign="justify" lineHeight="22">
+                <Text text="This is a longer text that should wrap and be justified in the box." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#3B82F6"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="justify + lineHeight" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: vertical | overflow=hidden | wordWrap=false -->
+        <Layer layout="horizontal" gap="16" alignment="stretch" arrangement="center">
+
+          <!-- writingMode=vertical -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="60" height="150">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" writingMode="vertical">
+                <Text text="竖排文字" fontFamily="Arial" fontSize="18"/>
+                <Fill color="#8B5CF6"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="vertical" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- overflow=hidden -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="120" height="50">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" overflow="hidden">
+                <Text text="Text line 1. Text line 2. Text line 3. Text line 4. Text line 5." fontFamily="Arial" fontSize="12"/>
+                <Fill color="#EF4444"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="overflow=hidden" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- wordWrap=false -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="100" height="40">
+              <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+              <Stroke color="#CBD5E1" width="1" dashes="4,3"/>
+              <TextBox left="0" right="0" top="0" bottom="0" wordWrap="false">
+                <Text text="No wrap text" fontFamily="Arial" fontSize="14"/>
+                <Fill color="#F59E0B"/>
+              </TextBox>
+            </Layer>
+            <Layer height="10">
+              <Text text="no wrap" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 3: auto size -->
+        <Layer layout="horizontal" gap="16" alignment="center" arrangement="center">
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer>
+              <Text text="Auto sized box" fontFamily="Arial" fontSize="16"/>
+              <Fill color="#10B981"/>
+            </Layer>
+            <Layer height="10">
+              <Text text="auto size (no TextBox)" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

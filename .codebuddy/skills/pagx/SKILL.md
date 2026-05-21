@@ -3,8 +3,8 @@ name: pagx
 description: >-
   Generates well-structured PAGX files from visual descriptions and edits existing ones.
   Use when user asks to create, write, design, or modify PAGX content, run pagx CLI
-  commands (render, verify, format, layout, bounds, font info/embed, import/export), or
-  look up PAGX element attributes and syntax.
+  commands (render, verify, format, layout, bounds, font info/embed, import/export,
+  export to HTML for browser preview), or look up PAGX element attributes and syntax.
 ---
 
 # PAGX Skill
@@ -19,7 +19,7 @@ relevant reference:
 | `references/guide.md` | Spec rules, techniques, common pitfalls | Read before generating |
 | `references/patterns.md` | Structural patterns for UI components, layouts, tables, charts, decorative effects | Read before generating |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes | As needed |
-| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` | As needed |
+| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` (SVG, HTML) | As needed |
 
 ---
 

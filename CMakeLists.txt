@@ -217,6 +217,31 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
+
+    # HTML exporter
+    file(GLOB_RECURSE HTML_EXPORTER_SOURCES src/pagx/html/*.*)
+    list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
+
+    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)
+    set(WOFF2_DIR third_party/woff2)
+    set(BROTLI_DIR ${WOFF2_DIR}/brotli)
+    set(WOFF2_SOURCES
+            ${WOFF2_DIR}/src/font.cc
+            ${WOFF2_DIR}/src/glyph.cc
+            ${WOFF2_DIR}/src/normalize.cc
+            ${WOFF2_DIR}/src/table_tags.cc
+            ${WOFF2_DIR}/src/transform.cc
+            ${WOFF2_DIR}/src/variable_length.cc
+            ${WOFF2_DIR}/src/woff2_common.cc
+            ${WOFF2_DIR}/src/woff2_enc.cc
+            ${WOFF2_DIR}/src/woff2_out.cc)
+    file(GLOB BROTLI_COMMON_SOURCES ${BROTLI_DIR}/c/common/*.c)
+    file(GLOB BROTLI_ENC_SOURCES ${BROTLI_DIR}/c/enc/*.c)
+    set(WOFF2_ALL_SOURCES ${WOFF2_SOURCES} ${BROTLI_COMMON_SOURCES} ${BROTLI_ENC_SOURCES})
+    list(APPEND PAG_FILES ${WOFF2_ALL_SOURCES})
+    list(APPEND PAG_INCLUDES ${WOFF2_DIR}/include ${BROTLI_DIR}/c/include)
+    # Suppress warnings for third-party woff2/brotli code that does not pass -Werror -Weffc++.
+    set_source_files_properties(${WOFF2_ALL_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})

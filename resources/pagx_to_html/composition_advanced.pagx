@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
+     different transforms on each instance -->
+<pagx version="1.0" width="420" height="280">
+  <Resources>
+    <!-- Reusable icon component: a colored circle with an inner diamond -->
+    <Composition id="icon" width="60" height="60">
+      <Layer>
+        <Ellipse position="30,30" size="56,56"/>
+        <Fill>
+          <RadialGradient center="0.5,0.5" radius="0.5">
+            <ColorStop offset="0" color="#60A5FA"/>
+            <ColorStop offset="1" color="#3B82F6"/>
+          </RadialGradient>
+        </Fill>
+      </Layer>
+      <Layer>
+        <Path data="M 30,4 L 56,30 L 30,56 L 4,30 Z"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+    <!-- Reusable badge: rounded rectangle with star -->
+    <Composition id="badge" width="50" height="50">
+      <Layer>
+        <Rectangle position="25,25" size="46,46" roundness="8"/>
+        <Fill color="#10B981"/>
+      </Layer>
+      <Layer>
+        <Polystar position="25,25" type="star" pointCount="5" outerRadius="16" innerRadius="8" rotation="-90"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Advanced Composition" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Multiple instances with different transforms" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Row of icon instances with different positions -->
+      <Layer x="24" y="19" composition="@icon"/>
+      <Layer x="108" y="19" composition="@icon"/>
+      <Layer x="192" y="19" composition="@icon" alpha="0.6"/>
+      <Layer x="276" y="19" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+
+      <!-- Row of badge instances -->
+      <Layer x="15" y="118" composition="@badge"/>
+      <Layer x="85" y="118" composition="@badge"/>
+      <Layer x="155" y="118" composition="@badge" alpha="0.7"/>
+      <!-- Badge with rotation via matrix -->
+      <Layer x="225" y="118" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
+      <!-- Larger scaled badge -->
+      <Layer x="280" y="108" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+    </Layer>
+  </Layer>
+</pagx>
