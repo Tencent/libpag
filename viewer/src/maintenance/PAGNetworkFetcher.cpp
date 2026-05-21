@@ -31,6 +31,7 @@ PAGNetworkFetcher::PAGNetworkFetcher(const QString& url, QObject* parent)
 
 void PAGNetworkFetcher::fetch() {
   QNetworkAccessManager manager;
+  manager.setTransferTimeout(15000);
   QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
 
   QEventLoop eventLoop;
@@ -53,6 +54,7 @@ void PAGNetworkFetcher::fetchAsync() {
     return;
   }
   asyncManager = new QNetworkAccessManager(this);
+  asyncManager->setTransferTimeout(15000);
   connect(asyncManager, &QNetworkAccessManager::finished, this,
           &PAGNetworkFetcher::onReplyFinished);
   asyncManager->get(QNetworkRequest(QUrl(url)));

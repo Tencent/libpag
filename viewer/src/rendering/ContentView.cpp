@@ -53,9 +53,6 @@ void ContentView::initDrawable() {
 }
 
 void ContentView::releaseDrawable() {
-  if (drawable == nullptr) {
-    return;
-  }
   if (renderThread != nullptr && renderThread->isRunning()) {
     QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
     renderThread->wait();

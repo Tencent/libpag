@@ -38,11 +38,12 @@ PAGCheckUpdateModel::~PAGCheckUpdateModel() {
 }
 
 void PAGCheckUpdateModel::checkForUpdates(bool keepSilent, bool isUseBeta) {
-  if (!availableUpdateUrls.empty()) {
+  if (fetchingAppcast) {
     qDebug() << "Checking for updates is already in progress, please try again later";
     return;
   }
 
+  fetchingAppcast = true;
   this->isUseBeta = isUseBeta;
   this->keepSilent = keepSilent;
   auto* fetcher = new PAGNetworkFetcher(ServerUrl, this);
@@ -60,6 +61,7 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
 
   if (baseUrl.isEmpty()) {
     qDebug() << "No update url found";
+    fetchingAppcast = false;
     return;
   }
 
@@ -107,6 +109,7 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
   QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
     availableUpdates.clear();
     availableUpdateUrls.clear();
+    fetchingAppcast = false;
     CheckForUpdates(keepSilent, selectedUrl.toStdString());
   });
 }

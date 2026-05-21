@@ -40,6 +40,7 @@ class PAGCheckUpdateModel : public QObject {
  private:
   bool isUseBeta = false;
   bool keepSilent = false;
+  bool fetchingAppcast = false;
   std::unique_ptr<QThreadPool> threadPool = nullptr;
 };
 
