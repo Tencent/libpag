@@ -114,6 +114,73 @@ void ParseStyleString(const std::string& styleStr,
   }
 }
 
+namespace {
+
+std::string StripSurroundingQuotes(const std::string& s) {
+  if (s.size() < 2) return s;
+  char first = s.front();
+  char last = s.back();
+  if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+    return s.substr(1, s.size() - 2);
+  }
+  return s;
+}
+
+}  // namespace
+
+std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
+  std::vector<std::string> out;
+  if (Trim(raw).empty()) return out;
+  auto tokens = SplitTopLevelCommas(raw);
+  out.reserve(tokens.size());
+  for (auto& token : tokens) {
+    auto trimmed = Trim(token);
+    if (trimmed.empty()) continue;
+    auto stripped = Trim(StripSurroundingQuotes(trimmed));
+    if (!stripped.empty()) {
+      out.push_back(std::move(stripped));
+    }
+  }
+  return out;
+}
+
+std::string ResolveGenericFontFamily(const std::string& name) {
+  std::string lower = ToLower(Trim(name));
+  if (lower.empty()) return {};
+
+#if defined(__APPLE__)
+  if (lower == "serif" || lower == "ui-serif") return "Times";
+  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
+      lower == "-apple-system" || lower == "blinkmacsystemfont") {
+    return "Helvetica";
+  }
+  if (lower == "monospace" || lower == "ui-monospace") return "Menlo";
+#elif defined(_WIN32)
+  if (lower == "serif" || lower == "ui-serif") return "Times New Roman";
+  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
+      lower == "-apple-system" || lower == "blinkmacsystemfont") {
+    return "Arial";
+  }
+  if (lower == "monospace" || lower == "ui-monospace") return "Consolas";
+#else
+  if (lower == "serif" || lower == "ui-serif") return "DejaVu Serif";
+  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
+      lower == "-apple-system" || lower == "blinkmacsystemfont") {
+    return "DejaVu Sans";
+  }
+  if (lower == "monospace" || lower == "ui-monospace") return "DejaVu Sans Mono";
+#endif
+
+  // Recognised generics with no concrete mapping on the current platform. Distinguished
+  // from "not a generic" so callers can warn and drop the token.
+  if (lower == "cursive" || lower == "fantasy" || lower == "ui-rounded" || lower == "emoji" ||
+      lower == "math" || lower == "fangsong") {
+    return {};
+  }
+
+  return name;
+}
+
 const std::unordered_map<std::string, uint32_t>& NamedColors() {
   // clang-format off
   static const std::unordered_map<std::string, uint32_t> table = {

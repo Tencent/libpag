@@ -22,13 +22,17 @@
 
 // ===== Style-value normalisers =====
 
-// Strip quotes and take only the first family. Tailwind/system defaults expand
-// to 5+ families with embedded "double quotes" which would otherwise break the
-// surrounding style="…" attribute.
-function simplifyFontFamily(value) {
+// Preserve the full CSS font stack but rewrite embedded double quotes as
+// single quotes so the value embeds safely inside the surrounding
+// style="…" attribute. CSS parses single- and double-quoted family names
+// equivalently, and the PAGX HTML importer (`ParseFontFamilyTokens`)
+// splits on top-level commas and strips either quote style, so a stack
+// like `"PingFang SC", -apple-system, sans-serif` round-trips: the
+// importer's first concrete family lands on `Text::fontFamily` and the
+// remaining concrete entries are registered as document-level fallbacks.
+function normalizeFontFamily(value) {
   if (!value) return '';
-  const first = value.split(',')[0].trim();
-  return first.replace(/^["']|["']$/g, '');
+  return value.replace(/"/g, "'");
 }
 
 // PAGX only models `overflow: hidden`. `clip`, `auto`, and `scroll` all map to
@@ -1681,7 +1685,7 @@ const STYLE_SCHEMA = [
   { prop: 'backdrop-filter',  scope: 'box',  defaults: ['none'] },
   { prop: 'mix-blend-mode',   scope: 'box',  defaults: ['normal'] },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
-  { prop: 'font-family',           scope: 'text', normalize: simplifyFontFamily },
+  { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
   { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
   { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
@@ -1705,11 +1709,11 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, text: renderTextInput };
 // Order matters only for runtime visibility of CONST initialisers; the
 // helper function declarations are hoisted to the top of the IIFE scope, so
 // references from inside the constants block (e.g. STYLE_SCHEMA's
-// `normalize: simplifyFontFamily`) resolve correctly even though the
+// `normalize: normalizeFontFamily`) resolve correctly even though the
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
-  simplifyFontFamily,
+  normalizeFontFamily,
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,

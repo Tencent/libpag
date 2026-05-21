@@ -347,10 +347,25 @@ class HTMLParserContext {
   // canvas-size resolution can still be surfaced once the document exists).
   std::vector<std::string> _pendingDiagnostics = {};
 
+  // Concrete (post-quote-strip, post-generic-map) family names seen anywhere in the
+  // document's font-family stacks. Insertion-ordered for deterministic FontConfig
+  // output; the set field deduplicates entries in O(1).
+  std::vector<std::string> _fallbackFamilyNames = {};
+  std::unordered_set<std::string> _fallbackFamilyNameSet = {};
+
   int _nextGeneratedId = 0;
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   bool _hadHardError = false;
+
+  // Records concrete family names from a font-family stack into the document-wide
+  // dedup set. Empty inputs and duplicates are silently skipped.
+  void recordFontFallbacks(const std::vector<std::string>& chain);
+
+  // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
+  // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
+  // discovered during the walk is available for per-glyph fallback at layout time.
+  void flushFontFallbacksToDocument();
 };
 
 }  // namespace pagx

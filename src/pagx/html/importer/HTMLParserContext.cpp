@@ -158,7 +158,28 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  flushFontFallbacksToDocument();
   return _document;
+}
+
+void HTMLParserContext::recordFontFallbacks(const std::vector<std::string>& chain) {
+  for (auto& name : chain) {
+    if (name.empty()) continue;
+    if (_fallbackFamilyNameSet.insert(name).second) {
+      _fallbackFamilyNames.push_back(name);
+    }
+  }
+}
+
+void HTMLParserContext::flushFontFallbacksToDocument() {
+  if (!_document) return;
+  auto& cfg = _document->fontConfig();
+  for (auto& name : _fallbackFamilyNames) {
+    // Style is fixed to "Regular": LayoutContext's user-fallback path matches by family
+    // name only (style is ignored for per-glyph fallback), so registering a single
+    // deferred record per family is sufficient.
+    cfg.addFallbackFont(/*path=*/std::string(), /*ttcIndex=*/0, name, "Regular");
+  }
 }
 
 //==================================================================================================
@@ -345,8 +366,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     auto layer = _document->makeNode<Layer>();
     auto text = _document->makeNode<Text>();
     text->text = "\n";
-    text->fontFamily =
-        inherited.fontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.fontFamily;
+    text->fontFamily = inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY
+                                                           : inherited.primaryFontFamily;
     text->fontSize = HTML_DEFAULT_FONT_SIZE;
     layer->contents.push_back(text);
     return layer;
@@ -473,7 +494,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
-  frag.fontFamily = inherited.fontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.fontFamily;
+  frag.fontFamily = inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY
+                                                        : inherited.primaryFontFamily;
   frag.fontStyleName = inherited.fontStyleName;
   frag.fontSize = inherited.fontSizePx;
   frag.letterSpacing = inherited.letterSpacingPx;

@@ -1383,6 +1383,116 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyAndLetterSpacing) {
   EXPECT_FLOAT_EQ(text->letterSpacing, 2.0f);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackPicksFirstConcreteAndStripsQuotes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style='font-family:"PingFang SC", -apple-system, sans-serif'>Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "PingFang SC");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackStripsSingleQuotes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'Roboto Mono'">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Roboto Mono");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyGenericFirstMapsToPlatformConcrete) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style='font-family:sans-serif, "Foo"'>Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+#if defined(__APPLE__)
+  EXPECT_EQ(text->fontFamily, "Helvetica");
+#elif defined(_WIN32)
+  EXPECT_EQ(text->fontFamily, "Arial");
+#else
+  EXPECT_EQ(text->fontFamily, "DejaVu Sans");
+#endif
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyAllUnmappableGenericsFallsBackToDefault) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:cursive, fantasy">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // cursive and fantasy are recognised generics with no concrete mapping; both are
+  // dropped with diagnostics and the importer falls back to HTML_DEFAULT_FONT_FAMILY.
+  EXPECT_EQ(text->fontFamily, "Arial");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyInheritedFromAncestor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <div style='font-family:"Inter", sans-serif'>
+        <span>Hi</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* divLayer = doc->layers.front()->children.front();
+  ASSERT_FALSE(divLayer->children.empty());
+  auto* spanLayer = divLayer->children.front();
+  auto* text = FindElementOfType<pagx::Text>(spanLayer);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Inter");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackRegistersFallbacksOnDocFontConfig) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style='font-family:"PingFang SC", "Helvetica Neue", monospace'>Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto names = doc->fontConfig().fallbackFamilyNames();
+  // The implicit "Arial" from <body>'s element default plus every concrete name from the
+  // span's stack should be present. The platform-mapped monospace family varies.
+  EXPECT_NE(std::find(names.begin(), names.end(), "Arial"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "PingFang SC"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "Helvetica Neue"), names.end());
+#if defined(__APPLE__)
+  EXPECT_NE(std::find(names.begin(), names.end(), "Menlo"), names.end());
+#elif defined(_WIN32)
+  EXPECT_NE(std::find(names.begin(), names.end(), "Consolas"), names.end());
+#else
+  EXPECT_NE(std::find(names.begin(), names.end(), "DejaVu Sans Mono"), names.end());
+#endif
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackDedupesAcrossElements) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style='font-family:"Inter", "Roboto"'>Hi</span>
+      <span style='font-family:"Inter", "Noto Sans"'>Bye</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto names = doc->fontConfig().fallbackFamilyNames();
+  size_t interCount = static_cast<size_t>(std::count(names.begin(), names.end(), "Inter"));
+  EXPECT_EQ(interCount, 1u);
+  EXPECT_NE(std::find(names.begin(), names.end(), "Roboto"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "Noto Sans"), names.end());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextAlignAndLineHeightOnParagraph) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">

@@ -70,6 +70,18 @@ std::vector<std::string> SplitTopLevelWhitespace(const std::string& s);
 void ParseStyleString(const std::string& styleStr,
                       std::unordered_map<std::string, std::string>& out);
 
+// Splits a CSS font-family value into individual family tokens. Top-level commas split,
+// surrounding "..." or '...' quotes are stripped, blank tokens are dropped. Generic
+// keywords are NOT mapped here; pass each token through ResolveGenericFontFamily.
+std::vector<std::string> ParseFontFamilyTokens(const std::string& raw);
+
+// Maps a CSS generic family keyword (sans-serif, monospace, ...) to a concrete platform
+// font name. Returns the input unchanged when `name` is not a recognised generic.
+// Returns an empty string when the keyword is a recognised generic with no sensible
+// mapping (cursive, fantasy, ui-rounded, emoji, math, fangsong). Recognises -apple-system
+// and BlinkMacSystemFont as system-ui aliases. Matching is ASCII case-insensitive.
+std::string ResolveGenericFontFamily(const std::string& name);
+
 // ----- Tag-set predicates -------------------------------------------------------------------
 
 inline bool IsContainerTag(const std::string& tag) {

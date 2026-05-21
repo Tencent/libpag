@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Padding.h"
@@ -83,6 +84,16 @@ struct HTMLInheritedStyle {
   float fontSizePx = HTML_DEFAULT_FONT_SIZE;
   float letterSpacingPx = 0.0f;
   Color resolvedTextColor = {0, 0, 0, 1, ColorSpace::SRGB};
+
+  // Pre-resolved CSS font-family stack. Kept in lock-step with `fontFamily` by
+  // `computeInherited`. `primaryFontFamily` is the first concrete name (after surrounding
+  // quotes are stripped and generic keywords are mapped to platform fonts) and gets
+  // written to `Text::fontFamily`. `fontFamilyChain` holds the same first name followed by
+  // every additional concrete name from the stack, in CSS order; the importer unions all
+  // chains across the document and registers the union as user fallback fonts on the
+  // document's FontConfig so per-glyph fallback in LayoutContext can pick them up.
+  std::string primaryFontFamily = {};
+  std::vector<std::string> fontFamilyChain = {};
 };
 
 /**

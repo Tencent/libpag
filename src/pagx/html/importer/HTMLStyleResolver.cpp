@@ -148,6 +148,29 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
+  // Re-parse the CSS font-family stack only when the raw value actually changed at this
+  // element. The cascade (`out = parent`) already carries the parent's parsed stack
+  // through unchanged in the common case where descendants inherit verbatim.
+  if (out.fontFamily != parent.fontFamily || (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
+    out.fontFamilyChain.clear();
+    out.primaryFontFamily.clear();
+    auto tokens = html::ParseFontFamilyTokens(out.fontFamily);
+    for (auto& token : tokens) {
+      std::string resolved = html::ResolveGenericFontFamily(token);
+      if (resolved.empty()) {
+        // Recognised generic with no concrete mapping on this platform (cursive,
+        // fantasy, ...). Drop with a single diagnostic so a stack like
+        // `cursive, "Foo"` still falls through to "Foo".
+        warn("html: font-family generic '" + token + "' not mapped on this platform; dropped");
+        continue;
+      }
+      out.fontFamilyChain.push_back(resolved);
+    }
+    if (!out.fontFamilyChain.empty()) {
+      out.primaryFontFamily = out.fontFamilyChain.front();
+    }
+    recordFontFallbacks(out.fontFamilyChain);
+  }
   CopyProperty(props, "font-size", out.fontSize);
   CopyProperty(props, "font-weight", out.fontWeight);
   CopyProperty(props, "font-style", out.fontStyle);

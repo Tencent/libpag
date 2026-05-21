@@ -128,13 +128,33 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
+   * Returns the document's font configuration. Importers populate fallback fonts here
+   * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
+   * so glyph-level fallback can pick them up at layout time). Callers may also register
+   * additional typefaces or fallbacks directly before invoking `applyLayout`.
+   *
+   * Note: `applyLayout(const FontConfig*)` with a non-null argument REPLACES this config
+   * wholesale. Pass `nullptr` (or merge the contents of this config into your own first)
+   * to preserve importer-injected fallback fonts across the layout call.
+   */
+  FontConfig& fontConfig() {
+    return fontConfig_;
+  }
+  const FontConfig& fontConfig() const {
+    return fontConfig_;
+  }
+
+  /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. This method should only
    * be called once per document — repeated calls may produce incorrect results because
    * measurement data is cached and some layout operations permanently modify source geometry.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
-   *                   updates the internal config before layout. Pass nullptr to use the
-   *                   previously set config (or no config).
+   *                   REPLACES the internal config (importer-injected fallback fonts on the
+   *                   internal config are discarded — merge them in via `fontConfig()` first
+   *                   if you want them preserved). Pass nullptr to use the previously set
+   *                   config, which is the right choice for HTML-imported documents that
+   *                   want to keep the importer's fallback stack.
    */
   void applyLayout(const FontConfig* fontConfig = nullptr);
 
@@ -156,7 +176,7 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
-  FontConfig fontConfig;
+  FontConfig fontConfig_;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -65,6 +66,13 @@ class FontConfig {
    */
   void addFallbackFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
                        const std::string& fontStyle);
+
+  /**
+   * Returns the family names of all fallback typefaces in registration order. Primarily
+   * intended for diagnostics and tests; callers should not rely on this for font lookup
+   * (use `applyLayout` and let `LayoutContext` resolve typefaces internally).
+   */
+  std::vector<std::string> fallbackFamilyNames() const;
 
  private:
   struct Data;
