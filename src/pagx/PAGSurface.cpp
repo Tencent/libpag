@@ -17,58 +17,62 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGSurface.h"
+#include "pagx/runtime/Drawable.h"
+#include "pagx/runtime/OffscreenDrawable.h"
 #include "pagx/runtime/PAGSurfaceImpl.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Device.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto* context = device->lockContext();
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto tgfxSurface = tgfx::Surface::Make(context, width, height);
-  device->unlock();
-  if (tgfxSurface == nullptr) {
-    return nullptr;
-  }
-  auto impl = std::make_unique<PAGSurface::Impl>();
-  impl->device = std::move(device);
-  impl->surface = std::move(tgfxSurface);
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(impl), width, height));
+  auto drawable = OffscreenDrawable::Make(width, height);
+  return MakeFrom(drawable);
 }
 
-PAGSurface::PAGSurface(std::unique_ptr<Impl> impl, int width, int height)
-    : impl(std::move(impl)), surfaceWidth(width), surfaceHeight(height) {
+std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  auto impl = std::make_unique<Impl>();
+  impl->drawable = std::move(drawable);
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(impl)));
+}
+
+PAGSurface::PAGSurface(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {
 }
 
 PAGSurface::~PAGSurface() = default;
 
+int PAGSurface::width() const {
+  return impl != nullptr && impl->drawable != nullptr ? impl->drawable->width() : 0;
+}
+
+int PAGSurface::height() const {
+  return impl != nullptr && impl->drawable != nullptr ? impl->drawable->height() : 0;
+}
+
 bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
-  if (impl == nullptr || impl->surface == nullptr || dstPixels == nullptr) {
+  if (impl == nullptr || impl->drawable == nullptr || dstPixels == nullptr) {
     return false;
   }
-  auto info = tgfx::ImageInfo::Make(surfaceWidth, surfaceHeight, tgfx::ColorType::RGBA_8888,
-                                    tgfx::AlphaType::Premultiplied, dstRowBytes);
-  if (info.isEmpty()) {
+  auto device = impl->drawable->getDevice();
+  if (device == nullptr) {
     return false;
   }
-  auto* context = impl->device->lockContext();
+  auto* context = device->lockContext();
   if (context == nullptr) {
     return false;
   }
-  bool ok = impl->surface->readPixels(info, dstPixels);
-  impl->device->unlock();
+  auto surface = impl->drawable->getSurface(context);
+  if (surface == nullptr) {
+    device->unlock();
+    return false;
+  }
+  auto info = tgfx::ImageInfo::Make(impl->drawable->width(), impl->drawable->height(),
+                                    tgfx::ColorType::RGBA_8888,
+                                    tgfx::AlphaType::Premultiplied, dstRowBytes);
+  bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);
+  device->unlock();
   return ok;
 }
 

@@ -23,6 +23,7 @@
 
 namespace pagx {
 
+class Drawable;
 class PAGFile;
 
 /**
@@ -43,6 +44,15 @@ class PAGSurface {
    */
   static std::shared_ptr<PAGSurface> MakeOffscreen(int width, int height);
 
+  /**
+   * Creates a PAGSurface backed by the given Drawable. The Drawable is retained for the lifetime
+   * of the returned PAGSurface. Returns nullptr if drawable is null. Drawable is an opaque
+   * extension point: platform-specific subclasses (e.g. canvas-backed drawables on the web) live
+   * in the pagx implementation tree and are obtained via their respective factory entry points.
+   * @param drawable the platform-specific render target adapter.
+   */
+  static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
+
   ~PAGSurface();
 
   PAGSurface(const PAGSurface&) = delete;
@@ -51,16 +61,12 @@ class PAGSurface {
   /**
    * Returns the surface width in pixels.
    */
-  int width() const {
-    return surfaceWidth;
-  }
+  int width() const;
 
   /**
    * Returns the surface height in pixels.
    */
-  int height() const {
-    return surfaceHeight;
-  }
+  int height() const;
 
   /**
    * Copies pixels from the surface into dstPixels. Pixels are written as RGBA_8888 with
@@ -75,11 +81,9 @@ class PAGSurface {
  private:
   struct Impl;
 
-  PAGSurface(std::unique_ptr<Impl> impl, int width, int height);
+  explicit PAGSurface(std::unique_ptr<Impl> impl);
 
   std::unique_ptr<Impl> impl;
-  int surfaceWidth = 0;
-  int surfaceHeight = 0;
 
   friend class PAGFile;
 };

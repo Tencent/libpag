@@ -24,10 +24,16 @@
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
+#include "platform/web/PagxCanvasDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
+#include "pagx/PAGFile.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
 
 using namespace emscripten;
 
@@ -671,6 +677,52 @@ bool PAGBindInit() {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");
+
+  // pagx bindings: minimal surface to drive PAGFile rendering from JavaScript on web.
+  class_<pagx::PAGXDocument>("_PAGXDocument")
+      .smart_ptr<std::shared_ptr<pagx::PAGXDocument>>("_PAGXDocument")
+      .class_function("_FromXML", optional_override([](const std::string& xml) {
+                        return pagx::PAGXImporter::FromXML(xml);
+                      }))
+      .function("_width",
+                optional_override([](pagx::PAGXDocument& doc) { return doc.width; }))
+      .function("_height",
+                optional_override([](pagx::PAGXDocument& doc) { return doc.height; }));
+
+  class_<pagx::PAGFile>("_PAGXFile")
+      .smart_ptr<std::shared_ptr<pagx::PAGFile>>("_PAGXFile")
+      .class_function("_Make", &pagx::PAGFile::Make)
+      .function("_getTimeline", &pagx::PAGFile::getTimeline)
+      .function("_getDefaultTimeline", &pagx::PAGFile::getDefaultTimeline)
+      .function("_draw", &pagx::PAGFile::draw)
+      .function("_width", &pagx::PAGFile::getWidth)
+      .function("_height", &pagx::PAGFile::getHeight);
+
+  class_<pagx::PAGTimeline>("_PAGXTimeline")
+      .smart_ptr<std::shared_ptr<pagx::PAGTimeline>>("_PAGXTimeline")
+      .function("_getId", &pagx::PAGTimeline::getId)
+      .function("_getDuration", &pagx::PAGTimeline::getDuration)
+      .function("_currentTime", &pagx::PAGTimeline::currentTime)
+      .function("_setCurrentTime", &pagx::PAGTimeline::setCurrentTime)
+      .function("_play", &pagx::PAGTimeline::play)
+      .function("_pause", &pagx::PAGTimeline::pause)
+      .function("_stop", &pagx::PAGTimeline::stop)
+      .function("_isPlaying", &pagx::PAGTimeline::isPlaying)
+      .function("_advance", &pagx::PAGTimeline::advance)
+      .function("_apply", &pagx::PAGTimeline::apply)
+      .function("_advanceAndApply", &pagx::PAGTimeline::advanceAndApply);
+
+  class_<pagx::PAGSurface>("_PAGXSurface")
+      .smart_ptr<std::shared_ptr<pagx::PAGSurface>>("_PAGXSurface")
+      .class_function("_FromCanvas",
+                      optional_override([](const std::string& canvasID) {
+                        return pagx::PAGSurface::MakeFrom(
+                            pagx::CanvasDrawable::FromCanvasID(canvasID));
+                      }))
+      .class_function("_MakeOffscreen", &pagx::PAGSurface::MakeOffscreen)
+      .function("_width", &pagx::PAGSurface::width)
+      .function("_height", &pagx::PAGSurface::height);
+
   return true;
 }
 }  // namespace pag

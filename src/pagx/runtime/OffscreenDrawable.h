@@ -18,16 +18,36 @@
 
 #pragma once
 
-#include <memory>
-#include "pagx/PAGSurface.h"
 #include "pagx/runtime/Drawable.h"
 
 namespace pagx {
 
-// Concrete definition of the opaque PAGSurface::Impl forward-declared in PAGSurface.h. Internal
-// to the runtime layer; not exposed in any public header.
-struct PAGSurface::Impl {
-  std::shared_ptr<Drawable> drawable = nullptr;
+/**
+ * OffscreenDrawable backs PAGSurface::MakeOffscreen with a fresh OpenGL device and a transient
+ * tgfx::Surface sized to the requested pixel dimensions. It is the default Drawable used by
+ * unit tests and any caller that just needs to read pixels back via PAGSurface::readPixels.
+ */
+class OffscreenDrawable : public Drawable {
+ public:
+  static std::shared_ptr<OffscreenDrawable> Make(int width, int height);
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<tgfx::Device> getDevice() override;
+  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
+
+ private:
+  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
+
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<tgfx::Device> device = nullptr;
 };
 
 }  // namespace pagx

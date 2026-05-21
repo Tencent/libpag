@@ -16,18 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include "pagx/PAGSurface.h"
-#include "pagx/runtime/Drawable.h"
+#include "pagx/runtime/OffscreenDrawable.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
-// Concrete definition of the opaque PAGSurface::Impl forward-declared in PAGSurface.h. Internal
-// to the runtime layer; not exposed in any public header.
-struct PAGSurface::Impl {
-  std::shared_ptr<Drawable> drawable = nullptr;
-};
+std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<OffscreenDrawable>(new OffscreenDrawable(width, height, std::move(device)));
+}
+
+OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)
+    : _width(width), _height(height), device(std::move(device)) {
+}
+
+std::shared_ptr<tgfx::Device> OffscreenDrawable::getDevice() {
+  return device;
+}
+
+std::shared_ptr<tgfx::Surface> OffscreenDrawable::getSurface(tgfx::Context* context) {
+  if (surface != nullptr) {
+    return surface;
+  }
+  if (context == nullptr) {
+    return nullptr;
+  }
+  surface = tgfx::Surface::Make(context, _width, _height);
+  return surface;
+}
 
 }  // namespace pagx

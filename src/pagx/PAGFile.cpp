@@ -101,22 +101,33 @@ std::shared_ptr<PAGTimeline> PAGFile::getDefaultTimeline() {
 }
 
 bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
-  if (surface == nullptr || surface->impl == nullptr || surface->impl->surface == nullptr) {
+  if (surface == nullptr || surface->impl == nullptr || surface->impl->drawable == nullptr) {
     return false;
   }
   if (layerTree == nullptr || layerTree->tree.root == nullptr) {
     return false;
   }
+  auto& drawable = surface->impl->drawable;
   if (!layerTree->rootAttached) {
     layerTree->displayList.root()->addChild(layerTree->tree.root);
     layerTree->rootAttached = true;
   }
-  auto* context = surface->impl->device->lockContext();
+  auto device = drawable->getDevice();
+  if (device == nullptr) {
+    return false;
+  }
+  auto* context = device->lockContext();
   if (context == nullptr) {
     return false;
   }
-  layerTree->displayList.render(surface->impl->surface.get());
-  surface->impl->device->unlock();
+  auto tgfxSurface = drawable->getSurface(context);
+  if (tgfxSurface == nullptr) {
+    device->unlock();
+    return false;
+  }
+  layerTree->displayList.render(tgfxSurface.get());
+  drawable->present(context);
+  device->unlock();
   return true;
 }
 
