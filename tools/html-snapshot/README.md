@@ -97,7 +97,7 @@ one call:
 tools/html-snapshot/html2pagx /path/to/page.html
 # → page.subset.html  (flat, subset-compliant; suppress with --no-subset-html)
 # → page.pagx         (after import + resolve)
-# → page.png          (rendered at scale=2)
+# → page.png          (rendered at scale=1)
 
 # URL input: --output-name is required (URLs have no filesystem basename)
 tools/html-snapshot/html2pagx https://example.com/demo \
@@ -113,7 +113,7 @@ Options:
 | `-o, --output-dir <dir>` | Write outputs to a different directory |
 | `--output-name <name>` | Base name for outputs (required when input is a URL) |
 | `--pagx-bin <path>` | Path to the `pagx` CLI binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
-| `--scale <N>` | PNG render scale (default 2) |
+| `--scale <N>` | PNG render scale (default 1) |
 | `--no-render` | Stop after `pagx resolve` |
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
