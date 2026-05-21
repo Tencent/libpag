@@ -275,7 +275,7 @@ std::string HTMLParserContext::generateUniqueId(const std::string& prefix) {
   std::string id;
   do {
     id = prefix + std::to_string(_nextGeneratedId++);
-  } while (_existingIds.count(id) > 0 || (_document && _document->findNode(id) != nullptr));
+  } while (_existingIds.count(id) > 0);
   _existingIds.insert(id);
   return id;
 }
@@ -283,14 +283,11 @@ std::string HTMLParserContext::generateUniqueId(const std::string& prefix) {
 std::string HTMLParserContext::consumeId(const std::shared_ptr<DOMNode>& element) {
   auto* idAttr = element->findAttribute("id");
   if (!idAttr || idAttr->empty()) return {};
-  std::string id = *idAttr;
-  // The id must be unique inside the PAGX document. Since IDs are author-controlled here,
-  // we trust the source unless it would collide with an already-bound node.
-  if (_document && _document->findNode(id) != nullptr) {
-    warn("html: duplicate id '" + id + "' on element; renaming");
-    id = generateUniqueId(id + "_");
-  }
-  return id;
+  // The PAGX layer registry is populated lazily by `makeNode<>`, never with an explicit id from
+  // this importer, so collisions can only come from the source DOM itself. `_existingIds` already
+  // tracks every DOM-side id discovered by `collectAllIds`, so we trust the author and forward
+  // the id verbatim.
+  return *idAttr;
 }
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
@@ -502,8 +499,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
-  frag.fontFamily = inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY
-                                                        : inherited.primaryFontFamily;
+  frag.fontFamily =
+      inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.primaryFontFamily;
   frag.fontStyleName = inherited.fontStyleName;
   frag.fontSize = inherited.fontSizePx;
   frag.letterSpacing = inherited.letterSpacingPx;

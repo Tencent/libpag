@@ -28,6 +28,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetPropertyTable.h"
@@ -47,9 +48,10 @@ const std::vector<std::string>& InheritableProperties() {
   return v;
 }
 
-bool IsVoidElement(const std::string& tag) {
-  return tag == "br" || tag == "hr" || tag == "img" || tag == "meta" || tag == "input" ||
-         tag == "link";
+// Tags that participate in the document skeleton but never produce visual output. The cascade,
+// property filter, and style emitter all skip them.
+bool IsNonRenderedTag(const std::string& tag) {
+  return tag == "html" || tag == "head" || tag == "title" || tag == "meta" || tag == "style";
 }
 
 bool IsAllowedTag(const std::string& tag) {
@@ -78,13 +80,6 @@ void RemoveNonElementChildren(const std::shared_ptr<DOMNode>& parent) {
     child = next;
   }
 }
-
-// Walk children of `parent` and call `fn(parent, prev, child)` for each child element. The
-// callback is allowed to remove or replace `child` via the returned new pointer (nullptr means
-// "delete this child"; any other pointer replaces it).
-//
-// (TransformChildren has been removed: its only call sites used lambdas and the project rule
-// bans lambdas; the loop pattern is now inlined where needed.)
 
 std::shared_ptr<DOMNode> MakeElement(const std::string& name) {
   auto node = std::make_shared<DOMNode>();
@@ -317,19 +312,22 @@ void CoalesceWebkitAlias(PropertyMap& resolved, const std::string& vendorName,
                          const std::string& standardName) {
   auto vendorIt = resolved.find(vendorName);
   if (vendorIt == resolved.end()) return;
-  if (resolved.find(standardName) == resolved.end()) {
-    resolved[standardName] = vendorIt->second;
-  }
+  resolved.emplace(standardName, std::move(vendorIt->second));
   resolved.erase(vendorIt);
 }
 
 void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inheritedIn,
-                 HTMLTransformContext& ctx) {
+                 HTMLTransformContext& ctx, int depth) {
   if (!element || element->type != DOMNodeType::Element) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn("subset:max-depth",
+             "html: maximum recursion depth reached during style resolution; subtree skipped",
+             element);
+    return;
+  }
   PropertyMap inherited = inheritedIn;
   // Compute this element's resolved style and update `inherited` for descendants.
-  if (element->name != "html" && element->name != "head" && element->name != "title" &&
-      element->name != "meta" && element->name != "style") {
+  if (!IsNonRenderedTag(element->name)) {
     ResolveElement(element, inheritedIn, ctx);
     auto* resolved = ctx.findResolved(element.get());
     if (resolved) {
@@ -345,7 +343,7 @@ void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inh
   if (element->name == "svg") return;
   auto child = element->firstChild;
   while (child) {
-    ResolveTree(child, inherited, ctx);
+    ResolveTree(child, inherited, ctx, depth + 1);
     child = child->nextSibling;
   }
 }
@@ -407,7 +405,7 @@ void ComputedStylePass::apply(const std::shared_ptr<DOMNode>& root, HTMLTransfor
   auto body = root->getFirstChild("body");
   if (!body) return;
   PropertyMap empty;
-  ResolveTree(body, empty, ctx);
+  ResolveTree(body, empty, ctx, 0);
 }
 
 //==================================================================================================
@@ -506,18 +504,23 @@ float FilterElement(const std::shared_ptr<DOMNode>& element, float parentFontSiz
 }
 
 void FilterTree(const std::shared_ptr<DOMNode>& element, float parentFontSizePx,
-                HTMLTransformContext& ctx) {
+                HTMLTransformContext& ctx, int depth) {
   if (!element || element->type != DOMNodeType::Element) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn("subset:max-depth",
+             "html: maximum recursion depth reached during property filtering; subtree skipped",
+             element);
+    return;
+  }
   float fontSizeForChildren = parentFontSizePx;
-  if (element->name != "html" && element->name != "head" && element->name != "title" &&
-      element->name != "meta" && element->name != "style") {
+  if (!IsNonRenderedTag(element->name)) {
     fontSizeForChildren = FilterElement(element, parentFontSizePx, ctx);
   }
   // SVG subtrees are opaque to property filtering.
   if (element->name == "svg") return;
   auto child = element->firstChild;
   while (child) {
-    FilterTree(child, fontSizeForChildren, ctx);
+    FilterTree(child, fontSizeForChildren, ctx, depth + 1);
     child = child->nextSibling;
   }
 }
@@ -530,7 +533,7 @@ void PropertyFilterPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTransfo
   if (!body) return;
   // Root document font-size defaults to 14px (matches HTML_DEFAULT_FONT_SIZE / the body
   // element default in `ElementDefaults`).
-  FilterTree(body, 14.0f, ctx);
+  FilterTree(body, 14.0f, ctx, 0);
 }
 
 //==================================================================================================
@@ -560,14 +563,12 @@ bool ParseNormalisedPx(const std::string& valueRaw, float& outPx) {
 
 // Reads a property from a resolved style map, returning empty when missing.
 const std::string& LookupResolved(const PropertyMap& props, const std::string& key) {
-  static const std::string kEmpty;
-  auto it = props.find(key);
-  return it == props.end() ? kEmpty : it->second;
+  return LookupProperty(props, key);
 }
 
 // Lower-cased view of a resolved property.
 std::string LookupResolvedLower(const PropertyMap& props, const std::string& key) {
-  return ToLower(Trim(LookupResolved(props, key)));
+  return LookupLowerTrimmed(props, key);
 }
 
 // Expands a `padding` shorthand value (e.g. `4px 8px`) into top/right/bottom/left. Returns
@@ -676,15 +677,17 @@ bool ChildBoxTopLess(const ChildBox& a, const ChildBox& b) {
   return a.top < b.top;
 }
 
-// Returns true when sorting `children` along `row` (true) or column (false) yields a sequence
-// with no main-axis overlap (within tolerance `tol`).
-bool IsAxisOrderedNoOverlap(const std::vector<ChildBox>& children, bool row, float tol) {
-  std::vector<ChildBox> sorted = children;
-  std::sort(sorted.begin(), sorted.end(), row ? ChildBoxLeftLess : ChildBoxTopLess);
-  for (size_t i = 0; i + 1 < sorted.size(); i++) {
-    float curEnd = row ? sorted[i].left + sorted[i].width : sorted[i].top + sorted[i].height;
-    float nextStart = row ? sorted[i + 1].left : sorted[i + 1].top;
-    if (nextStart < curEnd - tol) return false;  // overlap on main axis
+// Sorts `children` along `row` (true) or column (false) into `outSorted` and returns true
+// when sorting yields a sequence with no main-axis overlap (within tolerance `tol`).
+bool TryAxisSortedNoOverlap(const std::vector<ChildBox>& children, bool row, float tol,
+                            std::vector<ChildBox>& outSorted) {
+  outSorted = children;
+  std::sort(outSorted.begin(), outSorted.end(), row ? ChildBoxLeftLess : ChildBoxTopLess);
+  for (size_t i = 0; i + 1 < outSorted.size(); i++) {
+    float curEnd =
+        row ? outSorted[i].left + outSorted[i].width : outSorted[i].top + outSorted[i].height;
+    float nextStart = row ? outSorted[i + 1].left : outSorted[i + 1].top;
+    if (nextStart < curEnd - tol) return false;
   }
   return true;
 }
@@ -703,28 +706,27 @@ float AxisStartSpread(const std::vector<ChildBox>& children, bool row) {
 
 // Returns the inferred main axis when every child's bounding box is ordered along it without
 // overlap. When both axes are valid (single child / collinear), prefers the axis with the
-// larger spread. Returns std::nullopt-equivalent (false) when neither axis works.
-bool InferAxis(const std::vector<ChildBox>& children, float tol, FlexAxis& out) {
+// larger spread. On success populates `outSorted` with the children sorted along the chosen
+// main axis so the caller does not have to sort again.
+bool InferAxis(const std::vector<ChildBox>& children, float tol, FlexAxis& out,
+               std::vector<ChildBox>& outSorted) {
   if (children.size() < 2) return false;
-  bool rowOk = IsAxisOrderedNoOverlap(children, /*row=*/true, tol);
-  bool colOk = IsAxisOrderedNoOverlap(children, /*row=*/false, tol);
+  std::vector<ChildBox> sortedRow;
+  std::vector<ChildBox> sortedCol;
+  bool rowOk = TryAxisSortedNoOverlap(children, /*row=*/true, tol, sortedRow);
+  bool colOk = TryAxisSortedNoOverlap(children, /*row=*/false, tol, sortedCol);
+  if (!rowOk && !colOk) return false;
   if (rowOk && colOk) {
     // Both axes are non-overlapping — pick the one with the largest spread of starts so that a
     // genuine row-of-3 doesn't get classified as a column with three identical y values.
     out = AxisStartSpread(children, /*row=*/true) >= AxisStartSpread(children, /*row=*/false)
               ? FlexAxis::Row
               : FlexAxis::Column;
-    return true;
+  } else {
+    out = rowOk ? FlexAxis::Row : FlexAxis::Column;
   }
-  if (rowOk) {
-    out = FlexAxis::Row;
-    return true;
-  }
-  if (colOk) {
-    out = FlexAxis::Column;
-    return true;
-  }
-  return false;
+  outSorted = (out == FlexAxis::Row) ? std::move(sortedRow) : std::move(sortedCol);
+  return true;
 }
 
 enum class CrossAlign { Start, Center, End, Stretch, Mixed };
@@ -979,7 +981,8 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   float tol = std::max(0.0f, ctx.options().flexInferenceTolerancePx);
 
   FlexAxis axis = FlexAxis::Row;
-  if (!InferAxis(boxes, tol, axis)) {
+  std::vector<ChildBox> sorted;
+  if (!InferAxis(boxes, tol, axis, sorted)) {
     ctx.warn("subset:flex-inference-skipped",
              "html: <" + tag +
                  "> children overlap on both axes; cannot recover flex layout, kept absolute",
@@ -1027,11 +1030,8 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     return;
   }
 
-  // Sort once along the main axis for spacing inference.
-  std::vector<ChildBox> sorted = boxes;
-  std::sort(sorted.begin(), sorted.end(),
-            axis == FlexAxis::Row ? ChildBoxLeftLess : ChildBoxTopLess);
-
+  // `InferAxis` already sorted the children along the chosen main axis above; reuse the
+  // pre-sorted vector for spacing inference instead of re-sorting.
   MainAxisFit fit = InferMainAxisSpacing(sorted, axis, mainContentLow, mainContentHigh, tol);
   if (!fit.ok) {
     ctx.warn("subset:flex-inference-skipped",
@@ -1073,8 +1073,13 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
            parent);
 }
 
-void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx) {
+void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx, int depth) {
   if (!node || node->type != DOMNodeType::Element) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn("subset:max-depth",
+             "html: maximum recursion depth reached during flex inference; subtree skipped", node);
+    return;
+  }
   // SVG subtrees are opaque (their absolute geometry is meaningful at a different layer).
   if (node->name == "svg") return;
   // Recurse children first: a parent that folds into `align-items: stretch` erases its
@@ -1082,7 +1087,7 @@ void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& c
   // explicit width/height is still intact.
   auto child = node->firstChild;
   while (child) {
-    WalkInferFlex(child, ctx);
+    WalkInferFlex(child, ctx, depth + 1);
     child = child->nextSibling;
   }
   TryInferFlexOnContainer(node, ctx);
@@ -1096,7 +1101,7 @@ void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
   if (!ctx.options().inferFlexFromAbsolute) return;
   auto body = root->getFirstChild("body");
   if (!body) return;
-  WalkInferFlex(body, ctx);
+  WalkInferFlex(body, ctx, 0);
 }
 
 //==================================================================================================
@@ -1146,7 +1151,14 @@ void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext&
 
 // Recurse into element children, dropping unknown tags, then run WrapStrayText on the result.
 void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx,
-                       bool parentIsTextLeaf) {
+                       bool parentIsTextLeaf, int depth) {
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn(
+        "subset:max-depth",
+        "html: maximum recursion depth reached during structure normalization; subtree skipped",
+        parent);
+    return;
+  }
   // SVG subtrees are opaque: their tag set (`<circle>`, `<path>`, ...) is not part of the HTML
   // subset, but the importer captures the verbatim XML and feeds it to the SVG resolver. We
   // therefore leave the subtree untouched.
@@ -1184,7 +1196,7 @@ void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformCont
     }
     if (child->type == DOMNodeType::Element) {
       bool childIsTextLeaf = IsTextLeafTag(child->name);
-      NormalizeChildren(child, ctx, childIsTextLeaf);
+      NormalizeChildren(child, ctx, childIsTextLeaf, depth + 1);
     }
     prev = child;
     child = next;
@@ -1213,7 +1225,7 @@ void StructureNormalizationPass::apply(const std::shared_ptr<DOMNode>& root,
   if (!root || ctx.hasFatal()) return;
   auto body = root->getFirstChild("body");
   if (!body) return;
-  NormalizeChildren(body, ctx, /*parentIsTextLeaf=*/false);
+  NormalizeChildren(body, ctx, /*parentIsTextLeaf=*/false, 0);
 }
 
 //==================================================================================================
@@ -1277,10 +1289,15 @@ void EmitStyleAttribute(const std::shared_ptr<DOMNode>& element, HTMLTransformCo
   }
 }
 
-void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx) {
+void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx, int depth) {
   if (!element || element->type != DOMNodeType::Element) return;
-  if (element->name != "html" && element->name != "head" && element->name != "title" &&
-      element->name != "meta" && element->name != "style") {
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn("subset:max-depth",
+             "html: maximum recursion depth reached during inline style emission; subtree skipped",
+             element);
+    return;
+  }
+  if (!IsNonRenderedTag(element->name)) {
     EmitStyleAttribute(element, ctx);
     if (!ctx.options().preserveClassAttribute) {
       element->attributes.erase(
@@ -1292,7 +1309,7 @@ void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx
   if (element->name == "svg") return;
   auto child = element->firstChild;
   while (child) {
-    EmitTree(child, ctx);
+    EmitTree(child, ctx, depth + 1);
     child = child->nextSibling;
   }
 }
@@ -1304,8 +1321,7 @@ void InlineStyleEmitterPass::apply(const std::shared_ptr<DOMNode>& root,
   if (!root || ctx.hasFatal()) return;
   auto body = root->getFirstChild("body");
   if (!body) return;
-  EmitTree(body, ctx);
-  (void)IsVoidElement;  // referenced for future void-element handling; keep helper alive.
+  EmitTree(body, ctx, 0);
 }
 
 }  // namespace pagx::html
