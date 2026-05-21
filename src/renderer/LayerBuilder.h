@@ -20,19 +20,49 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "tgfx/layers/Layer.h"
 
+namespace tgfx {
+class FillStyle;
+class Gradient;
+class Image;
+class ImagePattern;
+class SolidColor;
+class StrokeStyle;
+class Text;
+}  // namespace tgfx
+
 namespace pagx {
 
+class ColorStop;
+class Fill;
+class Gradient;
+class Image;
+class ImagePattern;
+class SolidColor;
+class Stroke;
+class Text;
+
 /**
- * Result of building a layer tree, containing the root layer and an optional mapping from PAGX
- * Layer nodes to their corresponding tgfx::Layer objects.
+ * Runtime layer tree built from PAGX nodes, containing the root layer and mappings from PAGX nodes
+ * to their corresponding tgfx objects.
  */
-struct LayerBuildResult {
+struct PAGLayerTree {
   std::shared_ptr<tgfx::Layer> root = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
+  std::unordered_map<const SolidColor*, std::shared_ptr<tgfx::SolidColor>> solidMap = {};
+  std::unordered_map<const Gradient*, std::shared_ptr<tgfx::Gradient>> gradientMap = {};
+  std::unordered_map<const ColorStop*, size_t> stopMap = {};
+  std::unordered_map<const ImagePattern*, std::shared_ptr<tgfx::ImagePattern>> patternMap = {};
+  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> imageMap = {};
+  std::unordered_map<const Text*, std::shared_ptr<tgfx::Text>> textMap = {};
+  std::unordered_map<const Fill*, std::shared_ptr<tgfx::FillStyle>> fillMap = {};
+  std::unordered_map<const Stroke*, std::shared_ptr<tgfx::StrokeStyle>> strokeMap = {};
 };
+
+using LayerBuildResult = PAGLayerTree;
 
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.

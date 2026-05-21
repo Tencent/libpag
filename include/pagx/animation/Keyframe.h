@@ -18,48 +18,42 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include <cstdint>
+#include <string>
+#include "pagx/types/Color.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+using Frame = int64_t;
+constexpr Frame ZeroFrame = 0;
 
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
- public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+enum class KeyframeInterpolationType : uint8_t {
+  None = 0,
+  Linear = 1,
+  Bezier = 2,
+  Hold = 3,
+};
 
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
+struct ImageRef {
+  std::string id = {};
 
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  bool operator==(const ImageRef& other) const {
+    return id == other.id;
   }
 
- private:
-  Composition() = default;
+  bool operator!=(const ImageRef& other) const {
+    return !(*this == other);
+  }
+};
 
-  friend class PAGXDocument;
+template <typename T>
+struct Keyframe {
+  Frame time = ZeroFrame;
+  T value = {};
+  KeyframeInterpolationType interpolation = KeyframeInterpolationType::Linear;
+  Point bezierOut = {};
+  Point bezierIn = {};
 };
 
 }  // namespace pagx

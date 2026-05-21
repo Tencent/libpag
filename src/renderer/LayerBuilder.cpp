@@ -129,10 +129,8 @@ class LayerBuilderContext {
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
-    LayerBuildResult result = {};
-    result.root = root;
-    result.layerMap = std::move(_tgfxLayerByPagxLayer);
-    return result;
+    _layerTree.root = root;
+    return std::move(_layerTree);
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
@@ -149,8 +147,8 @@ class LayerBuilderContext {
 
     // Apply masks after all layers are built (second pass).
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
-      auto it = _tgfxLayerByPagxLayer.find(maskPagx);
-      if (it != _tgfxLayerByPagxLayer.end()) {
+      auto it = _layerTree.layerMap.find(maskPagx);
+      if (it != _layerTree.layerMap.end()) {
         auto maskLayer = it->second;
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
@@ -181,8 +179,8 @@ class LayerBuilderContext {
     }
 
     if (layer) {
-      // Register layer for mask lookups.
-      _tgfxLayerByPagxLayer[node] = layer;
+      // Register layer for mask lookups and animation writers.
+      _layerTree.layerMap[node] = layer;
 
       applyLayerAttributes(node, layer.get());
 
@@ -265,46 +263,63 @@ class LayerBuilderContext {
       return nullptr;
     }
 
+    std::shared_ptr<tgfx::VectorElement> result = nullptr;
     switch (node->nodeType()) {
       case NodeType::Rectangle:
-        return convertRectangle(static_cast<const Rectangle*>(node));
+        result = convertRectangle(static_cast<const Rectangle*>(node));
+        break;
       case NodeType::Ellipse:
-        return convertEllipse(static_cast<const Ellipse*>(node));
+        result = convertEllipse(static_cast<const Ellipse*>(node));
+        break;
       case NodeType::Polystar:
-        return convertPolystar(static_cast<const Polystar*>(node));
+        result = convertPolystar(static_cast<const Polystar*>(node));
+        break;
       case NodeType::Path:
-        return convertPath(static_cast<const Path*>(node));
+        result = convertPath(static_cast<const Path*>(node));
+        break;
       case NodeType::Text:
-        return convertText(static_cast<Text*>(node));
+        result = convertText(static_cast<Text*>(node));
+        break;
       case NodeType::Fill:
-        return convertFill(static_cast<const Fill*>(node));
+        result = convertFill(static_cast<const Fill*>(node));
+        break;
       case NodeType::Stroke:
-        return convertStroke(static_cast<const Stroke*>(node));
+        result = convertStroke(static_cast<const Stroke*>(node));
+        break;
       case NodeType::TrimPath:
-        return convertTrimPath(static_cast<const TrimPath*>(node));
+        result = convertTrimPath(static_cast<const TrimPath*>(node));
+        break;
       case NodeType::TextPath:
-        return convertTextPath(static_cast<const TextPath*>(node));
+        result = convertTextPath(static_cast<const TextPath*>(node));
+        break;
       case NodeType::RoundCorner:
-        return convertRoundCorner(static_cast<const RoundCorner*>(node));
+        result = convertRoundCorner(static_cast<const RoundCorner*>(node));
+        break;
       case NodeType::MergePath:
-        return convertMergePath(static_cast<const MergePath*>(node));
+        result = convertMergePath(static_cast<const MergePath*>(node));
+        break;
       case NodeType::Repeater:
-        return convertRepeater(static_cast<const Repeater*>(node));
+        result = convertRepeater(static_cast<const Repeater*>(node));
+        break;
       case NodeType::TextModifier:
-        return convertTextModifier(static_cast<const TextModifier*>(node));
+        result = convertTextModifier(static_cast<const TextModifier*>(node));
+        break;
       case NodeType::Group:
-        return convertGroup(static_cast<const Group*>(node));
+        result = convertGroup(static_cast<const Group*>(node));
+        break;
       case NodeType::TextBox: {
         auto* textBox = static_cast<const TextBox*>(node);
         if (textBox->elements.empty()) {
           return nullptr;
         }
         prepareTextBoxTextBlobs(textBox);
-        return convertGroup(textBox);
+        result = convertGroup(textBox);
+        break;
       }
       default:
-        return nullptr;
+        break;
     }
+    return result;
   }
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
@@ -381,6 +396,7 @@ class LayerBuilderContext {
     if (tgfxText) {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
+      _layerTree.textMap[node] = tgfxText;
     }
     return tgfxText;
   }
@@ -396,6 +412,7 @@ class LayerBuilderContext {
 
     auto fill = tgfx::FillStyle::Make(colorSource);
     if (fill) {
+      _layerTree.fillMap[node] = fill;
       fill->setAlpha(node->alpha);
       if (node->blendMode != BlendMode::Normal) {
         fill->setBlendMode(ToTGFX(node->blendMode));
@@ -423,6 +440,7 @@ class LayerBuilderContext {
     if (stroke == nullptr) {
       return nullptr;
     }
+    _layerTree.strokeMap[node] = stroke;
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
@@ -454,7 +472,11 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::SolidColor: {
         auto solid = static_cast<const SolidColor*>(node);
-        return tgfx::SolidColor::Make(ToTGFX(solid->color));
+        auto tgfxSolid = tgfx::SolidColor::Make(ToTGFX(solid->color));
+        if (tgfxSolid) {
+          _layerTree.solidMap[solid] = tgfxSolid;
+        }
+        return tgfxSolid;
       }
       case NodeType::LinearGradient: {
         auto grad = static_cast<const LinearGradient*>(node);
@@ -481,12 +503,12 @@ class LayerBuilderContext {
     }
   }
 
-  static void ExtractGradientStops(const std::vector<ColorStop*>& colorStops,
-                                   std::vector<tgfx::Color>* colors,
-                                   std::vector<float>* positions) {
+  void extractGradientStops(const std::vector<ColorStop*>& colorStops,
+                            std::vector<tgfx::Color>* colors, std::vector<float>* positions) {
     colors->reserve(colorStops.size());
     positions->reserve(colorStops.size());
     for (const auto* stop : colorStops) {
+      _layerTree.stopMap[stop] = colors->size();
       colors->push_back(ToTGFX(stop->color));
       positions->push_back(stop->offset);
     }
@@ -496,9 +518,10 @@ class LayerBuilderContext {
     }
   }
 
-  static std::shared_ptr<tgfx::ColorSource> ApplyGradientProperties(
+  std::shared_ptr<tgfx::ColorSource> applyGradientProperties(
       std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node) {
     if (gradient) {
+      _layerTree.gradientMap[node] = gradient;
       gradient->setFitsToGeometry(node->fitsToGeometry);
       if (!node->matrix.isIdentity()) {
         gradient->setMatrix(ToTGFX(node->matrix));
@@ -510,8 +533,8 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientProperties(
+    extractGradientStops(node->colorStops, &colors, &positions);
+    return applyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
         node);
@@ -520,16 +543,16 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientProperties(
+    extractGradientStops(node->colorStops, &colors, &positions);
+    return applyGradientProperties(
         tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+    extractGradientStops(node->colorStops, &colors, &positions);
+    return applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
                                                              node->endAngle, colors, positions),
                                    node);
   }
@@ -537,8 +560,8 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientProperties(
+    extractGradientStops(node->colorStops, &colors, &positions);
+    return applyGradientProperties(
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
@@ -558,6 +581,10 @@ class LayerBuilderContext {
       image = tgfx::Image::MakeFromFile(imageNode->filePath);
     }
 
+    if (image) {
+      _layerTree.imageMap[imageNode] = image;
+    }
+
     if (!image) {
       return nullptr;
     }
@@ -566,6 +593,7 @@ class LayerBuilderContext {
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
+      _layerTree.patternMap[node] = pattern;
       pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
@@ -889,7 +917,7 @@ class LayerBuilderContext {
     }
   };
   std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
-  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
+  PAGLayerTree _layerTree = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
 };

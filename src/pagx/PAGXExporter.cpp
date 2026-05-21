@@ -20,6 +20,9 @@
 #include <cmath>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/animation/Animation.h"
+#include "pagx/animation/AnimationObject.h"
+#include "pagx/animation/Property.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -130,6 +133,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
+static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -137,6 +141,130 @@ static void WriteCustomData(XMLBuilder& xml, const Node* node) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }
+}
+
+static std::string LoopModeToString(LoopMode loop) {
+  switch (loop) {
+    case LoopMode::Loop:
+      return "loop";
+    case LoopMode::PingPong:
+      return "pingPong";
+    case LoopMode::Once:
+    default:
+      return "once";
+  }
+}
+
+static std::string KeyframeInterpolationToString(KeyframeInterpolationType interpolation) {
+  switch (interpolation) {
+    case KeyframeInterpolationType::None:
+      return "none";
+    case KeyframeInterpolationType::Bezier:
+      return "bezier";
+    case KeyframeInterpolationType::Hold:
+      return "hold";
+    case KeyframeInterpolationType::Linear:
+    default:
+      return "linear";
+  }
+}
+
+template <typename T>
+static std::string KeyframeValueToString(const T& value) {
+  return std::to_string(value);
+}
+
+template <>
+std::string KeyframeValueToString<float>(const float& value) {
+  return FloatToString(value);
+}
+
+template <>
+std::string KeyframeValueToString<bool>(const bool& value) {
+  return value ? "true" : "false";
+}
+
+template <>
+std::string KeyframeValueToString<std::string>(const std::string& value) {
+  return value;
+}
+
+template <>
+std::string KeyframeValueToString<ImageRef>(const ImageRef& value) {
+  return "@" + value.id;
+}
+
+template <>
+std::string KeyframeValueToString<Color>(const Color& value) {
+  return ColorToHexString(value, value.alpha < 1.0f);
+}
+
+template <typename T>
+static void WriteTypedProperty(XMLBuilder& xml, const TypedProperty<T>* property,
+                               const char* typeName) {
+  xml.openElement("Property");
+  xml.addRequiredAttribute("channel", property->channel);
+  xml.addAttribute("type", typeName);
+  xml.closeElementStart();
+  for (const auto& key : property->keyframes) {
+    xml.openElement("Key");
+    xml.addRequiredAttribute("time", key.time);
+    xml.addRequiredAttribute("value", KeyframeValueToString<T>(key.value));
+    if (key.interpolation != KeyframeInterpolationType::Linear) {
+      xml.addAttribute("interpolation", KeyframeInterpolationToString(key.interpolation));
+    }
+    if (key.bezierOut != Point{}) {
+      xml.addAttribute("bezier-out", PointToString(key.bezierOut));
+    }
+    if (key.bezierIn != Point{}) {
+      xml.addAttribute("bezier-in", PointToString(key.bezierIn));
+    }
+    xml.closeElementSelfClosing();
+  }
+  xml.closeElement();
+}
+
+static void WriteProperty(XMLBuilder& xml, const Property* property) {
+  if (auto typed = dynamic_cast<const TypedProperty<float>*>(property)) {
+    WriteTypedProperty(xml, typed, "float");
+  } else if (auto typed = dynamic_cast<const TypedProperty<bool>*>(property)) {
+    WriteTypedProperty(xml, typed, "bool");
+  } else if (auto typed = dynamic_cast<const TypedProperty<int>*>(property)) {
+    WriteTypedProperty(xml, typed, "int");
+  } else if (auto typed = dynamic_cast<const TypedProperty<std::string>*>(property)) {
+    WriteTypedProperty(xml, typed, "string");
+  } else if (auto typed = dynamic_cast<const TypedProperty<ImageRef>*>(property)) {
+    WriteTypedProperty(xml, typed, "image");
+  } else if (auto typed = dynamic_cast<const TypedProperty<Color>*>(property)) {
+    WriteTypedProperty(xml, typed, "color");
+  }
+}
+
+static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
+  if (animations.empty()) {
+    return;
+  }
+  xml.openElement("Animations");
+  xml.closeElementStart();
+  for (const auto* animation : animations) {
+    xml.openElement("Animation");
+    xml.addRequiredAttribute("name", animation->name);
+    xml.addRequiredAttribute("duration", animation->duration);
+    xml.addAttribute("frameRate", animation->frameRate, 60.0f);
+    xml.addAttribute("loop", LoopModeToString(animation->loop));
+    xml.closeElementStart();
+    for (const auto* object : animation->objects) {
+      xml.openElement("Object");
+      xml.addRequiredAttribute("target", object->target);
+      xml.closeElementStart();
+      for (const auto* property : object->properties) {
+        WriteProperty(xml, property);
+      }
+      xml.closeElement();
+    }
+    xml.closeElement();
+  }
+  xml.closeElement();
 }
 
 //==============================================================================
@@ -984,13 +1112,14 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addRequiredAttribute("width", comp->width);
       xml.addRequiredAttribute("height", comp->height);
       WriteCustomData(xml, node);
-      if (comp->layers.empty()) {
+      if (comp->layers.empty() && comp->animations.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
           WriteLayer(xml, layer, options);
         }
+        WriteAnimations(xml, comp->animations);
         xml.closeElement();
       }
       break;
@@ -1119,6 +1248,16 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (node->composition != nullptr && !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
   }
+  if (!node->timelines.empty()) {
+    std::string timelines;
+    for (size_t i = 0; i < node->timelines.size(); ++i) {
+      if (i > 0) {
+        timelines += ",";
+      }
+      timelines += node->timelines[i];
+    }
+    xml.addAttribute("timelines", timelines);
+  }
 
   // Build directive attributes.
   xml.addAttribute("import", node->importDirective.source);
@@ -1188,6 +1327,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
+  WriteAnimations(xml, doc.animations);
 
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;

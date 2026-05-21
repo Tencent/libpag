@@ -18,46 +18,58 @@
 
 #pragma once
 
+#include <algorithm>
+#include <string>
+#include <variant>
 #include <vector>
+#include "pagx/animation/Keyframe.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
 
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
+class Property : public Node {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+  std::string channel = {};
 
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  KeyValue evaluateAt(Frame frame) const {
+    return onEvaluateAt(frame);
   }
 
+  NodeType nodeType() const override {
+    return NodeType::Property;
+  }
+
+ protected:
+  Property() = default;
+
  private:
-  Composition() = default;
+  virtual KeyValue onEvaluateAt(Frame frame) const = 0;
+
+  friend class PAGXDocument;
+};
+
+template <typename T>
+class TypedProperty : public Property {
+ public:
+  std::vector<Keyframe<T>> keyframes = {};
+
+ private:
+  KeyValue onEvaluateAt(Frame frame) const override {
+    if (keyframes.empty()) {
+      return T{};
+    }
+    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), frame,
+                               [](Frame value, const Keyframe<T>& keyframe) {
+                                 return value < keyframe.time;
+                               });
+    if (it == keyframes.begin()) {
+      return it->value;
+    }
+    --it;
+    return it->value;
+  }
 
   friend class PAGXDocument;
 };

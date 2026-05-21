@@ -34,6 +34,9 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
+#include "pagx/animation/Animation.h"
+#include "pagx/animation/AnimationObject.h"
+#include "pagx/animation/Property.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -5286,6 +5289,227 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   // Glyph count and IDs should match after re-embedding.
   EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), firstGlyphCount);
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
+}
+
+ * Test case: Top-level Animations / Object / Property / Keyframe round-trip
+ * across all six TypedProperty<T> instantiations (float, bool, int, string, image, color).
+ */
+PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto layer = doc->makeNode<pagx::Layer>("targetLayer");
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("targetSolid");
+  (void)solid;
+
+  auto animation = doc->makeNode<pagx::Animation>();
+  animation->name = "main";
+  animation->duration = 120;
+  animation->frameRate = 60;
+  animation->loop = pagx::LoopMode::PingPong;
+
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "targetLayer";
+  animation->objects.push_back(object);
+
+  auto floatProp = doc->makeNode<pagx::TypedProperty<float>>();
+  floatProp->channel = "alpha";
+  floatProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  floatProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->properties.push_back(floatProp);
+
+  auto boolProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  boolProp->channel = "visible";
+  boolProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  boolProp->keyframes.push_back({30, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(boolProp);
+
+  auto intProp = doc->makeNode<pagx::TypedProperty<int>>();
+  intProp->channel = "blendMode";
+  intProp->keyframes.push_back({0, 1, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  intProp->keyframes.push_back({60, 4, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(intProp);
+
+  auto strProp = doc->makeNode<pagx::TypedProperty<std::string>>();
+  strProp->channel = "text";
+  strProp->keyframes.push_back(
+      {0, std::string("Hello"), pagx::KeyframeInterpolationType::Hold, {}, {}});
+  strProp->keyframes.push_back(
+      {60, std::string("World"), pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(strProp);
+
+  auto imgProp = doc->makeNode<pagx::TypedProperty<pagx::ImageRef>>();
+  imgProp->channel = "image";
+  imgProp->keyframes.push_back(
+      {0, pagx::ImageRef{"imgA"}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  imgProp->keyframes.push_back(
+      {60, pagx::ImageRef{"imgB"}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(imgProp);
+
+  auto colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  colorProp->channel = "color";
+  pagx::Color colorA{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::Color colorB{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  colorProp->keyframes.push_back({0, colorA, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorProp->keyframes.push_back({60, colorB, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->properties.push_back(colorProp);
+
+  doc->animations.push_back(animation);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty()) << "errors: " << loaded->errors.size();
+  ASSERT_EQ(loaded->animations.size(), 1u);
+
+  auto* anim2 = loaded->animations[0];
+  EXPECT_EQ(anim2->name, "main");
+  EXPECT_EQ(anim2->duration, 120);
+  EXPECT_FLOAT_EQ(anim2->frameRate, 60.0f);
+  EXPECT_EQ(anim2->loop, pagx::LoopMode::PingPong);
+  ASSERT_EQ(anim2->objects.size(), 1u);
+
+  auto* obj2 = anim2->objects[0];
+  EXPECT_EQ(obj2->target, "targetLayer");
+  ASSERT_EQ(obj2->properties.size(), 6u);
+
+  auto* p0 = dynamic_cast<pagx::TypedProperty<float>*>(obj2->properties[0]);
+  ASSERT_TRUE(p0 != nullptr);
+  EXPECT_EQ(p0->channel, "alpha");
+  ASSERT_EQ(p0->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(p0->keyframes[1].value, 1.0f);
+
+  auto* p1 = dynamic_cast<pagx::TypedProperty<bool>*>(obj2->properties[1]);
+  ASSERT_TRUE(p1 != nullptr);
+  EXPECT_EQ(p1->keyframes[0].value, false);
+  EXPECT_EQ(p1->keyframes[1].value, true);
+
+  auto* p2 = dynamic_cast<pagx::TypedProperty<int>*>(obj2->properties[2]);
+  ASSERT_TRUE(p2 != nullptr);
+  EXPECT_EQ(p2->keyframes[1].value, 4);
+
+  auto* p3 = dynamic_cast<pagx::TypedProperty<std::string>*>(obj2->properties[3]);
+  ASSERT_TRUE(p3 != nullptr);
+  EXPECT_EQ(p3->keyframes[1].value, "World");
+
+  auto* p4 = dynamic_cast<pagx::TypedProperty<pagx::ImageRef>*>(obj2->properties[4]);
+  ASSERT_TRUE(p4 != nullptr);
+  EXPECT_EQ(p4->keyframes[0].value.id, "imgA");
+  EXPECT_EQ(p4->keyframes[1].value.id, "imgB");
+
+  auto* p5 = dynamic_cast<pagx::TypedProperty<pagx::Color>*>(obj2->properties[5]);
+  ASSERT_TRUE(p5 != nullptr);
+  EXPECT_FLOAT_EQ(p5->keyframes[0].value.red, 1.0f);
+  EXPECT_FLOAT_EQ(p5->keyframes[1].value.green, 1.0f);
+}
+
+/**
+ * Test case: Keyframe interpolation modes (None / Linear / Bezier / Hold)
+ * and bezier-in / bezier-out attributes round-trip.
+ */
+PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>();
+  animation->name = "ease";
+  animation->duration = 60;
+  doc->animations.push_back(animation);
+
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->channel = "alpha";
+  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Bezier,
+                             pagx::Point{0.42f, 0.0f}, pagx::Point{}});
+  prop->keyframes.push_back({30, 0.5f, pagx::KeyframeInterpolationType::Hold, pagx::Point{},
+                             pagx::Point{0.58f, 1.0f}});
+  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::None, pagx::Point{},
+                             pagx::Point{}});
+  object->properties.push_back(prop);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_EQ(loaded->animations.size(), 1u);
+
+  auto* prop2 =
+      dynamic_cast<pagx::TypedProperty<float>*>(loaded->animations[0]->objects[0]->properties[0]);
+  ASSERT_TRUE(prop2 != nullptr);
+  ASSERT_EQ(prop2->keyframes.size(), 3u);
+
+  EXPECT_EQ(prop2->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_FLOAT_EQ(prop2->keyframes[0].bezierOut.x, 0.42f);
+  EXPECT_FLOAT_EQ(prop2->keyframes[0].bezierOut.y, 0.0f);
+
+  EXPECT_EQ(prop2->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Hold);
+  EXPECT_FLOAT_EQ(prop2->keyframes[1].bezierIn.x, 0.58f);
+  EXPECT_FLOAT_EQ(prop2->keyframes[1].bezierIn.y, 1.0f);
+
+  EXPECT_EQ(prop2->keyframes[2].interpolation, pagx::KeyframeInterpolationType::None);
+}
+
+/**
+ * Test case: Layer.timelines attribute round-trip (comma-separated names).
+ */
+PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto card = doc->makeNode<pagx::Composition>("card");
+  card->width = 80;
+  card->height = 40;
+
+  auto cardAnim = doc->makeNode<pagx::Animation>();
+  cardAnim->name = "enter";
+  cardAnim->duration = 30;
+  card->animations.push_back(cardAnim);
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = card;
+  slot->timelines = {"enter", "idle"};
+  doc->layers.push_back(slot);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_GE(loaded->layers.size(), 1u);
+
+  auto* slot2 = loaded->layers[0];
+  ASSERT_TRUE(slot2->composition != nullptr);
+  EXPECT_EQ(slot2->composition->id, "card");
+  ASSERT_EQ(slot2->timelines.size(), 2u);
+  EXPECT_EQ(slot2->timelines[0], "enter");
+  EXPECT_EQ(slot2->timelines[1], "idle");
+  ASSERT_EQ(slot2->composition->animations.size(), 1u);
+  EXPECT_EQ(slot2->composition->animations[0]->name, "enter");
+}
+
+/**
+ * Test case: TypedProperty<T>::evaluateAt returns the keyframe value at or before the requested
+ * frame (Hold-style staircase), validating the binary search baseline behavior.
+ */
+PAGX_TEST(PAGXTest, TypedPropertyEvaluateAt) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto prop = doc->makeNode<pagx::TypedProperty<float>>();
+  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  prop->keyframes.push_back({30, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(-10)), 0.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0)), 0.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(15)), 0.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(30)), 0.5f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(45)), 0.5f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(60)), 1.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(120)), 1.0f);
 }
 
 }  // namespace pag

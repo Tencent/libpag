@@ -26,6 +26,9 @@
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
+#include "pagx/animation/Animation.h"
+#include "pagx/animation/AnimationObject.h"
+#include "pagx/animation/Property.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -128,6 +131,8 @@ static EnumType GetEnumAttribute(const DOMNode* node, const char* name,
 // Forward declarations for parse functions
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc);
 static void ParseResources(const DOMNode* node, PAGXDocument* doc);
+static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
+                            PAGXDocument* doc);
 static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
 static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
@@ -490,6 +495,23 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       ReportError(doc, node,
                   "Resource '" + compositionAttr + "' not found for 'composition' attribute.");
     }
+  } else if (!compositionAttr.empty()) {
+    ReportError(doc, node, "External composition paths are not supported until PR10.");
+  }
+  auto timelinesAttr = GetAttribute(node, "timelines");
+  layer->timelines.clear();
+  size_t start = 0;
+  while (start < timelinesAttr.size()) {
+    auto comma = timelinesAttr.find(',', start);
+    auto token =
+        timelinesAttr.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+    if (!token.empty()) {
+      layer->timelines.push_back(token);
+    }
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
   }
 
   // Build directive attributes.
@@ -1434,15 +1456,298 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
         if (layer) {
           comp->layers.push_back(layer);
         }
+      } else if (child->name == "Animations") {
+        ParseAnimations(child.get(), &comp->animations, doc);
       } else {
-        ReportError(
-            doc, child.get(),
-            "Element '" + child->name + "' is not allowed in 'Composition'. Expected: Layer.");
+        ReportError(doc, child.get(),
+                    "Element '" + child->name +
+                        "' is not allowed in 'Composition'. Expected: Layer, Animations.");
       }
     }
     child = child->nextSibling;
   }
   return comp;
+}
+
+static KeyframeInterpolationType ParseKeyframeInterpolation(const std::string& value,
+                                                            PAGXDocument* doc,
+                                                            const DOMNode* node) {
+  if (value.empty() || value == "linear") {
+    return KeyframeInterpolationType::Linear;
+  }
+  if (value == "none") {
+    return KeyframeInterpolationType::None;
+  }
+  if (value == "bezier") {
+    return KeyframeInterpolationType::Bezier;
+  }
+  if (value == "hold") {
+    return KeyframeInterpolationType::Hold;
+  }
+  ReportError(doc, node, "Invalid interpolation value '" + value + "'.");
+  return KeyframeInterpolationType::Linear;
+}
+
+static bool LooksLikeInteger(const std::string& value) {
+  if (value.empty()) {
+    return false;
+  }
+  size_t i = value[0] == '-' ? 1 : 0;
+  if (i == value.size()) {
+    return false;
+  }
+  for (; i < value.size(); ++i) {
+    if (value[i] < '0' || value[i] > '9') {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool LooksLikeFloat(const std::string& value) {
+  if (value.empty()) {
+    return false;
+  }
+  char* end = nullptr;
+  strtof(value.c_str(), &end);
+  return end != value.c_str() && *end == '\0';
+}
+
+template <typename T>
+static T ParseTypedValue(const std::string&, PAGXDocument*, const DOMNode*) {
+  return T{};
+}
+
+template <>
+float ParseTypedValue<float>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  return strtof(value.c_str(), nullptr);
+}
+
+template <>
+bool ParseTypedValue<bool>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  return value == "true" || value == "1";
+}
+
+template <>
+int ParseTypedValue<int>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  return std::atoi(value.c_str());
+}
+
+template <>
+std::string ParseTypedValue<std::string>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  return value;
+}
+
+template <>
+ImageRef ParseTypedValue<ImageRef>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  ImageRef ref = {};
+  ref.id = !value.empty() && value[0] == '@' ? value.substr(1) : value;
+  return ref;
+}
+
+template <>
+Color ParseTypedValue<Color>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
+  bool valid = false;
+  auto color = ParseColor(value, &valid);
+  if (!valid) {
+    ReportError(doc, node, "Invalid color keyframe value '" + value + "'.");
+  }
+  return color;
+}
+
+template <typename T>
+static void ParseKeyframes(const DOMNode* propertyNode, TypedProperty<T>* property,
+                           PAGXDocument* doc) {
+  auto child = propertyNode->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Key") {
+        Keyframe<T> key = {};
+        key.time = GetIntAttribute(child.get(), "time", 0, doc);
+        key.value = ParseTypedValue<T>(GetAttribute(child.get(), "value"), doc, child.get());
+        key.interpolation = ParseKeyframeInterpolation(GetAttribute(child.get(), "interpolation"),
+                                                       doc, child.get());
+        auto bezierOut = GetAttribute(child.get(), "bezier-out");
+        if (!bezierOut.empty()) {
+          bool valid = false;
+          key.bezierOut = ParsePoint(bezierOut, &valid);
+          if (!valid) {
+            ReportError(doc, child.get(), "Invalid bezier-out value '" + bezierOut + "'.");
+          }
+        }
+        auto bezierIn = GetAttribute(child.get(), "bezier-in");
+        if (!bezierIn.empty()) {
+          bool valid = false;
+          key.bezierIn = ParsePoint(bezierIn, &valid);
+          if (!valid) {
+            ReportError(doc, child.get(), "Invalid bezier-in value '" + bezierIn + "'.");
+          }
+        }
+        property->keyframes.push_back(key);
+      } else {
+        ReportError(doc, child.get(),
+                    "Element '" + child->name + "' is not allowed in 'Property'. Expected: Key.");
+      }
+    }
+    child = child->nextSibling;
+  }
+}
+
+static Property* ParseProperty(const DOMNode* node, PAGXDocument* doc) {
+  auto type = GetAttribute(node, "type");
+  auto firstValue = EmptyString();
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Key") {
+      firstValue = GetAttribute(child.get(), "value");
+      break;
+    }
+    child = child->nextSibling;
+  }
+  if (type.empty()) {
+    bool colorValid = false;
+    if (!firstValue.empty()) {
+      ParseColor(firstValue, &colorValid);
+    }
+    if (colorValid) {
+      type = "color";
+    } else if (firstValue == "true" || firstValue == "false") {
+      type = "bool";
+    } else if (!firstValue.empty() && firstValue[0] == '@') {
+      type = "image";
+    } else if (LooksLikeInteger(firstValue)) {
+      type = "int";
+    } else if (LooksLikeFloat(firstValue)) {
+      type = "float";
+    } else {
+      type = "string";
+    }
+  }
+
+  Property* result = nullptr;
+  if (type == "float" || type == "number") {
+    auto prop = makeNodeFromXML<TypedProperty<float>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else if (type == "bool") {
+    auto prop = makeNodeFromXML<TypedProperty<bool>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else if (type == "int" || type == "enum") {
+    auto prop = makeNodeFromXML<TypedProperty<int>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else if (type == "string" || type == "text") {
+    auto prop = makeNodeFromXML<TypedProperty<std::string>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else if (type == "image" || type == "imageRef") {
+    auto prop = makeNodeFromXML<TypedProperty<ImageRef>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else if (type == "color") {
+    auto prop = makeNodeFromXML<TypedProperty<Color>>(node, doc);
+    ParseKeyframes(node, prop, doc);
+    result = prop;
+  } else {
+    ReportError(doc, node, "Invalid Property type '" + type + "'.");
+  }
+
+  if (result != nullptr) {
+    result->channel = GetAttribute(node, "channel");
+    if (result->channel.empty()) {
+      ReportError(doc, node, "Property requires a non-empty 'channel' attribute.");
+    }
+  }
+  return result;
+}
+
+static AnimationObject* ParseAnimationObject(const DOMNode* node, PAGXDocument* doc) {
+  auto object = makeNodeFromXML<AnimationObject>(node, doc);
+  if (!object) {
+    return nullptr;
+  }
+  object->target = GetAttribute(node, "target");
+  if (object->target.empty()) {
+    ReportError(doc, node, "Object requires a non-empty 'target' attribute.");
+  }
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Property") {
+        auto property = ParseProperty(child.get(), doc);
+        if (property != nullptr) {
+          object->properties.push_back(property);
+        }
+      } else {
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name + "' is not allowed in 'Object'. Expected: Property.");
+      }
+    }
+    child = child->nextSibling;
+  }
+  return object;
+}
+
+static Animation* ParseAnimation(const DOMNode* node, PAGXDocument* doc) {
+  auto animation = makeNodeFromXML<Animation>(node, doc);
+  if (!animation) {
+    return nullptr;
+  }
+  animation->name = GetAttribute(node, "name");
+  if (animation->name.empty()) {
+    ReportError(doc, node, "Animation requires a non-empty 'name' attribute.");
+  }
+  animation->duration = GetIntAttribute(node, "duration", 0, doc);
+  animation->frameRate = GetFloatAttribute(node, "frameRate", 60.0f, doc);
+  auto loop = GetAttribute(node, "loop", "once");
+  if (loop == "once") {
+    animation->loop = LoopMode::Once;
+  } else if (loop == "loop") {
+    animation->loop = LoopMode::Loop;
+  } else if (loop == "pingPong") {
+    animation->loop = LoopMode::PingPong;
+  } else {
+    ReportError(doc, node, "Invalid Animation loop value '" + loop + "'.");
+  }
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Object") {
+        auto object = ParseAnimationObject(child.get(), doc);
+        if (object != nullptr) {
+          animation->objects.push_back(object);
+        }
+      } else {
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name + "' is not allowed in 'Animation'. Expected: Object.");
+      }
+    }
+    child = child->nextSibling;
+  }
+  return animation;
+}
+
+static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
+                            PAGXDocument* doc) {
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element) {
+      if (child->name == "Animation") {
+        auto animation = ParseAnimation(child.get(), doc);
+        if (animation != nullptr) {
+          animations->push_back(animation);
+        }
+      } else {
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name + "' is not allowed in 'Animations'. Expected: Animation.");
+      }
+    }
+    child = child->nextSibling;
+  }
 }
 
 static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
@@ -2189,10 +2494,12 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
         if (layer) {
           doc->layers.push_back(layer);
         }
+      } else if (child->name == "Animations") {
+        ParseAnimations(child.get(), &doc->animations, doc);
       } else if (child->name != "Resources") {
-        ReportError(
-            doc, child.get(),
-            "Element '" + child->name + "' is not allowed in 'pagx'. Expected: Resources, Layer.");
+        ReportError(doc, child.get(),
+                    "Element '" + child->name +
+                        "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations.");
       }
     }
     child = child->nextSibling;

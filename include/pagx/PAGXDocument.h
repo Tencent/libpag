@@ -28,6 +28,7 @@
 
 namespace pagx {
 
+class Animation;
 class LayoutContext;
 
 /**
@@ -58,6 +59,11 @@ class PAGXDocument : public Node {
    * Top-level layers (raw pointers, owned by nodes).
    */
   std::vector<Layer*> layers = {};
+
+  /**
+   * Top-level animations (raw pointers, owned by nodes).
+   */
+  std::vector<Animation*> animations = {};
 
   /**
    * Creates a node of the specified type and adds it to the document management.

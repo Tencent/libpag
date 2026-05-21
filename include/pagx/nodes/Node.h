@@ -84,6 +84,20 @@ enum class NodeType {
    */
   Glyph,
 
+  // Animation
+  /**
+   * An animation timeline.
+   */
+  Animation,
+  /**
+   * A keyed object in an animation.
+   */
+  AnimationObject,
+  /**
+   * A keyed property in an animation object.
+   */
+  Property,
+
   // Layer
   /**
    * A layer node that contains vector elements and child layers.

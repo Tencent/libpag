@@ -141,6 +141,13 @@ class Layer : public Node, public LayoutNode {
   Composition* composition = nullptr;
 
   /**
+   * The names of timelines (animations defined inside the referenced composition) to activate when
+   * this layer references a composition. Empty list means the composition is rendered statically
+   * with no internal timeline running.
+   */
+  std::vector<std::string> timelines = {};
+
+  /**
    * The vector elements contained in this layer (geometry, painters, modifiers, etc.).
    */
   std::vector<Element*> contents = {};

@@ -18,46 +18,25 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+class Property;
 
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
+class AnimationObject : public Node {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
+  std::string target = {};
+  std::vector<Property*> properties = {};
 
   NodeType nodeType() const override {
-    return NodeType::Composition;
+    return NodeType::AnimationObject;
   }
 
  private:
-  Composition() = default;
+  AnimationObject() = default;
 
   friend class PAGXDocument;
 };
