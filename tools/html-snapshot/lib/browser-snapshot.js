@@ -1677,4 +1677,14 @@ async function inlineExternalImages() {
 
 /* eslint-enable no-undef, no-inner-declarations */
 
-module.exports = { takeSnapshot, inlineExternalImages };
+// `HELPERS_SRC` / `PAYLOAD_CONSTANTS_SRC` are exposed for the browser-bundle
+// build script (see build-browser-bundle.js): the bundle inlines them into a
+// UMD wrapper so the same snapshot logic runs without puppeteer when loaded
+// via `<script>`. The puppeteer driver only needs `takeSnapshot` /
+// `inlineExternalImages`.
+module.exports = {
+  takeSnapshot,
+  inlineExternalImages,
+  HELPERS_SRC,
+  PAYLOAD_CONSTANTS_SRC,
+};

@@ -120,6 +120,56 @@ Options:
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
 
+### Browser bundle (no Node, no puppeteer)
+
+The DOM-walking helpers in `lib/browser-snapshot.js` are pure browser code —
+puppeteer is only needed to drive an external page from the command line. The
+same logic can be packaged as a standalone browser script that runs against
+the live page it is loaded into:
+
+```bash
+cd tools/html-snapshot
+npm run build:browser
+# → dist/html-snapshot.umd.js   (UMD: <script> sets window.HtmlSnapshot,
+#                                 also CommonJS / AMD compatible)
+# → dist/html-snapshot.esm.js   (ESM: import { takeSnapshot } from "...")
+# → dist/example.html           (drop-in demo that snapshots itself)
+```
+
+Both bundles expose the same two functions; both operate on the current
+document and require no other globals:
+
+```html
+<script src="html-snapshot.umd.js"></script>
+<script>
+  (async () => {
+    await HtmlSnapshot.inlineExternalImages();           // optional
+    const { html, width, height } = HtmlSnapshot.takeSnapshot();
+    // `html` is the same flat, subset-compliant string the CLI writes out.
+    // Feed it to `pagx import --format html` (server-side) to convert to PAGX.
+  })();
+</script>
+```
+
+```js
+import { takeSnapshot, inlineExternalImages } from './html-snapshot.esm.js';
+```
+
+Use cases:
+
+- bookmarklet / DevTools snippet to capture any page on demand,
+- Chrome extension content script (the bundle has no `eval` and no remote
+  fetches beyond the optional image-inlining pass, which obeys CORS),
+- in-app "export to PAGX" button that POSTs the snapshot to a backend
+  running the `pagx` CLI.
+
+The snapshot output is byte-identical to what `node snapshot.js` produces for
+the same page — both code paths share `lib/browser-snapshot.js`.
+
+The browser bundle covers step 1 of the HTML → PAGX pipeline (snapshot).
+Step 2 (`pagx import --format html`) is currently a C++ binary; running it in
+the browser would require a WebAssembly build of libpag's HTML importer.
+
 ### Manual pipeline (for debugging individual steps)
 
 ```bash
