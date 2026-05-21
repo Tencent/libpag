@@ -82,6 +82,20 @@ function normalizeBackgroundClip(value) {
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
 }
 
+// PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
+// CSS `vertical-rl` / `vertical-lr` map to Vertical (kept verbatim so the
+// importer can tell them apart); `sideways-rl/lr` (which would also rotate
+// the glyphs themselves) are degraded to the default `horizontal-tb`
+// because libpag has no upright/sideways distinction. Any other value
+// (including the default `horizontal-tb`) collapses to '' so STYLE_SCHEMA's
+// `defaults` filter drops the property entirely.
+function normalizeWritingMode(value) {
+  if (!value) return '';
+  const v = String(value).trim().toLowerCase();
+  if (v === 'vertical-rl' || v === 'vertical-lr') return v;
+  return '';
+}
+
 // ===== Pure number / string utilities =====
 
 // Preserve sub-pixel precision (one decimal). Authors regularly use
@@ -120,8 +134,13 @@ function joinStyles(...parts) {
 // white-space. Used in every spot where a single-line text span sits inside a
 // flex item or rides on a wrapper whose width was measured by Chromium —
 // prevents PAGX's text engine from re-wrapping at a sub-pixel divergence.
+// Skipped for vertical writing-mode spans: PAGX breaks vertical TextBoxes
+// by column height, and a forced `white-space: nowrap` would mis-trigger
+// the importer's `hasNoWrap` branch (disabling wordWrap on what should be
+// a multi-column vertical layout).
 function withNowrap(style) {
   if (!style) return 'white-space: nowrap';
+  if (/writing-mode:\s*vertical-(rl|lr)/.test(style)) return style;
   return /white-space:/.test(style) ? style : `${style}; white-space: nowrap`;
 }
 
@@ -792,6 +811,10 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
 // measurement; the per-line stride (top-to-top) is already line-height,
 // so consecutive expanded spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed) {
+  const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
+  if (wm === 'vertical-rl' || wm === 'vertical-lr') {
+    return emitVerticalTextSpan(textNode, parentRect, computed);
+  }
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws);
   const lineHeightPx = parseFloat(computed.getPropertyValue('line-height')) || 0;
@@ -813,6 +836,39 @@ function emitTextSpans(textNode, parentRect, computed) {
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(line.text)}</span>`);
   }
   return out;
+}
+
+// Emit a single absolutely-positioned <span> for a text node whose host
+// element uses `writing-mode: vertical-rl` or `vertical-lr`. The horizontal
+// `splitTextNodeIntoLines` path can't be reused because Chromium's
+// `getClientRects()` reports glyph rects in column order under vertical
+// writing modes, not line order, so its Y-axis bisection would produce
+// nonsense boundaries. Instead we hand the entire text fragment to PAGX as
+// one column-shaped span and let `TextLayout::layoutColumns` perform the
+// vertical glyph layout itself. The span's bounding box (from the union
+// `Range.getBoundingClientRect()`) gives PAGX the column width / total
+// height it needs; `writing-mode` propagates through STYLE_SCHEMA's
+// `text` scope; `white-space: nowrap` is intentionally NOT forced because
+// vertical TextBoxes break columns by height, and a forced nowrap would
+// mis-trigger the importer's `hasNoWrap` path.
+function emitVerticalTextSpan(textNode, parentRect, computed) {
+  const text = textNode.nodeValue || '';
+  if (!text.trim()) return [];
+  const ws = computed.getPropertyValue('white-space');
+  const preserve = typeof ws === 'string' && ws.startsWith('pre');
+  const cleaned = preserve ? text : text.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+  const range = document.createRange();
+  range.selectNodeContents(textNode);
+  const rect = range.getBoundingClientRect();
+  range.detach && range.detach();
+  if (!rect || (rect.width === 0 && rect.height === 0)) return [];
+  const tl = rect.left - parentRect.left;
+  const tt = rect.top - parentRect.top;
+  const style = buildStyle(tl, tt, rect.width, rect.height, computed, {
+    box: false, text: true,
+  });
+  return [`<span style="${style}">${escapeHtml(cleaned)}</span>`];
 }
 
 // ===== Flex container detection =====
@@ -1635,6 +1691,7 @@ const STYLE_SCHEMA = [
   { prop: 'text-decoration-line',  scope: 'text', defaults: ['none'], outProp: 'text-decoration' },
   { prop: 'text-decoration-color', scope: 'text', defaults: ['currentcolor'], skipIfEqualsTextColor: true },
   { prop: 'white-space',           scope: 'text', defaults: ['normal'] },
+  { prop: 'writing-mode',          scope: 'text', defaults: ['horizontal-tb'], normalize: normalizeWritingMode },
 ];
 const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));
 const STYLE_SCHEMA_BOX = STYLE_SCHEMA.filter((e) => e.scope === 'box');
@@ -1657,6 +1714,7 @@ const HELPER_FNS = [
   normalizeBorderRadius,
   normalizeBackgroundImage,
   normalizeBackgroundClip,
+  normalizeWritingMode,
   roundPx,
   px,
   escapeHtml,
@@ -1696,6 +1754,7 @@ const HELPER_FNS = [
   freezeSvg,
   splitTextNodeIntoLines,
   emitTextSpans,
+  emitVerticalTextSpan,
   flexMainGapPx,
   collectFlexProps,
   isMultiLineTextLeafItem,

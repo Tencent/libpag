@@ -374,6 +374,7 @@ std::unordered_map<std::string, PropertyHandler> BuildTable() {
   AddKeep(t, "text-decoration-color");
   AddKeep(t, "white-space");
   AddKeep(t, "text-overflow");
+  AddKeep(t, "writing-mode");
 
   // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
   AddDrop(t, "margin", "is not in the subset; use padding/gap/flex instead");

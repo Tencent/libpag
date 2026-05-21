@@ -71,6 +71,7 @@ struct HTMLInheritedStyle {
   std::string textDecoration = {};
   std::string textDecorationColor = {};
   std::string whiteSpace = {};
+  std::string writingMode = {};
   // Gradient string ("linear-gradient(...)" / "radial-gradient(...)" / "conic-gradient(...)")
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.

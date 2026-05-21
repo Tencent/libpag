@@ -552,8 +552,10 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   bool hasBgVisuals = hasBackgroundVisuals(box);
   bool hasMultipleFragments = fragments.size() > 1;
   bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
+  std::string wm = ToLower(Trim(inherited.writingMode));
+  bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
-                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap;
+                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap || isVertical;
 
   auto outer = _document->makeNode<Layer>();
   applySizeAndPosition(outer, box);
@@ -602,6 +604,9 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     }
     if (box.clipOverflow) {
       textBox->overflow = Overflow::Hidden;
+    }
+    if (isVertical) {
+      textBox->writingMode = WritingMode::Vertical;
     }
     for (size_t i = 0; i < fragments.size(); i++) {
       const auto& f = fragments[i];

@@ -157,6 +157,7 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   CopyProperty(props, "text-decoration", out.textDecoration);
   CopyProperty(props, "text-decoration-color", out.textDecorationColor);
   CopyProperty(props, "white-space", out.whiteSpace);
+  CopyProperty(props, "writing-mode", out.writingMode);
   // Propagate gradient text fill from the nearest clip-to-text ancestor. `out.textFillImage`
   // already inherits the parent's value via `out = parent`; we only override when this element
   // itself sets `background-clip: text` together with a gradient `background-image`.
