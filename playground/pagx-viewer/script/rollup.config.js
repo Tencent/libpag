@@ -45,7 +45,9 @@ const libDir = path.resolve(__dirname, '../lib');
 
 // Copy the wasm next to the bundle. For the single-threaded build, the wasm is renamed
 // with the `.st` infix; the emcc glue's hard-coded `new URL("pagx-viewer.wasm", ...)` is
-// rewritten to the matching name later by script/fix-wasm-imports.js.
+// rewritten to the matching name later by script/fix-wasm-imports.js. The matching
+// `*.wasm.symbols` map (release builds only) is copied alongside for stack-trace
+// symbolization; debug builds don't emit one, so its absence is silently ignored.
 const copyWasmPlugin = {
   name: 'copy-wasm',
   writeBundle() {
@@ -55,10 +57,15 @@ const copyWasmPlugin = {
       mkdirSync(libDir, { recursive: true });
     }
 
-    // Copy wasm file
-    const wasmFile = path.join(wasmDir, 'pagx-viewer.wasm');
-    if (existsSync(wasmFile)) {
-      copyFileSync(wasmFile, path.join(libDir, `pagx-viewer${nameInfix}.wasm`));
+    const artifacts = [
+      { src: 'pagx-viewer.wasm', dst: `pagx-viewer${nameInfix}.wasm` },
+      { src: 'pagx-viewer.wasm.symbols', dst: `pagx-viewer${nameInfix}.wasm.symbols` },
+    ];
+    for (const { src, dst } of artifacts) {
+      const srcPath = path.join(wasmDir, src);
+      if (existsSync(srcPath)) {
+        copyFileSync(srcPath, path.join(libDir, dst));
+      }
     }
   },
 };
