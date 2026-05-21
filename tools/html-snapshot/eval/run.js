@@ -24,6 +24,9 @@ const path = require('path');
 const child_process = require('child_process');
 const puppeteer = require('puppeteer');
 const compare = require('./compare');
+const { makeFail } = require('../lib/cli');
+
+const fail = makeFail('run');
 
 function parseArgs(argv) {
   const opts = {
@@ -48,8 +51,7 @@ function parseArgs(argv) {
       console.log(USAGE);
       process.exit(0);
     } else {
-      console.error(`run: unknown option '${a}'`);
-      process.exit(2);
+      fail(`unknown option '${a}'`);
     }
   }
   return opts;
@@ -461,21 +463,18 @@ ${cards}
 async function main() {
   const opts = parseArgs(process.argv);
   if (!opts.corpus) {
-    console.error('run: --corpus <dir> is required (or set EVAL_CORPUS)');
-    process.exit(2);
+    fail('--corpus <dir> is required (or set EVAL_CORPUS)');
   }
   if (!opts.pagxBin) opts.pagxBin = defaultPagxBin();
   if (!opts.outDir) opts.outDir = path.join(SCRIPT_DIR, 'out', opts.label);
   ensureDir(opts.outDir);
 
   if (!fs.existsSync(opts.pagxBin)) {
-    console.error(`run: pagx binary not found: ${opts.pagxBin}`);
-    process.exit(1);
+    fail(`pagx binary not found: ${opts.pagxBin}`, 1);
   }
   const cases = findCorpusFiles(opts.corpus, opts.only);
   if (cases.length === 0) {
-    console.error(`run: no html cases found in ${opts.corpus}`);
-    process.exit(1);
+    fail(`no html cases found in ${opts.corpus}`, 1);
   }
   console.log(`run: ${cases.length} cases → ${opts.outDir}`);
 

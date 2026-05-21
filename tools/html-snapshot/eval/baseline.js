@@ -12,6 +12,9 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const { openAndSettlePage } = require('../lib/page-loader');
+const { makeFail, parseNumber } = require('../lib/cli');
+
+const fail = makeFail('baseline');
 
 function parseArgs(argv) {
   const opts = {
@@ -28,16 +31,15 @@ function parseArgs(argv) {
     if (a === '-o' || a === '--output') {
       opts.output = argv[++i];
     } else if (a === '--viewport-width') {
-      opts.viewportWidth = Number(argv[++i]);
+      opts.viewportWidth = parseNumber('--viewport-width', argv[++i], { min: 1, fail });
     } else if (a === '--viewport-height') {
-      opts.viewportHeight = Number(argv[++i]);
+      opts.viewportHeight = parseNumber('--viewport-height', argv[++i], { min: 1, fail });
     } else if (a === '--wait-ms') {
-      opts.waitMs = Number(argv[++i]);
+      opts.waitMs = parseNumber('--wait-ms', argv[++i], { min: 0, fail });
     } else if (a === '--selector') {
       opts.selector = argv[++i];
     } else if (a.startsWith('-')) {
-      console.error(`baseline: unknown option '${a}'`);
-      process.exit(2);
+      fail(`unknown option '${a}'`);
     } else {
       positional.push(a);
     }
@@ -79,8 +81,7 @@ async function captureBodyRect(page) {
 async function main() {
   const opts = parseArgs(process.argv);
   if (!fs.existsSync(opts.input)) {
-    console.error(`baseline: input not found: ${opts.input}`);
-    process.exit(1);
+    fail(`input not found: ${opts.input}`, 1);
   }
 
   const browser = await puppeteer.launch({

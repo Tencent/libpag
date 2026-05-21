@@ -18,19 +18,35 @@ function fail(msg) {
   process.exit(2);
 }
 
+// Build a `fail`-style helper that prefixes log messages with `prefix:` and
+// exits with the given code (default 2). Used by sibling tools (eval/run.js,
+// eval/baseline.js) that share the same arg-error UX but want their own log
+// prefix so users can tell which tool reported the failure. The returned
+// function never returns, so callers can use it in expression position
+// without `return fail(...)` boilerplate.
+function makeFail(prefix) {
+  return function failWithPrefix(msg, code) {
+    console.error(`${prefix}: ${msg}`);
+    process.exit(code === undefined ? 2 : code);
+  };
+}
+
 // Convert a flag's argument to a number, validating it survives parsing and
 // is at or above `min`. Without this, `--viewport-width foo` would silently
 // send NaN to puppeteer's setViewport. Used for both strictly-positive
-// (viewport dimensions) and non-negative (wait-ms) numeric flags.
+// (viewport dimensions) and non-negative (wait-ms) numeric flags. `opts.fail`
+// optionally overrides the default `html-snapshot:`-prefixed reporter so
+// sibling tools can keep their own log prefix.
 function parseNumber(flagName, value, opts) {
   const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? opts.min : 0;
+  const failFn = (opts && opts.fail) || fail;
   if (value === undefined) {
-    fail(`'${flagName}' requires a numeric argument`);
+    failFn(`'${flagName}' requires a numeric argument`);
   }
   const n = Number(value);
   if (!Number.isFinite(n) || n < min) {
     const bound = min > 0 ? `>= ${min}` : 'non-negative';
-    fail(`'${flagName}' expects a ${bound} number, got '${value}'`);
+    failFn(`'${flagName}' expects a ${bound} number, got '${value}'`);
   }
   return n;
 }
@@ -191,4 +207,4 @@ Options:
                              repeatable)`);
 }
 
-module.exports = { parseArgs, printUsage, isHttpUrl, fail, parseNumber, LOG_PREFIX };
+module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, LOG_PREFIX };
