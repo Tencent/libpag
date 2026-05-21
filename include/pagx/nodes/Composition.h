@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "pagx/nodes/Node.h"
 
@@ -25,6 +26,7 @@ namespace pagx {
 
 class Animation;
 class Layer;
+class PAGXDocument;
 
 /**
  * Composition represents a reusable composition resource that contains a set of layers. It can be
@@ -51,6 +53,19 @@ class Composition : public Node {
    * The animations contained in this composition.
    */
   std::vector<Animation*> animations = {};
+
+  /**
+   * When non-null, this Composition is a sealed wrapper around an externally loaded PAGXDocument
+   * (typically introduced by a Layer with `composition="path.pagx"`). The wrapper's `layers` and
+   * `animations` fields point into the external document's top-level lists; the externalDoc
+   * shared_ptr keeps that document's node ownership alive for the lifetime of this Composition.
+   *
+   * Runtime code resolves Animation IDs and channel target IDs against externalDoc when this
+   * field is set, isolating internal IDs of the external document from the host's namespace.
+   * Internal compositions (defined within the same .pagx file) leave this field null and resolve
+   * IDs against their owning PAGXDocument.
+   */
+  std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
   NodeType nodeType() const override {
     return NodeType::Composition;

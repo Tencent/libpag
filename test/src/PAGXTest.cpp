@@ -6470,4 +6470,133 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 }
 
-}  // namespace pag
+namespace {
+// Builds a minimal external pagx file XML with a single Layer (id passed in) hosting an
+// alpha-targeting Animation (id also passed in). Returns the XML string.
+std::string MakeExternalPagxXML(const std::string& layerId, const std::string& animId) {
+  std::string xml;
+  xml += "<pagx width=\"50\" height=\"50\">\n";
+  xml += "  <Layer id=\"" + layerId + "\" width=\"50\" height=\"50\">\n";
+  xml += "    <Rectangle width=\"50\" height=\"50\"/>\n";
+  xml += "    <Fill>\n";
+  xml += "      <SolidColor color=\"#FF0000\"/>\n";
+  xml += "    </Fill>\n";
+  xml += "  </Layer>\n";
+  xml += "  <Animations>\n";
+  xml += "    <Animation id=\"" + animId + "\" duration=\"60\" frameRate=\"60\">\n";
+  xml += "      <Object target=\"" + layerId + "\">\n";
+  xml += "        <Property channel=\"alpha\" type=\"float\">\n";
+  xml += "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n";
+  xml += "          <Key time=\"60\" value=\"1\"/>\n";
+  xml += "        </Property>\n";
+  xml += "      </Object>\n";
+  xml += "    </Animation>\n";
+  xml += "  </Animations>\n";
+  xml += "</pagx>\n";
+  return xml;
+}
+
+std::string MakeMainPagxXML(const std::string& subFile, const std::string& subAnimId,
+                            const std::string& mainLayerId) {
+  std::string xml;
+  xml += "<pagx width=\"100\" height=\"100\">\n";
+  xml += "  <Layer id=\"" + mainLayerId + "\" composition=\"" + subFile + "\">\n";
+  xml += "    <Timelines>\n";
+  xml += "      <Animation ref=\"@" + subAnimId + "\" playing=\"true\"/>\n";
+  xml += "    </Timelines>\n";
+  xml += "  </Layer>\n";
+  xml += "</pagx>\n";
+  return xml;
+}
+}  // namespace
+
+/**
+ * Test case: Layer composition="path.pagx" loads the referenced external file, wraps it in a
+ * sealed Composition (externalDoc != nullptr), and the spawned slot timeline drives the
+ * external Layer's alpha channel through to the per-slot tgfx tree.
+ */
+PAGX_TEST(PAGXTest, CrossDocCompositionBasic) {
+  auto subPath =
+      SavePAGXFile(MakeExternalPagxXML("subLayer", "subEnter"), "PAGXTest/cross_doc_sub.pagx");
+  auto mainPath = SavePAGXFile(MakeMainPagxXML("cross_doc_sub.pagx", "subEnter", "slot"),
+                               "PAGXTest/cross_doc_main.pagx");
+
+  auto doc = pagx::PAGXImporter::FromFile(mainPath);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(doc->errors.empty()) << "errors: " << doc->errors.size();
+  ASSERT_EQ(doc->layers.size(), 1u);
+
+  auto* slotLayer = doc->layers[0];
+  ASSERT_TRUE(slotLayer->composition != nullptr);
+  ASSERT_TRUE(slotLayer->composition->externalDoc != nullptr);
+
+  // Internal IDs of the external file must NOT bleed into the host nodeMap.
+  EXPECT_EQ(doc->findNode("subLayer"), nullptr);
+  EXPECT_EQ(doc->findNode("subEnter"), nullptr);
+  // But the external doc keeps its own nodeMap intact.
+  EXPECT_NE(slotLayer->composition->externalDoc->findNode("subLayer"), nullptr);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->compositionSlots.size(), 1u);
+
+  // Driver spawned a slot timeline; advance the master clock and verify the external child
+  // Layer's alpha was animated.
+  file->advanceAndApply(500'000);
+  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
+  auto* externalChild = slotLayer->composition->externalDoc->findNode<pagx::Layer>("subLayer");
+  ASSERT_TRUE(externalChild != nullptr);
+  auto tgfxChild = slotTree.layerMap.at(externalChild);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+}
+
+/**
+ * Test case: Cyclic external composition references are detected and reported as errors instead
+ * of looping into infinite load.
+ */
+PAGX_TEST(PAGXTest, CrossDocCyclicReferenceReported) {
+  // a.pagx references b.pagx; b.pagx references a.pagx — cycle.
+  std::string aXml =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer composition=\"cross_doc_b.pagx\"/>\n"
+      "</pagx>\n";
+  std::string bXml =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer composition=\"cross_doc_a.pagx\"/>\n"
+      "</pagx>\n";
+  SavePAGXFile(bXml, "PAGXTest/cross_doc_b.pagx");
+  auto aPath = SavePAGXFile(aXml, "PAGXTest/cross_doc_a.pagx");
+
+  auto doc = pagx::PAGXImporter::FromFile(aPath);
+  ASSERT_TRUE(doc != nullptr);
+  // The cycle is detected and reported; loading completes without recursion blowing up.
+  bool foundCycleError = false;
+  for (const auto& err : doc->errors) {
+    if (err.find("Cyclic external composition") != std::string::npos) {
+      foundCycleError = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundCycleError) << "expected cycle detection error";
+}
+
+/**
+ * Test case: FromXML without a baseDir reports an error when encountering an external
+ * composition reference rather than silently failing.
+ */
+PAGX_TEST(PAGXTest, CrossDocFromXMLWithoutBaseDirReports) {
+  std::string xml =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer composition=\"missing.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  bool foundBaseDirError = false;
+  for (const auto& err : doc->errors) {
+    if (err.find("base directory") != std::string::npos) {
+      foundBaseDirError = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundBaseDirError);
+}}  // namespace pag

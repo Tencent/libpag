@@ -105,9 +105,10 @@ std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& id) {
   if (it != timelinesByAnimation.end()) {
     return it->second;
   }
-  // Top-level timelines target the file's top-level layerTree directly.
+  // Top-level timelines target the file's top-level layerTree directly. Channel target IDs are
+  // resolved against the primary document.
   auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), matched, &layerTree->tree));
+      std::weak_ptr<PAGFile>(shared_from_this()), matched, &layerTree->tree, document.get()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -208,7 +209,7 @@ void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
 }
 
 void PAGFile::applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree,
-                             int64_t microseconds, float mix) {
+                             PAGXDocument* contextDoc, int64_t microseconds, float mix) {
   if (animation == nullptr || document == nullptr || layerTree == nullptr) {
     return;
   }
@@ -216,13 +217,14 @@ void PAGFile::applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree,
     return;
   }
   auto* targetTree = slotLayerTree != nullptr ? slotLayerTree : &layerTree->tree;
+  auto* lookupDoc = contextDoc != nullptr ? contextDoc : document.get();
   auto clampedMix = std::min(1.0f, mix);
   const auto& registry = ChannelRegistry::Get();
   for (auto* object : animation->objects) {
     if (object == nullptr) {
       continue;
     }
-    auto* targetNode = document->findNode(object->target);
+    auto* targetNode = lookupDoc->findNode(object->target);
     if (targetNode == nullptr) {
       continue;
     }
@@ -241,12 +243,14 @@ void PAGFile::applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree,
 }
 
 std::shared_ptr<PAGTimeline> PAGFile::createSlotTimeline(Animation* animation,
-                                                         PAGLayerTree* layerTreeForSlot) {
+                                                         PAGLayerTree* layerTreeForSlot,
+                                                         PAGXDocument* contextDoc) {
   if (animation == nullptr || layerTreeForSlot == nullptr) {
     return nullptr;
   }
+  auto* effectiveDoc = contextDoc != nullptr ? contextDoc : document.get();
   return std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), animation, layerTreeForSlot));
+      std::weak_ptr<PAGFile>(shared_from_this()), animation, layerTreeForSlot, effectiveDoc));
 }
 
 }  // namespace pagx

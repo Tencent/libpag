@@ -123,14 +123,18 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
 
   // Evaluates the given animation at the given microsecond time and writes results into the
   // supplied per-slot layerTree (or the top-level layerTree when slotLayerTree is null).
+  // contextDoc is the document whose nodeMap channel target IDs are looked up against; it
+  // differs from `document` when the timeline was spawned by a sealed cross-document wrapper.
   // Called by PAGTimeline::apply().
-  void applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree, int64_t microseconds,
-                      float mix);
+  void applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree, PAGXDocument* contextDoc,
+                      int64_t microseconds, float mix);
 
   // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
-  // per-slot layerTree. Used by PAGComposition::Make for slot-spawned timelines. Caller owns the
-  // returned shared_ptr; the file does not register slot timelines into timelinesByAnimation.
-  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, PAGLayerTree* layerTree);
+  // per-slot layerTree and resolving channel targets against contextDoc. Used by
+  // PAGComposition::Make for slot-spawned timelines. Caller owns the returned shared_ptr; the
+  // file does not register slot timelines into timelinesByAnimation.
+  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, PAGLayerTree* layerTree,
+                                                  PAGXDocument* contextDoc);
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};

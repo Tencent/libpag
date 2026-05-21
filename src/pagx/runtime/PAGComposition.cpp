@@ -33,6 +33,10 @@ std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer,
     return nullptr;
   }
   auto slot = std::unique_ptr<PAGComposition>(new PAGComposition(ownerLayer, parentFile));
+  // Sealed cross-document wrapper Compositions surface their externalDoc as the effective ID
+  // namespace; in-document Compositions fall back to the parent file's document.
+  auto* externalDoc = ownerLayer->composition->externalDoc.get();
+  slot->effectiveDoc = externalDoc != nullptr ? externalDoc : parentFile->document.get();
   slot->buildSubtree();
   slot->spawnTimelines(ownerLayer->timelines);
   slot->buildChildSlots();
@@ -50,7 +54,7 @@ void PAGComposition::buildSubtree() {
 }
 
 void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
-  if (parentFile == nullptr) {
+  if (parentFile == nullptr || effectiveDoc == nullptr) {
     return;
   }
   for (const auto& driver : drivers) {
@@ -58,12 +62,11 @@ void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>
       continue;
     }
     auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation =
-        parentFile->document->findNode<Animation>(animationDriver->animationId);
+    auto* animation = effectiveDoc->findNode<Animation>(animationDriver->animationId);
     if (animation == nullptr) {
       continue;
     }
-    auto timeline = parentFile->createSlotTimeline(animation, &layerTree);
+    auto timeline = parentFile->createSlotTimeline(animation, &layerTree, effectiveDoc);
     if (timeline == nullptr) {
       continue;
     }

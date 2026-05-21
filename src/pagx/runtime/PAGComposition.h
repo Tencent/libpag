@@ -84,6 +84,10 @@ class PAGComposition {
 
   const Layer* ownerLayer = nullptr;
   PAGFile* parentFile = nullptr;
+  // The document whose nodeMap drives animation lookup and channel target resolution for this
+  // slot. Equal to parentFile->document for in-document Compositions; equal to
+  // ownerLayer->composition->externalDoc for sealed cross-document wrappers.
+  PAGXDocument* effectiveDoc = nullptr;
   PAGLayerTree layerTree = {};
   std::vector<std::shared_ptr<PAGTimeline>> slotTimelines = {};
   // Recursive child slots: one entry per Layer inside this slot whose composition field is set.

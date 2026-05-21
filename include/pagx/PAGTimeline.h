@@ -26,6 +26,7 @@ namespace pagx {
 
 struct PAGLayerTree;
 class PAGFile;
+class PAGXDocument;
 
 /**
  * PAGTimeline drives a single Animation inside a PAGFile. It owns the playback state (current
@@ -121,13 +122,18 @@ class PAGTimeline {
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
  private:
-  PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation, PAGLayerTree* layerTree);
+  PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation, PAGLayerTree* layerTree,
+              PAGXDocument* contextDoc);
 
   std::weak_ptr<PAGFile> ownerFile = {};
   Animation* animation = nullptr;
   // Per-slot layerTree the channel writers should target. nullptr means the owning PAGFile's
   // top-level layerTree (set by PAGFile when constructing top-level timelines).
   PAGLayerTree* layerTree = nullptr;
+  // Document used to resolve channel target IDs at apply time. Top-level timelines use the file's
+  // primary document; slot timelines spawned by sealed cross-document Composition wrappers use
+  // the wrapper's externalDoc so internal IDs of the external file stay self-contained.
+  PAGXDocument* contextDoc = nullptr;
   int64_t currentTimeUs = 0;
   bool playing = false;
 
