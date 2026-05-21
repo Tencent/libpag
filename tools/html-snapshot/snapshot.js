@@ -26,7 +26,7 @@
 
 const fs = require('fs');
 const puppeteer = require('puppeteer');
-const { parseArgs } = require('./lib/cli');
+const { parseArgs, LOG_PREFIX } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages } = require('./lib/browser-snapshot');
 const { openAndSettlePage } = require('./lib/page-loader');
 
@@ -34,7 +34,7 @@ async function main() {
   const opts = parseArgs(process.argv);
 
   if (!opts.isUrl && !fs.existsSync(opts.input)) {
-    console.error(`html-snapshot: input not found: ${opts.input}`);
+    console.error(`${LOG_PREFIX}input not found: ${opts.input}`);
     process.exit(1);
   }
 
@@ -42,10 +42,25 @@ async function main() {
   // here so the loader stays scheme-agnostic.
   const targetUrl = opts.isUrl ? opts.input : `file://${opts.input}`;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--font-render-hinting=none'],
-  });
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--font-render-hinting=none'],
+    });
+  } catch (err) {
+    // Most launch failures are missing-Chromium errors after a sandboxed
+    // `npm install` redirected the puppeteer cache. Surface a one-line hint
+    // so users can fix it without reading the full stack trace; the original
+    // error still propagates so non-cache failures aren't masked.
+    const msg = (err && err.message) || String(err);
+    if (/Could not find Chrome|Failed to launch the browser process/i.test(msg)) {
+      console.error(`${LOG_PREFIX}failed to launch headless Chromium. Run:`);
+      console.error(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
+      console.error(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
+    }
+    throw err;
+  }
   try {
     const page = await openAndSettlePage(browser, targetUrl, {
       viewportWidth: opts.viewportWidth,
@@ -81,10 +96,10 @@ async function main() {
       // "wrote ..." progress line goes to stderr so the parent process can
       // read stdout as a pure HTML string without parsing.
       process.stdout.write(result.html);
-      console.error(`html-snapshot: wrote stdout (${result.width}x${result.height})`);
+      console.error(`${LOG_PREFIX}wrote stdout (${result.width}x${result.height})`);
     } else {
       fs.writeFileSync(opts.output, result.html, 'utf8');
-      console.log(`html-snapshot: wrote ${opts.output} (${result.width}x${result.height})`);
+      console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
     }
   } finally {
     await browser.close();

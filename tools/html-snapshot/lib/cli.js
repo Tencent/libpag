@@ -7,31 +7,30 @@
 
 const path = require('path');
 
-// Convert a flag's argument to a positive number; abort with a clear error
-// message when the value is missing, NaN, or non-positive. Without this,
-// `--viewport-width foo` would silently send NaN to puppeteer's setViewport.
-function parsePositiveNumber(flagName, value) {
-  if (value === undefined) {
-    console.error(`html-snapshot: '${flagName}' requires a numeric argument`);
-    process.exit(2);
-  }
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) {
-    console.error(`html-snapshot: '${flagName}' expects a positive number, got '${value}'`);
-    process.exit(2);
-  }
-  return n;
+const LOG_PREFIX = 'html-snapshot: ';
+
+// Print an error message with the standard CLI prefix and abort with the
+// "argument error" exit code (2). Centralised so every fail point shares the
+// same prefix and exit semantics — the prior inline `console.error` + `exit`
+// pairs were close to identical and easy to drift.
+function fail(msg) {
+  console.error(`${LOG_PREFIX}${msg}`);
+  process.exit(2);
 }
 
-function parseNonNegativeNumber(flagName, value) {
+// Convert a flag's argument to a number, validating it survives parsing and
+// is at or above `min`. Without this, `--viewport-width foo` would silently
+// send NaN to puppeteer's setViewport. Used for both strictly-positive
+// (viewport dimensions) and non-negative (wait-ms) numeric flags.
+function parseNumber(flagName, value, opts) {
+  const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? opts.min : 0;
   if (value === undefined) {
-    console.error(`html-snapshot: '${flagName}' requires a numeric argument`);
-    process.exit(2);
+    fail(`'${flagName}' requires a numeric argument`);
   }
   const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) {
-    console.error(`html-snapshot: '${flagName}' expects a non-negative number, got '${value}'`);
-    process.exit(2);
+  if (!Number.isFinite(n) || n < min) {
+    const bound = min > 0 ? `>= ${min}` : 'non-negative';
+    fail(`'${flagName}' expects a ${bound} number, got '${value}'`);
   }
   return n;
 }
@@ -48,13 +47,11 @@ function isHttpUrl(s) {
 // the cookie is scoped to the right origin.
 function parseCookie(flagName, value) {
   if (value === undefined) {
-    console.error(`html-snapshot: '${flagName}' requires a 'name=value' argument`);
-    process.exit(2);
+    fail(`'${flagName}' requires a 'name=value' argument`);
   }
   const eq = value.indexOf('=');
   if (eq <= 0) {
-    console.error(`html-snapshot: '${flagName}' expects 'name=value', got '${value}'`);
-    process.exit(2);
+    fail(`'${flagName}' expects 'name=value', got '${value}'`);
   }
   return { name: value.slice(0, eq), value: value.slice(eq + 1) };
 }
@@ -64,19 +61,16 @@ function parseCookie(flagName, value) {
 // (so `Authorization: Bearer xyz:abc` works as expected).
 function parseHeader(flagName, value) {
   if (value === undefined) {
-    console.error(`html-snapshot: '${flagName}' requires a 'Key: Value' argument`);
-    process.exit(2);
+    fail(`'${flagName}' requires a 'Key: Value' argument`);
   }
   const colon = value.indexOf(':');
   if (colon <= 0) {
-    console.error(`html-snapshot: '${flagName}' expects 'Key: Value', got '${value}'`);
-    process.exit(2);
+    fail(`'${flagName}' expects 'Key: Value', got '${value}'`);
   }
   const key = value.slice(0, colon).trim();
   const val = value.slice(colon + 1).trim();
   if (!key) {
-    console.error(`html-snapshot: '${flagName}' has empty header name in '${value}'`);
-    process.exit(2);
+    fail(`'${flagName}' has empty header name in '${value}'`);
   }
   return [key, val];
 }
@@ -87,9 +81,9 @@ function parseHeader(flagName, value) {
 // flow rather than just options.
 const FLAGS = [
   { names: ['-o', '--output'],     set: (o, v) => { o.output = v; } },
-  { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parsePositiveNumber('--viewport-width', v); } },
-  { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parsePositiveNumber('--viewport-height', v); } },
-  { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = parseNonNegativeNumber('--wait-ms', v); } },
+  { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parseNumber('--viewport-width', v, { min: 1 }); } },
+  { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parseNumber('--viewport-height', v, { min: 1 }); } },
+  { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = parseNumber('--wait-ms', v, { min: 0 }); } },
   { names: ['--selector'],         set: (o, v) => { o.selector = v; } },
   { names: ['--cookie'],           set: (o, v) => { o.cookies.push(parseCookie('--cookie', v)); } },
   { names: ['--header'],           set: (o, v) => { o.headers.push(parseHeader('--header', v)); } },
@@ -132,8 +126,7 @@ function parseArgs(argv) {
       continue;
     }
     if (a.startsWith('-')) {
-      console.error(`html-snapshot: unknown option '${a}'`);
-      process.exit(2);
+      fail(`unknown option '${a}'`);
     }
     positional.push(a);
   }
@@ -156,14 +149,12 @@ function parseArgs(argv) {
     // to a magic name in cwd would silently overwrite a previous run.
     opts.input = inputArg;
     if (!opts.output && !opts.outputToStdout) {
-      console.error(`html-snapshot: -o/--output is required when input is a URL`);
-      process.exit(2);
+      fail(`-o/--output is required when input is a URL`);
     }
     if (opts.output) opts.output = path.resolve(opts.output);
   } else {
     if (opts.cookies.length || opts.headers.length) {
-      console.error(`html-snapshot: --cookie / --header are only supported with URL inputs`);
-      process.exit(2);
+      fail(`--cookie / --header are only supported with URL inputs`);
     }
     opts.input = path.resolve(inputArg);
     if (opts.outputToStdout) {
@@ -200,4 +191,4 @@ Options:
                              repeatable)`);
 }
 
-module.exports = { parseArgs, printUsage, isHttpUrl };
+module.exports = { parseArgs, printUsage, isHttpUrl, fail, parseNumber, LOG_PREFIX };
