@@ -63,6 +63,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
@@ -274,6 +275,11 @@ static void CollectRefsFromElement(const Element* element, std::unordered_set<st
         refs.insert(glyphRun->font->id);
       }
     }
+  } else if (type == NodeType::TextPath) {
+    auto* textPath = static_cast<const TextPath*>(element);
+    if (textPath->path != nullptr && !textPath->path->id.empty()) {
+      refs.insert(textPath->path->id);
+    }
   }
 }
 
@@ -323,7 +329,7 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
       continue;
     }
     auto type = node->nodeType();
-    if (type == NodeType::Layer || type == NodeType::Document) {
+    if (type == NodeType::Layer || type == NodeType::Document || type == NodeType::Glyph) {
       continue;
     }
     if (refs.find(node->id) == refs.end()) {
@@ -1460,6 +1466,9 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   if (fill->alpha < 0.999f) {
     return;
   }
+  if (fill->color != nullptr && fill->color->nodeType() != NodeType::SolidColor) {
+    return;
+  }
   if (!maskLayer->matrix.isIdentity()) {
     return;
   }
@@ -1625,6 +1634,15 @@ struct SpatialRect {
 
 static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+// Sibling overlap needs a small tolerance because auto-layout rounds child positions to integers
+// while child sizes can carry fractional text-measurement remainders. Adjacent siblings may then
+// appear to overlap by a fraction of a pixel even though the layout is visually correct.
+static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
+  constexpr float TOLERANCE = 0.5f;
+  return a.x + TOLERANCE < b.x + b.width && a.x + a.width > b.x + TOLERANCE &&
+         a.y + TOLERANCE < b.y + b.height && a.y + a.height > b.y + TOLERANCE;
 }
 
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
@@ -2007,7 +2025,7 @@ static void DetectOverlappingSiblings(const Layer* parentLayer,
   }
   for (size_t i = 0; i < layoutChildren.size(); i++) {
     for (size_t j = i + 1; j < layoutChildren.size(); j++) {
-      if (RectsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
+      if (SiblingsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
         auto& a = layoutChildren[i];
         auto& b = layoutChildren[j];
         std::vector<int> lines = {a.first->sourceLine, b.first->sourceLine};

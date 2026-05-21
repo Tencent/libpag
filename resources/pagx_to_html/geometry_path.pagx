@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
+<pagx width="420" height="280">
+  <Resources>
+    <PathData id="heart" data="M 60,22 C 60,10 48,0 36,0 C 18,0 0,16 0,36 C 0,54 20,72 60,96 C 100,72 120,54 120,36 C 120,16 102,0 84,0 C 72,0 60,10 60,22 Z"/>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Path Geometry" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Inline data and @id resource reference" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="0" padding="15" alignment="center" arrangement="center">
+
+      <!-- Inline path data -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center">
+        <Layer width="150" height="110">
+          <Path data="M 5,70 C 25,10 65,10 85,70 C 105,130 125,10 145,70" centerX="0" centerY="0"/>
+          <Stroke color="#3B82F6" width="4" cap="round"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="Inline bezier" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- Resource reference path (heart scaled to 120x96) -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center">
+        <Layer width="120" height="100">
+          <Path data="@heart" centerX="0" centerY="0"/>
+          <Fill color="#EF4444" alpha="0.8"/>
+        </Layer>
+        <Layer height="12">
+          <Text text="@id reference" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

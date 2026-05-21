@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer matrix3D rotations around X / Y / Z axes (each 60°), and preserve3D nesting
+     where siblings with different matrix3D transforms share a 3D space. Rotations are bumped
+     to 60° so the orthographic foreshortening on X/Y is visually obvious (PAGX doesn't expose
+     a perspective/camera primitive), and the preserve3D planes use translucent fills so the
+     overlap of the two rotation-plane silhouettes is legible even without depth intersection. -->
+<pagx width="420" height="400">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="3D matrix3D Axes" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="RotateX 60, RotateY 60, RotateZ 60, then preserve3D translucent planes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="12" alignment="stretch" arrangement="center">
+        <!-- Row 1: three single-axis rotations side by side. Labels sit above their shapes
+             because a rotateZ=60° rectangle extends diagonally; with the label below, the
+             shape's lower-right corner would overlap the rotateZ label. Row height 140 (cell
+             height 120) gives rotateZ's diagonal (~91px) room without leaking into the row
+             below. -->
+        <Layer height="140" layout="horizontal" gap="20" arrangement="spaceEvenly" alignment="center">
+          <!-- rotateX 60° -->
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateX 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+            <Layer width="80" height="60">
+              <!-- column-major: Rx(60°). cos60=0.5, sin60=0.866 -->
+              <Layer matrix3D="1,0,0,0,0,0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#3B82F6"/>
+              </Layer>
+            </Layer>
+          </Layer>
+
+          <!-- rotateY 60° -->
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateY 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+            <Layer width="80" height="60">
+              <!-- column-major: Ry(60°) -->
+              <Layer matrix3D="0.5,0,-0.866,0,0,1,0,0,0.866,0,0.5,0,0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#10B981"/>
+              </Layer>
+            </Layer>
+          </Layer>
+
+          <!-- rotateZ 60° -->
+          <Layer width="90" height="120" layout="vertical" gap="6" alignment="center" arrangement="center">
+            <Layer height="12">
+              <Text text="rotateZ 60" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+            <Layer width="80" height="60">
+              <!-- column-major: Rz(60°) -->
+              <Layer matrix3D="0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1,0,0,0,0,1" preserve3D="true">
+                <Rectangle position="40,30" size="80,60" roundness="8"/>
+                <Fill color="#EC4899"/>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: preserve3D scene — two translucent planes rotated on different axes share a
+             3D space. preserve3D keeps their 3D transforms composable with the parent; the
+             70%-alpha fills make the overlap visible even though the 2D compositor doesn't do
+             per-pixel depth intersection. -->
+        <Layer layout="vertical" gap="6" alignment="center">
+          <Layer height="12">
+            <Text text="preserve3D: two translucent planes sharing 3D space" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="200" height="114" preserve3D="true">
+            <!-- Plane A: rotateY 45° -->
+            <Layer matrix3D="0.707,0,-0.707,0,0,1,0,0,0.707,0,0.707,0,0,0,0,1">
+              <Rectangle position="100,60" size="160,90" roundness="10"/>
+              <Fill color="#F59E0BB3"/>
+            </Layer>
+            <!-- Plane B: rotateX 60° -->
+            <Layer matrix3D="1,0,0,0,0,0.5,0.866,0,0,-0.866,0.5,0,0,0,0,1">
+              <Rectangle position="100,60" size="160,90" roundness="10"/>
+              <Fill color="#8B5CF6B3"/>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

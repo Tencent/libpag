@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Composition resource → inline expansion; composition width/height defines coordinate system -->
+<pagx width="420" height="300">
+  <Resources>
+    <Composition id="badge" width="100" height="100">
+      <Layer>
+        <Ellipse position="50,50" size="90,90"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+      <Layer>
+        <Polystar position="50,50" type="star" pointCount="5" outerRadius="35" innerRadius="15" rotation="-90"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Composition Resource" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Reusable component with matrix transform" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Two composition instances side by side -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="20" gap="24" alignment="center" arrangement="spaceEvenly">
+        <!-- Normal size -->
+        <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="100" height="100">
+            <Layer x="0" y="0" composition="@badge"/>
+          </Layer>
+          <Layer height="14">
+            <Text text="Normal" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+
+        <!-- Scaled 1.5x -->
+        <Layer layout="vertical" gap="6" alignment="center" arrangement="center">
+          <Layer width="150" height="150">
+            <Layer x="0" y="0" composition="@badge" matrix="1.5,0,0,1.5,0,0"/>
+          </Layer>
+          <Layer height="14">
+            <Text text="Scaled 1.5x" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

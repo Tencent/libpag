@@ -355,6 +355,9 @@ std::vector<float> ParseFloatList(const std::string& str) {
 }
 
 std::string FloatToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
   if (value == 0.0f) {
     return "0";
   }
@@ -382,6 +385,39 @@ std::string FloatToString(float value) {
       }
       s = s.substr(0, last + 1);
     }
+  }
+  return s;
+}
+
+std::string CoordToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
+  float rounded = std::round(value * 100.0f) / 100.0f;
+  if (rounded == 0.0f) {
+    rounded = 0.0f;
+  }
+  char buf[32] = {};
+  snprintf(buf, sizeof(buf), "%g", rounded);
+  return std::string(buf);
+}
+
+std::string CssFloatToString(float value) {
+  if (std::isnan(value) || std::isinf(value)) {
+    return "0";
+  }
+  char buf[32] = {};
+  snprintf(buf, sizeof(buf), "%.4f", value);
+  std::string s(buf);
+  if (s.find('.') != std::string::npos) {
+    size_t lastNonZero = s.find_last_not_of('0');
+    s.erase(lastNonZero + 1);
+    if (!s.empty() && s.back() == '.') {
+      s.pop_back();
+    }
+  }
+  if (s == "-0") {
+    s = "0";
   }
   return s;
 }
