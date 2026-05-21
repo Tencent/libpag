@@ -189,6 +189,23 @@ function borderWidthOf(computed, side) {
   return parseFloat(computed.getPropertyValue(`border-${side}-width`)) || 0;
 }
 
+// Read all three relevant declarations for one border side in a single helper
+// so callers that need more than width (uniformity check, overlay paint,
+// triangle hack detection) avoid sprinkling `getPropertyValue('border-${side}-
+// width|style|color')` three times each. `widthRaw` is preserved as a string
+// alongside the parsed `width` so `isUniformBorder` can string-compare the raw
+// values (avoiding `'1px'` vs `'1.0px'` floating-point hazards) without
+// re-reading the property.
+function readBorderSide(computed, side) {
+  const widthRaw = computed.getPropertyValue(`border-${side}-width`);
+  return {
+    widthRaw,
+    width: parseFloat(widthRaw) || 0,
+    style: computed.getPropertyValue(`border-${side}-style`),
+    color: computed.getPropertyValue(`border-${side}-color`),
+  };
+}
+
 // Resolve the origin used for measuring an element's children's `left`/`top`.
 // CSS positions `position: absolute` descendants relative to the containing
 // block's PADDING BOX, not its border box; `getBoundingClientRect()` reports
@@ -215,17 +232,19 @@ function paddingBoxOrigin(rect, computed) {
 
 // True iff all four borders have the same non-zero width, the same `solid`
 // style, and the same color — i.e. the only case where the subset's single
-// `border` shorthand can losslessly express the page's border.
+// `border` shorthand can losslessly express the page's border. Compares the
+// raw width string (not the parsed value) so 0.5px vs 0.5000001px noise from
+// computed-style serialisation never sneaks past the equality check.
 function isUniformBorder(computed) {
-  const w0 = computed.getPropertyValue('border-top-width');
-  const s0 = computed.getPropertyValue('border-top-style');
-  const c0 = computed.getPropertyValue('border-top-color');
-  if (s0 !== 'solid') return false;
-  if ((parseFloat(w0) || 0) <= 0) return false;
+  const top = readBorderSide(computed, 'top');
+  if (top.style !== 'solid') return false;
+  if (top.width <= 0) return false;
   for (const side of SIDES) {
-    if (computed.getPropertyValue(`border-${side}-width`) !== w0) return false;
-    if (computed.getPropertyValue(`border-${side}-style`) !== s0) return false;
-    if (computed.getPropertyValue(`border-${side}-color`) !== c0) return false;
+    if (side === 'top') continue;
+    const s = readBorderSide(computed, side);
+    if (s.widthRaw !== top.widthRaw) return false;
+    if (s.style !== top.style) return false;
+    if (s.color !== top.color) return false;
   }
   return true;
 }
@@ -400,10 +419,9 @@ function appendStyleProp(parts, computed, entry, ctx) {
 // trade-off.
 function appendBorder(parts, computed) {
   if (!isUniformBorder(computed)) return;
-  const bw = borderWidthOf(computed, 'top');
-  if (bw <= 0) return;
-  const bc = computed.getPropertyValue('border-top-color').trim();
-  parts.push(`border: ${px(bw)} solid ${bc}`);
+  const top = readBorderSide(computed, 'top');
+  if (top.width <= 0) return;
+  parts.push(`border: ${px(top.width)} solid ${top.color.trim()}`);
 }
 
 // Pass `box-shadow` through verbatim if non-none.
@@ -496,17 +514,15 @@ function borderOverlayHTML(computed, width, height) {
   if (isUniformBorder(computed)) return [];
   const out = [];
   for (const side of SIDES) {
-    const t = borderWidthOf(computed, side);
-    if (t <= 0) continue;
-    const style = computed.getPropertyValue(`border-${side}-style`);
+    const b = readBorderSide(computed, side);
+    if (b.width <= 0) continue;
     // The subset has no model for dashed/dotted/double per-side borders.
     // Downgrade them to solid: it's an approximation but preserves the
     // visual divider, which is what the page actually wanted.
-    if (style === 'none' || style === 'hidden') continue;
-    const color = computed.getPropertyValue(`border-${side}-color`).trim();
-    const r = SIDE_OVERLAY[side](width, height, t);
+    if (b.style === 'none' || b.style === 'hidden') continue;
+    const r = SIDE_OVERLAY[side](width, height, b.width);
     out.push(`<div style="position: absolute; left: ${px(r.left)}; top: ${px(r.top)}; ` +
-      `width: ${px(r.w)}; height: ${px(r.h)}; background-color: ${color}"></div>`);
+      `width: ${px(r.w)}; height: ${px(r.h)}; background-color: ${b.color.trim()}"></div>`);
   }
   return out;
 }
@@ -581,10 +597,10 @@ function isCssBorderTrianglePattern(el, computed) {
   if (pad.top !== 0 || pad.right !== 0 || pad.bottom !== 0 || pad.left !== 0) return false;
   let visibleSides = 0;
   for (const side of SIDES) {
-    if (borderWidthOf(computed, side) <= 0) continue;
-    const style = computed.getPropertyValue(`border-${side}-style`);
-    if (style !== 'solid') return false;
-    if (colorAlpha(computed.getPropertyValue(`border-${side}-color`)) > 0) visibleSides++;
+    const b = readBorderSide(computed, side);
+    if (b.width <= 0) continue;
+    if (b.style !== 'solid') return false;
+    if (colorAlpha(b.color) > 0) visibleSides++;
   }
   if (visibleSides === 0) return false;
   if (colorAlpha(computed.getPropertyValue('background-color')) > 0) return false;
@@ -640,9 +656,9 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
   };
   const polys = [];
   for (const side of SIDES) {
-    const tw = borderWidthOf(computed, side);
-    if (tw <= 0) continue;
-    const color = computed.getPropertyValue(`border-${side}-color`).trim();
+    const b = readBorderSide(computed, side);
+    if (b.width <= 0) continue;
+    const color = b.color.trim();
     if (colorAlpha(color) <= 0) continue;
     const pts = triangles[side]
       .map(([x, y]) => mapPoint(x, y))
@@ -1729,6 +1745,7 @@ const HELPER_FNS = [
   isVisible,
   readPadding,
   borderWidthOf,
+  readBorderSide,
   paddingBoxOrigin,
   isUniformBorder,
   hasAnyBorder,
