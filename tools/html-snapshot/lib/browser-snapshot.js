@@ -1170,10 +1170,24 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
 // dimensions (so the flex engine can place it). `withNowrap` is mandatory:
 // the measured rect was for a single line and PAGX's text engine must not
 // rewrap at a sub-pixel divergence.
+//
+// Height is expanded to `line-height` when Chromium's `getClientRects`
+// reports a shorter glyph-bounds rect than the inherited line-height (e.g.
+// "首页" at font-size 16 / line-height 24 measures ~19px tall). Without the
+// expansion the flex container's `align-items: center` would centre the
+// 19px span box, but the inline text inside still renders against a 24px
+// line-box anchored at the span's top — pushing the visible glyph ~2.5px
+// below the icon sibling that was centred against its own box. Setting
+// height = line-height aligns the span's outer box with the line-box that
+// actually drives glyph placement, mirroring how the source HTML's
+// anonymous text flex item participates in centring. See `emitTextSpans`
+// for the same expansion applied along the absolute-positioning path.
 function renderFlexTextItem(child, parentComputed) {
   const r = child.rect;
   const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
-  const baseStyle = buildStyle(0, 0, r.width, r.height, parentComputed, {
+  const lineHeightPx = parseFloat(parentComputed.getPropertyValue('line-height')) || 0;
+  const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
+  const baseStyle = buildStyle(0, 0, r.width, height, parentComputed, {
     box: false, text: true, flexItem: true,
   });
   return `<span style="${withNowrap(baseStyle)}">${escapeHtml(text)}</span>`;
