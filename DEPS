@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "5342bbae5a2a297b8b1e23935f7f0b87cac39345",
+        "commit": "7b69a2e2a449839a5de15ef5815240b88fea0254",
         "dir": "third_party/tgfx"
       },
       {
@@ -49,11 +49,6 @@
         "url": "https://github.com/GNOME/libxml2.git",
         "commit": "3d840e17858de03a09fba8b202e3a89267d5795a",
         "dir": "third_party/libxml2"
-      },
-      {
-        "url": "https://github.com/google/woff2.git",
-        "commit": "1c69169e9e1811dccd6c54c532fedda300233968",
-        "dir": "third_party/woff2"
       }
     ]
   },
