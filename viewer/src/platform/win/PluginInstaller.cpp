@@ -47,7 +47,7 @@ QString PluginInstaller::GetH264EncoderToolsExePath() {
   }
 
   // Return installed path: %APPDATA%\H264EncoderTools\H264EncoderTools.exe
-  QString roaming = QString::fromLocal8Bit(qgetenv("APPDATA"));
+  QString roaming = qEnvironmentVariable("APPDATA");
   if (roaming.isEmpty()) {
     return {};
   }
@@ -206,7 +206,7 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 
   if (pluginName == "H264EncoderTools") {
     // Install to %APPDATA%\H264EncoderTools\ to match exporter's GetRoamingPath()
-    QString roaming = QString::fromLocal8Bit(qgetenv("APPDATA"));
+    QString roaming = qEnvironmentVariable("APPDATA");
     if (roaming.isEmpty()) {
       return {};
     }

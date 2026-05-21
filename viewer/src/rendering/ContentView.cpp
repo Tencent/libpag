@@ -69,6 +69,9 @@ void ContentView::prepareForRemoval() {
 
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
+  if (sizeChanged) {
+    return;
+  }
   sizeChanged = true;
   onSizeChangedDelayHandled();
   if (renderThread != nullptr) {
