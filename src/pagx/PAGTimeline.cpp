@@ -18,10 +18,22 @@
 
 #include "pagx/PAGTimeline.h"
 #include <algorithm>
-#include <cmath>
+#include "pagx/PAGFile.h"
 #include "pagx/animation/Animation.h"
 
 namespace pagx {
+
+static constexpr int64_t kMicrosPerSecond = 1'000'000;
+
+// Returns the animation duration in microseconds. Returns 0 for invalid animations.
+static int64_t DurationMicros(const Animation* animation) {
+  if (animation == nullptr || animation->frameRate <= 0.0f || animation->duration <= 0) {
+    return 0;
+  }
+  return static_cast<int64_t>(static_cast<double>(animation->duration) *
+                              static_cast<double>(kMicrosPerSecond) /
+                              static_cast<double>(animation->frameRate));
+}
 
 PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim)
     : ownerFile(std::move(file)), animation(anim) {
@@ -32,8 +44,8 @@ const std::string& PAGTimeline::getName() const {
   return animation != nullptr ? animation->name : kEmpty;
 }
 
-Frame PAGTimeline::getDuration() const {
-  return animation != nullptr ? animation->duration : 0;
+int64_t PAGTimeline::getDuration() const {
+  return DurationMicros(animation);
 }
 
 float PAGTimeline::getFrameRate() const {
@@ -50,46 +62,31 @@ void PAGTimeline::pause() {
 
 void PAGTimeline::stop() {
   playing = false;
-  currentFrame = ZeroFrame;
+  currentTimeUs = 0;
 }
 
 bool PAGTimeline::isPlaying() const {
   return playing;
 }
 
-void PAGTimeline::setTime(float seconds) {
-  auto rate = getFrameRate();
-  if (rate <= 0.0f) {
-    currentFrame = ZeroFrame;
-    return;
-  }
-  auto frame = static_cast<Frame>(std::llround(static_cast<double>(seconds) * rate));
-  currentFrame = std::max<Frame>(0, frame);
+void PAGTimeline::setCurrentTime(int64_t microseconds) {
+  currentTimeUs = std::max<int64_t>(0, microseconds);
 }
 
-float PAGTimeline::getTime() const {
-  auto rate = getFrameRate();
-  if (rate <= 0.0f) {
-    return 0.0f;
-  }
-  return static_cast<float>(static_cast<double>(currentFrame) / rate);
+int64_t PAGTimeline::currentTime() const {
+  return currentTimeUs;
 }
 
-bool PAGTimeline::advance(float dt) {
-  if (!playing || dt == 0.0f || animation == nullptr) {
+bool PAGTimeline::advance(int64_t deltaMicroseconds) {
+  if (!playing || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
-  auto rate = animation->frameRate;
-  auto duration = animation->duration;
-  if (rate <= 0.0f || duration <= 0) {
+  auto duration = DurationMicros(animation);
+  if (duration <= 0) {
     return false;
   }
-  auto previous = currentFrame;
-  auto delta = static_cast<Frame>(std::llround(static_cast<double>(dt) * rate));
-  if (delta == 0) {
-    return false;
-  }
-  auto next = currentFrame + delta;
+  auto previous = currentTimeUs;
+  auto next = currentTimeUs + deltaMicroseconds;
   switch (animation->loop) {
     case LoopMode::Once:
       if (next >= duration) {
@@ -117,16 +114,27 @@ bool PAGTimeline::advance(float dt) {
       break;
     }
   }
-  currentFrame = next;
-  return currentFrame != previous;
+  currentTimeUs = next;
+  return currentTimeUs != previous;
 }
 
-void PAGTimeline::apply(float /*mix*/) {
-  // TODO(PR4/PR8): evaluate properties at currentFrame and write through ChannelRegistry.
+void PAGTimeline::apply(float mix) {
+  if (animation == nullptr) {
+    return;
+  }
+  auto file = ownerFile.lock();
+  if (file == nullptr) {
+    return;
+  }
+  auto clamped = std::clamp(mix, 0.0f, 1.0f);
+  if (clamped <= 0.0f) {
+    return;
+  }
+  file->applyAnimation(animation, currentTimeUs, clamped);
 }
 
-bool PAGTimeline::advanceAndApply(float dt, float mix) {
-  bool changed = advance(dt);
+bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {
+  bool changed = advance(deltaMicroseconds);
   apply(mix);
   return changed;
 }

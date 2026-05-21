@@ -17,7 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGFile.h"
+#include <algorithm>
 #include "pagx/animation/Animation.h"
+#include "pagx/animation/AnimationObject.h"
+#include "pagx/runtime/AnimContext.h"
+#include "pagx/runtime/ChannelRegistry.h"
+#include "pagx/runtime/PAGFileInternal.h"
+#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
@@ -25,10 +31,15 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   if (document == nullptr) {
     return nullptr;
   }
+  if (!document->isLayoutApplied()) {
+    document->applyLayout();
+  }
   auto file = std::shared_ptr<PAGFile>(new PAGFile());
   file->document = document;
-  // PR1 only registers the file itself; node-level reverse mapping is populated when the runtime
-  // tree is actually built (PR6+). Pass an empty referenced-node list for now.
+  file->layerTree = std::make_unique<LayerTreeStorage>();
+  file->layerTree->tree = LayerBuilder::BuildWithMap(document.get());
+  // PR1 only registers the file itself; node-level reverse mapping is populated when notifyChange
+  // dispatch is wired up (PR11). Pass an empty referenced-node list for now.
   document->registerLiveFile(file, {});
   return file;
 }
@@ -71,7 +82,6 @@ std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& name) {
   if (it != timelinesByAnimation.end()) {
     return it->second;
   }
-  // Construct via private ctor; std::make_shared cannot access it.
   auto timeline = std::shared_ptr<PAGTimeline>(
       new PAGTimeline(std::weak_ptr<PAGFile>(shared_from_this()), matched));
   timelinesByAnimation.emplace(matched, timeline);
@@ -104,6 +114,37 @@ float PAGFile::getHeight() const {
 
 void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
   // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
+}
+
+void PAGFile::applyAnimation(Animation* animation, int64_t microseconds, float mix) {
+  if (animation == nullptr || document == nullptr || layerTree == nullptr) {
+    return;
+  }
+  if (mix <= 0.0f) {
+    return;
+  }
+  auto clampedMix = std::min(1.0f, mix);
+  const auto& registry = ChannelRegistry::Get();
+  for (auto* object : animation->objects) {
+    if (object == nullptr) {
+      continue;
+    }
+    auto* targetNode = document->findNode(object->target);
+    if (targetNode == nullptr) {
+      continue;
+    }
+    AnimContext ctx{&layerTree->tree, targetNode, clampedMix};
+    for (auto* property : object->properties) {
+      if (property == nullptr) {
+        continue;
+      }
+      auto* desc = registry.find(targetNode->nodeType(), property->channel);
+      if (desc == nullptr || !desc->writer) {
+        continue;
+      }
+      desc->writer(ctx, property->evaluateAt(microseconds, animation->frameRate));
+    }
+  }
 }
 
 }  // namespace pagx

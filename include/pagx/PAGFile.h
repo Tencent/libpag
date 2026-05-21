@@ -98,10 +98,20 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
+  // Evaluates the given animation at the given microsecond time and writes results into the
+  // runtime tree. Called by PAGTimeline::apply().
+  void applyAnimation(Animation* animation, int64_t microseconds, float mix);
+
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
+  // The runtime layer tree opaque pointer; concrete type lives in PAGFile.cpp to avoid pulling
+  // tgfx layer types into the public header.
+  struct LayerTreeStorage;
+  std::unique_ptr<LayerTreeStorage> layerTree = {};
+
   friend class PAGXDocument;
+  friend class PAGTimeline;
 };
 
 }  // namespace pagx

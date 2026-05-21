@@ -25,6 +25,9 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
+class BlurFilter;
+class DropShadowFilter;
+class DropShadowStyle;
 class FillStyle;
 class Gradient;
 class Image;
@@ -36,7 +39,10 @@ class Text;
 
 namespace pagx {
 
+class BlurFilter;
 class ColorStop;
+class DropShadowFilter;
+class DropShadowStyle;
 class Fill;
 class Gradient;
 class Image;
@@ -54,12 +60,17 @@ struct PAGLayerTree {
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
   std::unordered_map<const SolidColor*, std::shared_ptr<tgfx::SolidColor>> solidMap = {};
   std::unordered_map<const Gradient*, std::shared_ptr<tgfx::Gradient>> gradientMap = {};
-  std::unordered_map<const ColorStop*, size_t> stopMap = {};
+  std::unordered_map<const ColorStop*, std::pair<const Gradient*, size_t>> stopMap = {};
   std::unordered_map<const ImagePattern*, std::shared_ptr<tgfx::ImagePattern>> patternMap = {};
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> imageMap = {};
   std::unordered_map<const Text*, std::shared_ptr<tgfx::Text>> textMap = {};
   std::unordered_map<const Fill*, std::shared_ptr<tgfx::FillStyle>> fillMap = {};
   std::unordered_map<const Stroke*, std::shared_ptr<tgfx::StrokeStyle>> strokeMap = {};
+  std::unordered_map<const BlurFilter*, std::shared_ptr<tgfx::BlurFilter>> blurFilterMap = {};
+  std::unordered_map<const DropShadowFilter*, std::shared_ptr<tgfx::DropShadowFilter>>
+      dropShadowFilterMap = {};
+  std::unordered_map<const DropShadowStyle*, std::shared_ptr<tgfx::DropShadowStyle>>
+      dropShadowStyleMap = {};
 };
 
 using LayerBuildResult = PAGLayerTree;

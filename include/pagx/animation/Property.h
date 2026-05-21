@@ -19,6 +19,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
@@ -33,8 +34,18 @@ class Property : public Node {
  public:
   std::string channel = {};
 
+  // Evaluates the property value at the given Frame index. Useful for unit tests and any caller
+  // operating in frame-discrete time.
   KeyValue evaluateAt(Frame frame) const {
-    return onEvaluateAt(frame);
+    return onEvaluateAtFrame(frame);
+  }
+
+  // Evaluates the property value at the given time in microseconds, using the supplied frameRate
+  // to convert microseconds to a continuous frame position. Implementations should perform
+  // interpolation in double precision to avoid losing precision when the timeline is being driven
+  // by microsecond deltas.
+  KeyValue evaluateAt(int64_t microseconds, float frameRate) const {
+    return onEvaluateAtMicros(microseconds, frameRate);
   }
 
   NodeType nodeType() const override {
@@ -45,7 +56,8 @@ class Property : public Node {
   Property() = default;
 
  private:
-  virtual KeyValue onEvaluateAt(Frame frame) const = 0;
+  virtual KeyValue onEvaluateAtFrame(Frame frame) const = 0;
+  virtual KeyValue onEvaluateAtMicros(int64_t microseconds, float frameRate) const = 0;
 
   friend class PAGXDocument;
 };
@@ -56,7 +68,7 @@ class TypedProperty : public Property {
   std::vector<Keyframe<T>> keyframes = {};
 
  private:
-  KeyValue onEvaluateAt(Frame frame) const override {
+  KeyValue onEvaluateAtFrame(Frame frame) const override {
     if (keyframes.empty()) {
       return T{};
     }
@@ -68,6 +80,28 @@ class TypedProperty : public Property {
       return it->value;
     }
     --it;
+    return it->value;
+  }
+
+  KeyValue onEvaluateAtMicros(int64_t microseconds, float frameRate) const override {
+    if (keyframes.empty()) {
+      return T{};
+    }
+    // Compute continuous frame position in double precision so callers driving the timeline by
+    // microsecond deltas don't lose precision in the floor-to-Frame conversion.
+    double framePosition = frameRate > 0.0f ? static_cast<double>(microseconds) *
+                                                  static_cast<double>(frameRate) / 1.0e6
+                                            : 0.0;
+    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
+                               [](double value, const Keyframe<T>& keyframe) {
+                                 return value < static_cast<double>(keyframe.time);
+                               });
+    if (it == keyframes.begin()) {
+      return it->value;
+    }
+    --it;
+    // PR8 will replace this Hold-only baseline with Linear/Bezier interpolation that uses
+    // framePosition for high precision.
     return it->value;
   }
 

@@ -45,9 +45,10 @@ class PAGTimeline {
   const std::string& getName() const;
 
   /**
-   * Returns the animation duration in frames. Equal to Animation::duration.
+   * Returns the animation duration in microseconds, derived from Animation::duration (in frames)
+   * and Animation::frameRate.
    */
-  Frame getDuration() const;
+  int64_t getDuration() const;
 
   /**
    * Returns the animation frame rate. Equal to Animation::frameRate.
@@ -55,18 +56,18 @@ class PAGTimeline {
   float getFrameRate() const;
 
   /**
-   * Starts or resumes playback. Subsequent advance() calls will advance the current frame.
+   * Starts or resumes playback. Subsequent advance() calls will advance the current time.
    */
   void play();
 
   /**
-   * Pauses playback. The current frame is preserved; subsequent advance() calls become no-ops
+   * Pauses playback. The current time is preserved; subsequent advance() calls become no-ops
    * until play() is called again.
    */
   void pause();
 
   /**
-   * Stops playback and resets the current frame to zero.
+   * Stops playback and resets the current time to zero.
    */
   void stop();
 
@@ -76,26 +77,27 @@ class PAGTimeline {
   bool isPlaying() const;
 
   /**
-   * Sets the current playback time in seconds. Only updates the internal frame; callers must
+   * Sets the current playback time in microseconds. Only updates the internal time; callers must
    * invoke apply() to write the resulting values into the runtime tgfx tree.
    */
-  void setTime(float seconds);
+  void setCurrentTime(int64_t microseconds);
 
   /**
-   * Returns the current playback time in seconds.
+   * Returns the current playback time in microseconds.
    */
-  float getTime() const;
+  int64_t currentTime() const;
 
   /**
-   * Advances the current frame by dt seconds based on the animation's frame rate and loop mode.
-   * Does not write any values to the runtime tgfx tree.
-   * @param dt elapsed time in seconds since the previous advance.
-   * @return true if the current frame changed, false if the timeline is paused or dt is zero.
+   * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not write any
+   * values to the runtime tgfx tree.
+   * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
+   * @return true if the current time changed, false if the timeline is paused or
+   *         deltaMicroseconds is zero.
    */
-  bool advance(float dt);
+  bool advance(int64_t deltaMicroseconds);
 
   /**
-   * Evaluates all properties at the current frame and writes the results into the runtime tgfx
+   * Evaluates all properties at the current time and writes the results into the runtime tgfx
    * tree of the owning PAGFile, blended with the existing values by mix.
    *
    * Mixing rules:
@@ -112,17 +114,17 @@ class PAGTimeline {
   void apply(float mix = 1.0f);
 
   /**
-   * Convenience method equivalent to advance(dt) followed by apply(mix). Returns the result of
-   * advance(dt).
+   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(mix). Returns
+   * the result of advance(deltaMicroseconds).
    */
-  bool advanceAndApply(float dt, float mix = 1.0f);
+  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
  private:
   PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation);
 
   std::weak_ptr<PAGFile> ownerFile = {};
   Animation* animation = nullptr;
-  Frame currentFrame = ZeroFrame;
+  int64_t currentTimeUs = 0;
   bool playing = false;
 
   friend class PAGFile;

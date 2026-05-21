@@ -44,6 +44,7 @@
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -78,8 +79,14 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
+#include "pagx/runtime/PAGFileInternal.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 #include "utils/Baseline.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
@@ -5570,7 +5577,7 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
   ASSERT_TRUE(t1 != nullptr);
   EXPECT_EQ(t1.get(), t1Again.get());
   EXPECT_EQ(t1->getName(), "main");
-  EXPECT_EQ(t1->getDuration(), 60);
+  EXPECT_EQ(t1->getDuration(), 1'000'000);
 
   auto t2 = file->getTimeline("hint");
   ASSERT_TRUE(t2 != nullptr);
@@ -5583,7 +5590,8 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
 }
 
 /**
- * Test case: PAGTimeline play/pause/stop/setTime/advance state machine, including loop modes.
+ * Test case: PAGTimeline play/pause/stop/setCurrentTime/advance state machine, including loop
+ * modes. Time is measured in microseconds.
  */
 PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
@@ -5599,30 +5607,33 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   auto timeline = file->getTimeline("loop");
   ASSERT_TRUE(timeline != nullptr);
 
-  EXPECT_FALSE(timeline->isPlaying());
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.0f);
+  // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
+  EXPECT_EQ(timeline->getDuration(), 1'000'000);
 
-  EXPECT_FALSE(timeline->advance(0.5f));
+  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_EQ(timeline->currentTime(), 0);
+
+  EXPECT_FALSE(timeline->advance(500'000));
 
   timeline->play();
   EXPECT_TRUE(timeline->isPlaying());
-  EXPECT_TRUE(timeline->advance(0.5f));
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.5f);
+  EXPECT_TRUE(timeline->advance(500'000));
+  EXPECT_EQ(timeline->currentTime(), 500'000);
 
-  EXPECT_TRUE(timeline->advance(0.6f));
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.1f);
+  EXPECT_TRUE(timeline->advance(600'000));
+  EXPECT_EQ(timeline->currentTime(), 100'000);
 
   timeline->pause();
   EXPECT_FALSE(timeline->isPlaying());
-  EXPECT_FALSE(timeline->advance(0.2f));
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.1f);
+  EXPECT_FALSE(timeline->advance(200'000));
+  EXPECT_EQ(timeline->currentTime(), 100'000);
 
-  timeline->setTime(0.4f);
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.4f);
+  timeline->setCurrentTime(400'000);
+  EXPECT_EQ(timeline->currentTime(), 400'000);
 
   timeline->stop();
   EXPECT_FALSE(timeline->isPlaying());
-  EXPECT_FLOAT_EQ(timeline->getTime(), 0.0f);
+  EXPECT_EQ(timeline->currentTime(), 0);
 
   auto onceAnim = doc->makeNode<pagx::Animation>();
   onceAnim->name = "once";
@@ -5633,8 +5644,8 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
 
   auto onceTimeline = file->getTimeline("once");
   onceTimeline->play();
-  EXPECT_TRUE(onceTimeline->advance(2.0f));
-  EXPECT_FLOAT_EQ(onceTimeline->getTime(), 1.0f);
+  EXPECT_TRUE(onceTimeline->advance(2'000'000));
+  EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
   EXPECT_FALSE(onceTimeline->isPlaying());
 }
 
@@ -5644,6 +5655,396 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
 PAGX_TEST(PAGXTest, PAGSurfaceSkeleton) {
   auto surface = pagx::PAGSurface::MakeOffscreen(64, 64);
   EXPECT_EQ(surface, nullptr);
+}
+
+/**
+ * Test case: Layer.alpha channel applies with mix=1 and lerp blends with mix=0.5.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "anim";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  alphaProp->channel = "alpha";
+  alphaProp->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(alphaProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto& tree = file->layerTree->tree;
+  auto tgfxLayer = tree.layerMap.at(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  tgfxLayer->setAlpha(1.0f);
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // mix=1: alpha overwritten to keyframe value 0.25.
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.25f);
+
+  // mix=0.5 from current 1.0 toward 0.25 = 1 + (0.25-1)*0.5 = 0.625.
+  tgfxLayer->setAlpha(1.0f);
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.625f);
+
+  // mix=0: no write.
+  tgfxLayer->setAlpha(0.8f);
+  timeline->apply(0.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.8f);
+}
+
+/**
+ * Test case: Layer.visible is a discrete channel; mix is ignored for mix > 0 and skipped at mix=0.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 10;
+  layer->height = 10;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "anim";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* visProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  visProp->channel = "visible";
+  visProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(visProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto tgfxLayer = tree.layerMap.at(layer);
+  tgfxLayer->setVisible(true);
+
+  auto timeline = file->getDefaultTimeline();
+
+  // mix=0.3 still overwrites because discrete.
+  timeline->apply(0.3f);
+  EXPECT_FALSE(tgfxLayer->visible());
+
+  // mix=0 skips even discrete.
+  tgfxLayer->setVisible(true);
+  timeline->apply(0.0f);
+  EXPECT_TRUE(tgfxLayer->visible());
+}
+
+/**
+ * Test case: Layer.x channel writes the matrix tx component, blending with mix.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerX) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 10;
+  layer->height = 10;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "anim";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  xProp->channel = "x";
+  xProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(xProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto tgfxLayer = tree.layerMap.at(layer);
+
+  auto matrix = tgfxLayer->matrix();
+  matrix.setTranslateX(20.0f);
+  tgfxLayer->setMatrix(matrix);
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 60.0f);  // 20 + (100-20)*0.5
+}
+
+/**
+ * Test case: SolidColor.color channel applies via solidMap with RGBA lerp.
+ */
+PAGX_TEST(PAGXTest, ChannelSolidColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "a";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* p = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  p->channel = "color";
+  pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  p->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(p);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto it = tree.solidMap.find(solid);
+  ASSERT_TRUE(it != tree.solidMap.end());
+  auto tgfxSolid = it->second;
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxSolid->color().red, 0.0f);
+  EXPECT_FLOAT_EQ(tgfxSolid->color().blue, 1.0f);
+
+  // Reset to red, then blend halfway toward blue.
+  tgfxSolid->setColor({1.0f, 0.0f, 0.0f, 1.0f});
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxSolid->color().red, 0.5f);
+  EXPECT_FLOAT_EQ(tgfxSolid->color().blue, 0.5f);
+}
+
+/**
+ * Test case: ColorStop.color and ColorStop.offset channels write through stopMap into the parent
+ * Gradient's colors() / positions() arrays.
+ */
+PAGX_TEST(PAGXTest, ChannelColorStop) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto gradient = doc->makeNode<pagx::LinearGradient>("G");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {50, 0};
+
+  auto stop0 = doc->makeNode<pagx::ColorStop>("Stop0");
+  stop0->offset = 0.0f;
+  stop0->color = {1.0f, 0.0f, 0.0f, 1.0f};
+
+  auto stop1 = doc->makeNode<pagx::ColorStop>("Stop1");
+  stop1->offset = 1.0f;
+  stop1->color = {0.0f, 1.0f, 0.0f, 1.0f};
+
+  gradient->colorStops.push_back(stop0);
+  gradient->colorStops.push_back(stop1);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = gradient;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "a";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "Stop1";
+  anim->objects.push_back(obj);
+  auto* colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  colorProp->channel = "color";
+  pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  colorProp->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(colorProp);
+  auto* offsetProp = doc->makeNode<pagx::TypedProperty<float>>();
+  offsetProp->channel = "offset";
+  offsetProp->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(offsetProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto gradIt = tree.gradientMap.find(gradient);
+  ASSERT_TRUE(gradIt != tree.gradientMap.end());
+  auto tgfxGrad = gradIt->second;
+  auto stopIt = tree.stopMap.find(stop1);
+  ASSERT_TRUE(stopIt != tree.stopMap.end());
+  EXPECT_EQ(stopIt->second.first, gradient);
+  EXPECT_EQ(stopIt->second.second, 1u);
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxGrad->colors()[1].blue, 1.0f);
+  EXPECT_FLOAT_EQ(tgfxGrad->positions()[1], 0.4f);
+}
+
+/**
+ * Test case: BlurFilter.blurX/blurY channels write through blurFilterMap.
+ */
+PAGX_TEST(PAGXTest, ChannelBlurFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto blur = doc->makeNode<pagx::BlurFilter>("B");
+  blur->blurX = 2.0f;
+  blur->blurY = 2.0f;
+  layer->filters.push_back(blur);
+
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "a";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "B";
+  anim->objects.push_back(obj);
+  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  xProp->channel = "blurX";
+  xProp->keyframes.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(xProp);
+  auto* yProp = doc->makeNode<pagx::TypedProperty<float>>();
+  yProp->channel = "blurY";
+  yProp->keyframes.push_back({0, 6.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(yProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto it = tree.blurFilterMap.find(blur);
+  ASSERT_TRUE(it != tree.blurFilterMap.end());
+  auto tgfxBlur = it->second;
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxBlur->blurrinessX(), 6.0f);  // 2 + (10-2)*0.5
+  EXPECT_FLOAT_EQ(tgfxBlur->blurrinessY(), 4.0f);  // 2 + (6-2)*0.5
+}
+
+/**
+ * Test case: DropShadowFilter / DropShadowStyle channel writers cover offset, blur, color.
+ */
+PAGX_TEST(PAGXTest, ChannelDropShadow) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto dsFilter = doc->makeNode<pagx::DropShadowFilter>("F");
+  dsFilter->offsetX = 0.0f;
+  dsFilter->offsetY = 0.0f;
+  dsFilter->blurX = 0.0f;
+  dsFilter->blurY = 0.0f;
+  dsFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->filters.push_back(dsFilter);
+
+  auto dsStyle = doc->makeNode<pagx::DropShadowStyle>("S");
+  dsStyle->offsetX = 0.0f;
+  dsStyle->offsetY = 0.0f;
+  dsStyle->blurX = 0.0f;
+  dsStyle->blurY = 0.0f;
+  dsStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->styles.push_back(dsStyle);
+
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "a";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  auto* fObj = doc->makeNode<pagx::AnimationObject>();
+  fObj->target = "F";
+  anim->objects.push_back(fObj);
+  auto* fx = doc->makeNode<pagx::TypedProperty<float>>();
+  fx->channel = "offsetX";
+  fx->keyframes.push_back({0, 8.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  fObj->properties.push_back(fx);
+  auto* fcolor = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  fcolor->channel = "color";
+  fcolor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  fObj->properties.push_back(fcolor);
+
+  auto* sObj = doc->makeNode<pagx::AnimationObject>();
+  sObj->target = "S";
+  anim->objects.push_back(sObj);
+  auto* sblur = doc->makeNode<pagx::TypedProperty<float>>();
+  sblur->channel = "blurY";
+  sblur->keyframes.push_back({0, 12.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  sObj->properties.push_back(sblur);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto fIt = tree.dropShadowFilterMap.find(dsFilter);
+  ASSERT_TRUE(fIt != tree.dropShadowFilterMap.end());
+  auto sIt = tree.dropShadowStyleMap.find(dsStyle);
+  ASSERT_TRUE(sIt != tree.dropShadowStyleMap.end());
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(1.0f);
+
+  EXPECT_FLOAT_EQ(fIt->second->offsetX(), 8.0f);
+  EXPECT_FLOAT_EQ(fIt->second->color().red, 1.0f);
+  EXPECT_FLOAT_EQ(sIt->second->blurrinessY(), 12.0f);
+}
+
+/**
+ * Test case: Two timelines targeting the same channel stack in apply() order; later writer mixes
+ * against the earlier writer's result.
+ */
+PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 10;
+  layer->height = 10;
+  doc->layers.push_back(layer);
+
+  auto makeAlphaAnim = [&](const std::string& name, float value) {
+    auto anim = doc->makeNode<pagx::Animation>();
+    anim->name = name;
+    anim->duration = 60;
+    anim->frameRate = 60;
+    doc->animations.push_back(anim);
+    auto* obj = doc->makeNode<pagx::AnimationObject>();
+    obj->target = "L";
+    anim->objects.push_back(obj);
+    auto* p = doc->makeNode<pagx::TypedProperty<float>>();
+    p->channel = "alpha";
+    p->keyframes.push_back({0, value, pagx::KeyframeInterpolationType::Hold, {}, {}});
+    obj->properties.push_back(p);
+    return anim;
+  };
+  makeAlphaAnim("base", 0.0f);
+  makeAlphaAnim("hint", 1.0f);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto& tree = file->layerTree->tree;
+  auto tgfxLayer = tree.layerMap.at(layer);
+  tgfxLayer->setAlpha(0.5f);
+
+  auto base = file->getTimeline("base");
+  auto hint = file->getTimeline("hint");
+
+  // base writes 0.0 fully, then hint blends 30% toward 1.0 from 0.0.
+  base->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.0f);
+  hint->apply(0.3f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
 }
 
 }  // namespace pag

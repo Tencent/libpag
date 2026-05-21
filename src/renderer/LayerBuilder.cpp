@@ -503,12 +503,12 @@ class LayerBuilderContext {
     }
   }
 
-  void extractGradientStops(const std::vector<ColorStop*>& colorStops,
+  void extractGradientStops(const Gradient* parent, const std::vector<ColorStop*>& colorStops,
                             std::vector<tgfx::Color>* colors, std::vector<float>* positions) {
     colors->reserve(colorStops.size());
     positions->reserve(colorStops.size());
     for (const auto* stop : colorStops) {
-      _layerTree.stopMap[stop] = colors->size();
+      _layerTree.stopMap[stop] = std::make_pair(parent, colors->size());
       colors->push_back(ToTGFX(stop->color));
       positions->push_back(stop->offset);
     }
@@ -533,7 +533,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node->colorStops, &colors, &positions);
+    extractGradientStops(node, node->colorStops, &colors, &positions);
     return applyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
@@ -543,7 +543,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node->colorStops, &colors, &positions);
+    extractGradientStops(node, node->colorStops, &colors, &positions);
     return applyGradientProperties(
         tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node);
   }
@@ -551,7 +551,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node->colorStops, &colors, &positions);
+    extractGradientStops(node, node->colorStops, &colors, &positions);
     return applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
                                                              node->endAngle, colors, positions),
                                    node);
@@ -560,7 +560,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node->colorStops, &colors, &positions);
+    extractGradientStops(node, node->colorStops, &colors, &positions);
     return applyGradientProperties(
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node);
   }
@@ -842,6 +842,7 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        _layerTree.dropShadowStyleMap[style] = tgfxStyle;
         return tgfxStyle;
       }
       case NodeType::InnerShadowStyle: {
@@ -875,13 +876,18 @@ class LayerBuilderContext {
     switch (node->nodeType()) {
       case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
-        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
+        auto tgfxFilter =
+            tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
+        _layerTree.blurFilterMap[filter] = tgfxFilter;
+        return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
-        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
-                                            filter->blurY, ToTGFX(filter->color),
-                                            filter->shadowOnly);
+        auto tgfxFilter = tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY,
+                                                       filter->blurX, filter->blurY,
+                                                       ToTGFX(filter->color), filter->shadowOnly);
+        _layerTree.dropShadowFilterMap[filter] = tgfxFilter;
+        return tgfxFilter;
       }
       case NodeType::InnerShadowFilter: {
         auto filter = static_cast<const pagx::InnerShadowFilter*>(node);
