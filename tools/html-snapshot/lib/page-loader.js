@@ -7,11 +7,12 @@
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
-// The function body is serialised into the browser, so it must be fully
-// self-contained.
-function rootHasChildrenScript() {
-  return 'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
-}
+// Defined as a string constant rather than a function — the body is
+// serialised into the browser via `page.waitForFunction`, which accepts the
+// expression source directly, so wrapping it in a Node-side function would
+// just toString() back to the same value on every call.
+const ROOT_HAS_CHILDREN_SCRIPT =
+  'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
 
 // Open a fresh page on `browser`, navigate to `url`, and apply the standard
 // wait strategy. `url` must already be a fully-qualified URL — callers are
@@ -56,7 +57,7 @@ async function openAndSettlePage(browser, url, opts) {
     await page.waitForSelector(selector, { timeout: 15000 });
   } else {
     try {
-      await page.waitForFunction(rootHasChildrenScript(), { timeout: 10000 });
+      await page.waitForFunction(ROOT_HAS_CHILDREN_SCRIPT, { timeout: 10000 });
     } catch (_) { /* not fatal — pages without #root simply skip this wait */ }
   }
 
