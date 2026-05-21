@@ -18,7 +18,7 @@
 
 import { PAGXBind } from './binding';
 import type { PAGXModule } from './types';
-import createPAGX from '../../wasm-mt/pagx-viewer';
+import createPAGX from 'pagx-glue';
 
 export { PAGXView } from './pagx-view';
 export type { PAGXModule } from './types';

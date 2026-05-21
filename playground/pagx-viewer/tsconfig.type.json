@@ -8,9 +8,11 @@
     "skipLibCheck": true,
     "experimentalDecorators": true,
     "moduleResolution": "bundler",
+    "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@tgfx/*": ["../../third_party/tgfx/web/src/*"]
+      "@tgfx/*": ["../../third_party/tgfx/web/src/*"],
+      "pagx-glue": ["./wasm-mt/pagx-viewer"]
     }
   },
   "include": ["src/ts/pagx.ts"]

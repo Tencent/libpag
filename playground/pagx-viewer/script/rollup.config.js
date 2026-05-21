@@ -65,14 +65,15 @@ const copyWasmPlugin = {
 
 const plugins = [
   // MUST stay before resolve()/esbuild() — see PR #3436. Otherwise node-resolve will
-  // resolve `../../wasm-mt/pagx-viewer` to a concrete file before alias rewrites it,
-  // and the single-threaded bundle will silently inline the multi-threaded glue.
+  // resolve the `pagx-glue` import to a concrete file before alias rewrites it, and
+  // the single-threaded bundle will silently inline the multi-threaded glue.
   alias({
     entries: [
       { find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') },
-      // Redirect the wasm glue import in pagx.ts to the requested arch's output directory.
+      // Redirect the virtual `pagx-glue` import in pagx.ts to the requested arch's output
+      // directory. The same module name is mapped via tsconfig `paths` for type generation.
       {
-        find: '../../wasm-mt/pagx-viewer',
+        find: 'pagx-glue',
         replacement: path.resolve(__dirname, `../${arch}/pagx-viewer`),
       },
     ],
