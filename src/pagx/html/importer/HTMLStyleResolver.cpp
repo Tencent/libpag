@@ -151,7 +151,8 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   // Re-parse the CSS font-family stack only when the raw value actually changed at this
   // element. The cascade (`out = parent`) already carries the parent's parsed stack
   // through unchanged in the common case where descendants inherit verbatim.
-  if (out.fontFamily != parent.fontFamily || (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
+  if (out.fontFamily != parent.fontFamily ||
+      (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
     out.fontFamilyChain.clear();
     out.primaryFontFamily.clear();
     auto tokens = html::ParseFontFamilyTokens(out.fontFamily);

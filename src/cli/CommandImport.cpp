@@ -183,8 +183,7 @@ struct SnapshotResult {
 // subset). snapshot.js routes its `wrote ...` progress line and any browser errors to
 // stderr, which `popen` leaves connected to the parent's stderr — so the user still sees
 // progress and diagnostics while we get a clean HTML payload back on stdout.
-static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
-                                      const std::string& binPath) {
+static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, const std::string& binPath) {
   SnapshotResult result;
   auto bin = ResolveSnapshotBin(binPath);
   if (bin.empty()) {
@@ -271,11 +270,10 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
   // html for URLs (the extension heuristic would otherwise pick up nonsense like
   // "com" from the hostname).
   bool isUrl = IsHttpUrl(filePath);
-  std::string effectiveFormat = isUrl ? NormalizeFormat(format, "html")
-                                      : NormalizeFormat(format, GetFileExtension(filePath));
+  std::string effectiveFormat =
+      isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
   if (isUrl && !formatOptions.htmlSnapshot) {
-    result.error =
-        "URL inputs require --html-snapshot (the importer cannot fetch http(s) URLs)";
+    result.error = "URL inputs require --html-snapshot (the importer cannot fetch http(s) URLs)";
     return result;
   }
   if (effectiveFormat == "svg") {
