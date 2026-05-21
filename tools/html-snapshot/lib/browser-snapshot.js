@@ -264,6 +264,40 @@ function firstTextNodeChild(el) {
   return null;
 }
 
+// Resolve the text content of `el`'s ::before / ::after pseudo-element. Used
+// to surface icon-font glyphs (Phosphor, Font Awesome, Material Icons, ...)
+// whose visible character is composed by the stylesheet via
+// `content: "\e123"`. Without this hook the host element renders as an
+// empty box in the snapshot because the glyph lives in a pseudo node that
+// has no DOM presence.
+//
+// Returns '' when the pseudo has no content (the CSS defaults `none` /
+// `normal`) or when the value can't be expressed as a plain string —
+// `url(...)`, `attr(...)`, `counter(...)` and the quote keywords are not
+// supported because we have no clean way to render them inside a `<span>`.
+// Chromium's getComputedStyle returns the value with escapes already
+// resolved into actual characters and string tokens wrapped in double
+// quotes, so the parser only needs to extract quoted runs.
+function pseudoText(el, pseudo) {
+  const cs = getComputedStyle(el, pseudo);
+  const raw = (cs.getPropertyValue('content') || '').trim();
+  if (!raw || raw === 'none' || raw === 'normal') return '';
+  let out = '';
+  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    out += (m[1] !== undefined ? m[1] : m[2]);
+  }
+  return out;
+}
+
+// True when `el` has a non-empty ::before and/or ::after pseudo content.
+// The cheap fast path for the common case of a non-decorative element
+// (zero pseudo content) skips two extra getComputedStyle calls per node.
+function hasPseudoContent(el) {
+  return !!(pseudoText(el, '::before') || pseudoText(el, '::after'));
+}
+
 // Resolve the <img>'s source for the snapshot output. We prefer the inlined
 // data URI produced by the pre-snapshot `inlineExternalImages` pass: PAGX's
 // renderer only knows how to load local files and `data:` URIs, so leaving an
@@ -1164,6 +1198,57 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
 }
 
+// Emit an element whose only visible content comes from its ::before /
+// ::after pseudo-element(s) — typically an icon-font glyph such as
+// `<i class="ph ph-pen-nib"></i>`. The host has no DOM children and no
+// direct text node, so neither the text-leaf nor the container path
+// produces any visible output today; this renderer mirrors them by
+// wrapping the host as a flex box and emitting one inner <span> per
+// non-empty pseudo, styled with the pseudo's own computed font / color
+// (so icon-font CSS that sets `font-family: 'Phosphor'` only on the
+// pseudo still resolves correctly even when the host itself inherits a
+// different font from the body cascade).
+//
+// Pseudo nodes have no DOM presence, so `Range.getClientRects` can't
+// measure them; we centre the inner spans inside the host rect (vertical
+// centring is the right default for inline-level pseudos riding on the
+// baseline of a fixed-height box; horizontal alignment is derived from
+// the host's `text-align` so left-aligned block icons stay against the
+// left edge of their parent column).
+function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opts) {
+  const boxStyle = buildStyle(left, top, rect.width, rect.height, hostComputed, {
+    box: true, ...opts,
+  });
+  const overlays = borderOverlayHTML(hostComputed, rect.width, rect.height).join('');
+
+  const spans = [];
+  for (const pseudo of ['::before', '::after']) {
+    const text = pseudoText(el, pseudo);
+    if (!text) continue;
+    const pseudoComputed = getComputedStyle(el, pseudo);
+    const textStyle = withNowrap(buildStyle(0, 0, 0, 0, pseudoComputed, {
+      box: false, text: true, positioned: false,
+    }));
+    spans.push(`<span style="${textStyle}">${escapeHtml(text)}</span>`);
+  }
+  if (spans.length === 0) {
+    return `<div style="${boxStyle}">${overlays}</div>`;
+  }
+
+  let innerLayout;
+  if (opts.flexItem) {
+    innerLayout = textLeafInnerLayout(hostComputed);
+  } else {
+    const textAlign = (hostComputed.getPropertyValue('text-align') || 'left').trim();
+    let justify = 'flex-start';
+    if (textAlign === 'center') justify = 'center';
+    else if (textAlign === 'right' || textAlign === 'end') justify = 'flex-end';
+    innerLayout = `display: flex; align-items: center; justify-content: ${justify}`;
+  }
+  const composed = joinStyles(boxStyle, innerLayout);
+  return `<div style="${composed}">${spans.join('')}${overlays}</div>`;
+}
+
 // Emit a bare text-node child of a flex container as a sized <span> flex
 // item. The text inherits color/font-* from the container's computed style;
 // we only need to forward the inherited text props plus the explicit
@@ -1356,6 +1441,13 @@ function render(el, parentRect, opts, precomputed) {
   const directText = gatherDirectText(el);
   if (!elementHasChildren(el) && directText) {
     return renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts);
+  }
+  // Icon-font / decorative pseudo case: the host has no DOM children and
+  // no direct text, but the stylesheet supplies a `::before`/`::after`
+  // content string. Emit that as inner spans so the glyph actually shows
+  // up; the container path would otherwise return an empty <div>.
+  if (!elementHasChildren(el) && hasPseudoContent(el)) {
+    return renderPseudoTextLeaf(el, parentRect, rect, left, top, computed, opts);
   }
   return renderContainer(el, parentRect, rect, left, top, computed, opts);
 }
@@ -1583,6 +1675,8 @@ const HELPER_FNS = [
   gatherDirectText,
   elementHasChildren,
   firstTextNodeChild,
+  pseudoText,
+  hasPseudoContent,
   imgSrc,
   syntheticText,
   classify,
@@ -1613,6 +1707,7 @@ const HELPER_FNS = [
   renderTextInput,
   textLeafInnerLayout,
   renderTextLeaf,
+  renderPseudoTextLeaf,
   renderFlexTextItem,
   renderFlexContainer,
   renderContainer,
