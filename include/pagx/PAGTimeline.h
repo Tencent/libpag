@@ -24,6 +24,7 @@
 
 namespace pagx {
 
+struct PAGLayerTree;
 class PAGFile;
 
 /**
@@ -120,10 +121,13 @@ class PAGTimeline {
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
  private:
-  PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation);
+  PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation, PAGLayerTree* layerTree);
 
   std::weak_ptr<PAGFile> ownerFile = {};
   Animation* animation = nullptr;
+  // Per-slot layerTree the channel writers should target. nullptr means the owning PAGFile's
+  // top-level layerTree (set by PAGFile when constructing top-level timelines).
+  PAGLayerTree* layerTree = nullptr;
   int64_t currentTimeUs = 0;
   bool playing = false;
 

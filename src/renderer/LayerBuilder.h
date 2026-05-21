@@ -98,6 +98,24 @@ class LayerBuilder {
    *         layout was not applied.
    */
   static LayerBuildResult BuildWithMap(PAGXDocument* document);
+
+  /**
+   * Builds a top-level layer tree but stops at Composition slot boundaries — Layers whose
+   * `composition` field is non-null produce empty container tgfx layers without recursing into
+   * Composition.layers. The runtime PAGFile uses this entry point and then populates each slot
+   * with an independent PAGComposition build via BuildCompositionSubtree(), keeping per-slot
+   * layerMaps isolated.
+   * @param document The document to build from. Must have had applyLayout() called.
+   */
+  static LayerBuildResult BuildWithSlotsHandedOff(PAGXDocument* document);
+
+  /**
+   * Builds a Composition's child layer subtree into a fresh PAGLayerTree. Used by the runtime
+   * PAGComposition slot to obtain its own per-slot layerMap, masks, and tgfx layer instances.
+   * @param composition The Composition to build. Must reference layers from a document that has
+   *                    had applyLayout() called.
+   */
+  static LayerBuildResult BuildCompositionSubtree(const Composition* composition);
 };
 
 }  // namespace pagx

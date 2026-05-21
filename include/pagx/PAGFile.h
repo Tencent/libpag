@@ -30,6 +30,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+class PAGComposition;
 
 /**
  * PAGFile is the runtime instance of a PAGXDocument. It owns the runtime layer tree, the timeline
@@ -92,6 +93,28 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    */
   float getHeight() const;
 
+  /**
+   * Advances the master clock by deltaMicroseconds and applies the result to the runtime tree.
+   * The master clock drives the default top-level timeline (animations[0]) and every spawned slot
+   * timeline inside Composition slots; non-default top-level timelines are independent and must
+   * be advanced via getTimeline(...) directly.
+   *
+   * Mirrors Rive's artboard.advanceAndApply(dt) idiom: business code typically just calls
+   * file->advance(dt) per frame, then file->draw(surface).
+   */
+  void advance(int64_t deltaMicroseconds);
+
+  /**
+   * Re-applies the default timeline plus every spawned slot timeline at their current times,
+   * without advancing. Useful after notifyChange or when a new PAGSurface is bound.
+   */
+  void apply();
+
+  /**
+   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply().
+   */
+  void advanceAndApply(int64_t deltaMicroseconds);
+
  private:
   PAGFile() = default;
 
@@ -99,11 +122,21 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
   // Evaluates the given animation at the given microsecond time and writes results into the
-  // runtime tree. Called by PAGTimeline::apply().
-  void applyAnimation(Animation* animation, int64_t microseconds, float mix);
+  // supplied per-slot layerTree (or the top-level layerTree when slotLayerTree is null).
+  // Called by PAGTimeline::apply().
+  void applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree, int64_t microseconds,
+                      float mix);
+
+  // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
+  // per-slot layerTree. Used by PAGComposition::Make for slot-spawned timelines. Caller owns the
+  // returned shared_ptr; the file does not register slot timelines into timelinesByAnimation.
+  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, PAGLayerTree* layerTree);
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
+
+  // Composition slots, one per top-level Layer with composition!=null.
+  std::vector<std::unique_ptr<PAGComposition>> compositionSlots = {};
 
   // The runtime layer tree opaque pointer; concrete type lives in PAGFile.cpp to avoid pulling
   // tgfx layer types into the public header.
@@ -112,6 +145,7 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
 
   friend class PAGXDocument;
   friend class PAGTimeline;
+  friend class PAGComposition;
 };
 
 }  // namespace pagx

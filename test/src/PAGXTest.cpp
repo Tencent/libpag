@@ -81,6 +81,7 @@
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
 #include "pagx/runtime/PAGFileInternal.h"
+#include "pagx/runtime/PAGComposition.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
@@ -6238,6 +6239,235 @@ PAGX_TEST(PAGXTest, KeyframeMicrosVsFrameAlignment) {
   auto byMicros = std::get<float>(prop->evaluateAt(500'000, 60.0f));
   auto byFrame = std::get<float>(prop->evaluateAt(30));
   EXPECT_NEAR(byMicros, byFrame, 1.0e-6f);
+}
+
+namespace {
+// Helper for nested-composition tests: builds a Composition with a single child Layer that holds
+// a SolidColor (alpha-target) plus an Animation driving the child's `alpha` channel from 0 to 1.
+// Returns (composition, animationId, childLayer, solidColor).
+struct NestedCompFixture {
+  pagx::Composition* comp = nullptr;
+  std::string animationId;
+  pagx::Layer* childLayer = nullptr;
+  pagx::SolidColor* solid = nullptr;
+};
+
+NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::string& compId,
+                                       const std::string& animId,
+                                       const std::string& childLayerId) {
+  NestedCompFixture fx;
+  fx.comp = doc->makeNode<pagx::Composition>(compId);
+  fx.comp->width = 50;
+  fx.comp->height = 50;
+
+  fx.childLayer = doc->makeNode<pagx::Layer>(childLayerId);
+  fx.childLayer->width = 50;
+  fx.childLayer->height = 50;
+  fx.comp->layers.push_back(fx.childLayer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  fx.childLayer->contents.push_back(rect);
+
+  fx.solid = doc->makeNode<pagx::SolidColor>();
+  fx.solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = fx.solid;
+  fx.childLayer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>(animId);
+  anim->duration = 60;
+  anim->frameRate = 60;
+  fx.comp->animations.push_back(anim);
+  fx.animationId = animId;
+
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = childLayerId;
+  anim->objects.push_back(obj);
+
+  auto* alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  alphaProp->channel = "alpha";
+  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  obj->properties.push_back(alphaProp);
+
+  return fx;
+}
+}  // namespace
+
+/**
+ * Test case: A nested Composition slot with a single AnimationTimeline driver actually drives the
+ * child Layer's alpha channel — the slot's per-slot layerMap is wired through to ChannelRegistry,
+ * and the spawned timeline plays automatically by default.
+ */
+PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->compositionSlots.size(), 1u);
+
+  // Per-slot layerMap should expose the child Layer's tgfx instance — and that instance must
+  // differ from anything stored in the top-level layerTree (top-level has the slot Layer only).
+  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
+  auto childIt = slotTree.layerMap.find(fx.childLayer);
+  ASSERT_TRUE(childIt != slotTree.layerMap.end());
+  auto tgfxChild = childIt->second;
+
+  // Initial state: alpha defaults to 1.0 (tgfx default) until apply runs.
+  EXPECT_FLOAT_EQ(tgfxChild->alpha(), 1.0f);
+
+  // Advance by 30 frames @ 60fps = 500_000 us. Linear keyframe should write alpha = 0.5.
+  file->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+
+  // Advance to the end of the segment (another 500_000 us).
+  file->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxChild->alpha(), 1.0f, 1.0e-3f);
+}
+
+/**
+ * Test case: Two slot Layers referencing the same Composition keep their alpha state independent
+ * because each slot owns its own per-slot layerMap and its own driver-spawned PAGTimeline.
+ *
+ * Setup: slotA starts the timeline at t=0, slotB has its driver paused so its child stays at
+ * the keyframe's start value. After advancing, slotA's child alpha changes; slotB's stays put.
+ */
+PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
+
+  auto slotA = doc->makeNode<pagx::Layer>("slotA");
+  slotA->composition = fx.comp;
+  slotA->width = 50;
+  slotA->height = 50;
+  auto driverA = std::make_unique<pagx::AnimationTimeline>();
+  driverA->animationId = fx.animationId;
+  driverA->playing = true;
+  slotA->timelines.push_back(std::move(driverA));
+  doc->layers.push_back(slotA);
+
+  auto slotB = doc->makeNode<pagx::Layer>("slotB");
+  slotB->composition = fx.comp;
+  slotB->width = 50;
+  slotB->height = 50;
+  auto driverB = std::make_unique<pagx::AnimationTimeline>();
+  driverB->animationId = fx.animationId;
+  driverB->playing = false;  // paused
+  slotB->timelines.push_back(std::move(driverB));
+  doc->layers.push_back(slotB);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_EQ(file->compositionSlots.size(), 2u);
+
+  auto& treeA = file->compositionSlots[0]->mutableLayerTree();
+  auto& treeB = file->compositionSlots[1]->mutableLayerTree();
+  auto tgfxChildA = treeA.layerMap.at(fx.childLayer);
+  auto tgfxChildB = treeB.layerMap.at(fx.childLayer);
+  EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
+
+  // Reset alphas to a known value, then advance. Slot A is playing, slot B is paused.
+  tgfxChildA->setAlpha(1.0f);
+  tgfxChildB->setAlpha(1.0f);
+  file->advanceAndApply(500'000);
+
+  // Slot A's child reflects the half-progress alpha (0.5).
+  EXPECT_NEAR(tgfxChildA->alpha(), 0.5f, 1.0e-3f);
+  // Slot B's child apply still ran (apply is independent of playing state) but the timeline's
+  // currentTime stayed at 0, so the start-of-segment value (alpha=0) is written.
+  EXPECT_NEAR(tgfxChildB->alpha(), 0.0f, 1.0e-3f);
+}
+
+/**
+ * Test case: PAGFile::advance acts as the master clock. Calling it advances the default top-level
+ * timeline and every slot timeline by the same delta, while non-default top-level timelines are
+ * not touched.
+ */
+PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
+
+  // Top-level "main" animation drives a top-level Layer's alpha; this is the master clock.
+  auto bgLayer = doc->makeNode<pagx::Layer>("bg");
+  bgLayer->width = 100;
+  bgLayer->height = 100;
+  doc->layers.push_back(bgLayer);
+
+  auto mainAnim = doc->makeNode<pagx::Animation>("main");
+  mainAnim->duration = 60;
+  mainAnim->frameRate = 60;
+  doc->animations.push_back(mainAnim);
+  auto* mainObj = doc->makeNode<pagx::AnimationObject>();
+  mainObj->target = "bg";
+  mainAnim->objects.push_back(mainObj);
+  auto* mainProp = doc->makeNode<pagx::TypedProperty<float>>();
+  mainProp->channel = "alpha";
+  mainProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  mainProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  mainObj->properties.push_back(mainProp);
+
+  // A non-default top-level animation that should NOT be advanced by the master clock.
+  auto hintAnim = doc->makeNode<pagx::Animation>("hint");
+  hintAnim->duration = 60;
+  hintAnim->frameRate = 60;
+  doc->animations.push_back(hintAnim);
+  auto* hintObj = doc->makeNode<pagx::AnimationObject>();
+  hintObj->target = "bg";
+  hintAnim->objects.push_back(hintObj);
+  auto* hintProp = doc->makeNode<pagx::TypedProperty<float>>();
+  hintProp->channel = "alpha";
+  hintProp->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  hintProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  hintObj->properties.push_back(hintProp);
+
+  // Slot Layer with composition + driver.
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto mainTimeline = file->getTimeline("main");
+  auto hintTimeline = file->getTimeline("hint");
+  ASSERT_TRUE(mainTimeline != nullptr);
+  ASSERT_TRUE(hintTimeline != nullptr);
+  // hint must remain paused (default state); only the master advance call should drive it.
+  EXPECT_FALSE(hintTimeline->isPlaying());
+
+  // Default timeline (master) needs play() to participate in advance(); slot timelines were
+  // started by their drivers' playing=true and stay autonomous.
+  mainTimeline->play();
+  file->advance(500'000);
+
+  // Master clock advanced default (main).
+  EXPECT_EQ(mainTimeline->currentTime(), 500'000);
+  // Master clock left non-default timelines alone.
+  EXPECT_EQ(hintTimeline->currentTime(), 0);
+  // Slot timeline (inside the only slot) advanced too — verify by checking slot child alpha
+  // after apply.
+  file->apply();
+  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
+  auto tgfxChild = slotTree.layerMap.at(fx.childLayer);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 }
 
 }  // namespace pag

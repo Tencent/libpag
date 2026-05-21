@@ -127,6 +127,29 @@ class LayerBuilderContext {
  public:
   LayerBuilderContext() = default;
 
+  void setSlotsHandedOff(bool value) {
+    _slotsHandedOff = value;
+  }
+
+  // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
+  // their own independent layerMap. The returned LayerBuildResult.root is a fresh container layer
+  // populated with the composition's child layers. Per-slot mask resolution still runs on the
+  // returned tree so layer styles, filters, etc. behave the same as the document-wide build.
+  LayerBuildResult buildSubtree(const Composition* comp) {
+    auto root = tgfx::Layer::Make();
+    if (comp != nullptr) {
+      for (const auto& child : comp->layers) {
+        auto childLayer = convertLayer(child);
+        if (childLayer) {
+          root->addChild(childLayer);
+        }
+      }
+      resolvePendingMasks();
+    }
+    _layerTree.root = root;
+    return std::move(_layerTree);
+  }
+
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
     _layerTree.root = root;
@@ -144,8 +167,11 @@ class LayerBuilderContext {
         rootLayer->addChild(childLayer);
       }
     }
+    resolvePendingMasks();
+    return rootLayer;
+  }
 
-    // Apply masks after all layers are built (second pass).
+  void resolvePendingMasks() {
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
       auto it = _layerTree.layerMap.find(maskPagx);
       if (it != _layerTree.layerMap.end()) {
@@ -157,8 +183,7 @@ class LayerBuilderContext {
         layer->setMaskType(maskType);
       }
     }
-
-    return rootLayer;
+    _pendingMasks.clear();
   }
 
  private:
@@ -204,8 +229,16 @@ class LayerBuilderContext {
     if (!comp) {
       return nullptr;
     }
-
+    // Composition slot: create an empty container layer. The runtime PAGComposition is
+    // responsible for populating this slot with its own per-slot layer subtree, so multiple
+    // Layers referencing the same Composition stay independent. When LayerBuilder is invoked
+    // standalone (no PAGFile in play, e.g. from optimizer / cli rendering paths) the slot is
+    // populated immediately with a flat expansion to preserve backward-compatible static
+    // rendering. PAGFile sets _slotsHandedOff before calling Build() to opt out of this path.
     auto containerLayer = tgfx::Layer::Make();
+    if (_slotsHandedOff) {
+      return containerLayer;
+    }
     for (const auto& compLayer : comp->layers) {
       auto childLayer = convertLayer(compLayer);
       if (childLayer) {
@@ -926,6 +959,7 @@ class LayerBuilderContext {
   PAGLayerTree _layerTree = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  bool _slotsHandedOff = false;
 };
 
 // Public API implementation
@@ -958,6 +992,32 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
 
   LayerBuilderContext context;
   return context.buildWithMap(*document);
+}
+
+LayerBuildResult LayerBuilder::BuildWithSlotsHandedOff(PAGXDocument* document) {
+  if (document == nullptr) {
+    return {};
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilder::BuildWithSlotsHandedOff() called before applyLayout(). Call "
+        "document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+  LayerBuilderContext context;
+  context.setSlotsHandedOff(true);
+  return context.buildWithMap(*document);
+}
+
+LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* composition) {
+  if (composition == nullptr) {
+    return {};
+  }
+  LayerBuilderContext context;
+  // Slot's recursive children build their own subtrees independently.
+  context.setSlotsHandedOff(true);
+  return context.buildSubtree(composition);
 }
 
 }  // namespace pagx
