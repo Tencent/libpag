@@ -45,6 +45,14 @@ class ContentView : public QQuickItem {
   virtual ContentViewModel* getViewModel() const = 0;
   RenderThread* getRenderThread() const;
 
+  /// Releases the GPU drawable and shuts down the render thread.
+  /// Called from QML before the Loader switches components, ensuring the drawable
+  /// is released while the item is still attached to the window.
+  /// Note: the same releaseDrawable() effect is also triggered by ~ContentView() and
+  /// itemChange(ItemSceneChange) when the item loses its window, but those fire too
+  /// late for a Loader component switch where RenderThread needs the window context.
+  Q_INVOKABLE void prepareForRemoval();
+
   /**
    * Updates the QSG texture node with the current drawable's texture.
    * Handles both node creation and texture binding.
@@ -67,7 +75,9 @@ class ContentView : public QQuickItem {
   Q_SLOT void onWindowChanged(QQuickWindow* win);
 
   virtual void initDrawable();
+  virtual void releaseDrawable();
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+  void itemChange(ItemChange change, const ItemChangeData& value) override;
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
   // additional work after a resize debounce, such as marking render state dirty.
   virtual void onSizeChangedDelayHandled() {
@@ -77,11 +87,6 @@ class ContentView : public QQuickItem {
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
-  // Timestamp until which geometryChange() should skip starting the resize timer.
-  // This is set by subclasses when they handle size changes immediately
-  // (e.g., during file loading) to prevent the 400ms delayed updateSize()
-  // from causing the rendered image to disappear due to race conditions.
-  qint64 skipResizeTimerUntil = 0;
 };
 
 }  // namespace pag

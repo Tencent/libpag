@@ -34,6 +34,21 @@ enum class VersionResult {
   VersionInfoUnavailable
 };
 
+/// Indicates the privilege level required to install/uninstall a plugin.
+/// Each value represents a distinct privilege model. Do not introduce hybrid values —
+/// callers rely on a binary User-vs-Admin decision.
+enum class PluginPermission {
+  /// The plugin installs to user-writable directories and needs no elevation.
+  User,
+  /// The plugin installs to system directories and requires admin privileges.
+  Admin
+};
+
+struct PluginInfo {
+  QString name;
+  PluginPermission permission;
+};
+
 class PluginInstaller : public QObject {
   Q_OBJECT
 
@@ -68,6 +83,7 @@ class PluginInstaller : public QObject {
   QString getPluginSourcePath(const QString& pluginName) const;
   QString getPluginInstallPath(const QString& pluginName) const;
   QString getPluginFullName(const QString& pluginName) const;
+  PluginPermission getPluginPermission(const QString& pluginName) const;
   int getAeVersionForPath(const QString& aePath) const;
 
   VersionResult getPluginVersionString(const QString& pluginPath, QString& version) const;
@@ -78,6 +94,7 @@ class PluginInstaller : public QObject {
 
   int64_t getPluginVersion(const QString& pluginPath) const;
   QStringList getPluginList() const;
+  static const QList<PluginInfo>& pluginInfoList();
 
   void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
   void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
@@ -90,8 +107,7 @@ class PluginInstaller : public QObject {
 
   void storeViewerPathForPlugin() const;
 
-  bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
-  QString getH264EncoderToolsInstallDir() const;
+  bool copyUserPluginWithRetry(const QString& plugin, int maxRetries = 5) const;
 
   void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
