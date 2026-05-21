@@ -27,6 +27,9 @@
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGFile.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -5426,12 +5429,12 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
 
   auto prop = doc->makeNode<pagx::TypedProperty<float>>();
   prop->channel = "alpha";
-  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Bezier,
-                             pagx::Point{0.42f, 0.0f}, pagx::Point{}});
-  prop->keyframes.push_back({30, 0.5f, pagx::KeyframeInterpolationType::Hold, pagx::Point{},
-                             pagx::Point{0.58f, 1.0f}});
-  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::None, pagx::Point{},
-                             pagx::Point{}});
+  prop->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, pagx::Point{0.42f, 0.0f}, pagx::Point{}});
+  prop->keyframes.push_back(
+      {30, 0.5f, pagx::KeyframeInterpolationType::Hold, pagx::Point{}, pagx::Point{0.58f, 1.0f}});
+  prop->keyframes.push_back(
+      {60, 1.0f, pagx::KeyframeInterpolationType::None, pagx::Point{}, pagx::Point{}});
   object->properties.push_back(prop);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
@@ -5510,6 +5513,137 @@ PAGX_TEST(PAGXTest, TypedPropertyEvaluateAt) {
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(45)), 0.5f);
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(60)), 1.0f);
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(120)), 1.0f);
+}
+
+/**
+ * Test case: PAGFile registers itself with the source document on creation and unregisters on
+ * destruction.
+ */
+PAGX_TEST(PAGXTest, PAGFileLiveFileRegistration) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  EXPECT_TRUE(doc->liveFiles.empty());
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(doc->liveFiles.size(), 1u);
+  EXPECT_EQ(doc->liveFiles[0].lock().get(), file.get());
+
+  file.reset();
+  EXPECT_TRUE(doc->liveFiles.empty() ||
+              (doc->liveFiles.size() == 1u && doc->liveFiles[0].expired()));
+
+  auto file2 = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file2 != nullptr);
+  EXPECT_EQ(file2->getWidth(), 100.0f);
+  EXPECT_EQ(file2->getHeight(), 100.0f);
+}
+
+/**
+ * Test case: PAGFile timeline lookup by name and identity sharing.
+ */
+PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto main = doc->makeNode<pagx::Animation>();
+  main->name = "main";
+  main->duration = 60;
+  main->frameRate = 60;
+  doc->animations.push_back(main);
+
+  auto hint = doc->makeNode<pagx::Animation>();
+  hint->name = "hint";
+  hint->duration = 30;
+  hint->frameRate = 60;
+  doc->animations.push_back(hint);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto names = file->getTimelineNames();
+  ASSERT_EQ(names.size(), 2u);
+  EXPECT_EQ(names[0], "main");
+  EXPECT_EQ(names[1], "hint");
+
+  auto t1 = file->getTimeline("main");
+  auto t1Again = file->getTimeline("main");
+  ASSERT_TRUE(t1 != nullptr);
+  EXPECT_EQ(t1.get(), t1Again.get());
+  EXPECT_EQ(t1->getName(), "main");
+  EXPECT_EQ(t1->getDuration(), 60);
+
+  auto t2 = file->getTimeline("hint");
+  ASSERT_TRUE(t2 != nullptr);
+  EXPECT_NE(t1.get(), t2.get());
+
+  EXPECT_EQ(file->getTimeline("missing"), nullptr);
+
+  auto def = file->getDefaultTimeline();
+  EXPECT_EQ(def.get(), t1.get());
+}
+
+/**
+ * Test case: PAGTimeline play/pause/stop/setTime/advance state machine, including loop modes.
+ */
+PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+
+  auto anim = doc->makeNode<pagx::Animation>();
+  anim->name = "loop";
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(anim);
+
+  auto file = pagx::PAGFile::Make(doc);
+  auto timeline = file->getTimeline("loop");
+  ASSERT_TRUE(timeline != nullptr);
+
+  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.0f);
+
+  EXPECT_FALSE(timeline->advance(0.5f));
+
+  timeline->play();
+  EXPECT_TRUE(timeline->isPlaying());
+  EXPECT_TRUE(timeline->advance(0.5f));
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.5f);
+
+  EXPECT_TRUE(timeline->advance(0.6f));
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.1f);
+
+  timeline->pause();
+  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_FALSE(timeline->advance(0.2f));
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.1f);
+
+  timeline->setTime(0.4f);
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.4f);
+
+  timeline->stop();
+  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_FLOAT_EQ(timeline->getTime(), 0.0f);
+
+  auto onceAnim = doc->makeNode<pagx::Animation>();
+  onceAnim->name = "once";
+  onceAnim->duration = 60;
+  onceAnim->frameRate = 60;
+  onceAnim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(onceAnim);
+
+  auto onceTimeline = file->getTimeline("once");
+  onceTimeline->play();
+  EXPECT_TRUE(onceTimeline->advance(2.0f));
+  EXPECT_FLOAT_EQ(onceTimeline->getTime(), 1.0f);
+  EXPECT_FALSE(onceTimeline->isPlaying());
+}
+
+/**
+ * Test case: PAGSurface skeleton currently returns nullptr for offscreen creation (PR5).
+ */
+PAGX_TEST(PAGXTest, PAGSurfaceSkeleton) {
+  auto surface = pagx::PAGSurface::MakeOffscreen(64, 64);
+  EXPECT_EQ(surface, nullptr);
 }
 
 }  // namespace pag

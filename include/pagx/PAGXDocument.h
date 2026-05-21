@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/nodes/Layer.h"
@@ -30,6 +31,7 @@ namespace pagx {
 
 class Animation;
 class LayoutContext;
+class PAGFile;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -165,6 +167,16 @@ class PAGXDocument : public Node {
    * layout performs runtime shaping instead of reusing stale embedded data.
    */
   void clearEmbed();
+  
+  /**
+   * Notifies all live PAGFile instances created from this document that the given nodes have
+   * changed. PAGFile instances will rebuild their runtime state for the affected nodes on the next
+   * draw. Callers must invoke this method after directly mutating fields on document nodes;
+   * otherwise the changes will not be reflected by any rendering pipeline.
+   * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
+   * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
+   */
+  void notifyChange(const std::vector<Node*>& dirtyNodes);
 
   NodeType nodeType() const override {
     return NodeType::Document;
@@ -177,13 +189,28 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
+  // PAGFile lifecycle hooks (called from PAGFile::Make / ~PAGFile).
+  void registerLiveFile(const std::shared_ptr<PAGFile>& file,
+                        const std::vector<Node*>& referencedNodes);
+  void unregisterLiveFile(PAGFile* file);
+
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
+  // Live PAGFile instances created from this document. Stored as weak_ptr so that the document
+  // does not keep PAGFile alive; expired entries are pruned during notifyChange.
+  std::vector<std::weak_ptr<PAGFile>> liveFiles = {};
+
+  // Reverse index from node to the PAGFile instances that reference it. Raw pointers because the
+  // owning weak_ptr lives in liveFiles; PAGFile must unregister itself on destruction to keep this
+  // map free of dangling pointers.
+  std::unordered_map<Node*, std::vector<PAGFile*>> nodeToFiles = {};
+
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
+  friend class PAGFile;
 };
 
 }  // namespace pagx

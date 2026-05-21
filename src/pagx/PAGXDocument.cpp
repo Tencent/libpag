@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include <algorithm>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/PAGFile.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -151,6 +153,56 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
+}
+
+void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
+  if (dirtyNodes.empty()) {
+    return;
+  }
+  // Prune expired weak_ptr entries to keep liveFiles bounded.
+  liveFiles.erase(std::remove_if(liveFiles.begin(), liveFiles.end(),
+                                 [](const std::weak_ptr<PAGFile>& weak) { return weak.expired(); }),
+                  liveFiles.end());
+  // Dispatch to PAGFile::onNodesChanged via nodeToFiles. Implementation lives in PAGFile.cpp to
+  // avoid pulling PAGFile.h into the document header.
+  // TODO(PR11): wire to PAGFile::onNodesChanged once that method is implemented.
+  (void)dirtyNodes;
+}
+
+void PAGXDocument::registerLiveFile(const std::shared_ptr<PAGFile>& file,
+                                    const std::vector<Node*>& referencedNodes) {
+  if (file == nullptr) {
+    return;
+  }
+  liveFiles.emplace_back(file);
+  auto* raw = file.get();
+  for (auto* node : referencedNodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    nodeToFiles[node].push_back(raw);
+  }
+}
+
+void PAGXDocument::unregisterLiveFile(PAGFile* file) {
+  if (file == nullptr) {
+    return;
+  }
+  liveFiles.erase(std::remove_if(liveFiles.begin(), liveFiles.end(),
+                                 [file](const std::weak_ptr<PAGFile>& weak) {
+                                   auto locked = weak.lock();
+                                   return weak.expired() || locked.get() == file;
+                                 }),
+                  liveFiles.end());
+  for (auto it = nodeToFiles.begin(); it != nodeToFiles.end();) {
+    auto& list = it->second;
+    list.erase(std::remove(list.begin(), list.end(), file), list.end());
+    if (list.empty()) {
+      it = nodeToFiles.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 }  // namespace pagx
