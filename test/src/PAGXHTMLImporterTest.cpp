@@ -760,22 +760,38 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedLayoutPropertiesEmitWarnings) {
 PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="outline:1px solid red;clip-path:circle(20px);transform-origin:center;
+      <div style="outline:1px solid red;clip-path:circle(20px);
                   background-size:cover;width:50px;height:50px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  bool outlineWarn = false, clipWarn = false, originWarn = false, bgSizeWarn = false;
+  bool outlineWarn = false, clipWarn = false, bgSizeWarn = false;
   for (const auto& msg : doc->errors) {
     if (msg.find("outline") != std::string::npos) outlineWarn = true;
     if (msg.find("clip-path") != std::string::npos) clipWarn = true;
-    if (msg.find("transform-origin") != std::string::npos) originWarn = true;
     if (msg.find("background-size") != std::string::npos) bgSizeWarn = true;
   }
   EXPECT_TRUE(outlineWarn);
   EXPECT_TRUE(clipWarn);
-  EXPECT_TRUE(originWarn);
   EXPECT_TRUE(bgSizeWarn);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginWarnsWithTransform) {
+  // `transform-origin` is silently accepted on its own (no transform makes it a no-op);
+  // when paired with a transform we keep the default `50% 50%` (matching CSS) but warn
+  // for any other origin keyword/length so authors know the pivot is approximated.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <h1 style="transform:skewX(-5deg);transform-origin:0 0;
+                 width:200px;height:60px">Hello</h1>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool originWarn = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("transform-origin") != std::string::npos) originWarn = true;
+  }
+  EXPECT_TRUE(originWarn);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, DisallowedTextPropertiesEmitWarnings) {
@@ -2237,11 +2253,14 @@ PAG_TEST(PAGXHTMLImporterTest, RawGridTemplateWarns) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawTransformWarns) {
+  // Compound transform chains aren't decomposed by the importer today; they fall through
+  // the subset transformer with a diagnostic. Single-function forms (skewX/rotate/scale/...)
+  // map onto the TextBox transform fields and are silent — see RawSingleTransformIsAccepted.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="transform:rotate(45deg);width:50px;height:50px"></div>
+      <div style="transform:rotate(45deg) translate(10px);width:50px;height:50px"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -2251,6 +2270,28 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformWarns) {
     if (msg.find("transform") != std::string::npos) warned = true;
   }
   EXPECT_TRUE(warned);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawSingleTransformIsAccepted) {
+  // Single-function `transform` forms in the supported subset (skewX/skewY/rotate/scale[X|Y]/
+  // translate[X|Y]) round-trip silently — they become TextBox skew/rotation/scale fields on
+  // text leaves. Non-text elements still drop the transform with a diagnostic because Layer
+  // has no transform fields, but the diagnostic in that case complains about the host, not
+  // the property; here we just assert that no generic "transform not supported" warning is
+  // emitted for the rotate(45deg) form.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <h1 style="transform:skewX(-5deg);width:200px;height:60px">Hello</h1>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("transform '"), std::string::npos)
+        << "Unexpected transform diagnostic: " << msg;
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusDropped) {

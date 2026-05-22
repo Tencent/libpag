@@ -20,6 +20,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <vector>
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
@@ -28,7 +30,54 @@ namespace pagx {
 
 using namespace pagx::html;
 
-namespace {}  // namespace
+namespace {
+
+// Splits a CSS function argument list (the slice between `(` and `)`) on top-level commas,
+// trimming each token. Used by `ParseTransformFunction` so multi-arg forms like
+// `scale(1.5, 0.75)` and `translate(10px, 20px)` round-trip without a heavier parser.
+std::vector<std::string> SplitCommaArgs(const std::string& args) {
+  std::vector<std::string> out;
+  size_t start = 0;
+  for (size_t i = 0; i <= args.size(); ++i) {
+    if (i == args.size() || args[i] == ',') {
+      out.push_back(Trim(args.substr(start, i - start)));
+      start = i + 1;
+    }
+  }
+  return out;
+}
+
+// Pulls the function name and the argument-list slice from "fn(args)" form. The CSS subset
+// transformer in HTMLSubsetPropertyTable already rejects compound chains and `matrix(...)`
+// before we see the value, but the resolver runs even when subset transformation is bypassed
+// (e.g. `HTMLImporter::Options::autoNormalize == false`), so we re-check the shape here:
+// the FIRST `)` must coincide with the LAST `)` and trail only whitespace, otherwise the
+// value is a compound chain and is rejected.
+bool SplitTransformFunction(const std::string& trimmed, std::string& fnName,
+                            std::string& argsBody) {
+  size_t openParen = trimmed.find('(');
+  if (openParen == std::string::npos || openParen == 0) return false;
+  size_t closeParen = trimmed.find_last_of(')');
+  if (closeParen == std::string::npos || closeParen <= openParen) return false;
+  if (trimmed.find(')') != closeParen) return false;
+  if (!Trim(trimmed.substr(closeParen + 1)).empty()) return false;
+  fnName = ToLower(Trim(trimmed.substr(0, openParen)));
+  argsBody = Trim(trimmed.substr(openParen + 1, closeParen - openParen - 1));
+  return !fnName.empty();
+}
+
+bool ParseScalarFloat(const std::string& token, float& out) {
+  std::string trimmed = Trim(token);
+  if (trimmed.empty()) return false;
+  char* end = nullptr;
+  float v = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str()) return false;
+  if (!Trim(end).empty()) return false;
+  out = v;
+  return true;
+}
+
+}  // namespace
 
 void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
@@ -261,6 +310,7 @@ HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& 
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
   parseBoxVisuals(box, props);
+  parseBoxTransform(box, props);
   return box;
 }
 
@@ -380,7 +430,6 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
   if (!LookupProperty(props, "grid-template-rows").empty()) {
     warn("html: grid layout not supported");
   }
-  if (!LookupProperty(props, "transform").empty()) warn("html: transform not supported");
 }
 
 void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
@@ -521,14 +570,132 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* kVisualsDisallowed[] = {
-      "background-size", "background-repeat", "background-position", "outline", "transform-origin",
-      "perspective",     "clip-path"};
+  static const char* kVisualsDisallowed[] = {"background-size",     "background-repeat",
+                                             "background-position", "outline",
+                                             "perspective",         "clip-path"};
   for (const auto* prop : kVisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
+}
+
+void HTMLParserContext::parseBoxTransform(
+    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+  std::string transform = Trim(LookupProperty(props, "transform"));
+  if (transform.empty()) return;
+
+  std::string fn;
+  std::string args;
+  if (!SplitTransformFunction(transform, fn, args)) {
+    warn("html: transform '" + transform + "' is malformed; ignored");
+    return;
+  }
+  auto parts = SplitCommaArgs(args);
+  HTMLTransform parsed = {};
+
+  if (fn == "skewx") {
+    if (parts.size() != 1) {
+      warn("html: skewX expects 1 argument; got '" + transform + "'");
+      return;
+    }
+    parsed.skew = -ParseAngle(parts[0]);
+    parsed.skewAxis = 0.0f;
+    parsed.valid = true;
+  } else if (fn == "skewy") {
+    if (parts.size() != 1) {
+      warn("html: skewY expects 1 argument; got '" + transform + "'");
+      return;
+    }
+    parsed.skew = ParseAngle(parts[0]);
+    parsed.skewAxis = 90.0f;
+    parsed.valid = true;
+  } else if (fn == "rotate") {
+    if (parts.size() != 1) {
+      warn("html: rotate expects 1 argument; got '" + transform + "'");
+      return;
+    }
+    parsed.rotation = ParseAngle(parts[0]);
+    parsed.valid = true;
+  } else if (fn == "scale") {
+    float sx = 1.0f;
+    float sy = 1.0f;
+    if (parts.size() == 1 && ParseScalarFloat(parts[0], sx)) {
+      sy = sx;
+    } else if (parts.size() == 2 && ParseScalarFloat(parts[0], sx) &&
+               ParseScalarFloat(parts[1], sy)) {
+      // sx/sy already filled.
+    } else {
+      warn("html: scale expects 1 or 2 numeric arguments; got '" + transform + "'");
+      return;
+    }
+    parsed.scaleX = sx;
+    parsed.scaleY = sy;
+    parsed.valid = true;
+  } else if (fn == "scalex" || fn == "scaley") {
+    float v = 1.0f;
+    if (parts.size() != 1 || !ParseScalarFloat(parts[0], v)) {
+      warn("html: " + fn + " expects 1 numeric argument; got '" + transform + "'");
+      return;
+    }
+    if (fn == "scalex") {
+      parsed.scaleX = v;
+    } else {
+      parsed.scaleY = v;
+    }
+    parsed.valid = true;
+  } else if (fn == "translate") {
+    if (parts.empty() || parts.size() > 2) {
+      warn("html: translate expects 1 or 2 length arguments; got '" + transform + "'");
+      return;
+    }
+    float tx = parsePxLength(parts[0]);
+    if (std::isnan(tx)) {
+      warn("html: translate first argument '" + parts[0] + "' is not a px length; ignored");
+      return;
+    }
+    float ty = 0.0f;
+    if (parts.size() == 2) {
+      ty = parsePxLength(parts[1]);
+      if (std::isnan(ty)) {
+        warn("html: translate second argument '" + parts[1] + "' is not a px length; ignored");
+        return;
+      }
+    }
+    parsed.translateX = tx;
+    parsed.translateY = ty;
+    parsed.valid = true;
+  } else if (fn == "translatex" || fn == "translatey") {
+    if (parts.size() != 1) {
+      warn("html: " + fn + " expects 1 length argument; got '" + transform + "'");
+      return;
+    }
+    float v = parsePxLength(parts[0]);
+    if (std::isnan(v)) {
+      warn("html: " + fn + " argument '" + parts[0] + "' is not a px length; ignored");
+      return;
+    }
+    if (fn == "translatex") {
+      parsed.translateX = v;
+    } else {
+      parsed.translateY = v;
+    }
+    parsed.valid = true;
+  } else {
+    warn("html: transform function '" + fn + "' is not in the supported subset");
+    return;
+  }
+
+  // The current importer only honours `transform-origin: 50% 50%` (the CSS default), which
+  // matches the inline output emitted by the html-snapshot tool. Anything else would require
+  // the resolver to translate the origin into a TextBox `anchor` offset. Warn so authors of
+  // hand-written subset HTML notice.
+  std::string origin = ToLower(Trim(LookupProperty(props, "transform-origin")));
+  if (!origin.empty() && origin != "50% 50%" && origin != "center" && origin != "center center") {
+    warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
+  }
+
+  box.transform = parsed;
 }
 
 }  // namespace pagx

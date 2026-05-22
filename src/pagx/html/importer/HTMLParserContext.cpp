@@ -581,8 +581,14 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
   std::string wm = ToLower(Trim(inherited.writingMode));
   bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
+  // CSS `transform` is reproduced by setting Group/TextBox transform fields, which only
+  // exist on TextBox (inherited from Group) — not on the surrounding Layer. So a transformed
+  // text leaf must always synthesise an explicit TextBox even when no other property would
+  // otherwise have required one.
+  bool hasTransform = box.transform.valid;
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
-                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap || isVertical;
+                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
+                      isVertical || hasTransform;
 
   auto outer = _document->makeNode<Layer>();
   applySizeAndPosition(outer, box);
@@ -634,6 +640,33 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     }
     if (isVertical) {
       textBox->writingMode = WritingMode::Vertical;
+    }
+    if (hasTransform) {
+      textBox->skew = box.transform.skew;
+      textBox->skewAxis = box.transform.skewAxis;
+      textBox->rotation = box.transform.rotation;
+      textBox->scale = Point{box.transform.scaleX, box.transform.scaleY};
+      // PAGX `Group::getMatrix()` applies `T(renderPos) · R · Skew · S · T(-anchor)`. Note that
+      // the renderer reads the translation from `renderPosition()` (i.e. `layoutBounds().{x,y}`),
+      // not from the authored `position` field — see `LayerBuilder::convertGroup`. To reproduce
+      // CSS's `transform-origin: 50% 50%` (centre stays fixed, content pivots around it) we
+      // therefore need both `anchor = (W/2, H/2)` and `layoutBounds.x/y = (W/2, H/2)`. We pin
+      // the latter via `left`/`top` so PerformConstraintLayout takes the constrained branch and
+      // computes layoutBounds.x/y from those values rather than from `preferredX/Y`. Setting
+      // `position` directly is insufficient because the renderer ignores it. CSS `translate(tx,
+      // ty)` is folded into the `left`/`top` offsets so the same anchor + position relationship
+      // still holds (anchor unchanged, render position shifted by (tx, ty)).
+      if (std::isnan(box.widthPx) || std::isnan(box.heightPx)) {
+        warn("html: transform on text leaf '<" + element->name +
+             ">' without explicit width/height; pivot falls back to top-left and may differ "
+             "from CSS transform-origin: 50% 50%");
+      } else {
+        float halfW = box.widthPx * 0.5f;
+        float halfH = box.heightPx * 0.5f;
+        textBox->anchor = Point{halfW, halfH};
+        textBox->left = halfW + box.transform.translateX;
+        textBox->top = halfH + box.transform.translateY;
+      }
     }
     for (size_t i = 0; i < fragments.size(); i++) {
       const auto& f = fragments[i];

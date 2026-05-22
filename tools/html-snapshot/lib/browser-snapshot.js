@@ -592,6 +592,41 @@ function transformMatrix(computed) {
   return new DOMMatrix(t);
 }
 
+// Read the inline `transform` and `transform-origin` declarations off an
+// element. Returns `null` when no inline transform is set; otherwise returns
+// the original CSS strings preserved verbatim so a downstream Chromium render
+// of the subset HTML reproduces the same visual skew/rotate, and PAGX's
+// importer can re-map the function names onto Group/TextBox transform fields.
+// Computed style is intentionally not consulted here: it always returns a
+// `matrix(...)` form, which is harder to map back to discrete skewX/rotate/
+// scale/translate operations than the source function strings.
+function readInlineTransform(el) {
+  if (!el || !el.style) return null;
+  const t = (el.style.transform || '').trim();
+  if (!t || t === 'none') return null;
+  const o = (el.style.transformOrigin || '').trim();
+  return { transform: t, transformOrigin: o };
+}
+
+// Run `fn` with the element's inline transform temporarily cleared, then
+// restore the original declarations. Used by the text path to obtain
+// pre-transform `getBoundingClientRect()` / `Range.getClientRects()`
+// measurements so the geometry handed to PAGX matches the unrotated layout
+// the TextBox node will reproduce after applying its own skew/rotation/scale.
+function withStrippedTransform(el, fn) {
+  if (!el || !el.style) return fn();
+  const savedT = el.style.transform;
+  const savedO = el.style.transformOrigin;
+  el.style.transform = 'none';
+  if (savedO) el.style.transformOrigin = '';
+  try {
+    return fn();
+  } finally {
+    el.style.transform = savedT;
+    if (savedO) el.style.transformOrigin = savedO;
+  }
+}
+
 // Detect the classic "0×0 element + asymmetric borders to paint a triangle"
 // pattern. The CSS rules look like:
 //   width: 0; height: 0;
@@ -1311,6 +1346,57 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     const wrapperStyle = joinStyles(boxStyle, innerLayout);
     return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
+
+  // Inline `transform` on the host (e.g. `<h1 style="transform: skewX(-5deg)">`)
+  // re-shapes its bounding rect — `getBoundingClientRect()` and the inner
+  // `Range.getClientRects()` both return post-transform geometry — but the
+  // PAGX subset has no `transform` property on Layer / generic boxes. When the
+  // text leaf carries a transform we therefore measure under
+  // `withStrippedTransform` so the wrapper / inner spans capture the
+  // unrotated layout, then attach the original transform string to the inner
+  // <span> (the actual textLeaf the importer recognises) so PAGX maps the
+  // function back onto the TextBox's own skew/rotation/scale fields. Putting
+  // the declaration on the outer wrapper would have left the importer's
+  // textLeaf path unaware of it (the wrapper is treated as a container, and
+  // PAGX Layer has no transform fields). Multi-line transforms degrade
+  // gracefully: the per-line spans would each rotate around their own
+  // centre instead of the host's, so we drop the transform with a warning.
+  const inlineTransform = readInlineTransform(el);
+  if (inlineTransform) {
+    let preRect = rect;
+    let preSpans = [];
+    withStrippedTransform(el, () => {
+      preRect = el.getBoundingClientRect();
+      const tn = firstTextNodeChild(el);
+      preSpans = tn ? emitTextSpans(tn, paddingBoxOrigin(preRect, computed), computed) : [];
+    });
+    const preLeft = preRect.left - parentRect.left;
+    const preTop = preRect.top - parentRect.top;
+    const preBoxStyle = buildStyle(preLeft, preTop, preRect.width, preRect.height, computed, {
+      box: true, ...opts,
+    });
+    const preOverlays = borderOverlayHTML(computed, preRect.width, preRect.height).join('');
+    if (preSpans.length === 1) {
+      let transformDecl = `transform: ${inlineTransform.transform}`;
+      if (inlineTransform.transformOrigin) {
+        transformDecl += `; transform-origin: ${inlineTransform.transformOrigin}`;
+      }
+      // Inject the transform into the single line span. emitTextSpans returns a fully
+      // formed `<span style="...">text</span>`; insert the declaration before the closing
+      // quote so the existing styles are preserved verbatim (joinStyles can't be reused
+      // here without re-parsing the span markup).
+      const spanWithTransform = preSpans[0].replace(
+        /style="([^"]*)"/,
+        (_, s) => `style="${s.replace(/;\s*$/, '')}; ${transformDecl}"`);
+      return `<div style="${preBoxStyle}">${spanWithTransform}${preOverlays}</div>`;
+    }
+    // Multi-line: emitting per-line spans each carrying the same transform would
+    // pivot every line around its own centre, not the host's. PAGX has no model
+    // for that today; degrade by dropping the transform with a diagnostic-friendly
+    // attribute the importer will warn about.
+    return `<div style="${preBoxStyle}" data-pagx-transform-dropped="${escapeHtml(inlineTransform.transform)}">${preSpans.join('')}${preOverlays}</div>`;
+  }
+
   const textNode = firstTextNodeChild(el);
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
@@ -1812,6 +1898,8 @@ const HELPER_FNS = [
   colorAlpha,
   transformOriginXY,
   transformMatrix,
+  readInlineTransform,
+  withStrippedTransform,
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,

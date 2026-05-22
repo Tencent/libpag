@@ -181,6 +181,8 @@ class HTMLParserContext {
                       const std::unordered_map<std::string, std::string>& props);
   void parseBoxVisuals(HTMLBoxAttributes& box,
                        const std::unordered_map<std::string, std::string>& props);
+  void parseBoxTransform(HTMLBoxAttributes& box,
+                         const std::unordered_map<std::string, std::string>& props);
 
   HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
                                       const HTMLInheritedStyle& parent);

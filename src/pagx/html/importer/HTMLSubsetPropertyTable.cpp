@@ -295,6 +295,65 @@ std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTr
   return Trim(value);
 }
 
+// CSS `transform` is mapped onto the TextBox / Group transform fields (skew,
+// skewAxis, rotation, scale, position) by HTMLStyleResolver. Only the simple
+// single-function forms below are accepted; compound chains like
+// `skewX(-5deg) rotate(10deg)` and the catch-all `matrix(...)` form would
+// require a 2x2 matrix decomposition that the importer does not currently
+// implement, so they are dropped with a warning.
+std::string TransformTransform(const std::string& value, const PropertyContext&,
+                               HTMLTransformContext& diags) {
+  std::string trimmed = Trim(value);
+  if (trimmed.empty()) return std::string();
+  std::string lc = ToLower(trimmed);
+  if (lc == "none") return std::string();
+  size_t openParen = trimmed.find('(');
+  if (openParen == std::string::npos || openParen == 0) {
+    return DropProperty("transform", value, "is not a recognised function form", diags);
+  }
+  size_t closeParen = trimmed.find_last_of(')');
+  if (closeParen == std::string::npos || closeParen <= openParen) {
+    return DropProperty("transform", value, "is malformed", diags);
+  }
+  // The argument body lives between the FIRST `(` and its matching `)`. If anything other
+  // than whitespace appears outside that span (either before the function name, between
+  // the function call and the closing `)`, or after the closing `)`) the value is a
+  // compound chain or contains nested calls — neither is supported in the single-function
+  // subset, so drop with a diagnostic.
+  size_t firstClose = trimmed.find(')');
+  if (firstClose != closeParen) {
+    return DropProperty("transform", value,
+                        "compound transforms are not supported; use a single function "
+                        "(skewX/skewY/rotate/scale/translate)",
+                        diags);
+  }
+  std::string trailing = Trim(trimmed.substr(closeParen + 1));
+  if (!trailing.empty()) {
+    return DropProperty("transform", value,
+                        "compound transforms are not supported; use a single function "
+                        "(skewX/skewY/rotate/scale/translate)",
+                        diags);
+  }
+  std::string fn = ToLower(Trim(trimmed.substr(0, openParen)));
+  if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
+      fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey") {
+    return trimmed;
+  }
+  return DropProperty("transform", value,
+                      "is not in the supported function set "
+                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y])",
+                      diags);
+}
+
+// `transform-origin` is forwarded verbatim. The downstream resolver only
+// understands the default "50% 50%" form (the typical inline output) and
+// warns when it sees something else, so the table-level transform is a
+// straight pass-through.
+std::string TransformTransformOrigin(const std::string& value, const PropertyContext&,
+                                     HTMLTransformContext&) {
+  return Trim(value);
+}
+
 // ------------------------ Table population helpers -------------------------------------------
 
 void AddKeep(std::unordered_map<std::string, PropertyHandler>& table, const char* name) {
@@ -382,8 +441,12 @@ std::unordered_map<std::string, PropertyHandler> BuildTable() {
   AddDrop(t, "margin-right", "is not in the subset; use padding/gap/flex instead");
   AddDrop(t, "margin-bottom", "is not in the subset; use padding/gap/flex instead");
   AddDrop(t, "margin-left", "is not in the subset; use padding/gap/flex instead");
-  AddDrop(t, "transform", "is not in the subset");
-  AddDrop(t, "transform-origin", "is not in the subset");
+  // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the function
+  // back onto the TextBox / Group transform fields (skew, skewAxis, rotation, scale, position).
+  // The handler enforces the supported single-function subset; compound chains and matrix(...)
+  // forms are dropped with a diagnostic.
+  AddTransform(t, "transform", &TransformTransform);
+  AddTransform(t, "transform-origin", &TransformTransformOrigin);
   AddDrop(t, "perspective", "is not in the subset");
   AddDrop(t, "clip-path", "is not in the subset");
   AddDrop(t, "outline", "is not in the subset");

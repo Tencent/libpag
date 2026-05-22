@@ -193,11 +193,29 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginIsDroppedWithDiagnostic) {
   EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, TransformIsDropped) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SupportedTransformIsKept) {
+  // Single-function `transform` forms in the supported subset (skewX/skewY/rotate/scale[X|Y]/
+  // translate[X|Y]) are forwarded untouched; the resolver later maps them onto the TextBox's
+  // transform fields. Earlier the subset transformer dropped every `transform` declaration
+  // unconditionally because Layer has no transform model, and text leaves had no way to
+  // honour skew/rotate either.
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="transform: rotate(45deg)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "transform: rotate(45deg)"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedTransformIsDropped) {
+  // Compound chains and `matrix(...)` would need 2x2 matrix decomposition the importer
+  // doesn't implement; they're dropped with a diagnostic rather than passed through and
+  // mis-applied later.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="transform: rotate(45deg) translate(10px)"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
   EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "transform"));

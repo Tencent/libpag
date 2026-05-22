@@ -97,6 +97,26 @@ struct HTMLInheritedStyle {
 };
 
 /**
+ * Resolved CSS `transform` for a single HTML element. Populated when the inline `transform`
+ * declaration uses one of the supported single-function forms (skewX/skewY/rotate/scale[X|Y]/
+ * translate[X|Y]); compound chains and `matrix(...)` are dropped earlier in the subset
+ * transformer. Values are pre-mapped onto the corresponding Group/TextBox fields, so the
+ * importer can apply them verbatim without re-parsing the CSS function string. `valid` is
+ * false when no usable transform was set; in that case all numeric members keep their
+ * defaults (skew/rotation/translate = 0; scale = 1).
+ */
+struct HTMLTransform {
+  bool valid = false;
+  float skew = 0.0f;        // pagx skew (deg); CSS skewX(α) -> -α; CSS skewY(α) -> α.
+  float skewAxis = 0.0f;    // pagx skewAxis (deg); 0 for skewX, 90 for skewY.
+  float rotation = 0.0f;    // pagx rotation (deg); from CSS rotate(α).
+  float scaleX = 1.0f;      // pagx scale.x; from CSS scale*().
+  float scaleY = 1.0f;      // pagx scale.y; from CSS scale*().
+  float translateX = 0.0f;  // CSS translate*().x in px; folded into Layer left/top.
+  float translateY = 0.0f;  // CSS translate*().y in px; folded into Layer left/top.
+};
+
+/**
  * Resolved box-model attributes for a single HTML element. Anything left as NaN / empty
  * is "not specified" and falls back to PAGX defaults (which mirror CSS defaults for the
  * accepted subset).
@@ -158,6 +178,12 @@ struct HTMLBoxAttributes {
   // `<img>`). Empty means "not set" and should fall back to the CSS default
   // `fill`, which corresponds to PAGX `ScaleMode::Stretch`.
   std::string objectFit = {};
+
+  // Inline `transform` mapped to the TextBox / Group transform fields. Currently the
+  // importer only honours `valid == true` for text leaves (where the resolved fields
+  // get written onto the synthesised TextBox); on non-text elements the transform is
+  // dropped with a diagnostic at apply time because Layer has no skew/rotation fields.
+  HTMLTransform transform = {};
 };
 
 }  // namespace pagx
