@@ -31,6 +31,17 @@ function makeFail(prefix) {
   };
 }
 
+// Extract a one-line message from any thrown value. Centralised because the
+// `err && err.message ? err.message : err` pattern was repeated at every
+// catch site that wanted to log a reason without a stack trace. Treats
+// non-Error throws (strings, plain objects, undefined) gracefully — falls
+// back to `String(err)` so `undefined` becomes `'undefined'` rather than
+// an empty trailing colon in the log.
+function errMessage(err) {
+  if (err && typeof err.message === 'string' && err.message) return err.message;
+  return String(err);
+}
+
 // Convert a flag's argument to a number, validating it survives parsing and
 // is at or above `min`. Without this, `--viewport-width foo` would silently
 // send NaN to puppeteer's setViewport. Used for both strictly-positive
@@ -238,4 +249,4 @@ Options:
                              installed).`);
 }
 
-module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, LOG_PREFIX };
+module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, errMessage, LOG_PREFIX };
