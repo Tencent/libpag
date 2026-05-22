@@ -23,7 +23,12 @@
 const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
-const pixelmatch = require('pixelmatch');
+// pixelmatch v7+ is ESM-only (`export default`). Under Node's ESM-from-CJS
+// `require()` interop the module resolves to a namespace object whose default
+// export is the function, so `require('pixelmatch')` itself is not callable.
+// Unwrap defensively so both shapes (legacy CJS and the v7+ namespace) work.
+const pixelmatchMod = require('pixelmatch');
+const pixelmatch = typeof pixelmatchMod === 'function' ? pixelmatchMod : pixelmatchMod.default;
 
 function loadPng(filePath) {
   const data = fs.readFileSync(filePath);
