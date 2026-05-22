@@ -94,6 +94,23 @@ bool IsItalicCssStyle(const std::string& cssFontStyle) {
   return s == "italic" || s == "oblique";
 }
 
+// Maps a single weight keyword token (already lowercased and trimmed) to a numeric weight.
+// Recognises both PAGX keywords (thin/extralight/light/regular/medium/semibold/bold/extrabold/
+// black) and a handful of vendor aliases (book, demi, heavy, ultra). Returns 0 for unknown
+// tokens so callers can fall through to numeric parsing.
+int WeightKeywordToNumeric(const std::string& token) {
+  if (token == "thin" || token == "hairline") return 100;
+  if (token == "extralight" || token == "ultralight") return 200;
+  if (token == "light") return 300;
+  if (token == "regular" || token == "normal" || token == "book") return 400;
+  if (token == "medium") return 500;
+  if (token == "semibold" || token == "demibold" || token == "demi") return 600;
+  if (token == "bold") return 700;
+  if (token == "extrabold" || token == "ultrabold") return 800;
+  if (token == "black" || token == "heavy" || token == "ultra") return 900;
+  return 0;
+}
+
 }  // namespace
 
 std::string ResolveFontStyleName(const std::string& cssFontWeight,
@@ -111,6 +128,55 @@ std::string ResolveFontStyleName(const std::string& cssFontWeight,
     return "Italic";
   }
   return std::string();
+}
+
+ParsedFontStyle ParseFontStyleName(const std::string& fontStyleName) {
+  ParsedFontStyle out;
+  bool sawWeightToken = false;
+  size_t pos = 0;
+  while (pos < fontStyleName.size()) {
+    while (pos < fontStyleName.size() &&
+           std::isspace(static_cast<unsigned char>(fontStyleName[pos]))) {
+      ++pos;
+    }
+    size_t end = pos;
+    while (end < fontStyleName.size() &&
+           !std::isspace(static_cast<unsigned char>(fontStyleName[end]))) {
+      ++end;
+    }
+    if (end == pos) {
+      break;
+    }
+    std::string token = ToLowerAscii(fontStyleName.substr(pos, end - pos));
+    pos = end;
+
+    if (token == "italic" || token == "oblique") {
+      out.italic = true;
+      continue;
+    }
+    int weight = WeightKeywordToNumeric(token);
+    if (weight > 0) {
+      out.weight = weight;
+      sawWeightToken = true;
+      continue;
+    }
+    char* numericEnd = nullptr;
+    long n = std::strtol(token.c_str(), &numericEnd, 10);
+    if (numericEnd != token.c_str() && *numericEnd == '\0' && n > 0) {
+      if (n < 100) n = 100;
+      if (n > 900) n = 900;
+      out.weight = static_cast<int>(n);
+      sawWeightToken = true;
+      continue;
+    }
+    // Unknown token: ignore. Common on macOS where CTFontCopyName may return localised
+    // labels or compound names ("W4", "Pro" etc.); leaving the weight at its current value
+    // is safer than guessing.
+  }
+  if (!sawWeightToken) {
+    out.weight = 400;
+  }
+  return out;
 }
 
 }  // namespace pagx

@@ -36,4 +36,21 @@ namespace pagx {
 //   ("normal", "italic") -> "Italic"
 std::string ResolveFontStyleName(const std::string& cssFontWeight, const std::string& cssFontStyle);
 
+// Parsed view of a PAGX/CSS font-style label.
+struct ParsedFontStyle {
+  // Numeric weight on the CSS scale (100..900). 400 means Regular when the input did not
+  // mention a weight token.
+  int weight = 400;
+  // True when the input contains `italic` or `oblique` tokens.
+  bool italic = false;
+};
+
+// Parses a PAGX `fontStyle` attribute value (e.g. "Bold Italic", "Black", "Italic", "Regular",
+// or "") into a numeric weight + italic flag. Tokens are whitespace separated and
+// case-insensitive. Recognised weight keywords are Thin / ExtraLight / Light / Regular(Normal) /
+// Medium / SemiBold / Bold / ExtraBold / Black. Bare numeric weights such as "700" are accepted
+// and clamped to [100, 900]. Unknown tokens are silently ignored. An empty input yields
+// {weight=400, italic=false}.
+ParsedFontStyle ParseFontStyleName(const std::string& fontStyleName);
+
 }  // namespace pagx
