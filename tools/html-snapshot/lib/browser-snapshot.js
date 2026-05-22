@@ -374,6 +374,34 @@ function syntheticText(el) {
   return '';
 }
 
+// Apply CSS `text-transform` to a text fragment. The PAGX importer downstream
+// has no `text-transform` model, and the `Range.getClientRects()` measurements
+// upstream were already taken against the *rendered* (transformed) glyphs —
+// so emitting the original mixed-case `nodeValue` would render with the
+// pre-transform glyphs at widths that no longer match the measured rects
+// (e.g. `<div class="uppercase">Complete Deconstruction</div>` would emit
+// the literal mixed-case characters even though Chromium painted them as
+// `COMPLETE DECONSTRUCTION`). Pre-transforming the text here keeps the
+// emitted span's literal characters in agreement with the box widths.
+//
+// `capitalize` matches Chromium's whitespace-bounded word starts via a
+// simple regex; punctuation-bounded words (e.g. "hello-world" → "Hello-world"
+// vs. Chromium's "Hello-World") may diverge for non-Latin punctuation but
+// match Chromium for the common ASCII whitespace cases. `full-width` and
+// `full-size-kana` are CJK glyph remappings without a clean JS implementation
+// and are passed through unchanged.
+function applyTextTransform(text, computed) {
+  if (!text) return text;
+  const tt = String(computed.getPropertyValue('text-transform') || '').trim().toLowerCase();
+  if (!tt || tt === 'none') return text;
+  if (tt === 'uppercase') return text.toUpperCase();
+  if (tt === 'lowercase') return text.toLowerCase();
+  if (tt === 'capitalize') {
+    return text.replace(/(^|\s)(\S)/g, (_, prefix, ch) => prefix + ch.toUpperCase());
+  }
+  return text;
+}
+
 // Decide whether to keep an element. Returns null to drop it.
 function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
@@ -850,7 +878,8 @@ function emitTextSpans(textNode, parentRect, computed) {
       box: false, text: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
-    out.push(`<span style="${withNowrap(base)}">${escapeHtml(line.text)}</span>`);
+    const transformed = applyTextTransform(line.text, computed);
+    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -885,7 +914,7 @@ function emitVerticalTextSpan(textNode, parentRect, computed) {
   const style = buildStyle(tl, tt, rect.width, rect.height, computed, {
     box: false, text: true,
   });
-  return [`<span style="${style}">${escapeHtml(cleaned)}</span>`];
+  return [`<span style="${style}">${escapeHtml(applyTextTransform(cleaned, computed))}</span>`];
 }
 
 // ===== Flex container detection =====
@@ -1184,7 +1213,7 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   const finalTextStyle = withNowrap(textStyle);
   const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
   const composed = joinStyles(boxStyle, inner);
-  return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(text)}</span>${overlays}</div>`;
+  return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>${overlays}</div>`;
 }
 
 // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
@@ -1280,7 +1309,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     // inside the padding box.
     const innerLayout = textLeafInnerLayout(computed);
     const wrapperStyle = joinStyles(boxStyle, innerLayout);
-    return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(directText)}</span>${overlays}</div>`;
+    return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
   const textNode = firstTextNodeChild(el);
   const lineSpans = textNode
@@ -1320,7 +1349,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
     const textStyle = withNowrap(buildStyle(0, 0, 0, 0, pseudoComputed, {
       box: false, text: true, positioned: false,
     }));
-    spans.push(`<span style="${textStyle}">${escapeHtml(text)}</span>`);
+    spans.push(`<span style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
   }
   if (spans.length === 0) {
     return `<div style="${boxStyle}">${overlays}</div>`;
@@ -1366,7 +1395,7 @@ function renderFlexTextItem(child, parentComputed) {
   const baseStyle = buildStyle(0, 0, r.width, height, parentComputed, {
     box: false, text: true, flexItem: true,
   });
-  return `<span style="${withNowrap(baseStyle)}">${escapeHtml(text)}</span>`;
+  return `<span style="${withNowrap(baseStyle)}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
 }
 
 // Render an element + its subtree as a flex container. The container itself
@@ -1773,6 +1802,7 @@ const HELPER_FNS = [
   hasPseudoContent,
   imgSrc,
   syntheticText,
+  applyTextTransform,
   classify,
   appendStyleProp,
   appendBorder,
