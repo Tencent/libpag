@@ -68,15 +68,10 @@ void RemoveNonElementChildren(const std::shared_ptr<DOMNode>& parent) {
   while (child) {
     auto next = child->nextSibling;
     if (child->type != DOMNodeType::Element) {
-      if (!prev) {
-        parent->firstChild = next;
-      } else {
-        prev->nextSibling = next;
-      }
-      child = next;
-      continue;
+      UnlinkChild(parent, prev, child);
+    } else {
+      prev = child;
     }
-    prev = child;
     child = next;
   }
 }
@@ -111,13 +106,7 @@ void AbsorbDuplicateInto(const std::shared_ptr<DOMNode>& parent,
   } else if (last) {
     last->nextSibling = sub;
   }
-  auto dupNext = dup->nextSibling;
-  if (prev) {
-    prev->nextSibling = dupNext;
-  } else {
-    parent->firstChild = dupNext;
-  }
-  dup->nextSibling = nullptr;
+  UnlinkChild(parent, prev, dup);
   dup->firstChild = nullptr;
 }
 
@@ -165,11 +154,7 @@ void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTrans
       // downstream tooling (and existing tests) keep matching on the message substring.
       ctx.warn("subset:unsupported-tag",
                "html: element '" + child->name + "' at root is not allowed; skipped", child);
-      if (prev) {
-        prev->nextSibling = next;
-      } else {
-        root->firstChild = next;
-      }
+      UnlinkChild(root, prev, child);
     }
     child = next;
   }
@@ -214,11 +199,7 @@ void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTrans
         drop = true;
       }
       if (drop) {
-        if (!prevHeadChild) {
-          head->firstChild = next;
-        } else {
-          prevHeadChild->nextSibling = next;
-        }
+        UnlinkChild(head, prevHeadChild, headChild);
       } else {
         prevHeadChild = headChild;
       }
@@ -293,11 +274,7 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
     while (child) {
       auto next = child->nextSibling;
       if (child->type == DOMNodeType::Element && child->name == "style") {
-        if (!prev) {
-          head->firstChild = next;
-        } else {
-          prev->nextSibling = next;
-        }
+        UnlinkChild(head, prev, child);
       } else {
         prev = child;
       }
@@ -1143,12 +1120,7 @@ void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext&
       prev = wrapper;
     } else if (child->type == DOMNodeType::Text && IsBlankText(child->name)) {
       // Drop blank whitespace nodes between elements (they confuse layout).
-      if (!prev) {
-        parent->firstChild = next;
-      } else {
-        prev->nextSibling = next;
-      }
-      child->nextSibling = nullptr;
+      UnlinkChild(parent, prev, child);
     } else {
       prev = child;
     }
@@ -1192,11 +1164,7 @@ void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformCont
       } else {
         ctx.warn("subset:unsupported-tag",
                  "html: <" + child->name + "> is not in the subset; dropped", child);
-        if (!prev) {
-          parent->firstChild = next;
-        } else {
-          prev->nextSibling = next;
-        }
+        UnlinkChild(parent, prev, child);
         child = next;
         continue;
       }

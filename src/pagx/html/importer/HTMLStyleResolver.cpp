@@ -122,14 +122,14 @@ void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNod
         warn("html: universal selector '*' not allowed in <style>; declarations dropped");
         continue;
       }
+      // Parse each rule's declarations once at <style> collection time so per-element
+      // resolution can copy the resulting PropertyMap instead of re-parsing the same string.
       if (parsed.kind == SelectorKind::Class) {
-        auto& slot = _cssClassRules[parsed.key];
-        slot = slot.empty() ? rule.declarations : (slot + ";" + rule.declarations);
+        ParseStyleString(rule.declarations, _cssClassRules[parsed.key]);
         continue;
       }
       if (parsed.kind == SelectorKind::Element) {
-        auto& slot = _cssElementRules[parsed.key];
-        slot = slot.empty() ? rule.declarations : (slot + ";" + rule.declarations);
+        ParseStyleString(rule.declarations, _cssElementRules[parsed.key]);
         continue;
       }
       warn("html: unsupported selector '" + sel + "' in <style>; declarations dropped");
@@ -148,7 +148,10 @@ void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
     while (e < s.size() && !std::isspace(static_cast<unsigned char>(s[e]))) e++;
     auto it = _cssClassRules.find(s.substr(p, e - p));
     if (it != _cssClassRules.end()) {
-      ParseStyleString(it->second, out);
+      // Last writer wins, matching the inline-style cascade order.
+      for (const auto& kv : it->second) {
+        out[kv.first] = kv.second;
+      }
     }
     p = e;
   }
@@ -170,7 +173,9 @@ const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolv
   }
   auto elemRuleIt = _cssElementRules.find(node->name);
   if (elemRuleIt != _cssElementRules.end()) {
-    ParseStyleString(elemRuleIt->second, slot);
+    for (const auto& kv : elemRuleIt->second) {
+      slot[kv.first] = kv.second;
+    }
   }
   auto* classAttr = node->findAttribute("class");
   if (classAttr) {

@@ -291,6 +291,34 @@ std::shared_ptr<DOMNode> MakeStrayTextSpan(const std::string& text) {
   return span;
 }
 
+void UnlinkChild(const std::shared_ptr<DOMNode>& parent, const std::shared_ptr<DOMNode>& prev,
+                 const std::shared_ptr<DOMNode>& child) {
+  if (!parent || !child) return;
+  auto next = child->nextSibling;
+  if (prev) {
+    prev->nextSibling = next;
+  } else {
+    parent->firstChild = next;
+  }
+  child->nextSibling = nullptr;
+}
+
+std::shared_ptr<DOMNode> ReplaceChild(const std::shared_ptr<DOMNode>& parent,
+                                      const std::shared_ptr<DOMNode>& prev,
+                                      const std::shared_ptr<DOMNode>& child,
+                                      const std::shared_ptr<DOMNode>& replacement) {
+  if (!parent || !child || !replacement) return child ? child->nextSibling : nullptr;
+  auto next = child->nextSibling;
+  replacement->nextSibling = next;
+  if (prev) {
+    prev->nextSibling = replacement;
+  } else {
+    parent->firstChild = replacement;
+  }
+  child->nextSibling = nullptr;
+  return next;
+}
+
 std::string EscapeXml(const std::string& text, bool isAttribute) {
   std::string out;
   out.reserve(text.size());

@@ -151,16 +151,6 @@ std::string TransformFlex(const std::string& value, const PropertyContext&,
   return FormatNumber(grow);
 }
 
-std::string TransformLength(const std::string& value, const PropertyContext& ctx,
-                            HTMLTransformContext& diags) {
-  return ResolveLength(value, ctx, diags);
-}
-
-std::string TransformLengthShorthand(const std::string& value, const PropertyContext& ctx,
-                                     HTMLTransformContext& diags) {
-  return ResolveLengthShorthand(value, ctx, diags);
-}
-
 std::string TransformPosition(const std::string& value, const PropertyContext& ctx,
                               HTMLTransformContext& diags) {
   std::string lc = ToLower(Trim(value));
@@ -242,12 +232,6 @@ std::string TransformBorder(const std::string& value, const PropertyContext&,
     // when a token is not a recognised colour, so we don't re-validate here.
   }
   return trimmed;
-}
-
-std::string TransformBorderRadius(const std::string& value, const PropertyContext& ctx,
-                                  HTMLTransformContext& diags) {
-  // `border-radius` accepts 1-4 lengths or percentages; reuse the length shorthand resolver.
-  return ResolveLengthShorthand(value, ctx, diags);
 }
 
 std::string TransformOpacity(const std::string& value, const PropertyContext&,
@@ -347,150 +331,146 @@ std::string TransformTransformOrigin(const std::string& value, const PropertyCon
   return Trim(value);
 }
 
-// ------------------------ Table population helpers -------------------------------------------
+struct PropertyEntry {
+  const char* name;
+  PropAction action;
+  PropertyTransformFn transform;  // non-null only when action == Transform
+  const char* dropMessage;        // non-null only when action == Drop
+};
 
-void AddKeep(std::unordered_map<std::string, PropertyHandler>& table, const char* name) {
-  PropertyHandler h = {};
-  h.action = PropAction::Keep;
-  table[name] = h;
-}
-
-void AddTransform(std::unordered_map<std::string, PropertyHandler>& table, const char* name,
-                  PropertyTransformFn fn) {
-  PropertyHandler h = {};
-  h.action = PropAction::Transform;
-  h.transform = fn;
-  table[name] = h;
-}
-
-void AddDrop(std::unordered_map<std::string, PropertyHandler>& table, const char* name,
-             const char* msg) {
-  PropertyHandler h = {};
-  h.action = PropAction::Drop;
-  h.dropMessage = msg;
-  table[name] = h;
-}
+// Static, data-driven property table. Adding a CSS property = adding one row here. Listed in
+// roughly the same order as the resolver consumes them so it doubles as a quick subset map.
+const PropertyEntry SubsetPropertyEntries[] = {
+    // Layout
+    {"display", PropAction::Transform, &TransformDisplay, nullptr},
+    {"flex-direction", PropAction::Transform, &TransformFlexDirection, nullptr},
+    {"align-items", PropAction::Transform, &TransformAlignItems, nullptr},
+    {"justify-content", PropAction::Transform, &TransformJustifyContent, nullptr},
+    {"flex", PropAction::Transform, &TransformFlex, nullptr},
+    {"gap", PropAction::Transform, &ResolveLength, nullptr},
+    {"padding", PropAction::Transform, &ResolveLengthShorthand, nullptr},
+    {"padding-top", PropAction::Transform, &ResolveLength, nullptr},
+    {"padding-right", PropAction::Transform, &ResolveLength, nullptr},
+    {"padding-bottom", PropAction::Transform, &ResolveLength, nullptr},
+    {"padding-left", PropAction::Transform, &ResolveLength, nullptr},
+    // Sizing
+    {"width", PropAction::Transform, &ResolveLength, nullptr},
+    {"height", PropAction::Transform, &ResolveLength, nullptr},
+    {"box-sizing", PropAction::Keep, nullptr, nullptr},
+    // Positioning
+    {"position", PropAction::Transform, &TransformPosition, nullptr},
+    {"left", PropAction::Transform, &ResolveLength, nullptr},
+    {"right", PropAction::Transform, &ResolveLength, nullptr},
+    {"top", PropAction::Transform, &ResolveLength, nullptr},
+    {"bottom", PropAction::Transform, &ResolveLength, nullptr},
+    // Painting / effects
+    {"background-color", PropAction::Keep, nullptr, nullptr},
+    {"background-image", PropAction::Transform, &TransformBackgroundImage, nullptr},
+    {"background-clip", PropAction::Transform, &TransformBackgroundClip, nullptr},
+    {"border", PropAction::Transform, &TransformBorder, nullptr},
+    // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
+    {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
+    {"box-shadow", PropAction::Keep, nullptr, nullptr},
+    {"filter", PropAction::Keep, nullptr, nullptr},
+    {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
+    {"opacity", PropAction::Transform, &TransformOpacity, nullptr},
+    {"mix-blend-mode", PropAction::Keep, nullptr, nullptr},
+    {"overflow", PropAction::Keep, nullptr, nullptr},
+    {"object-fit", PropAction::Transform, &TransformObjectFit, nullptr},
+    // Text
+    {"color", PropAction::Keep, nullptr, nullptr},
+    {"font-family", PropAction::Keep, nullptr, nullptr},
+    {"font-size", PropAction::Transform, &ResolveLength, nullptr},
+    {"font-weight", PropAction::Keep, nullptr, nullptr},
+    {"font-style", PropAction::Keep, nullptr, nullptr},
+    {"letter-spacing", PropAction::Transform, &ResolveLength, nullptr},
+    {"line-height", PropAction::Transform, &PassThrough, nullptr},  // px / unitless both accepted
+    {"text-align", PropAction::Keep, nullptr, nullptr},
+    {"text-decoration", PropAction::Keep, nullptr, nullptr},
+    {"text-decoration-color", PropAction::Keep, nullptr, nullptr},
+    {"white-space", PropAction::Keep, nullptr, nullptr},
+    {"text-overflow", PropAction::Keep, nullptr, nullptr},
+    {"writing-mode", PropAction::Keep, nullptr, nullptr},
+    // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the
+    // function back onto the TextBox / Group transform fields. The handler enforces the
+    // supported single-function subset; compound chains and matrix(...) forms are dropped.
+    {"transform", PropAction::Transform, &TransformTransform, nullptr},
+    {"transform-origin", PropAction::Transform, &TransformTransformOrigin, nullptr},
+    // `flex-shrink` is handled as a transform because the canonical snapshot output emits
+    // `flex-shrink: 0` on every flex item; treating it as a generic drop would produce one
+    // warning per flex item with no actionable diagnostic.
+    {"flex-shrink", PropAction::Transform, &TransformFlexShrink, nullptr},
+    // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
+    {"margin", PropAction::Drop, nullptr, "is not in the subset; use padding/gap/flex instead"},
+    {"margin-top", PropAction::Drop, nullptr, "is not in the subset; use padding/gap/flex instead"},
+    {"margin-right", PropAction::Drop, nullptr,
+     "is not in the subset; use padding/gap/flex instead"},
+    {"margin-bottom", PropAction::Drop, nullptr,
+     "is not in the subset; use padding/gap/flex instead"},
+    {"margin-left", PropAction::Drop, nullptr,
+     "is not in the subset; use padding/gap/flex instead"},
+    {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
+    {"clip-path", PropAction::Drop, nullptr, "is not in the subset"},
+    {"outline", PropAction::Drop, nullptr, "is not in the subset"},
+    {"float", PropAction::Drop, nullptr, "is not in the subset"},
+    {"order", PropAction::Drop, nullptr, "is not in the subset"},
+    {"align-content", PropAction::Drop, nullptr, "is not in the subset"},
+    {"align-self", PropAction::Drop, nullptr, "is not in the subset"},
+    {"direction", PropAction::Drop, nullptr, "is not in the subset"},
+    {"unicode-bidi", PropAction::Drop, nullptr, "is not in the subset"},
+    {"flex-wrap", PropAction::Drop, nullptr, "is not in the subset"},
+    {"flex-grow", PropAction::Drop, nullptr, "use 'flex: <N>' shorthand instead"},
+    {"flex-basis", PropAction::Drop, nullptr, "use 'flex: <N>' shorthand instead"},
+    {"min-width", PropAction::Drop, nullptr, "is not in the subset"},
+    {"max-width", PropAction::Drop, nullptr, "is not in the subset"},
+    {"min-height", PropAction::Drop, nullptr, "is not in the subset"},
+    {"max-height", PropAction::Drop, nullptr, "is not in the subset"},
+    {"aspect-ratio", PropAction::Drop, nullptr, "is not in the subset"},
+    {"background-size", PropAction::Drop, nullptr, "is not in the subset"},
+    {"background-repeat", PropAction::Drop, nullptr, "is not in the subset"},
+    {"background-position", PropAction::Drop, nullptr, "is not in the subset"},
+    {"text-transform", PropAction::Drop, nullptr, "is not in the subset"},
+    {"text-indent", PropAction::Drop, nullptr, "is not in the subset"},
+    {"word-spacing", PropAction::Drop, nullptr, "is not in the subset"},
+    {"word-break", PropAction::Drop, nullptr, "is not in the subset"},
+    {"overflow-wrap", PropAction::Drop, nullptr, "is not in the subset"},
+    {"font-variant", PropAction::Drop, nullptr, "is not in the subset"},
+    {"font-stretch", PropAction::Drop, nullptr, "is not in the subset"},
+    {"font", PropAction::Drop, nullptr, "use the longhand properties instead"},
+    {"grid-template-columns", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
+    {"grid-template-rows", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
+    {"grid-area", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
+    {"grid-column", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
+    {"grid-row", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
+    {"border-top", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
+    {"border-right", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
+    {"border-bottom", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
+    {"border-left", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
+    {"border-top-left-radius", PropAction::Drop, nullptr,
+     "use the shorthand 'border-radius' instead"},
+    {"border-top-right-radius", PropAction::Drop, nullptr,
+     "use the shorthand 'border-radius' instead"},
+    {"border-bottom-left-radius", PropAction::Drop, nullptr,
+     "use the shorthand 'border-radius' instead"},
+    {"border-bottom-right-radius", PropAction::Drop, nullptr,
+     "use the shorthand 'border-radius' instead"},
+    {"z-index", PropAction::Drop, nullptr, "is not in the subset"},
+    {"cursor", PropAction::Drop, nullptr, "is not in the subset"},
+    {"pointer-events", PropAction::Drop, nullptr, "is not in the subset"},
+    {"user-select", PropAction::Drop, nullptr, "is not in the subset"},
+    {"visibility", PropAction::Drop, nullptr, "is not in the subset"},
+};
 
 std::unordered_map<std::string, PropertyHandler> BuildTable() {
   std::unordered_map<std::string, PropertyHandler> t;
-
-  // Layout
-  AddTransform(t, "display", &TransformDisplay);
-  AddTransform(t, "flex-direction", &TransformFlexDirection);
-  AddTransform(t, "align-items", &TransformAlignItems);
-  AddTransform(t, "justify-content", &TransformJustifyContent);
-  AddTransform(t, "flex", &TransformFlex);
-  AddTransform(t, "gap", &TransformLength);
-  AddTransform(t, "padding", &TransformLengthShorthand);
-  AddTransform(t, "padding-top", &TransformLength);
-  AddTransform(t, "padding-right", &TransformLength);
-  AddTransform(t, "padding-bottom", &TransformLength);
-  AddTransform(t, "padding-left", &TransformLength);
-
-  // Sizing
-  AddTransform(t, "width", &TransformLength);
-  AddTransform(t, "height", &TransformLength);
-  AddKeep(t, "box-sizing");
-
-  // Positioning
-  AddTransform(t, "position", &TransformPosition);
-  AddTransform(t, "left", &TransformLength);
-  AddTransform(t, "right", &TransformLength);
-  AddTransform(t, "top", &TransformLength);
-  AddTransform(t, "bottom", &TransformLength);
-
-  // Painting / effects
-  AddKeep(t, "background-color");
-  AddTransform(t, "background-image", &TransformBackgroundImage);
-  AddTransform(t, "background-clip", &TransformBackgroundClip);
-  AddTransform(t, "border", &TransformBorder);
-  AddTransform(t, "border-radius", &TransformBorderRadius);
-  AddKeep(t, "box-shadow");
-  AddKeep(t, "filter");
-  AddKeep(t, "backdrop-filter");
-  AddTransform(t, "opacity", &TransformOpacity);
-  AddKeep(t, "mix-blend-mode");
-  AddKeep(t, "overflow");
-  AddTransform(t, "object-fit", &TransformObjectFit);
-
-  // Text
-  AddKeep(t, "color");
-  AddKeep(t, "font-family");
-  AddTransform(t, "font-size", &TransformLength);
-  AddKeep(t, "font-weight");
-  AddKeep(t, "font-style");
-  AddTransform(t, "letter-spacing", &TransformLength);
-  AddTransform(t, "line-height", &PassThrough);  // px / unitless both accepted by importer
-  AddKeep(t, "text-align");
-  AddKeep(t, "text-decoration");
-  AddKeep(t, "text-decoration-color");
-  AddKeep(t, "white-space");
-  AddKeep(t, "text-overflow");
-  AddKeep(t, "writing-mode");
-
-  // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
-  AddDrop(t, "margin", "is not in the subset; use padding/gap/flex instead");
-  AddDrop(t, "margin-top", "is not in the subset; use padding/gap/flex instead");
-  AddDrop(t, "margin-right", "is not in the subset; use padding/gap/flex instead");
-  AddDrop(t, "margin-bottom", "is not in the subset; use padding/gap/flex instead");
-  AddDrop(t, "margin-left", "is not in the subset; use padding/gap/flex instead");
-  // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the function
-  // back onto the TextBox / Group transform fields (skew, skewAxis, rotation, scale, position).
-  // The handler enforces the supported single-function subset; compound chains and matrix(...)
-  // forms are dropped with a diagnostic.
-  AddTransform(t, "transform", &TransformTransform);
-  AddTransform(t, "transform-origin", &TransformTransformOrigin);
-  AddDrop(t, "perspective", "is not in the subset");
-  AddDrop(t, "clip-path", "is not in the subset");
-  AddDrop(t, "outline", "is not in the subset");
-  AddDrop(t, "float", "is not in the subset");
-  AddDrop(t, "order", "is not in the subset");
-  AddDrop(t, "align-content", "is not in the subset");
-  AddDrop(t, "align-self", "is not in the subset");
-  AddDrop(t, "direction", "is not in the subset");
-  AddDrop(t, "unicode-bidi", "is not in the subset");
-  AddDrop(t, "flex-wrap", "is not in the subset");
-  AddDrop(t, "flex-grow", "use 'flex: <N>' shorthand instead");
-  // `flex-shrink` is handled as a transform because the canonical snapshot output
-  // emits `flex-shrink: 0` on every flex item; treating it as a generic drop would
-  // produce one warning per flex item with no actionable diagnostic.
-  AddTransform(t, "flex-shrink", &TransformFlexShrink);
-  AddDrop(t, "flex-basis", "use 'flex: <N>' shorthand instead");
-  AddDrop(t, "min-width", "is not in the subset");
-  AddDrop(t, "max-width", "is not in the subset");
-  AddDrop(t, "min-height", "is not in the subset");
-  AddDrop(t, "max-height", "is not in the subset");
-  AddDrop(t, "aspect-ratio", "is not in the subset");
-  AddDrop(t, "background-size", "is not in the subset");
-  AddDrop(t, "background-repeat", "is not in the subset");
-  AddDrop(t, "background-position", "is not in the subset");
-  AddDrop(t, "text-transform", "is not in the subset");
-  AddDrop(t, "text-indent", "is not in the subset");
-  AddDrop(t, "word-spacing", "is not in the subset");
-  AddDrop(t, "word-break", "is not in the subset");
-  AddDrop(t, "overflow-wrap", "is not in the subset");
-  AddDrop(t, "font-variant", "is not in the subset");
-  AddDrop(t, "font-stretch", "is not in the subset");
-  AddDrop(t, "font", "use the longhand properties instead");
-  AddDrop(t, "grid-template-columns", "use 'display: flex' instead of grid");
-  AddDrop(t, "grid-template-rows", "use 'display: flex' instead of grid");
-  AddDrop(t, "grid-area", "use 'display: flex' instead of grid");
-  AddDrop(t, "grid-column", "use 'display: flex' instead of grid");
-  AddDrop(t, "grid-row", "use 'display: flex' instead of grid");
-  AddDrop(t, "border-top", "use the shorthand 'border' instead");
-  AddDrop(t, "border-right", "use the shorthand 'border' instead");
-  AddDrop(t, "border-bottom", "use the shorthand 'border' instead");
-  AddDrop(t, "border-left", "use the shorthand 'border' instead");
-  AddDrop(t, "border-top-left-radius", "use the shorthand 'border-radius' instead");
-  AddDrop(t, "border-top-right-radius", "use the shorthand 'border-radius' instead");
-  AddDrop(t, "border-bottom-left-radius", "use the shorthand 'border-radius' instead");
-  AddDrop(t, "border-bottom-right-radius", "use the shorthand 'border-radius' instead");
-  AddDrop(t, "z-index", "is not in the subset");
-  AddDrop(t, "cursor", "is not in the subset");
-  AddDrop(t, "pointer-events", "is not in the subset");
-  AddDrop(t, "user-select", "is not in the subset");
-  AddDrop(t, "visibility", "is not in the subset");
-
+  t.reserve(sizeof(SubsetPropertyEntries) / sizeof(SubsetPropertyEntries[0]));
+  for (const auto& entry : SubsetPropertyEntries) {
+    PropertyHandler h = {};
+    h.action = entry.action;
+    h.transform = entry.transform;
+    h.dropMessage = entry.dropMessage;
+    t[entry.name] = h;
+  }
   return t;
 }
 

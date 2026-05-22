@@ -130,6 +130,12 @@ class HTMLParserContext {
   // `text`), and therefore can be merged into a single run.
   static bool fragmentsShareStyle(const TextFragment& a, const TextFragment& b);
 
+  // Fast fingerprint check used by appendTextFragment to skip the full makeTextFragment()
+  // materialisation (which copies four std::string fields) when the new run shares style with
+  // the previous fragment. Mirrors the field selection of makeTextFragment +
+  // fragmentsShareStyle — keep them in sync.
+  static bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
+
   // Appends `text` to the fragment list, merging into the previous fragment when their
   // style fingerprints match.
   void appendTextFragment(std::vector<TextFragment>& out, const HTMLInheritedStyle& inherited,
@@ -330,11 +336,15 @@ class HTMLParserContext {
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::string _basePath = {};
 
-  // CSS class selectors (key = class name without dot, value = declaration string).
-  std::unordered_map<std::string, std::string> _cssClassRules = {};
+  // CSS class selectors (key = class name without dot). Value is the parsed PropertyMap so
+  // that mergeClassRules() can copy entries instead of re-running ParseStyleString on every
+  // element that references a class — for documents that use the same class on hundreds of
+  // nodes this is the difference between O(rules·elements) and O(rules+elements).
+  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> _cssClassRules = {};
 
-  // CSS element selectors (key = tag name).
-  std::unordered_map<std::string, std::string> _cssElementRules = {};
+  // CSS element selectors (key = tag name). Same parsed-up-front shape as _cssClassRules.
+  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> _cssElementRules =
+      {};
 
   // Cached resolved style per DOM node. Each entry merges inline + class + element rules.
   std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>

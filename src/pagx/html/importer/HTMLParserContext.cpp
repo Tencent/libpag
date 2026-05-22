@@ -118,15 +118,18 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     collectStyles(head);
   }
 
-  // Determine canvas size before constructing the document so that we can publish a
-  // diagnostic entry into PAGXDocument::errors when sizing fails. The document is
-  // constructed in either case so that callers can read diagnostics.
+  // Resolve the canvas size. Without one we cannot make a usable document, so this is a
+  // hard error: any diagnostics queued up to this point are lost (the public Parse()
+  // contract surfaces failure via a nullptr return).
   float canvasW = 0;
   float canvasH = 0;
-  bool canvasResolved = resolveCanvasSize(body, canvasW, canvasH);
+  if (!resolveCanvasSize(body, canvasW, canvasH)) {
+    hardError("html: failed to determine canvas size");
+    return nullptr;
+  }
   _canvasWidth = canvasW;
   _canvasHeight = canvasH;
-  _document = PAGXDocument::Make(canvasResolved ? canvasW : 0.0f, canvasResolved ? canvasH : 0.0f);
+  _document = PAGXDocument::Make(canvasW, canvasH);
 
   // Seed the document's font registry from the caller-supplied FontConfig before any
   // discovery happens, so registered typefaces and pre-configured fallbacks are in place
@@ -141,11 +144,6 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     _document->errors.push_back(std::move(msg));
   }
   _pendingDiagnostics.clear();
-
-  if (!canvasResolved) {
-    hardError("html: failed to determine canvas size");
-    return nullptr;
-  }
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -531,14 +529,30 @@ bool HTMLParserContext::fragmentsShareStyle(const TextFragment& a, const TextFra
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
 }
 
+bool HTMLParserContext::fragmentMatchesInherited(const TextFragment& a,
+                                                 const HTMLInheritedStyle& inherited) {
+  constexpr float epsilon = 1e-3f;
+  const bool familyMatch = inherited.primaryFontFamily.empty()
+                               ? a.fontFamily == HTML_DEFAULT_FONT_FAMILY
+                               : a.fontFamily == inherited.primaryFontFamily;
+  return familyMatch && a.fontStyleName == inherited.fontStyleName &&
+         std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
+         std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
+         a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
+         a.fillImage == inherited.textFillImage;
+}
+
 void HTMLParserContext::appendTextFragment(std::vector<TextFragment>& out,
                                            const HTMLInheritedStyle& inherited, std::string text) {
   if (text.empty()) return;
-  TextFragment frag = makeTextFragment(inherited);
-  if (!out.empty() && fragmentsShareStyle(out.back(), frag)) {
+  // Fast path: when the new run shares style with the back of `out`, just extend its text and
+  // skip the fragment construction entirely. Saves four std::string copies per merged run on
+  // typical rich-text inputs.
+  if (!out.empty() && fragmentMatchesInherited(out.back(), inherited)) {
     out.back().text += text;
     return;
   }
+  TextFragment frag = makeTextFragment(inherited);
   frag.text = std::move(text);
   out.push_back(std::move(frag));
 }

@@ -127,6 +127,26 @@ std::shared_ptr<DOMNode> MakeStrayTextSpan(const std::string& text);
 // Escape XML text/attribute values for round-tripping inline SVG content.
 std::string EscapeXml(const std::string& text, bool isAttribute);
 
+// Linked-list child operations. Several importer passes need to splice / remove children
+// of a DOM element while iterating; these helpers keep the prev/next bookkeeping in one
+// place so a fix to one path applies everywhere. They do not own the unlinked nodes —
+// callers' shared_ptrs continue to keep the subtree alive.
+
+// Unlinks `child` from `parent`'s linked list. `prev` is the predecessor of `child` (may
+// be null when `child` is the first sibling). After the call `child->nextSibling` is
+// cleared but `child->firstChild` is left intact, so the caller can re-attach the
+// detached node elsewhere.
+void UnlinkChild(const std::shared_ptr<DOMNode>& parent, const std::shared_ptr<DOMNode>& prev,
+                 const std::shared_ptr<DOMNode>& child);
+
+// Replace `child` (currently a sibling under `parent`, with predecessor `prev`) with
+// `replacement`, preserving the iteration cursor. Returns the next sibling (the value
+// the caller should advance their cursor to).
+std::shared_ptr<DOMNode> ReplaceChild(const std::shared_ptr<DOMNode>& parent,
+                                      const std::shared_ptr<DOMNode>& prev,
+                                      const std::shared_ptr<DOMNode>& child,
+                                      const std::shared_ptr<DOMNode>& replacement);
+
 // ----- Numeric / unit helpers ---------------------------------------------------------------
 
 // Try to parse a CSS angle in `deg`, `rad`, `turn`, or unitless (deg).
