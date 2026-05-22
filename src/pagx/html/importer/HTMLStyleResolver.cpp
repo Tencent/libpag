@@ -25,6 +25,7 @@
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace pagx {
 
@@ -245,30 +246,10 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
       ownBgImage.find("gradient") != std::string::npos) {
     out.textFillImage = ownBgImage;
   }
-  // Compute combined font-style label used by PAGX Text.
-  bool isBold = false;
-  if (!out.fontWeight.empty()) {
-    std::string w = ToLower(Trim(out.fontWeight));
-    if (w == "bold" || w == "bolder") isBold = true;
-    if (!isBold) {
-      char* end = nullptr;
-      long n = std::strtol(w.c_str(), &end, 10);
-      if (end != w.c_str() && n >= 600) isBold = true;
-    }
-  }
-  bool isItalic = false;
-  if (!out.fontStyle.empty()) {
-    std::string fs = ToLower(Trim(out.fontStyle));
-    if (fs == "italic" || fs == "oblique") isItalic = true;
-  }
-  out.fontStyleName.clear();
-  if (isBold && isItalic) {
-    out.fontStyleName = "Bold Italic";
-  } else if (isBold) {
-    out.fontStyleName = "Bold";
-  } else if (isItalic) {
-    out.fontStyleName = "Italic";
-  }
+  // Compute combined font-style label used by PAGX Text. Maps CSS font-weight (numeric or
+  // keyword) and font-style to a single PAGX `fontStyle` keyword such as "Bold Italic" or
+  // "Black Italic". Regular weight collapses the weight portion to empty.
+  out.fontStyleName = ResolveFontStyleName(out.fontWeight, out.fontStyle);
 
   static const char* kTextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",

@@ -29,6 +29,7 @@
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/TextBaseline.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -1096,7 +1097,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     text->baseline = TextBaseline::Alphabetic;
 
     // Font weight: element attribute > inherited style.
-    // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").
+    // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light", "Black").
     std::string fontWeight = getAttribute(element, "font-weight");
     if (fontWeight.empty()) {
       fontWeight = inheritedStyle.fontWeight;
@@ -1106,20 +1107,11 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     if (fontStyleAttr.empty()) {
       fontStyleAttr = inheritedStyle.fontStyle;
     }
-    // Combine font-weight and font-style into fontStyle field.
-    // This is a simplification; in practice, font selection is more complex.
-    if (!fontWeight.empty() || !fontStyleAttr.empty()) {
-      bool isBold = (fontWeight == "bold" || fontWeight == "700" || fontWeight == "800" ||
-                     fontWeight == "900" || fontWeight == "bolder");
-      bool isItalic = (fontStyleAttr == "italic" || fontStyleAttr == "oblique");
-      if (isBold && isItalic) {
-        text->fontStyle = "Bold Italic";
-      } else if (isBold) {
-        text->fontStyle = "Bold";
-      } else if (isItalic) {
-        text->fontStyle = "Italic";
-      }
-    }
+    // Combine font-weight and font-style into the PAGX fontStyle attribute. Numeric
+    // weights are rounded to the nearest 100 and mapped to OpenType keywords (Thin,
+    // Light, Medium, SemiBold, Bold, ExtraBold, Black) so that 900 does not collapse
+    // to 700.
+    text->fontStyle = ResolveFontStyleName(fontWeight, fontStyleAttr);
 
     // Letter spacing: element attribute > inherited style.
     std::string letterSpacing = getAttribute(element, "letter-spacing");
