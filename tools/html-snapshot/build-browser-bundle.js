@@ -25,6 +25,7 @@ const path = require('path');
 
 const {
   inlineExternalImages,
+  inlineCanvases,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 } = require('./lib/browser-snapshot');
@@ -41,6 +42,7 @@ const banner = `/*!
  * Public API (operates on the live document):
  *   takeSnapshot()              -> { html, width, height }
  *   inlineExternalImages()      -> Promise<void>
+ *   inlineCanvases()            -> Promise<void>
  *
  * Run \`pagx import --format html\` on the resulting HTML to convert it to
  * PAGX. The snapshot conforms to spec/html_subset.md.
@@ -59,9 +61,12 @@ ${PAYLOAD_CONSTANTS_SRC}
 
 ${inlineExternalImages.toString()}
 
+${inlineCanvases.toString()}
+
 return {
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
+  inlineCanvases: inlineCanvases,
 };
 `;
 
@@ -89,6 +94,7 @@ ${factoryBody}
 
 export const takeSnapshot = _module.takeSnapshot;
 export const inlineExternalImages = _module.inlineExternalImages;
+export const inlineCanvases = _module.inlineCanvases;
 export default _module;
 `;
 
@@ -197,6 +203,10 @@ const exampleHtml = `<!DOCTYPE html>
         // Optional: inline cross-origin <img src="https://…"> as data: URIs.
         // No-op when the page has no http(s)-served images.
         await HtmlSnapshot.inlineExternalImages();
+        // Optional: capture every <canvas> bitmap as a data: URI so chart
+        // libraries (ECharts, Chart.js, …) survive the snapshot. No-op when
+        // the page has no canvases.
+        await HtmlSnapshot.inlineCanvases();
         const { html, width, height } = HtmlSnapshot.takeSnapshot();
         const head = '// ' + width + 'x' + height + ', ' + html.length + ' bytes\\n';
         const preview = html.length > 4000 ? html.slice(0, 4000) + '\\n// …truncated' : html;

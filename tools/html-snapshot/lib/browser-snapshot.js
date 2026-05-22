@@ -381,6 +381,15 @@ function classify(el, computed) {
   if (!isVisible(computed)) return null;
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
+  if (tag === 'canvas') {
+    // Canvas is supported only when `inlineCanvases` (the pre-snapshot pass)
+    // managed to extract a data URI from the live bitmap. WebGL contexts
+    // without `preserveDrawingBuffer: true`, tainted 2D canvases (with a
+    // cross-origin `drawImage` source), and zero-sized canvases all fall
+    // through to null and the element is dropped — same outcome as before
+    // canvas support landed.
+    return el.getAttribute('data-snapshot-canvas-src') ? 'canvas' : null;
+  }
   if (tag === 'input' || tag === 'textarea' || tag === 'select') {
     return syntheticText(el) ? 'text' : null;
   }
@@ -1119,6 +1128,24 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
 }
 
+// <canvas>: PAGX has no canvas / scripted-graphics primitive, but the live
+// bitmap that the page already painted is a perfectly good static texture.
+// `inlineCanvases` (the pre-snapshot pass) walks every <canvas> and stashes
+// `canvas.toDataURL('image/png')` on the element as `data-snapshot-canvas-
+// src`; here we emit it as an <img> with the same outer wrapper / overlay
+// geometry as a real <img>. Charts produced by ECharts, Chart.js, D3 +
+// Canvas, etc. round-trip through this path without their JS runtime ever
+// touching PAGX's renderer.
+function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
+  const src = el.getAttribute('data-snapshot-canvas-src') || '';
+  const imgStyle = imageInnerStyle(rect, opts.flexItem);
+  const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+    box: true, ...opts,
+  });
+  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>${overlays}</div>`;
+}
+
 // <input> / <textarea> / <select>: outer box for bg/border/radius + inner
 // span sitting inside the padding box. `<input>` paints its background
 // across the full element rect, but the actual text sits inside the padding
@@ -1636,7 +1663,7 @@ ${parts.join('')}
 const PAYLOAD_CONSTANTS_SRC = `
 const DROP_TAGS = new Set([
   'script', 'style', 'link', 'meta', 'noscript',
-  'iframe', 'object', 'embed', 'video', 'audio', 'canvas',
+  'iframe', 'object', 'embed', 'video', 'audio',
   'br', 'hr', 'wbr',
   'head', 'title', 'base',
   'template', 'slot', 'dialog', 'details', 'summary',
@@ -1705,7 +1732,7 @@ const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));
 const STYLE_SCHEMA_BOX = STYLE_SCHEMA.filter((e) => e.scope === 'box');
 const STYLE_SCHEMA_TEXT = STYLE_SCHEMA.filter((e) => e.scope === 'text');
 
-const KIND_DISPATCH = { svg: renderSvg, img: renderImg, text: renderTextInput };
+const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, text: renderTextInput };
 `;
 
 // ===== Payload assembly =====
@@ -1770,6 +1797,7 @@ const HELPER_FNS = [
   classifyFlexContainer,
   renderSvg,
   renderImg,
+  renderCanvas,
   renderTextInput,
   textLeafInnerLayout,
   renderTextLeaf,
@@ -1836,6 +1864,41 @@ async function inlineExternalImages() {
   }));
 }
 
+// ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
+
+// Walk every <canvas> in the document and stash a `data:image/png;base64,...`
+// URI of its current bitmap on `data-snapshot-canvas-src`. The snapshot
+// renderer treats a canvas with that attribute as if it were an <img>; charts
+// drawn at runtime by ECharts, Chart.js, D3-canvas, etc. therefore survive
+// the trip to PAGX as ordinary static images, even though PAGX has no canvas
+// model.
+//
+// Failure modes left as silent drops (snapshot walker treats canvases without
+// the attribute as if they were still in DROP_TAGS):
+//   - SecurityError ("tainted canvas"): the page drew a cross-origin image
+//     into the canvas without CORS, so the browser refuses to serialise it.
+//   - WebGL contexts created without `preserveDrawingBuffer: true` may have
+//     an empty back buffer by the time we read it. Workaround: pages can
+//     preserve the buffer themselves, or call `drawImage` into a 2D canvas
+//     before snapshot.
+//   - Zero-sized canvas (`width=0` or `height=0`): toDataURL returns the
+//     trivial `"data:,"`, which we skip so the renderer drops the element.
+async function inlineCanvases() {
+  const canvases = Array.from(document.querySelectorAll('canvas'));
+  for (const canvas of canvases) {
+    if (!canvas.width || !canvas.height) continue;
+    let dataUri = '';
+    try {
+      dataUri = canvas.toDataURL('image/png');
+    } catch (err) {
+      console.warn(`html-snapshot: canvas.toDataURL failed: ${err && err.message}`);
+      continue;
+    }
+    if (!dataUri || dataUri === 'data:,') continue;
+    canvas.setAttribute('data-snapshot-canvas-src', dataUri);
+  }
+}
+
 /* eslint-enable no-undef, no-inner-declarations */
 
 // `HELPERS_SRC` / `PAYLOAD_CONSTANTS_SRC` are exposed for the browser-bundle
@@ -1846,6 +1909,7 @@ async function inlineExternalImages() {
 module.exports = {
   takeSnapshot,
   inlineExternalImages,
+  inlineCanvases,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

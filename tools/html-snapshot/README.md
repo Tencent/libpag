@@ -34,6 +34,10 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - inline `<svg>` icons are kept verbatim, with `currentColor` (and
   `context-fill` / `context-stroke`) frozen per-element so per-node `color`
   overrides survive;
+- `<canvas>` elements are captured via `canvas.toDataURL('image/png')`
+  before the DOM walk and emitted as `<img>` tags, so chart libraries
+  (ECharts, Chart.js, D3 + Canvas, …) survive the trip to PAGX as static
+  bitmaps;
 - `display: contents` elements are flattened to a transparent pass-through —
   their box is suppressed and their children are positioned against the
   element's CSS parent;
@@ -136,7 +140,7 @@ npm run build:browser
 # → dist/example.html           (drop-in demo that snapshots itself)
 ```
 
-Both bundles expose the same two functions; both operate on the current
+Both bundles expose the same three functions; both operate on the current
 document and require no other globals:
 
 ```html
@@ -144,6 +148,7 @@ document and require no other globals:
 <script>
   (async () => {
     await HtmlSnapshot.inlineExternalImages();           // optional
+    await HtmlSnapshot.inlineCanvases();                 // optional
     const { html, width, height } = HtmlSnapshot.takeSnapshot();
     // `html` is the same flat, subset-compliant string the CLI writes out.
     // Feed it to `pagx import --format html` (server-side) to convert to PAGX.
@@ -152,7 +157,7 @@ document and require no other globals:
 ```
 
 ```js
-import { takeSnapshot, inlineExternalImages } from './html-snapshot.esm.js';
+import { takeSnapshot, inlineExternalImages, inlineCanvases } from './html-snapshot.esm.js';
 ```
 
 Use cases:
@@ -186,9 +191,14 @@ pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
   `--selector` to land on the desired frame.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
-- `<canvas>`, `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
+- `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
   `<template>`, `<slot>`, `<map>`/`<area>`, `<source>`/`<track>`, etc. are
   dropped — they have no static visual representation.
+- `<canvas>` is captured via `toDataURL`, which fails silently in two
+  cases: tainted 2D canvases (cross-origin `drawImage` source without CORS),
+  and WebGL canvases created without `preserveDrawingBuffer: true` (the
+  back buffer may be empty by the time we read it). Such canvases are
+  dropped and render as empty boxes.
 - Asymmetric borders are downgraded to overlay rectangles. Per-side `dashed` /
   `dotted` borders are coerced to `solid` (the closest visual approximation
   available in the subset).

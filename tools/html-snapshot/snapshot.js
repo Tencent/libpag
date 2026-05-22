@@ -27,7 +27,7 @@
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { parseArgs, LOG_PREFIX } = require('./lib/cli');
-const { takeSnapshot, inlineExternalImages } = require('./lib/browser-snapshot');
+const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
 const { openAndSettlePage } = require('./lib/page-loader');
 
 async function main() {
@@ -85,6 +85,11 @@ async function main() {
     // on `data-snapshot-src` rather than mutating `src` so that the live layout
     // (which has already settled around the original image) is left untouched.
     await page.evaluate(inlineExternalImages);
+
+    // Capture each <canvas>'s live bitmap as a data URI so the snapshot
+    // walker can emit it as an <img>. Without this, every chart / scripted
+    // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
+    await page.evaluate(inlineCanvases);
 
     // `takeSnapshot` is a self-contained IIFE string assembled from the
     // helpers in lib/browser-snapshot.js; `page.evaluate` accepts strings
