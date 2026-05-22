@@ -670,6 +670,74 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesCamelCaseAttributes) {
   EXPECT_EQ(content.find("<lineargradient"), std::string::npos);
 }
 
+// Regression: inline <svg> with `fill="currentColor"` must be resolved against
+// the inherited CSS `color` from its host. The icon-font snapshot pre-pass
+// (tools/html-snapshot/lib/icon-font.js) emits glyph paths as `fill="currentColor"`
+// and relies on the wrapping `<div style="color: …">` to tint them. The
+// downstream SVG importer has no notion of `color` / `currentColor`, so the
+// HTML importer pre-resolves these tokens before serialising into the import
+// directive. Without this, every icon collapses to black.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgResolvesCurrentColorFromInheritedColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <div style="width:20px;height:20px;color:rgb(130, 208, 164)">
+        <svg width="20" height="20" viewBox="0 0 1024 1024">
+          <path d="M0 0L1024 0L1024 1024L0 1024Z" fill="currentColor"/>
+        </svg>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  auto* svgLayer = outer->children.front();
+  const auto& content = svgLayer->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_NE(content.find("fill=\"#82D0A4\""), std::string::npos);
+  EXPECT_EQ(content.find("currentColor"), std::string::npos);
+}
+
+// Inline SVG can also use `style="fill: currentColor"` (inline-style form).
+// Both the attribute form and the inline-style form must be rewritten so that
+// authored SVG snippets, not just icon-font output, get the correct tint.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgResolvesCurrentColorInInlineStyle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px;color:#1188ff">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="30" style="fill: currentColor"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_EQ(content.find("currentColor"), std::string::npos);
+  EXPECT_NE(content.find("#1188FF"), std::string::npos);
+}
+
+// A `color` declared on an SVG descendant overrides the inherited cascade for
+// itself and its children. The walker tracks the active colour while it
+// recurses so each `currentColor` token resolves against the right value.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgCurrentColorRespectsInnerColorOverride) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px;color:#112233">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <g color="#445566">
+          <rect x="0" y="0" width="40" height="40" fill="currentColor"/>
+        </g>
+        <rect x="40" y="0" width="40" height="40" fill="currentColor"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_EQ(content.find("currentColor"), std::string::npos);
+  EXPECT_NE(content.find("fill=\"#445566\""), std::string::npos);
+  EXPECT_NE(content.find("fill=\"#112233\""), std::string::npos);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.box{background-color:#123456;border-radius:8px}</style></head>

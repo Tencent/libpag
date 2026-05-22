@@ -16,8 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
 #include "pagx/utils/StringParser.h"
@@ -57,6 +59,167 @@ void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node, int d
   out += "</";
   out += node->name;
   out.push_back('>');
+}
+
+// SVG `fill` / `stroke` attributes accept CSS colour tokens. PAGX's SVG importer
+// understands `#RRGGBB`, `#RRGGBBAA`, and `rgb()/rgba()`, but not the CSS `color()`
+// function used for DisplayP3 — `ColorToSVGHex` collapses those to sRGB hex for us.
+// Alpha < 1 is rare for `currentColor` resolution (CSS `color` rarely carries
+// transparency), but we round-trip it via the 8-digit hex form when present so the
+// importer's `addFillStroke` path picks up the right alpha.
+std::string FormatColorForSvgAttribute(const Color& color) {
+  if (color.alpha >= 1.0f || color.colorSpace == ColorSpace::DisplayP3) {
+    return ColorToSVGHex(color);
+  }
+  int r = 0;
+  int g = 0;
+  int b = 0;
+  ColorToRGB(color, r, g, b);
+  int a = std::clamp(static_cast<int>(std::round(color.alpha * 255.0f)), 0, 255);
+  char buf[10] = {};
+  snprintf(buf, sizeof(buf), "#%02X%02X%02X%02X", r, g, b, a);
+  return buf;
+}
+
+// Case-insensitive equality for ASCII property/keyword names. SVG attribute
+// names like `color` and CSS keywords like `currentColor` are matched here.
+bool EqualsIgnoreCase(const std::string& a, const char* literal) {
+  size_t i = 0;
+  for (; i < a.size() && literal[i] != '\0'; ++i) {
+    char ca = static_cast<char>(std::tolower(static_cast<unsigned char>(a[i])));
+    char cb = static_cast<char>(std::tolower(static_cast<unsigned char>(literal[i])));
+    if (ca != cb) return false;
+  }
+  return i == a.size() && literal[i] == '\0';
+}
+
+// CSS `currentColor` (any casing) is the spelling we resolve here. The icon-font
+// pre-pass in tools/html-snapshot emits `fill="currentColor"` verbatim, and authored
+// inline SVGs sometimes use `currentcolor` lowercased.
+bool IsCurrentColorKeyword(const std::string& value) {
+  return EqualsIgnoreCase(value, "currentColor") || EqualsIgnoreCase(value, "currentcolor");
+}
+
+// Extracts a `color: <value>` declaration from an inline `style="..."` string,
+// returning the trimmed value or empty when absent. Other properties (e.g.
+// `fill-color`, `background-color`) are ignored — we only honour the bare `color`
+// keyword, which is what CSS uses for `currentColor` cascade.
+std::string ExtractColorFromInlineStyle(const std::string& style) {
+  size_t pos = 0;
+  while (pos < style.size()) {
+    size_t semi = style.find(';', pos);
+    std::string decl = style.substr(pos, (semi == std::string::npos ? style.size() : semi) - pos);
+    size_t colon = decl.find(':');
+    if (colon != std::string::npos) {
+      std::string prop = Trim(decl.substr(0, colon));
+      std::string value = Trim(decl.substr(colon + 1));
+      if (EqualsIgnoreCase(prop, "color") && !value.empty()) {
+        return value;
+      }
+    }
+    if (semi == std::string::npos) break;
+    pos = semi + 1;
+  }
+  return {};
+}
+
+// Rewrites `fill: currentColor` / `stroke: currentColor` declarations inside an
+// inline `style="..."` value to the supplied concrete colour. Other declarations
+// (including a leading `color: ...`) are preserved verbatim.
+std::string RewriteCurrentColorInInlineStyle(const std::string& style,
+                                             const std::string& replacement) {
+  std::string out;
+  out.reserve(style.size());
+  size_t pos = 0;
+  bool first = true;
+  while (pos < style.size()) {
+    size_t semi = style.find(';', pos);
+    std::string decl = style.substr(pos, (semi == std::string::npos ? style.size() : semi) - pos);
+    size_t colon = decl.find(':');
+    if (colon != std::string::npos) {
+      std::string prop = Trim(decl.substr(0, colon));
+      std::string value = Trim(decl.substr(colon + 1));
+      if ((EqualsIgnoreCase(prop, "fill") || EqualsIgnoreCase(prop, "stroke")) &&
+          IsCurrentColorKeyword(value)) {
+        if (!first) out.push_back(';');
+        out += prop;
+        out.push_back(':');
+        out.push_back(' ');
+        out += replacement;
+        first = false;
+        if (semi == std::string::npos) break;
+        pos = semi + 1;
+        continue;
+      }
+    }
+    if (!first) out.push_back(';');
+    out += decl;
+    first = false;
+    if (semi == std::string::npos) break;
+    pos = semi + 1;
+  }
+  return out;
+}
+
+// Walks an inline SVG subtree and replaces `currentColor` references in `fill` /
+// `stroke` (attribute form plus inline `style="…"` form) with the concrete
+// colour active at that node. CSS cascade for the `color` property is honoured
+// inside the subtree: an SVG-internal element's `color` attribute or
+// `style="color: …"` declaration overrides the inherited value for itself and
+// its descendants.
+//
+// The root SVG element is handled specially: the caller pre-resolves its
+// effective colour via `computeInherited` (which already folds any inline
+// `style="color:…"` the HTML cascade pass attached to the SVG), and passes
+// that as `inheritedColor`. We deliberately skip re-reading the root's own
+// `color` / `style` to preserve the caller-supplied formatting (e.g. so a
+// snapshot-stage `color: rgb(...)` round-trips as the hex form we resolved
+// from the parsed `Color`). Descendants get the standard cascade tracking.
+//
+// This runs before serialising the SVG into a PAGX import directive because
+// the downstream SVG importer has no notion of `color` / `currentColor` — by
+// the time it parses the directive content, every fill/stroke must already
+// carry a concrete colour token. Mirrors browser-snapshot's `freezeSvg`
+// (tools/html-snapshot/lib/browser-snapshot.js) but runs at C++ import time
+// rather than during the browser snapshot, so that icon-font glyphs (which
+// the snapshot intentionally leaves as `fill="currentColor"` so the wrapper's
+// `color` flows through at render time) still pick up the right tint.
+void ResolveCurrentColorInSvg(const std::shared_ptr<DOMNode>& node,
+                              const std::string& inheritedColor, int depth, bool isRoot) {
+  if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
+  if (node->type != DOMNodeType::Element) return;
+
+  std::string here = inheritedColor;
+  if (!isRoot) {
+    for (const auto& attr : node->attributes) {
+      if (EqualsIgnoreCase(attr.name, "color")) {
+        std::string value = Trim(attr.value);
+        if (!value.empty() && !EqualsIgnoreCase(value, "inherit") &&
+            !IsCurrentColorKeyword(value)) {
+          here = value;
+        }
+      } else if (EqualsIgnoreCase(attr.name, "style")) {
+        std::string colorFromStyle = ExtractColorFromInlineStyle(attr.value);
+        if (!colorFromStyle.empty() && !EqualsIgnoreCase(colorFromStyle, "inherit") &&
+            !IsCurrentColorKeyword(colorFromStyle)) {
+          here = colorFromStyle;
+        }
+      }
+    }
+  }
+
+  for (auto& attr : node->attributes) {
+    if ((EqualsIgnoreCase(attr.name, "fill") || EqualsIgnoreCase(attr.name, "stroke")) &&
+        IsCurrentColorKeyword(attr.value)) {
+      attr.value = here;
+    } else if (EqualsIgnoreCase(attr.name, "style")) {
+      attr.value = RewriteCurrentColorInInlineStyle(attr.value, here);
+    }
+  }
+
+  for (auto child = node->firstChild; child; child = child->nextSibling) {
+    ResolveCurrentColorInSvg(child, here, depth + 1, /*isRoot=*/false);
+  }
 }
 
 // External `.svg` URL — i.e. ends with `.svg` and is not an inline `data:` URI. Such
@@ -447,10 +610,24 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
 }
 
 Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLBoxAttributes& box) {
+                                           const HTMLBoxAttributes& box,
+                                           const HTMLInheritedStyle& inherited) {
   auto layer = _document->makeNode<Layer>();
   applySizeAndPosition(layer, box);
   applyLayerAttributes(layer, element, box);
+
+  // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
+  // `computeInherited` returns the style descendants see, but `resolvedTextColor`
+  // is the *element's own* colour after applying any `style="color: …"` on the
+  // SVG itself — exactly what `currentColor` should resolve to at the SVG root.
+  // We pre-resolve here (mutating the captured subtree in place) because the
+  // downstream SVG importer treats anything other than a literal colour token
+  // as black, dropping the wrapper's tint that the snapshot relied on for
+  // icon-font glyphs.
+  HTMLInheritedStyle svgStyle = computeInherited(element, inherited);
+  std::string rootColor = FormatColorForSvgAttribute(svgStyle.resolvedTextColor);
+  ResolveCurrentColorInSvg(element, rootColor, /*depth=*/0, /*isRoot=*/true);
+
   layer->importDirective.content = serializeSvg(element);
   layer->importDirective.format = "svg";
   assignElementId(layer, element);

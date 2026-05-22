@@ -164,7 +164,8 @@ class HTMLParserContext {
   std::string resolveImageSource(const std::string& src) const;
 
   // Inline <svg> conversion.
-  Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
+  Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
+                          const HTMLInheritedStyle& inherited);
 
   // Style / property helpers ----------------------------------------------------------
   const std::unordered_map<std::string, std::string>& getResolvedStyle(

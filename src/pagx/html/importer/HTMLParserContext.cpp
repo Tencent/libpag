@@ -379,7 +379,7 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = resolveBox(element);
-    return convertInlineSvg(element, box);
+    return convertInlineSvg(element, box, inherited);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = resolveBox(element);
