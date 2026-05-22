@@ -35,6 +35,7 @@
 'use strict';
 
 const fsp = require('fs').promises;
+const { errMessage } = require('./cli');
 
 let opentype = null;
 let wawoff2 = null;
@@ -44,74 +45,98 @@ function loadDeps() {
   return { opentype, wawoff2 };
 }
 
-// ===== Browser-side helpers (serialised into puppeteer page.evaluate) =====
+// ===== Browser-side helpers =====
 //
-// Each fn below is `.toString()`-able and self-contained (no closures over
-// node-side state). They are concatenated into a single IIFE for the
-// puppeteer driver to ship to Chromium, and exported individually so the
-// browser bundle (build-browser-bundle.js) can expose them as standalone
-// hooks for callers running outside of node.
+// Each helper below is a top-level function declaration — never nested inside
+// another function — so its `Function.prototype.toString()` source can be
+// concatenated into a single IIFE string and shipped to the page via
+// `page.evaluate`. The same source is also injected into the standalone
+// browser bundle (build-browser-bundle.js) so callers running outside of
+// node have access to the same helpers under one shared closure.
+//
+// Layout mirrors lib/browser-snapshot.js:
+//   ICON_FONT_HELPER_FNS  — node-side array of helper references.
+//   ICON_FONT_HELPERS_SRC — concatenated source string. Empty until the
+//                           array is finalised at module-load time.
+// The two `browserCollect…` entry points reference these helpers by name;
+// they only resolve when run inside a closure that has already declared the
+// helpers (i.e. the IIFE strings below, or the bundle's factory closure).
+
+// Format-rank lookup for picking the most-decode-friendly source. WOFF2 is
+// preferred (smallest, modern), then WOFF (zlib-only), then raw SFNT
+// containers. `truetype`/`opentype` are aliases for ttf/otf.
+function formatRank(f) {
+  if (f === 'woff2') return 1;
+  if (f === 'woff') return 2;
+  if (f === 'ttf' || f === 'truetype') return 3;
+  if (f === 'otf' || f === 'opentype') return 4;
+  return 5;
+}
+
+// Parse a `src:` declaration into the best-ranked `{url, format}` pair.
+// `font-family` values are unquoted by the caller; `src` URLs are resolved
+// against the stylesheet's own `href` so relative paths in CDN-hosted
+// stylesheets produce absolute, fetchable URLs.
+function parseSrcList(srcRaw, sheetBase) {
+  const urls = [];
+  const re = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)]+?))\s*\)(?:\s*format\(\s*["']?([^"')]+)["']?\s*\))?/g;
+  let m;
+  while ((m = re.exec(srcRaw)) !== null) {
+    const u = (m[1] || m[2] || m[3] || '').trim();
+    const fmt = (m[4] || '').trim().toLowerCase();
+    if (u) urls.push({ url: u, format: fmt });
+  }
+  if (urls.length === 0) return null;
+  urls.sort(function (a, b) { return formatRank(a.format) - formatRank(b.format); });
+  const best = urls[0];
+  let absUrl = best.url;
+  try { absUrl = new URL(best.url, sheetBase).href; } catch (_) { /* keep raw */ }
+  return { url: absUrl, format: best.format };
+}
+
+// Parse `@font-face { ... }` blocks out of a raw CSS string. Used as a
+// fallback when `cssRules` is denied by CORS — Chromium still loaded and
+// applied the stylesheet (so the page renders), but JS can't introspect it.
+// Regex parsing is intentionally permissive: the only tokens we care about
+// are `font-family` and `src`, both of which use the same syntax that
+// `cssRules` would yield. Comments are stripped first so a `/* src: url(...)
+// */` decoy doesn't mislead the matcher.
+function parseFontFaceFromText(cssText, sheetBase) {
+  if (!cssText) return [];
+  const stripped = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
+  const out = [];
+  const ffRe = /@font-face\s*\{([^}]*)\}/gi;
+  let m;
+  while ((m = ffRe.exec(stripped)) !== null) {
+    const body = m[1];
+    const fm = body.match(/font-family\s*:\s*([^;]+)/i);
+    const sm = body.match(/src\s*:\s*([^;]+)/i);
+    if (!fm || !sm) continue;
+    const family = fm[1].trim().replace(/^["']|["']$/g, '');
+    const parsed = parseSrcList(sm[1], sheetBase);
+    if (family && parsed) out.push({ family: family, url: parsed.url, format: parsed.format });
+  }
+  return out;
+}
 
 // Walk `document.styleSheets` for `@font-face` rules and return a
 // JSON-safe `{ family: { url, format } }` map.
 //
-// `cssRules` access throws `SecurityError` on cross-origin stylesheets
-// that did not opt in via `crossorigin="anonymous"` — which is most
-// stylesheets loaded via plain `<link href="https://cdn.example/...">`.
-// For each such sheet we issue a regular `fetch(href)` and parse the
-// returned CSS text manually; nearly every font CDN (unpkg, cdnjs,
-// jsdelivr, googlefonts) sends `Access-Control-Allow-Origin: *` on the
-// stylesheet response, so the fallback succeeds without page-side
-// configuration. Sheets that fail both paths are silently skipped (the
-// snapshot will keep emitting a font-named span for those glyphs).
+// `cssRules` access throws `SecurityError` on cross-origin stylesheets that
+// did not opt in via `crossorigin="anonymous"` — which is most stylesheets
+// loaded via plain `<link href="https://cdn.example/...">`. For each such
+// sheet we issue a regular `fetch(href)` and parse the returned CSS text
+// manually; nearly every font CDN (unpkg, cdnjs, jsdelivr, googlefonts)
+// sends `Access-Control-Allow-Origin: *` on the stylesheet response, so the
+// fallback succeeds without page-side configuration. Sheets that fail both
+// paths are silently skipped (the snapshot will keep emitting a font-named
+// span for those glyphs).
 //
-// `font-family` values are unquoted; `src` URLs are resolved against the
-// stylesheet's own `href` so relative paths in CDN-hosted stylesheets
-// produce absolute, fetchable URLs.
-async function browserCollectFontFaceMap() {
-  // Format-rank lookup for picking the most-decode-friendly source. WOFF2
-  // is preferred (smallest, modern), then WOFF (zlib-only), then raw
-  // SFNT containers. `truetype`/`opentype` are aliases for ttf/otf.
-  function formatRank(f) {
-    if (f === 'woff2') return 1;
-    if (f === 'woff') return 2;
-    if (f === 'ttf' || f === 'truetype') return 3;
-    if (f === 'otf' || f === 'opentype') return 4;
-    return 5;
-  }
-  function parseSrcList(srcRaw, sheetBase) {
-    const urls = [];
-    const re = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)]+?))\s*\)(?:\s*format\(\s*["']?([^"')]+)["']?\s*\))?/g;
-    let m;
-    while ((m = re.exec(srcRaw)) !== null) {
-      const u = (m[1] || m[2] || m[3] || '').trim();
-      const fmt = (m[4] || '').trim().toLowerCase();
-      if (u) urls.push({ url: u, format: fmt });
-    }
-    if (urls.length === 0) return null;
-    urls.sort(function (a, b) { return formatRank(a.format) - formatRank(b.format); });
-    const best = urls[0];
-    let absUrl = best.url;
-    try { absUrl = new URL(best.url, sheetBase).href; } catch (_) { /* keep raw */ }
-    return { url: absUrl, format: best.format };
-  }
-  function parseFontFaceFromText(cssText, sheetBase) {
-    if (!cssText) return [];
-    const stripped = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
-    const out = [];
-    const ffRe = /@font-face\s*\{([^}]*)\}/gi;
-    let m;
-    while ((m = ffRe.exec(stripped)) !== null) {
-      const body = m[1];
-      const fm = body.match(/font-family\s*:\s*([^;]+)/i);
-      const sm = body.match(/src\s*:\s*([^;]+)/i);
-      if (!fm || !sm) continue;
-      const family = fm[1].trim().replace(/^["']|["']$/g, '');
-      const parsed = parseSrcList(sm[1], sheetBase);
-      if (family && parsed) out.push({ family: family, url: parsed.url, format: parsed.format });
-    }
-    return out;
-  }
+// First-write wins: a duplicate `@font-face` (e.g. weight variants sharing
+// the same family) keeps the first source — good enough for icon fonts
+// (single regular weight) and avoids round-tripping a heavier italic/bold
+// variant.
+async function collectFontFaceMap() {
   const map = {};
   const inaccessible = [];
   const sheets = document.styleSheets ? Array.from(document.styleSheets) : [];
@@ -132,10 +157,6 @@ async function browserCollectFontFaceMap() {
       if (!familyRaw || !srcRaw) continue;
       const family = familyRaw.replace(/^["']|["']$/g, '');
       const parsed = parseSrcList(srcRaw, sheetBase);
-      // First-write wins: a duplicate `@font-face` (e.g. weight variants
-      // sharing the same family) keeps the first source — good enough
-      // for icon fonts (single regular weight) and avoids round-tripping
-      // a heavier italic/bold variant.
       if (parsed && !map[family]) map[family] = parsed;
     }
   }
@@ -153,6 +174,68 @@ async function browserCollectFontFaceMap() {
   return map;
 }
 
+// Decode a CSS `content` value into the literal pseudo-element text. The
+// value comes back from `getPropertyValue('content')` already wrapped in
+// quotes (single or double); this regex pulls out every quoted segment and
+// concatenates them. Returns '' for `none` / `normal` / unset, which the
+// caller treats as "no pseudo".
+function pseudoChar(el, pseudo) {
+  const cs = getComputedStyle(el, pseudo);
+  const raw = (cs.getPropertyValue('content') || '').trim();
+  if (!raw || raw === 'none' || raw === 'normal') return '';
+  let out = '';
+  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    out += m[1] !== undefined ? m[1] : m[2];
+  }
+  return out;
+}
+
+// PUA-only filter, applied per-codepoint (not per-string) so a single
+// surrogate-pair character in PUA-A (U+F0000+) is also accepted via
+// `codePointAt(0)`. Single-char check (in the caller) ensures we don't
+// accidentally capture multi-glyph ligature names ("home", "menu") that
+// some icon fonts use; ligature handling would require renderText
+// measurements we don't have here.
+function isPuaCodepoint(cp) {
+  return cp >= 0xE000 && cp <= 0xF8FF;
+}
+
+// Tags whose subtree never paints visible icon glyphs. Skip them up front
+// so a page with hundreds of inline `<style>` / `<script>` blocks doesn't
+// pay for a per-element `getComputedStyle(el, '::before')` round-trip.
+// Mirrors the `DROP_TAGS` list in browser-snapshot.js but is independently
+// declared because the two payloads are shipped as separate IIFEs.
+function isIconScanSkippedTag(tag) {
+  if (!tag) return false;
+  switch (tag) {
+    case 'SCRIPT': case 'STYLE': case 'LINK': case 'META': case 'NOSCRIPT':
+    case 'IFRAME': case 'OBJECT': case 'EMBED': case 'VIDEO': case 'AUDIO':
+    case 'HEAD': case 'TITLE': case 'BASE':
+    case 'TEMPLATE': case 'SLOT': case 'DIALOG':
+    case 'MAP': case 'AREA': case 'SOURCE': case 'TRACK': case 'PARAM':
+    case 'BR': case 'HR': case 'WBR':
+      return true;
+    default:
+      return false;
+  }
+}
+
+// ===== Browser-side entry points =====
+//
+// `browserCollect…` functions are not self-contained: they reference the
+// helpers above by name and only resolve when executed inside a closure
+// that has those helpers in scope. The IIFE strings below build that
+// closure for `page.evaluate`; the standalone browser bundle does the same
+// inside its UMD/ESM factory.
+
+// Walk styleSheets and return the JSON-safe `@font-face` family→{url,format}
+// map. Async because the cross-origin CSS fallback uses `fetch`.
+async function browserCollectFontFaceMap() {
+  return await collectFontFaceMap();
+}
+
 // Walk every leaf element in the document and report icon-font candidates.
 // A candidate is an element with no element children, no direct text, and a
 // single PUA character in its `::before` (or `::after`) `content` whose
@@ -164,135 +247,14 @@ async function browserCollectFontFaceMap() {
 // webfonts (Phosphor, Material Icons, Font Awesome, …) and avoids
 // converting genuine pseudo-text content (e.g. `content: "—"`) into
 // rendering glyph paths.
-//
-// Async because cross-origin stylesheets routinely deny `cssRules` access
-// (Chromium throws `SecurityError` when the response was loaded without an
-// opt-in `crossorigin="anonymous"` attribute). For each such sheet we fall
-// back to fetching the CSS text via `window.fetch` — the network response
-// almost always carries `Access-Control-Allow-Origin: *` even when the
-// stylesheet `<link>` itself didn't request CORS — and parse the
-// `@font-face` declarations with a small regex pipeline. This is the only
-// way to discover the Phosphor / FontAwesome / Material Icons URL when the
-// snapshot loads them straight off `unpkg.com` / `cdnjs.com` without any
-// page-side configuration.
 async function browserCollectIconFontTargets() {
-  function formatRank(f) {
-    if (f === 'woff2') return 1;
-    if (f === 'woff') return 2;
-    if (f === 'ttf' || f === 'truetype') return 3;
-    if (f === 'otf' || f === 'opentype') return 4;
-    return 5;
-  }
-  function parseSrcList(srcRaw, sheetBase) {
-    const urls = [];
-    const re = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)]+?))\s*\)(?:\s*format\(\s*["']?([^"')]+)["']?\s*\))?/g;
-    let m;
-    while ((m = re.exec(srcRaw)) !== null) {
-      const u = (m[1] || m[2] || m[3] || '').trim();
-      const fmt = (m[4] || '').trim().toLowerCase();
-      if (u) urls.push({ url: u, format: fmt });
-    }
-    if (urls.length === 0) return null;
-    urls.sort(function (a, b) { return formatRank(a.format) - formatRank(b.format); });
-    const best = urls[0];
-    let absUrl = best.url;
-    try { absUrl = new URL(best.url, sheetBase).href; } catch (_) { /* keep raw */ }
-    return { url: absUrl, format: best.format };
-  }
-  // Parse `@font-face { ... }` blocks out of a raw CSS string. Used as a
-  // fallback when `cssRules` is denied by CORS — Chromium still loaded
-  // and applied the stylesheet (so the page renders), but JS can't
-  // introspect it. Regex parsing is intentionally permissive: the only
-  // tokens we care about are `font-family` and `src`, both of which use
-  // the same syntax that `cssRules` would yield. Comments are stripped
-  // first so a `/* src: url(...) */` decoy doesn't mislead the matcher.
-  function parseFontFaceFromText(cssText, sheetBase) {
-    if (!cssText) return [];
-    const stripped = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
-    const out = [];
-    const ffRe = /@font-face\s*\{([^}]*)\}/gi;
-    let m;
-    while ((m = ffRe.exec(stripped)) !== null) {
-      const body = m[1];
-      const fm = body.match(/font-family\s*:\s*([^;]+)/i);
-      const sm = body.match(/src\s*:\s*([^;]+)/i);
-      if (!fm || !sm) continue;
-      const family = fm[1].trim().replace(/^["']|["']$/g, '');
-      const parsed = parseSrcList(sm[1], sheetBase);
-      if (family && parsed) out.push({ family: family, url: parsed.url, format: parsed.format });
-    }
-    return out;
-  }
-  async function collectFontFaceMap() {
-    const map = {};
-    const inaccessible = [];
-    const sheets = document.styleSheets ? Array.from(document.styleSheets) : [];
-    for (const sheet of sheets) {
-      let rules;
-      try { rules = sheet.cssRules; } catch (_) {
-        if (sheet.href) inaccessible.push(sheet.href);
-        continue;
-      }
-      if (!rules) continue;
-      const sheetBase = sheet.href || document.baseURI;
-      for (const rule of Array.from(rules)) {
-        if (rule.type !== 5) continue;
-        const familyRaw = (rule.style.getPropertyValue('font-family') || '').trim();
-        const srcRaw = rule.style.getPropertyValue('src') || '';
-        if (!familyRaw || !srcRaw) continue;
-        const family = familyRaw.replace(/^["']|["']$/g, '');
-        const parsed = parseSrcList(srcRaw, sheetBase);
-        if (parsed && !map[family]) map[family] = parsed;
-      }
-    }
-    // Fallback for cross-origin sheets that denied cssRules access. Most
-    // CDNs (unpkg, cdnjs, jsdelivr, fonts.googleapis) send an unrestricted
-    // `Access-Control-Allow-Origin: *` on the CSS response, so a plain
-    // `fetch(href)` from the page's origin succeeds even when the linked
-    // stylesheet itself was loaded without `crossorigin`. Failures (rare,
-    // typically same-origin policy on a self-hosted icon font without
-    // ACAO) silently drop the family from the map; the snapshot will keep
-    // emitting a font-named span for those glyphs.
-    for (const href of inaccessible) {
-      try {
-        const res = await fetch(href, { mode: 'cors', credentials: 'omit' });
-        if (!res.ok) continue;
-        const css = await res.text();
-        const entries = parseFontFaceFromText(css, href);
-        for (const e of entries) {
-          if (!map[e.family]) map[e.family] = { url: e.url, format: e.format };
-        }
-      } catch (_) { /* CORS or network — skip */ }
-    }
-    return map;
-  }
-  function pseudoChar(el, pseudo) {
-    const cs = getComputedStyle(el, pseudo);
-    const raw = (cs.getPropertyValue('content') || '').trim();
-    if (!raw || raw === 'none' || raw === 'normal') return '';
-    let out = '';
-    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
-    let m;
-    while ((m = re.exec(raw)) !== null) {
-      out += m[1] !== undefined ? m[1] : m[2];
-    }
-    return out;
-  }
   const fontFaceMap = await collectFontFaceMap();
   const targets = [];
   let counter = 0;
-  // PUA-only filter, applied per-codepoint (not per-string) so a single
-  // surrogate-pair character in PUA-A (U+F0000+) is also accepted via
-  // `codePointAt(0)`. Single-char check ensures we don't accidentally
-  // capture multi-glyph ligature names ("home", "menu") that some icon
-  // fonts use; ligature handling would require renderText measurements
-  // we don't have here.
-  function isPuaCodepoint(cp) {
-    return cp >= 0xE000 && cp <= 0xF8FF;
-  }
   const all = document.body ? document.body.querySelectorAll('*') : [];
   for (const el of all) {
     if (!el || el.children.length > 0) continue;
+    if (isIconScanSkippedTag(el.tagName)) continue;
     let hasText = false;
     for (const n of el.childNodes) {
       if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) { hasText = true; break; }
@@ -343,6 +305,9 @@ async function browserCollectIconFontTargets() {
 // routes via `renderInlineIconSvg`. Hosts that didn't get a result (font
 // fetch failed, glyph missing, …) keep their original `::before` pseudo,
 // so the snapshot falls back to the legacy font-named span path.
+//
+// Self-contained (no helper dependencies), so it can be passed straight to
+// `page.evaluate(fn, args)` without an IIFE wrapper.
 function browserApplyIconFontSvgs(results) {
   const arr = results || [];
   for (let i = 0; i < arr.length; i++) {
@@ -360,6 +325,35 @@ function browserApplyIconFontSvgs(results) {
     stragglers[i].removeAttribute('data-icon-target-id');
   }
 }
+
+// ===== Browser-side payload assembly =====
+//
+// Mirrors the layout in lib/browser-snapshot.js: a single array of helper
+// references → concatenated source string → IIFE wrappers around the two
+// async entry points. The standalone browser bundle re-uses
+// `ICON_FONT_HELPERS_SRC` to expose the helpers under its factory closure.
+
+const ICON_FONT_HELPER_FNS = [
+  formatRank,
+  parseSrcList,
+  parseFontFaceFromText,
+  collectFontFaceMap,
+  pseudoChar,
+  isPuaCodepoint,
+  isIconScanSkippedTag,
+];
+const ICON_FONT_HELPERS_SRC = ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
+
+// `page.evaluate(string)` evaluates the string and awaits its result, so an
+// async-IIFE is the right shape for both entry points: the helpers are
+// declared first (function declarations hoist), then the entry function is
+// declared and immediately invoked.
+const COLLECT_FONT_FACE_MAP_PAYLOAD =
+  '(async () => {\n' + ICON_FONT_HELPERS_SRC + '\n' + browserCollectFontFaceMap.toString() +
+  '\nreturn await browserCollectFontFaceMap();\n})()';
+const COLLECT_ICON_FONT_TARGETS_PAYLOAD =
+  '(async () => {\n' + ICON_FONT_HELPERS_SRC + '\n' + browserCollectIconFontTargets.toString() +
+  '\nreturn await browserCollectIconFontTargets();\n})()';
 
 // ===== Node-side helpers =====
 
@@ -471,24 +465,39 @@ function glyphToSvg(font, codepoint) {
 // snapshot falls back to the font-named span.
 async function resolveIconFontSvgs(targets, logger) {
   if (!targets || targets.length === 0) return [];
-  const log = typeof logger === 'function' ? logger : function () {};
+  const log = logger;
   const fontByUrl = new Map();
   const failedUrls = new Set();
+
+  // Pre-fetch each unique font URL in parallel. The previous implementation
+  // walked targets sequentially and downloaded on-demand, which serialised
+  // every CDN round-trip — a page using Phosphor + FontAwesome + Material
+  // Icons paid three RTTs back-to-back. Pulling the fetch+parse out into a
+  // Promise.all collapses those into a single overlapping window. Per-glyph
+  // SVG extraction stays sequential (CPU-bound, not benefitted by parallel
+  // dispatch) and runs against the now-warm cache.
+  const uniqueUrls = [];
+  const seen = new Set();
+  for (const t of targets) {
+    if (!t || !t.fontUrl || seen.has(t.fontUrl)) continue;
+    seen.add(t.fontUrl);
+    uniqueUrls.push(t.fontUrl);
+  }
+  await Promise.all(uniqueUrls.map(async (url) => {
+    try {
+      const bytes = await fetchFontBytes(url);
+      const font = await parseFontBuffer(bytes);
+      fontByUrl.set(url, font);
+    } catch (err) {
+      failedUrls.add(url);
+      log('failed to load icon font ' + url + ': ' + errMessage(err));
+    }
+  }));
+
   const results = [];
   for (const t of targets) {
     if (!t || !t.fontUrl) continue;
     if (failedUrls.has(t.fontUrl)) continue;
-    if (!fontByUrl.has(t.fontUrl)) {
-      try {
-        const bytes = await fetchFontBytes(t.fontUrl);
-        const font = await parseFontBuffer(bytes);
-        fontByUrl.set(t.fontUrl, font);
-      } catch (err) {
-        failedUrls.add(t.fontUrl);
-        log('failed to load icon font ' + t.fontUrl + ': ' + (err && err.message ? err.message : err));
-        continue;
-      }
-    }
     const font = fontByUrl.get(t.fontUrl);
     if (!font) continue;
     let svg = null;
@@ -496,7 +505,7 @@ async function resolveIconFontSvgs(targets, logger) {
       svg = glyphToSvg(font, t.codepoint);
     } catch (err) {
       log('failed to extract glyph U+' + t.codepoint.toString(16).toUpperCase() + ' from ' + t.fontUrl
-        + ': ' + (err && err.message ? err.message : err));
+        + ': ' + errMessage(err));
       continue;
     }
     if (!svg) continue;
@@ -513,10 +522,7 @@ async function resolveIconFontSvgs(targets, logger) {
 async function inlineIconFontsOnPage(page, opts) {
   const options = opts || {};
   const logger = typeof options.logger === 'function' ? options.logger : function () {};
-  // Ship `browserCollectIconFontTargets` to the page. The fn is fully
-  // self-contained (collectFontFaceMap and pseudoChar are inlined), so a
-  // straight `page.evaluate(fn)` is enough.
-  const targets = await page.evaluate(browserCollectIconFontTargets);
+  const targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_PAYLOAD);
   if (!targets || targets.length === 0) return { inlined: 0, total: 0 };
   const results = await resolveIconFontSvgs(targets, logger);
   await page.evaluate(browserApplyIconFontSvgs, results);
@@ -525,10 +531,14 @@ async function inlineIconFontsOnPage(page, opts) {
 
 module.exports = {
   // Browser-side hooks (also re-exported in the standalone bundle so
-  // callers running outside of node can plug in their own resolver).
+  // callers running outside of node can plug in their own resolver). Each
+  // entry function references the helpers below by name; consumers that
+  // run them in isolation must inject `ICON_FONT_HELPERS_SRC` into the
+  // surrounding closure first.
   browserCollectFontFaceMap,
   browserCollectIconFontTargets,
   browserApplyIconFontSvgs,
+  ICON_FONT_HELPERS_SRC,
   // Node-side helpers.
   fetchFontBytes,
   parseFontBuffer,

@@ -33,6 +33,7 @@ const {
   browserCollectFontFaceMap,
   browserCollectIconFontTargets,
   browserApplyIconFontSvgs,
+  ICON_FONT_HELPERS_SRC,
 } = require('./lib/icon-font');
 
 const distDir = path.join(__dirname, 'dist');
@@ -66,10 +67,17 @@ const banner = `/*!
 // reference helpers by name; hoisting makes those references resolve even
 // though the constants appear textually before the helpers in the IIFE
 // payload (matching the layout the puppeteer driver uses today).
+//
+// Icon-font helpers (formatRank, parseSrcList, parseFontFaceFromText,
+// collectFontFaceMap, pseudoChar, isPuaCodepoint, isIconScanSkippedTag) are
+// injected via ICON_FONT_HELPERS_SRC; the `browserCollect*` entry points
+// reference them by name and would `ReferenceError` without this block.
 const factoryBody = `
 ${HELPERS_SRC}
 
 ${PAYLOAD_CONSTANTS_SRC}
+
+${ICON_FONT_HELPERS_SRC}
 
 ${inlineExternalImages.toString()}
 
