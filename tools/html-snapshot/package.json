@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "opentype.js": "^2.0.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "puppeteer": "^23.0.0",
     "wawoff2": "^2.0.1"
   }
