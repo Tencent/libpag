@@ -37,6 +37,8 @@ function parseArgs(argv) {
     skipExisting: false,
     only: '',
     label: 'current',
+    recursive: false,
+    concurrency: 1,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -47,6 +49,12 @@ function parseArgs(argv) {
     else if (a === '--skip-existing') opts.skipExisting = true;
     else if (a === '--only') opts.only = argv[++i];
     else if (a === '--label') opts.label = argv[++i];
+    else if (a === '--recursive' || a === '-r') opts.recursive = true;
+    else if (a === '--concurrency' || a === '-j') {
+      const v = parseInt(argv[++i], 10);
+      if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
+      opts.concurrency = v;
+    }
     else if (a === '-h' || a === '--help') {
       console.log(USAGE);
       process.exit(0);
@@ -64,8 +72,13 @@ const USAGE = `Usage: node run.js [options]
   --pagx-bin <path>   pagx binary (default: \$PAGX_BIN or repo cmake-build-debug/pagx)
   --no-infer-flex     Disable C++ AbsoluteToFlexInferencePass
   --skip-existing     Reuse existing baseline.png / subset.png if present
-  --only <substr>     Only run cases whose filename contains <substr>
-  --label <name>      Sub-directory name under out/ (default: current)`;
+  --only <substr>     Only run cases whose relative path contains <substr>
+  --label <name>      Sub-directory name under out/ (default: current)
+  --recursive, -r     Recurse into sub-directories of --corpus; case names are
+                      derived from the relative path (e.g. tech-hy3/page-001)
+  --concurrency, -j N Process N cases in parallel (default: 1). Each case
+                      spawns its own baseline/snapshot Chromium plus the pagx
+                      binary, so memory and CPU scale roughly linearly with N.`;
 
 const SCRIPT_DIR = __dirname;
 const TOOL_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -75,22 +88,44 @@ function defaultPagxBin() {
   return path.join(REPO_ROOT, 'cmake-build-debug', 'pagx');
 }
 
-function findCorpusFiles(corpusDir, only) {
-  // We deliberately exclude `.subset.` outputs that earlier runs left in the
-  // corpus directory. Only top-level *.html files are kept.
-  const entries = fs.readdirSync(corpusDir);
-  const files = [];
-  for (const name of entries) {
-    if (!name.toLowerCase().endsWith('.html')) continue;
-    if (name.includes('.subset.')) continue;
-    if (only && !name.includes(only)) continue;
-    const full = path.join(corpusDir, name);
-    const stat = fs.statSync(full);
-    if (!stat.isFile()) continue;
-    files.push(full);
-  }
-  files.sort();
-  return files;
+// Returns an array of { path, name } where `path` is the absolute html path
+// and `name` is a filesystem-safe identifier derived from the relative path
+// (subdirectories collapsed with '__' so that two `page-001.html` files in
+// different sub-corpora don't overwrite each other in the output tree).
+function findCorpusFiles(corpusDir, only, recursive) {
+  const out = [];
+  const visit = (dir, relPrefix) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (err) {
+      fail(`cannot read directory '${dir}': ${err.message}`);
+    }
+    for (const ent of entries) {
+      const name = ent.name;
+      if (name.startsWith('.')) continue;
+      const full = path.join(dir, name);
+      if (ent.isDirectory()) {
+        if (recursive) visit(full, relPrefix ? `${relPrefix}/${name}` : name);
+        continue;
+      }
+      if (!ent.isFile()) continue;
+      if (!name.toLowerCase().endsWith('.html')) continue;
+      // We deliberately exclude `.subset.` outputs that earlier runs left in
+      // the corpus directory.
+      if (name.includes('.subset.')) continue;
+      const rel = relPrefix ? `${relPrefix}/${name}` : name;
+      if (only && !rel.includes(only)) continue;
+      const base = name.slice(0, -'.html'.length);
+      const caseName = relPrefix
+        ? `${relPrefix.replace(/[\\/]/g, '__')}__${base}`
+        : base;
+      out.push({ path: full, name: caseName });
+    }
+  };
+  visit(corpusDir, '');
+  out.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return out;
 }
 
 function ensureDir(p) {
@@ -106,25 +141,47 @@ function fmt(n, digits = 4) {
   return n.toFixed(digits);
 }
 
+// Async spawn wrapper. Returns a Promise so processCase calls can run in
+// parallel under --concurrency without serializing on the Node event loop
+// (spawnSync would have blocked it).
 function runProc(cmd, args, stderrPath) {
-  const startedAt = timeNow();
-  const result = child_process.spawnSync(cmd, args, {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 180000,
+  return new Promise((resolve) => {
+    const startedAt = timeNow();
+    let child;
+    try {
+      child = child_process.spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      const stderr = `\n${err.message}`;
+      if (stderrPath) {
+        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
+      }
+      resolve({ code: null, durationMs: timeNow() - startedAt, stdout: '', stderr });
+      return;
+    }
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    let killedByTimeout = false;
+    const timer = setTimeout(() => {
+      killedByTimeout = true;
+      try { child.kill('SIGKILL'); } catch (_e) { /* ignore */ }
+    }, 180000);
+    child.on('error', (err) => { stderr += `\n${err.message}`; });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (killedByTimeout) stderr += '\n[runProc] killed by timeout (180s)';
+      if (stderrPath) {
+        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
+      }
+      resolve({ code, durationMs: timeNow() - startedAt, stdout, stderr });
+    });
   });
-  const stderr = (result.stderr || '') + (result.error ? `\n${result.error.message}` : '');
-  if (stderrPath) fs.writeFileSync(stderrPath, stderr, 'utf8');
-  return {
-    code: result.status,
-    durationMs: timeNow() - startedAt,
-    stdout: result.stdout || '',
-    stderr,
-  };
 }
 
-async function processCase(htmlPath, outDir, opts, browser) {
-  const base = path.basename(htmlPath, '.html');
+async function processCase(entry, outDir, opts, browser) {
+  const htmlPath = entry.path;
+  const base = entry.name;
   const caseDir = path.join(outDir, base);
   ensureDir(caseDir);
 
@@ -162,7 +219,7 @@ async function processCase(htmlPath, outDir, opts, browser) {
 
   // 1. baseline
   if (!opts.skipExisting || !fs.existsSync(baselinePng)) {
-    const r = runProc('node', [path.join(SCRIPT_DIR, 'baseline.js'), htmlPath, '-o', baselinePng], baselineStderr);
+    const r = await runProc('node', [path.join(SCRIPT_DIR, 'baseline.js'), htmlPath, '-o', baselinePng], baselineStderr);
     row.baselineMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'baseline-failed';
@@ -172,7 +229,7 @@ async function processCase(htmlPath, outDir, opts, browser) {
 
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
-    const r = runProc('node', [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml], snapshotStderr);
+    const r = await runProc('node', [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml], snapshotStderr);
     row.snapshotMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'snapshot-failed';
@@ -184,7 +241,7 @@ async function processCase(htmlPath, outDir, opts, browser) {
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
     const args = ['import', '--input', subsetHtml, '--output', subsetPagx, '--format', 'html'];
     if (opts.inferFlex) args.push('--html-infer-flex');
-    const r = runProc(opts.pagxBin, args, importStderr);
+    const r = await runProc(opts.pagxBin, args, importStderr);
     row.importMs = r.durationMs;
     if (r.code !== 0 || !fs.existsSync(subsetPagx)) {
       row.error = 'import-failed';
@@ -198,8 +255,8 @@ async function processCase(htmlPath, outDir, opts, browser) {
 
   // 4. resolve + render
   if (!opts.skipExisting || !fs.existsSync(subsetPng)) {
-    runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
-    const r = runProc(opts.pagxBin, ['render', subsetPagx, '--output', subsetPng, '--scale', '1'],
+    await runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
+    const r = await runProc(opts.pagxBin, ['render', subsetPagx, '--output', subsetPng, '--scale', '1'],
       path.join(caseDir, 'render.stderr.txt'));
     row.renderMs = r.durationMs;
     if (r.code !== 0 || !fs.existsSync(subsetPng)) {
@@ -472,36 +529,55 @@ async function main() {
   if (!fs.existsSync(opts.pagxBin)) {
     fail(`pagx binary not found: ${opts.pagxBin}`, 1);
   }
-  const cases = findCorpusFiles(opts.corpus, opts.only);
+  const cases = findCorpusFiles(opts.corpus, opts.only, opts.recursive);
   if (cases.length === 0) {
-    fail(`no html cases found in ${opts.corpus}`, 1);
+    const hint = opts.recursive ? '' : ' (try --recursive to descend into sub-directories)';
+    fail(`no html cases found in ${opts.corpus}${hint}`, 1);
   }
-  console.log(`run: ${cases.length} cases → ${opts.outDir}`);
+  const concurrency = Math.max(1, Math.min(opts.concurrency, cases.length));
+  console.log(`run: ${cases.length} cases → ${opts.outDir}  (concurrency=${concurrency})`);
 
   // A single browser instance is reused for both the live and subset flex
-  // counts across every case. Launching once shaves ~1s per case.
+  // counts across every case. Launching once shaves ~1s per case. Opening
+  // multiple pages on it concurrently is safe.
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--font-render-hinting=none'],
   });
 
-  const rows = [];
-  try {
-    for (let i = 0; i < cases.length; i++) {
+  // Results are stored at the input index so the report keeps deterministic
+  // order regardless of completion timing. Workers pull from a shared cursor.
+  const rows = new Array(cases.length);
+  let nextIdx = 0;
+  let doneCount = 0;
+  const total = cases.length;
+
+  const worker = async () => {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= total) return;
       const c = cases[i];
-      const name = path.basename(c);
-      process.stdout.write(`[${i + 1}/${cases.length}] ${name}  `);
       const t0 = timeNow();
-      const row = await processCase(c, opts.outDir, opts, browser);
+      let row;
+      try {
+        row = await processCase(c, opts.outDir, opts, browser);
+      } catch (err) {
+        row = { name: c.name, htmlPath: c.path, error: `unhandled: ${err && err.message ? err.message : err}` };
+      }
       const dur = timeNow() - t0;
+      doneCount += 1;
       if (row.error) {
-        console.log(`ERROR ${row.error} (${dur} ms)`);
+        console.log(`[${doneCount}/${total}] ${c.name}  ERROR ${row.error} (${dur} ms)`);
       } else {
         const delta = row.flexDelta > 0 ? `+${row.flexDelta}` : String(row.flexDelta);
-        console.log(`SSIM ${fmt(row.ssim, 4)}  diff ${fmt(row.pixelDiffRatio * 100, 2)}%  flex ${row.flexLive}/${row.flexSubset} (Δ${delta})  warn ${row.importerWarnings}  (${dur} ms)`);
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssim, 4)}  diff ${fmt(row.pixelDiffRatio * 100, 2)}%  flex ${row.flexLive}/${row.flexSubset} (Δ${delta})  warn ${row.importerWarnings}  (${dur} ms)`);
       }
-      rows.push(row);
+      rows[i] = row;
     }
+  };
+
+  try {
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
   } finally {
     await browser.close();
   }
