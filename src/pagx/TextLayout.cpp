@@ -25,6 +25,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
@@ -384,13 +385,25 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
+    // Synthesise bold / italic when the typeface that the system actually returned does not
+    // carry the requested weight or slant. Mirrors the browser's default
+    // `font-synthesis: weight style` behaviour and is essential for CJK fonts which rarely
+    // ship Italic faces and often stop at Bold (no Black). The 200-step weight threshold
+    // avoids over-darkening when the gap is small (e.g. requested SemiBold matched onto
+    // Medium).
+    auto requestedStyle = ParseFontStyleName(text->fontStyle);
+    auto actualStyle =
+        primaryTypeface ? ParseFontStyleName(primaryTypeface->fontStyle()) : ParsedFontStyle{};
+    bool synthBold = (requestedStyle.weight - actualStyle.weight) >= 200;
+    bool synthItalic = requestedStyle.italic && !actualStyle.italic;
+
     float effectiveFontSize = text->fontSize * textScale;
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
-    primaryFont.setFauxBold(text->fauxBold);
-    primaryFont.setFauxItalic(text->fauxItalic);
+    primaryFont.setFauxBold(text->fauxBold || synthBold);
+    primaryFont.setFauxItalic(text->fauxItalic || synthItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
-    metricsFont.setFauxBold(text->fauxBold);
-    metricsFont.setFauxItalic(text->fauxItalic);
+    metricsFont.setFauxBold(text->fauxBold || synthBold);
+    metricsFont.setFauxItalic(text->fauxItalic || synthItalic);
     float currentX = 0;
     const std::string& content = text->text;
     float effectiveLetterSpacing = text->letterSpacing * textScale;

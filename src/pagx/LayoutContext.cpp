@@ -17,23 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayoutContext.h"
+#include <cstdlib>
 #include "FontConfigData.h"
 #include "SystemFonts.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-static int StylePriority(const std::string& style) {
-  if (style == "Regular") {
-    return 0;
-  }
-  if (style == "Medium") {
-    return 1;
-  }
-  if (style == "Normal") {
-    return 2;
-  }
-  return 3;
+static int StyleMatchDistance(const ParsedFontStyle& candidate, const ParsedFontStyle& requested) {
+  // Slant mismatches are penalised heavily so that the closest-weight upright never wins
+  // over an italic match (and vice versa) when the caller asked for one. The 1000-step
+  // penalty exceeds the maximum possible weight gap (900 - 100 = 800).
+  int weightDiff = std::abs(candidate.weight - requested.weight);
+  int slantPenalty = (candidate.italic != requested.italic) ? 1000 : 0;
+  return weightDiff + slantPenalty;
 }
 
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
@@ -58,20 +56,25 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
       return it->second;
     }
 
-    // Stage 2: Family-name match in registered typefaces (prefer Regular style)
+    // Stage 2: Family-name match in registered typefaces. Pick the candidate whose parsed
+    // weight + slant is closest to the request so that asking for `Black Italic` prefers a
+    // registered Black face over Regular when both are present. Lexicographic style ordering
+    // is used as a stable tiebreak when two faces sit at equal distance.
+    auto requested = ParseFontStyleName(fontStyle);
     std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
-    int bestPriority = 4;
+    int bestDistance = 0;
     std::string bestStyle = {};
     for (const auto& pair : fontConfig->data->registeredTypefaces) {
       if (pair.first.family != fontFamily) {
         continue;
       }
-      int priority = StylePriority(pair.first.style);
-      bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
-                       (priority == bestPriority && pair.first.style < bestStyle);
+      auto candidate = ParseFontStyleName(pair.first.style);
+      int distance = StyleMatchDistance(candidate, requested);
+      bool preferred = (bestTypeface == nullptr) || (distance < bestDistance) ||
+                       (distance == bestDistance && pair.first.style < bestStyle);
       if (preferred) {
         bestTypeface = pair.second;
-        bestPriority = priority;
+        bestDistance = distance;
         bestStyle = pair.first.style;
       }
     }
