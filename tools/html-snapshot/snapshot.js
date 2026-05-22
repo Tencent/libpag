@@ -26,7 +26,7 @@
 
 const fs = require('fs');
 const puppeteer = require('puppeteer');
-const { parseArgs, LOG_PREFIX } = require('./lib/cli');
+const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
 const { inlineIconFontsOnPage } = require('./lib/icon-font');
 const { openAndSettlePage } = require('./lib/page-loader');
@@ -54,7 +54,7 @@ async function main() {
     // `npm install` redirected the puppeteer cache. Surface a one-line hint
     // so users can fix it without reading the full stack trace; the original
     // error still propagates so non-cache failures aren't masked.
-    const msg = (err && err.message) || String(err);
+    const msg = errMessage(err);
     if (/Could not find Chrome|Failed to launch the browser process/i.test(msg)) {
       console.error(`${LOG_PREFIX}failed to launch headless Chromium. Run:`);
       console.error(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
@@ -72,11 +72,11 @@ async function main() {
       headers: opts.headers,
       onConsole: (msg) => {
         if (msg.type() === 'error') {
-          console.error(`page error: ${msg.text()}`);
+          console.error(`${LOG_PREFIX}page error: ${msg.text()}`);
         }
       },
       onPageError: (err) => {
-        console.error(`page exception: ${err.message}`);
+        console.error(`${LOG_PREFIX}page exception: ${errMessage(err)}`);
       },
     });
 
@@ -112,7 +112,7 @@ async function main() {
         // legacy font-named span path. Surface the diagnostic so the
         // operator can decide whether to investigate, but never abort
         // the snapshot — the rest of the page still has to make it out.
-        console.error(`${LOG_PREFIX}inline-icon-fonts failed: ${err && err.message ? err.message : err}`);
+        console.error(`${LOG_PREFIX}inline-icon-fonts failed: ${errMessage(err)}`);
       }
     }
 
