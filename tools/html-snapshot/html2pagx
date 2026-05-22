@@ -42,6 +42,21 @@ print_usage() {
   sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
 }
 
+# Run an external command and abort the script with a uniform error message
+# on non-zero exit. Use this for the snapshot/resolve/render steps where a
+# failure should terminate html2pagx with `html2pagx: <label> failed`. The
+# `pagx import` step is excluded — it pipes through `grep` to filter known
+# warnings, so its exit code is intentionally swallowed and a `[[ ! -f ]]`
+# check verifies success after the pipe.
+run_step() {
+  local label="$1"
+  shift
+  if ! "$@"; then
+    echo "html2pagx: ${label} failed" >&2
+    exit 1
+  fi
+}
+
 #--------------------------------------------------------------------------------------------------
 # Arg parsing
 #--------------------------------------------------------------------------------------------------
@@ -227,8 +242,9 @@ TOTAL_STEPS=2
 [[ "$DO_RENDER" -eq 1 ]] && TOTAL_STEPS=4
 
 echo "[1/$TOTAL_STEPS] snapshot  $INPUT_ABS"
-node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}" \
-  || { echo "html2pagx: snapshot failed" >&2; exit 1; }
+run_step snapshot \
+  node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" \
+  "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}"
 
 #--------------------------------------------------------------------------------------------------
 # Step 2: pagx import
@@ -258,8 +274,7 @@ fi
 # Step 3: pagx resolve
 #--------------------------------------------------------------------------------------------------
 echo "[3/$TOTAL_STEPS] resolve   $PAGX_FILE"
-"$PAGX_BIN" resolve "$PAGX_FILE" \
-  || { echo "html2pagx: pagx resolve failed" >&2; exit 1; }
+run_step "pagx resolve" "$PAGX_BIN" resolve "$PAGX_FILE"
 
 if [[ "$DO_RENDER" -ne 1 ]]; then
   echo "[done] wrote $PAGX_FILE (skipped render)"
@@ -270,7 +285,6 @@ fi
 # Step 4: pagx render
 #--------------------------------------------------------------------------------------------------
 echo "[4/$TOTAL_STEPS] render    $PAGX_FILE  ->  $PNG_FILE (scale=$SCALE)"
-"$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE" \
-  || { echo "html2pagx: pagx render failed" >&2; exit 1; }
+run_step "pagx render" "$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE"
 
 echo "[done] $PNG_FILE"
