@@ -251,10 +251,10 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   // "Black Italic". Regular weight collapses the weight portion to empty.
   out.fontStyleName = ResolveFontStyleName(out.fontWeight, out.fontStyle);
 
-  static const char* kTextDisallowed[] = {
+  static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
       "font-variant",   "font-stretch", "font"};
-  for (const auto* prop : kTextDisallowed) {
+  for (const auto* prop : TextDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
@@ -303,9 +303,9 @@ void HTMLParserContext::parseBoxSizing(HTMLBoxAttributes& box,
   if (!boxSizing.empty() && boxSizing != "border-box") {
     warn("html: box-sizing: " + boxSizing + " not supported; treated as border-box");
   }
-  static const char* kSizingDisallowed[] = {"min-width", "min-height", "max-width", "max-height",
-                                            "aspect-ratio"};
-  for (const auto* prop : kSizingDisallowed) {
+  static const char* SizingDisallowed[] = {"min-width", "min-height", "max-width", "max-height",
+                                           "aspect-ratio"};
+  for (const auto* prop : SizingDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
@@ -390,10 +390,9 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
   if (!LookupProperty(props, "flex-wrap").empty()) {
     warn("html: flex-wrap not supported; ignored");
   }
-  static const char* kLayoutDisallowed[] = {"flex-grow",  "flex-shrink", "flex-basis",
-                                            "float",      "order",       "align-content",
-                                            "align-self", "direction"};
-  for (const auto* prop : kLayoutDisallowed) {
+  static const char* LayoutDisallowed[] = {"flex-grow", "flex-shrink",   "flex-basis", "float",
+                                           "order",     "align-content", "align-self", "direction"};
+  for (const auto* prop : LayoutDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
@@ -509,6 +508,12 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
   const std::string& border = LookupProperty(props, "border");
   if (!border.empty()) {
     auto tokens = SplitTopLevelWhitespace(border);
+    // Collect candidate colour tokens — anything that's not a width / known style keyword.
+    // Take the FIRST candidate as the border colour and warn on any subsequent ones so the
+    // author notices `border: 1px solid red blue`-style mistakes (previously the second
+    // colour silently overwrote the first).
+    std::string colorToken;
+    bool sawExtraColor = false;
     for (auto& t : tokens) {
       float w = parsePxLength(t);
       if (!std::isnan(w)) {
@@ -522,7 +527,17 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
         warn("html: border style '" + lt + "' not supported; treated as solid");
         continue;
       }
-      box.borderColor = parseColor(t);
+      if (colorToken.empty()) {
+        colorToken = t;
+      } else {
+        sawExtraColor = true;
+      }
+    }
+    if (sawExtraColor) {
+      warn("html: border value '" + border + "' has multiple colour tokens; first one used");
+    }
+    if (!colorToken.empty()) {
+      box.borderColor = parseColor(colorToken);
     }
     box.borderSet = box.borderWidthPx > 0;
   }
@@ -551,10 +566,10 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* kVisualsDisallowed[] = {"background-size",     "background-repeat",
-                                             "background-position", "outline",
-                                             "perspective",         "clip-path"};
-  for (const auto* prop : kVisualsDisallowed) {
+  static const char* VisualsDisallowed[] = {"background-size",     "background-repeat",
+                                            "background-position", "outline",
+                                            "perspective",         "clip-path"};
+  for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
@@ -563,6 +578,17 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
 void HTMLParserContext::parseBoxTransform(
     HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+  // The current importer only honours `transform-origin: 50% 50%` (the CSS default), which
+  // matches the inline output emitted by the html-snapshot tool. Anything else would require
+  // the resolver to translate the origin into a TextBox `anchor` offset. Warn so authors of
+  // hand-written subset HTML notice — this used to live at the tail of this function and
+  // was therefore skipped on every transform-parsing failure (`return` early), masking the
+  // real configuration issue.
+  std::string origin = ToLower(Trim(LookupProperty(props, "transform-origin")));
+  if (!origin.empty() && origin != "50% 50%" && origin != "center" && origin != "center center") {
+    warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
+  }
+
   std::string transform = Trim(LookupProperty(props, "transform"));
   if (transform.empty()) return;
 
@@ -665,15 +691,6 @@ void HTMLParserContext::parseBoxTransform(
   } else {
     warn("html: transform function '" + fn + "' is not in the supported subset");
     return;
-  }
-
-  // The current importer only honours `transform-origin: 50% 50%` (the CSS default), which
-  // matches the inline output emitted by the html-snapshot tool. Anything else would require
-  // the resolver to translate the origin into a TextBox `anchor` offset. Warn so authors of
-  // hand-written subset HTML notice.
-  std::string origin = ToLower(Trim(LookupProperty(props, "transform-origin")));
-  if (!origin.empty() && origin != "50% 50%" && origin != "center" && origin != "center center") {
-    warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
   }
 
   box.transform = parsed;

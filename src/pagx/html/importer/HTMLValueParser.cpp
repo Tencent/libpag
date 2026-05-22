@@ -31,7 +31,7 @@ using namespace pagx::html;
 
 namespace {
 
-constexpr float kHtmlPi = 3.14159265358979323846f;
+constexpr float HtmlPi = 3.14159265358979323846f;
 
 }  // namespace
 
@@ -100,14 +100,22 @@ float HTMLParserContext::parsePxLength(const std::string& valueRaw) {
   char* end = nullptr;
   float num = std::strtof(value.c_str(), &end);
   if (end == value.c_str()) return NAN;
-  std::string suffix = Trim(end);
-  if (suffix.empty() || suffix == "px") return num;
+  std::string suffix = ToLower(Trim(end));
   if (suffix == "%") {
     return NAN;  // percent not allowed for properties parsed via parsePxLength
   }
-  if (suffix == "em" || suffix == "rem") {
-    warn("html: em/rem unit not supported; treated as 16px");
-    return num * 16.0f;
+  bool recognized = false;
+  // fontSize is not known at this layer (see ResolveLength for the context-aware path); pass NaN
+  // so em falls back to 16px to match the long-standing behaviour. _canvasWidth/_canvasHeight are
+  // populated before any per-element parsePxLength call; they are 0 only during canvas-size
+  // resolution itself, where vw/vh are necessarily a self-referential mistake.
+  float px = ConvertCssLengthToPx(num, suffix, /*fontSizePx=*/NAN, _canvasWidth, _canvasHeight,
+                                  recognized);
+  if (recognized) {
+    if (suffix == "em" || suffix == "rem") {
+      warn("html: em/rem unit not supported here; treated as 16px");
+    }
+    return px;
   }
   warn("html: length unit '" + suffix + "' not supported; treated as px");
   return num;
@@ -265,7 +273,7 @@ LinearGradient* HTMLParserContext::parseLinearGradient(const std::string& value)
   if (!finaliseGradientStops(stops)) return nullptr;
 
   auto grad = _document->makeNode<LinearGradient>();
-  float angle = CssToPagxAngle(cssAngle) * kHtmlPi / 180.0f;
+  float angle = CssToPagxAngle(cssAngle) * HtmlPi / 180.0f;
   float cx = 0.5f, cy = 0.5f;
   float half = 0.5f;
   grad->startPoint = {cx - std::cos(angle) * half, cy - std::sin(angle) * half};

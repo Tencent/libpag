@@ -29,7 +29,7 @@ namespace pagx::html {
 
 namespace {
 
-constexpr float kRemBasePx = 16.0f;
+constexpr float RemBasePx = 16.0f;
 
 bool IsFiniteNonZero(float v) {
   return std::isfinite(v) && v != 0.0f;
@@ -220,34 +220,27 @@ std::string TransformBorder(const std::string& value, const PropertyContext&,
   if (trimmed.empty()) return std::string();
   std::string lc = ToLower(trimmed);
   if (lc == "none" || lc == "0" || lc == "0px") return std::string();
-  // Accept the canonical `Wpx solid <color>` form (with arbitrary token order). The importer's
-  // own parser tolerates ordering, so we just sanity-check and pass through.
+  // Accept the canonical `Wpx solid <color>` form with arbitrary token order. We do NOT enforce
+  // that the value contains both a width and a style — the resolver downstream is tolerant of
+  // partial forms (e.g. `border: red`, which it treats as a 1px solid border) — but we DO want
+  // to downgrade non-solid styles to `solid` and warn on unknown style keywords. Width/colour
+  // tokens pass through unchanged.
   auto tokens = SplitTopLevelWhitespace(trimmed);
-  bool sawWidth = false;
-  bool sawStyle = false;
   for (auto& t : tokens) {
     std::string tl = ToLower(t);
-    if (tl == "solid") {
-      sawStyle = true;
-      continue;
-    }
+    if (tl == "solid") continue;
     if (tl == "dashed" || tl == "dotted" || tl == "double" || tl == "groove" || tl == "ridge" ||
         tl == "inset" || tl == "outset" || tl == "none" || tl == "hidden") {
       diags.warn("subset:unsupported-property",
                  "html: 'border' style '" + tl + "' downgraded to 'solid'");
-      sawStyle = true;
       continue;
     }
     float n = 0.0f;
     std::string unit;
-    if (ParseLengthComponent(t, n, unit)) {
-      sawWidth = true;
-      continue;
-    }
-    // Otherwise assume color: pass through.
+    if (ParseLengthComponent(t, n, unit)) continue;
+    // Otherwise assume color: pass through. The resolver's parseColor() emits a diagnostic
+    // when a token is not a recognised colour, so we don't re-validate here.
   }
-  (void)sawWidth;
-  (void)sawStyle;
   return trimmed;
 }
 
@@ -543,34 +536,20 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
   if (unit == "%") {
     return EmitPercent(n);
   }
-  if (unit == "em") {
-    float base = IsFiniteNonZero(ctx.currentFontSizePx) ? ctx.currentFontSizePx : kRemBasePx;
+  // Delegate em / rem / pt / vw / vh / unknown unit handling to the shared helper so
+  // ResolveLength and parsePxLength agree on numeric semantics. ResolveLength keeps the
+  // richer diagnostics here (the helper just answers "what px does this resolve to?").
+  bool recognized = false;
+  float fontBase = IsFiniteNonZero(ctx.currentFontSizePx) ? ctx.currentFontSizePx : RemBasePx;
+  float px = ConvertCssLengthToPx(n, unit, fontBase, ctx.canvasWidth, ctx.canvasHeight, recognized);
+  if (recognized) {
     diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
-                                                "' converted to " + FormatNumber(n * base) + "px");
-    return EmitPx(n * base);
-  }
-  if (unit == "rem") {
-    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
-                                                "' converted to " + FormatNumber(n * kRemBasePx) +
-                                                "px");
-    return EmitPx(n * kRemBasePx);
+                                                "' converted to " + FormatNumber(px) + "px");
+    return EmitPx(px);
   }
   if (unit == "vw" || unit == "vh") {
-    float dim = unit == "vw" ? ctx.canvasWidth : ctx.canvasHeight;
-    if (!IsFiniteNonZero(dim)) {
-      return DropProperty(ctx.propertyName, value, "vw/vh require a known canvas size to resolve",
-                          diagnostics);
-    }
-    float px = n * dim / 100.0f;
-    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
-                                                "' converted to " + FormatNumber(px) + "px");
-    return EmitPx(px);
-  }
-  if (unit == "pt") {
-    float px = n * 4.0f / 3.0f;
-    diagnostics.warn("subset:unit-coerced", "html: '" + ctx.propertyName + ": " + trimmed +
-                                                "' converted to " + FormatNumber(px) + "px");
-    return EmitPx(px);
+    return DropProperty(ctx.propertyName, value, "vw/vh require a known canvas size to resolve",
+                        diagnostics);
   }
   return DropProperty(ctx.propertyName, value, "uses an unsupported unit '" + unit + "'",
                       diagnostics);

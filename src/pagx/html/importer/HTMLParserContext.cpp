@@ -111,6 +111,13 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     return nullptr;
   }
 
+  // Collect <style> rules from <head> BEFORE canvas-size resolution: the body's width/height
+  // may live in a class rule, and resolveCanvasSize() routes through getResolvedStyle() which
+  // depends on _cssClassRules / _cssElementRules being populated.
+  if (head) {
+    collectStyles(head);
+  }
+
   // Determine canvas size before constructing the document so that we can publish a
   // diagnostic entry into PAGXDocument::errors when sizing fails. The document is
   // constructed in either case so that callers can read diagnostics.
@@ -138,11 +145,6 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (!canvasResolved) {
     hardError("html: failed to determine canvas size");
     return nullptr;
-  }
-
-  // Collect <style> rules from <head>.
-  if (head) {
-    collectStyles(head);
   }
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
@@ -222,15 +224,10 @@ void HTMLParserContext::hardError(const std::string& message) {
 bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, float& outW,
                                           float& outH) {
   bool haveTarget = !std::isnan(_options.targetWidth) && !std::isnan(_options.targetHeight);
-  std::unordered_map<std::string, std::string> props;
-  auto* styleAttr = body->findAttribute("style");
-  if (styleAttr) {
-    ParseStyleString(*styleAttr, props);
-  }
-  auto* classAttr = body->findAttribute("class");
-  if (classAttr) {
-    mergeClassRules(*classAttr, props);
-  }
+  // Reuse getResolvedStyle so the body's resolved property map is parsed once and cached
+  // for later resolveBox() in convertBody. This also means class rules and element rules
+  // (collected just before this call) participate in canvas-size resolution.
+  const auto& props = getResolvedStyle(body);
   float bodyW = parsePxLength(LookupProperty(props, "width"));
   float bodyH = parsePxLength(LookupProperty(props, "height"));
   bool haveBody = !std::isnan(bodyW) && !std::isnan(bodyH) && bodyW > 0 && bodyH > 0;
@@ -264,10 +261,10 @@ void HTMLParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node, int 
       _existingIds.insert(*idAttr);
     }
   }
-  auto child = node->firstChild;
+  auto child = node->getFirstChild();
   while (child) {
     collectAllIds(child, depth + 1);
-    child = child->nextSibling;
+    child = child->getNextSibling();
   }
 }
 
@@ -348,6 +345,19 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
       auto* childLayer = convertElement(child, inherited, 1);
       if (childLayer) {
         contentHost->children.push_back(childLayer);
+      }
+    } else if (child->type == DOMNodeType::Text) {
+      // Stray text directly under <body> — match convertContainer's behaviour so authors
+      // who write `<body>hello</body>` get a visible result instead of silent loss.
+      std::string trimmed = Trim(child->name);
+      if (!trimmed.empty()) {
+        warn("html: stray text inside <body>; emitted as anonymous text leaf");
+        HTMLBoxAttributes leafBox = HTMLBoxAttributes{};
+        auto anon = MakeStrayTextSpan(trimmed);
+        Layer* leaf = convertTextLeaf(anon, leafBox, inherited);
+        if (leaf) {
+          contentHost->children.push_back(leaf);
+        }
       }
     }
     child = child->getNextSibling();
@@ -511,8 +521,13 @@ HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
 }
 
 bool HTMLParserContext::fragmentsShareStyle(const TextFragment& a, const TextFragment& b) {
+  // CSS unit conversions (em -> px etc.) introduce sub-pixel rounding that should not
+  // prevent two same-styled inline runs from merging. Use a small absolute tolerance for
+  // the float fields. The tolerance is well below any visually-meaningful step.
+  constexpr float epsilon = 1e-3f;
   return a.fontFamily == b.fontFamily && a.fontStyleName == b.fontStyleName &&
-         a.fontSize == b.fontSize && a.letterSpacing == b.letterSpacing && a.color == b.color &&
+         std::fabs(a.fontSize - b.fontSize) < epsilon &&
+         std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
 }
 

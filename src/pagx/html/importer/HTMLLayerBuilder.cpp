@@ -46,15 +46,15 @@ void SerializeNode(std::string& out, const std::shared_ptr<DOMNode>& node, int d
     out += EscapeXml(attr.value, /*isAttribute=*/true);
     out.push_back('"');
   }
-  if (!node->firstChild) {
+  if (!node->getFirstChild()) {
     out += "/>";
     return;
   }
   out.push_back('>');
-  auto child = node->firstChild;
+  auto child = node->getFirstChild();
   while (child) {
     SerializeNode(out, child, depth + 1);
-    child = child->nextSibling;
+    child = child->getNextSibling();
   }
   out += "</";
   out += node->name;
@@ -217,7 +217,7 @@ void ResolveCurrentColorInSvg(const std::shared_ptr<DOMNode>& node,
     }
   }
 
-  for (auto child = node->firstChild; child; child = child->nextSibling) {
+  for (auto child = node->getFirstChild(); child; child = child->getNextSibling()) {
     ResolveCurrentColorInSvg(child, here, depth + 1, /*isRoot=*/false);
   }
 }
@@ -321,20 +321,20 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
   if (box.gapSet) layer->gap = box.gapPx;
   if (box.paddingSet) layer->padding = box.padding;
   if (!box.alignItems.empty()) {
-    static const std::unordered_map<std::string, Alignment> kAlignTable = {
+    static const std::unordered_map<std::string, Alignment> alignTable = {
         {"stretch", Alignment::Stretch},  {"center", Alignment::Center},
         {"flex-start", Alignment::Start}, {"start", Alignment::Start},
         {"flex-end", Alignment::End},     {"end", Alignment::End},
     };
-    auto it = kAlignTable.find(box.alignItems);
-    if (it != kAlignTable.end()) {
+    auto it = alignTable.find(box.alignItems);
+    if (it != alignTable.end()) {
       layer->alignment = it->second;
     } else {
       warn("html: unsupported align-items '" + box.alignItems + "'");
     }
   }
   if (!box.justifyContent.empty()) {
-    static const std::unordered_map<std::string, Arrangement> kArrangeTable = {
+    static const std::unordered_map<std::string, Arrangement> arrangementTable = {
         {"flex-start", Arrangement::Start},
         {"start", Arrangement::Start},
         {"center", Arrangement::Center},
@@ -344,8 +344,8 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
         {"space-evenly", Arrangement::SpaceEvenly},
         {"space-around", Arrangement::SpaceAround},
     };
-    auto it = kArrangeTable.find(box.justifyContent);
-    if (it != kArrangeTable.end()) {
+    auto it = arrangementTable.find(box.justifyContent);
+    if (it != arrangementTable.end()) {
       layer->arrangement = it->second;
     } else {
       warn("html: unsupported justify-content '" + box.justifyContent + "'");

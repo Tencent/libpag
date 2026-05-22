@@ -161,6 +161,21 @@ Padding BuildPaddingShorthand(const std::vector<float>& nums);
 // Returns true on success and writes one of `outPx` / `outPct` (the other stays NaN).
 bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct);
 
+// Single source of truth for CSS length unit conversion.
+// `num` is the numeric component, `unit` is the unit suffix already lower-cased (or empty
+// for unitless). `fontSizePx`/`canvasW`/`canvasH` provide context for em / rem / vw / vh; pass
+// NaN or 0 when not available. On success returns the px equivalent and sets `*recognized`
+// to true. When the unit is unknown or context-dependent context is missing (e.g. vw without
+// a canvas), returns NaN and leaves `*recognized` false.
+//   - "" / "px"  -> num
+//   - "em"       -> num * (fontSizePx finite ? fontSizePx : 16)
+//   - "rem"      -> num * 16
+//   - "%"        -> NaN, recognized=false (caller must opt into percent semantics)
+//   - "pt"       -> num * 4 / 3
+//   - "vw"/"vh"  -> num * canvas / 100 when canvas is finite & > 0; otherwise unrecognized
+float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx, float canvasW,
+                           float canvasH, bool& recognized);
+
 // Collapse HTML whitespace in a single fragment: convert tabs/CR to spaces, collapse
 // adjacent ASCII whitespace, and trim leading/trailing whitespace at the fragment level.
 std::string CollapseHTMLWhitespace(const std::string& raw);

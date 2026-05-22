@@ -432,6 +432,43 @@ bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct) {
   return true;
 }
 
+float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx, float canvasW,
+                           float canvasH, bool& recognized) {
+  recognized = false;
+  if (unit.empty() || unit == "px") {
+    recognized = true;
+    return num;
+  }
+  if (unit == "em") {
+    recognized = true;
+    float base = (std::isfinite(fontSizePx) && fontSizePx > 0) ? fontSizePx : 16.0f;
+    return num * base;
+  }
+  if (unit == "rem") {
+    recognized = true;
+    return num * 16.0f;
+  }
+  if (unit == "pt") {
+    recognized = true;
+    return num * 4.0f / 3.0f;
+  }
+  if (unit == "vw") {
+    if (std::isfinite(canvasW) && canvasW > 0) {
+      recognized = true;
+      return num * canvasW / 100.0f;
+    }
+    return NAN;
+  }
+  if (unit == "vh") {
+    if (std::isfinite(canvasH) && canvasH > 0) {
+      recognized = true;
+      return num * canvasH / 100.0f;
+    }
+    return NAN;
+  }
+  return NAN;
+}
+
 std::string CollapseHTMLWhitespace(const std::string& raw) {
   std::string normalized;
   normalized.reserve(raw.size());

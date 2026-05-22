@@ -94,6 +94,35 @@ std::shared_ptr<DOMNode> MakeElement(const std::string& name) {
 // DocumentSkeletonPass
 //==================================================================================================
 
+namespace {
+
+// Merge `dup`'s children onto the end of `first`'s child list, then unlink `dup` from
+// `parent`'s child list. `prev` is `dup`'s predecessor (or null when `dup` was the first
+// child). Used by the head / body deduplication path so the two cases share one
+// implementation.
+void AbsorbDuplicateInto(const std::shared_ptr<DOMNode>& parent,
+                         const std::shared_ptr<DOMNode>& first, const std::shared_ptr<DOMNode>& dup,
+                         const std::shared_ptr<DOMNode>& prev) {
+  auto sub = dup->firstChild;
+  std::shared_ptr<DOMNode> last = first->firstChild;
+  while (last && last->nextSibling) last = last->nextSibling;
+  if (!first->firstChild) {
+    first->firstChild = sub;
+  } else if (last) {
+    last->nextSibling = sub;
+  }
+  auto dupNext = dup->nextSibling;
+  if (prev) {
+    prev->nextSibling = dupNext;
+  } else {
+    parent->firstChild = dupNext;
+  }
+  dup->nextSibling = nullptr;
+  dup->firstChild = nullptr;
+}
+
+}  // namespace
+
 void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) {
   if (!root) {
     ctx.error("subset:no-root", "html: input has no DOM root");
@@ -121,33 +150,14 @@ void DocumentSkeletonPass::apply(const std::shared_ptr<DOMNode>& root, HTMLTrans
         head = child;
         prev = child;
       } else {
-        // Append head's children into the first head.
-        auto sub = child->firstChild;
-        std::shared_ptr<DOMNode> lastInHead = head->firstChild;
-        while (lastInHead && lastInHead->nextSibling) lastInHead = lastInHead->nextSibling;
-        if (!head->firstChild) {
-          head->firstChild = sub;
-        } else if (lastInHead) {
-          lastInHead->nextSibling = sub;
-        }
-        // Remove duplicate from root.
-        if (prev) prev->nextSibling = next;
+        AbsorbDuplicateInto(root, head, child, prev);
       }
     } else if (child->name == "body") {
       if (!body) {
         body = child;
         prev = child;
       } else {
-        // Append body's children into the first body.
-        auto sub = child->firstChild;
-        std::shared_ptr<DOMNode> lastInBody = body->firstChild;
-        while (lastInBody && lastInBody->nextSibling) lastInBody = lastInBody->nextSibling;
-        if (!body->firstChild) {
-          body->firstChild = sub;
-        } else if (lastInBody) {
-          lastInBody->nextSibling = sub;
-        }
-        if (prev) prev->nextSibling = next;
+        AbsorbDuplicateInto(root, body, child, prev);
       }
     } else {
       // Stray top-level element. The subset doesn't permit anything between <html> and
@@ -1110,18 +1120,16 @@ void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
 
 namespace {
 
-// Wraps non-blank text children of a container into a synthetic `<p>` (or `<span>` when the
-// parent is itself a text leaf). Element children are left untouched.
-void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx,
-                   bool insideTextLeaf) {
-  std::string wrapperTag = insideTextLeaf ? "span" : "p";
+// Wraps non-blank text children of a container into a synthetic `<p>`. Element children are
+// left untouched. Only ever invoked for container parents (see NormalizeChildren), so the
+// wrapper tag is always `<p>`.
+void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
   std::shared_ptr<DOMNode> prev = nullptr;
   auto child = parent->firstChild;
   while (child) {
     auto next = child->nextSibling;
     if (child->type == DOMNodeType::Text && !IsBlankText(child->name)) {
-      // Wrap this text node.
-      auto wrapper = MakeElement(wrapperTag);
+      auto wrapper = MakeElement("p");
       wrapper->firstChild = child;
       child->nextSibling = nullptr;
       wrapper->nextSibling = next;
@@ -1131,8 +1139,7 @@ void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext&
         parent->firstChild = wrapper;
       }
       ctx.warn("subset:text-wrapped",
-               "html: stray text inside <" + parent->name + "> wrapped in <" + wrapperTag + ">",
-               parent);
+               "html: stray text inside <" + parent->name + "> wrapped in <p>", parent);
       prev = wrapper;
     } else if (child->type == DOMNodeType::Text && IsBlankText(child->name)) {
       // Drop blank whitespace nodes between elements (they confuse layout).
@@ -1151,7 +1158,7 @@ void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext&
 
 // Recurse into element children, dropping unknown tags, then run WrapStrayText on the result.
 void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx,
-                       bool parentIsTextLeaf, int depth) {
+                       int depth) {
   if (depth >= MAX_HTML_RECURSION_DEPTH) {
     ctx.warn(
         "subset:max-depth",
@@ -1195,26 +1202,16 @@ void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformCont
       }
     }
     if (child->type == DOMNodeType::Element) {
-      bool childIsTextLeaf = IsTextLeafTag(child->name);
-      NormalizeChildren(child, ctx, childIsTextLeaf, depth + 1);
+      NormalizeChildren(child, ctx, depth + 1);
     }
     prev = child;
     child = next;
   }
-  // After cleaning element children, wrap stray text. Skip inline-run parents (<span>, <a>,
-  // <br>) since their text content is meaningful.
-  if (parent->type == DOMNodeType::Element && parent->name != "br" && parent->name != "img" &&
-      parent->name != "svg" && parent->name != "title" && parent->name != "meta" &&
-      parent->name != "style") {
-    bool wrapAsSpan = parentIsTextLeaf || IsInlineRunTag(parent->name);
-    if (IsContainerTag(parent->name)) {
-      wrapAsSpan = false;
-    }
-    if (!wrapAsSpan && IsContainerTag(parent->name)) {
-      WrapStrayText(parent, ctx, /*insideTextLeaf=*/false);
-    } else if (parentIsTextLeaf) {
-      // Text leaves keep their text children unmodified (they are valid inside <p>/<hN>).
-    }
+  // After cleaning element children, wrap stray text in containers. Text-leaf parents
+  // (<p>/<hN>/<span>/<a>) keep their text children unmodified — that's where text content
+  // legitimately lives. Inline-run / void / metadata parents are also skipped.
+  if (parent->type == DOMNodeType::Element && IsContainerTag(parent->name)) {
+    WrapStrayText(parent, ctx);
   }
 }
 
@@ -1225,7 +1222,7 @@ void StructureNormalizationPass::apply(const std::shared_ptr<DOMNode>& root,
   if (!root || ctx.hasFatal()) return;
   auto body = root->getFirstChild("body");
   if (!body) return;
-  NormalizeChildren(body, ctx, /*parentIsTextLeaf=*/false, 0);
+  NormalizeChildren(body, ctx, 0);
 }
 
 //==================================================================================================
