@@ -12,6 +12,8 @@
     "build:browser": "node build-browser-bundle.js"
   },
   "dependencies": {
-    "puppeteer": "^23.0.0"
+    "opentype.js": "^2.0.0",
+    "puppeteer": "^23.0.0",
+    "wawoff2": "^2.0.1"
   }
 }

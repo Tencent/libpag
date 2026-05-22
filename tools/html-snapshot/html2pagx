@@ -21,6 +21,8 @@
 #   --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
 #   --no-subset-html           Do not write <input>.subset.html (use a temp file
 #                              that is removed after import); default keeps it
+#   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
+#                              → inline SVG conversion (default: enabled)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   -h, --help                 Show this help
@@ -96,6 +98,10 @@ while [[ $# -gt 0 ]]; do
     --viewport-width|--viewport-height|--wait-ms|--selector|--cookie|--header)
       SNAPSHOT_EXTRA_ARGS+=("$1" "$2")
       shift 2
+      ;;
+    --no-inline-icon-fonts)
+      SNAPSHOT_EXTRA_ARGS+=("$1")
+      shift
       ;;
     --)
       shift

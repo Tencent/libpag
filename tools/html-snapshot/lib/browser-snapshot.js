@@ -1179,6 +1179,84 @@ function renderSvg(el, parentRect, rect, left, top, computed, opts) {
   return `<div style="${composed}">${freezeSvg(el, rect)}</div>`;
 }
 
+// Element tagged by the `inline-icon-fonts` pre-pass (lib/icon-font.js):
+// the live page's `::before` icon-font glyph has been replaced with an
+// inline `<svg>` carrying the glyph's vector path. The SVG markup is
+// stashed on the host as `data-snapshot-icon-svg`; here we wrap it in the
+// usual `colorOnly` flex centring box (so the host's inherited `color`
+// flows through `currentColor` fills) and pin its width / height to a
+// `font-size` square inside the host's measured rect.
+//
+// Why `font-size`-sized SVG instead of `rect`-sized? Icon webfonts paint
+// each glyph as a `font-size × font-size` em-square box, so an icon set
+// via `text-[32px]` always renders the glyph at 32×32. The host's actual
+// bounding rect can be larger than that — e.g. `<i class="block">` makes
+// the host span its parent's full width (330 px in a Tailwind column), or
+// a `line-height: 1.5` inflates the height — and stretching the SVG to
+// the rect would distort the icon (a flat 330×32 pen-nib instead of a
+// 32×32 one positioned at the left edge). Using the font-size square
+// preserves the original glyph aspect ratio; the surrounding wrapper
+// still matches the host's rect so siblings positioned alongside the
+// icon stay correctly anchored.
+//
+// Anchoring inside the wrapper mirrors the legacy pseudo-text path: the
+// host's `text-align` (typically `left` for an `<i>` block) drives
+// `justify-content` so an icon in a left-aligned column lands flush with
+// its column edge, while a `text-align: center` host (toolbar buttons,
+// centred grid icons) keeps the icon centred. `align-items: center`
+// vertically centres the glyph in any line-height-induced extra space.
+//
+// `<i>` / `<span>` icon-font hosts often have explicit `font-size` /
+// `line-height` declarations meant to size the glyph. STYLE_SCHEMA's
+// `colorOnly` filter already drops `font-size` / `line-height` from the
+// wrapper output (they belong to the `text` scope, which we don't enable
+// here), so the SVG's pinned pixel dimensions are the sole source of
+// truth for the on-screen icon size.
+function renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts) {
+  const raw = el.getAttribute('data-snapshot-icon-svg') || '';
+  if (!raw) return '';
+  // The icon's natural rendered size: a `font-size × font-size` square.
+  // Clamp to the wrapper's rect so that hosts with sub-font-size boxes
+  // (rare: an icon clipped by a parent's `overflow: hidden` plus an
+  // explicit `width`/`height` smaller than `font-size`) still fit
+  // visibly inside the wrapper. `parseFloat` of the computed `font-size`
+  // returns the resolved pixel value regardless of the source unit.
+  const fontSize = parseFloat(computed.getPropertyValue('font-size')) || 0;
+  let iconW = rect.width;
+  let iconH = rect.height;
+  if (fontSize > 0) {
+    iconW = Math.min(rect.width, fontSize);
+    iconH = Math.min(rect.height, fontSize);
+  }
+  // Map host `text-align` to flex `justify-content` so the icon sits
+  // where the original glyph rendered. `start`/`left` collapse to
+  // `flex-start` (default), `end`/`right` to `flex-end`, `center` to
+  // `center`. Other values (`justify`) fall back to flex-start because
+  // they have no analogue for a single child.
+  let justify = 'flex-start';
+  const textAlign = (computed.getPropertyValue('text-align') || 'left').trim().toLowerCase();
+  if (textAlign === 'center') justify = 'center';
+  else if (textAlign === 'right' || textAlign === 'end') justify = 'flex-end';
+  const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+    box: true, colorOnly: true, ...opts,
+  });
+  const innerLayout = `display: flex; align-items: center; justify-content: ${justify}`;
+  const composed = joinStyles(wrapperStyle, innerLayout);
+  // Pin width / height onto the inner <svg>. The pre-pass emits a
+  // viewBox-only SVG so the size is decided here against the live
+  // measurement; strip any author-emitted dimensions before re-injecting
+  // ours so the values stay coherent.
+  const w = roundPx(iconW);
+  const h = roundPx(iconH);
+  const sized = raw.replace(/^<svg([^>]*)>/i, (_, attrs) => {
+    const stripped = attrs
+      .replace(/\s+width="[^"]*"/i, '')
+      .replace(/\s+height="[^"]*"/i, '');
+    return `<svg${stripped} width="${w}" height="${h}">`;
+  });
+  return `<div style="${composed}">${sized}</div>`;
+}
+
 // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are
 // baked into overlay rectangles painted on top.
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
@@ -1630,6 +1708,19 @@ function render(el, parentRect, opts, precomputed) {
   const left = rect.left - parentRect.left;
   const top = rect.top - parentRect.top;
 
+  // Pre-pass-tagged icon-font hosts: the inline-icon-fonts pass
+  // (lib/icon-font.js) replaced the live `::before` glyph with an inline
+  // `<svg>` payload stashed on the host as `data-snapshot-icon-svg`.
+  // Route to the dedicated renderer ahead of every other branch so we
+  // never accidentally fall through to the legacy pseudo-text path
+  // (which would emit a font-named `<span>` with the original codepoint
+  // alongside the SVG, double-painting the icon). This check is cheap
+  // enough — `getAttribute` on a missing attribute returns null without
+  // touching the attribute table — to leave outside the kind dispatch.
+  if (el.getAttribute && el.getAttribute('data-snapshot-icon-svg')) {
+    return renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts);
+  }
+
   // Dispatch table for the three kinds with dedicated renderers; the `box`
   // kind has its own bifurcation (text-leaf vs container) handled below.
   const handler = KIND_DISPATCH[kind];
@@ -1914,6 +2005,7 @@ const HELPER_FNS = [
   isFlexLayoutFaithful,
   classifyFlexContainer,
   renderSvg,
+  renderInlineIconSvg,
   renderImg,
   renderCanvas,
   renderTextInput,

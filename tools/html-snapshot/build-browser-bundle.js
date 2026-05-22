@@ -29,6 +29,11 @@ const {
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 } = require('./lib/browser-snapshot');
+const {
+  browserCollectFontFaceMap,
+  browserCollectIconFontTargets,
+  browserApplyIconFontSvgs,
+} = require('./lib/icon-font');
 
 const distDir = path.join(__dirname, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
@@ -40,9 +45,16 @@ const banner = `/*!
  * by hand; rerun \`npm run build:browser\` after changing the source.
  *
  * Public API (operates on the live document):
- *   takeSnapshot()              -> { html, width, height }
- *   inlineExternalImages()      -> Promise<void>
- *   inlineCanvases()            -> Promise<void>
+ *   takeSnapshot()                          -> { html, width, height }
+ *   inlineExternalImages()                  -> Promise<void>
+ *   inlineCanvases()                        -> Promise<void>
+ *   collectIconFontTargets()                -> Promise<target[]>
+ *   applyIconFontSvgs(target_svg_pairs)     -> void
+ *   collectFontFaceMap()                    -> Promise<{family:{url,format}}>
+ *
+ * The \`*IconFont*\` hooks let a node-side resolver (or a custom in-browser
+ * font-parsing pass) replace webfont glyph pseudos with inline <svg>; see
+ * tools/html-snapshot/lib/icon-font.js for the reference implementation.
  *
  * Run \`pagx import --format html\` on the resulting HTML to convert it to
  * PAGX. The snapshot conforms to spec/html_subset.md.
@@ -63,10 +75,26 @@ ${inlineExternalImages.toString()}
 
 ${inlineCanvases.toString()}
 
+${browserCollectFontFaceMap.toString()}
+
+${browserCollectIconFontTargets.toString()}
+
+${browserApplyIconFontSvgs.toString()}
+
 return {
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,
+  // Icon-font hooks: callers running outside of node (no opentype.js /
+  // wawoff2 available) can still tag icon-font hosts via
+  // collectIconFontTargets() and post their own SVG results back via
+  // applyIconFontSvgs(). For example, a backend service can receive the
+  // target list, run the node-side resolveIconFontSvgs(), and return the
+  // SVG strings to the page; or the page can use opentype.js + a WOFF2
+  // decoder loaded via <script> to resolve glyphs in-browser.
+  collectFontFaceMap: browserCollectFontFaceMap,
+  collectIconFontTargets: browserCollectIconFontTargets,
+  applyIconFontSvgs: browserApplyIconFontSvgs,
 };
 `;
 
@@ -95,6 +123,9 @@ ${factoryBody}
 export const takeSnapshot = _module.takeSnapshot;
 export const inlineExternalImages = _module.inlineExternalImages;
 export const inlineCanvases = _module.inlineCanvases;
+export const collectFontFaceMap = _module.collectFontFaceMap;
+export const collectIconFontTargets = _module.collectIconFontTargets;
+export const applyIconFontSvgs = _module.applyIconFontSvgs;
 export default _module;
 `;
 

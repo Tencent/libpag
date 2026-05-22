@@ -34,6 +34,12 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - inline `<svg>` icons are kept verbatim, with `currentColor` (and
   `context-fill` / `context-stroke`) frozen per-element so per-node `color`
   overrides survive;
+- webfont icon glyphs (Phosphor, Material Icons, Font Awesome, Lucide,
+  Remix, Tabler, …) injected via `::before { content: "\eXXX"; font-family:
+  "IconFont" }` are converted to inline `<svg><path/></svg>` so the
+  resulting PAGX is self-contained — no longer depends on the icon font
+  being installed on the rendering host (see `--no-inline-icon-fonts`
+  below to opt out);
 - `<canvas>` elements are captured via `canvas.toDataURL('image/png')`
   before the DOM walk and emitted as `<img>` tags, so chart libraries
   (ECharts, Chart.js, D3 + Canvas, …) survive the trip to PAGX as static
@@ -91,6 +97,46 @@ Options:
 | `--selector <css>` | _(auto)_ | Wait for this selector before snapshotting |
 | `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
+| `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
+
+### Inline icon fonts
+
+Icon webfonts (Phosphor, Material Icons, Font Awesome, Lucide, Remix,
+Tabler, …) deliver their glyphs through `@font-face` plus
+`::before { content: "\eXXX" }` pseudo-elements. By default, the snapshot
+walks every PUA pseudo whose `font-family` resolves to a registered
+`@font-face` rule, downloads the font file (WOFF2 → `wawoff2` → TTF →
+`opentype.js`), extracts the glyph as a vector path, and emits it as an
+inline `<svg><path fill="currentColor"/></svg>`. The resulting PAGX:
+
+- no longer depends on the icon font being installed on the rendering
+  machine (the legacy path emits `<Text fontFamily="Phosphor"/>` which
+  silently falls back to a system font when "Phosphor" isn't found —
+  typically a row of `□` glyphs);
+- ships only the glyphs the page actually uses (one `<Path>` per icon, no
+  font tables or kerning data);
+- inherits color through `currentColor`, so `color: red` on an ancestor
+  paints the icon red exactly like the original CSS-driven icon font.
+
+CDN-hosted CSS (e.g. `unpkg.com`, `cdnjs.com`) typically blocks
+`document.styleSheets[i].cssRules` introspection because the response
+wasn't loaded with `crossorigin="anonymous"`. The pre-pass falls back to
+fetching the stylesheet via `window.fetch` and parsing `@font-face` blocks
+out of the raw CSS text — this works for every CDN that sends
+`Access-Control-Allow-Origin: *` (which is all the major ones).
+
+Pass `--no-inline-icon-fonts` to skip the pass entirely. The snapshot
+then emits a font-named `<span>` for each pseudo glyph, matching the
+pre-flag behaviour. Use this when:
+
+- the source page does not use webfont icons (the pass is a no-op then,
+  but disabling it skips a small `document.fonts` walk and a network
+  round-trip per unique font URL);
+- the rendering host is guaranteed to have the icon font installed and
+  you'd rather keep the icon as text (preserves selectability,
+  per-glyph color animation in PAGX TextBoxes, etc.);
+- network egress is undesirable (the pass fetches each unique font URL
+  once via Node's `fetch`).
 
 ### One-shot pipeline
 
@@ -121,6 +167,7 @@ Options:
 | `--no-render` | Stop after `pagx resolve` |
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
+| `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
 
@@ -140,7 +187,7 @@ npm run build:browser
 # → dist/example.html           (drop-in demo that snapshots itself)
 ```
 
-Both bundles expose the same three functions; both operate on the current
+Both bundles expose the same set of functions; all operate on the current
 document and require no other globals:
 
 ```html
@@ -149,6 +196,20 @@ document and require no other globals:
   (async () => {
     await HtmlSnapshot.inlineExternalImages();           // optional
     await HtmlSnapshot.inlineCanvases();                 // optional
+    // Optional: inline icon-font glyphs as <svg>. The browser bundle only
+    // exposes the collect/apply hooks (font parsing requires opentype.js
+    // + a WOFF2 decoder, which we don't bundle). A typical setup posts
+    // the targets to a backend running `lib/icon-font.js`'s
+    // `resolveIconFontSvgs(targets)` and applies the result here:
+    const targets = await HtmlSnapshot.collectIconFontTargets();
+    if (targets.length) {
+      const results = await fetch('/api/inline-icon-fonts', {
+        method: 'POST',
+        body: JSON.stringify(targets),
+        headers: { 'Content-Type': 'application/json' },
+      }).then((r) => r.json());
+      HtmlSnapshot.applyIconFontSvgs(results);
+    }
     const { html, width, height } = HtmlSnapshot.takeSnapshot();
     // `html` is the same flat, subset-compliant string the CLI writes out.
     // Feed it to `pagx import --format html` (server-side) to convert to PAGX.
@@ -157,7 +218,13 @@ document and require no other globals:
 ```
 
 ```js
-import { takeSnapshot, inlineExternalImages, inlineCanvases } from './html-snapshot.esm.js';
+import {
+  takeSnapshot,
+  inlineExternalImages,
+  inlineCanvases,
+  collectIconFontTargets,
+  applyIconFontSvgs,
+} from './html-snapshot.esm.js';
 ```
 
 Use cases:

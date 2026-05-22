@@ -95,6 +95,10 @@ function parseHeader(flagName, value) {
 // setter that mutates `opts` with the next argv token. `-h` / `--help` and
 // positional handling stay inline in `parseArgs` since they affect control
 // flow rather than just options.
+// Boolean toggles that don't consume the next argv token. `takesArg: false`
+// distinguishes them from the value-bearing flags above so `parseArgs` knows
+// not to shift the index after the flag is matched. The helper here keeps
+// the table declarative.
 const FLAGS = [
   { names: ['-o', '--output'],     set: (o, v) => { o.output = v; } },
   { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parseNumber('--viewport-width', v, { min: 1 }); } },
@@ -103,6 +107,14 @@ const FLAGS = [
   { names: ['--selector'],         set: (o, v) => { o.selector = v; } },
   { names: ['--cookie'],           set: (o, v) => { o.cookies.push(parseCookie('--cookie', v)); } },
   { names: ['--header'],           set: (o, v) => { o.headers.push(parseHeader('--header', v)); } },
+  // Disable the inline-icon-font pre-pass (default: enabled). When the pass
+  // is on, every PUA `::before` glyph whose font is registered via
+  // `@font-face` is replaced with a vector `<svg>` extracted from the font
+  // file, so the resulting PAGX no longer depends on the icon font being
+  // installed on the rendering machine. Disable to fall back to the
+  // legacy font-named span path (faster, no font fetch, but the PAGX file
+  // becomes non-portable).
+  { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
 ];
 
 const FLAG_BY_NAME = new Map();
@@ -128,6 +140,13 @@ function parseArgs(argv) {
     selector: '',
     cookies: [],
     headers: [],
+    // Inline-icon-font pre-pass: convert every PUA `::before` glyph backed
+    // by a webfont (Phosphor, Material Icons, Font Awesome, Lucide, …) to
+    // an inline `<svg>` so the snapshot — and the PAGX downstream — no
+    // longer depends on the icon font being available at render time.
+    // See lib/icon-font.js for the pipeline; toggle via
+    // `--no-inline-icon-fonts`.
+    inlineIconFonts: true,
   };
   const positional = [];
   for (let i = 2; i < argv.length; i++) {
@@ -138,7 +157,13 @@ function parseArgs(argv) {
     }
     const flag = FLAG_BY_NAME.get(a);
     if (flag) {
-      flag.set(opts, argv[++i]);
+      // Boolean flags (`takesArg: false`) don't consume the next argv
+      // token; value-bearing flags shift the index past their argument.
+      if (flag.takesArg === false) {
+        flag.set(opts);
+      } else {
+        flag.set(opts, argv[++i]);
+      }
       continue;
     }
     if (a.startsWith('-')) {
@@ -204,7 +229,13 @@ Options:
   --cookie <name=value>      Set a cookie on the target URL (URL inputs only;
                              repeatable)
   --header <Key: Value>      Set an extra HTTP request header (URL inputs only;
-                             repeatable)`);
+                             repeatable)
+  --no-inline-icon-fonts     Disable converting webfont icon glyphs (Phosphor,
+                             Material Icons, Font Awesome, Lucide, …) to
+                             inline <svg>. Default: enabled (the snapshot is
+                             self-contained and renders identically on any
+                             machine, regardless of which icon fonts are
+                             installed).`);
 }
 
 module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, LOG_PREFIX };

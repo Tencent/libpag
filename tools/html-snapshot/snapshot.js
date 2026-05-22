@@ -28,6 +28,7 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { parseArgs, LOG_PREFIX } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
+const { inlineIconFontsOnPage } = require('./lib/icon-font');
 const { openAndSettlePage } = require('./lib/page-loader');
 
 async function main() {
@@ -90,6 +91,30 @@ async function main() {
     // walker can emit it as an <img>. Without this, every chart / scripted
     // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
     await page.evaluate(inlineCanvases);
+
+    // Convert webfont-backed icon glyphs (`::before { content: "\eXXX";
+    // font-family: "Phosphor" }`) to inline `<svg>` paths so the resulting
+    // PAGX is self-contained — `pagx render` no longer needs the icon font
+    // installed on the rendering host. See lib/icon-font.js for details.
+    // Disable with `--no-inline-icon-fonts` when the source page does not
+    // use webfont icons (or when network egress is undesirable, since the
+    // pass downloads each unique font URL once to extract glyph outlines).
+    if (opts.inlineIconFonts) {
+      try {
+        const stats = await inlineIconFontsOnPage(page, {
+          logger: (msg) => console.error(`${LOG_PREFIX}${msg}`),
+        });
+        if (stats.total > 0) {
+          console.error(`${LOG_PREFIX}inlined ${stats.inlined}/${stats.total} icon-font glyph(s) as SVG`);
+        }
+      } catch (err) {
+        // The icon-font pass is best-effort: failures degrade to the
+        // legacy font-named span path. Surface the diagnostic so the
+        // operator can decide whether to investigate, but never abort
+        // the snapshot — the rest of the page still has to make it out.
+        console.error(`${LOG_PREFIX}inline-icon-fonts failed: ${err && err.message ? err.message : err}`);
+      }
+    }
 
     // `takeSnapshot` is a self-contained IIFE string assembled from the
     // helpers in lib/browser-snapshot.js; `page.evaluate` accepts strings
