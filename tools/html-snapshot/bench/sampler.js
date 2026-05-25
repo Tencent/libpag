@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// sampler.js — Linux-only process-tree resource sampler.
+// sampler.js — cross-platform process-tree resource sampler.
 //
 // Why this exists:
 //   /usr/bin/time -v only captures ru_maxrss for the directly waited-on
@@ -11,40 +11,42 @@
 //
 // What this does:
 //   1. Spawns the target command with its arguments.
-//   2. Every `--interval-ms` (default 50ms), walks /proc once:
-//        - reads /proc/<pid>/stat to get ppid for every PID,
-//        - builds a parent → children index,
-//        - traverses descendants of the target PID,
-//        - reads /proc/<pid>/status's `VmRSS:` (resident set, anonymous +
-//          file-backed pages currently in RAM) for each descendant + self,
-//        - sums into a total_rss_kb for the sample, tracks the maximum.
-//   3. After the child exits, reads its own /proc/self/cgroup -> the
-//      container's `memory.peak` (cgroup v2) as a cross-check, plus
-//      `cpu.stat`'s usage_usec delta as a kernel-accounted CPU total
-//      (covers the entire cgroup, including processes that already
-//      exited before the next sample tick).
+//   2. Every `--interval-ms` (default 50ms), walks the live process
+//      table once, builds a parent → children index, traverses the
+//      descendants of the target PID, sums per-process RSS, and tracks
+//      the running peak.
+//        - Linux: reads /proc/<pid>/{stat,status,smaps_rollup} for
+//          VmRSS (resident set, anon + file-backed) and Pss (shared
+//          pages attributed proportionally).
+//        - macOS / Darwin: shells out to `ps -A -o pid=,ppid=,rss=,comm=`
+//          once per tick. No PSS equivalent on macOS, so the `pss`
+//          fields come back null.
+//   3. Optionally (Linux only, controlled by --cgroup / --no-cgroup),
+//      reads `/sys/fs/cgroup/memory.peak` + `/sys/fs/cgroup/cpu.stat`
+//      as kernel-accounted cross-checks. Enabled by default inside
+//      the bench Docker container, off by default for native runs
+//      where the global cgroup is contaminated by other host
+//      processes.
 //   4. Emits a single JSON line on stdout (so a shell loop can append
 //      results to a JSONL file without parsing).
 //
 // Notes / caveats:
 //   - VmRSS double-counts pages shared via fork+CoW (each process that
 //     maps the page is billed for it). For Chromium that's significant,
-//     especially with zygote forking. We also report `unique_rss_kb`
-//     using `Pss:` from /proc/<pid>/smaps_rollup when available, which
-//     attributes shared pages proportionally and is the standard
-//     "what does this process tree actually cost" metric.
-//   - The 50ms tick + /proc walk is itself ~0.5–2% CPU overhead; we
-//     accept that as the cost of accuracy. Lower `--interval-ms` for
-//     faster bursts at the cost of more overhead.
+//     especially with zygote forking. On Linux we also report a Pss
+//     ("proportional share") number from /proc/<pid>/smaps_rollup; on
+//     macOS Pss isn't exposed, so only the upper-bound RSS sum is
+//     available.
+//   - The 50ms tick is itself ~0.5–2% CPU overhead (Linux /proc walk
+//     or macOS `ps -A` fork). Lower `--interval-ms` for faster bursts
+//     at the cost of more overhead.
 //   - cgroup v2 `memory.peak` is the source of truth for peak RSS
-//     across the container; if it's available, it should be quoted in
-//     reports. The /proc-tree number is useful for per-stage breakdown
-//     (when the same container runs many cases), but reset between
-//     stages is unsupported on Linux < 6.5, so memory.peak is reported
-//     as a delta against the value observed at sampler start.
+//     across a containerised run; it's reported as a delta against the
+//     value observed at sampler start (memory.peak is monotonic on
+//     kernels < 6.5).
 //
 // Usage:
-//   sampler.js [--label LABEL] [--interval-ms 50] -- <cmd> [args...]
+//   sampler.js [--label LABEL] [--interval-ms 50] [--no-cgroup] -- <cmd> [args...]
 //
 // Output (single JSON line on stdout):
 //   {
@@ -72,33 +74,43 @@
 'use strict';
 
 const fs = require('node:fs');
-const { spawn } = require('node:child_process');
-const path = require('node:path');
+const os = require('node:os');
+const { spawn, execFileSync } = require('node:child_process');
+
+const PLATFORM = os.platform();
 
 const args = process.argv.slice(2);
 let label = '';
 let intervalMs = 50;
+// cgroup v2 reads only make sense inside a dedicated cgroup (i.e. the
+// bench Docker container). On native runs the values point at the
+// host's user-session / root cgroup and are contaminated by every
+// other process, so we default off on non-Linux and let the
+// container's run-cases.sh opt in via --cgroup.
+let collectCgroup = PLATFORM === 'linux';
 let cmdStart = -1;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--label') { label = args[++i]; continue; }
   if (args[i] === '--interval-ms') { intervalMs = Number(args[++i]); continue; }
+  if (args[i] === '--cgroup') { collectCgroup = true; continue; }
+  if (args[i] === '--no-cgroup') { collectCgroup = false; continue; }
   if (args[i] === '--') { cmdStart = i + 1; break; }
 }
 if (cmdStart < 0 || cmdStart >= args.length) {
-  process.stderr.write('usage: sampler.js [--label L] [--interval-ms N] -- <cmd> [args...]\n');
+  process.stderr.write(
+    'usage: sampler.js [--label L] [--interval-ms N] [--cgroup|--no-cgroup] -- <cmd> [args...]\n',
+  );
   process.exit(2);
 }
 const cmd = args[cmdStart];
 const cmdArgs = args.slice(cmdStart + 1);
 
-// ---- /proc helpers -------------------------------------------------------
+if (PLATFORM !== 'linux' && PLATFORM !== 'darwin') {
+  process.stderr.write(`sampler.js: unsupported platform '${PLATFORM}'\n`);
+  process.exit(2);
+}
 
-// Cache CLK_TCK once (sysconf(_SC_CLK_TCK)); used to convert utime/stime
-// jiffies into seconds. Linux defaults to 100 and there's no portable way
-// to read it from Node without a native module; 100 is correct on every
-// distro we'd reasonably target.
-const CLK_TCK = 100;
-const PAGE_SIZE = 4096;
+// ---- /proc helpers (Linux) -----------------------------------------------
 
 function readProcStat(pid) {
   // /proc/<pid>/stat fields:
@@ -111,14 +123,11 @@ function readProcStat(pid) {
     if (rparen < 0) return null;
     const comm = raw.slice(raw.indexOf('(') + 1, rparen);
     const rest = raw.slice(rparen + 2).split(' ');
-    // rest[0] = state, rest[1] = ppid, rest[11] = utime, rest[12] = stime.
-    return {
-      pid,
-      comm,
-      ppid: Number(rest[1]),
-      utimeJiffies: Number(rest[11]),
-      stimeJiffies: Number(rest[12]),
-    };
+    // rest[0] = state, rest[1] = ppid. We don't track utime/stime here;
+    // CPU time accounting is delegated to the cgroup v2 `cpu.stat`
+    // reader, which captures processes that exited between sampler
+    // ticks (something per-pid /proc scraping inherently misses).
+    return { pid, comm, ppid: Number(rest[1]) };
   } catch {
     return null;
   }
@@ -149,7 +158,7 @@ function readProcPss(pid) {
   }
 }
 
-function walkAllPids() {
+function walkAllPidsProc() {
   // Faster than scanning /proc/*/stat sequentially for descendants:
   // pre-build a children index once per tick, then BFS from root.
   const entries = fs.readdirSync('/proc');
@@ -182,6 +191,97 @@ function descendants(rootPid, childrenOf) {
   return out;
 }
 
+function sampleTreeLinux(rootPid) {
+  const { byPid, childrenOf } = walkAllPidsProc();
+  const pids = descendants(rootPid, childrenOf);
+  let rssKb = 0;
+  let pssKb = 0;
+  const perComm = new Map();
+  for (const p of pids) {
+    const rss = readProcStatusRss(p);
+    rssKb += rss;
+    pssKb += readProcPss(p);
+    const stat = byPid.get(p);
+    const comm = stat ? stat.comm : '?';
+    perComm.set(comm, (perComm.get(comm) || 0) + rss);
+  }
+  return { rssKb, pssKb, procCount: pids.length, perComm };
+}
+
+// ---- ps helpers (macOS) ---------------------------------------------------
+
+function sampleTreeDarwin(rootPid) {
+  // `ps -A -o pid=,ppid=,rss=,comm=` returns one row per process
+  // with no header (`=` suffix suppresses each column header). On
+  // BSD ps `rss` is reported in kilobytes; `comm` is the full
+  // executable path — we deliberately don't use `ucomm` because
+  // ucomm truncates at MAXCOMLEN (~16 chars) and collapses every
+  // Chromium helper (Helper, Helper (Renderer), Helper (GPU),
+  // Helper (Alerts), …) into a single "Google Chrome fo" bucket,
+  // destroying the per-process attribution that motivated this
+  // breakdown in the first place. We strip the path down to the
+  // basename below.
+  let raw;
+  try {
+    raw = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,comm='], {
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+    });
+  } catch {
+    return { rssKb: 0, pssKb: null, procCount: 0, perComm: new Map() };
+  }
+  const byPid = new Map();
+  const childrenOf = new Map();
+  for (const rawLine of raw.split('\n')) {
+    // BSD ps left-pads pid/ppid/rss columns with spaces; comm may
+    // itself contain spaces ("Google Chrome for Testing Helper
+    // (Renderer)") and parens, so we anchor on the first three
+    // integer columns and take everything after as the comm.
+    const m = rawLine.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*\S)\s*$/);
+    if (!m) continue;
+    const pid = Number(m[1]);
+    const ppid = Number(m[2]);
+    const rss = Number(m[3]);
+    let comm = m[4];
+    // Path → basename: keeps the renderer / GPU / utility helper
+    // distinction (each is its own binary under .../Helpers/...)
+    // while dropping the long .app bundle prefix.
+    const lastSlash = comm.lastIndexOf('/');
+    if (lastSlash >= 0) comm = comm.slice(lastSlash + 1);
+    // macOS occasionally wraps the comm in parens when a process
+    // is transitioning state ("(node)"); strip them so the
+    // per-comm aggregation doesn't double-bucket.
+    if (comm.startsWith('(') && comm.endsWith(')')) comm = comm.slice(1, -1);
+    byPid.set(pid, { pid, ppid, rss, comm });
+    const arr = childrenOf.get(ppid) || [];
+    arr.push(pid);
+    childrenOf.set(ppid, arr);
+  }
+  const seen = new Set();
+  const stack = [rootPid];
+  let rssKb = 0;
+  let procCount = 0;
+  const perComm = new Map();
+  while (stack.length) {
+    const p = stack.pop();
+    if (seen.has(p)) continue;
+    seen.add(p);
+    const info = byPid.get(p);
+    if (info) {
+      rssKb += info.rss;
+      procCount += 1;
+      perComm.set(info.comm, (perComm.get(info.comm) || 0) + info.rss);
+    }
+    const kids = childrenOf.get(p);
+    if (kids) for (const k of kids) stack.push(k);
+  }
+  // pssKb is null (not 0) on macOS so summarize.js renders 'n/a'
+  // rather than implying we measured a true zero.
+  return { rssKb, pssKb: null, procCount, perComm };
+}
+
+const sampleTree = PLATFORM === 'linux' ? sampleTreeLinux : sampleTreeDarwin;
+
 // ---- cgroup v2 helpers ----------------------------------------------------
 
 function readCgroupMemoryPeak() {
@@ -209,8 +309,8 @@ function readCgroupCpuStat() {
 // ---- main -----------------------------------------------------------------
 
 const startWall = Date.now();
-const cgroupCpuBefore = readCgroupCpuStat();
-const cgroupMemPeakBefore = readCgroupMemoryPeak() ?? 0;
+const cgroupCpuBefore = collectCgroup ? readCgroupCpuStat() : null;
+const cgroupMemPeakBefore = collectCgroup ? (readCgroupMemoryPeak() ?? 0) : 0;
 
 // stdio: keep sampler's stdout clean for the single JSON result line
 // (the surrounding shell loop appends it to results.jsonl), so we
@@ -222,6 +322,7 @@ const child = spawn(cmd, cmdArgs, {
 
 let peakRssKb = 0;
 let peakPssKb = 0;
+let pssEverSampled = false;
 let peakProcCount = 0;
 let sampleCount = 0;
 // Map comm → peak rss in KB. Comm strings change for renderer / gpu
@@ -233,22 +334,13 @@ let tick = null;
 
 function sample() {
   sampleCount++;
-  const { childrenOf, byPid } = walkAllPids();
-  const pids = descendants(child.pid, childrenOf);
-  let rssSum = 0;
-  let pssSum = 0;
-  const perComm = new Map();
-  for (const p of pids) {
-    const rss = readProcStatusRss(p);
-    rssSum += rss;
-    pssSum += readProcPss(p);
-    const stat = byPid.get(p);
-    const comm = stat ? stat.comm : '?';
-    perComm.set(comm, (perComm.get(comm) || 0) + rss);
+  const { rssKb, pssKb, procCount, perComm } = sampleTree(child.pid);
+  if (rssKb > peakRssKb) peakRssKb = rssKb;
+  if (pssKb != null) {
+    pssEverSampled = true;
+    if (pssKb > peakPssKb) peakPssKb = pssKb;
   }
-  if (rssSum > peakRssKb) peakRssKb = rssSum;
-  if (pssSum > peakPssKb) peakPssKb = pssSum;
-  if (pids.length > peakProcCount) peakProcCount = pids.length;
+  if (procCount > peakProcCount) peakProcCount = procCount;
   // Per-comm peaks tracked across the run (so we can attribute the
   // tree's peak to the worst-offender process(es)).
   for (const [comm, kb] of perComm) {
@@ -265,8 +357,8 @@ child.on('exit', (code, signal) => {
   // One last sample after exit to catch late-life peaks. /proc/<pid>
   // for the now-dead child is gone, but cgroup data is still valid.
   const wallMs = Date.now() - startWall;
-  const cgroupCpuAfter = readCgroupCpuStat();
-  const cgroupMemPeakAfter = readCgroupMemoryPeak();
+  const cgroupCpuAfter = collectCgroup ? readCgroupCpuStat() : null;
+  const cgroupMemPeakAfter = collectCgroup ? readCgroupMemoryPeak() : null;
 
   let cgUserSec = null;
   let cgSystemSec = null;
@@ -286,6 +378,32 @@ child.on('exit', (code, signal) => {
     cgroupMemPeakDelta = Math.max(0, cgroupMemPeakAfter - cgroupMemPeakBefore);
   }
 
+  // macOS ps oscillates between the full executable path and the
+  // 16-char truncated binary name for the same process (typically
+  // around exec transitions), so a single Chromium helper can land
+  // in two per-comm buckets (e.g. "Google Chrome fo" and "Google
+  // Chrome for Testing Helper"). Collapse any ≤16-char key that's
+  // a strict prefix of a longer key into that longer key, taking
+  // the max RSS (true peak of the underlying process). No-op on
+  // Linux where /proc comm names are stable per process.
+  if (PLATFORM === 'darwin') {
+    const keys = Array.from(perCommPeak.keys());
+    for (const short of keys) {
+      if (!perCommPeak.has(short)) continue;
+      if (short.length > 16) continue;
+      for (const long of keys) {
+        if (long === short || !perCommPeak.has(long)) continue;
+        if (long.length > short.length && long.startsWith(short)) {
+          const shortKb = perCommPeak.get(short) || 0;
+          const longKb = perCommPeak.get(long) || 0;
+          perCommPeak.set(long, Math.max(shortKb, longKb));
+          perCommPeak.delete(short);
+          break;
+        }
+      }
+    }
+  }
+
   const breakdown = Array.from(perCommPeak.entries())
     .map(([comm, kb]) => ({ comm, peak_rss_mb: +(kb / 1024).toFixed(1) }))
     .sort((a, b) => b.peak_rss_mb - a.peak_rss_mb)
@@ -295,10 +413,11 @@ child.on('exit', (code, signal) => {
     label,
     exit_code: code,
     signal,
+    platform: PLATFORM,
     wall_ms: wallMs,
     samples: sampleCount,
     peak_proc_tree_rss_mb: +(peakRssKb / 1024).toFixed(1),
-    peak_proc_tree_pss_mb: +(peakPssKb / 1024).toFixed(1),
+    peak_proc_tree_pss_mb: pssEverSampled ? +(peakPssKb / 1024).toFixed(1) : null,
     peak_proc_count: peakProcCount,
     cgroup_memory_peak_mb:
       cgroupMemPeakAfter != null ? +(cgroupMemPeakAfter / 1024 / 1024).toFixed(1) : null,
