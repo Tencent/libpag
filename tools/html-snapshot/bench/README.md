@@ -25,6 +25,14 @@ Two execution modes share the same per-case loop:
   just want to validate the pipeline locally or get rough host
   numbers without standing up Docker.
 
+Both modes can drive either headless browser engine — pass
+`--engine puppeteer` (default) or `--engine playwright` to switch.
+The selection is forwarded to `snapshot.js` and `baseline-blank.js`
+via `--browser-engine` (and `HTML_SNAPSHOT_BROWSER` for any nested
+tooling that reads the env var), so a Playwright run goes through
+the exact same `lib/browser-engine.js` adapter as the rest of the
+codebase — no separate code path to keep in sync.
+
 ## Why this exists
 
 `html-snapshot` is JS-driven so its cost on Linux is dominated by
@@ -63,7 +71,12 @@ still downloads the x64 binary into a `linux_arm-*` directory and
 then fails to launch under binfmt_misc QEMU. The Bookworm `chromium`
 package is built natively for both arm64 and amd64, so a single image
 works on every architecture. `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`
-in the Dockerfile points puppeteer at it.
+in the Dockerfile points puppeteer at it; for the playwright engine
+the same path is exposed as `PLAYWRIGHT_EXECUTABLE_PATH`, which
+`lib/browser-engine.js` reads and threads through as the
+`launchOptions.executablePath` (Playwright doesn't honour an env var
+natively). End result: both engines launch the same distro chromium,
+so the image stays small and the numbers compare apples-to-apples.
 
 Why a process-tree sampler (not `/usr/bin/time -v`):
 Puppeteer spawns Chromium as a child of `node`, and Chromium itself
@@ -117,6 +130,7 @@ Knobs (env vars, honoured by both `run-bench.sh` and `run-native.sh`):
 
 | Variable | Default | Effect |
 | --- | --- | --- |
+| `BROWSER_ENGINE` | `puppeteer` | `puppeteer` or `playwright`. Same selection is also exposed via `--engine NAME` on both wrappers. Recorded in `host_meta.json` as `browser_engine`, and surfaced in `summary.md` / `summary.html` so reports for different engines are unambiguous. |
 | `BASELINE_RUNS` | `1` | Number of baseline rows to emit (0 = skip). Set to e.g. `5` for variance estimates. |
 | `BASELINE_HOLD_MS` | `200` | ms to hold `about:blank` open after navigation, so `sampler.js`'s 50ms tick sees a stable peak. |
 
@@ -154,6 +168,13 @@ CONTAINER_CPUS=2 CONTAINER_MEMORY=2g INTERVAL_MS=100 \
 BASELINE_RUNS=5 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 BASELINE_RUNS=0 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 
+# Drive Chromium through Playwright instead of Puppeteer
+tools/html-snapshot/bench/run-bench.sh --engine playwright \
+  --label pw-1 ~/Desktop/tmp_case
+# or:
+BROWSER_ENGINE=playwright LABEL=pw-1 \
+  tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
+
 # Force a rebuild after editing Dockerfile / sampler
 REBUILD=1 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 ```
@@ -165,10 +186,17 @@ Prerequisites:
 - `npm install` already run in `tools/html-snapshot/`. On macOS, this
   also downloads puppeteer's bundled Chrome-for-Testing into
   `~/.cache/puppeteer`, which `snapshot.js` will pick up
-  automatically.
+  automatically. The default install also pulls in `playwright`
+  (declared as an optionalDependency), so `--engine playwright`
+  works out of the box once you've run `npx playwright install
+  chromium` (or pointed `PLAYWRIGHT_EXECUTABLE_PATH` at an
+  existing Chromium binary).
 - On Linux, either let puppeteer use its bundled Chrome or install
   distro Chromium and export
-  `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` before running.
+  `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` before running. For
+  Playwright, the same path can be exposed as
+  `PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium` to skip the bundled
+  download entirely.
 
 ```bash
 # Default output dir = tools/html-snapshot/bench/out/current
@@ -188,6 +216,15 @@ INTERVAL_MS=100 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
 # Take 5 baseline samples for variance instead of 1, or skip entirely
 BASELINE_RUNS=5 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
 BASELINE_RUNS=0 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
+
+# Drive Chromium through Playwright instead of Puppeteer. Requires
+# `playwright` installed under tools/html-snapshot/ (the default
+# `npm install` already pulls it in as an optionalDependency); on a
+# host without distro chromium also run `npx playwright install
+# chromium` once, or set PLAYWRIGHT_EXECUTABLE_PATH to an existing
+# Chromium binary.
+tools/html-snapshot/bench/run-native.sh --engine playwright \
+  --label pw-1 ~/Desktop/tmp_case
 ```
 
 The native path drops two columns of metrics vs. Docker:

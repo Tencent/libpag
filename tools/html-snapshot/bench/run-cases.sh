@@ -29,6 +29,12 @@
 #                  is 1 (collect) inside the Docker container and 0
 #                  (skip) elsewhere; the wrapper scripts set this
 #                  explicitly so behaviour is deterministic.
+#   BROWSER_ENGINE puppeteer|playwright. Selects which headless browser
+#                  driver snapshot.js / baseline-blank.js launch under
+#                  the sampler. Defaults to puppeteer (back-compat).
+#                  Forwarded to both scripts as `--browser-engine` and
+#                  also exported as HTML_SNAPSHOT_BROWSER so any tool
+#                  that reads the env var picks up the same selection.
 #   BASELINE_RUNS  number of "browser opens about:blank" baseline runs
 #                  prepended to the case loop (default 1). Each run
 #                  emits a row labelled `__baseline:blank/<n>` so
@@ -81,6 +87,40 @@ if [[ ! -f "$BENCH_DIR/baseline-blank.js" ]]; then
 fi
 mkdir -p "$OUT_DIR"
 
+# ---- engine selection -----------------------------------------------------
+#
+# Default to puppeteer for back-compat. Validate against the same
+# whitelist that lib/browser-engine.js enforces so a typo here fails
+# fast with a clear message instead of going through 200+ cases and
+# producing a useless results.jsonl.
+BROWSER_ENGINE=${BROWSER_ENGINE:-puppeteer}
+case "$BROWSER_ENGINE" in
+  puppeteer|playwright) ;;
+  *)
+    echo "run-cases.sh: unsupported BROWSER_ENGINE='$BROWSER_ENGINE' (expected puppeteer|playwright)" >&2
+    exit 2
+    ;;
+esac
+
+# When playwright is requested, verify the package is actually present
+# in the snapshot dir before we burn time on the case loop. The error
+# message tells the user exactly what to install.
+if [[ "$BROWSER_ENGINE" == "playwright" ]]; then
+  if ! (cd "$SNAPSHOT_DIR" && node -e 'require("playwright")') >/dev/null 2>&1; then
+    echo "run-cases.sh: BROWSER_ENGINE=playwright but the 'playwright' package is not installed under $SNAPSHOT_DIR." >&2
+    echo "  run: (cd $SNAPSHOT_DIR && npm install playwright)" >&2
+    echo "  (and, on a host without distro chromium, npx playwright install chromium)" >&2
+    exit 2
+  fi
+fi
+
+# Export so any nested process — sampler.js, baseline-blank.js,
+# snapshot.js — that reads HTML_SNAPSHOT_BROWSER picks up the same
+# value as the explicit --browser-engine flag we pass below. Belt and
+# suspenders: lib/browser-engine.js prefers the flag, but keeping the
+# env var aligned avoids surprises if anyone forgets to add the flag.
+export HTML_SNAPSHOT_BROWSER="$BROWSER_ENGINE"
+
 # ---- environment snapshot -------------------------------------------------
 
 # Resolve puppeteer's version from the snapshot dir (where its
@@ -89,6 +129,15 @@ PUPPETEER_VERSION=$(
   cd "$SNAPSHOT_DIR" \
     && node -e 'console.log(require("puppeteer/package.json").version)' 2>/dev/null \
     || echo unknown
+)
+
+# Playwright is opt-in, so resolve its version conditionally; report
+# 'not_installed' when the user picked puppeteer (or playwright isn't
+# in node_modules) so host_meta.json stays a single stable schema.
+PLAYWRIGHT_VERSION=$(
+  cd "$SNAPSHOT_DIR" \
+    && node -e 'console.log(require("playwright/package.json").version)' 2>/dev/null \
+    || echo not_installed
 )
 
 # Chromium version: prefer the binary puppeteer is actually going to
@@ -108,17 +157,40 @@ chromium_probe() {
   "$bin" --version 2>/dev/null | head -n 1 | tr -d '\r' | sed 's/[[:space:]]*$//'
 }
 
+# Probe order matches what each engine will actually launch:
+#   1. PLAYWRIGHT_EXECUTABLE_PATH or PUPPETEER_EXECUTABLE_PATH —
+#      explicit override (the bench Docker image sets both to
+#      /usr/bin/chromium so the recorded version matches the binary
+#      that actually ran, regardless of which engine was selected).
+#   2. /usr/bin/chromium — distro install path.
+#   3. Engine's bundled binary — puppeteer.executablePath() for the
+#      puppeteer code path, playwright.chromium.executablePath() for
+#      playwright (the standard macOS native path: bench/run-native.sh
+#      → ~/.cache/puppeteer or ~/Library/Caches/ms-playwright).
 CHROMIUM_VERSION=unknown
-if v=$(chromium_probe "${PUPPETEER_EXECUTABLE_PATH:-}"); then
+if [[ "$BROWSER_ENGINE" == "playwright" ]]; then
+  ENGINE_OVERRIDE=${PLAYWRIGHT_EXECUTABLE_PATH:-${PUPPETEER_EXECUTABLE_PATH:-}}
+else
+  ENGINE_OVERRIDE=${PUPPETEER_EXECUTABLE_PATH:-}
+fi
+if v=$(chromium_probe "$ENGINE_OVERRIDE"); then
   CHROMIUM_VERSION=$v
 elif v=$(chromium_probe /usr/bin/chromium); then
   CHROMIUM_VERSION=$v
 else
-  PUPPETEER_BUNDLED=$(
-    cd "$SNAPSHOT_DIR" \
-      && node -e 'try { console.log(require("puppeteer").executablePath()); } catch (e) {}' 2>/dev/null
-  ) || PUPPETEER_BUNDLED=""
-  if v=$(chromium_probe "$PUPPETEER_BUNDLED"); then
+  BUNDLED_PROBE=""
+  if [[ "$BROWSER_ENGINE" == "playwright" ]]; then
+    BUNDLED_PROBE=$(
+      cd "$SNAPSHOT_DIR" \
+        && node -e 'try { console.log(require("playwright").chromium.executablePath()); } catch (e) {}' 2>/dev/null
+    ) || BUNDLED_PROBE=""
+  else
+    BUNDLED_PROBE=$(
+      cd "$SNAPSHOT_DIR" \
+        && node -e 'try { console.log(require("puppeteer").executablePath()); } catch (e) {}' 2>/dev/null
+    ) || BUNDLED_PROBE=""
+  fi
+  if v=$(chromium_probe "$BUNDLED_PROBE"); then
     CHROMIUM_VERSION=$v
   fi
 fi
@@ -155,7 +227,9 @@ COLLECT_CGROUP=${CGROUP:-0}
   printf '  "platform": "%s",\n'         "$OS"
   printf '  "cpu_count": "%s",\n'        "$CPU_COUNT"
   printf '  "node_version": "%s",\n'     "$(node --version)"
+  printf '  "browser_engine": "%s",\n'   "$BROWSER_ENGINE"
   printf '  "puppeteer_version": "%s",\n' "$PUPPETEER_VERSION"
+  printf '  "playwright_version": "%s",\n' "$PLAYWRIGHT_VERSION"
   printf '  "chromium_version": "%s",\n' "$CHROMIUM_VERSION"
   printf '  "container_memory_max_bytes": "%s",\n' "$CGROUP_MEM"
   printf '  "container_cpu_max": "%s"\n' "$CGROUP_CPU"
@@ -180,7 +254,7 @@ fi
 # sort on macOS doesn't ship).
 IFS=$'\n' CASES=($(printf '%s\n' "${CASES[@]}" | LC_ALL=C sort)); unset IFS
 
-echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR"
+echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE)"
 
 # ---- run loop -------------------------------------------------------------
 
@@ -210,7 +284,7 @@ BASELINE_RUNS=${BASELINE_RUNS:-1}
 BASELINE_HOLD_MS=${BASELINE_HOLD_MS:-200}
 
 if [[ "$BASELINE_RUNS" -gt 0 ]]; then
-  echo "Running $BASELINE_RUNS baseline (browser opens about:blank) sample(s)"
+  echo "Running $BASELINE_RUNS baseline (browser opens about:blank) sample(s) [engine=$BROWSER_ENGINE]"
   for i in $(seq 1 "$BASELINE_RUNS"); do
     label="__baseline:blank/$i"
     echo "-> $label"
@@ -223,6 +297,7 @@ if [[ "$BASELINE_RUNS" -gt 0 ]]; then
       node "$BENCH_DIR/baseline-blank.js" \
         --snapshot-dir "$SNAPSHOT_DIR" \
         --hold-ms "$BASELINE_HOLD_MS" \
+        --browser-engine "$BROWSER_ENGINE" \
       >> "$RESULTS"
     status=$?
     set -e
@@ -255,6 +330,7 @@ for src in "${CASES[@]}"; do
     "${SAMPLER_FLAGS[@]}" \
     -- \
     node "$SNAPSHOT_DIR/snapshot.js" "$src" -o "$out_file" \
+      --browser-engine "$BROWSER_ENGINE" \
     >> "$RESULTS"
   status=$?
   set -e

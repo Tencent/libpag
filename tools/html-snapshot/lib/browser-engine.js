@@ -88,6 +88,22 @@ async function launchBrowser(opts) {
     // diff cleanly. Both engines accept these flags identically.
     args: (opts && opts.args) || ['--no-sandbox', '--font-render-hinting=none'],
   };
+  // Engine-specific executablePath plumbing:
+  //   - puppeteer auto-reads PUPPETEER_EXECUTABLE_PATH; we don't have to
+  //     forward anything.
+  //   - playwright ignores env vars for the binary location, so callers
+  //     who want to point it at a pre-installed Chromium (e.g. distro
+  //     `/usr/bin/chromium` inside the bench Docker image, which avoids
+  //     the ~200 MB Chrome-for-Testing download and matches what the
+  //     puppeteer path already uses) must pass `executablePath`. We
+  //     accept either an explicit `opts.executablePath` or the
+  //     `PLAYWRIGHT_EXECUTABLE_PATH` env var, with the option winning.
+  if (engine === 'playwright') {
+    const exe = (opts && opts.executablePath)
+      || process.env.PLAYWRIGHT_EXECUTABLE_PATH
+      || '';
+    if (exe) launchOpts.executablePath = exe;
+  }
   const browser = await launcher.launch(launchOpts);
   return { browser, engine };
 }

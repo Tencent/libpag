@@ -16,6 +16,10 @@
 #
 # Environment overrides:
 #   LABEL                 sub-directory name under bench/out (default: current)
+#   BROWSER_ENGINE        puppeteer|playwright; which headless driver
+#                         snapshot.js + baseline-blank.js use under
+#                         the sampler. Default: puppeteer.
+#                         Also settable via `--engine NAME`.
 #   IMAGE_NAME            docker image tag           (default: html-snapshot-bench:latest)
 #   CONTAINER_CPUS        --cpus value for the run   (default: 4)
 #   CONTAINER_MEMORY      --memory value for the run (default: 4g)
@@ -30,15 +34,20 @@
 #   LABEL=ima-glm5.1 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 #   CONTAINER_CPUS=2 CONTAINER_MEMORY=2g REBUILD=1 \
 #     tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case /tmp/bench-out
+#   tools/html-snapshot/bench/run-bench.sh --engine playwright ~/Desktop/tmp_case
+#   BROWSER_ENGINE=playwright LABEL=pw-1 \
+#     tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BUILD_CTX=$(cd "$SCRIPT_DIR/.." && pwd)
 
-# Optional --label NAME flag. Anything else stays positional so the
-# existing `<input_dir> [output_dir]` calling convention still works.
+# Optional --label NAME / --engine NAME flags. Anything else stays
+# positional so the existing `<input_dir> [output_dir]` calling
+# convention still works.
 LABEL=${LABEL:-current}
+BROWSER_ENGINE=${BROWSER_ENGINE:-puppeteer}
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,6 +60,15 @@ while [[ $# -gt 0 ]]; do
       LABEL=${1#--label=}
       shift
       ;;
+    --engine|--browser-engine)
+      [[ $# -ge 2 ]] || { echo "--engine requires a value" >&2; exit 2; }
+      BROWSER_ENGINE=$2
+      shift 2
+      ;;
+    --engine=*|--browser-engine=*)
+      BROWSER_ENGINE=${1#*=}
+      shift
+      ;;
     -h|--help)
       sed -n '2,30p' "$0"
       exit 0
@@ -61,6 +79,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "$BROWSER_ENGINE" in
+  puppeteer|playwright) ;;
+  *)
+    echo "unsupported --engine '$BROWSER_ENGINE' (expected puppeteer|playwright)" >&2
+    exit 2
+    ;;
+esac
 
 if [[ ${#POSITIONAL[@]} -lt 1 ]]; then
   echo "usage: $0 [--label NAME] <input_dir> [output_dir]" >&2
@@ -82,6 +108,7 @@ BASELINE_HOLD_MS=${BASELINE_HOLD_MS:-200}
 echo "INPUT_DIR        = $INPUT_DIR"
 echo "OUTPUT_DIR       = $OUTPUT_DIR"
 echo "LABEL            = $LABEL"
+echo "BROWSER_ENGINE   = $BROWSER_ENGINE"
 echo "IMAGE_NAME       = $IMAGE_NAME"
 echo "BUILD_CTX        = $BUILD_CTX"
 echo "CONTAINER_CPUS   = $CONTAINER_CPUS"
@@ -135,6 +162,7 @@ docker run --rm \
   --security-opt seccomp=unconfined \
   -e BASELINE_RUNS="$BASELINE_RUNS" \
   -e BASELINE_HOLD_MS="$BASELINE_HOLD_MS" \
+  -e BROWSER_ENGINE="$BROWSER_ENGINE" \
   -v "$INPUT_DIR":/inputs:ro \
   -v "$OUTPUT_DIR":/out \
   "$IMAGE_NAME" \

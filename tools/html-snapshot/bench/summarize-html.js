@@ -260,12 +260,14 @@ function renderHeader() {
   const baselineNote = baseline.length
     ? ` · ${baseline.length} 条空白页基准（独立统计）`
     : '';
+  const engine = hostMeta.browser_engine || 'puppeteer';
   return `
 <h1>html-snapshot Linux benchmark</h1>
 <p class="subtitle">
   ${cases.length} 个 HTML 用例，
   <strong style="color: var(--good)">${ok.length} 成功</strong>
   / <strong style="color: ${failColor}">${fail.length} 失败</strong>${baselineNote}
+  · engine <code>${esc(engine)}</code>
   · 生成于 ${generatedAt}
 </p>`;
 }
@@ -372,6 +374,12 @@ function renderEnvironment() {
   const memMaxGiB = hostMeta.container_memory_max_bytes
     ? (Number(hostMeta.container_memory_max_bytes) / 1024 / 1024 / 1024).toFixed(1) + ' GiB'
     : 'n/a';
+  // Older host_meta.json (pre-playwright) lacks browser_engine; fall
+  // back to "puppeteer" so historical reports keep rendering.
+  const engine = hostMeta.browser_engine || 'puppeteer';
+  const driverRow = engine === 'playwright'
+    ? `  <dt>playwright</dt><dd>${esc(hostMeta.playwright_version || 'n/a')}</dd>`
+    : `  <dt>puppeteer</dt><dd>${esc(hostMeta.puppeteer_version || 'n/a')}</dd>`;
   return `
 <h2>环境</h2>
 <dl class="meta">
@@ -379,7 +387,8 @@ function renderEnvironment() {
   <dt>arch</dt><dd>${esc(hostMeta.arch || 'n/a')}</dd>
   <dt>cpu</dt><dd>${esc(hostMeta.cpu_count || 'n/a')} cores</dd>
   <dt>node</dt><dd>${esc(hostMeta.node_version || 'n/a')}</dd>
-  <dt>puppeteer</dt><dd>${esc(hostMeta.puppeteer_version || 'n/a')}</dd>
+  <dt>browser engine</dt><dd>${esc(engine)}</dd>
+${driverRow}
   <dt>chromium</dt><dd>${esc(hostMeta.chromium_version || 'n/a')}</dd>
   <dt>容器 memory.max</dt><dd>${memMaxGiB}</dd>
   <dt>容器 cpu.max</dt><dd>${esc(hostMeta.container_cpu_max || 'n/a')} (quota period)</dd>

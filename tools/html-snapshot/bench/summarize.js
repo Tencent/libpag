@@ -46,13 +46,25 @@ out.push('# html-snapshot Linux benchmark');
 out.push('');
 out.push('## Environment');
 out.push('');
+// `browser_engine` was added when playwright support landed; older
+// host_meta.json files don't have it, so fall back to "puppeteer"
+// (the only engine supported before that). Same fallback used by
+// summarize-html.js so the two reports stay in sync.
+const engine = hostMeta.browser_engine || 'puppeteer';
 out.push('| Key | Value |');
 out.push('|-----|-------|');
 out.push(`| kernel | ${hostMeta.kernel || 'n/a'} |`);
 out.push(`| arch | ${hostMeta.arch || 'n/a'} |`);
 out.push(`| cpu_count | ${hostMeta.cpu_count || 'n/a'} |`);
 out.push(`| node | ${hostMeta.node_version || 'n/a'} |`);
-out.push(`| puppeteer | ${hostMeta.puppeteer_version || 'n/a'} |`);
+out.push(`| browser engine | ${engine} |`);
+// Only show the driver that actually ran (the other field is either
+// `not_installed` or the inert bundled version that wasn't loaded).
+if (engine === 'playwright') {
+  out.push(`| playwright | ${hostMeta.playwright_version || 'n/a'} |`);
+} else {
+  out.push(`| puppeteer | ${hostMeta.puppeteer_version || 'n/a'} |`);
+}
 out.push(`| chromium | ${hostMeta.chromium_version || 'n/a'} |`);
 out.push(`| container memory.max | ${hostMeta.container_memory_max_bytes || 'n/a'} |`);
 out.push(`| container cpu.max | ${hostMeta.container_cpu_max || 'n/a'} |`);

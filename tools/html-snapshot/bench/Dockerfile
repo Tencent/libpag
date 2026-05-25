@@ -83,13 +83,25 @@ WORKDIR /app
 # Copy manifests first to maximise layer caching across rebuilds.
 COPY package.json package-lock.json* ./
 
-# Tell puppeteer's postinstall to skip its Chrome-for-Testing download
-# (see distro-chromium rationale above) and use the apt-installed
-# binary at runtime. `--omit=optional` skips playwright (the bench
-# only exercises the puppeteer code path).
+# Tell both engines' postinstall hooks to skip their bundled Chromium
+# download (see distro-chromium rationale above) and reuse the
+# apt-installed binary at runtime:
+#   - puppeteer reads PUPPETEER_EXECUTABLE_PATH automatically.
+#   - playwright doesn't honour an env var natively, so the same value
+#     is also exposed as PLAYWRIGHT_EXECUTABLE_PATH; the bench's
+#     `lib/browser-engine.js` adapter reads it and threads it through
+#     as the launchOpts.executablePath, which keeps the docker image
+#     small and works on both linux-amd64 and linux-arm64 (Chromium
+#     for Testing only ships linux-x64, so a downloaded playwright
+#     chromium would fail to launch on ARM containers anyway).
+# Optional dependencies are kept enabled so playwright lands in
+# node_modules and the `--engine playwright` bench path works without
+# a second `npm install` step.
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-RUN npm install --omit=optional --no-audit --no-fund
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the tool (lib/, snapshot.js). bench/ itself is
 # copied to /bench so the in-container entrypoint can find sampler.js.
