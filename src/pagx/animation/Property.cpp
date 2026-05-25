@@ -41,6 +41,36 @@ KeyValue TypedProperty<T>::onEvaluateAtMicros(int64_t microseconds, float frameR
   return EvaluateKeyframeSequence<T>(keyframes, framePosition);
 }
 
+template <>
+PropertyValueType TypedProperty<float>::valueType() const {
+  return PropertyValueType::Float;
+}
+
+template <>
+PropertyValueType TypedProperty<bool>::valueType() const {
+  return PropertyValueType::Bool;
+}
+
+template <>
+PropertyValueType TypedProperty<int>::valueType() const {
+  return PropertyValueType::Int;
+}
+
+template <>
+PropertyValueType TypedProperty<std::string>::valueType() const {
+  return PropertyValueType::String;
+}
+
+template <>
+PropertyValueType TypedProperty<ImageRef>::valueType() const {
+  return PropertyValueType::ImageRef;
+}
+
+template <>
+PropertyValueType TypedProperty<Color>::valueType() const {
+  return PropertyValueType::Color;
+}
+
 // Explicit instantiations: must cover every alternative of KeyValue.
 template class TypedProperty<float>;
 template class TypedProperty<bool>;

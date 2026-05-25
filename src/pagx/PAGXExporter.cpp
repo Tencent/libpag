@@ -226,18 +226,25 @@ static void WriteTypedProperty(XMLBuilder& xml, const TypedProperty<T>* property
 }
 
 static void WriteProperty(XMLBuilder& xml, const Property* property) {
-  if (auto typed = dynamic_cast<const TypedProperty<float>*>(property)) {
-    WriteTypedProperty(xml, typed, "float");
-  } else if (auto typed = dynamic_cast<const TypedProperty<bool>*>(property)) {
-    WriteTypedProperty(xml, typed, "bool");
-  } else if (auto typed = dynamic_cast<const TypedProperty<int>*>(property)) {
-    WriteTypedProperty(xml, typed, "int");
-  } else if (auto typed = dynamic_cast<const TypedProperty<std::string>*>(property)) {
-    WriteTypedProperty(xml, typed, "string");
-  } else if (auto typed = dynamic_cast<const TypedProperty<ImageRef>*>(property)) {
-    WriteTypedProperty(xml, typed, "image");
-  } else if (auto typed = dynamic_cast<const TypedProperty<Color>*>(property)) {
-    WriteTypedProperty(xml, typed, "color");
+  switch (property->valueType()) {
+    case PropertyValueType::Float:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<float>*>(property), "float");
+      break;
+    case PropertyValueType::Bool:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<bool>*>(property), "bool");
+      break;
+    case PropertyValueType::Int:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<int>*>(property), "int");
+      break;
+    case PropertyValueType::String:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<std::string>*>(property), "string");
+      break;
+    case PropertyValueType::ImageRef:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<ImageRef>*>(property), "image");
+      break;
+    case PropertyValueType::Color:
+      WriteTypedProperty(xml, static_cast<const TypedProperty<Color>*>(property), "color");
+      break;
   }
 }
 
