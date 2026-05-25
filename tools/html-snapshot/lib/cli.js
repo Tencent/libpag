@@ -6,6 +6,7 @@
 'use strict';
 
 const path = require('path');
+const { SUPPORTED_ENGINES, resolveEngine } = require('./browser-engine');
 
 const LOG_PREFIX = 'html-snapshot: ';
 
@@ -126,6 +127,18 @@ const FLAGS = [
   // legacy font-named span path (faster, no font fetch, but the PAGX file
   // becomes non-portable).
   { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
+  // Pick the headless browser driver. Defaults to puppeteer; pass
+  // `playwright` to drive Chromium through Playwright instead (requires
+  // `playwright` to be installed — declared as an optionalDependency).
+  // The same selection is also honoured via the `HTML_SNAPSHOT_BROWSER`
+  // env var; the flag wins when both are set.
+  { names: ['--browser-engine'], set: (o, v) => {
+    try {
+      o.browserEngine = resolveEngine(v);
+    } catch (err) {
+      fail(err && err.message ? err.message : String(err));
+    }
+  } },
 ];
 
 const FLAG_BY_NAME = new Map();
@@ -158,6 +171,10 @@ function parseArgs(argv) {
     // See lib/icon-font.js for the pipeline; toggle via
     // `--no-inline-icon-fonts`.
     inlineIconFonts: true,
+    // Headless browser driver: 'puppeteer' (default) or 'playwright'.
+    // `resolveEngine(undefined)` reads HTML_SNAPSHOT_BROWSER if set, else
+    // returns the default. The `--browser-engine` flag below overrides both.
+    browserEngine: resolveEngine(undefined),
   };
   const positional = [];
   for (let i = 2; i < argv.length; i++) {
@@ -246,7 +263,10 @@ Options:
                              inline <svg>. Default: enabled (the snapshot is
                              self-contained and renders identically on any
                              machine, regardless of which icon fonts are
-                             installed).`);
+                             installed).
+  --browser-engine <name>    Headless browser driver: one of
+                             ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
+                             override via HTML_SNAPSHOT_BROWSER env var).`);
 }
 
 module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, errMessage, LOG_PREFIX };

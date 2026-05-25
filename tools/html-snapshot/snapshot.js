@@ -25,11 +25,11 @@
 'use strict';
 
 const fs = require('fs');
-const puppeteer = require('puppeteer');
 const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
 const { inlineIconFontsOnPage } = require('./lib/icon-font');
 const { openAndSettlePage } = require('./lib/page-loader');
+const { launchBrowser } = require('./lib/browser-engine');
 
 async function main() {
   const opts = parseArgs(process.argv);
@@ -43,27 +43,29 @@ async function main() {
   // here so the loader stays scheme-agnostic.
   const targetUrl = opts.isUrl ? opts.input : `file://${opts.input}`;
 
-  let browser;
+  let engineHandle;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--font-render-hinting=none'],
-    });
+    engineHandle = await launchBrowser({ engine: opts.browserEngine });
   } catch (err) {
-    // Most launch failures are missing-Chromium errors after a sandboxed
-    // `npm install` redirected the puppeteer cache. Surface a one-line hint
-    // so users can fix it without reading the full stack trace; the original
-    // error still propagates so non-cache failures aren't masked.
+    // Most launch failures are missing-browser errors after a sandboxed
+    // `npm install` redirected the engine's download cache. Surface a one-line
+    // hint so users can fix it without reading the full stack trace; the
+    // original error still propagates so non-cache failures aren't masked.
     const msg = errMessage(err);
-    if (/Could not find Chrome|Failed to launch the browser process/i.test(msg)) {
-      console.error(`${LOG_PREFIX}failed to launch headless Chromium. Run:`);
-      console.error(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
-      console.error(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
+    if (/Could not find Chrome|Failed to launch the browser process|Executable doesn't exist/i.test(msg)) {
+      console.error(`${LOG_PREFIX}failed to launch headless Chromium for engine '${opts.browserEngine}'. Try:`);
+      if (opts.browserEngine === 'playwright') {
+        console.error(`  npx --prefix tools/html-snapshot playwright install chromium`);
+      } else {
+        console.error(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
+        console.error(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
+      }
     }
     throw err;
   }
+  const { browser } = engineHandle;
   try {
-    const page = await openAndSettlePage(browser, targetUrl, {
+    const page = await openAndSettlePage(engineHandle, targetUrl, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,

@@ -10,9 +10,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
 const { openAndSettlePage } = require('../lib/page-loader');
 const { makeFail, parseNumber } = require('../lib/cli');
+const { launchBrowser, resolveEngine, setViewport } = require('../lib/browser-engine');
 
 const fail = makeFail('baseline');
 
@@ -24,6 +24,10 @@ function parseArgs(argv) {
     viewportHeight: 900,
     waitMs: 800,
     selector: '',
+    // Headless browser driver — picks up HTML_SNAPSHOT_BROWSER if set, falls
+    // back to puppeteer otherwise. Override per-invocation with
+    // --browser-engine playwright (matches the snapshot.js flag).
+    browserEngine: resolveEngine(undefined),
   };
   const positional = [];
   for (let i = 2; i < argv.length; i++) {
@@ -38,6 +42,9 @@ function parseArgs(argv) {
       opts.waitMs = parseNumber('--wait-ms', argv[++i], { min: 0, fail });
     } else if (a === '--selector') {
       opts.selector = argv[++i];
+    } else if (a === '--browser-engine') {
+      try { opts.browserEngine = resolveEngine(argv[++i]); }
+      catch (err) { fail(err && err.message ? err.message : String(err)); }
     } else if (a.startsWith('-')) {
       fail(`unknown option '${a}'`);
     } else {
@@ -84,12 +91,10 @@ async function main() {
     fail(`input not found: ${opts.input}`, 1);
   }
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--font-render-hinting=none'],
-  });
+  const engineHandle = await launchBrowser({ engine: opts.browserEngine });
+  const { browser, engine } = engineHandle;
   try {
-    const page = await openAndSettlePage(browser, `file://${opts.input}`, {
+    const page = await openAndSettlePage(engineHandle, `file://${opts.input}`, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
@@ -99,9 +104,11 @@ async function main() {
       },
     });
     const { width, height } = await captureBodyRect(page);
-    // Re-set the viewport to the captured size so the screenshot is taken at
-    // the canvas dimensions (matches `pagx render --scale 1` output size).
-    await page.setViewport({ width, height, deviceScaleFactor: 1 });
+    // Re-size the viewport to the captured body rect so the screenshot is
+    // taken at the canvas dimensions (matches `pagx render --scale 1` output
+    // size). `setViewport` is engine-aware: puppeteer keeps the legacy
+    // per-page setter, playwright forwards to setViewportSize.
+    await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
     await new Promise((r) => setTimeout(r, 50));
     await page.screenshot({
       path: opts.output,

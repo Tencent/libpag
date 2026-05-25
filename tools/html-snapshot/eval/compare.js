@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
+const { unwrap, newPage, mapWaitUntil } = require('../lib/browser-engine');
 // pixelmatch v7+ is ESM-only (`export default`). Under Node's ESM-from-CJS
 // `require()` interop the module resolves to a namespace object whose default
 // export is the function, so `require('pixelmatch')` itself is not callable.
@@ -139,17 +140,27 @@ function pixelMetrics(baselinePath, subsetPath, diffPath) {
 // subset via a `display:\s*flex` regex on the source (the previous approach)
 // inflates the count because each <div> wrapper emits its own style attribute,
 // and the live count uses computed style — the two metrics weren't comparable.
-async function countFlexInRenderedHtml(browser, htmlPath, opts = {}) {
+//
+// `browserOrWrapper` accepts either a raw Puppeteer/Playwright browser or the
+// `{ browser, engine }` wrapper returned by `lib/browser-engine`. The wrapper
+// shape is preferred because it threads the engine name through to the
+// per-engine API differences (viewport setter, networkidle token).
+async function countFlexInRenderedHtml(browserOrWrapper, htmlPath, opts = {}) {
   const {
     viewportWidth = 1400,
     viewportHeight = 900,
     waitMs = 0,
     waitForRoot = false,
   } = opts;
-  const page = await browser.newPage();
+  const { engine } = unwrap(browserOrWrapper);
+  const page = await newPage(browserOrWrapper, {
+    viewport: { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 },
+  });
   try {
-    await page.setViewport({ width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 });
-    await page.goto('file://' + htmlPath, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.goto('file://' + htmlPath, {
+      waitUntil: mapWaitUntil(engine, 'networkidle'),
+      timeout: 30000,
+    });
     if (waitForRoot) {
       try {
         await page.waitForFunction(

@@ -22,9 +22,9 @@
 const fs = require('fs');
 const path = require('path');
 const child_process = require('child_process');
-const puppeteer = require('puppeteer');
 const compare = require('./compare');
 const { makeFail } = require('../lib/cli');
+const { launchBrowser, resolveEngine } = require('../lib/browser-engine');
 
 const fail = makeFail('run');
 
@@ -39,6 +39,10 @@ function parseArgs(argv) {
     label: 'current',
     recursive: false,
     concurrency: 1,
+    // Headless browser driver — propagates to baseline.js / snapshot.js via
+    // --browser-engine, plus to the flex-counter pages owned by this script.
+    // Honours HTML_SNAPSHOT_BROWSER when no flag is passed.
+    browserEngine: resolveEngine(undefined),
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -54,6 +58,10 @@ function parseArgs(argv) {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
       opts.concurrency = v;
+    }
+    else if (a === '--browser-engine') {
+      try { opts.browserEngine = resolveEngine(argv[++i]); }
+      catch (err) { fail(err && err.message ? err.message : String(err)); }
     }
     else if (a === '-h' || a === '--help') {
       console.log(USAGE);
@@ -78,7 +86,11 @@ const USAGE = `Usage: node run.js [options]
                       derived from the relative path (e.g. tech-hy3/page-001)
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
-                      binary, so memory and CPU scale roughly linearly with N.`;
+                      binary, so memory and CPU scale roughly linearly with N.
+  --browser-engine N  Headless browser driver: 'puppeteer' (default) or
+                      'playwright'. Forwarded to baseline.js and snapshot.js,
+                      and also used for this script's flex-counter pages.
+                      Honours \$HTML_SNAPSHOT_BROWSER when no flag is given.`;
 
 const SCRIPT_DIR = __dirname;
 const TOOL_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -217,9 +229,21 @@ async function processCase(entry, outDir, opts, browser) {
     error: '',
   };
 
+  // The forwarded browser-engine flag keeps every subprocess on the same
+  // headless driver as the parent run. Without this, baseline.js and
+  // snapshot.js would fall back to their own default (puppeteer) and produce
+  // inconsistent results when the parent was launched with --browser-engine
+  // playwright (e.g. baseline PNG from puppeteer-Chromium, subset PNG from a
+  // playwright-Chromium font cache).
+  const engineArgs = ['--browser-engine', opts.browserEngine];
+
   // 1. baseline
   if (!opts.skipExisting || !fs.existsSync(baselinePng)) {
-    const r = await runProc('node', [path.join(SCRIPT_DIR, 'baseline.js'), htmlPath, '-o', baselinePng], baselineStderr);
+    const r = await runProc(
+      'node',
+      [path.join(SCRIPT_DIR, 'baseline.js'), htmlPath, '-o', baselinePng, ...engineArgs],
+      baselineStderr,
+    );
     row.baselineMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'baseline-failed';
@@ -229,7 +253,11 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
-    const r = await runProc('node', [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml], snapshotStderr);
+    const r = await runProc(
+      'node',
+      [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml, ...engineArgs],
+      snapshotStderr,
+    );
     row.snapshotMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'snapshot-failed';
@@ -539,11 +567,10 @@ async function main() {
 
   // A single browser instance is reused for both the live and subset flex
   // counts across every case. Launching once shaves ~1s per case. Opening
-  // multiple pages on it concurrently is safe.
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--font-render-hinting=none'],
-  });
+  // multiple pages on it concurrently is safe. The wrapper carries the
+  // engine name so compare.countFlexInRenderedHtml can apply the right
+  // viewport / waitUntil semantics for whichever driver was selected.
+  const browser = await launchBrowser({ engine: opts.browserEngine });
 
   // Results are stored at the input index so the report keeps deterministic
   // order regardless of completion timing. Workers pull from a shared cursor.
@@ -579,7 +606,7 @@ async function main() {
   try {
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
   } finally {
-    await browser.close();
+    await browser.browser.close();
   }
 
   writeCsv(rows, path.join(opts.outDir, 'report.csv'));

@@ -25,6 +25,9 @@
 #                              → inline SVG conversion (default: enabled)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+#   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
+#                              or 'playwright'. Forwarded to snapshot.js.
+#                              Honours $HTML_SNAPSHOT_BROWSER.
 #   -h, --help                 Show this help
 
 set -eu
@@ -70,6 +73,10 @@ DO_RENDER=1
 INFER_FLEX=1
 KEEP_SUBSET_HTML=1
 SNAPSHOT_EXTRA_ARGS=()
+# Browser engine: defaults to puppeteer; --browser-engine wins over the env
+# var which wins over this default. Captured separately from
+# SNAPSHOT_EXTRA_ARGS so the preflight check (below) can look at it.
+BROWSER_ENGINE="${HTML_SNAPSHOT_BROWSER:-puppeteer}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -112,6 +119,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --viewport-width|--viewport-height|--wait-ms|--selector|--cookie|--header)
       SNAPSHOT_EXTRA_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --browser-engine)
+      BROWSER_ENGINE="$2"
       shift 2
       ;;
     --no-inline-icon-fonts)
@@ -203,26 +214,49 @@ fi
 #--------------------------------------------------------------------------------------------------
 # Pre-flight
 #--------------------------------------------------------------------------------------------------
-if [[ ! -d "$SCRIPT_DIR/node_modules/puppeteer" ]]; then
-  echo "html2pagx: puppeteer is not installed. Run:" >&2
-  echo "  cd $SCRIPT_DIR && npm install" >&2
+# Validate the selected engine and check that its npm package is on disk.
+# We deliberately do not look at the actual node_modules tree of the *other*
+# engine — users who only want playwright shouldn't be forced to install
+# puppeteer, and vice versa.
+case "$BROWSER_ENGINE" in
+  puppeteer|playwright) ;;
+  *)
+    echo "html2pagx: unsupported --browser-engine '$BROWSER_ENGINE' (expected puppeteer or playwright)" >&2
+    exit 2
+    ;;
+esac
+
+if [[ ! -d "$SCRIPT_DIR/node_modules/$BROWSER_ENGINE" ]]; then
+  echo "html2pagx: '$BROWSER_ENGINE' is not installed. Run:" >&2
+  if [[ "$BROWSER_ENGINE" == "playwright" ]]; then
+    echo "  cd $SCRIPT_DIR && npm install playwright" >&2
+    echo "  npx --prefix $SCRIPT_DIR playwright install chromium" >&2
+  else
+    echo "  cd $SCRIPT_DIR && npm install" >&2
+  fi
   exit 1
 fi
 
-# Puppeteer ships with a pinned Chromium build cached in $PUPPETEER_CACHE_DIR
-# (defaults to ~/.cache/puppeteer). If it's missing — for example because npm
-# install ran inside a sandbox with a redirected cache — surface a clear
-# remediation rather than letting puppeteer-core throw a stack trace.
-PUPPETEER_CACHE_DIR_EFFECTIVE="${PUPPETEER_CACHE_DIR:-$HOME/.cache/puppeteer}"
-if [[ ! -d "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" ]] \
-    || [[ -z "$(ls "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" 2>/dev/null)" ]]; then
-  echo "html2pagx: puppeteer's bundled Chrome is missing from" >&2
-  echo "          $PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" >&2
-  echo "Install it with:" >&2
-  echo "  PUPPETEER_CACHE_DIR=\"$PUPPETEER_CACHE_DIR_EFFECTIVE\" \\" >&2
-  echo "    npx --prefix $SCRIPT_DIR puppeteer browsers install chrome" >&2
-  exit 1
+if [[ "$BROWSER_ENGINE" == "puppeteer" ]]; then
+  # Puppeteer ships with a pinned Chromium build cached in $PUPPETEER_CACHE_DIR
+  # (defaults to ~/.cache/puppeteer). If it's missing — for example because npm
+  # install ran inside a sandbox with a redirected cache — surface a clear
+  # remediation rather than letting puppeteer-core throw a stack trace.
+  PUPPETEER_CACHE_DIR_EFFECTIVE="${PUPPETEER_CACHE_DIR:-$HOME/.cache/puppeteer}"
+  if [[ ! -d "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" ]] \
+      || [[ -z "$(ls "$PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" 2>/dev/null)" ]]; then
+    echo "html2pagx: puppeteer's bundled Chrome is missing from" >&2
+    echo "          $PUPPETEER_CACHE_DIR_EFFECTIVE/chrome" >&2
+    echo "Install it with:" >&2
+    echo "  PUPPETEER_CACHE_DIR=\"$PUPPETEER_CACHE_DIR_EFFECTIVE\" \\" >&2
+    echo "    npx --prefix $SCRIPT_DIR puppeteer browsers install chrome" >&2
+    exit 1
+  fi
 fi
+
+# Always forward the resolved engine so snapshot.js doesn't fall back to its
+# own default (which would silently override what the user selected here).
+SNAPSHOT_EXTRA_ARGS+=("--browser-engine" "$BROWSER_ENGINE")
 
 if [[ "$DO_RESOLVE" -eq 1 || "$DO_RENDER" -eq 1 ]]; then
   if [[ ! -x "$PAGX_BIN" ]]; then

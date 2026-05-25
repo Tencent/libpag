@@ -1,24 +1,36 @@
-// Shared puppeteer page-loading flow used by snapshot.js and eval/baseline.js.
-// Both callers need the same sequence (set viewport, navigate to a URL, wait
-// for networkidle, optionally wait for a #root child to appear, optionally
-// wait an extra settle delay), so the steps live here in one place.
+// Shared page-loading flow used by snapshot.js and eval/baseline.js. Both
+// callers need the same sequence (open a page, set a viewport, navigate to a
+// URL, wait for networkidle, optionally wait for a #root child to appear,
+// optionally wait an extra settle delay), so the steps live here in one place.
+//
+// The flow is engine-agnostic — it accepts either a raw puppeteer/playwright
+// Browser handle (legacy callers) or the `{ browser, engine }` wrapper that
+// `lib/browser-engine.js`'s `launchBrowser` returns. The engine name is
+// threaded through to the adapter's per-engine helpers so cookies, viewport,
+// and waitUntil semantics match whichever browser was launched.
 
 'use strict';
+
+const { unwrap, newPage, mapWaitUntil, addCookies } = require('./browser-engine');
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
 // Defined as a string constant rather than a function — the body is
 // serialised into the browser via `page.waitForFunction`, which accepts the
-// expression source directly, so wrapping it in a Node-side function would
-// just toString() back to the same value on every call.
+// expression source directly on both engines, so wrapping it in a Node-side
+// function would just toString() back to the same value on every call.
 const ROOT_HAS_CHILDREN_SCRIPT =
   'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
 
-// Open a fresh page on `browser`, navigate to `url`, and apply the standard
-// wait strategy. `url` must already be a fully-qualified URL — callers are
-// responsible for prepending `file://` when the input is a local path. Returns
-// the page; the caller is responsible for closing it.
-async function openAndSettlePage(browser, url, opts) {
+// Open a fresh page on `browserOrWrapper`, navigate to `url`, and apply the
+// standard wait strategy. `url` must already be a fully-qualified URL —
+// callers are responsible for prepending `file://` when the input is a local
+// path. Returns the page; the caller is responsible for closing it.
+//
+// `browserOrWrapper` may be either:
+//   - the `{ browser, engine }` wrapper returned by `launchBrowser`, or
+//   - a raw puppeteer Browser (legacy callers — engine defaults to puppeteer).
+async function openAndSettlePage(browserOrWrapper, url, opts) {
   const {
     viewportWidth = 1400,
     viewportHeight = 900,
@@ -30,11 +42,9 @@ async function openAndSettlePage(browser, url, opts) {
     onPageError = null,
   } = opts || {};
 
-  const page = await browser.newPage();
-  await page.setViewport({
-    width: viewportWidth,
-    height: viewportHeight,
-    deviceScaleFactor: 1,
+  const { engine } = unwrap(browserOrWrapper);
+  const page = await newPage(browserOrWrapper, {
+    viewport: { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 },
   });
   if (onConsole) page.on('console', onConsole);
   if (onPageError) page.on('pageerror', onPageError);
@@ -45,13 +55,13 @@ async function openAndSettlePage(browser, url, opts) {
     await page.setExtraHTTPHeaders(headerMap);
   }
   if (cookies.length > 0) {
-    // page.setCookie expects each cookie scoped to a URL or domain. Scope to
-    // the navigation target so the cookie travels on the very first request.
+    // Scope cookies to the navigation target so they travel on the very first
+    // request. Both engines accept `{ name, value, url }` here.
     const scoped = cookies.map((c) => ({ ...c, url }));
-    await page.setCookie(...scoped);
+    await addCookies(page, engine, scoped);
   }
 
-  await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+  await page.goto(url, { waitUntil: mapWaitUntil(engine, 'networkidle'), timeout: 30000 });
 
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });

@@ -17,5 +17,8 @@
     "pngjs": "^7.0.0",
     "puppeteer": "^23.0.0",
     "wawoff2": "^2.0.1"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.60.0"
   }
 }

@@ -75,6 +75,35 @@ PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \
   npx --prefix tools/html-snapshot puppeteer browsers install chrome
 ```
 
+### Optional: Playwright
+
+The snapshot pipeline can drive Chromium through [Playwright](https://playwright.dev/)
+as an alternative to Puppeteer. Playwright is declared as an
+`optionalDependency`, so a plain `npm install` will fetch it on supported
+platforms; if you skipped it (or if `npm install --omit=optional` was used),
+install it explicitly:
+
+```bash
+cd tools/html-snapshot
+npm install playwright
+npx playwright install chromium
+```
+
+Select Playwright either per invocation or via an env var:
+
+```bash
+node snapshot.js page.html -o page.subset.html --browser-engine playwright
+# or:
+HTML_SNAPSHOT_BROWSER=playwright node snapshot.js page.html -o page.subset.html
+```
+
+The flag wins over the env var; the env var wins over the `puppeteer` default.
+Both engines run the same `lib/browser-snapshot.js` payload, so the resulting
+HTML is structurally identical; sub-pixel coordinates may differ by a fraction
+because the two engines bundle slightly different Chromium builds (Puppeteer's
+`chrome-for-testing` vs. Playwright's `chromium-headless-shell`) with their
+own font metrics.
+
 ## Usage
 
 ```bash
@@ -98,6 +127,7 @@ Options:
 | `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
+| `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
 
 ### Inline icon fonts
 
@@ -169,6 +199,7 @@ Options:
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
+| `--browser-engine <name>` | Headless driver to use (`puppeteer` or `playwright`); forwarded to `snapshot.js`. Honours `$HTML_SNAPSHOT_BROWSER`. |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
 
 ### Browser bundle (no Node, no puppeteer)
