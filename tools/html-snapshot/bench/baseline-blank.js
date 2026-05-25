@@ -36,7 +36,7 @@
 // `lib/browser-engine.js` module.
 //
 // Usage:
-//   baseline-blank.js [--snapshot-dir DIR] [--hold-ms N]
+//   baseline-blank.js [--snapshot-dir DIR] [--hold-ms N] [--browser-engine NAME]
 
 'use strict';
 
@@ -45,6 +45,10 @@ const path = require('node:path');
 const args = process.argv.slice(2);
 let snapshotDir = path.resolve(__dirname, '..');
 let holdMs = 200;
+// `engine` defaults to undefined so launchBrowser() falls through to its
+// own resolution chain (HTML_SNAPSHOT_BROWSER env → DEFAULT_ENGINE),
+// matching how snapshot.js behaves when --browser-engine is omitted.
+let engine;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--snapshot-dir') {
     snapshotDir = path.resolve(args[++i]);
@@ -54,12 +58,22 @@ for (let i = 0; i < args.length; i++) {
     holdMs = Number(args[++i]);
     continue;
   }
+  if (args[i] === '--browser-engine') {
+    engine = args[++i];
+    continue;
+  }
   if (args[i] === '-h' || args[i] === '--help') {
     process.stdout.write(
-      'usage: baseline-blank.js [--snapshot-dir DIR] [--hold-ms N]\n',
+      'usage: baseline-blank.js [--snapshot-dir DIR] [--hold-ms N] '
+      + '[--browser-engine puppeteer|playwright]\n',
     );
     process.exit(0);
   }
+  // Anything else is a typo or a stale flag — fail fast rather than
+  // silently drop it (the previous behaviour caused run-cases.sh's
+  // --browser-engine value to be ignored entirely).
+  process.stderr.write(`baseline-blank.js: unknown argument '${args[i]}'\n`);
+  process.exit(2);
 }
 
 // We deliberately re-use snapshot.js's adapter rather than calling
@@ -70,7 +84,7 @@ const enginePath = path.join(snapshotDir, 'lib', 'browser-engine.js');
 const { launchBrowser, newPage } = require(enginePath);
 
 async function main() {
-  const handle = await launchBrowser({});
+  const handle = await launchBrowser({ engine });
   try {
     const page = await newPage(handle, {
       // The exact viewport doesn't matter for an empty page, but using

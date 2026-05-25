@@ -103,18 +103,28 @@ function stat(field, src) {
 // Useful for derived fields (e.g. user+sys CPU total per case) where
 // dressing them up as fake records just to pass through stat() is
 // noisy.
+//
+// Implementation note: we sort once and read min/p50/p95/max off the
+// sorted array, instead of calling minOf + percentile(0.5) + percentile(0.95)
+// + maxOf which would scan the array four times (and sort it twice via
+// percentile()). For corpora with thousands of cases this halves the
+// per-run sort cost.
 function statValues(vals) {
   vals = vals.filter((v) => typeof v === 'number');
   if (!vals.length) {
     return { min: null, p50: null, p95: null, max: null, mean: null };
   }
-  const sum = vals.reduce((a, b) => a + b, 0);
+  const sorted = vals.slice().sort((a, b) => a - b);
+  const n = sorted.length;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += sorted[i];
+  const pickPct = (p) => sorted[Math.min(n - 1, Math.floor(p * n))];
   return {
-    min: minOf(vals),
-    p50: percentile(vals, 0.5),
-    p95: percentile(vals, 0.95),
-    max: maxOf(vals),
-    mean: +(sum / vals.length).toFixed(2),
+    min: sorted[0],
+    p50: pickPct(0.5),
+    p95: pickPct(0.95),
+    max: sorted[n - 1],
+    mean: +(sum / n).toFixed(2),
   };
 }
 
@@ -152,4 +162,6 @@ module.exports = {
   fmt,
   topBy,
   cpuTotalSec,
+  minOf,
+  maxOf,
 };

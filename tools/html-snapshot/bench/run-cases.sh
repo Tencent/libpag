@@ -157,6 +157,26 @@ chromium_probe() {
   "$bin" --version 2>/dev/null | head -n 1 | tr -d '\r' | sed 's/[[:space:]]*$//'
 }
 
+# Resolve the path of the bundled chromium that an engine package ships
+# with (puppeteer.executablePath() / playwright.chromium.executablePath()).
+# Returns nothing on failure so the caller's `if v=$(...)` branch falls
+# through cleanly. Lives in a function because the puppeteer / playwright
+# code paths are otherwise byte-equivalent.
+bundled_chromium_path() {
+  local engine=$1
+  local snippet
+  case "$engine" in
+    puppeteer)
+      snippet='try { console.log(require("puppeteer").executablePath()); } catch (e) {}'
+      ;;
+    playwright)
+      snippet='try { console.log(require("playwright").chromium.executablePath()); } catch (e) {}'
+      ;;
+    *) return 1 ;;
+  esac
+  (cd "$SNAPSHOT_DIR" && node -e "$snippet") 2>/dev/null
+}
+
 # Probe order matches what each engine will actually launch:
 #   1. PLAYWRIGHT_EXECUTABLE_PATH or PUPPETEER_EXECUTABLE_PATH —
 #      explicit override (the bench Docker image sets both to
@@ -178,18 +198,7 @@ if v=$(chromium_probe "$ENGINE_OVERRIDE"); then
 elif v=$(chromium_probe /usr/bin/chromium); then
   CHROMIUM_VERSION=$v
 else
-  BUNDLED_PROBE=""
-  if [[ "$BROWSER_ENGINE" == "playwright" ]]; then
-    BUNDLED_PROBE=$(
-      cd "$SNAPSHOT_DIR" \
-        && node -e 'try { console.log(require("playwright").chromium.executablePath()); } catch (e) {}' 2>/dev/null
-    ) || BUNDLED_PROBE=""
-  else
-    BUNDLED_PROBE=$(
-      cd "$SNAPSHOT_DIR" \
-        && node -e 'try { console.log(require("puppeteer").executablePath()); } catch (e) {}' 2>/dev/null
-    ) || BUNDLED_PROBE=""
-  fi
+  BUNDLED_PROBE=$(bundled_chromium_path "$BROWSER_ENGINE") || BUNDLED_PROBE=""
   if v=$(chromium_probe "$BUNDLED_PROBE"); then
     CHROMIUM_VERSION=$v
   fi
@@ -251,8 +260,13 @@ if [[ ${#CASES[@]} -eq 0 ]]; then
 fi
 
 # Sort the array in-shell (avoids relying on `sort -z`, which BSD
-# sort on macOS doesn't ship).
+# sort on macOS doesn't ship). `set -f` disables pathname expansion
+# while we splice the sorted lines back into an array — without it,
+# any case path containing a glob metacharacter (`*`, `?`, `[`) would
+# be expanded against the cwd and produce wrong / extra entries.
+set -f
 IFS=$'\n' CASES=($(printf '%s\n' "${CASES[@]}" | LC_ALL=C sort)); unset IFS
+set +f
 
 echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE)"
 
@@ -267,6 +281,31 @@ if [[ "$COLLECT_CGROUP" == "1" ]]; then
 else
   SAMPLER_FLAGS+=(--no-cgroup)
 fi
+
+# Run one command under sampler.js, append its JSON row to $RESULTS, and
+# stash the child exit code in $LAST_SAMPLER_STATUS so the caller can
+# decide whether to log a diagnostic. Wrapping `set +e/-e` here keeps
+# the surrounding loop alive on snapshot failures (the row is still
+# recorded with the non-zero exit_code, so it shows up in summary.md's
+# Failures table). We deliberately don't `return $status` — bash's
+# errexit semantics around function return values are subtle across
+# versions, and a sentinel variable sidesteps that entirely.
+#
+# Args: $1 = sampler --label value; $2.. = command + args to sample.
+LAST_SAMPLER_STATUS=0
+run_sampled() {
+  local label=$1; shift
+  set +e
+  node "$BENCH_DIR/sampler.js" \
+    --label "$label" \
+    --interval-ms "$INTERVAL_MS" \
+    "${SAMPLER_FLAGS[@]}" \
+    -- \
+    "$@" \
+    >> "$RESULTS"
+  LAST_SAMPLER_STATUS=$?
+  set -e
+}
 
 # ---- baseline runs --------------------------------------------------------
 # Run the "browser opens about:blank" floor measurement first so subsequent
@@ -288,21 +327,13 @@ if [[ "$BASELINE_RUNS" -gt 0 ]]; then
   for i in $(seq 1 "$BASELINE_RUNS"); do
     label="__baseline:blank/$i"
     echo "-> $label"
-    set +e
-    node "$BENCH_DIR/sampler.js" \
-      --label "$label" \
-      --interval-ms "$INTERVAL_MS" \
-      "${SAMPLER_FLAGS[@]}" \
-      -- \
+    run_sampled "$label" \
       node "$BENCH_DIR/baseline-blank.js" \
         --snapshot-dir "$SNAPSHOT_DIR" \
         --hold-ms "$BASELINE_HOLD_MS" \
-        --browser-engine "$BROWSER_ENGINE" \
-      >> "$RESULTS"
-    status=$?
-    set -e
-    if [[ $status -ne 0 ]]; then
-      echo "   (baseline exited $status; row still recorded for diagnostics)"
+        --browser-engine "$BROWSER_ENGINE"
+    if [[ $LAST_SAMPLER_STATUS -ne 0 ]]; then
+      echo "   (baseline exited $LAST_SAMPLER_STATUS; row still recorded for diagnostics)"
     fi
   done
 fi
@@ -320,23 +351,13 @@ for src in "${CASES[@]}"; do
   # The sampler writes exactly one JSON line on its stdout (the
   # result row); the child's stdout/stderr go to fd 2 inside
   # sampler.js, so progress logs surface in the parent terminal /
-  # docker logs while the JSONL stays clean. `set +e` keeps the loop
-  # going on snapshot failures — the row is still recorded with the
-  # non-zero exit code so it shows up in summary.md's Failures table.
-  set +e
-  node "$BENCH_DIR/sampler.js" \
-    --label "$rel" \
-    --interval-ms "$INTERVAL_MS" \
-    "${SAMPLER_FLAGS[@]}" \
-    -- \
+  # docker logs while the JSONL stays clean.
+  run_sampled "$rel" \
     node "$SNAPSHOT_DIR/snapshot.js" "$src" -o "$out_file" \
-      --browser-engine "$BROWSER_ENGINE" \
-    >> "$RESULTS"
-  status=$?
-  set -e
+      --browser-engine "$BROWSER_ENGINE"
 
-  if [[ $status -ne 0 ]]; then
-    echo "   (snapshot exited $status; row still recorded for diagnostics)"
+  if [[ $LAST_SAMPLER_STATUS -ne 0 ]]; then
+    echo "   (snapshot exited $LAST_SAMPLER_STATUS; row still recorded for diagnostics)"
   fi
 done
 

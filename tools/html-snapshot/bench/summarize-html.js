@@ -47,6 +47,8 @@ const {
   fmt,
   topBy,
   cpuTotalSec,
+  minOf,
+  maxOf,
 } = require('./report-utils');
 
 const [, , resultsPath, hostMetaPath] = process.argv;
@@ -87,8 +89,12 @@ function fixed(v, digits = 1, suffix = '') {
 function histogramSvg({ values, width = 560, height = 160, bins = 20,
                         title, unit = '' }) {
   if (!values.length) return '';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  // minOf / maxOf rather than Math.min(...values) — V8 spreads
+  // arguments onto the platform stack, so a corpus with ~100k cases
+  // (already plausible for batched runs) would RangeError. The same
+  // reduce-based helpers are used for stat() in report-utils.js.
+  const min = minOf(values);
+  const max = maxOf(values);
   const range = Math.max(1e-9, max - min);
   const binW = range / bins;
   const counts = new Array(bins).fill(0);
@@ -97,6 +103,7 @@ function histogramSvg({ values, width = 560, height = 160, bins = 20,
     if (i >= bins) i = bins - 1;
     counts[i]++;
   }
+  // counts has fixed length `bins` (default 20), so spread is safe here.
   const maxC = Math.max(...counts);
   const padL = 36, padR = 8, padT = 18, padB = 26;
   const innerW = width - padL - padR;
