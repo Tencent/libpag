@@ -406,6 +406,7 @@ Embedded font resource containing subsetted glyph data (vector outlines or bitma
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `file` | string | - | External font file path (TTF/OTF). Font nodes with `file` serve as font source declarations. `pagx embed` auto-discovers them, loads the referenced font files, and registers fonts for text shaping. After embed, `file` is preserved for source traceability. |
 | `unitsPerEm` | int | 1000 | Font design space units; rendering scale = fontSize / unitsPerEm |
 
 ### Glyph

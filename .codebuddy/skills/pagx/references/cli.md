@@ -246,7 +246,7 @@ element, an error is reported.
 
 ## pagx font
 
-Font operations with two subcommands: `info` (query metrics) and `embed` (embed into PAGX).
+Query font identity and metrics from a font file or system font. (The old `info` and `embed` subcommands have been removed — use `pagx font --file` / `pagx font --name` for font info, and `pagx embed` for font embedding.)
 
 ### pagx font info
 
@@ -272,24 +272,34 @@ Returns typeface info (fontFamily, fontStyle, glyphsCount, unitsPerEm, hasColor,
 and all FontMetrics fields at the specified size (top, ascent, descent, bottom, leading, xMin,
 xMax, xHeight, capHeight, underlineThickness, underlinePosition).
 
-### pagx font embed
+`pagx font embed` was removed in Phase 1. Use `pagx embed` instead.
 
-Embed fonts into a PAGX file by performing text layout and glyph extraction.
+---
+
+## pagx embed
+
+Embed font glyphs and images into a PAGX file for self-contained output. Font embedding extracts glyph data from laid-out text; image embedding inlines external image files as base64. Font nodes with a `file` attribute are automatically discovered and registered for text shaping — no `--font-file` flag needed.
 
 ```bash
-pagx font embed input.pagx
-pagx font embed -o out.pagx input.pagx
-pagx font embed --file a.ttf --file b.ttf input.pagx
-pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pagx
+pagx embed input.pagx                                    # embed fonts + images (overwrite)
+pagx embed -o out.pagx input.pagx                        # embed fonts + images to new file
+pagx embed --skip-fonts input.pagx                       # embed images only
+pagx embed --skip-images input.pagx                      # embed fonts only
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--file <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--skip-fonts` | Skip font embedding |
+| `--skip-images` | Skip image embedding |
+| `-h, --help` | Show this help message |
 
-`--file` and `--fallback` work the same as in `pagx render`.
+Fonts are resolved in the following order:
+1. Font nodes with `file` attribute are loaded and registered by their internal family name
+2. `--fallback` fonts are tried when a character is not found in the primary font
+
+Image embedding inlines external file references (Image nodes with `filePath`) as base64 data. See the Font `file` attribute in `attributes.md` for details on external font references.
 
 ---
 

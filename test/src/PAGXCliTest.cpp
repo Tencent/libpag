@@ -36,6 +36,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
@@ -3019,22 +3020,85 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
   EXPECT_EQ(contentBefore, contentAfter);
 }
 
-CLI_TEST(PAGXCliTest, Embed_FontFlags_AcceptedLikeOldSubcommand) {
-  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
-  auto outPagx = TempDir() + "/embed_fontflags_out.pagx";
-  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", fontPath, "-o", outPagx, tempPagx});
+CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  auto fontFile = CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf",
+                                      "NotoSansSC-Regular.otf");
+  auto outPagx = TempDir() + "/embed_fontfile_out.pagx";
+  StreamCapture outCapture(std::cout);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
   EXPECT_EQ(ret, 0);
+  EXPECT_NE(outCapture.str().find("pagx embed: wrote"), std::string::npos);
   auto document = pagx::PAGXImporter::FromFile(outPagx);
   ASSERT_NE(document, nullptr);
-  bool hasFontNode = false;
+  bool hasFileFont = false;
+  bool hasEmbedFont = false;
   for (auto& node : document->nodes) {
     if (node->nodeType() == pagx::NodeType::Font) {
-      hasFontNode = true;
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        hasFileFont = true;
+        EXPECT_TRUE(font->id == "noto");
+      }
+      if (font->id.find("__embed_font_") == 0) {
+        hasEmbedFont = true;
+      }
     }
   }
-  EXPECT_TRUE(hasFontNode);
+  EXPECT_TRUE(hasFileFont);
+  EXPECT_TRUE(hasEmbedFont);
+}
+
+CLI_TEST(PAGXCliTest, Embed_FileFlag_RejectedAsUnknown) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", "font.ttf", tempPagx});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("pagx embed: unknown option"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  auto content = ReadFile(tempPagx);
+  auto pos = content.find("NotoSansSC-Regular.otf");
+  ASSERT_NE(pos, std::string::npos);
+  content.replace(pos, std::strlen("NotoSansSC-Regular.otf"), "nonexistent_font.otf");
+  std::ofstream out(tempPagx);
+  out << content;
+  out.close();
+  auto outPagx = TempDir() + "/embed_missing_font_out.pagx";
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"),
+            std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  auto fontFile = CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf",
+                                      "NotoSansSC-Regular.otf");
+  auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
+  auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
+  auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});
+  EXPECT_EQ(ret1, 0);
+  auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", pass1, "-o", pass2});
+  EXPECT_EQ(ret2, 0);
+  auto doc2 = pagx::PAGXImporter::FromFile(pass2);
+  ASSERT_NE(doc2, nullptr);
+  bool hasFileFont = false;
+  for (auto& node : doc2->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        hasFileFont = true;
+        EXPECT_TRUE(font->id == "noto");
+      }
+    }
+  }
+  EXPECT_TRUE(hasFileFont);
 }
 
 CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
