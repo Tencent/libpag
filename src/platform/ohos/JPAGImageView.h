@@ -91,10 +91,11 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void release();
 
-  std::string id;
+  void setProgressCallback(napi_threadsafe_function callback);
 
-  napi_threadsafe_function progressCallback = nullptr;
-  napi_threadsafe_function playingStateCallback = nullptr;
+  void setPlayingStateCallback(napi_threadsafe_function callback);
+
+  std::string id;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
@@ -112,6 +113,9 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> getImage(Frame frame);
 
   bool present(std::shared_ptr<tgfx::Image> image);
+
+  napi_threadsafe_function progressCallback = nullptr;
+  napi_threadsafe_function playingStateCallback = nullptr;
 
   std::mutex locker;
   int _width = 0;

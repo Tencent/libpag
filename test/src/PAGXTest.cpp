@@ -25,10 +25,12 @@
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
+#include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
@@ -73,20 +75,12 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
-}
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
@@ -95,16 +89,6 @@ static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& fil
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;
-}
-
-static void VerifyFile(const std::string& filePath, const std::string& key) {
-  std::streambuf* oldErr = std::cerr.rdbuf();
-  std::ostringstream verifyErr;
-  std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet =
-      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
-  std::cerr.rdbuf(oldErr);
-  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
@@ -201,6 +185,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
+    // Step 1b: Simplify the imported structure before layout so verify doesn't flag the raw
+    // Layer/Group tree produced by the SVG importer.
+    pagx::PAGXOptimizer::Optimize(doc.get());
+
     // Step 2: Layout and embed fonts
     doc->applyLayout(&svgFontConfig);
     pagx::FontEmbedder().embed(doc.get());
@@ -209,6 +197,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
     auto key = "svg_" + baseName;
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + key + ".pagx");
+
+    // Step 3b: The PAGXOptimizer is responsible for eliminating every structural warning
+    // verify can flag.
+    VerifyFile(pagxPath, key);
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
@@ -5168,6 +5160,13 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
   EXPECT_FLOAT_EQ(textBox2->padding.right, 12);
   EXPECT_FLOAT_EQ(textBox2->padding.bottom, 8);
   EXPECT_FLOAT_EQ(textBox2->padding.left, 12);
+}
+
+/**
+ * Test all HTML-related PAGX files in resources/pagx_to_html directory.
+ */
+PAGX_TEST(PAGXTest, HtmlFiles) {
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
 }
 
 }  // namespace pag

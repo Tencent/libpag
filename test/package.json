@@ -1,0 +1,11 @@
+{
+  "name": "pagx-html-test",
+  "version": "1.0.0",
+  "description": "Tests for PAGX HTML exporter",
+  "main": "screenshot.js",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "dependencies": {
+    "puppeteer": "^24.40.0"
+  }
+}

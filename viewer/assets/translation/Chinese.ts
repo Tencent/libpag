@@ -95,26 +95,26 @@
         <translation>导出错误，错误码：</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="535"/>
+        <location filename="../qml/Main.qml" line="539"/>
         <source>Open PAG File</source>
         <translation>打开PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="610"/>
-        <location filename="../qml/Main.qml" line="635"/>
-        <location filename="../qml/Main.qml" line="658"/>
+        <location filename="../qml/Main.qml" line="614"/>
+        <location filename="../qml/Main.qml" line="639"/>
+        <location filename="../qml/Main.qml" line="662"/>
         <source>Select save path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="621"/>
-        <location filename="../qml/Main.qml" line="642"/>
-        <location filename="../qml/Main.qml" line="667"/>
+        <location filename="../qml/Main.qml" line="625"/>
+        <location filename="../qml/Main.qml" line="646"/>
+        <location filename="../qml/Main.qml" line="671"/>
         <source>Exporting</source>
         <translation>正在导出</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="685"/>
+        <location filename="../qml/Main.qml" line="689"/>
         <source>Profiling</source>
         <translation>分析</translation>
     </message>
@@ -122,72 +122,72 @@
 <context>
     <name>MainForm</name>
     <message>
-        <location filename="../qml/MainForm.qml" line="182"/>
+        <location filename="../qml/MainForm.qml" line="185"/>
         <source>Click the menu or drag-drop here to open a PAG file</source>
         <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="242"/>
+        <location filename="../qml/MainForm.qml" line="245"/>
         <source>Edit Layer</source>
         <translation>图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="247"/>
+        <location filename="../qml/MainForm.qml" line="250"/>
         <source>File Structure</source>
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="247"/>
+        <location filename="../qml/MainForm.qml" line="250"/>
         <source>Source Editor</source>
         <translation>源码编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="315"/>
+        <location filename="../qml/MainForm.qml" line="318"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="315"/>
+        <location filename="../qml/MainForm.qml" line="318"/>
         <source>PAGX files do not support layer editing</source>
         <translation>PAGX 文件不支持图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="323"/>
+        <location filename="../qml/MainForm.qml" line="326"/>
         <source>Go to Source Editor →</source>
         <translation>前往源码编辑 →</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="397"/>
+        <location filename="../qml/MainForm.qml" line="400"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="479"/>
+        <location filename="../qml/MainForm.qml" line="482"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="607"/>
+        <location filename="../qml/MainForm.qml" line="610"/>
         <source>Discard</source>
         <translation>放弃</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="641"/>
+        <location filename="../qml/MainForm.qml" line="644"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="679"/>
+        <location filename="../qml/MainForm.qml" line="684"/>
         <source>Save</source>
-        <translation type="unfinished">保存</translation>
+        <translation>保存</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="635"/>
+        <location filename="../qml/MainForm.qml" line="638"/>
         <source>Changes discarded</source>
         <translation>修改已放弃</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="670"/>
+        <location filename="../qml/MainForm.qml" line="675"/>
         <source>Changes applied</source>
         <translation>修改已应用</translation>
     </message>
@@ -196,7 +196,7 @@
         <translation type="vanished">应用修改失败</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="712"/>
+        <location filename="../qml/MainForm.qml" line="717"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
     </message>
@@ -451,17 +451,17 @@
     <message>
         <location filename="../qml/Profiler.qml" line="692"/>
         <source>Node Distribution</source>
-        <translation type="unfinished"></translation>
+        <translation>节点分布</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="702"/>
         <source>nodes</source>
-        <translation type="unfinished"></translation>
+        <translation>个节点</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="809"/>
         <source>Theoretical FPS</source>
-        <translation type="unfinished"></translation>
+        <translation>理论帧率</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="26"/>
@@ -602,29 +602,29 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="308"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="312"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
-        <translation type="unfinished"></translation>
+        <translation>解析 XML 失败：语法或结构无效</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="313"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="318"/>
         <source>Failed to build layer from XML document</source>
-        <translation type="unfinished"></translation>
+        <translation>从 XML 文档构建图层失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="341"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="349"/>
         <source>No file path specified</source>
-        <translation type="unfinished"></translation>
+        <translation>未指定文件路径</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="345"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="353"/>
         <source>Failed to open file for writing: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法打开文件进行写入：%1</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="350"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="358"/>
         <source>Failed to write all data to file</source>
-        <translation type="unfinished"></translation>
+        <translation>写入文件数据不完整</translation>
     </message>
 </context>
 <context>

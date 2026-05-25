@@ -201,6 +201,9 @@ std::shared_ptr<tgfx::Image> ApplyFilter(std::shared_ptr<tgfx::Image> input, Eff
                                          const tgfx::Rect& filterBounds,
                                          const tgfx::Point& effectScale,
                                          const tgfx::Point& sourceScale, tgfx::Point* offset) {
+  if (input == nullptr) {
+    return nullptr;
+  }
   switch (effect->type()) {
     case EffectType::CornerPin:
       return CornerPinFilter::Apply(std::move(input), cache, effect, layerFrame, sourceScale,
@@ -406,6 +409,9 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   auto inputBounds = contentBounds;
   inputBounds.scale(sourceScale.x, sourceScale.y);
   auto input = CreatePictureImage(sourcePicture, &totalOffset, &inputBounds);
+  if (input == nullptr) {
+    return content->draw(parentCanvas);
+  }
 
   auto output = ApplyFilters(input, cache, filterList.get(), sourceScale, filterBounds, clipBounds,
                              clipStartIndex, &offset);
@@ -420,8 +426,6 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
     auto filter = LayerStylesFilter::Make(cache, filterList->layerStyles, filterList->layerFrame,
                                           contentScale, filterList->layerStyleScale);
     filter->applyFilter(parentCanvas, std::move(output));
-  } else if (input == output) {
-    parentCanvas->drawPicture(sourcePicture);
   } else {
     auto canvasMatrix = parentCanvas->getMatrix();
     parentCanvas->translate(totalOffset.x, totalOffset.y);

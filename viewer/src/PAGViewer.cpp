@@ -39,11 +39,19 @@ bool PAGViewer::event(QEvent* event) {
 }
 
 void PAGViewer::openFile(QString path) {
+  bool isPagx = path.toLower().endsWith(".pagx");
   PAGWindow* window = nullptr;
   for (int i = 0; i < PAGWindow::AllWindows.count(); i++) {
     auto win = PAGWindow::AllWindows[i];
     auto fileInWindow = win->getFilePath();
-    if (fileInWindow.isEmpty() || fileInWindow == path) {
+    if (!path.isEmpty() && fileInWindow == path) {
+      window = win;
+      break;
+    }
+    // PAGX files always open in a new window because they require a different QML view
+    // component (PAGXView vs PAGView), and reusing an empty PAG window would need a Loader
+    // switch that is simpler handled by creating a fresh window.
+    if (!isPagx && fileInWindow.isEmpty()) {
       window = win;
       break;
     }
@@ -51,13 +59,16 @@ void PAGViewer::openFile(QString path) {
 
   if (!window) {
     window = new PAGWindow();
-    window->open();
     PAGWindow::AllWindows.append(window);
     QObject::connect(window, &PAGWindow::destroyWindow, this, &PAGViewer::onWindowDestroyed,
                      Qt::UniqueConnection);
+    QString viewType = isPagx ? "pagx" : "pag";
+    window->open(viewType);
   }
 
-  window->openFile(path);
+  if (!path.isEmpty()) {
+    window->openFile(path);
+  }
 }
 
 PAGCheckUpdateModel* PAGViewer::getCheckUpdateModel() {

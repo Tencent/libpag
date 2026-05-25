@@ -29,7 +29,7 @@ class PAGCheckUpdateModel : public QObject {
  public:
   explicit PAGCheckUpdateModel(QObject* parent = nullptr);
   ~PAGCheckUpdateModel() override;
-  Q_INVOKABLE void checkForUpdates(bool keepSlient, bool isUseBeta);
+  Q_INVOKABLE void checkForUpdates(bool keepSilent, bool isUseBeta);
   void getAppcast(const QByteArray& data);
   void getUpdateVersion(QString url, QString version);
 
@@ -38,8 +38,11 @@ class PAGCheckUpdateModel : public QObject {
   QMap<QString, QString> availableUpdates = {};
 
  private:
+  void finalizeUpdateCheck(const QString& selectedUrl);
+
   bool isUseBeta = false;
   bool keepSilent = false;
+  bool fetchingAppcast = false;
   std::unique_ptr<QThreadPool> threadPool = nullptr;
 };
 

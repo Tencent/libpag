@@ -160,8 +160,29 @@ bool PluginInstaller::isPluginInstalled() const {
   return QFile::exists(getPluginInstallPath(pluginName));
 }
 
+const QList<PluginInfo>& PluginInstaller::pluginInfoList() {
+  static const QList<PluginInfo> list = {
+      {"PAGExporter", PluginPermission::Admin},
+      {"H264EncoderTools", PluginPermission::User},
+  };
+  return list;
+}
+
 QStringList PluginInstaller::getPluginList() const {
-  return {"PAGExporter", "H264EncoderTools"};
+  QStringList names;
+  for (const auto& info : pluginInfoList()) {
+    names << info.name;
+  }
+  return names;
+}
+
+PluginPermission PluginInstaller::getPluginPermission(const QString& pluginName) const {
+  for (const auto& info : pluginInfoList()) {
+    if (info.name == pluginName) {
+      return info.permission;
+    }
+  }
+  return PluginPermission::Admin;
 }
 
 int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {

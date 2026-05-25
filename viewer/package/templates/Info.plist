@@ -16,6 +16,18 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>pagx</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>pagIcon</string>
+			<key>CFBundleTypeName</key>
+			<string>PAGX File Format</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>PAGViewer</string>

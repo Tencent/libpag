@@ -93,10 +93,6 @@ class OHOSVideoDecoder : public VideoDecoder {
   OH_AVCodecCategory codecCategory = HARDWARE;
   int videoStride = 0;
   int videoSliceHeight = 0;
-  std::shared_ptr<pag::YUVBuffer> yuvBuffer = nullptr;
-  int64_t yBufferSize = 0;
-  int64_t uvBufferSize = 0;
-  std::weak_ptr<OHOSVideoDecoder> weakThis;
   size_t maxPendingFramesCount = 0;
 
   explicit OHOSVideoDecoder(const VideoFormat& format, bool hardware);

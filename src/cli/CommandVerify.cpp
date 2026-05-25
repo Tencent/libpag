@@ -20,6 +20,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlschemas.h>
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -62,6 +63,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
@@ -273,6 +275,11 @@ static void CollectRefsFromElement(const Element* element, std::unordered_set<st
         refs.insert(glyphRun->font->id);
       }
     }
+  } else if (type == NodeType::TextPath) {
+    auto* textPath = static_cast<const TextPath*>(element);
+    if (textPath->path != nullptr && !textPath->path->id.empty()) {
+      refs.insert(textPath->path->id);
+    }
   }
 }
 
@@ -322,7 +329,7 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
       continue;
     }
     auto type = node->nodeType();
-    if (type == NodeType::Layer || type == NodeType::Document) {
+    if (type == NodeType::Layer || type == NodeType::Document || type == NodeType::Glyph) {
       continue;
     }
     if (refs.find(node->id) == refs.end()) {
@@ -629,10 +636,6 @@ static bool IsGeometryElement(NodeType type) {
          type == NodeType::Path || type == NodeType::Text;
 }
 
-static bool IsPainterElement(NodeType type) {
-  return type == NodeType::Fill || type == NodeType::Stroke;
-}
-
 static bool ContainsRepeater(const std::vector<Element*>& elements) {
   for (auto* element : elements) {
     if (element->nodeType() == NodeType::Repeater) {
@@ -650,7 +653,7 @@ static void DetectPainterLeak(const std::vector<Element*>& elements,
   int lastPainterIndex = -1;
   for (size_t i = 0; i < elements.size(); i++) {
     auto type = elements[i]->nodeType();
-    if (!IsPainterElement(type)) {
+    if (!IsPainter(type)) {
       continue;
     }
     if (lastPainterIndex >= 0) {
@@ -727,11 +730,22 @@ static void DetectRedundantFirstChildGroup(const std::vector<Element*>& elements
     return;
   }
   auto* group = static_cast<const Group*>(first);
-  if (CanUnwrapFirstChildGroup(group)) {
-    AddDiagnostic(diagnostics, group->sourceLine,
-                  "redundant first-child Group, no painter isolation needed. "
-                  "Fix: unwrap — move children into parent scope");
+  if (!CanUnwrapFirstChildGroup(group)) {
+    return;
   }
+  // Groups with customData carry intentional metadata that would be lost if unwrapped.
+  if (!group->customData.empty()) {
+    return;
+  }
+  // If there are following siblings AND the group contains painters, unwrapping would let those
+  // painters bleed onto subsequent geometry. The Group is therefore providing real painter
+  // isolation and should not be flagged.
+  if (elements.size() > 1 && HasPainter(group->elements)) {
+    return;
+  }
+  AddDiagnostic(diagnostics, group->sourceLine,
+                "redundant first-child Group, no painter isolation needed. "
+                "Fix: unwrap — move children into parent scope");
 }
 
 // ============================================================================
@@ -1146,7 +1160,7 @@ static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayou
 // ============================================================================
 
 static bool CanDowngradeLayerToGroup(const Layer* layer) {
-  return layer->children.empty() && pagx::cli::IsLayerShell(layer);
+  return layer->children.empty() && pagx::IsLayerShell(layer);
 }
 
 static void DetectDowngradableLayers(const Layer* parentLayer,
@@ -1310,10 +1324,10 @@ static void DetectHighPathComplexity(const Path* path, std::vector<VerifyDiagnos
     return;
   }
   auto verbCount = path->data->verbs().size();
-  if (verbCount > 500) {
+  if (verbCount > 1024) {
     AddDiagnostic(diagnostics, path->sourceLine,
                   "Path with " + std::to_string(verbCount) +
-                      " verbs (> 500), may cause slow rendering. "
+                      " verbs (> 1024), may cause slow rendering. "
                       "Fix: check if path can be simplified or split");
   }
 }
@@ -1442,8 +1456,17 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
       maskLayer->contents[1]->nodeType() != NodeType::Fill) {
     return;
   }
+  auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
+  // A rounded or reversed rectangle is NOT clip-equivalent to a plain rectangular bounds clip,
+  // so suggesting scrollRect/clipToBounds would change the rendered output.
+  if (rect->roundness != 0 || rect->reversed) {
+    return;
+  }
   auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
   if (fill->alpha < 0.999f) {
+    return;
+  }
+  if (fill->color != nullptr && fill->color->nodeType() != NodeType::SolidColor) {
     return;
   }
   if (!maskLayer->matrix.isIdentity()) {
@@ -1611,6 +1634,15 @@ struct SpatialRect {
 
 static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+// Sibling overlap needs a small tolerance because auto-layout rounds child positions to integers
+// while child sizes can carry fractional text-measurement remainders. Adjacent siblings may then
+// appear to overlap by a fraction of a pixel even though the layout is visually correct.
+static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
+  constexpr float TOLERANCE = 0.5f;
+  return a.x + TOLERANCE < b.x + b.width && a.x + a.width > b.x + TOLERANCE &&
+         a.y + TOLERANCE < b.y + b.height && a.y + a.height > b.y + TOLERANCE;
 }
 
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
@@ -1993,7 +2025,7 @@ static void DetectOverlappingSiblings(const Layer* parentLayer,
   }
   for (size_t i = 0; i < layoutChildren.size(); i++) {
     for (size_t j = i + 1; j < layoutChildren.size(); j++) {
-      if (RectsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
+      if (SiblingsOverlap(layoutChildren[i].second, layoutChildren[j].second)) {
         auto& a = layoutChildren[i];
         auto& b = layoutChildren[j];
         std::vector<int> lines = {a.first->sourceLine, b.first->sourceLine};

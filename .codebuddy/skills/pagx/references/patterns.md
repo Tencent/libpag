@@ -30,6 +30,46 @@ Layers in rows or columns, and constraint positioning for positioning elements w
 **Pattern**: 1px Rectangle for horizontal rules. For full-width dividers, use
 `width="100%"` on the Layer instead of explicit width.
 
+### Dashed Divider
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="300" height="20">
+  <Layer centerX="0" centerY="0" width="260">
+    <Path data="M 0,0 L 260,0"/>
+    <Stroke color="#94A3B8" width="1" dashes="4,4"/>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Use a single-segment Path (one `M`+`L`) for any dashed or dotted line —
+horizontal, vertical, or diagonal. A Rectangle is a four-edge closed shape, so a dashed
+Stroke traces every edge and renders as two parallel rows of dashes, not one.
+
+### Arrow Line
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="180" height="20">
+  <Layer centerX="0" centerY="0" width="172" height="12">
+    <!-- Line ends at the triangle's base midpoint (160,6), not the tip (172,6) -->
+    <Path data="M 0,6 L 160,6"/>
+    <Stroke color="#334155" width="2" cap="butt"/>
+    <Group>
+      <Path data="M 160,0 L 172,6 L 160,12 Z"/>
+      <Fill color="#334155"/>
+    </Group>
+  </Layer>
+</pagx>
+```
+
+**Pattern**: Arrow = line Path + triangle Path with matching Fill, wrapped in a
+Group to isolate the Fill from the Stroke. End the line at the triangle's
+**base midpoint**, not the tip — otherwise the line pokes through the head.
+Triangle formula: `M tipX-L,tipY-W L tipX,tipY L tipX-L,tipY+W Z`
+(`L` = head length, `W` ≈ 0.5×L). Same rule holds for dashed (`dashes="6,4"`) or
+curved (`Q`/`C`) line variants.
+
 ### Button / Badge
 
 ```xml

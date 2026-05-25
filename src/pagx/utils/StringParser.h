@@ -232,6 +232,27 @@ Matrix MatrixFromString(const std::string& str);
 std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 
+/**
+ * Formats a float as a pixel coordinate or size with at most two decimal places. Unlike
+ * FloatToString (which uses %g and preserves full float precision), this trims sub-pixel
+ * noise that only adds visual clutter to HTML/CSS output. Use this for left/top/width/height
+ * /translate/line-height-style numbers. Do not use for SVG path data, transform matrices,
+ * color channels, or other precision-sensitive values.
+ */
+std::string CoordToString(float value);
+
+/**
+ * Formats a float for CSS/HTML output using at most three decimal places, with trailing
+ * zeros and a bare trailing dot stripped. Unlike FloatToString (which uses %g and prints
+ * up to 6 significant digits, producing inconsistent precision such as 0.0823529 next to
+ * -1.90915 next to -11.31), this gives uniform fractional precision suitable for
+ * transform matrix coefficients, rotation degrees, scale factors, alpha values, gradient
+ * stop percentages, SVG path data, and other CSS numerics. Px coordinates should still
+ * use CoordToString (two decimal places). PAGX serialization and SVG export keep
+ * FloatToString to preserve full roundtrip precision.
+ */
+std::string CssFloatToString(float value);
+
 //==============================================================================
 // Custom data key validation
 //==============================================================================
