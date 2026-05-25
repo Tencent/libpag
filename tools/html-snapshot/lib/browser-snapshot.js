@@ -1715,15 +1715,20 @@ function render(el, parentRect, opts, precomputed) {
 
   const rect = el.getBoundingClientRect();
   // An empty leaf with a degenerate rect would render as nothing, so skip
-  // it. Exception: a flex item like `<div style="flex: 1"></div>` is a
-  // spacer that pushes its siblings along the main axis. Under
-  // `align-items: center` it reports a non-zero main-axis size but
-  // `height: 0` on the cross axis (there is no content to stretch).
-  // Dropping it would collapse the gap and shift every following sibling,
-  // so keep flex items that have any extent on either axis.
-  const rectIsDegenerate = opts.flexItem
-    ? (rect.width <= 0 && rect.height <= 0)
-    : !nonZero(rect);
+  // it. Flex items are always preserved here (even when both axes collapse
+  // to zero) because they still count as siblings for the parent's `gap`
+  // accounting and for `justify-content` distribution. Two concrete cases:
+  //   - `<div style="flex: 1"></div>` under `align-items: center` reports a
+  //     non-zero main-axis size but `height: 0` on the cross axis — keep it
+  //     so it can keep pushing its siblings along the main axis.
+  //   - An empty `<i>` whose icon-font CSS failed to load reports `0x0`.
+  //     The parent flex's `gap: Npx` adds N px between this empty box and
+  //     every later sibling; dropping it would silently shift those
+  //     siblings, breaking alignment with the source paint.
+  // Visibility (`display: none` / `visibility: hidden`) is filtered
+  // upstream in `flexItemChildren`, so anything that reaches here is
+  // layout-active.
+  const rectIsDegenerate = !opts.flexItem && !nonZero(rect);
   if (rectIsDegenerate && !elementHasChildren(el) && !gatherDirectText(el) &&
       !syntheticText(el)) {
     return '';
