@@ -508,6 +508,7 @@
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="unitsPerEm" type="xs:integer" default="1000"/>
+    <xs:attribute name="file" type="xs:string"/>
   </xs:complexType>
 
   <!-- ========================= GlyphRun ========================= -->

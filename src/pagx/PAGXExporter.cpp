@@ -1004,6 +1004,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
       xml.addAttribute("unitsPerEm", font->unitsPerEm, Default<Font>().unitsPerEm);
+      if (!font->file.empty()) {
+        xml.addAttribute("file", font->file);
+      }
       WriteCustomData(xml, node);
       if (font->glyphs.empty()) {
         xml.closeElementSelfClosing();

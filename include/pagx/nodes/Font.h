@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
@@ -75,6 +76,13 @@ class Font : public Node {
    * The default value is 1000.
    */
   int unitsPerEm = 1000;
+
+  /**
+   * Path to an external font file. When set, glyph data is extracted from this file during embed
+   * instead of being read from Glyph children. The path is resolved relative to the PAGX file's
+   * directory. An empty string means no external reference.
+   */
+  std::string file = {};
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing
