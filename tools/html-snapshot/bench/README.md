@@ -5,6 +5,12 @@ against every non-`*.subset.html` file in an input directory under a
 process-tree sampler, then writes one JSON line per case
 (`results.jsonl`) plus a Markdown summary table (`summary.md`).
 
+Outputs land in `bench/out/<label>/` by default — same convention as
+the `eval/` harness — so successive runs against different corpora
+(or different code revisions) don't clobber each other. Pass
+`--label NAME` or `LABEL=NAME` to tag a run; the default label is
+`current`.
+
 Two execution modes share the same per-case loop:
 
 - **Docker** (`run-bench.sh`) — Debian Bookworm + distro Chromium
@@ -93,10 +99,15 @@ the cheapest path; the harness builds for whatever architecture Docker
 defaults to on the host.
 
 ```bash
-# Build + run, default output dir = ./bench-out
+# Build + run, default output dir = tools/html-snapshot/bench/out/current
 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 
-# Pick a different output dir
+# Tag the run so it lands in bench/out/ima-glm5.1/ instead of out/current/
+tools/html-snapshot/bench/run-bench.sh --label ima-glm5.1 ~/Desktop/tmp_case
+# or:
+LABEL=ima-glm5.1 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
+
+# Pick an explicit output dir (overrides the out/<label>/ default)
 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case /tmp/bench-out
 
 # Tune container envelope / sampler tick rate
@@ -120,10 +131,15 @@ Prerequisites:
   `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` before running.
 
 ```bash
-# Default output dir = ./bench-out
+# Default output dir = tools/html-snapshot/bench/out/current
 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
 
-# Pick a different output dir
+# Tag the run so it lands in bench/out/glm5.1/ instead of out/current/
+tools/html-snapshot/bench/run-native.sh --label glm5.1 ~/Desktop/tmp_case
+# or:
+LABEL=glm5.1 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
+
+# Pick an explicit output dir (overrides the out/<label>/ default)
 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case /tmp/bench-out
 
 # Tune sampler tick rate
