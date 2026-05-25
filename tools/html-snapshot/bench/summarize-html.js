@@ -57,12 +57,24 @@ if (!resultsPath) {
 
 const { rows, hostMeta, ok, fail, baseline, cases } = loadReport(resultsPath, hostMetaPath);
 
-// ---- escaping -------------------------------------------------------------
+// ---- escaping / number formatting ----------------------------------------
 
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Null-safe wrapper around toFixed() for the tile / notes blocks. The
+// shared fmt() in report-utils.js picks digits dynamically (0 for
+// >=1000, else 1) which is wrong for the headline tiles that need a
+// stable precision (e.g. "5.3s", not "5253" for wall ms). Without
+// this guard the script crashes on native macOS / Linux runs where
+// PSS and cgroup_* columns come back null because the platform
+// doesn't expose them — see run-native.sh's caveats block.
+function fixed(v, digits = 1, suffix = '') {
+  if (v == null || Number.isNaN(v)) return 'n/a';
+  return v.toFixed(digits) + suffix;
 }
 
 // ---- histogram (inline SVG) ----------------------------------------------
@@ -218,6 +230,9 @@ function renderHeadCss() {
     padding: 10px 14px;
   }
   .chart svg { width: 100%; height: auto; display: block; }
+  .chart-empty { padding: 24px 8px; text-align: center; color: var(--fg-muted); }
+  .chart-empty-title { font-size: 11px; font-weight: 600; color: #222; margin-bottom: 8px; }
+  .chart-empty-body { font-size: 12px; }
 
   .meta { font-family: var(--mono); font-size: 12px; color: var(--fg-muted); }
   .meta dt { float: left; clear: left; min-width: 160px; }
@@ -259,6 +274,10 @@ function renderTiles() {
   const denom = cases.length || 1;
   const successRate = ((ok.length / denom) * 100).toFixed(1);
   const successClass = fail.length === 0 ? 'good' : 'warn';
+  // Convert ms → s only when we actually have a number; otherwise
+  // hand null straight to fixed() so the tile renders 'n/a' instead
+  // of "0.0s" (null/1000 === 0 in JS, which would be misleading).
+  const toSec = (ms) => (ms == null ? null : ms / 1000);
   return `
 <div class="tiles">
   <div class="tile ${successClass}">
@@ -268,23 +287,23 @@ function renderTiles() {
   </div>
   <div class="tile">
     <div class="lbl">wall p50 / p95</div>
-    <div class="v">${(stats.wall.p50 / 1000).toFixed(1)}s</div>
-    <div class="sub">p95 ${(stats.wall.p95 / 1000).toFixed(1)}s · max ${(stats.wall.max / 1000).toFixed(1)}s</div>
+    <div class="v">${fixed(toSec(stats.wall.p50), 1, 's')}</div>
+    <div class="sub">p95 ${fixed(toSec(stats.wall.p95), 1, 's')} · max ${fixed(toSec(stats.wall.max), 1, 's')}</div>
   </div>
   <div class="tile">
     <div class="lbl">PSS 峰值 p95 (按比例摊分)</div>
-    <div class="v">${stats.procPss.p95.toFixed(0)} MB</div>
-    <div class="sub">p50 ${stats.procPss.p50.toFixed(0)} · max ${stats.procPss.max.toFixed(0)}</div>
+    <div class="v">${fixed(stats.procPss.p95, 0, ' MB')}</div>
+    <div class="sub">p50 ${fixed(stats.procPss.p50, 0)} · max ${fixed(stats.procPss.max, 0)}</div>
   </div>
   <div class="tile">
     <div class="lbl">cgroup memory.peak (OS 实际提交)</div>
-    <div class="v">${cgMemMax.toFixed(0)} MB</div>
+    <div class="v">${cgMemMax > 0 ? cgMemMax.toFixed(0) + ' MB' : 'n/a'}</div>
     <div class="sub">单容器整轮高水位</div>
   </div>
   <div class="tile">
     <div class="lbl">CPU per case (user+sys)</div>
-    <div class="v">${stats.cpuTotal.p50.toFixed(1)}s</div>
-    <div class="sub">p95 ${stats.cpuTotal.p95.toFixed(1)}s · 占 1 核 ${stats.cgPct.p50.toFixed(0)}%</div>
+    <div class="v">${fixed(stats.cpuTotal.p50, 1, 's')}</div>
+    <div class="sub">p95 ${fixed(stats.cpuTotal.p95, 1, 's')} · 占 1 核 ${fixed(stats.cgPct.p50, 0, '%')}</div>
   </div>
   <div class="tile">
     <div class="lbl">单 case 进程数</div>
@@ -301,9 +320,9 @@ function renderNotes() {
      <code>sampler.js</code> 每 50ms 遍历 <code>/proc/&lt;pid&gt;</code> 整棵子树聚合
      RSS / PSS，配合 cgroup v2 <code>memory.peak</code> 和 <code>cpu.stat</code> 做交叉验证。</p>
   <p><strong>三个内存指标的差异</strong>：
-     <code>proc-tree RSS</code> ≈ ${stats.procRss.p50.toFixed(0)} MB（含共享页重复计数，是 <code>top</code> 一眼看到的数）；
-     <code>proc-tree PSS</code> ≈ ${stats.procPss.p50.toFixed(0)} MB（共享页按比例摊分，业界常用）；
-     <code>cgroup memory.peak</code> = ${cgMemMax.toFixed(0)} MB（<strong>OS 真正提交的物理页，部署时容器 limit 应参考此值</strong>）。</p>
+     <code>proc-tree RSS</code> ≈ ${fixed(stats.procRss.p50, 0, ' MB')}（含共享页重复计数，是 <code>top</code> 一眼看到的数）；
+     <code>proc-tree PSS</code> ≈ ${fixed(stats.procPss.p50, 0, ' MB')}（共享页按比例摊分，业界常用）；
+     <code>cgroup memory.peak</code> = ${cgMemMax > 0 ? cgMemMax.toFixed(0) + ' MB' : 'n/a'}（<strong>OS 真正提交的物理页，部署时容器 limit 应参考此值</strong>）。</p>
 </div>`;
 }
 
@@ -367,18 +386,32 @@ function renderEnvironment() {
 </dl>`;
 }
 
+// Render either a histogram SVG or, when the underlying metric isn't
+// populated on this platform (e.g. PSS / cgroup CPU% on native macOS),
+// a small "no data" placeholder so the chart card doesn't render as a
+// blank white box.
+function chartCell(values, opts) {
+  if (!values.length) {
+    return `<div class="chart-empty">
+      <div class="chart-empty-title">${esc(opts.title)}</div>
+      <div class="chart-empty-body">该平台未采集此指标</div>
+    </div>`;
+  }
+  return histogramSvg({ values, ...opts });
+}
+
 function renderCharts() {
   return `
 <h2>分布</h2>
 <div class="chart-grid">
   <div class="chart">
-    ${histogramSvg({ values: wallVals.map((v) => v / 1000), title: 'wall time (秒)', unit: 's' })}
+    ${chartCell(wallVals.map((v) => v / 1000), { title: 'wall time (秒)', unit: 's' })}
   </div>
   <div class="chart">
-    ${histogramSvg({ values: pssVals, title: '进程树 PSS 峰值 (MB)', unit: 'MB' })}
+    ${chartCell(pssVals, { title: '进程树 PSS 峰值 (MB)', unit: 'MB' })}
   </div>
   <div class="chart">
-    ${histogramSvg({ values: cpuVals, title: 'CPU 占用率 (% of 1 core)', unit: '%' })}
+    ${chartCell(cpuVals, { title: 'CPU 占用率 (% of 1 core)', unit: '%' })}
   </div>
 </div>`;
 }

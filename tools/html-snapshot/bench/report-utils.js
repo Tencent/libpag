@@ -17,7 +17,11 @@
 //   - stat(field, src) → { min, p50, p95, max, mean } | { all-null }
 //   - fmt(v, suffix?) → string  (n/a-aware, integer >= 1000)
 //   - topBy(rows, field, n)     → rows sorted desc by field, top-n only
-//   - cpuTotalSec(row)          → user+sys cgroup CPU (0-default)
+//   - cpuTotalSec(row)          → user+sys cgroup CPU; null if both
+//                                  inputs are null (e.g. native macOS
+//                                  has no cgroups, so reporting 0
+//                                  would falsely imply "measured zero
+//                                  CPU" rather than "not measured")
 //
 // All numeric helpers ignore non-number entries (`null`, `undefined`,
 // strings) so the same code path works for both fully-populated Docker
@@ -130,7 +134,12 @@ function topBy(rows, field, n) {
 }
 
 function cpuTotalSec(row) {
-  return (row.cgroup_cpu_user_sec || 0) + (row.cgroup_cpu_system_sec || 0);
+  const u = row.cgroup_cpu_user_sec;
+  const s = row.cgroup_cpu_system_sec;
+  // Both unmeasured → return null so downstream stat()/fmt() show
+  // 'n/a' instead of a misleading "0.0s" tile or table cell.
+  if (u == null && s == null) return null;
+  return (u || 0) + (s || 0);
 }
 
 module.exports = {
