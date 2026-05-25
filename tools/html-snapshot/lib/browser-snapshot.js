@@ -877,19 +877,39 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
 }
 
 // Emit one absolutely-positioned, nowrap <span> per line of `textNode`,
-// positioned relative to `parentRect`. When the line's measured glyph rect
-// is shorter than the computed `line-height` (Chromium's `getClientRects`
-// reports glyph bounds for inline text, not the line box), expand each
-// line span vertically to the full line-height and re-centre it around
-// the original glyph mid-line. Without this PAGX's text engine, whose
-// baseline / leading model differs from Chromium's by sub-pixel amounts,
-// ends up rendering the final line a hair below the span's declared
-// bottom — invisible on Latin block text but clipping descenders and
-// bottom-heavy CJK strokes inside a `line-clamp` wrapper whose own height
-// was pinned to exactly N × line-height. Same shift is applied to the
-// line's top so the visible glyph centre still lines up with Chromium's
-// measurement; the per-line stride (top-to-top) is already line-height,
-// so consecutive expanded spans tile cleanly without overlap.
+// positioned relative to `parentRect`. Chromium's `Range.getClientRects()`
+// reports glyph INK bounds, not line-box bounds — and the two diverge in
+// both directions:
+//
+//   - Latin block text: ink is SHORTER than `line-height` (`getClientRects`
+//     gives a 19px rect for `font-size:16; line-height:24`). Expand the
+//     span to the full line-height and re-centre it around the original
+//     glyph mid-line. Without this, PAGX's text engine — whose
+//     baseline/leading model differs from Chromium's by sub-pixel amounts —
+//     renders the final line a hair below the span's declared bottom,
+//     clipping descenders inside a `line-clamp` wrapper whose height was
+//     pinned to exactly N × line-height.
+//
+//   - CJK italic / synthetic-italic text: ink is TALLER than `line-height`
+//     because the font's ascent + descent exceeds the chosen leading
+//     (`font-size:72; line-height:82.8` measures as a 104px rect, with the
+//     ink extending ~11px above and ~10px below the line-box). Using
+//     `rect.top` as the span's top would shift the rendered line-box up by
+//     the same ~11px because both Chromium and PAGX anchor the line-box at
+//     the span's top edge — making the rendered text bottom drift far
+//     enough above the original to misalign every following sibling (e.g.
+//     a `mt-24` divider that suddenly sits further from the visible text
+//     than the source CSS asked for). Clamp the span back to line-box
+//     geometry: width is unchanged (skewed glyphs still need the wider
+//     bounding box), but height collapses to line-height and the top
+//     shifts down by half the overflow so the line-box centre stays where
+//     Chromium painted it. The ink that escapes the wrapper is fine in
+//     practice — siblings position themselves against the line-box edge in
+//     the source CSS, so matching the line-box position is exactly what
+//     preserves the inter-element spacing.
+//
+// The per-line stride (top-to-top) is line-height in both branches, so
+// consecutive spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed) {
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
@@ -905,6 +925,10 @@ function emitTextSpans(textNode, parentRect, computed) {
     if (lineHeightPx > lh + 0.1) {
       const delta = (lineHeightPx - lh) / 2;
       lt -= delta;
+      lh = lineHeightPx;
+    } else if (lineHeightPx > 0 && lh > lineHeightPx + 0.1) {
+      const delta = (lh - lineHeightPx) / 2;
+      lt += delta;
       lh = lineHeightPx;
     }
     const tl = line.rect.left - parentRect.left;
