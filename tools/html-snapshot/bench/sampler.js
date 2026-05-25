@@ -48,26 +48,28 @@
 // Usage:
 //   sampler.js [--label LABEL] [--interval-ms 50] [--no-cgroup] -- <cmd> [args...]
 //
-// Output (single JSON line on stdout):
+// Output (single JSON line on stdout). Fields whose source isn't
+// available on the current platform are emitted as null (not omitted)
+// so downstream consumers can rely on a stable schema:
 //   {
 //     "label": "...",
 //     "exit_code": 0,
+//     "signal": null,
+//     "platform": "linux",
 //     "wall_ms": 4123,
-//     "user_cpu_sec": 3.21,
-//     "system_cpu_sec": 0.42,
-//     "cpu_usage_pct_of_one_core": 88.1,
 //     "samples": 82,
 //     "peak_proc_tree_rss_mb": 612.5,
-//     "peak_proc_tree_pss_mb": 487.2,
+//     "peak_proc_tree_pss_mb": 487.2,           // null on macOS
 //     "peak_proc_count": 11,
-//     "cgroup_memory_peak_mb": 619.1,
-//     "cgroup_cpu_user_sec": 3.18,
-//     "cgroup_cpu_system_sec": 0.40,
+//     "cgroup_memory_peak_mb": 619.1,           // null without --cgroup
+//     "cgroup_memory_peak_delta_mb": 18.4,      // null without --cgroup
+//     "cgroup_cpu_user_sec": 3.18,              // null without --cgroup
+//     "cgroup_cpu_system_sec": 0.40,            // null without --cgroup
+//     "cgroup_cpu_usage_pct_of_one_core": 87.3, // null without --cgroup
 //     "child_process_breakdown": [
-//       { "comm": "node",            "peak_rss_mb": 96.4 },
-//       { "comm": "chrome",          "peak_rss_mb": 215.1 },
-//       { "comm": "chrome (renderer)", "peak_rss_mb": 178.6 },
-//       ...
+//       { "comm": "node",              "peak_rss_mb": 96.4 },
+//       { "comm": "chrome",            "peak_rss_mb": 215.1 },
+//       { "comm": "chrome (renderer)", "peak_rss_mb": 178.6 }
 //     ]
 //   }
 
@@ -306,6 +308,55 @@ function readCgroupCpuStat() {
   }
 }
 
+// ---- result formatting helpers -------------------------------------------
+
+// Convert KB → MB (rounded to one decimal). Returns null on null input
+// so we can pipe optional fields straight through (cleaner than
+// repeating `x != null ? +(x / 1024).toFixed(1) : null` inline).
+function kbToMb(kb) {
+  return kb == null ? null : +(kb / 1024).toFixed(1);
+}
+function bytesToMb(bytes) {
+  return bytes == null ? null : +(bytes / 1024 / 1024).toFixed(1);
+}
+function roundSec(sec) {
+  return sec == null ? null : +sec.toFixed(2);
+}
+
+// macOS ps oscillates between the full executable path and the 16-char
+// truncated binary name for the same process (typically around exec
+// transitions), so a single Chromium helper can land in two per-comm
+// buckets (e.g. "Google Chrome fo" and "Google Chrome for Testing
+// Helper"). Collapse any ≤16-char key that's a strict prefix of a
+// longer key into that longer key, taking the max RSS (true peak of
+// the underlying process). No-op on Linux where /proc comm names are
+// stable per process.
+function mergeDarwinShortCommKeys(perCommPeak) {
+  if (PLATFORM !== 'darwin') return;
+  const keys = Array.from(perCommPeak.keys());
+  for (const short of keys) {
+    if (!perCommPeak.has(short)) continue;
+    if (short.length > 16) continue;
+    for (const long of keys) {
+      if (long === short || !perCommPeak.has(long)) continue;
+      if (long.length > short.length && long.startsWith(short)) {
+        const shortKb = perCommPeak.get(short) || 0;
+        const longKb = perCommPeak.get(long) || 0;
+        perCommPeak.set(long, Math.max(shortKb, longKb));
+        perCommPeak.delete(short);
+        break;
+      }
+    }
+  }
+}
+
+function buildBreakdown(perCommPeak, limit = 12) {
+  return Array.from(perCommPeak.entries())
+    .map(([comm, kb]) => ({ comm, peak_rss_mb: kbToMb(kb) }))
+    .sort((a, b) => b.peak_rss_mb - a.peak_rss_mb)
+    .slice(0, limit);
+}
+
 // ---- main -----------------------------------------------------------------
 
 const startWall = Date.now();
@@ -367,47 +418,20 @@ child.on('exit', (code, signal) => {
     cgSystemSec = (cgroupCpuAfter.system_usec - (cgroupCpuBefore.system_usec || 0)) / 1e6;
   }
 
-  let cgroupMemPeakDelta = null;
-  if (cgroupMemPeakAfter != null) {
-    // memory.peak is monotonic; report the larger of "delta since
-    // start" and "absolute" (the latter handles the first case in a
-    // fresh container where the before-value was 0/low). The
-    // surrounding run-in-container.sh script writes to memory.peak
-    // between cases when the kernel supports it (6.5+); we still
-    // report both so reports remain interpretable on older kernels.
-    cgroupMemPeakDelta = Math.max(0, cgroupMemPeakAfter - cgroupMemPeakBefore);
-  }
+  // memory.peak is monotonic on kernels < 6.5; report the delta against
+  // the value observed at sampler start. The surrounding
+  // run-in-container.sh writes to memory.peak between cases when the
+  // kernel supports it (6.5+); we still report both so reports remain
+  // interpretable on older kernels.
+  const cgroupMemPeakDelta = cgroupMemPeakAfter != null
+    ? Math.max(0, cgroupMemPeakAfter - cgroupMemPeakBefore)
+    : null;
 
-  // macOS ps oscillates between the full executable path and the
-  // 16-char truncated binary name for the same process (typically
-  // around exec transitions), so a single Chromium helper can land
-  // in two per-comm buckets (e.g. "Google Chrome fo" and "Google
-  // Chrome for Testing Helper"). Collapse any ≤16-char key that's
-  // a strict prefix of a longer key into that longer key, taking
-  // the max RSS (true peak of the underlying process). No-op on
-  // Linux where /proc comm names are stable per process.
-  if (PLATFORM === 'darwin') {
-    const keys = Array.from(perCommPeak.keys());
-    for (const short of keys) {
-      if (!perCommPeak.has(short)) continue;
-      if (short.length > 16) continue;
-      for (const long of keys) {
-        if (long === short || !perCommPeak.has(long)) continue;
-        if (long.length > short.length && long.startsWith(short)) {
-          const shortKb = perCommPeak.get(short) || 0;
-          const longKb = perCommPeak.get(long) || 0;
-          perCommPeak.set(long, Math.max(shortKb, longKb));
-          perCommPeak.delete(short);
-          break;
-        }
-      }
-    }
-  }
+  mergeDarwinShortCommKeys(perCommPeak);
 
-  const breakdown = Array.from(perCommPeak.entries())
-    .map(([comm, kb]) => ({ comm, peak_rss_mb: +(kb / 1024).toFixed(1) }))
-    .sort((a, b) => b.peak_rss_mb - a.peak_rss_mb)
-    .slice(0, 12);
+  const cgCpuPct = (cgUserSec != null && cgSystemSec != null && wallMs > 0)
+    ? +(((cgUserSec + cgSystemSec) * 1000) / wallMs * 100).toFixed(1)
+    : null;
 
   const result = {
     label,
@@ -416,20 +440,15 @@ child.on('exit', (code, signal) => {
     platform: PLATFORM,
     wall_ms: wallMs,
     samples: sampleCount,
-    peak_proc_tree_rss_mb: +(peakRssKb / 1024).toFixed(1),
-    peak_proc_tree_pss_mb: pssEverSampled ? +(peakPssKb / 1024).toFixed(1) : null,
+    peak_proc_tree_rss_mb: kbToMb(peakRssKb),
+    peak_proc_tree_pss_mb: pssEverSampled ? kbToMb(peakPssKb) : null,
     peak_proc_count: peakProcCount,
-    cgroup_memory_peak_mb:
-      cgroupMemPeakAfter != null ? +(cgroupMemPeakAfter / 1024 / 1024).toFixed(1) : null,
-    cgroup_memory_peak_delta_mb:
-      cgroupMemPeakDelta != null ? +(cgroupMemPeakDelta / 1024 / 1024).toFixed(1) : null,
-    cgroup_cpu_user_sec: cgUserSec != null ? +cgUserSec.toFixed(2) : null,
-    cgroup_cpu_system_sec: cgSystemSec != null ? +cgSystemSec.toFixed(2) : null,
-    cgroup_cpu_usage_pct_of_one_core:
-      cgUserSec != null && cgSystemSec != null && wallMs > 0
-        ? +(((cgUserSec + cgSystemSec) * 1000) / wallMs * 100).toFixed(1)
-        : null,
-    child_process_breakdown: breakdown,
+    cgroup_memory_peak_mb: bytesToMb(cgroupMemPeakAfter),
+    cgroup_memory_peak_delta_mb: bytesToMb(cgroupMemPeakDelta),
+    cgroup_cpu_user_sec: roundSec(cgUserSec),
+    cgroup_cpu_system_sec: roundSec(cgSystemSec),
+    cgroup_cpu_usage_pct_of_one_core: cgCpuPct,
+    child_process_breakdown: buildBreakdown(perCommPeak),
   };
   process.stdout.write(JSON.stringify(result) + '\n');
   process.exit(code === null ? 1 : code);

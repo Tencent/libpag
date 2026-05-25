@@ -1,21 +1,47 @@
 #!/usr/bin/env node
 //
-// summarize-html.js — turn the JSONL output of run-in-container.sh
-// into a single self-contained HTML report (inline CSS + inline SVG,
-// no external fonts / scripts / network). Opens cleanly in any
-// browser; small enough to attach to a PR description or e-mail.
+// summarize-html.js — turn the JSONL output of run-cases.sh into a
+// single self-contained HTML report (inline CSS + inline SVG, no
+// external fonts / scripts / network). Opens cleanly in any browser;
+// small enough to attach to a PR description or e-mail.
 //
 // Companion to summarize.js (which produces Markdown for terminal /
-// PR-comment use). The two scripts read the same JSONL schema so they
-// can be run independently from the same bench output without
-// re-running the workload.
+// PR-comment use). The two scripts read the same JSONL schema and
+// share statistical helpers via report-utils.js so the same numbers
+// land in both reports.
 //
 // Usage:
 //   node summarize-html.js results.jsonl host_meta.json > summary.html
+//
+// Layout:
+//   <head>          inline CSS + meta
+//   <body>
+//     header        title + success-rate subtitle
+//     tiles         six headline metrics (success rate, wall, PSS, …)
+//     notes         caveat box explaining the three memory metrics
+//     environment   kernel / arch / node / puppeteer / chromium / cgroup
+//     charts        three histograms (wall, PSS, CPU%)
+//     aggregate     full p50/p95/max/mean table
+//     top cases     top 8 by PSS, top 8 by wall
+//     failures      (only if any)
+//     per-case      collapsed <details> with full table
+//     footer        generation metadata
+//
+// Each section is its own renderXxx() function that returns an HTML
+// string; the main code at the bottom just concatenates them. Block
+// boundaries match the section headings, so editing one section
+// doesn't risk breaking adjacent markup.
 
 'use strict';
 
-const fs = require('node:fs');
+const {
+  loadReport,
+  stat,
+  statValues,
+  fmt,
+  topBy,
+  cpuTotalSec,
+} = require('./report-utils');
 
 const [, , resultsPath, hostMetaPath] = process.argv;
 if (!resultsPath) {
@@ -23,42 +49,10 @@ if (!resultsPath) {
   process.exit(2);
 }
 
-const rows = fs
-  .readFileSync(resultsPath, 'utf8')
-  .split('\n').map((s) => s.trim()).filter(Boolean).map((s) => JSON.parse(s));
+const { rows, hostMeta, ok, fail } = loadReport(resultsPath, hostMetaPath);
 
-let hostMeta = {};
-if (hostMetaPath) {
-  try { hostMeta = JSON.parse(fs.readFileSync(hostMetaPath, 'utf8')); } catch {}
-}
+// ---- escaping -------------------------------------------------------------
 
-const ok = rows.filter((r) => r.exit_code === 0);
-const fail = rows.filter((r) => r.exit_code !== 0);
-
-// ---- stats helpers --------------------------------------------------------
-
-function pct(arr, p) {
-  if (!arr.length) return null;
-  const s = arr.slice().sort((a, b) => a - b);
-  return s[Math.min(s.length - 1, Math.floor(p * s.length))];
-}
-function stat(field, src) {
-  const vals = src.map((r) => r[field]).filter((v) => typeof v === 'number');
-  if (!vals.length) return { p50: null, p95: null, max: null, mean: null, min: null };
-  const sum = vals.reduce((a, b) => a + b, 0);
-  return {
-    min: Math.min(...vals),
-    p50: pct(vals, 0.5),
-    p95: pct(vals, 0.95),
-    max: Math.max(...vals),
-    mean: +(sum / vals.length).toFixed(2),
-  };
-}
-function fmt(v, suffix = '') {
-  if (v == null) return 'n/a';
-  if (typeof v === 'number') return (v >= 1000 ? v.toFixed(0) : v.toFixed(1)) + suffix;
-  return String(v) + suffix;
-}
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -67,11 +61,11 @@ function esc(s) {
 
 // ---- histogram (inline SVG) ----------------------------------------------
 
-// Render a simple bar histogram into an inline <svg>. We pick bin
-// boundaries from the data range with a power-of-2-ish bin count so
-// the chart stays legible without external chart libs. The labels are
-// placed manually (no <text> auto-fit logic) so the SVG renders the
-// same in every browser.
+// Render a simple bar histogram into an inline <svg>. Bin boundaries
+// come from the data range with a fixed bin count so the chart stays
+// legible without external chart libs. Tick labels are placed manually
+// (no <text> auto-fit logic) so the SVG renders the same in every
+// browser.
 function histogramSvg({ values, width = 560, height = 160, bins = 20,
                         title, unit = '' }) {
   if (!values.length) return '';
@@ -114,43 +108,32 @@ function histogramSvg({ values, width = 560, height = 160, bins = 20,
 </svg>`;
 }
 
-// ---- aggregate stats -----------------------------------------------------
+// ---- aggregate stats (computed once, shared by multiple sections) --------
 
-const wallStat   = stat('wall_ms', ok);
-const procRssStat = stat('peak_proc_tree_rss_mb', ok);
-const procPssStat = stat('peak_proc_tree_pss_mb', ok);
-const cgUserStat  = stat('cgroup_cpu_user_sec', ok);
-const cgSysStat   = stat('cgroup_cpu_system_sec', ok);
-const cgPctStat   = stat('cgroup_cpu_usage_pct_of_one_core', ok);
-const cgMemMax    = ok.reduce((m, r) => Math.max(m, r.cgroup_memory_peak_mb || 0), 0);
+const stats = {
+  wall:    stat('wall_ms', ok),
+  procRss: stat('peak_proc_tree_rss_mb', ok),
+  procPss: stat('peak_proc_tree_pss_mb', ok),
+  cgUser:  stat('cgroup_cpu_user_sec', ok),
+  cgSys:   stat('cgroup_cpu_system_sec', ok),
+  cgPct:   stat('cgroup_cpu_usage_pct_of_one_core', ok),
+  cpuTotal: statValues(ok.map(cpuTotalSec)),
+};
+const cgMemMax = ok.reduce((m, r) => Math.max(m, r.cgroup_memory_peak_mb || 0), 0);
+const peakProcCountMax = ok.reduce((m, r) => Math.max(m, r.peak_proc_count || 0), 0);
 
-// Distribution values
+// Distribution values for the histogram chart row.
 const wallVals = ok.map((r) => r.wall_ms).filter((v) => typeof v === 'number');
 const pssVals  = ok.map((r) => r.peak_proc_tree_pss_mb).filter((v) => typeof v === 'number');
 const cpuVals  = ok.map((r) => r.cgroup_cpu_usage_pct_of_one_core)
                   .filter((v) => typeof v === 'number');
 
-// ---- HTML -----------------------------------------------------------------
-
-const totalCpuPerCaseSec = ok
-  .map((r) => (r.cgroup_cpu_user_sec || 0) + (r.cgroup_cpu_system_sec || 0));
-const cpuTotalStat = stat('_total', totalCpuPerCaseSec.map((v) => ({ _total: v })));
-
-const topByMem = ok.slice()
-  .sort((a, b) => (b.peak_proc_tree_pss_mb || 0) - (a.peak_proc_tree_pss_mb || 0))
-  .slice(0, 8);
-const topByWall = ok.slice()
-  .sort((a, b) => (b.wall_ms || 0) - (a.wall_ms || 0))
-  .slice(0, 8);
-
 const generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
-const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<title>html-snapshot Linux benchmark — ${ok.length}/${rows.length} cases</title>
-<style>
+// ---- block renderers ------------------------------------------------------
+
+function renderHeadCss() {
+  return `<style>
   :root {
     --fg: #111;
     --fg-muted: #555;
@@ -248,34 +231,40 @@ const html = `<!DOCTYPE html>
             font-size: 11px; color: var(--fg-muted); }
   code { font-family: var(--mono); font-size: 12px; background: #f3f4f6;
           padding: 1px 5px; border-radius: 3px; }
-</style>
-</head>
-<body>
-<div class="container">
+</style>`;
+}
 
+function renderHeader() {
+  const failColor = fail.length ? 'var(--bad)' : 'var(--good)';
+  return `
 <h1>html-snapshot Linux benchmark</h1>
 <p class="subtitle">
   ${rows.length} 个 HTML 用例，
   <strong style="color: var(--good)">${ok.length} 成功</strong>
-  / <strong style="color: ${fail.length ? 'var(--bad)' : 'var(--good)'}">${fail.length} 失败</strong>
+  / <strong style="color: ${failColor}">${fail.length} 失败</strong>
   · 生成于 ${generatedAt}
-</p>
+</p>`;
+}
 
+function renderTiles() {
+  const successRate = ((ok.length / rows.length) * 100).toFixed(1);
+  const successClass = fail.length === 0 ? 'good' : 'warn';
+  return `
 <div class="tiles">
-  <div class="tile ${fail.length === 0 ? 'good' : 'warn'}">
+  <div class="tile ${successClass}">
     <div class="lbl">成功率</div>
-    <div class="v">${((ok.length / rows.length) * 100).toFixed(1)}%</div>
+    <div class="v">${successRate}%</div>
     <div class="sub">${ok.length} / ${rows.length}</div>
   </div>
   <div class="tile">
     <div class="lbl">wall p50 / p95</div>
-    <div class="v">${(wallStat.p50 / 1000).toFixed(1)}s</div>
-    <div class="sub">p95 ${(wallStat.p95 / 1000).toFixed(1)}s · max ${(wallStat.max / 1000).toFixed(1)}s</div>
+    <div class="v">${(stats.wall.p50 / 1000).toFixed(1)}s</div>
+    <div class="sub">p95 ${(stats.wall.p95 / 1000).toFixed(1)}s · max ${(stats.wall.max / 1000).toFixed(1)}s</div>
   </div>
   <div class="tile">
     <div class="lbl">PSS 峰值 p95 (按比例摊分)</div>
-    <div class="v">${procPssStat.p95.toFixed(0)} MB</div>
-    <div class="sub">p50 ${procPssStat.p50.toFixed(0)} · max ${procPssStat.max.toFixed(0)}</div>
+    <div class="v">${stats.procPss.p95.toFixed(0)} MB</div>
+    <div class="sub">p50 ${stats.procPss.p50.toFixed(0)} · max ${stats.procPss.max.toFixed(0)}</div>
   </div>
   <div class="tile">
     <div class="lbl">cgroup memory.peak (OS 实际提交)</div>
@@ -284,26 +273,35 @@ const html = `<!DOCTYPE html>
   </div>
   <div class="tile">
     <div class="lbl">CPU per case (user+sys)</div>
-    <div class="v">${cpuTotalStat.p50.toFixed(1)}s</div>
-    <div class="sub">p95 ${cpuTotalStat.p95.toFixed(1)}s · 占 1 核 ${cgPctStat.p50.toFixed(0)}%</div>
+    <div class="v">${stats.cpuTotal.p50.toFixed(1)}s</div>
+    <div class="sub">p95 ${stats.cpuTotal.p95.toFixed(1)}s · 占 1 核 ${stats.cgPct.p50.toFixed(0)}%</div>
   </div>
   <div class="tile">
     <div class="lbl">单 case 进程数</div>
-    <div class="v">${Math.max(...ok.map((r) => r.peak_proc_count || 0))}</div>
+    <div class="v">${peakProcCountMax}</div>
     <div class="sub">node + chromium 子树</div>
   </div>
-</div>
+</div>`;
+}
 
+function renderNotes() {
+  return `
 <div class="notes">
   <p><strong>测量口径</strong>：每个 case 起一个独立的 <code>node + chromium</code> 进程树（冷启动）。
      <code>sampler.js</code> 每 50ms 遍历 <code>/proc/&lt;pid&gt;</code> 整棵子树聚合
      RSS / PSS，配合 cgroup v2 <code>memory.peak</code> 和 <code>cpu.stat</code> 做交叉验证。</p>
   <p><strong>三个内存指标的差异</strong>：
-     <code>proc-tree RSS</code> ≈ ${procRssStat.p50.toFixed(0)} MB（含共享页重复计数，是 <code>top</code> 一眼看到的数）；
-     <code>proc-tree PSS</code> ≈ ${procPssStat.p50.toFixed(0)} MB（共享页按比例摊分，业界常用）；
+     <code>proc-tree RSS</code> ≈ ${stats.procRss.p50.toFixed(0)} MB（含共享页重复计数，是 <code>top</code> 一眼看到的数）；
+     <code>proc-tree PSS</code> ≈ ${stats.procPss.p50.toFixed(0)} MB（共享页按比例摊分，业界常用）；
      <code>cgroup memory.peak</code> = ${cgMemMax.toFixed(0)} MB（<strong>OS 真正提交的物理页，部署时容器 limit 应参考此值</strong>）。</p>
-</div>
+</div>`;
+}
 
+function renderEnvironment() {
+  const memMaxGiB = hostMeta.container_memory_max_bytes
+    ? (Number(hostMeta.container_memory_max_bytes) / 1024 / 1024 / 1024).toFixed(1) + ' GiB'
+    : 'n/a';
+  return `
 <h2>环境</h2>
 <dl class="meta">
   <dt>kernel</dt><dd>${esc(hostMeta.kernel || 'n/a')}</dd>
@@ -312,14 +310,13 @@ const html = `<!DOCTYPE html>
   <dt>node</dt><dd>${esc(hostMeta.node_version || 'n/a')}</dd>
   <dt>puppeteer</dt><dd>${esc(hostMeta.puppeteer_version || 'n/a')}</dd>
   <dt>chromium</dt><dd>${esc(hostMeta.chromium_version || 'n/a')}</dd>
-  <dt>容器 memory.max</dt><dd>${
-    hostMeta.container_memory_max_bytes
-      ? (Number(hostMeta.container_memory_max_bytes) / 1024 / 1024 / 1024).toFixed(1) + ' GiB'
-      : 'n/a'
-  }</dd>
+  <dt>容器 memory.max</dt><dd>${memMaxGiB}</dd>
   <dt>容器 cpu.max</dt><dd>${esc(hostMeta.container_cpu_max || 'n/a')} (quota period)</dd>
-</dl>
+</dl>`;
+}
 
+function renderCharts() {
+  return `
 <h2>分布</h2>
 <div class="chart-grid">
   <div class="chart">
@@ -331,8 +328,25 @@ const html = `<!DOCTYPE html>
   <div class="chart">
     ${histogramSvg({ values: cpuVals, title: 'CPU 占用率 (% of 1 core)', unit: '%' })}
   </div>
-</div>
+</div>`;
+}
 
+// One <tr> for the aggregate-stat table. Pulls min/p50/p95/max/mean
+// from a single stat() result so the column order stays consistent
+// across rows.
+function aggregateRow(label, s) {
+  return `    <tr>
+      <td>${label}</td>
+      <td class="num">${fmt(s.min)}</td>
+      <td class="num">${fmt(s.p50)}</td>
+      <td class="num">${fmt(s.p95)}</td>
+      <td class="num">${fmt(s.max)}</td>
+      <td class="num">${fmt(s.mean)}</td>
+    </tr>`;
+}
+
+function renderAggregateTable() {
+  return `
 <h2>聚合统计</h2>
 <table>
   <thead>
@@ -346,57 +360,34 @@ const html = `<!DOCTYPE html>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>wall (ms)</td>
-      <td class="num">${fmt(wallStat.min)}</td>
-      <td class="num">${fmt(wallStat.p50)}</td>
-      <td class="num">${fmt(wallStat.p95)}</td>
-      <td class="num">${fmt(wallStat.max)}</td>
-      <td class="num">${fmt(wallStat.mean)}</td>
-    </tr>
-    <tr>
-      <td>进程树 RSS 峰值 (MB)</td>
-      <td class="num">${fmt(procRssStat.min)}</td>
-      <td class="num">${fmt(procRssStat.p50)}</td>
-      <td class="num">${fmt(procRssStat.p95)}</td>
-      <td class="num">${fmt(procRssStat.max)}</td>
-      <td class="num">${fmt(procRssStat.mean)}</td>
-    </tr>
-    <tr>
-      <td>进程树 PSS 峰值 (MB)</td>
-      <td class="num">${fmt(procPssStat.min)}</td>
-      <td class="num">${fmt(procPssStat.p50)}</td>
-      <td class="num">${fmt(procPssStat.p95)}</td>
-      <td class="num">${fmt(procPssStat.max)}</td>
-      <td class="num">${fmt(procPssStat.mean)}</td>
-    </tr>
-    <tr>
-      <td>cgroup CPU user (s)</td>
-      <td class="num">${fmt(cgUserStat.min)}</td>
-      <td class="num">${fmt(cgUserStat.p50)}</td>
-      <td class="num">${fmt(cgUserStat.p95)}</td>
-      <td class="num">${fmt(cgUserStat.max)}</td>
-      <td class="num">${fmt(cgUserStat.mean)}</td>
-    </tr>
-    <tr>
-      <td>cgroup CPU system (s)</td>
-      <td class="num">${fmt(cgSysStat.min)}</td>
-      <td class="num">${fmt(cgSysStat.p50)}</td>
-      <td class="num">${fmt(cgSysStat.p95)}</td>
-      <td class="num">${fmt(cgSysStat.max)}</td>
-      <td class="num">${fmt(cgSysStat.mean)}</td>
-    </tr>
-    <tr>
-      <td>CPU 占用 (% of 1 core)</td>
-      <td class="num">${fmt(cgPctStat.min)}</td>
-      <td class="num">${fmt(cgPctStat.p50)}</td>
-      <td class="num">${fmt(cgPctStat.p95)}</td>
-      <td class="num">${fmt(cgPctStat.max)}</td>
-      <td class="num">${fmt(cgPctStat.mean)}</td>
-    </tr>
+${aggregateRow('wall (ms)', stats.wall)}
+${aggregateRow('进程树 RSS 峰值 (MB)', stats.procRss)}
+${aggregateRow('进程树 PSS 峰值 (MB)', stats.procPss)}
+${aggregateRow('cgroup CPU user (s)', stats.cgUser)}
+${aggregateRow('cgroup CPU system (s)', stats.cgSys)}
+${aggregateRow('CPU 占用 (% of 1 core)', stats.cgPct)}
   </tbody>
-</table>
+</table>`;
+}
 
+function renderTopCases() {
+  const topByMem = topBy(ok, 'peak_proc_tree_pss_mb', 8);
+  const topByWall = topBy(ok, 'wall_ms', 8);
+  const memRows = topByMem.map((r) => `
+        <tr>
+          <td class="lbl">${esc(r.label)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
+          <td class="num">${fmt(r.wall_ms)}</td>
+        </tr>`).join('');
+  const wallRows = topByWall.map((r) => `
+        <tr class="${r.wall_ms > 10000 ? 'outlier' : ''}">
+          <td class="lbl">${esc(r.label)}</td>
+          <td class="num">${fmt(r.wall_ms)}</td>
+          <td class="num">${fmt(cpuTotalSec(r))}</td>
+          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+        </tr>`).join('');
+  return `
 <h2>Top 用例</h2>
 <div class="chart-grid">
   <div>
@@ -408,14 +399,7 @@ const html = `<!DOCTYPE html>
         <th class="num">RSS MB</th>
         <th class="num">wall ms</th>
       </tr></thead>
-      <tbody>
-        ${topByMem.map((r) => `
-        <tr>
-          <td class="lbl">${esc(r.label)}</td>
-          <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
-          <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
-          <td class="num">${fmt(r.wall_ms)}</td>
-        </tr>`).join('')}
+      <tbody>${memRows}
       </tbody>
     </table>
   </div>
@@ -428,20 +412,22 @@ const html = `<!DOCTYPE html>
         <th class="num">CPU s</th>
         <th class="num">CPU %</th>
       </tr></thead>
-      <tbody>
-        ${topByWall.map((r) => `
-        <tr class="${r.wall_ms > 10000 ? 'outlier' : ''}">
-          <td class="lbl">${esc(r.label)}</td>
-          <td class="num">${fmt(r.wall_ms)}</td>
-          <td class="num">${fmt((r.cgroup_cpu_user_sec || 0) + (r.cgroup_cpu_system_sec || 0))}</td>
-          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
-        </tr>`).join('')}
+      <tbody>${wallRows}
       </tbody>
     </table>
   </div>
-</div>
+</div>`;
+}
 
-${fail.length ? `
+function renderFailures() {
+  if (!fail.length) return '';
+  const failRows = fail.map((r) => `
+    <tr class="fail">
+      <td class="lbl">${esc(r.label)}</td>
+      <td class="num">${r.exit_code}</td>
+      <td class="num">${fmt(r.wall_ms)}</td>
+    </tr>`).join('');
+  return `
 <h2>失败用例</h2>
 <table>
   <thead><tr>
@@ -449,22 +435,35 @@ ${fail.length ? `
     <th class="num">exit_code</th>
     <th class="num">wall ms</th>
   </tr></thead>
-  <tbody>
-    ${fail.map((r) => `
-    <tr class="fail">
-      <td class="lbl">${esc(r.label)}</td>
-      <td class="num">${r.exit_code}</td>
-      <td class="num">${fmt(r.wall_ms)}</td>
-    </tr>`).join('')}
+  <tbody>${failRows}
   </tbody>
 </table>
 <p style="font-size:12px;color:var(--fg-muted);margin-top:8px">
   ⚠️ 失败几乎都是 puppeteer <code>networkidle0</code> 等 CDN 资源超时；
   这些页面引用 <code>cdn.tailwindcss.com</code> / <code>unpkg.com</code> /
   <code>fonts.googleapis.com</code>，单独重跑通常即恢复。
-</p>
-` : ''}
+</p>`;
+}
 
+function renderPerCaseDetail() {
+  const sortedRows = rows.slice().sort((a, b) => (a.label > b.label ? 1 : -1));
+  const tbody = sortedRows.map((r) => {
+    const cls = r.exit_code !== 0 ? 'fail'
+      : (r.wall_ms || 0) > 10000 ? 'outlier' : '';
+    return `<tr class="${cls}">
+          <td class="lbl">${esc(r.label)}</td>
+          <td class="num">${r.exit_code}</td>
+          <td class="num">${fmt(r.wall_ms)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
+          <td class="num">${fmt(r.cgroup_memory_peak_delta_mb)}</td>
+          <td class="num">${fmt(r.cgroup_cpu_user_sec)}</td>
+          <td class="num">${fmt(r.cgroup_cpu_system_sec)}</td>
+          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+          <td class="num">${r.peak_proc_count ?? 'n/a'}</td>
+        </tr>`;
+  }).join('');
+  return `
 <h2>完整用例</h2>
 <details>
   <summary>展开 ${rows.length} 行 per-case 数据</summary>
@@ -482,32 +481,42 @@ ${fail.length ? `
       <th class="num">procs</th>
     </tr></thead>
     <tbody>
-      ${rows.slice().sort((a, b) => (a.label > b.label ? 1 : -1)).map((r) => {
-        const cls = r.exit_code !== 0 ? 'fail'
-          : (r.wall_ms || 0) > 10000 ? 'outlier' : '';
-        return `<tr class="${cls}">
-          <td class="lbl">${esc(r.label)}</td>
-          <td class="num">${r.exit_code}</td>
-          <td class="num">${fmt(r.wall_ms)}</td>
-          <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
-          <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
-          <td class="num">${fmt(r.cgroup_memory_peak_delta_mb)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_user_sec)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_system_sec)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
-          <td class="num">${r.peak_proc_count ?? 'n/a'}</td>
-        </tr>`;
-      }).join('')}
+      ${tbody}
     </tbody>
   </table>
-</details>
+</details>`;
+}
 
+function renderFooter() {
+  return `
 <div class="footer">
   由 <code>tools/html-snapshot/bench/summarize-html.js</code> 生成 ·
   数据源 <code>results.jsonl</code>（${rows.length} 行）+ <code>host_meta.json</code> ·
   ${generatedAt}
-</div>
+</div>`;
+}
 
+// ---- assembly -------------------------------------------------------------
+
+const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>html-snapshot Linux benchmark — ${ok.length}/${rows.length} cases</title>
+${renderHeadCss()}
+</head>
+<body>
+<div class="container">
+${renderHeader()}
+${renderTiles()}
+${renderNotes()}
+${renderEnvironment()}
+${renderCharts()}
+${renderAggregateTable()}
+${renderTopCases()}
+${renderFailures()}
+${renderPerCaseDetail()}
+${renderFooter()}
 </div>
 </body>
 </html>`;
