@@ -21,6 +21,8 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "renderer/FontEmbedder.h"
+#include "base/utils/Log.h"
 
 namespace pagx {
 
@@ -136,6 +138,19 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     found = true;
   }
   return found;
+}
+
+bool PAGXDocument::embed() {
+  if (!isLayoutApplied()) {
+    LOGE("PAGXDocument::embed() called before applyLayout(). Call applyLayout() first.");
+    return false;
+  }
+  FontEmbedder embedder;
+  return embedder.embed(this);
+}
+
+void PAGXDocument::clearEmbed() {
+  FontEmbedder::ClearEmbeddedGlyphRuns(this);
 }
 
 }  // namespace pagx
