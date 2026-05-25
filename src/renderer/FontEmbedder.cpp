@@ -398,15 +398,27 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   for (auto& node : document->nodes) {
     auto type = node->nodeType();
     if (type == NodeType::Font) {
-      toRemove.insert(node.get());
       auto* font = static_cast<Font*>(node.get());
-      for (auto* glyph : font->glyphs) {
-        toRemove.insert(glyph);
-        if (glyph->path != nullptr) {
-          toRemove.insert(glyph->path);
+      if (!font->file.empty()) {
+        for (auto* glyph : font->glyphs) {
+          toRemove.insert(glyph);
+          if (glyph->path != nullptr) {
+            toRemove.insert(glyph->path);
+          }
+          if (glyph->image != nullptr) {
+            toRemove.insert(glyph->image);
+          }
         }
-        if (glyph->image != nullptr) {
-          toRemove.insert(glyph->image);
+      } else {
+        toRemove.insert(node.get());
+        for (auto* glyph : font->glyphs) {
+          toRemove.insert(glyph);
+          if (glyph->path != nullptr) {
+            toRemove.insert(glyph->path);
+          }
+          if (glyph->image != nullptr) {
+            toRemove.insert(glyph->image);
+          }
         }
       }
     } else if (type == NodeType::GlyphRun) {

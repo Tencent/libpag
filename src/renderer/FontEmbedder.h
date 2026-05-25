@@ -39,7 +39,9 @@ class FontEmbedder {
    * Resets previously-embedded font data in the document so it can be re-embedded from scratch.
    * Clears the embedded GlyphRuns vector on every Text node and removes previously-installed
    * Font nodes (along with their Glyph, PathData, and Image children) plus any orphan GlyphRun
-   * nodes from document->nodes. Call this before applyLayout() when re-embedding a file that
+   * nodes from document->nodes. Font nodes with a non-empty `file` attribute are preserved
+   * (only their Glyph children are cleared); Font nodes without `file` are removed entirely.
+   * Call this before applyLayout() when re-embedding a file that
    * already has embedded fonts, so that layout performs runtime shaping instead of using stale
    * embedded data.
    *

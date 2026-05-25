@@ -26,6 +26,7 @@
 #include "cli/CliUtils.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/nodes/Font.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/ImageEmbedder.h"
 
@@ -34,7 +35,6 @@ namespace pagx::cli {
 struct EmbedOptions {
   std::string inputFile = {};
   std::string outputFile = {};
-  std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
   bool skipFonts = false;
   bool skipImages = false;
@@ -48,8 +48,6 @@ static void PrintEmbedUsage() {
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
-      << "  --font-file, --file <path>       Register a font file for glyph embedding\n"
-      << "                                   (can be specified multiple times)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
       << "  --skip-fonts                     Skip font embedding\n"
@@ -63,8 +61,6 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
     std::string arg = argv[i];
     if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
       options->outputFile = argv[++i];
-    } else if ((arg == "--file" || arg == "--font-file") && i + 1 < argc) {
-      options->fontFiles.push_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
     } else if (arg == "--skip-fonts") {
@@ -118,8 +114,21 @@ int RunEmbed(int argc, char* argv[]) {
 
   if (!options.skipFonts) {
     FontConfig fontConfig = {};
-    if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx embed")) {
+    if (!LoadFontConfig(&fontConfig, {}, options.fallbacks, "pagx embed")) {
       return 1;
+    }
+    for (auto& node : document->nodes) {
+      if (node->nodeType() == NodeType::Font) {
+        auto* font = static_cast<Font*>(node.get());
+        if (!font->file.empty()) {
+          auto typeface = tgfx::Typeface::MakeFromPath(font->file);
+          if (typeface == nullptr) {
+            std::cerr << "pagx embed: failed to load font '" << font->file << "'\n";
+            return 1;
+          }
+          fontConfig.registerTypeface(typeface);
+        }
+      }
     }
     FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
     document->applyLayout(&fontConfig);
