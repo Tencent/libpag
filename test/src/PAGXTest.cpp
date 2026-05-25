@@ -5169,4 +5169,123 @@ PAGX_TEST(PAGXTest, HtmlFiles) {
   TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
 }
 
+/**
+ * Test case: PAGXDocument::embed() returns false when layout is not applied.
+ */
+PAGX_TEST(PAGXTest, DocumentEmbedWithoutLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  EXPECT_FALSE(doc->embed());
+}
+
+/**
+ * Test case: PAGXDocument::embed() succeeds when layout is applied.
+ */
+PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+
+  EXPECT_TRUE(doc->embed());
+  EXPECT_FALSE(text->glyphRuns.empty());
+}
+
+/**
+ * Test case: PAGXDocument::clearEmbed() clears embedded GlyphRuns.
+ */
+PAGX_TEST(PAGXTest, DocumentClearEmbed) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+  doc->embed();
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+
+  doc->clearEmbed();
+  EXPECT_TRUE(text->glyphRuns.empty());
+}
+
+/**
+ * Test case: PAGXDocument re-embedding after clearEmbed.
+ * Embeds fonts, clears, re-embeds, and verifies the result is consistent.
+ */
+PAGX_TEST(PAGXTest, DocumentReEmbed) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+  doc->embed();
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  size_t firstGlyphCount = text->glyphRuns[0]->glyphs.size();
+  auto firstGlyphs = text->glyphRuns[0]->glyphs;
+
+  // Re-embed: clear existing glyphs, re-layout, re-embed.
+  doc->clearEmbed();
+  EXPECT_TRUE(text->glyphRuns.empty());
+
+  doc->applyLayout();
+  doc->embed();
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  // Glyph count and IDs should match after re-embedding.
+  EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), firstGlyphCount);
+  EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
+}
+
 }  // namespace pag
