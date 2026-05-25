@@ -18,11 +18,11 @@
 
 #include "pagx/PAGXDocument.h"
 #include "LayoutContext.h"
+#include "base/utils/Log.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
-#include "base/utils/Log.h"
 
 namespace pagx {
 

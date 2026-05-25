@@ -154,9 +154,9 @@ class PAGXDocument : public Node {
   bool embed();
 
   /**
-   * Clears existing embedded GlyphRuns from all Text nodes in the document. Call this before
-   * applyLayout() when re-embedding a file that already has embedded fonts, so that layout
-   * performs runtime shaping instead of using stale embedded data.
+   * Clears all embedded GlyphRuns from Text nodes in the document. Typically called before a
+   * subsequent applyLayout() when re-embedding a file that already has embedded fonts, so that
+   * layout performs runtime shaping instead of reusing stale embedded data.
    */
   void clearEmbed();
 
