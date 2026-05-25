@@ -23,8 +23,11 @@
 #   label      = current   (override with LABEL=... or --label NAME)
 #
 # Environment overrides:
-#   LABEL          sub-directory name under bench/out (default: current)
-#   INTERVAL_MS    sampler tick (ms)                  (default: 50)
+#   LABEL              sub-directory name under bench/out (default: current)
+#   INTERVAL_MS        sampler tick (ms)                  (default: 50)
+#   BASELINE_RUNS      "browser opens about:blank" floor runs prepended
+#                      to the case loop (default 1, set 0 to skip)
+#   BASELINE_HOLD_MS   ms each baseline run holds the page open (default 200)
 #
 # Examples:
 #   tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case

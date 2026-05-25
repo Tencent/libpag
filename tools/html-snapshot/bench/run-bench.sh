@@ -20,6 +20,9 @@
 #   CONTAINER_CPUS        --cpus value for the run   (default: 4)
 #   CONTAINER_MEMORY      --memory value for the run (default: 4g)
 #   INTERVAL_MS           sampler tick (ms)          (default: 50)
+#   BASELINE_RUNS         "browser opens about:blank" floor runs prepended
+#                         to the case loop (default 1, set 0 to skip)
+#   BASELINE_HOLD_MS      ms each baseline run holds the page open (default 200)
 #   REBUILD=1             force `docker build` even if image exists
 #
 # Examples:
@@ -73,6 +76,8 @@ IMAGE_NAME=${IMAGE_NAME:-html-snapshot-bench:latest}
 CONTAINER_CPUS=${CONTAINER_CPUS:-4}
 CONTAINER_MEMORY=${CONTAINER_MEMORY:-4g}
 INTERVAL_MS=${INTERVAL_MS:-50}
+BASELINE_RUNS=${BASELINE_RUNS:-1}
+BASELINE_HOLD_MS=${BASELINE_HOLD_MS:-200}
 
 echo "INPUT_DIR        = $INPUT_DIR"
 echo "OUTPUT_DIR       = $OUTPUT_DIR"
@@ -82,6 +87,8 @@ echo "BUILD_CTX        = $BUILD_CTX"
 echo "CONTAINER_CPUS   = $CONTAINER_CPUS"
 echo "CONTAINER_MEMORY = $CONTAINER_MEMORY"
 echo "INTERVAL_MS      = $INTERVAL_MS"
+echo "BASELINE_RUNS    = $BASELINE_RUNS"
+echo "BASELINE_HOLD_MS = $BASELINE_HOLD_MS"
 echo
 
 # ---- build image ----------------------------------------------------------
@@ -126,6 +133,8 @@ docker run --rm \
   --memory "$CONTAINER_MEMORY" \
   --cap-add SYS_PTRACE \
   --security-opt seccomp=unconfined \
+  -e BASELINE_RUNS="$BASELINE_RUNS" \
+  -e BASELINE_HOLD_MS="$BASELINE_HOLD_MS" \
   -v "$INPUT_DIR":/inputs:ro \
   -v "$OUTPUT_DIR":/out \
   "$IMAGE_NAME" \

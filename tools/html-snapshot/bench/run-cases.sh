@@ -29,6 +29,15 @@
 #                  is 1 (collect) inside the Docker container and 0
 #                  (skip) elsewhere; the wrapper scripts set this
 #                  explicitly so behaviour is deterministic.
+#   BASELINE_RUNS  number of "browser opens about:blank" baseline runs
+#                  prepended to the case loop (default 1). Each run
+#                  emits a row labelled `__baseline:blank/<n>` so
+#                  reports can show the floor browser cost separately
+#                  from real snapshot work. Set to 0 to skip.
+#   BASELINE_HOLD_MS
+#                  ms baseline-blank.js holds the page open after
+#                  navigation (default 200) so sampler.js gets at
+#                  least one steady-state tick on fast machines.
 #
 # Notes:
 #   - Bash 3.2 compatible (no `mapfile`, no `sort -z`). The case-list
@@ -64,6 +73,10 @@ if [[ ! -f "$SNAPSHOT_DIR/snapshot.js" ]]; then
 fi
 if [[ ! -f "$BENCH_DIR/sampler.js" ]]; then
   echo "run-cases.sh: sampler.js not found under $BENCH_DIR" >&2
+  exit 2
+fi
+if [[ ! -f "$BENCH_DIR/baseline-blank.js" ]]; then
+  echo "run-cases.sh: baseline-blank.js not found under $BENCH_DIR" >&2
   exit 2
 fi
 mkdir -p "$OUT_DIR"
@@ -179,6 +192,44 @@ if [[ "$COLLECT_CGROUP" == "1" ]]; then
   SAMPLER_FLAGS+=(--cgroup)
 else
   SAMPLER_FLAGS+=(--no-cgroup)
+fi
+
+# ---- baseline runs --------------------------------------------------------
+# Run the "browser opens about:blank" floor measurement first so subsequent
+# rows are directly comparable. Goes through the same sampler wrapper as
+# real cases, so the resulting JSONL row has the identical schema and
+# slots cleanly into results.jsonl. summarize.js / summarize-html.js
+# detect the `__baseline:blank/` label prefix and surface these rows in
+# their own section above the aggregate stats.
+#
+# Caveat: cgroup memory.peak is monotonic on kernels < 6.5, so on those
+# kernels the baseline's peak becomes the floor for every later case's
+# `cgroup_memory_peak_delta_mb`. The proc-tree numbers stay per-case
+# correct regardless. See README's "Gotchas" section.
+BASELINE_RUNS=${BASELINE_RUNS:-1}
+BASELINE_HOLD_MS=${BASELINE_HOLD_MS:-200}
+
+if [[ "$BASELINE_RUNS" -gt 0 ]]; then
+  echo "Running $BASELINE_RUNS baseline (browser opens about:blank) sample(s)"
+  for i in $(seq 1 "$BASELINE_RUNS"); do
+    label="__baseline:blank/$i"
+    echo "-> $label"
+    set +e
+    node "$BENCH_DIR/sampler.js" \
+      --label "$label" \
+      --interval-ms "$INTERVAL_MS" \
+      "${SAMPLER_FLAGS[@]}" \
+      -- \
+      node "$BENCH_DIR/baseline-blank.js" \
+        --snapshot-dir "$SNAPSHOT_DIR" \
+        --hold-ms "$BASELINE_HOLD_MS" \
+      >> "$RESULTS"
+    status=$?
+    set -e
+    if [[ $status -ne 0 ]]; then
+      echo "   (baseline exited $status; row still recorded for diagnostics)"
+    fi
+  done
 fi
 
 start_all=$(date +%s)

@@ -10,20 +10,26 @@
 //
 // Sections:
 //   1. Environment   — kernel / arch / cpu / node / puppeteer / cgroup limits
-//   2. Aggregate     — count of cases, success rate, p50/p95/max for
+//   2. Baseline      — "browser opens about:blank" floor cost rows
+//                       (only emitted if BASELINE_RUNS > 0 in run-cases.sh)
+//   3. Aggregate     — count of cases, success rate, p50/p95/max for
 //                       wall_ms, peak_proc_tree_rss_mb, cgroup_memory_peak_mb,
 //                       cgroup_cpu_*sec, cpu_pct_of_one_core
-//   3. Top cases     — top 5 by peak memory, top 5 by wall time, listed
+//                       (baseline rows excluded so floor-cost samples
+//                        don't drag percentiles toward zero)
+//   4. Top cases     — top 5 by peak memory, top 5 by wall time, listed
 //                       so reviewers can drill into the heavy ones
-//   4. Failures      — every row with exit_code != 0
-//   5. Per-case      — full table, sorted by relative path
+//   5. Failures      — every case row with exit_code != 0
+//   6. Per-case      — full table, sorted by relative path
 //
 // Stats / formatting helpers live in report-utils.js so the Markdown
 // and HTML reports share one source of truth for percentile math.
 
 'use strict';
 
-const { loadReport, stat, fmt, topBy, cpuTotalSec } = require('./report-utils');
+const {
+  loadReport, stat, fmt, topBy, cpuTotalSec,
+} = require('./report-utils');
 
 const [, , resultsPath, hostMetaPath] = process.argv;
 if (!resultsPath) {
@@ -31,7 +37,7 @@ if (!resultsPath) {
   process.exit(2);
 }
 
-const { rows, hostMeta, ok, fail } = loadReport(resultsPath, hostMetaPath);
+const { rows, hostMeta, ok, fail, baseline, cases } = loadReport(resultsPath, hostMetaPath);
 
 // ---- write ---------------------------------------------------------------
 
@@ -52,11 +58,33 @@ out.push(`| container memory.max | ${hostMeta.container_memory_max_bytes || 'n/a
 out.push(`| container cpu.max | ${hostMeta.container_cpu_max || 'n/a'} |`);
 out.push('');
 
+if (baseline.length) {
+  out.push('## Baseline (browser opens about:blank)');
+  out.push('');
+  out.push(
+    'Floor cost of launching headless Chromium and opening `about:blank` '
+    + '(no html-snapshot work). Subtract these numbers from per-case rows '
+    + 'to estimate the marginal cost of actually rendering each page.',
+  );
+  out.push('');
+  out.push('| label | exit | wall ms | proc-tree RSS MB | proc-tree PSS MB | cgroup peak Δ MB | cpu user s | cpu sys s | cpu %/core | procs |');
+  out.push('|-------|-----:|--------:|-----------------:|-----------------:|-----------------:|-----------:|----------:|-----------:|------:|');
+  for (const r of baseline) {
+    out.push(
+      `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(r.cgroup_cpu_user_sec)} | ${fmt(r.cgroup_cpu_system_sec)} | ${fmt(r.cgroup_cpu_usage_pct_of_one_core)} | ${r.peak_proc_count ?? 'n/a'} |`,
+    );
+  }
+  out.push('');
+}
+
 out.push('## Aggregate');
 out.push('');
-out.push(`- total cases: ${rows.length}`);
+out.push(`- total cases: ${cases.length}`);
 out.push(`- succeeded:   ${ok.length}`);
 out.push(`- failed:      ${fail.length}`);
+if (baseline.length) {
+  out.push(`- baseline rows (excluded from stats): ${baseline.length}`);
+}
 out.push('');
 
 const wallStat    = stat('wall_ms', ok);
@@ -115,7 +143,9 @@ out.push('## Per-case detail');
 out.push('');
 out.push('| label | exit | wall ms | proc-tree RSS MB | proc-tree PSS MB | cgroup peak Δ MB | cpu user s | cpu sys s | cpu %/core | procs |');
 out.push('|-------|-----:|--------:|-----------------:|-----------------:|-----------------:|-----------:|----------:|-----------:|------:|');
-for (const r of rows.slice().sort((a, b) => (a.label > b.label ? 1 : -1))) {
+// Baseline rows have their own section above; the per-case table is
+// strictly per-snapshot-case so floor cost samples don't show up twice.
+for (const r of cases.slice().sort((a, b) => (a.label > b.label ? 1 : -1))) {
   out.push(
     `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(r.cgroup_cpu_user_sec)} | ${fmt(r.cgroup_cpu_system_sec)} | ${fmt(r.cgroup_cpu_usage_pct_of_one_core)} | ${r.peak_proc_count ?? 'n/a'} |`,
   );

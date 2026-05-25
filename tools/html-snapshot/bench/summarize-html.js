@@ -20,12 +20,18 @@
 //     tiles         six headline metrics (success rate, wall, PSS, …)
 //     notes         caveat box explaining the three memory metrics
 //     environment   kernel / arch / node / puppeteer / chromium / cgroup
+//     baseline      (only if BASELINE_RUNS > 0) browser-floor rows
 //     charts        three histograms (wall, PSS, CPU%)
-//     aggregate     full p50/p95/max/mean table
-//     top cases     top 8 by PSS, top 8 by wall
+//     aggregate     full p50/p95/max/mean table (cases only)
+//     top cases     top 8 by PSS, top 8 by wall (cases only)
 //     failures      (only if any)
-//     per-case      collapsed <details> with full table
+//     per-case      collapsed <details> with full table (cases only)
 //     footer        generation metadata
+//
+// Baseline rows (label prefix `__baseline:`, produced by
+// bench/baseline-blank.js) are rendered in their own dedicated section
+// and excluded from `ok` / `fail` / `cases` aggregates so the
+// floor-cost samples don't drag percentile math toward zero.
 //
 // Each section is its own renderXxx() function that returns an HTML
 // string; the main code at the bottom just concatenates them. Block
@@ -49,7 +55,7 @@ if (!resultsPath) {
   process.exit(2);
 }
 
-const { rows, hostMeta, ok, fail } = loadReport(resultsPath, hostMetaPath);
+const { rows, hostMeta, ok, fail, baseline, cases } = loadReport(resultsPath, hostMetaPath);
 
 // ---- escaping -------------------------------------------------------------
 
@@ -236,25 +242,29 @@ function renderHeadCss() {
 
 function renderHeader() {
   const failColor = fail.length ? 'var(--bad)' : 'var(--good)';
+  const baselineNote = baseline.length
+    ? ` · ${baseline.length} 条空白页基准（独立统计）`
+    : '';
   return `
 <h1>html-snapshot Linux benchmark</h1>
 <p class="subtitle">
-  ${rows.length} 个 HTML 用例，
+  ${cases.length} 个 HTML 用例，
   <strong style="color: var(--good)">${ok.length} 成功</strong>
-  / <strong style="color: ${failColor}">${fail.length} 失败</strong>
+  / <strong style="color: ${failColor}">${fail.length} 失败</strong>${baselineNote}
   · 生成于 ${generatedAt}
 </p>`;
 }
 
 function renderTiles() {
-  const successRate = ((ok.length / rows.length) * 100).toFixed(1);
+  const denom = cases.length || 1;
+  const successRate = ((ok.length / denom) * 100).toFixed(1);
   const successClass = fail.length === 0 ? 'good' : 'warn';
   return `
 <div class="tiles">
   <div class="tile ${successClass}">
     <div class="lbl">成功率</div>
     <div class="v">${successRate}%</div>
-    <div class="sub">${ok.length} / ${rows.length}</div>
+    <div class="sub">${ok.length} / ${cases.length}</div>
   </div>
   <div class="tile">
     <div class="lbl">wall p50 / p95</div>
@@ -295,6 +305,48 @@ function renderNotes() {
      <code>proc-tree PSS</code> ≈ ${stats.procPss.p50.toFixed(0)} MB（共享页按比例摊分，业界常用）；
      <code>cgroup memory.peak</code> = ${cgMemMax.toFixed(0)} MB（<strong>OS 真正提交的物理页，部署时容器 limit 应参考此值</strong>）。</p>
 </div>`;
+}
+
+// "Browser opens about:blank" floor-cost rows (produced by
+// bench/baseline-blank.js, run before the case loop in run-cases.sh).
+// Rendered as a standalone section so readers can subtract this floor
+// from per-case numbers when reasoning about marginal snapshot cost.
+function renderBaseline() {
+  if (!baseline.length) return '';
+  const trs = baseline.map((r) => `
+        <tr>
+          <td class="lbl">${esc(r.label)}</td>
+          <td class="num">${r.exit_code}</td>
+          <td class="num">${fmt(r.wall_ms)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
+          <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
+          <td class="num">${fmt(r.cgroup_memory_peak_delta_mb)}</td>
+          <td class="num">${fmt(cpuTotalSec(r))}</td>
+          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+          <td class="num">${r.peak_proc_count ?? 'n/a'}</td>
+        </tr>`).join('');
+  return `
+<h2>空白页基准（floor cost）</h2>
+<p style="margin:0 0 8px;color:var(--fg-muted);font-size:13px">
+  仅启动 headless Chromium → 打开 <code>about:blank</code> → 关闭。
+  没有任何 html-snapshot 工作。把这一行从单 case 数值里减掉，剩下的就是
+  渲染该页面的边际开销。
+</p>
+<table>
+  <thead><tr>
+    <th>label</th>
+    <th class="num">exit</th>
+    <th class="num">wall ms</th>
+    <th class="num">RSS MB</th>
+    <th class="num">PSS MB</th>
+    <th class="num">cg peak Δ</th>
+    <th class="num">CPU s</th>
+    <th class="num">CPU %</th>
+    <th class="num">procs</th>
+  </tr></thead>
+  <tbody>${trs}
+  </tbody>
+</table>`;
 }
 
 function renderEnvironment() {
@@ -446,7 +498,7 @@ function renderFailures() {
 }
 
 function renderPerCaseDetail() {
-  const sortedRows = rows.slice().sort((a, b) => (a.label > b.label ? 1 : -1));
+  const sortedRows = cases.slice().sort((a, b) => (a.label > b.label ? 1 : -1));
   const tbody = sortedRows.map((r) => {
     const cls = r.exit_code !== 0 ? 'fail'
       : (r.wall_ms || 0) > 10000 ? 'outlier' : '';
@@ -466,7 +518,7 @@ function renderPerCaseDetail() {
   return `
 <h2>完整用例</h2>
 <details>
-  <summary>展开 ${rows.length} 行 per-case 数据</summary>
+  <summary>展开 ${sortedRows.length} 行 per-case 数据</summary>
   <table>
     <thead><tr>
       <th>label</th>
@@ -502,7 +554,7 @@ const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>html-snapshot Linux benchmark — ${ok.length}/${rows.length} cases</title>
+<title>html-snapshot Linux benchmark — ${ok.length}/${cases.length} cases</title>
 ${renderHeadCss()}
 </head>
 <body>
@@ -511,6 +563,7 @@ ${renderHeader()}
 ${renderTiles()}
 ${renderNotes()}
 ${renderEnvironment()}
+${renderBaseline()}
 ${renderCharts()}
 ${renderAggregateTable()}
 ${renderTopCases()}

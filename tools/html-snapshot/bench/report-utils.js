@@ -6,7 +6,13 @@
 // implementation.
 //
 // Public surface (CommonJS, deliberately minimal):
-//   - loadReport(resultsPath, hostMetaPath?) → { rows, hostMeta, ok, fail }
+//   - loadReport(resultsPath, hostMetaPath?)
+//       → { rows, hostMeta, ok, fail, baseline, cases }
+//       where `ok` / `fail` partition the **non-baseline** case rows.
+//       `baseline` holds the floor-cost rows produced by
+//       `bench/baseline-blank.js`; they're filtered out of `ok`/`fail`
+//       so they don't pollute aggregate p50/p95 stats.
+//   - isBaselineRow(row) → boolean
 //   - percentile(arr, p) → number | null
 //   - stat(field, src) → { min, p50, p95, max, mean } | { all-null }
 //   - fmt(v, suffix?) → string  (n/a-aware, integer >= 1000)
@@ -18,6 +24,19 @@
 // runs and reduced native runs where cgroup_* / pss are null.
 
 const fs = require('node:fs');
+
+// Rows produced by bench/baseline-blank.js carry this label prefix so
+// report consumers can split them off from real cases without an
+// out-of-band channel. The full label is `__baseline:blank/<n>` (n = 1
+// for the default single-run mode); we match on the `__baseline:`
+// prefix to leave room for future baseline scenarios (e.g.
+// `__baseline:warm-blank/1` once we add a warm-browser path).
+const BASELINE_LABEL_PREFIX = '__baseline:';
+
+function isBaselineRow(row) {
+  return !!row && typeof row.label === 'string'
+    && row.label.startsWith(BASELINE_LABEL_PREFIX);
+}
 
 function loadReport(resultsPath, hostMetaPath) {
   if (!resultsPath) {
@@ -40,9 +59,14 @@ function loadReport(resultsPath, hostMetaPath) {
     }
   }
 
-  const ok = rows.filter((r) => r.exit_code === 0);
-  const fail = rows.filter((r) => r.exit_code !== 0);
-  return { rows, hostMeta, ok, fail };
+  const baseline = rows.filter(isBaselineRow);
+  const cases = rows.filter((r) => !isBaselineRow(r));
+  // ok / fail intentionally exclude baseline rows so existing callers
+  // that do `stat('wall_ms', ok)` keep computing per-case statistics
+  // without picking up the (much cheaper) baseline samples.
+  const ok = cases.filter((r) => r.exit_code === 0);
+  const fail = cases.filter((r) => r.exit_code !== 0);
+  return { rows, hostMeta, ok, fail, baseline, cases };
 }
 
 function percentile(arr, p) {
@@ -110,6 +134,8 @@ function cpuTotalSec(row) {
 }
 
 module.exports = {
+  BASELINE_LABEL_PREFIX,
+  isBaselineRow,
   loadReport,
   percentile,
   stat,

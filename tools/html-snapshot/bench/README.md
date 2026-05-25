@@ -45,11 +45,14 @@ headless Chromium. We want answers to:
 bench/
 ├── Dockerfile              Debian Bookworm + Node 22 + distro Chromium
 ├── sampler.js              spawns the target, walks /proc or `ps`, emits JSON
+├── baseline-blank.js       launches Chromium → about:blank → exit (floor cost)
 ├── run-cases.sh            iterates inputs, invokes sampler per case (env-agnostic)
 ├── run-in-container.sh     container shim: hands /app + /bench to run-cases.sh
 ├── run-bench.sh            Docker entrypoint: build image + docker run
 ├── run-native.sh           native (no-Docker) entrypoint: macOS + Linux
 ├── summarize.js            JSONL → Markdown report
+├── summarize-html.js       JSONL → standalone HTML report
+├── report-utils.js         stats / formatting helpers shared by both reports
 └── README.md               this file
 ```
 
@@ -89,6 +92,39 @@ descendant tree every 50ms — `/proc/<pid>/` reads on Linux,
   `/sys/fs/cgroup/cpu.stat`, also kernel-accounted (no sampling holes).
   Container only, same caveat.
 
+## Baseline (browser opens about:blank)
+
+Every benchmark run prepends one or more "browser opens `about:blank`"
+samples to the case loop, produced by `bench/baseline-blank.js`. These
+rows are labelled `__baseline:blank/<n>` in `results.jsonl` and rendered
+in their own section in `summary.md` / `summary.html` — they're
+**excluded** from the aggregate p50/p95/max numbers and from the Top-N
+tables so floor-cost samples don't drag those statistics toward zero.
+
+The baseline reuses `lib/browser-engine.js` (the same module
+`snapshot.js` uses) so any optimisation we make to the snapshot launch
+path automatically reflects in the baseline number — there is no
+second source of truth for browser-launch flags. The baseline is just
+launch + `about:blank` + close, with a configurable hold (default
+200ms) so `sampler.js` reliably gets a steady-state tick before
+teardown.
+
+Use the baseline number to subtract the fixed browser startup tax
+from per-case wall time / CPU / memory and reason about the marginal
+cost of actually rendering each page.
+
+Knobs (env vars, honoured by both `run-bench.sh` and `run-native.sh`):
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `BASELINE_RUNS` | `1` | Number of baseline rows to emit (0 = skip). Set to e.g. `5` for variance estimates. |
+| `BASELINE_HOLD_MS` | `200` | ms to hold `about:blank` open after navigation, so `sampler.js`'s 50ms tick sees a stable peak. |
+
+Caveat: cgroup `memory.peak` is monotonic on kernels < 6.5, so on
+those kernels the baseline's peak is the floor for every later case's
+`cgroup_memory_peak_delta_mb`. The proc-tree numbers stay per-case
+correct regardless. See "Gotchas" below.
+
 ## Quick start
 
 ### Docker (envelope numbers, Linux semantics)
@@ -113,6 +149,10 @@ tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case /tmp/bench-out
 # Tune container envelope / sampler tick rate
 CONTAINER_CPUS=2 CONTAINER_MEMORY=2g INTERVAL_MS=100 \
   tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
+
+# Take 5 baseline samples for variance instead of 1, or skip entirely
+BASELINE_RUNS=5 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
+BASELINE_RUNS=0 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
 
 # Force a rebuild after editing Dockerfile / sampler
 REBUILD=1 tools/html-snapshot/bench/run-bench.sh ~/Desktop/tmp_case
@@ -144,6 +184,10 @@ tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case /tmp/bench-out
 
 # Tune sampler tick rate
 INTERVAL_MS=100 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
+
+# Take 5 baseline samples for variance instead of 1, or skip entirely
+BASELINE_RUNS=5 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
+BASELINE_RUNS=0 tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
 ```
 
 The native path drops two columns of metrics vs. Docker:
