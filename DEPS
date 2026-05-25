@@ -12,7 +12,7 @@
       },
       {
         "url": "git@github.com:Tencent/tgfx.git",
-        "commit": "02419909ae0b4af8e683876da55d463429499c00",
+        "commit": "919ff33cfc4374d3ea0c614a7e168fadd646db4f",
         "dir": "third_party/tgfx"
       },
       {
