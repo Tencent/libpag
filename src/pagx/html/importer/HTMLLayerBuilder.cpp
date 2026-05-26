@@ -106,20 +106,10 @@ bool IsCurrentColorKeyword(const std::string& value) {
 // `fill-color`, `background-color`) are ignored — we only honour the bare `color`
 // keyword, which is what CSS uses for `currentColor` cascade.
 std::string ExtractColorFromInlineStyle(const std::string& style) {
-  size_t pos = 0;
-  while (pos < style.size()) {
-    size_t semi = style.find(';', pos);
-    std::string decl = style.substr(pos, (semi == std::string::npos ? style.size() : semi) - pos);
-    size_t colon = decl.find(':');
-    if (colon != std::string::npos) {
-      std::string prop = Trim(decl.substr(0, colon));
-      std::string value = Trim(decl.substr(colon + 1));
-      if (EqualsIgnoreCase(prop, "color") && !value.empty()) {
-        return value;
-      }
+  for (const auto& decl : ParseStyleDeclarations(style)) {
+    if (EqualsIgnoreCase(decl.first, "color") && !decl.second.empty()) {
+      return decl.second;
     }
-    if (semi == std::string::npos) break;
-    pos = semi + 1;
   }
   return {};
 }
@@ -129,35 +119,22 @@ std::string ExtractColorFromInlineStyle(const std::string& style) {
 // (including a leading `color: ...`) are preserved verbatim.
 std::string RewriteCurrentColorInInlineStyle(const std::string& style,
                                              const std::string& replacement) {
+  auto decls = ParseStyleDeclarations(style);
   std::string out;
   out.reserve(style.size());
-  size_t pos = 0;
   bool first = true;
-  while (pos < style.size()) {
-    size_t semi = style.find(';', pos);
-    std::string decl = style.substr(pos, (semi == std::string::npos ? style.size() : semi) - pos);
-    size_t colon = decl.find(':');
-    if (colon != std::string::npos) {
-      std::string prop = Trim(decl.substr(0, colon));
-      std::string value = Trim(decl.substr(colon + 1));
-      if ((EqualsIgnoreCase(prop, "fill") || EqualsIgnoreCase(prop, "stroke")) &&
-          IsCurrentColorKeyword(value)) {
-        if (!first) out.push_back(';');
-        out += prop;
-        out.push_back(':');
-        out.push_back(' ');
-        out += replacement;
-        first = false;
-        if (semi == std::string::npos) break;
-        pos = semi + 1;
-        continue;
-      }
+  for (auto& decl : decls) {
+    std::string value = decl.second;
+    if ((EqualsIgnoreCase(decl.first, "fill") || EqualsIgnoreCase(decl.first, "stroke")) &&
+        IsCurrentColorKeyword(value)) {
+      value = replacement;
     }
     if (!first) out.push_back(';');
-    out += decl;
+    out += decl.first;
+    out.push_back(':');
+    out.push_back(' ');
+    out += value;
     first = false;
-    if (semi == std::string::npos) break;
-    pos = semi + 1;
   }
   return out;
 }
@@ -418,10 +395,11 @@ Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box
   // honour the per-corner geometry without a layout pass.
   if (std::isnan(box.widthPx) || std::isnan(box.heightPx) || box.widthPx <= 0.0f ||
       box.heightPx <= 0.0f) {
-    float maxR = std::max({box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx,
-                           box.borderRadiusBLPx});
-    warn("html: per-corner border-radius without fixed px width/height; approximated with the "
-         "largest radius (PAGX Path requires concrete dimensions)");
+    float maxR = std::max(
+        {box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx, box.borderRadiusBLPx});
+    warn(
+        "html: per-corner border-radius without fixed px width/height; approximated with the "
+        "largest radius (PAGX Path requires concrete dimensions)");
     auto* rect = _document->makeNode<Rectangle>();
     rect->percentWidth = 100.0f;
     rect->percentHeight = 100.0f;
@@ -462,109 +440,119 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
     layer->contents.push_back(geometry);
     emitted = true;
   }
+  applyBackgroundFill(layer, box, geometry, emitted);
+  applyBorderStroke(layer, box, geometry, emitted);
+  applyBoxShadows(layer, box, emitted);
+  applyBackdropFilter(layer, box, emitted);
+  return emitted;
+}
 
-  // Background colour / gradient.
-  if (geometry && box.backgroundColorSet && box.backgroundImage.empty()) {
+void HTMLParserContext::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
+                                            Element* geometry, bool& emitted) {
+  if (!geometry) return;
+  if (box.backgroundColorSet && box.backgroundImage.empty()) {
     layer->contents.push_back(buildSolidFill(box.backgroundColor));
     emitted = true;
-  } else if (geometry && !box.backgroundImage.empty()) {
-    auto fill = _document->makeNode<Fill>();
-    std::string bg = Trim(box.backgroundImage);
-    fill->color = parseGradientByValue(bg);
-    if (!fill->color) {
-      std::string lower = ToLower(bg);
-      if (lower.compare(0, 4, "url(") == 0) {
-        warn("html: background-image '" + bg + "' (url) not supported; use <img>");
-      } else {
-        warn("html: background-image '" + bg + "' not supported");
-      }
-    }
-    if (!fill->color && box.backgroundColorSet) {
-      auto solid = _document->makeNode<SolidColor>();
-      solid->color = box.backgroundColor;
-      fill->color = solid;
-    }
-    if (fill->color) {
-      layer->contents.push_back(fill);
-      emitted = true;
+    return;
+  }
+  if (box.backgroundImage.empty()) return;
+
+  auto fill = _document->makeNode<Fill>();
+  std::string bg = Trim(box.backgroundImage);
+  fill->color = parseGradientByValue(bg);
+  if (!fill->color) {
+    std::string lower = ToLower(bg);
+    if (lower.compare(0, 4, "url(") == 0) {
+      warn("html: background-image '" + bg + "' (url) not supported; use <img>");
+    } else {
+      warn("html: background-image '" + bg + "' not supported");
     }
   }
-
-  // Border.
-  if (geometry && box.borderSet) {
-    auto stroke = _document->makeNode<Stroke>();
+  if (!fill->color && box.backgroundColorSet) {
     auto solid = _document->makeNode<SolidColor>();
-    solid->color = box.borderColor;
-    stroke->color = solid;
-    stroke->width = box.borderWidthPx;
-    stroke->align = StrokeAlign::Inside;
-    // CSS `border-style: dashed | dotted` maps onto Stroke's dash pattern.
-    // Chromium-ish proportions: `dashed` paints rectangular dashes 2x the line
-    // width separated by 1x gaps; `dotted` paints round dots with diameter
-    // equal to the line width, spaced 1 width apart (a zero-length dash with
-    // a Round cap renders as a circle of radius w/2, and centre-to-centre
-    // spacing of 2w yields a 1w gap between dot edges).
-    if (box.borderStyle == BorderStyle::Dashed) {
-      const float w = box.borderWidthPx;
-      stroke->dashes = {2.0f * w, w};
-    } else if (box.borderStyle == BorderStyle::Dotted) {
-      const float w = box.borderWidthPx;
-      stroke->cap = LineCap::Round;
-      stroke->dashes = {0.0f, 2.0f * w};
-    }
-    layer->contents.push_back(stroke);
+    solid->color = box.backgroundColor;
+    fill->color = solid;
+  }
+  if (fill->color) {
+    layer->contents.push_back(fill);
     emitted = true;
   }
+}
 
-  // box-shadow -> DropShadowStyle / InnerShadowStyle list.
+void HTMLParserContext::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,
+                                          Element* geometry, bool& emitted) {
+  if (!geometry || !box.borderSet) return;
+  auto stroke = _document->makeNode<Stroke>();
+  auto solid = _document->makeNode<SolidColor>();
+  solid->color = box.borderColor;
+  stroke->color = solid;
+  stroke->width = box.borderWidthPx;
+  stroke->align = StrokeAlign::Inside;
+  // CSS `border-style: dashed | dotted` maps onto Stroke's dash pattern.
+  // Chromium-ish proportions: `dashed` paints rectangular dashes 2x the line
+  // width separated by 1x gaps; `dotted` paints round dots with diameter
+  // equal to the line width, spaced 1 width apart (a zero-length dash with
+  // a Round cap renders as a circle of radius w/2, and centre-to-centre
+  // spacing of 2w yields a 1w gap between dot edges).
+  if (box.borderStyle == BorderStyle::Dashed) {
+    const float w = box.borderWidthPx;
+    stroke->dashes = {2.0f * w, w};
+  } else if (box.borderStyle == BorderStyle::Dotted) {
+    const float w = box.borderWidthPx;
+    stroke->cap = LineCap::Round;
+    stroke->dashes = {0.0f, 2.0f * w};
+  }
+  layer->contents.push_back(stroke);
+  emitted = true;
+}
+
+void HTMLParserContext::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted) {
+  if (box.boxShadow.empty()) return;
   // CSS spec defines the `box-shadow` blur-radius as the standard deviation of the Gaussian
   // blur, doubled. PAGX layer-style `blurX/blurY` values flow into tgfx's `ImageFilter::Blur`
   // (and SVG `feGaussianBlur stdDeviation`), both of which take Gaussian σ directly. Halving
   // the parsed blur-radius lands on the matching σ. NOTE: this conversion is specific to
-  // `box-shadow` — the `filter: drop-shadow()` consumer below keeps its blur as-is, since
-  // the CSS Filter spec defines that function's blur-radius as σ already.
-  if (!box.boxShadow.empty()) {
-    auto shadows = parseShadowList(box.boxShadow);
-    for (auto& s : shadows) {
-      const float sigma = s.blur * 0.5f;
-      if (s.inset) {
-        auto inner = _document->makeNode<InnerShadowStyle>();
-        inner->offsetX = s.offsetX;
-        inner->offsetY = s.offsetY;
-        inner->blurX = sigma;
-        inner->blurY = sigma;
-        inner->color = s.color;
-        layer->styles.push_back(inner);
-      } else {
-        auto drop = _document->makeNode<DropShadowStyle>();
-        drop->offsetX = s.offsetX;
-        drop->offsetY = s.offsetY;
-        drop->blurX = sigma;
-        drop->blurY = sigma;
-        drop->color = s.color;
-        layer->styles.push_back(drop);
-      }
-    }
-    if (!shadows.empty()) emitted = true;
-  }
-
-  // backdrop-filter: blur(...) -> BackgroundBlurStyle.
-  if (!box.backdropFilter.empty()) {
-    auto steps = parseFilterChain(box.backdropFilter);
-    for (auto& step : steps) {
-      if (step.kind == FilterStep::Kind::Blur) {
-        auto bg = _document->makeNode<BackgroundBlurStyle>();
-        bg->blurX = step.blurX;
-        bg->blurY = step.blurY;
-        layer->styles.push_back(bg);
-        emitted = true;
-      } else {
-        warn("html: backdrop-filter '" + step.raw + "' not supported");
-      }
+  // `box-shadow` — the `filter: drop-shadow()` consumer keeps its blur as-is, since the CSS
+  // Filter spec defines that function's blur-radius as σ already.
+  auto shadows = parseShadowList(box.boxShadow);
+  for (auto& s : shadows) {
+    const float sigma = s.blur * 0.5f;
+    if (s.inset) {
+      auto inner = _document->makeNode<InnerShadowStyle>();
+      inner->offsetX = s.offsetX;
+      inner->offsetY = s.offsetY;
+      inner->blurX = sigma;
+      inner->blurY = sigma;
+      inner->color = s.color;
+      layer->styles.push_back(inner);
+    } else {
+      auto drop = _document->makeNode<DropShadowStyle>();
+      drop->offsetX = s.offsetX;
+      drop->offsetY = s.offsetY;
+      drop->blurX = sigma;
+      drop->blurY = sigma;
+      drop->color = s.color;
+      layer->styles.push_back(drop);
     }
   }
+  if (!shadows.empty()) emitted = true;
+}
 
-  return emitted;
+void HTMLParserContext::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box,
+                                            bool& emitted) {
+  if (box.backdropFilter.empty()) return;
+  auto steps = parseFilterChain(box.backdropFilter);
+  for (auto& step : steps) {
+    if (step.kind == FilterStep::Kind::Blur) {
+      auto bg = _document->makeNode<BackgroundBlurStyle>();
+      bg->blurX = step.blurX;
+      bg->blurY = step.blurY;
+      layer->styles.push_back(bg);
+      emitted = true;
+    } else {
+      warn("html: backdrop-filter '" + step.raw + "' not supported");
+    }
+  }
 }
 
 void HTMLParserContext::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,

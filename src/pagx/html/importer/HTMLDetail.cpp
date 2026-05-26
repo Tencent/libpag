@@ -73,44 +73,51 @@ std::vector<std::string> SplitTopLevelWhitespace(const std::string& s) {
   return out;
 }
 
-void ParseStyleString(const std::string& styleStr,
-                      std::unordered_map<std::string, std::string>& out) {
+std::vector<std::pair<std::string, std::string>> ParseStyleDeclarations(const std::string& style) {
+  std::vector<std::pair<std::string, std::string>> out;
   size_t pos = 0;
-  while (pos < styleStr.size()) {
-    while (pos < styleStr.size() && std::isspace(static_cast<unsigned char>(styleStr[pos]))) {
+  while (pos < style.size()) {
+    while (pos < style.size() && std::isspace(static_cast<unsigned char>(style[pos]))) {
       ++pos;
     }
-    if (pos + 1 < styleStr.size() && styleStr[pos] == '/' && styleStr[pos + 1] == '*') {
-      auto commentEnd = styleStr.find("*/", pos + 2);
-      pos = (commentEnd == std::string::npos) ? styleStr.size() : commentEnd + 2;
+    if (pos + 1 < style.size() && style[pos] == '/' && style[pos + 1] == '*') {
+      auto commentEnd = style.find("*/", pos + 2);
+      pos = (commentEnd == std::string::npos) ? style.size() : commentEnd + 2;
       continue;
     }
-    size_t colonPos = styleStr.find(':', pos);
+    size_t colonPos = style.find(':', pos);
     if (colonPos == std::string::npos) {
       break;
     }
-    std::string propName = ToLower(Trim(styleStr.substr(pos, colonPos - pos)));
-    size_t searchStart = colonPos + 1;
+    std::string propName = Trim(style.substr(pos, colonPos - pos));
     size_t semicolonPos = std::string::npos;
     int parenDepth = 0;
-    for (size_t i = searchStart; i < styleStr.size(); i++) {
-      if (styleStr[i] == '(') {
+    for (size_t i = colonPos + 1; i < style.size(); i++) {
+      if (style[i] == '(') {
         parenDepth++;
-      } else if (styleStr[i] == ')') {
+      } else if (style[i] == ')') {
         if (parenDepth > 0) parenDepth--;
-      } else if (styleStr[i] == ';' && parenDepth == 0) {
+      } else if (style[i] == ';' && parenDepth == 0) {
         semicolonPos = i;
         break;
       }
     }
     if (semicolonPos == std::string::npos) {
-      semicolonPos = styleStr.size();
+      semicolonPos = style.size();
     }
-    std::string propValue = Trim(styleStr.substr(colonPos + 1, semicolonPos - colonPos - 1));
+    std::string propValue = Trim(style.substr(colonPos + 1, semicolonPos - colonPos - 1));
     if (!propName.empty() && !propValue.empty()) {
-      out[propName] = propValue;
+      out.emplace_back(std::move(propName), std::move(propValue));
     }
     pos = semicolonPos + 1;
+  }
+  return out;
+}
+
+void ParseStyleString(const std::string& styleStr,
+                      std::unordered_map<std::string, std::string>& out) {
+  for (auto& decl : ParseStyleDeclarations(styleStr)) {
+    out[ToLower(decl.first)] = std::move(decl.second);
   }
 }
 

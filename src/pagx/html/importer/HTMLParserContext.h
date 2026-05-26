@@ -191,6 +191,13 @@ class HTMLParserContext {
   void parseBoxTransform(HTMLBoxAttributes& box,
                          const std::unordered_map<std::string, std::string>& props);
 
+  // parseBoxVisuals sub-step. Parses `border-radius` shorthand into the four `borderRadius*Px`
+  // fields, expanding 1-4 tokens per CSS spec, resolving percentages against the box size, and
+  // applying the CSS edge-overlap scaling clamp. Caller has already established that
+  // `props["border-radius"]` is non-empty.
+  void parseBorderRadius(HTMLBoxAttributes& box,
+                         const std::unordered_map<std::string, std::string>& props);
+
   HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
                                       const HTMLInheritedStyle& parent);
 
@@ -228,6 +235,16 @@ class HTMLParserContext {
   // backdrop-filter. Returns true if any visual was applied (the caller should consider
   // the double-layer split for padded contents).
   bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
+
+  // applyBackgroundVisuals sub-steps. Each consumes the `geometry` node already attached to
+  // `layer->contents` (when relevant) and toggles `emitted` true when it pushes a visual that
+  // would force the caller to honour the double-host split.
+  void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
+                           bool& emitted);
+  void applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
+                         bool& emitted);
+  void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
+  void applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
 
   // Builds the background geometry node for a layer that carries `border-radius`. Returns a
   // `Rectangle` covering the layer (with `roundness` set) when all four corner radii are equal

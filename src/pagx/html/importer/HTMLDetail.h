@@ -65,8 +65,16 @@ std::vector<std::string> SplitTopLevelCommas(const std::string& s);
 // "0 2px 6px rgba(0,0,0,0.2)" yields four tokens).
 std::vector<std::string> SplitTopLevelWhitespace(const std::string& s);
 
+// Walks an inline `style="..."` declaration list. Returns (propertyName, propertyValue) in
+// source order. Property names are preserved as-is (caller may lower-case if needed); values
+// are trimmed but otherwise verbatim. Respects /* ... */ comments and parenthesised values
+// (so a `;` inside `linear-gradient(...)` doesn't terminate the declaration). Empty
+// names / values are skipped.
+std::vector<std::pair<std::string, std::string>> ParseStyleDeclarations(const std::string& style);
+
 // Parse a CSS style string into a property map. Later properties override earlier ones.
-// Comments and parenthesised values are respected.
+// Property names are lower-cased before insertion so callers can use canonical CSS names.
+// Thin wrapper over `ParseStyleDeclarations` — see it for syntactic guarantees.
 void ParseStyleString(const std::string& styleStr,
                       std::unordered_map<std::string, std::string>& out);
 
