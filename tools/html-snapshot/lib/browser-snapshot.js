@@ -18,6 +18,8 @@
 
 'use strict';
 
+const { DROP_TAG_NAMES } = require('./dom-tags');
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -456,8 +458,15 @@ function classify(el, computed) {
 // Append a single schema-driven CSS declaration to `parts` if its computed
 // value isn't a default and survives normalisation. `ctx.textColor` (when
 // provided) is consulted by entries flagged `skipIfEqualsTextColor`.
+// `ctx.textColorOverride` lets callers substitute the rendered `color`
+// value (e.g. an `<input>` whose visible text is the placeholder, painted
+// with `::placeholder { color: ... }`) without doing post-hoc string
+// surgery on the joined style — see renderTextInput.
 function appendStyleProp(parts, computed, entry, ctx) {
-  const raw = computed.getPropertyValue(entry.prop).trim();
+  let raw = computed.getPropertyValue(entry.prop).trim();
+  if (entry.prop === 'color' && ctx && ctx.textColorOverride) {
+    raw = ctx.textColorOverride;
+  }
   const v = entry.normalize ? entry.normalize(raw) : raw;
   if (!v) return;
   if (entry.defaults && entry.defaults.includes(v)) return;
@@ -547,8 +556,9 @@ function buildStyle(left, top, width, height, computed, opts) {
 
   if (opts.text) {
     const textColor = computed.getPropertyValue('color').trim();
+    const ctx = { textColor, textColorOverride: opts.textColorOverride };
     for (const entry of STYLE_SCHEMA_TEXT) {
-      appendStyleProp(parts, computed, entry, { textColor });
+      appendStyleProp(parts, computed, entry, ctx);
     }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
@@ -1362,17 +1372,30 @@ function renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts) {
   return `<div style="${composed}">${sized}</div>`;
 }
 
+// Common wrapper used by every "replaced element" branch (`<img>`,
+// `<canvas>`, form-input synthetics): outer `<div>` carrying the box
+// style + asymmetric border overlays, inner replaced content, and an
+// optional extra style block (e.g. flex-centring rules) joined onto the
+// outer wrapper. Centralised so the three callers stay in lockstep on
+// border/overlay rendering — adding shadow/outline support, for instance,
+// only needs touching this helper.
+function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxStyle) {
+  const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+    box: true, ...opts,
+  });
+  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  const composed = extraBoxStyle ? joinStyles(boxStyle, extraBoxStyle) : boxStyle;
+  return `<div style="${composed}">${inner}${overlays}</div>`;
+}
+
 // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are
 // baked into overlay rectangles painted on top.
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(el.getAttribute('alt') || '');
   const imgStyle = imageInnerStyle(rect, opts.flexItem);
-  const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-    box: true, ...opts,
-  });
-  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>${overlays}</div>`;
+  const inner = `<img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>`;
+  return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
 // <canvas>: PAGX has no canvas / scripted-graphics primitive, but the live
@@ -1386,11 +1409,8 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
 function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
   const src = el.getAttribute('data-snapshot-canvas-src') || '';
   const imgStyle = imageInnerStyle(rect, opts.flexItem);
-  const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-    box: true, ...opts,
-  });
-  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  return `<div style="${wrapperStyle}"><img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>${overlays}</div>`;
+  const inner = `<img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>`;
+  return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
 // <input> / <textarea> / <select>: outer box for bg/border/radius + inner
@@ -1417,21 +1437,15 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   const placeholderColor = (!el.value && el.getAttribute('placeholder'))
     ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
     : '';
-  const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
-    box: true, ...opts,
-  });
-  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
   const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
-  let textStyle = buildStyle(0, 0, 0, 0, computed, {
+  const textStyle = buildStyle(0, 0, 0, 0, computed, {
     box: false, text: true, positioned: false,
+    textColorOverride: placeholderColor || undefined,
   });
-  if (placeholderColor) {
-    textStyle = textStyle.replace(/(^|; )color: [^;]+/, `$1color: ${placeholderColor}`);
-  }
   const finalTextStyle = withNowrap(textStyle);
-  const inner = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const composed = joinStyles(boxStyle, inner);
-  return `<div style="${composed}"><span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>${overlays}</div>`;
+  const innerLayout = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
 // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
@@ -2281,15 +2295,7 @@ ${parts.join('')}
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
-const DROP_TAGS = new Set([
-  'script', 'style', 'link', 'meta', 'noscript',
-  'iframe', 'object', 'embed', 'video', 'audio',
-  'br', 'hr', 'wbr',
-  'head', 'title', 'base',
-  'template', 'slot', 'dialog', 'details', 'summary',
-  'map', 'area', 'source', 'track', 'param',
-  'form',
-]);
+const DROP_TAGS = new Set(${JSON.stringify(DROP_TAG_NAMES)});
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
@@ -2431,6 +2437,7 @@ const HELPER_FNS = [
   classifyFlexContainer,
   renderSvg,
   renderInlineIconSvg,
+  renderBoxedReplaced,
   renderImg,
   renderCanvas,
   renderTextInput,

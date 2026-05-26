@@ -69,7 +69,7 @@ const banner = `/*!
 // payload (matching the layout the puppeteer driver uses today).
 //
 // Icon-font helpers (formatRank, parseSrcList, parseFontFaceFromText,
-// collectFontFaceMap, pseudoChar, isPuaCodepoint, isIconScanSkippedTag) are
+// collectFontFaceMap, isPuaCodepoint, isIconScanSkippedTag) are
 // injected via ICON_FONT_HELPERS_SRC; the `browserCollect*` entry points
 // reference them by name and would `ReferenceError` without this block.
 const factoryBody = `

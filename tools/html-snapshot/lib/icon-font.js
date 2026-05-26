@@ -35,6 +35,7 @@
 'use strict';
 
 const fsp = require('fs').promises;
+const { DROP_TAG_NAMES } = require('./dom-tags');
 const { errMessage } = require('./cli');
 
 let opentype = null;
@@ -174,24 +175,6 @@ async function collectFontFaceMap() {
   return map;
 }
 
-// Decode a CSS `content` value into the literal pseudo-element text. The
-// value comes back from `getPropertyValue('content')` already wrapped in
-// quotes (single or double); this regex pulls out every quoted segment and
-// concatenates them. Returns '' for `none` / `normal` / unset, which the
-// caller treats as "no pseudo".
-function pseudoChar(el, pseudo) {
-  const cs = getComputedStyle(el, pseudo);
-  const raw = (cs.getPropertyValue('content') || '').trim();
-  if (!raw || raw === 'none' || raw === 'normal') return '';
-  let out = '';
-  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
-  let m;
-  while ((m = re.exec(raw)) !== null) {
-    out += m[1] !== undefined ? m[1] : m[2];
-  }
-  return out;
-}
-
 // PUA-only filter, applied per-codepoint (not per-string) so a single
 // surrogate-pair character in PUA-A (U+F0000+) is also accepted via
 // `codePointAt(0)`. Single-char check (in the caller) ensures we don't
@@ -205,21 +188,13 @@ function isPuaCodepoint(cp) {
 // Tags whose subtree never paints visible icon glyphs. Skip them up front
 // so a page with hundreds of inline `<style>` / `<script>` blocks doesn't
 // pay for a per-element `getComputedStyle(el, '::before')` round-trip.
-// Mirrors the `DROP_TAGS` list in browser-snapshot.js but is independently
-// declared because the two payloads are shipped as separate IIFEs.
+//
+// Backed by the shared `DROP_TAG_NAMES` list in lib/dom-tags.js so this
+// pass and the main snapshot walker stay in lockstep — the function body
+// is constructed at module load and serialised into the browser payload
+// through `ICON_FONT_DROP_TAGS_SRC` below.
 function isIconScanSkippedTag(tag) {
-  if (!tag) return false;
-  switch (tag) {
-    case 'SCRIPT': case 'STYLE': case 'LINK': case 'META': case 'NOSCRIPT':
-    case 'IFRAME': case 'OBJECT': case 'EMBED': case 'VIDEO': case 'AUDIO':
-    case 'HEAD': case 'TITLE': case 'BASE':
-    case 'TEMPLATE': case 'SLOT': case 'DIALOG':
-    case 'MAP': case 'AREA': case 'SOURCE': case 'TRACK': case 'PARAM':
-    case 'BR': case 'HR': case 'WBR':
-      return true;
-    default:
-      return false;
-  }
+  return tag ? DROP_TAGS_UPPER.has(tag) : false;
 }
 
 // ===== Browser-side entry points =====
@@ -252,12 +227,11 @@ async function browserCollectIconFontTargets() {
   const targets = [];
   let counter = 0;
   const all = document.body ? document.body.querySelectorAll('*') : [];
-  // Hoist the quoted-segment regex once: every candidate that survives the
-  // PUA gate would otherwise allocate a fresh RegExp per iteration via
-  // `pseudoChar`. Doing it here also lets us reuse the single
-  // `getComputedStyle(el, pseudo)` lookup for both `content` and
-  // `font-family`, halving the layout queries vs. calling pseudoChar()
-  // (one CS) and then a second CS for font-family.
+  // Hoist the quoted-segment regex once and inline the `content` decode
+  // alongside the `font-family` lookup so each candidate pays a single
+  // `getComputedStyle(el, pseudo)` call for both reads. Splitting the two
+  // (an earlier helper extracted just the character) doubled the
+  // pseudo-element layout queries on dense pages.
   const QUOTED_RE = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
   for (const el of all) {
     if (!el || el.children.length > 0) continue;
@@ -352,11 +326,21 @@ const ICON_FONT_HELPER_FNS = [
   parseSrcList,
   parseFontFaceFromText,
   collectFontFaceMap,
-  pseudoChar,
   isPuaCodepoint,
   isIconScanSkippedTag,
 ];
-const ICON_FONT_HELPERS_SRC = ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
+// Prepend the shared drop-tag set as raw JS so the serialised
+// `isIconScanSkippedTag` body resolves `DROP_TAGS_UPPER` from the same IIFE
+// scope. Keeping the constant here (rather than inside the function via a
+// closure) ensures both browser entry points reuse one Set instead of
+// reconstructing it on every call.
+const ICON_FONT_DROP_TAGS_SRC =
+  'const DROP_TAGS_UPPER = new Set(' +
+  JSON.stringify(DROP_TAG_NAMES.map(function (s) { return s.toUpperCase(); })) +
+  ');';
+const ICON_FONT_HELPERS_SRC =
+  ICON_FONT_DROP_TAGS_SRC + '\n\n' +
+  ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
 // `page.evaluate(string)` evaluates the string and awaits its result, so an
 // async-IIFE is the right shape for both entry points: the helpers are
