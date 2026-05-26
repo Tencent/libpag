@@ -271,14 +271,20 @@ function resolveZIndex(computed) {
   return isFinite(v) ? v : 0;
 }
 
-// Replay CSS paint order: non-positioned (flow) children first, then
-// positioned children sorted by z-index ascending, with DOM order as
-// tie-break. Ignoring z-index lets a sibling that was authored earlier
-// in the DOM but assigned a higher z-index (e.g. an iOS notch with
-// `z-index: 50`) be hidden by a later sibling at `z-index: auto`.
+// Replay CSS paint order: non-stackable (flow) children first, then
+// stackable children sorted by z-index ascending, with DOM order as
+// tie-break. A child is "stackable" when its z-index participates in
+// stacking — that is, when it is `position` != static (CSS2 rule) OR
+// when it is a flex / grid item (CSS Flexbox & Grid both honour
+// `z-index` on items regardless of `position`). Without the
+// flex/grid carve-out a `position: static` flex item authored with a
+// high z-index (e.g. the slide-13 `.center-node { z-index: 20 }`
+// sitting above its `.satellite-card` siblings at `z-index: 10`)
+// would always sort to the back, painting underneath siblings the
+// browser draws on top.
 function paintOrder(a, b) {
-  if (a.positioned !== b.positioned) return a.positioned ? 1 : -1;
-  if (a.positioned && a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
+  if (a.stackable !== b.stackable) return a.stackable ? 1 : -1;
+  if (a.stackable && a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
   return a.domIndex - b.domIndex;
 }
 
@@ -1667,14 +1673,18 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
 // parent's text-align.
 //
 // Paint order: browsers paint static-flow descendants first, then
-// positioned descendants on top (z-index:auto → DOM order). Since we
-// flatten every box to `position: absolute`, we must replay that order
-// ourselves: flow children + direct text runs in DOM order, then
-// positioned children (also in DOM order). Otherwise an `<input bg-gray>`
-// declared after an `<svg>` would paint over the icon, an inline-flex
-// bg-pill <button>'s positioned label would render under the bg, etc.
-// Asymmetric border overlays paint *on top* of all children to match CSS,
-// which renders borders after content.
+// stackable descendants on top — positioned children, plus flex/grid
+// items whose z-index participates in stacking even at `position:
+// static` (CSS Flexbox / Grid rule). Since we flatten every box to
+// `position: absolute`, we must replay that order ourselves: flow
+// children + direct text runs in DOM order, then stackable children
+// sorted by z-index (DOM order as tie-break). Otherwise an `<input
+// bg-gray>` declared after an `<svg>` would paint over the icon, an
+// inline-flex bg-pill <button>'s positioned label would render under
+// the bg, a `.center-node { z-index: 20 }` flex item would sort
+// underneath its `.satellite-card { z-index: 10 }` siblings, etc.
+// Asymmetric border overlays paint *on top* of all children to match
+// CSS, which renders borders after content.
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed);
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
@@ -1692,13 +1702,25 @@ function renderChildrenInto(el, parentRect, hostComputed) {
   const items = [];
   let domIndex = 0;
   const computedFor = hostComputed || getComputedStyle(el);
+  // CSS Flexbox / Grid both let an item paint by its own `z-index`
+  // regardless of `position`. Detect that on the parent so a
+  // `position: static` flex/grid child with a non-default z-index
+  // still participates in z-index sorting alongside its positioned
+  // siblings, matching what the browser actually draws.
+  const parentDisplay = computedFor.display;
+  const flexOrGridParent =
+    parentDisplay === 'flex' ||
+    parentDisplay === 'inline-flex' ||
+    parentDisplay === 'grid' ||
+    parentDisplay === 'inline-grid';
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
       const isPositioned = childComputed.position !== 'static';
+      const isStackable = isPositioned || flexOrGridParent;
       items.push({
-        positioned: isPositioned,
-        zIndex: isPositioned ? resolveZIndex(childComputed) : 0,
+        stackable: isStackable,
+        zIndex: isStackable ? resolveZIndex(childComputed) : 0,
         domIndex: domIndex++,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
@@ -1708,7 +1730,7 @@ function renderChildrenInto(el, parentRect, hostComputed) {
       const spans = emitTextSpans(n, parentRect, computedFor);
       if (spans.length > 0) {
         items.push({
-          positioned: false,
+          stackable: false,
           zIndex: 0,
           domIndex: domIndex++,
           html: spans.join(''),
