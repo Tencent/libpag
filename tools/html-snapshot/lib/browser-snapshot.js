@@ -2462,7 +2462,33 @@ const HELPERS_SRC = HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 // Single-shot browser-side payload. `page.evaluate` accepts a string and
 // will return whatever the expression evaluates to, so the IIFE simply
 // returns `snapshotMain()`'s result.
+//
+// Kept as the legacy "self-contained" form so the standalone browser
+// bundle (build-browser-bundle.js) and any external embedder can keep
+// calling it without an init-script step. The puppeteer driver in
+// snapshot.js prefers the split-payload route (SNAPSHOT_INIT_SCRIPT +
+// TAKE_SNAPSHOT_EXPR below) so the ~80 KB helper source is shipped to the
+// browser exactly once at navigation time instead of on every evaluate.
 const takeSnapshot = `(() => {\n${HELPERS_SRC}\n${PAYLOAD_CONSTANTS_SRC}\nreturn snapshotMain();\n})()`;
+
+// Init-script form: install every helper / constant onto a fresh
+// `window.__pagxSnapshot` namespace so subsequent evaluate calls only ship
+// the entry expression (`TAKE_SNAPSHOT_EXPR`, ~70 bytes) instead of the
+// full helper source. The IIFE runs once per document load (registered via
+// `page.evaluateOnNewDocument` / Playwright `addInitScript`), before any
+// of the page's own scripts.
+const SNAPSHOT_INIT_SCRIPT = `(function() {
+${HELPERS_SRC}
+${PAYLOAD_CONSTANTS_SRC}
+window.__pagxSnapshot = {
+  takeSnapshot: snapshotMain,
+};
+})();`;
+
+// Entry expression matching SNAPSHOT_INIT_SCRIPT. Compact enough that the
+// CDP roundtrip per snapshot is bounded by the protocol overhead, not the
+// payload size.
+const TAKE_SNAPSHOT_EXPR = '(() => window.__pagxSnapshot.takeSnapshot())()';
 
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
@@ -2593,6 +2619,8 @@ async function inlineCanvases() {
 // `inlineExternalImages`.
 module.exports = {
   takeSnapshot,
+  SNAPSHOT_INIT_SCRIPT,
+  TAKE_SNAPSHOT_EXPR,
   inlineExternalImages,
   inlineCanvases,
   HELPERS_SRC,

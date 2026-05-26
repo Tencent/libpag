@@ -26,8 +26,13 @@
 
 const fs = require('fs');
 const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
-const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
-const { inlineIconFontsOnPage } = require('./lib/icon-font');
+const {
+  TAKE_SNAPSHOT_EXPR,
+  SNAPSHOT_INIT_SCRIPT,
+  inlineExternalImages,
+  inlineCanvases,
+} = require('./lib/browser-snapshot');
+const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./lib/icon-font');
 const { openAndSettlePage } = require('./lib/page-loader');
 const { launchBrowser, responseBytes } = require('./lib/browser-engine');
 
@@ -113,6 +118,12 @@ async function main() {
         console.error(`${LOG_PREFIX}page exception: ${errMessage(err)}`);
       },
       onResponse: makeImageCaptureListener(engine, imageBytesByUrl, null),
+      // Ship both helper bundles to the page exactly once at navigation
+      // time. Subsequent `page.evaluate(...)` calls only have to send the
+      // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
+      // dispatch wrappers in lib/icon-font.js), instead of re-encoding the
+      // ~80 KB helper source for every snapshot.
+      initScripts: [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
     });
 
     // PAGX's renderer can read `data:` URIs and local files but not `http(s)://`
@@ -154,10 +165,10 @@ async function main() {
       }
     }
 
-    // `takeSnapshot` is a self-contained IIFE string assembled from the
-    // helpers in lib/browser-snapshot.js; `page.evaluate` accepts strings
-    // and returns the expression's result.
-    const result = await page.evaluate(takeSnapshot);
+    // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
+    // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
+    // ships the ~70-byte entry expression now.
+    const result = await page.evaluate(TAKE_SNAPSHOT_EXPR);
     if (opts.outputToStdout) {
       // Stdout mode (triggered by `-o -`, used by pagx's `--html-snapshot`
       // integration): the HTML is the sole stdout payload, and the

@@ -11,7 +11,7 @@
 
 'use strict';
 
-const { unwrap, newPage, mapWaitUntil, addCookies } = require('./browser-engine');
+const { unwrap, newPage, mapWaitUntil, addCookies, addInitScript } = require('./browser-engine');
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
@@ -41,6 +41,7 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
     onConsole = null,
     onPageError = null,
     onResponse = null,
+    initScripts = [],
   } = opts || {};
 
   const { engine } = unwrap(browserOrWrapper);
@@ -54,6 +55,13 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
   // to cache image responses for later in-page inlining without paying the
   // CORS round-trip a second time.
   if (onResponse) page.on('response', onResponse);
+  // Init scripts must be registered before `page.goto` so the page's own
+  // inline scripts see the helper bundles already on `window`. Each entry
+  // is a self-contained source string (callers prepare it with
+  // `windowAttachScript` from lib/browser-snapshot.js / lib/icon-font.js).
+  for (const script of initScripts) {
+    if (script) await addInitScript(page, engine, script);
+  }
 
   if (headers.length > 0) {
     const headerMap = {};

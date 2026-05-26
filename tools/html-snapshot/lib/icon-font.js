@@ -361,6 +361,24 @@ const COLLECT_ICON_FONT_TARGETS_PAYLOAD =
   '(async () => {\n' + ICON_FONT_HELPERS_SRC + '\n' + browserCollectIconFontTargets.toString() +
   '\nreturn await browserCollectIconFontTargets();\n})()';
 
+// Init-script form: install the icon-font helpers + the two browser-side
+// entry points onto `window.__pagxIconFont` so the puppeteer driver can
+// trigger them with a sub-100-byte expression instead of re-shipping
+// `ICON_FONT_HELPERS_SRC` on every evaluate. Registered via
+// `page.evaluateOnNewDocument` from snapshot.js before navigation.
+const ICON_FONT_INIT_SCRIPT =
+  '(function() {\n' + ICON_FONT_HELPERS_SRC + '\n' +
+  browserCollectFontFaceMap.toString() + '\n' +
+  browserCollectIconFontTargets.toString() + '\n' +
+  browserApplyIconFontSvgs.toString() + '\n' +
+  'window.__pagxIconFont = {\n' +
+  '  collectFontFaceMap: browserCollectFontFaceMap,\n' +
+  '  collectTargets: browserCollectIconFontTargets,\n' +
+  '  applySvgs: browserApplyIconFontSvgs,\n' +
+  '};\n' +
+  '})();';
+const COLLECT_ICON_FONT_TARGETS_EXPR = '(async () => await window.__pagxIconFont.collectTargets())()';
+
 // ===== Node-side helpers =====
 
 // Hard cap on a single icon-font network fetch. Without this, a slow or
@@ -553,7 +571,7 @@ async function inlineIconFontsOnPage(page, opts) {
 
   let targets = null;
   try {
-    targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_PAYLOAD);
+    targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_EXPR);
   } catch (err) {
     logger('inline-icon-fonts: target collection failed: ' + errMessage(err));
     return { inlined: 0, total: 0 };
@@ -573,7 +591,7 @@ async function inlineIconFontsOnPage(page, opts) {
   // collector left on every candidate. Skipping it would leak those
   // attributes into the final snapshot HTML.
   try {
-    await page.evaluate(browserApplyIconFontSvgs, results);
+    await page.evaluate((r) => window.__pagxIconFont.applySvgs(r), results);
   } catch (err) {
     logger('inline-icon-fonts: SVG application failed: ' + errMessage(err));
   }
@@ -590,6 +608,7 @@ module.exports = {
   browserCollectIconFontTargets,
   browserApplyIconFontSvgs,
   ICON_FONT_HELPERS_SRC,
+  ICON_FONT_INIT_SCRIPT,
   // Node-side helpers.
   fetchFontBytes,
   parseFontBuffer,

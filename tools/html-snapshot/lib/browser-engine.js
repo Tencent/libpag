@@ -228,6 +228,22 @@ async function responseBytes(resp, engine) {
   return resp.buffer();
 }
 
+// Register a script that runs in every new document this page loads, before
+// any of the page's own scripts. Used by snapshot.js to inject the snapshot
+// helper bundle into `window.__pagxSnapshot` once at navigation time so the
+// subsequent `page.evaluate(...)` calls only trigger the entry function
+// instead of re-shipping the ~80 KB helper source over CDP per call.
+//
+// Puppeteer: `page.evaluateOnNewDocument(string|fn)`.
+// Playwright: `page.addInitScript({ content: string })`.
+async function addInitScript(page, engine, script) {
+  if (engine === 'playwright') {
+    await page.addInitScript({ content: script });
+    return;
+  }
+  await page.evaluateOnNewDocument(script);
+}
+
 module.exports = {
   SUPPORTED_ENGINES,
   DEFAULT_ENGINE,
@@ -240,4 +256,5 @@ module.exports = {
   mapWaitUntil,
   addCookies,
   responseBytes,
+  addInitScript,
 };
