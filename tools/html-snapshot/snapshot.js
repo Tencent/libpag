@@ -29,7 +29,38 @@ const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
 const { takeSnapshot, inlineExternalImages, inlineCanvases } = require('./lib/browser-snapshot');
 const { inlineIconFontsOnPage } = require('./lib/icon-font');
 const { openAndSettlePage } = require('./lib/page-loader');
-const { launchBrowser } = require('./lib/browser-engine');
+const { launchBrowser, responseBytes } = require('./lib/browser-engine');
+
+// Build a `page.on('response')` listener that captures every successful
+// image response into `cache` as a `url -> data:URI` mapping. The map is
+// later handed to `inlineExternalImages` so the in-page pass reuses the
+// browser's already-loaded bytes instead of re-fetching cross-origin
+// images (which the legacy `fetch(url, { mode: 'cors' })` path silently
+// failed for, since most image CDNs do not return CORS headers).
+//
+// We capture by URL key (not by element ref) so the same image used by
+// multiple <img> tags pays a single base64 conversion. The listener never
+// throws — a detached response or scheme we don't support just leaves the
+// URL absent from the cache, and the in-page fetch fallback will retry.
+function makeImageCaptureListener(engine, cache, log) {
+  return async function captureImageResponse(resp) {
+    try {
+      const req = resp.request();
+      if (req.resourceType() !== 'image') return;
+      const url = req.url();
+      if (!url || url.startsWith('data:')) return;
+      if (!resp.ok()) return;
+      const buf = await responseBytes(resp, engine);
+      const ct = resp.headers()['content-type'] || 'application/octet-stream';
+      cache.set(url, `data:${ct};base64,${buf.toString('base64')}`);
+    } catch (err) {
+      // Common case: response detached after a navigation, or the request
+      // was served from cache and the body is no longer accessible. Drop
+      // it — the in-page fetch fallback handles cache misses.
+      if (log) log(`image capture skipped: ${errMessage(err)}`);
+    }
+  };
+}
 
 async function main() {
   const opts = parseArgs(process.argv);
@@ -63,8 +94,9 @@ async function main() {
     }
     throw err;
   }
-  const { browser } = engineHandle;
+  const { browser, engine } = engineHandle;
   try {
+    const imageBytesByUrl = new Map();
     const page = await openAndSettlePage(engineHandle, targetUrl, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
@@ -80,6 +112,7 @@ async function main() {
       onPageError: (err) => {
         console.error(`${LOG_PREFIX}page exception: ${errMessage(err)}`);
       },
+      onResponse: makeImageCaptureListener(engine, imageBytesByUrl, null),
     });
 
     // PAGX's renderer can read `data:` URIs and local files but not `http(s)://`
@@ -87,7 +120,10 @@ async function main() {
     // downstream `pagx render` step can decode them directly. We stash the result
     // on `data-snapshot-src` rather than mutating `src` so that the live layout
     // (which has already settled around the original image) is left untouched.
-    await page.evaluate(inlineExternalImages);
+    // The Map captured above is handed in as a plain object so `page.evaluate`
+    // can serialise it across the CDP boundary; misses fall back to in-page
+    // fetch (limited to 8 concurrent requests inside the helper).
+    await page.evaluate(inlineExternalImages, Object.fromEntries(imageBytesByUrl));
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted

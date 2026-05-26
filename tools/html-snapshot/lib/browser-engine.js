@@ -216,6 +216,18 @@ async function addCookies(page, engine, cookies) {
   await page.setCookie(...cookies);
 }
 
+// Read a response body as a Buffer. Puppeteer exposes `response.buffer()`;
+// Playwright renamed it to `response.body()`. Both return a Node Buffer
+// with the raw bytes (no charset coercion). May throw if the response
+// detached (page navigated away before the body was consumed) — callers
+// should wrap in try/catch and treat the failure as "skip this resource".
+async function responseBytes(resp, engine) {
+  if (engine === 'playwright') {
+    return resp.body();
+  }
+  return resp.buffer();
+}
+
 module.exports = {
   SUPPORTED_ENGINES,
   DEFAULT_ENGINE,
@@ -227,4 +239,5 @@ module.exports = {
   setViewport,
   mapWaitUntil,
   addCookies,
+  responseBytes,
 };

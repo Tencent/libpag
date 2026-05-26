@@ -40,6 +40,7 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
     headers = [],
     onConsole = null,
     onPageError = null,
+    onResponse = null,
   } = opts || {};
 
   const { engine } = unwrap(browserOrWrapper);
@@ -48,6 +49,11 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
   });
   if (onConsole) page.on('console', onConsole);
   if (onPageError) page.on('pageerror', onPageError);
+  // Register onResponse before any navigation so the listener captures the
+  // very first request's bytes (favicon, document, …). Used by snapshot.js
+  // to cache image responses for later in-page inlining without paying the
+  // CORS round-trip a second time.
+  if (onResponse) page.on('response', onResponse);
 
   if (headers.length > 0) {
     const headerMap = {};

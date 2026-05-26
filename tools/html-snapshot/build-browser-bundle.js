@@ -47,7 +47,7 @@ const banner = `/*!
  *
  * Public API (operates on the live document):
  *   takeSnapshot()                          -> { html, width, height }
- *   inlineExternalImages()                  -> Promise<void>
+ *   inlineExternalImages(cachedMap?)        -> Promise<void>
  *   inlineCanvases()                        -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void

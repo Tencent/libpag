@@ -2412,14 +2412,32 @@ const takeSnapshot = `(() => {\n${HELPERS_SRC}\n${PAYLOAD_CONSTANTS_SRC}\nreturn
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
 // Walk every <img> in the document and, for any whose `src` is an absolute
-// `http(s)://` URL, fetch the bytes and stash a `data:` URI on
-// `data-snapshot-src`. The downstream snapshot reader (`imgSrc`) prefers
-// that attribute, so the emitted HTML becomes self-contained — required
-// because `pagx render` cannot fetch URLs at render time. Failures (CORS,
-// network, 404) are logged and left in place: the snapshot will then fall
-// back to the original URL and render as an empty box rather than aborting
-// the pipeline.
-async function inlineExternalImages() {
+// `http(s)://` URL, stash a `data:` URI on `data-snapshot-src`. The
+// downstream snapshot reader (`imgSrc`) prefers that attribute, so the
+// emitted HTML becomes self-contained — required because `pagx render`
+// cannot fetch URLs at render time.
+//
+// Two byte sources, in priority order:
+//
+//   1. `cachedMap` — a `{ url: dataURI }` table populated by snapshot.js
+//      from `page.on('response')`. The browser already loaded these images
+//      to render the page, so reusing those bytes bypasses the second
+//      cross-origin round-trip entirely (and the CORS preflight that the
+//      old `fetch(url, { mode: 'cors' })` path silently failed at — most
+//      business image CDNs do not return ACAO headers, so the legacy path
+//      lost essentially every cross-origin image).
+//
+//   2. In-page `fetch()` fallback — used when the cache misses (e.g. the
+//      browser-bundle entry point in build-browser-bundle.js, which has no
+//      Node side to capture responses; or images that loaded before the
+//      response listener attached). Limited to 8 concurrent requests so
+//      pages with hundreds of icons don't trip same-origin connection
+//      caps or upstream 429 throttling.
+//
+// Failures (network, 404, tainted cache hit) are logged and left in place:
+// the snapshot will then fall back to the original URL and render as an
+// empty box rather than aborting the pipeline.
+async function inlineExternalImages(cachedMap) {
   // Convert a Blob into a `data:` URI without the FileReader callback dance.
   // Reading bytes via `arrayBuffer()` + chunked btoa avoids the "Maximum
   // call stack size" trap that String.fromCharCode(...big) hits on large
@@ -2436,24 +2454,44 @@ async function inlineExternalImages() {
     return `data:${mime};base64,${btoa(binary)}`;
   }
 
+  const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
-  await Promise.all(imgs.map(async (img) => {
+  const pending = [];
+  for (const img of imgs) {
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
-    if (!src) return;
-    if (src.startsWith('data:')) return;
-    if (!/^https?:/i.test(src)) return;
+    if (!src) continue;
+    if (src.startsWith('data:')) continue;
+    if (!/^https?:/i.test(src)) continue;
+    const cached = cache[src];
+    if (cached) {
+      img.setAttribute('data-snapshot-src', cached);
+      continue;
+    }
+    pending.push({ img, src });
+  }
+
+  async function processOne(entry) {
     try {
-      const res = await fetch(src, { mode: 'cors', credentials: 'omit' });
+      const res = await fetch(entry.src, { credentials: 'omit' });
       if (!res.ok) {
-        console.warn(`html-snapshot: image fetch ${res.status} for ${src}`);
+        console.warn(`html-snapshot: image fetch ${res.status} for ${entry.src}`);
         return;
       }
       const dataUri = await blobToDataUri(await res.blob());
-      img.setAttribute('data-snapshot-src', dataUri);
+      entry.img.setAttribute('data-snapshot-src', dataUri);
     } catch (err) {
-      console.warn(`html-snapshot: failed to inline ${src}: ${err && err.message}`);
+      console.warn(`html-snapshot: failed to inline ${entry.src}: ${err && err.message}`);
     }
-  }));
+  }
+
+  // Same-origin browsers cap parallel connections at ~6, and many CDNs
+  // throttle aggressively past that. Keeping the in-flight window at 8
+  // lets us saturate the bottleneck without queueing surprises.
+  const FETCH_CHUNK_SIZE = 8;
+  for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(processOne));
+  }
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
