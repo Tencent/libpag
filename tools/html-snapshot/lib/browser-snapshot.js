@@ -1296,11 +1296,13 @@ function renderSvg(el, parentRect, rect, left, top, computed, opts) {
 
 // Element tagged by the `inline-icon-fonts` pre-pass (lib/icon-font.js):
 // the live page's `::before` icon-font glyph has been replaced with an
-// inline `<svg>` carrying the glyph's vector path. The SVG markup is
-// stashed on the host as `data-snapshot-icon-svg`; here we wrap it in the
-// usual `colorOnly` flex centring box (so the host's inherited `color`
-// flows through `currentColor` fills) and pin its width / height to a
-// `font-size` square inside the host's measured rect.
+// inline `<svg>` carrying the glyph's vector path. The SVG XML is held in
+// `window.__pagxIconSvgs` keyed by the host's `data-snapshot-icon-svg-id`
+// (stored separately so the actual XML — quotes, angle brackets, future
+// metadata — never round-trips through an HTML attribute value); here we
+// wrap it in the usual `colorOnly` flex centring box (so the host's
+// inherited `color` flows through `currentColor` fills) and pin its width
+// / height to a `font-size` square inside the host's measured rect.
 //
 // Why `font-size`-sized SVG instead of `rect`-sized? Icon webfonts paint
 // each glyph as a `font-size × font-size` em-square box, so an icon set
@@ -1328,7 +1330,9 @@ function renderSvg(el, parentRect, rect, left, top, computed, opts) {
 // here), so the SVG's pinned pixel dimensions are the sole source of
 // truth for the on-screen icon size.
 function renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts) {
-  const raw = el.getAttribute('data-snapshot-icon-svg') || '';
+  const id = el.getAttribute('data-snapshot-icon-svg-id') || '';
+  const dict = (typeof window !== 'undefined' && window.__pagxIconSvgs) || null;
+  const raw = (id && dict) ? (dict[id] || '') : '';
   if (!raw) return '';
   // The icon's natural rendered size: a `font-size × font-size` square.
   // Clamp to the wrapper's rect so that hosts with sub-font-size boxes
@@ -2121,14 +2125,15 @@ function render(el, parentRect, opts, precomputed) {
 
   // Pre-pass-tagged icon-font hosts: the inline-icon-fonts pass
   // (lib/icon-font.js) replaced the live `::before` glyph with an inline
-  // `<svg>` payload stashed on the host as `data-snapshot-icon-svg`.
-  // Route to the dedicated renderer ahead of every other branch so we
-  // never accidentally fall through to the legacy pseudo-text path
-  // (which would emit a font-named `<span>` with the original codepoint
-  // alongside the SVG, double-painting the icon). This check is cheap
-  // enough — `getAttribute` on a missing attribute returns null without
-  // touching the attribute table — to leave outside the kind dispatch.
-  if (el.getAttribute && el.getAttribute('data-snapshot-icon-svg')) {
+  // `<svg>` payload, indexed by id under `data-snapshot-icon-svg-id` /
+  // `window.__pagxIconSvgs`. Route to the dedicated renderer ahead of
+  // every other branch so we never accidentally fall through to the
+  // legacy pseudo-text path (which would emit a font-named `<span>` with
+  // the original codepoint alongside the SVG, double-painting the icon).
+  // This check is cheap enough — `getAttribute` on a missing attribute
+  // returns null without touching the attribute table — to leave outside
+  // the kind dispatch.
+  if (el.getAttribute && el.getAttribute('data-snapshot-icon-svg-id')) {
     return renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts);
   }
 

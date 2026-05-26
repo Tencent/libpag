@@ -288,22 +288,30 @@ async function browserCollectIconFontTargets() {
   return targets;
 }
 
-// Re-find each tagged host and attach the resolved SVG markup as
-// `data-snapshot-icon-svg`. The snapshot walker reads that attribute and
-// routes via `renderInlineIconSvg`. Hosts that didn't get a result (font
-// fetch failed, glyph missing, …) keep their original `::before` pseudo,
-// so the snapshot falls back to the legacy font-named span path.
+// Re-find each tagged host, store the resolved SVG markup in a window-level
+// dictionary keyed by the host's stable `data-icon-target-id`, then leave
+// only the id reference on the host as `data-snapshot-icon-svg-id`. The
+// snapshot walker reads that id and looks the SVG up in
+// `window.__pagxIconSvgs` instead of round-tripping arbitrary XML through
+// an HTML attribute value — earlier flat-attribute storage worked for
+// today's purely numeric path data but would have silently corrupted any
+// future glyph payload containing nested attribute quoting (embedded
+// `<text>`, metadata, etc.). The dictionary persists into the
+// `takeSnapshot` evaluate call because both run in the same page context
+// without intervening navigation.
 //
 // Self-contained (no helper dependencies), so it can be passed straight to
 // `page.evaluate(fn, args)` without an IIFE wrapper.
 function browserApplyIconFontSvgs(results) {
   const arr = results || [];
+  const dict = (window.__pagxIconSvgs = window.__pagxIconSvgs || Object.create(null));
   for (let i = 0; i < arr.length; i++) {
     const r = arr[i];
     if (!r || !r.id || !r.svg) continue;
     const el = document.querySelector('[data-icon-target-id="' + r.id + '"]');
     if (!el) continue;
-    el.setAttribute('data-snapshot-icon-svg', r.svg);
+    dict[r.id] = r.svg;
+    el.setAttribute('data-snapshot-icon-svg-id', r.id);
     el.removeAttribute('data-icon-target-id');
   }
   // Strip any leftover tags whose host failed to resolve, so the snapshot
@@ -519,18 +527,56 @@ async function resolveIconFontSvgs(targets, logger) {
   return results;
 }
 
-// Convenience: run the full collect → resolve → apply pipeline against a
-// puppeteer page. Returns `{ inlined, total }` so the driver can log how
-// many icons were converted ("inlined N / M icon-font glyphs"). A zero
+// Top-level pipeline: discover icon-font targets in the page, fetch their
+// font URLs, render each target glyph to an inline `<svg>` payload and
+// stash that payload on the host element via `data-snapshot-icon-svg`.
+// The downstream snapshot walker (`render` in browser-snapshot.js) routes
+// any element carrying that attribute to `renderInlineIconSvg`, which
+// emits the SVG instead of a font-named span.
+//
+// Returns `{ inlined, total }` so the caller can log how many targets
+// survived. An empty `targets` (no PUA pseudo backed by a webfont) early
 // return is silent — pages without icon-font usage round-trip identically
 // to the legacy snapshot.
+//
+// Each phase has its own try/catch: the previous flat layout meant a
+// cssRules SecurityError during *target collection* would skip the whole
+// page even when the resolver and applicator would have worked fine on
+// the targets that *did* parse. Now collection failures abort cleanly,
+// resolver failures fall back to "apply nothing" (which still cleans up
+// the `data-icon-target-id` markers the collector left behind), and
+// applicator failures only lose the visual replacement — the page is
+// still snapshotted, just with the original font-named spans.
 async function inlineIconFontsOnPage(page, opts) {
   const options = opts || {};
   const logger = typeof options.logger === 'function' ? options.logger : function () {};
-  const targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_PAYLOAD);
+
+  let targets = null;
+  try {
+    targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_PAYLOAD);
+  } catch (err) {
+    logger('inline-icon-fonts: target collection failed: ' + errMessage(err));
+    return { inlined: 0, total: 0 };
+  }
   if (!targets || targets.length === 0) return { inlined: 0, total: 0 };
-  const results = await resolveIconFontSvgs(targets, logger);
-  await page.evaluate(browserApplyIconFontSvgs, results);
+
+  let results = [];
+  try {
+    results = await resolveIconFontSvgs(targets, logger);
+  } catch (err) {
+    logger('inline-icon-fonts: SVG resolution failed: ' + errMessage(err));
+    results = [];
+  }
+
+  // Always run the applicator, even when `results` is empty: it doubles as
+  // the cleanup pass that strips the `data-icon-target-id` markers the
+  // collector left on every candidate. Skipping it would leak those
+  // attributes into the final snapshot HTML.
+  try {
+    await page.evaluate(browserApplyIconFontSvgs, results);
+  } catch (err) {
+    logger('inline-icon-fonts: SVG application failed: ' + errMessage(err));
+  }
   return { inlined: results.length, total: targets.length };
 }
 
