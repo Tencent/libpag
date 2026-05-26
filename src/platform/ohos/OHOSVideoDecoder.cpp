@@ -291,6 +291,12 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
         return nullptr;
       }
     }
+    if (videoStride < videoFormat.width || videoSliceHeight < videoFormat.height) {
+      LOGE("OHOSVideoDecoder: invalid stride/sliceHeight stride=%d sliceHeight=%d "
+           "width=%d height=%d",
+           videoStride, videoSliceHeight, videoFormat.width, videoFormat.height);
+      return nullptr;
+    }
     auto capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
     if (capacity <= 0) {
       return nullptr;
@@ -300,10 +306,13 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       return nullptr;
     }
     size_t yBufferSize = static_cast<size_t>(videoStride) * static_cast<size_t>(videoSliceHeight);
-    size_t uvBufferSize = codecBufferInfo.attr.size > static_cast<int32_t>(yBufferSize)
-                              ? static_cast<size_t>(codecBufferInfo.attr.size) - yBufferSize
-                              : 0;
-    if (uvBufferSize == 0) {
+    // NV12 has a half-height interleaved UV plane, so its strided size is exactly half of Y.
+    size_t uvStridedSize = yBufferSize / 2;
+    size_t requiredSize = yBufferSize + uvStridedSize;
+    if (static_cast<size_t>(codecBufferInfo.attr.size) < requiredSize ||
+        static_cast<size_t>(capacity) < requiredSize) {
+      LOGE("OHOSVideoDecoder: buffer too small attrSize=%d capacity=%d required=%zu",
+           codecBufferInfo.attr.size, capacity, requiredSize);
       return nullptr;
     }
 
@@ -316,14 +325,28 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       return nullptr;
     }
     frameBuffer->lineSize[0] = videoStride;
-    frameBuffer->data[1] = new (std::nothrow) uint8_t[uvBufferSize];
+    memcpy(frameBuffer->data[0], yuvAddress, yBufferSize);
+
+    // Repack the UV plane into a tightly packed buffer (rowBytes == width). This avoids
+    // relying on GL_UNPACK_ROW_LENGTH during NV12 texture upload, which has been observed
+    // to crash inside libGLES_mali.so on certain HarmonyOS devices when the source buffer
+    // lacks the trailing padding the driver tries to read. The per-row memcpy is cheaper
+    // than the per-row glTexSubImage2D fallback path that would otherwise be required to
+    // work around the driver bug.
+    int uvHeight = videoFormat.height / 2;
+    size_t uvRowBytes = static_cast<size_t>(videoFormat.width);
+    size_t uvAllocSize = uvRowBytes * static_cast<size_t>(uvHeight);
+    frameBuffer->data[1] = new (std::nothrow) uint8_t[uvAllocSize];
     if (frameBuffer->data[1] == nullptr) {
       return nullptr;
     }
-    frameBuffer->lineSize[1] = videoStride;
+    frameBuffer->lineSize[1] = static_cast<int>(uvRowBytes);
 
-    memcpy(frameBuffer->data[0], yuvAddress, yBufferSize);
-    memcpy(frameBuffer->data[1], yuvAddress + yBufferSize, uvBufferSize);
+    const uint8_t* uvSrc = yuvAddress + yBufferSize;
+    for (int row = 0; row < uvHeight; ++row) {
+      memcpy(frameBuffer->data[1] + static_cast<size_t>(row) * uvRowBytes,
+             uvSrc + static_cast<size_t>(row) * static_cast<size_t>(videoStride), uvRowBytes);
+    }
 
     uint8_t* planes[3] = {frameBuffer->data[0], frameBuffer->data[1], nullptr};
     int lineSizes[3] = {frameBuffer->lineSize[0], frameBuffer->lineSize[1], 0};
