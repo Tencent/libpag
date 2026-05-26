@@ -159,3 +159,4 @@ env CGROUP=0 \
 echo
 echo "==> results: $OUTPUT_DIR/results.jsonl"
 echo "==> summary: $OUTPUT_DIR/summary.md"
+echo "==> report:  $OUTPUT_DIR/summary.html"

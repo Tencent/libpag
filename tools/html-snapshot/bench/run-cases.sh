@@ -85,6 +85,14 @@ if [[ ! -f "$BENCH_DIR/baseline-blank.js" ]]; then
   echo "run-cases.sh: baseline-blank.js not found under $BENCH_DIR" >&2
   exit 2
 fi
+if [[ ! -f "$BENCH_DIR/summarize.js" ]]; then
+  echo "run-cases.sh: summarize.js not found under $BENCH_DIR" >&2
+  exit 2
+fi
+if [[ ! -f "$BENCH_DIR/summarize-html.js" ]]; then
+  echo "run-cases.sh: summarize-html.js not found under $BENCH_DIR" >&2
+  exit 2
+fi
 mkdir -p "$OUT_DIR"
 
 # ---- engine selection -----------------------------------------------------
@@ -365,8 +373,16 @@ elapsed=$(( $(date +%s) - start_all ))
 echo "All ${#CASES[@]} cases done in ${elapsed}s"
 
 # ---- summary --------------------------------------------------------------
+#
+# Always emit both reports so consumers get the terminal/PR-friendly
+# Markdown view (summary.md) and the self-contained browser view
+# (summary.html) without having to remember to invoke summarize-html.js
+# separately. Both scripts read the same results.jsonl + host_meta.json,
+# so the numbers stay in sync by construction.
 
 node "$BENCH_DIR/summarize.js" "$RESULTS" "$OUT_DIR/host_meta.json" \
   > "$OUT_DIR/summary.md"
+node "$BENCH_DIR/summarize-html.js" "$RESULTS" "$OUT_DIR/host_meta.json" \
+  > "$OUT_DIR/summary.html"
 echo
-echo "Wrote $RESULTS, $OUT_DIR/summary.md"
+echo "Wrote $RESULTS, $OUT_DIR/summary.md, $OUT_DIR/summary.html"

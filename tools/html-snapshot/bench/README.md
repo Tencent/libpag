@@ -3,7 +3,10 @@
 Benchmark harness for `tools/html-snapshot`. Runs `node snapshot.js`
 against every non-`*.subset.html` file in an input directory under a
 process-tree sampler, then writes one JSON line per case
-(`results.jsonl`) plus a Markdown summary table (`summary.md`).
+(`results.jsonl`) plus a Markdown summary table (`summary.md`) and a
+self-contained HTML report (`summary.html`). Both reports are emitted
+on every run from the same `results.jsonl`, so the terminal-friendly
+and browser-friendly views are always in sync.
 
 Outputs land in `bench/out/<label>/` by default — same convention as
 the `eval/` harness — so successive runs against different corpora
