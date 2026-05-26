@@ -270,6 +270,21 @@ class HTMLParserContext {
   void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                             const HTMLBoxAttributes& box);
 
+  // Hoists `DropShadowStyle` entries off `inner` onto a fresh outer wrapper Layer when
+  // `inner` would also clip its bounds (`clipToBounds == true`). PAGX's `clipToBounds`
+  // (mapped to tgfx's `scrollRect`) is applied to the canvas before the layer's "Below"
+  // styles are drawn, so a shadow on the same layer as `clipToBounds` would be cut off
+  // along with the children — the opposite of CSS, where `overflow: hidden` clips
+  // descendants but `box-shadow` keeps spilling outside the element's box. The wrapper
+  // takes over the layout slot (size / position / flex / includeInLayout), the
+  // through-effects that wrap the shadow (alpha, blendMode, transform, filters,
+  // customData) and the hoisted shadows; `inner` becomes a 100% × 100% child that
+  // retains its `clipToBounds` plus its painted background. Returns the new outer
+  // wrapper, or `inner` unchanged when no split is needed (no `clipToBounds`, no
+  // outset shadows, or `inner` is null). `InnerShadowStyle` and `BackgroundBlurStyle`
+  // stay on `inner` since CSS inset shadows / `backdrop-filter` paint within the box.
+  Layer* maybeSplitBoxShadowFromClip(Layer* inner);
+
   // Parses a CSS color-like value into a PAGX Color. Returns transparent on empty/"none".
   Color parseColor(const std::string& value);
 

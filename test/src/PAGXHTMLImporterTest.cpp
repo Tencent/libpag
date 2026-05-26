@@ -310,8 +310,9 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->offsetX, 0.0f);
   EXPECT_FLOAT_EQ(drop->offsetY, 2.0f);
-  EXPECT_FLOAT_EQ(drop->blurX, 8.0f);
-  EXPECT_FLOAT_EQ(drop->blurY, 8.0f);
+  // CSS box-shadow blur-radius (8px) maps to PAGX σ = blur-radius / 2 (= 4).
+  EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
+  EXPECT_FLOAT_EQ(drop->blurY, 4.0f);
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000, 0.2f), 0.02f));
 }
 
@@ -328,7 +329,8 @@ PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
   ASSERT_NE(inner, nullptr);
   EXPECT_FLOAT_EQ(inner->offsetX, 2.0f);
   EXPECT_FLOAT_EQ(inner->offsetY, 2.0f);
-  EXPECT_FLOAT_EQ(inner->blurX, 4.0f);
+  // CSS box-shadow blur-radius (4px) maps to PAGX σ = blur-radius / 2 (= 2).
+  EXPECT_FLOAT_EQ(inner->blurX, 2.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, MultipleBoxShadows) {
@@ -341,6 +343,68 @@ PAG_TEST(PAGXHTMLImporterTest, MultipleBoxShadows) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   EXPECT_EQ(div->styles.size(), 2u);
+}
+
+// Regression: CSS `overflow: hidden` clips children but does NOT clip `box-shadow`. PAGX's
+// `clipToBounds` (mapped to tgfx scrollRect) clips contents AND layer styles together —
+// `tgfx::Layer::drawChild` runs `ClipScrollRect` before drawing the layer's "Below" styles,
+// so a drop shadow on the same layer would be cut off along with the children. The importer
+// must hoist the shadow onto an outer wrapper that does not clip; the inner layer keeps
+// `clipToBounds` plus its painted background.
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowAndOverflowHiddenSplitsLayers) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:120px;height:120px">
+      <div style="width:80px;height:80px;background-color:#FFF;overflow:hidden;
+                  box-shadow:0 2px 8px #00000033"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  // Outer wrapper carries the shadow only — no clipping, no painted box.
+  EXPECT_FALSE(outer->clipToBounds);
+  EXPECT_TRUE(outer->contents.empty());
+  ASSERT_EQ(outer->styles.size(), 1u);
+  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(outer->styles.front());
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
+  // Wrapper takes over the original layout slot so the parent's flow / constraints are
+  // unchanged.
+  EXPECT_FLOAT_EQ(outer->width, 80.0f);
+  EXPECT_FLOAT_EQ(outer->height, 80.0f);
+  ASSERT_EQ(outer->children.size(), 1u);
+
+  auto* inner = outer->children.front();
+  ASSERT_NE(inner, nullptr);
+  EXPECT_TRUE(inner->clipToBounds);
+  // No drop shadows leak back to the inner; the painted background and clip stay here.
+  for (auto* s : inner->styles) {
+    EXPECT_NE(s->nodeType(), pagx::NodeType::DropShadowStyle);
+  }
+  EXPECT_FALSE(inner->contents.empty());  // Rectangle + Fill from background-color:#FFF
+  EXPECT_FLOAT_EQ(inner->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(inner->percentHeight, 100.0f);
+  EXPECT_TRUE(std::isnan(inner->width));
+  EXPECT_TRUE(std::isnan(inner->height));
+}
+
+// Regression: an inset shadow paints inside the box in CSS, which `clipToBounds` already
+// matches — so it must stay on the clipped inner layer rather than being hoisted onto a
+// wrapper.
+PAG_TEST(PAGXHTMLImporterTest, InsetShadowWithOverflowHiddenStaysOnClippedLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:120px;height:120px">
+      <div style="width:80px;height:80px;background-color:#FFF;overflow:hidden;
+                  box-shadow:inset 0 2px 4px #00000044"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  // No outer wrapper is introduced: the layer keeps both the clip and the inset shadow.
+  EXPECT_TRUE(div->clipToBounds);
+  ASSERT_EQ(div->styles.size(), 1u);
+  EXPECT_NE(dynamic_cast<pagx::InnerShadowStyle*>(div->styles.front()), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OpacityMapsToLayerAlpha) {

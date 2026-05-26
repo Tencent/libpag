@@ -329,6 +329,10 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   }
   applyLayerAttributes(layer, body, box);
 
+  // Hoist any `box-shadow` off the clipped layer so `overflow: hidden` does not also clip the
+  // shadow. `wrapper` is `layer` when no split happens.
+  Layer* wrapper = maybeSplitBoxShadowFromClip(layer);
+
   Layer* contentHost = layer;
   bool needsInnerHost = hasBgVisuals && (box.paddingSet || box.displayFlex);
   if (needsInnerHost) {
@@ -360,8 +364,8 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     }
     child = child->getNextSibling();
   }
-  assignElementId(layer, body);
-  return layer;
+  assignElementId(wrapper, body);
+  return wrapper;
 }
 
 Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element,
@@ -449,6 +453,12 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     return layer;
   }
 
+  // Hoist any non-inset `box-shadow` off the clipping layer so `overflow: hidden` does not
+  // cut the shadow. `wrapper` is `layer` when no split happens; both children added below
+  // and the layout-host machinery continue to operate on `layer` (now potentially the
+  // inner of the split).
+  Layer* wrapper = maybeSplitBoxShadowFromClip(layer);
+
   Layer* contentHost = layer;
   if (needsInner) {
     contentHost = createInnerHost(layer, box);
@@ -498,8 +508,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     }
     child = child->getNextSibling();
   }
-  assignElementId(layer, element);
-  return layer;
+  assignElementId(wrapper, element);
+  return wrapper;
 }
 
 //==================================================================================================
@@ -639,6 +649,11 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     outer->padding = box.padding;
   }
 
+  // Hoist any non-inset `box-shadow` off `outer` when it also clips. `wrapper` becomes the
+  // root of this subtree returned to the caller; `outer` (and `textHost`) keep their
+  // existing role as the clipping/text host inside the wrapper.
+  Layer* wrapper = maybeSplitBoxShadowFromClip(outer);
+
   if (!needsTextBox) {
     const auto& f = fragments.front();
     textHost->contents.push_back(buildTextElement(f));
@@ -713,8 +728,8 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     }
   }
 
-  assignElementId(outer, element);
-  return outer;
+  assignElementId(wrapper, element);
+  return wrapper;
 }
 
 }  // namespace pagx

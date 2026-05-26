@@ -517,23 +517,30 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
   }
 
   // box-shadow -> DropShadowStyle / InnerShadowStyle list.
+  // CSS spec defines the `box-shadow` blur-radius as the standard deviation of the Gaussian
+  // blur, doubled. PAGX layer-style `blurX/blurY` values flow into tgfx's `ImageFilter::Blur`
+  // (and SVG `feGaussianBlur stdDeviation`), both of which take Gaussian σ directly. Halving
+  // the parsed blur-radius lands on the matching σ. NOTE: this conversion is specific to
+  // `box-shadow` — the `filter: drop-shadow()` consumer below keeps its blur as-is, since
+  // the CSS Filter spec defines that function's blur-radius as σ already.
   if (!box.boxShadow.empty()) {
     auto shadows = parseShadowList(box.boxShadow);
     for (auto& s : shadows) {
+      const float sigma = s.blur * 0.5f;
       if (s.inset) {
         auto inner = _document->makeNode<InnerShadowStyle>();
         inner->offsetX = s.offsetX;
         inner->offsetY = s.offsetY;
-        inner->blurX = s.blur;
-        inner->blurY = s.blur;
+        inner->blurX = sigma;
+        inner->blurY = sigma;
         inner->color = s.color;
         layer->styles.push_back(inner);
       } else {
         auto drop = _document->makeNode<DropShadowStyle>();
         drop->offsetX = s.offsetX;
         drop->offsetY = s.offsetY;
-        drop->blurX = s.blur;
-        drop->blurY = s.blur;
+        drop->blurX = sigma;
+        drop->blurY = sigma;
         drop->color = s.color;
         layer->styles.push_back(drop);
       }
@@ -643,6 +650,83 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
       layer->customData["href"] = *href;
     }
   }
+}
+
+Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
+  if (inner == nullptr || !inner->clipToBounds || inner->styles.empty()) {
+    return inner;
+  }
+
+  // Partition styles: drop shadows are hoisted onto the wrapper; inset/background blur stay
+  // with the clipped inner since CSS already paints them inside the element's box.
+  std::vector<LayerStyle*> hoisted;
+  std::vector<LayerStyle*> kept;
+  hoisted.reserve(inner->styles.size());
+  kept.reserve(inner->styles.size());
+  for (auto* s : inner->styles) {
+    if (s != nullptr && s->nodeType() == NodeType::DropShadowStyle) {
+      hoisted.push_back(s);
+    } else {
+      kept.push_back(s);
+    }
+  }
+  if (hoisted.empty()) {
+    return inner;
+  }
+
+  inner->styles = std::move(kept);
+
+  auto* outer = _document->makeNode<Layer>();
+
+  // Move the layout slot (the wrapper occupies the same space in its parent that `inner`
+  // previously held).
+  outer->width = inner->width;
+  outer->height = inner->height;
+  outer->percentWidth = inner->percentWidth;
+  outer->percentHeight = inner->percentHeight;
+  outer->left = inner->left;
+  outer->right = inner->right;
+  outer->top = inner->top;
+  outer->bottom = inner->bottom;
+  outer->centerX = inner->centerX;
+  outer->centerY = inner->centerY;
+  outer->includeInLayout = inner->includeInLayout;
+  outer->flex = inner->flex;
+
+  // Move "through-effects" that semantically wrap the element + its shadow in CSS.
+  outer->alpha = inner->alpha;
+  outer->blendMode = inner->blendMode;
+  outer->matrix = inner->matrix;
+  outer->matrix3D = inner->matrix3D;
+  outer->preserve3D = inner->preserve3D;
+  outer->filters = std::move(inner->filters);
+  outer->customData = std::move(inner->customData);
+  outer->id = std::move(inner->id);
+  outer->styles = std::move(hoisted);
+
+  // Reset the moved fields on `inner` so the wrapping is invisible to downstream
+  // consumers. `inner` now fills the wrapper exactly; its clipToBounds / contents
+  // / styles-that-stayed remain in place.
+  inner->width = NAN;
+  inner->height = NAN;
+  inner->percentWidth = 100.0f;
+  inner->percentHeight = 100.0f;
+  inner->left = NAN;
+  inner->right = NAN;
+  inner->top = NAN;
+  inner->bottom = NAN;
+  inner->centerX = NAN;
+  inner->centerY = NAN;
+  inner->includeInLayout = true;
+  inner->flex = 0.0f;
+  inner->alpha = 1.0f;
+  inner->blendMode = BlendMode::Normal;
+  inner->matrix = Matrix{};
+  inner->matrix3D = Matrix3D{};
+  inner->preserve3D = false;
+
+  outer->children.push_back(inner);
+  return outer;
 }
 
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
