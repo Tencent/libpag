@@ -357,6 +357,13 @@ const COLLECT_ICON_FONT_TARGETS_PAYLOAD =
 
 // ===== Node-side helpers =====
 
+// Hard cap on a single icon-font network fetch. Without this, a slow or
+// hung CDN blocks the entire snapshot pipeline indefinitely (the caller
+// already wraps fetchFontBytes in try/catch, so timing out just routes
+// the failed font to the legacy span path — the rest of the page still
+// snapshots cleanly).
+const ICON_FONT_FETCH_TIMEOUT_MS = 10_000;
+
 // Fetch `url` into a Buffer. Supports `http(s)://`, `data:`, and `file://`
 // schemes; everything else is rejected so a relative-path src that slipped
 // through URL resolution doesn't silently become a no-op.
@@ -377,7 +384,7 @@ async function fetchFontBytes(url) {
   if (!/^https?:/i.test(url)) {
     throw new Error('unsupported scheme: ' + url);
   }
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(ICON_FONT_FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return Buffer.from(await res.arrayBuffer());
 }
