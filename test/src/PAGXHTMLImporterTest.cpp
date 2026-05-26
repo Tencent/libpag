@@ -651,8 +651,7 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
 // fragments inside a `<Group>` to scope per-run style overrides, so a
 // flat `tb->elements` scan finds only the first run.
 inline void GatherTextRuns(const std::vector<pagx::Element*>& elements,
-                           std::vector<pagx::Text*>* texts,
-                           std::vector<pagx::Fill*>* fills) {
+                           std::vector<pagx::Text*>* texts, std::vector<pagx::Fill*>* fills) {
   for (auto* e : elements) {
     if (auto* t = dynamic_cast<pagx::Text*>(e)) {
       texts->push_back(t);
@@ -699,8 +698,7 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineSizeRunMergesInto
 // The same merge survives when the inline run carries its own colour
 // (the snapshot tool folds the source `<span>`'s `opacity` into the
 // emitted `color` so a translucent unit run still flattens cleanly).
-PAG_TEST(PAGXHTMLImporterTest,
-         AbsolutePositionedSpanWithInlineRunHonoursPerRunColorAlpha) {
+PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunColorAlpha) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:420px;height:44px">
       <span style="position:absolute;left:0;top:0;width:420px;height:44px;color:rgb(17,17,17);font-family:'Plus Jakarta Sans';font-size:44px;font-weight:600;line-height:44px;white-space:nowrap">159.9<span style="color:rgba(17,17,17,0.7);font-size:22px;line-height:22px">亿美元</span></span>
@@ -1582,7 +1580,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   EXPECT_EQ(text->fontStyle, "Bold");
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontWeightUnder600IsNotBold) {
+PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:500">Medium</span>
@@ -1591,7 +1589,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightUnder600IsNotBold) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  EXPECT_TRUE(text->fontStyle.empty());
+  EXPECT_EQ(text->fontStyle, "Medium");
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
@@ -2898,12 +2896,13 @@ PAG_TEST(PAGXHTMLImporterTest, RawPxLengthEmRemWarnsThroughPadding) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
-  // `pt` is not a unit parsePxLength understands; it falls back with a warning.
+  // `in` is a real CSS unit but parsePxLength does not understand it; it falls back with a
+  // warning. (CSS recognised units consumed by parsePxLength are px / em / rem / pt / vw / vh.)
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="display:flex;padding:5pt;width:50px;height:50px"></div>
+      <div style="display:flex;padding:5in;width:50px;height:50px"></div>
     </body></html>
   )HTML",
                                              opts);
