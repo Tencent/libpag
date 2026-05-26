@@ -292,9 +292,10 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       }
     }
     if (videoStride < videoFormat.width || videoSliceHeight < videoFormat.height) {
-      LOGE("OHOSVideoDecoder: invalid stride/sliceHeight stride=%d sliceHeight=%d "
-           "width=%d height=%d",
-           videoStride, videoSliceHeight, videoFormat.width, videoFormat.height);
+      LOGE(
+          "OHOSVideoDecoder: invalid stride/sliceHeight stride=%d sliceHeight=%d "
+          "width=%d height=%d",
+          videoStride, videoSliceHeight, videoFormat.width, videoFormat.height);
       return nullptr;
     }
     auto capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
