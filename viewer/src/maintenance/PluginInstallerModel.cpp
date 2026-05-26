@@ -52,4 +52,8 @@ bool PluginInstallerModel::isPluginInstalled() const {
   return installer->isPluginInstalled();
 }
 
+void PluginInstallerModel::checkPluginOnStartup() {
+  installer->checkPluginOnStartup();
+}
+
 }  // namespace pag
