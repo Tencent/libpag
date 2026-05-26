@@ -305,6 +305,27 @@ function elementHasChildren(el) {
   return false;
 }
 
+// Single-pass `childNodes` scan that produces `{hasElementChild, directText}`.
+// `render()` reaches a chain of branches (rect-degenerate guard, text-leaf
+// dispatch, pseudo-text dispatch, inline-text-leaf candidate) that each
+// independently consults `elementHasChildren` and/or `gatherDirectText`.
+// Doing it one node at a time forces 3–4 separate `childNodes` walks per
+// element on the common box path; this helper folds them into one. Callers
+// that need only one of the two values still use the dedicated helpers
+// above so they don't allocate the unused half.
+function scanChildNodes(el) {
+  let hasElementChild = false;
+  let directText = '';
+  for (const n of el.childNodes) {
+    if (n.nodeType === Node.ELEMENT_NODE) {
+      hasElementChild = true;
+    } else if (n.nodeType === Node.TEXT_NODE) {
+      directText += n.nodeValue;
+    }
+  }
+  return { hasElementChild, directText: directText.replace(/\s+/g, ' ').trim() };
+}
+
 function firstTextNodeChild(el) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.TEXT_NODE) return n;
@@ -889,8 +910,15 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // right; this keeps the search O(log n) at the cost of binding collapsed
   // whitespace to whichever side wins the bisection (visually invisible
   // either way).
-  function findFirstCharAtOrBelow(lineTop) {
-    let lo = 0;
+  //
+  // `loStart` lets the caller pass the previously-found boundary as the
+  // lower bound, since boundaries are strictly increasing across lines.
+  // Without this, every line's search starts from index 0 and re-flushes
+  // layout for the leading characters that we already know belong to a
+  // higher line — for a 1000-char × 20-line block that's the difference
+  // between log2(1000)·20 ≈ 200 layout flushes and roughly half that.
+  function findFirstCharAtOrBelow(lineTop, loStart) {
+    let lo = loStart;
     let hi = text.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
@@ -911,7 +939,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // Boundary i = first char index of line i (boundaries[0] = 0).
   const boundaries = [0];
   for (let k = 1; k < lineRects.length; k++) {
-    boundaries.push(findFirstCharAtOrBelow(lineRects[k].top));
+    boundaries.push(findFirstCharAtOrBelow(lineRects[k].top, boundaries[k - 1] + 1));
   }
   boundaries.push(text.length);
   range.detach && range.detach();
@@ -1158,9 +1186,12 @@ function flexItemChildren(el) {
     const pos = cs.position;
     if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
     if (isMultiLineTextLeafItem(c)) return null;
-    // Stash the computed style alongside the node so render() can reuse it
-    // instead of asking the engine again.
-    out.push({ kind: 'element', node: c, computed: cs });
+    // Stash the computed style and rect alongside the node so render() and
+    // isFlexLayoutFaithful() can reuse them instead of asking the engine
+    // again. The rect is captured in the same layout-pristine state as the
+    // text-kind branch above, so callers see consistent measurements
+    // regardless of which kind they're processing.
+    out.push({ kind: 'element', node: c, computed: cs, rect: c.getBoundingClientRect() });
   }
   return out.length ? out : null;
 }
@@ -1191,13 +1222,14 @@ function isFlexLayoutFaithful(children, computed) {
     ? computed.getPropertyValue('column-gap')
     : computed.getPropertyValue('row-gap');
   const declaredGap = parseFloat(gapRaw) || 0;
-  const rects = children.map((c) => (
-    c.kind === 'text' ? c.rect : c.node.getBoundingClientRect()
-  ));
+  // Both kinds carry a cached rect (text from getClientRects, element from
+  // getBoundingClientRect inside flexItemChildren). Reusing the cache avoids
+  // a second forced layout flush per element child — for a typical 8-item
+  // flex row that's 8 saved sync-layout traversals.
   const TOLERANCE = 1.5;
-  for (let i = 0; i + 1 < rects.length; i++) {
-    const a = rects[i];
-    const b = rects[i + 1];
+  for (let i = 0; i + 1 < children.length; i++) {
+    const a = children[i].rect;
+    const b = children[i + 1].rect;
     const measuredGap = isRow ? (b.left - a.right) : (b.top - a.bottom);
     if (Math.abs(measuredGap - declaredGap) > TOLERANCE) return false;
   }
@@ -1557,8 +1589,11 @@ function isInlineRunChild(el) {
 // one `<Text>` run per style change. PAGX's own text engine then computes
 // the inter-run advance with whatever font it actually has loaded, so the
 // runs always touch correctly regardless of font fallback.
-function isInlineTextLeafCandidate(el, computed) {
-  if (!elementHasChildren(el)) return false;
+function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
+  const hasChildren = precomputedHasChildren !== undefined
+    ? precomputedHasChildren
+    : elementHasChildren(el);
+  if (!hasChildren) return false;
   // Box-shape constraints: a wrapper with overflow:hidden / outline / shadow
   // can still be emitted (those live on the wrapper itself and PAGX honours
   // them on the Layer); we only reject what would conflict with delegating
@@ -2097,15 +2132,22 @@ function render(el, parentRect, opts, precomputed) {
     return renderBorderTriangle(el, parentRect, rect, left, top, computed, opts);
   }
 
-  const directText = gatherDirectText(el);
-  if (!elementHasChildren(el) && directText) {
+  // Single-pass childNodes scan: the four branches below all consult
+  // `elementHasChildren` and/or `gatherDirectText`. Calling them
+  // independently re-walks `childNodes` 3–4 times for every box element on
+  // the page. The dispatch and triangle branches above don't need either
+  // value (and KIND_DISPATCH covers the most common early-return shapes),
+  // so the scan is placed here where every remaining branch will actually
+  // use the result.
+  const { hasElementChild, directText } = scanChildNodes(el);
+  if (!hasElementChild && directText) {
     return renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts);
   }
   // Icon-font / decorative pseudo case: the host has no DOM children and
   // no direct text, but the stylesheet supplies a `::before`/`::after`
   // content string. Emit that as inner spans so the glyph actually shows
   // up; the container path would otherwise return an empty <div>.
-  if (!elementHasChildren(el) && hasPseudoContent(el)) {
+  if (!hasElementChild && hasPseudoContent(el)) {
     return renderPseudoTextLeaf(el, parentRect, rect, left, top, computed, opts);
   }
   // Mixed-style inline text leaf (`<p>NN<span class="text-[28px]">unit</span></p>`
@@ -2115,7 +2157,7 @@ function render(el, parentRect, opts, precomputed) {
   // between the snapshot browser and `pagx render` overlaps adjacent
   // runs (e.g. "22.25" eating its trailing "%"). See
   // `isInlineTextLeafCandidate` for the full rationale.
-  if (isInlineTextLeafCandidate(el, computed)) {
+  if (isInlineTextLeafCandidate(el, computed, hasElementChild)) {
     return renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts);
   }
   return renderContainer(el, parentRect, rect, left, top, computed, opts);
@@ -2348,6 +2390,7 @@ const HELPER_FNS = [
   paintOrder,
   gatherDirectText,
   elementHasChildren,
+  scanChildNodes,
   firstTextNodeChild,
   pseudoText,
   hasPseudoContent,

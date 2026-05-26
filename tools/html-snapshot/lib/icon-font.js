@@ -252,6 +252,13 @@ async function browserCollectIconFontTargets() {
   const targets = [];
   let counter = 0;
   const all = document.body ? document.body.querySelectorAll('*') : [];
+  // Hoist the quoted-segment regex once: every candidate that survives the
+  // PUA gate would otherwise allocate a fresh RegExp per iteration via
+  // `pseudoChar`. Doing it here also lets us reuse the single
+  // `getComputedStyle(el, pseudo)` lookup for both `content` and
+  // `font-family`, halving the layout queries vs. calling pseudoChar()
+  // (one CS) and then a second CS for font-family.
+  const QUOTED_RE = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
   for (const el of all) {
     if (!el || el.children.length > 0) continue;
     if (isIconScanSkippedTag(el.tagName)) continue;
@@ -261,7 +268,15 @@ async function browserCollectIconFontTargets() {
     }
     if (hasText) continue;
     for (const pseudo of ['::before', '::after']) {
-      const ch = pseudoChar(el, pseudo);
+      const cs = getComputedStyle(el, pseudo);
+      const raw = (cs.getPropertyValue('content') || '').trim();
+      if (!raw || raw === 'none' || raw === 'normal') continue;
+      let ch = '';
+      QUOTED_RE.lastIndex = 0;
+      let m;
+      while ((m = QUOTED_RE.exec(raw)) !== null) {
+        ch += m[1] !== undefined ? m[1] : m[2];
+      }
       if (!ch) continue;
       // String length ≠ codepoint count for surrogate pairs, but icon-font
       // glyphs all live in BMP PUA today (U+E000..U+F8FF) so length === 1
@@ -270,7 +285,6 @@ async function browserCollectIconFontTargets() {
       if (ch.length !== 1) continue;
       const cp = ch.codePointAt(0);
       if (!isPuaCodepoint(cp)) continue;
-      const cs = getComputedStyle(el, pseudo);
       const fontFamilyRaw = (cs.getPropertyValue('font-family') || '').trim();
       const families = fontFamilyRaw
         .split(',')
