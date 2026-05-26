@@ -198,6 +198,12 @@ class HTMLParserContext {
   void parseBorderRadius(HTMLBoxAttributes& box,
                          const std::unordered_map<std::string, std::string>& props);
 
+  // parseBoxVisuals sub-step. Parses the `border` shorthand value (already looked up by the
+  // caller; guaranteed non-empty) into `borderWidthPx`, `borderStyle`, and `borderColor`.
+  // Recognised tokens: a px length, the keywords `solid`/`none`/`dashed`/`dotted`, and a
+  // single colour. Unsupported style keywords downgrade to solid with a warning.
+  void parseBorder(HTMLBoxAttributes& box, const std::string& border);
+
   HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
                                       const HTMLInheritedStyle& parent);
 

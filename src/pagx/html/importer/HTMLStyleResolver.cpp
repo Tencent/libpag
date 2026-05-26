@@ -464,46 +464,7 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
   const std::string& border = LookupProperty(props, "border");
   if (!border.empty()) {
-    auto tokens = SplitTopLevelWhitespace(border);
-    // Collect candidate colour tokens — anything that's not a width / known style keyword.
-    // Take the FIRST candidate as the border colour and warn on any subsequent ones so the
-    // author notices `border: 1px solid red blue`-style mistakes (previously the second
-    // colour silently overwrote the first).
-    std::string colorToken;
-    bool sawExtraColor = false;
-    for (auto& t : tokens) {
-      float w = parsePxLength(t);
-      if (!std::isnan(w)) {
-        box.borderWidthPx = w;
-        continue;
-      }
-      std::string lt = ToLower(t);
-      if (lt == "solid" || lt == "none") continue;
-      if (lt == "dashed") {
-        box.borderStyle = BorderStyle::Dashed;
-        continue;
-      }
-      if (lt == "dotted") {
-        box.borderStyle = BorderStyle::Dotted;
-        continue;
-      }
-      if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
-        warn("html: border style '" + lt + "' not supported; treated as solid");
-        continue;
-      }
-      if (colorToken.empty()) {
-        colorToken = t;
-      } else {
-        sawExtraColor = true;
-      }
-    }
-    if (sawExtraColor) {
-      warn("html: border value '" + border + "' has multiple colour tokens; first one used");
-    }
-    if (!colorToken.empty()) {
-      box.borderColor = parseColor(colorToken);
-    }
-    box.borderSet = box.borderWidthPx > 0;
+    parseBorder(box, border);
   }
 
   box.boxShadow = LookupProperty(props, "box-shadow");
@@ -887,6 +848,49 @@ void HTMLParserContext::parseBorderRadius(
   // `Rectangle roundness=0` for an all-zero shorthand is harmless and keeps the legacy
   // tests stable.
   box.borderRadiusSet = true;
+}
+
+void HTMLParserContext::parseBorder(HTMLBoxAttributes& box, const std::string& border) {
+  auto tokens = SplitTopLevelWhitespace(border);
+  // Collect candidate colour tokens — anything that's not a width / known style keyword.
+  // Take the FIRST candidate as the border colour and warn on any subsequent ones so the
+  // author notices `border: 1px solid red blue`-style mistakes (previously the second
+  // colour silently overwrote the first).
+  std::string colorToken;
+  bool sawExtraColor = false;
+  for (auto& t : tokens) {
+    float w = parsePxLength(t);
+    if (!std::isnan(w)) {
+      box.borderWidthPx = w;
+      continue;
+    }
+    std::string lt = ToLower(t);
+    if (lt == "solid" || lt == "none") continue;
+    if (lt == "dashed") {
+      box.borderStyle = BorderStyle::Dashed;
+      continue;
+    }
+    if (lt == "dotted") {
+      box.borderStyle = BorderStyle::Dotted;
+      continue;
+    }
+    if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
+      warn("html: border style '" + lt + "' not supported; treated as solid");
+      continue;
+    }
+    if (colorToken.empty()) {
+      colorToken = t;
+    } else {
+      sawExtraColor = true;
+    }
+  }
+  if (sawExtraColor) {
+    warn("html: border value '" + border + "' has multiple colour tokens; first one used");
+  }
+  if (!colorToken.empty()) {
+    box.borderColor = parseColor(colorToken);
+  }
+  box.borderSet = box.borderWidthPx > 0;
 }
 
 }  // namespace pagx
