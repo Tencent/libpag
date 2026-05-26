@@ -645,6 +645,89 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
   EXPECT_EQ(groupCount, 1u);
 }
 
+// Walk `tb`'s elements (and any nested `<Group>` subtrees the importer
+// emits for style breaks) and return the flat sequence of (Text, Fill)
+// pairs in document order. The PAGX subset wraps the second-and-later
+// fragments inside a `<Group>` to scope per-run style overrides, so a
+// flat `tb->elements` scan finds only the first run.
+inline void GatherTextRuns(const std::vector<pagx::Element*>& elements,
+                           std::vector<pagx::Text*>* texts,
+                           std::vector<pagx::Fill*>* fills) {
+  for (auto* e : elements) {
+    if (auto* t = dynamic_cast<pagx::Text*>(e)) {
+      texts->push_back(t);
+    } else if (auto* f = dynamic_cast<pagx::Fill*>(e)) {
+      fills->push_back(f);
+    } else if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+      GatherTextRuns(g->elements, texts, fills);
+    }
+  }
+}
+
+// Snapshot contract: the html-snapshot tool (`tools/html-snapshot`) merges
+// `<p>NN<span class="text-[28px]">unit</span></p>` and friends into a
+// single absolutely-positioned `<span>` text-leaf with an inline child
+// `<span>` for the unit run, so PAGX's own text engine — rather than the
+// snapshot's hard-coded `left` values — owns the inter-run advance. The
+// importer must collapse that into one TextBox with two Text runs whose
+// fontSize differs; this is what makes the run boundary survive font
+// fallback drift on the render side.
+PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineSizeRunMergesIntoOneTextBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:52px">
+      <span style="position:absolute;left:0;top:0;width:420px;height:52px;color:rgb(17,17,17);font-family:'Plus Jakarta Sans';font-size:52px;font-weight:600;letter-spacing:-1.3px;line-height:52px;white-space:nowrap">22.25<span style="font-size:28px;line-height:28px">%</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FALSE(tb->wordWrap);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "22.25");
+  EXPECT_FLOAT_EQ(texts[0]->fontSize, 52.0f);
+  EXPECT_FLOAT_EQ(texts[0]->letterSpacing, -1.3f);
+  EXPECT_EQ(texts[1]->text, "%");
+  EXPECT_FLOAT_EQ(texts[1]->fontSize, 28.0f);
+  EXPECT_FLOAT_EQ(texts[1]->letterSpacing, -1.3f);
+}
+
+// The same merge survives when the inline run carries its own colour
+// (the snapshot tool folds the source `<span>`'s `opacity` into the
+// emitted `color` so a translucent unit run still flattens cleanly).
+PAG_TEST(PAGXHTMLImporterTest,
+         AbsolutePositionedSpanWithInlineRunHonoursPerRunColorAlpha) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:44px">
+      <span style="position:absolute;left:0;top:0;width:420px;height:44px;color:rgb(17,17,17);font-family:'Plus Jakarta Sans';font-size:44px;font-weight:600;line-height:44px;white-space:nowrap">159.9<span style="color:rgba(17,17,17,0.7);font-size:22px;line-height:22px">亿美元</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 2u);
+  ASSERT_EQ(fills.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "159.9");
+  EXPECT_FLOAT_EQ(texts[0]->fontSize, 44.0f);
+  EXPECT_EQ(texts[1]->text, "亿美元");
+  EXPECT_FLOAT_EQ(texts[1]->fontSize, 22.0f);
+  auto* solid0 = dynamic_cast<pagx::SolidColor*>(fills[0]->color);
+  auto* solid1 = dynamic_cast<pagx::SolidColor*>(fills[1]->color);
+  ASSERT_NE(solid0, nullptr);
+  ASSERT_NE(solid1, nullptr);
+  EXPECT_TRUE(ColorNear(solid0->color, HexColor(0x111111, 1.0f)));
+  EXPECT_TRUE(ColorNear(solid1->color, HexColor(0x111111, 0.7f)));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

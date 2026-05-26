@@ -1453,6 +1453,243 @@ function textLeafInnerLayout(computed) {
   return '';
 }
 
+// Tags the PAGX importer accepts as inline runs inside a text leaf
+// (see `IsInlineRunTag` in `src/pagx/html/importer/HTMLDetail.h`). Limiting
+// the snapshot-side eligibility check to the same set keeps the inline
+// reconstruction reversible by the importer: anything emitted here lands
+// in `collectTextFragments` and gets merged into a single TextBox with one
+// `<Text>` run per style change.
+const INLINE_RUN_TAGS = new Set(['span', 'a']);
+
+// True when `cs` declares any property that paints outside the element's
+// text — background, border, shadow, outline, filter, clip. Inline-text-leaf
+// reconstruction rejects child elements that carry box visuals because
+// PAGX has no per-inline-run box-paint model: the visuals would be
+// silently dropped when the run is merged into a `<Text>` element.
+//
+// Opacity is intentionally NOT rejected: an inline run's opacity has no
+// observable effect outside its own text glyphs (the inline box paints no
+// background once we've ruled out the rest), so it can be folded into the
+// run's text colour alpha during emission — see `multiplyColorAlpha`.
+function hasBoxVisualsForInline(cs) {
+  const bg = cs.getPropertyValue('background-color').trim();
+  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return true;
+  const bgImg = cs.getPropertyValue('background-image').trim();
+  if (bgImg && bgImg !== 'none') return true;
+  if (borderWidthOf(cs, 'top') > 0) return true;
+  if (borderWidthOf(cs, 'right') > 0) return true;
+  if (borderWidthOf(cs, 'bottom') > 0) return true;
+  if (borderWidthOf(cs, 'left') > 0) return true;
+  const shadow = cs.getPropertyValue('box-shadow').trim();
+  if (shadow && shadow !== 'none') return true;
+  const outline = cs.getPropertyValue('outline-style').trim();
+  if (outline && outline !== 'none') return true;
+  const filter = cs.getPropertyValue('filter').trim();
+  if (filter && filter !== 'none') return true;
+  return false;
+}
+
+// Multiply the alpha channel of an `rgb()` / `rgba()` colour string by
+// `factor` (rounded to 3 fractional digits, trailing zeros trimmed).
+// Used to fold an inline run's `opacity` into the emitted `color` so the
+// snapshot collapses to a single text-leaf without losing the visual
+// composite. Returns the input string unchanged when the format is not
+// the standard rgb/rgba serialization (e.g. `transparent`, `currentcolor`,
+// or future colour spaces).
+function multiplyColorAlpha(colorStr, factor) {
+  if (!colorStr) return colorStr;
+  if (factor === 1) return colorStr;
+  const m = colorStr.trim().match(
+      /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/);
+  if (!m) return colorStr;
+  const r = parseInt(m[1], 10);
+  const g = parseInt(m[2], 10);
+  const b = parseInt(m[3], 10);
+  const a = m[4] != null ? parseFloat(m[4]) : 1;
+  const newA = Math.max(0, Math.min(1, a * factor));
+  const aStr = newA.toFixed(3).replace(/\.?0+$/, '') || '0';
+  return `rgba(${r}, ${g}, ${b}, ${aStr})`;
+}
+
+// Recursive check: returns true when `el` is a plain inline run whose
+// subtree contains only text + further plain inline runs. "Plain" here
+// means: tag in INLINE_RUN_TAGS, `display: inline*`, statically positioned,
+// no transform, no box visuals, no padding/margin. The eligibility is
+// strict by design — anything weirder than `<span>%</span>` or a nested
+// styling tag falls back to the existing absolute-positioned container
+// path and renders the same as before.
+function isInlineRunChild(el) {
+  if (el.nodeType !== Node.ELEMENT_NODE) return false;
+  const tag = el.tagName.toLowerCase();
+  if (!INLINE_RUN_TAGS.has(tag)) return false;
+  const cs = getComputedStyle(el);
+  if (!isVisible(cs)) return false;
+  const display = cs.display;
+  if (display !== 'inline' && display !== 'inline-block') return false;
+  if (cs.position !== 'static') return false;
+  const t = cs.transform;
+  if (t && t !== 'none' && t !== 'matrix(1, 0, 0, 1, 0, 0)') return false;
+  if (hasBoxVisualsForInline(cs)) return false;
+  const pad = readPadding(cs);
+  if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  for (const c of el.childNodes) {
+    if (c.nodeType === Node.TEXT_NODE) continue;
+    if (c.nodeType !== Node.ELEMENT_NODE) return false;
+    if (!isInlineRunChild(c)) return false;
+  }
+  return true;
+}
+
+// Detect the `<p>NN<span class="text-[28px]">unit</span></p>` family: a
+// container whose visible content is one single line of inline text mixed
+// with inline-styled spans (different font-size / color / weight). The
+// default snapshot path would flatten each child into its own absolutely
+// positioned sibling, hard-coding the `left` of every run to the browser's
+// measured advance width. PAGX then renders each run with its own (possibly
+// fallback) font metrics, and any width difference compounds into a
+// visible overlap / gap between adjacent runs.
+//
+// When this predicate fires, `renderInlineTextLeaf` instead emits a single
+// text-leaf `<span>` wrapper preserving the inline structure verbatim
+// (`<span>NN<span style="font-size:28px">unit</span></span>`). The PAGX
+// importer recognises this as a multi-fragment text leaf
+// (`HTMLParserContext::collectTextFragments`) and builds one TextBox with
+// one `<Text>` run per style change. PAGX's own text engine then computes
+// the inter-run advance with whatever font it actually has loaded, so the
+// runs always touch correctly regardless of font fallback.
+function isInlineTextLeafCandidate(el, computed) {
+  if (!elementHasChildren(el)) return false;
+  // Box-shape constraints: a wrapper with overflow:hidden / outline / shadow
+  // can still be emitted (those live on the wrapper itself and PAGX honours
+  // them on the Layer); we only reject what would conflict with delegating
+  // text layout to PAGX.
+  const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
+  if (wm === 'vertical-rl' || wm === 'vertical-lr') return false;
+  const display = computed.display;
+  // Flex / grid containers route through the dedicated flex path before this
+  // check is reached; reject anything else block-display that we'd be
+  // collapsing visible layout for.
+  if (display !== 'block' && display !== 'inline' && display !== 'inline-block') return false;
+  // All children must be either bare text or further plain inline runs.
+  // A single `<br>` (or any disallowed tag) bails out to the absolute path.
+  let sawElementChild = false;
+  for (const c of el.childNodes) {
+    if (c.nodeType === Node.TEXT_NODE) continue;
+    if (c.nodeType !== Node.ELEMENT_NODE) return false;
+    if (!isInlineRunChild(c)) return false;
+    sawElementChild = true;
+  }
+  if (!sawElementChild) return false;
+  // Reject elements whose own padding would shift the inline content: the
+  // text-leaf wrapper writes its `width/height` as the bounding rect but
+  // PAGX's TextBox renders text from the content-box origin, so padding
+  // would visibly move the baseline. Symmetric handling on the wrapper is
+  // future work; for now bail.
+  const pad = readPadding(computed);
+  if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  // Must produce a single visual line of inline content. `getClientRects()`
+  // returns one rect per inline box on the range, so a `<p>` containing
+  // text + a nested `<span>` legitimately yields three rects on a single
+  // line (the outer text run, the inner span's inline box, the inner text
+  // run). Reject only when the union vertical extent exceeds roughly one
+  // line-height — that's the unambiguous signature of a wrap.
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+  range.detach && range.detach();
+  if (rects.length === 0) return false;
+  let minTop = Infinity;
+  let maxBottom = -Infinity;
+  for (const r of rects) {
+    if (r.top < minTop) minTop = r.top;
+    if (r.top + r.height > maxBottom) maxBottom = r.top + r.height;
+  }
+  const unionHeight = maxBottom - minTop;
+  let lineHeightPx = parseFloat(computed.getPropertyValue('line-height'));
+  if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
+    const fs = parseFloat(computed.getPropertyValue('font-size')) || 0;
+    lineHeightPx = fs * 1.2;
+  }
+  // Allow generous headroom for tall ink (CJK accents, italic descenders)
+  // that legitimately overshoots the line box without implying a wrap.
+  if (lineHeightPx <= 0) return false;
+  if (unionHeight > lineHeightPx * 1.8) return false;
+  return true;
+}
+
+// Resolve the text-scope value for `entry` on `cs`, folding the element's
+// own (non-inherited) `opacity` into any colour declaration so the inline
+// run can be flattened into a TextBox `<Text>` without losing the visual
+// composite. The opacity multiplier is applied here — not at parent
+// comparison time — because the wrapper's own opacity is separately
+// carried by the box-scope path on the text-leaf wrapper, so an inline
+// child inherits a fully opaque rendering context.
+function resolveInlineTextValue(cs, entry, opacityFactor) {
+  const raw = cs.getPropertyValue(entry.prop).trim();
+  const v = entry.normalize ? entry.normalize(raw) : raw;
+  if (!v) return v;
+  if (opacityFactor !== 1 && (entry.prop === 'color' || entry.prop === 'text-decoration-color')) {
+    return multiplyColorAlpha(v, opacityFactor);
+  }
+  return v;
+}
+
+// Emit the inline-run subtree of `el` as a string, preserving text nodes
+// verbatim and wrapping each inline-element child in a `<span>` that
+// carries only the text-scope style declarations that actually differ
+// from the wrapper. The PAGX importer's `appendTextFragment` deduplicates
+// styles whose computed value matches the inherited one, but emitting the
+// minimum delta keeps the snapshot HTML human-readable and bounded in
+// size.
+function emitInlineRunMarkup(el, parentComputed) {
+  let out = '';
+  for (const c of el.childNodes) {
+    if (c.nodeType === Node.TEXT_NODE) {
+      const t = c.nodeValue;
+      if (!t) continue;
+      out += escapeHtml(applyTextTransform(t, parentComputed));
+      continue;
+    }
+    if (c.nodeType !== Node.ELEMENT_NODE) continue;
+    const cs = getComputedStyle(c);
+    const opacityRaw = parseFloat(cs.getPropertyValue('opacity'));
+    const opacityFactor = isFinite(opacityRaw) ? opacityRaw : 1;
+    const deltaParts = [];
+    for (const entry of STYLE_SCHEMA_TEXT) {
+      const v = resolveInlineTextValue(cs, entry, opacityFactor);
+      if (!v) continue;
+      const parentV = resolveInlineTextValue(parentComputed, entry, 1);
+      if (v === parentV) continue;
+      const outProp = entry.outProp || entry.prop;
+      deltaParts.push(`${outProp}: ${v}`);
+    }
+    const inner = emitInlineRunMarkup(c, cs);
+    if (deltaParts.length === 0) {
+      out += inner;
+    } else {
+      out += `<span style="${deltaParts.join('; ')}">${inner}</span>`;
+    }
+  }
+  return out;
+}
+
+// Emit `el` as a single text-leaf wrapper containing inline runs.
+// See `isInlineTextLeafCandidate` for the eligibility rationale.
+function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
+  const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, {
+    box: true, text: true, ...opts,
+  });
+  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  // Force `white-space: nowrap` on the wrapper. The geometry above was
+  // taken from a single-line `Range.getClientRects()` measurement, and
+  // PAGX's text engine — whose intrinsic glyph metrics differ from
+  // Chromium's by a sub-pixel — would otherwise risk introducing a
+  // phantom wrap when the natural advance crowds the wrapper width.
+  const style = withNowrap(boxStyle);
+  const inner = emitInlineRunMarkup(el, computed);
+  return `<span style="${style}">${inner}${overlays}</span>`;
+}
+
 // Pure-text leaf (no element children): emit one outer <div> carrying the
 // box styles plus one nowrap <span> per visually-rendered line. Each line
 // span is placed at the text's *actual* rendered rect (from
@@ -1871,6 +2108,16 @@ function render(el, parentRect, opts, precomputed) {
   if (!elementHasChildren(el) && hasPseudoContent(el)) {
     return renderPseudoTextLeaf(el, parentRect, rect, left, top, computed, opts);
   }
+  // Mixed-style inline text leaf (`<p>NN<span class="text-[28px]">unit</span></p>`
+  // and friends). Reconstructs the original inline flow so PAGX's text
+  // engine — rather than the snapshot's hard-coded `left` values — owns
+  // the inter-run spacing. Without this, font-fallback width drift
+  // between the snapshot browser and `pagx render` overlaps adjacent
+  // runs (e.g. "22.25" eating its trailing "%"). See
+  // `isInlineTextLeafCandidate` for the full rationale.
+  if (isInlineTextLeafCandidate(el, computed)) {
+    return renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts);
+  }
   return renderContainer(el, parentRect, rect, left, top, computed, opts);
 }
 
@@ -2002,6 +2249,8 @@ const DROP_TAGS = new Set([
   'form',
 ]);
 
+const INLINE_RUN_TAGS = new Set(['span', 'a']);
+
 const NON_TEXT_INPUT_TYPES = new Set([
   'checkbox', 'radio', 'file', 'range', 'color', 'image', 'hidden',
   'date', 'datetime-local', 'month', 'time', 'week',
@@ -2124,6 +2373,13 @@ const HELPER_FNS = [
   splitTextNodeIntoLines,
   emitTextSpans,
   emitVerticalTextSpan,
+  hasBoxVisualsForInline,
+  multiplyColorAlpha,
+  resolveInlineTextValue,
+  isInlineRunChild,
+  isInlineTextLeafCandidate,
+  emitInlineRunMarkup,
+  renderInlineTextLeaf,
   flexMainGapPx,
   collectFlexProps,
   isMultiLineTextLeafItem,
