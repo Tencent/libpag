@@ -528,6 +528,23 @@ function buildStyle(left, top, width, height, computed, opts) {
     appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('color'));
   }
 
+  // Forward the host's resolved CSS `transform` (and `transform-origin`) when
+  // the element-level wrapper in `render()` detected a non-identity transform
+  // on this element. The wrapper measured this element's geometry under
+  // `withStrippedTransform`, so the `left/top/width/height` above describe
+  // the unrotated layout box; the browser then re-applies the same transform
+  // when the snapshot is reopened, and the PAGX importer's `matrix(...)`
+  // branch (`HTMLSubsetPropertyTable.cpp` / `HTMLStyleResolver.cpp`) writes
+  // the six floats straight onto `Layer.matrix` so `pagx render` reproduces
+  // the rotation/skew/scale as well. Origin defaults to `50% 50%` (CSS
+  // default and the importer's only supported origin).
+  if (opts.transform && opts.transform.transform) {
+    parts.push(`transform: ${opts.transform.transform}`);
+    if (opts.transform.transformOrigin) {
+      parts.push(`transform-origin: ${opts.transform.transformOrigin}`);
+    }
+  }
+
   return parts.join('; ');
 }
 
@@ -594,17 +611,42 @@ function transformMatrix(computed) {
 
 // Read the inline `transform` and `transform-origin` declarations off an
 // element. Returns `null` when no inline transform is set; otherwise returns
-// the original CSS strings preserved verbatim so a downstream Chromium render
-// of the subset HTML reproduces the same visual skew/rotate, and PAGX's
-// importer can re-map the function names onto Group/TextBox transform fields.
-// Computed style is intentionally not consulted here: it always returns a
-// `matrix(...)` form, which is harder to map back to discrete skewX/rotate/
-// scale/translate operations than the source function strings.
+// the original CSS function strings (e.g. `rotate(10deg)`, `skewX(-5deg)`)
+// preserved verbatim. Used by the text-leaf path: a single-function inline
+// `transform` is forwarded to the inner `<span>` so PAGX's importer maps it
+// onto the TextBox's own skew/rotation/scale fields. Computed style would
+// always serialise to `matrix(...)`, which the TextBox path historically
+// could not parse — that path therefore relies on the source function
+// strings still being present in `el.style`.
 function readInlineTransform(el) {
   if (!el || !el.style) return null;
   const t = (el.style.transform || '').trim();
   if (!t || t === 'none') return null;
   const o = (el.style.transformOrigin || '').trim();
+  return { transform: t, transformOrigin: o };
+}
+
+// Read the resolved `transform` off an element from its computed style.
+// Returns `null` when the resolved value is identity (the property
+// effectively no-ops). Otherwise returns the computed CSS string — almost
+// always a `matrix(a, b, c, d, tx, ty)` token — paired with the computed
+// `transform-origin` (resolved to absolute pixels by Chromium).
+//
+// Why computed style instead of `el.style.transform`? Modern stylesheets and
+// utility frameworks (Tailwind's `rotate-45`, `scale-110`, …) deliver
+// `transform` through CSS class rules; the inline `style` slot is then
+// empty, but `getComputedStyle(el).transform` still surfaces the resolved
+// matrix. The downstream renderer needs the matrix to bake the rotation /
+// skew / scale into the wrapper, and the PAGX importer's `matrix(...)`
+// branch (HTMLSubsetPropertyTable.cpp / HTMLStyleResolver.cpp) writes the
+// six floats straight into `Layer.matrix` regardless of the source CSS
+// function used — so we never need to recover the original function form.
+function readBoxTransform(computed) {
+  if (!computed) return null;
+  const t = (computed.transform || '').trim();
+  if (!t || t === 'none') return null;
+  if (t === 'matrix(1, 0, 0, 1, 0, 0)') return null;
+  const o = (computed.transformOrigin || '').trim();
   return { transform: t, transformOrigin: o };
 }
 
@@ -1695,6 +1737,37 @@ function render(el, parentRect, opts, precomputed) {
     return renderChildrenInto(el, parentRect, computed);
   }
 
+  // Generic CSS `transform` preservation. Any non-identity computed
+  // transform (rotate/skew/scale/translate, or any `matrix(...)` form
+  // including the one Tailwind synthesises from its utility classes) must
+  // be forwarded to the wrapper this element emits — otherwise a
+  // `<div class="rotate-45">` lays down as an axis-aligned square instead
+  // of the diamond Chromium painted.
+  //
+  // Strategy: temporarily clear the inline `transform` slot (which
+  // out-specifies any class-level rule) so all downstream measurements —
+  // this element's `getBoundingClientRect()`, every descendant's rect,
+  // every text-line `Range.getClientRects()` — see the unrotated layout.
+  // The dispatched renderer then emits an absolutely-positioned wrapper
+  // sized to the unrotated box, with the original computed transform
+  // string injected back via `buildStyle(opts.transform)`. Reopening the
+  // snapshot in a browser reproduces the same visual transform, and the
+  // PAGX importer reads the `matrix(...)` form into `Layer.matrix` so
+  // `pagx render` agrees pixel-for-pixel.
+  //
+  // Skipped for `_strippedTransform` re-entries (the recursive call below)
+  // and for the CSS-triangle path (`renderBorderTriangle` already bakes
+  // the transform into its polygon coordinates) — handled by re-checking
+  // the flag rather than guarding here so the shared flow stays simple.
+  if (!opts._strippedTransform) {
+    const boxTransform = readBoxTransform(computed);
+    if (boxTransform) {
+      return withStrippedTransform(el, () => render(el, parentRect, {
+        ...opts, _strippedTransform: true, transform: boxTransform,
+      }, getComputedStyle(el)));
+    }
+  }
+
   // Direct flex preservation: when the live computed style says this
   // element is a flex container and its children can all participate as
   // flex items, emit it as `display: flex` rather than baking everything
@@ -2019,6 +2092,7 @@ const HELPER_FNS = [
   transformOriginXY,
   transformMatrix,
   readInlineTransform,
+  readBoxTransform,
   withStrippedTransform,
   isCssBorderTrianglePattern,
   renderBorderTriangle,

@@ -583,15 +583,46 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
 
 void HTMLParserContext::parseBoxTransform(
     HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
-  // The current importer only honours `transform-origin: 50% 50%` (the CSS default), which
-  // matches the inline output emitted by the html-snapshot tool. Anything else would require
-  // the resolver to translate the origin into a TextBox `anchor` offset. Warn so authors of
-  // hand-written subset HTML notice — this used to live at the tail of this function and
-  // was therefore skipped on every transform-parsing failure (`return` early), masking the
-  // real configuration issue.
+  // CSS `transform-origin` resolved by Chromium's computed style is almost
+  // always emitted as `<x>px <y>px` (the centre of the element box, the CSS
+  // default). Hand-written subset HTML still sometimes carries `50% 50%` or
+  // `center [center]`; both are accepted as synonyms for the box centre.
+  // Other percentage / keyword combinations cannot be resolved without
+  // knowing the box width/height in absolute terms (parseBoxSizing fills
+  // those in `box.widthPx/heightPx`), so non-px / non-default forms are
+  // warned and the transform falls back to the centre pivot.
   std::string origin = ToLower(Trim(LookupProperty(props, "transform-origin")));
-  if (!origin.empty() && origin != "50% 50%" && origin != "center" && origin != "center center") {
-    warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
+  float resolvedOriginX = NAN;
+  float resolvedOriginY = NAN;
+  bool originIsCentre = origin.empty() || origin == "50% 50%" || origin == "center" ||
+                        origin == "center center";
+  if (!originIsCentre) {
+    std::vector<std::string> originParts;
+    size_t spaceIdx = origin.find(' ');
+    if (spaceIdx != std::string::npos) {
+      originParts.push_back(Trim(origin.substr(0, spaceIdx)));
+      originParts.push_back(Trim(origin.substr(spaceIdx + 1)));
+    }
+    if (originParts.size() == 2) {
+      float ox = parsePxLength(originParts[0]);
+      float oy = parsePxLength(originParts[1]);
+      if (!std::isnan(ox) && !std::isnan(oy)) {
+        // Suppress the warning when the px values are exactly the box's
+        // geometric centre — Chromium emits this for the CSS default and
+        // applyBoxTransform's fallback pivot already lands there.
+        bool matchesCentre = !std::isnan(box.widthPx) && !std::isnan(box.heightPx) &&
+                             std::fabs(ox - box.widthPx * 0.5f) < 0.5f &&
+                             std::fabs(oy - box.heightPx * 0.5f) < 0.5f;
+        if (!matchesCentre) {
+          resolvedOriginX = ox;
+          resolvedOriginY = oy;
+        }
+        originIsCentre = true;  // resolved to a usable pivot, no warning needed
+      }
+    }
+    if (!originIsCentre) {
+      warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
+    }
   }
 
   std::string transform = Trim(LookupProperty(props, "transform"));
@@ -693,9 +724,90 @@ void HTMLParserContext::parseBoxTransform(
       parsed.translateY = v;
     }
     parsed.valid = true;
+  } else if (fn == "matrix") {
+    // The catch-all `matrix(a, b, c, d, tx, ty)` form. The browser emits
+    // this whenever computed style is asked for `transform` — utility CSS
+    // frameworks (Tailwind, UnoCSS) compose multiple `--tw-*` values into a
+    // single function chain that resolves to a matrix, and the
+    // html-snapshot tool forwards exactly that string. We can't recover the
+    // original CSS function (rotate vs skew vs scale) from the matrix
+    // without ambiguity, so the discrete fields stay at their defaults and
+    // only `parsed.matrix` is populated. Non-text Layers consume the matrix
+    // directly; the legacy TextBox path (which keys off `parsed.rotation` /
+    // `parsed.skew` / `parsed.scale*`) sees an identity transform here and
+    // is therefore not engaged for matrix-form transforms — that's
+    // intentional, the new generic Layer path covers the same case.
+    if (parts.size() != 6) {
+      warn("html: matrix expects 6 numeric arguments; got '" + transform + "'");
+      return;
+    }
+    float m[6];
+    for (size_t i = 0; i < 6; i++) {
+      if (!ParseScalarFloat(parts[i], m[i])) {
+        warn("html: matrix argument '" + parts[i] + "' is not a number; ignored");
+        return;
+      }
+    }
+    parsed.matrix.a = m[0];
+    parsed.matrix.b = m[1];
+    parsed.matrix.c = m[2];
+    parsed.matrix.d = m[3];
+    parsed.matrix.tx = m[4];
+    parsed.matrix.ty = m[5];
+    parsed.valid = !parsed.matrix.isIdentity();
   } else {
     warn("html: transform function '" + fn + "' is not in the supported subset");
     return;
+  }
+
+  // Compose the discrete-field representation into `parsed.matrix` for the
+  // single-function branches. Skipped for the `matrix(...)` branch above
+  // (which already populated `parsed.matrix` directly and intentionally
+  // left the discrete fields at their defaults), and for the case where
+  // none of the branches set `valid` (early returns). Order mirrors the
+  // CSS spec: T(translate) * R(rotation) * Skew(skew, skewAxis) * S(scale).
+  // `transform-origin` is NOT folded in here; the Layer-side consumer
+  // applies it as `T(cx, cy) * matrix * T(-cx, -cy)`.
+  if (parsed.valid && fn != "matrix") {
+    Matrix translate = Matrix::Translate(parsed.translateX, parsed.translateY);
+    Matrix rotate =
+        (parsed.rotation != 0.0f) ? Matrix::Rotate(parsed.rotation) : Matrix::Identity();
+    Matrix skew = Matrix::Identity();
+    if (parsed.skew != 0.0f) {
+      // PAGX skew is parameterised as (skew, skewAxis) where skewAxis is the angle of the
+      // axis that stays fixed. The CSS-equivalent affine is the product of an axis
+      // rotation, an x-shear by tan(skew), and the inverse axis rotation:
+      //     R(skewAxis) * Shear(tan(skew)) * R(-skewAxis).
+      // For the two CSS forms we accept (skewX/skewY, populated by parseBoxTransform
+      // with skewAxis=0/90), this reduces to a pure horizontal/vertical shear.
+      float radians = parsed.skew * 3.14159265358979323846f / 180.0f;
+      float t = std::tan(radians);
+      Matrix shear = Matrix::Identity();
+      if (parsed.skewAxis == 0.0f) {
+        shear.c = t;  // horizontal shear (CSS skewY's effect after the sign flip)
+      } else if (parsed.skewAxis == 90.0f) {
+        shear.b = t;  // vertical shear (CSS skewX's effect after the sign flip)
+      } else {
+        Matrix axisRotate = Matrix::Rotate(parsed.skewAxis);
+        Matrix axisRotateInv = Matrix::Rotate(-parsed.skewAxis);
+        shear.c = t;
+        skew = axisRotate * shear * axisRotateInv;
+      }
+      if (skew.isIdentity()) {
+        skew = shear;
+      }
+    }
+    Matrix scale = Matrix::Scale(parsed.scaleX, parsed.scaleY);
+    parsed.matrix = translate * rotate * skew * scale;
+  }
+
+  // Forward the resolved transform-origin (if it differs from the box's
+  // centre) onto the parsed transform so applyBoxTransform pivots around
+  // the requested point. Centre pivots are signalled by leaving the fields
+  // at NaN — the apply path already defaults to W/2,H/2 in that case.
+  if (parsed.valid) {
+    parsed.originXPx = resolvedOriginX;
+    parsed.originYPx = resolvedOriginY;
   }
 
   box.transform = parsed;

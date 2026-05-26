@@ -229,6 +229,14 @@ class HTMLParserContext {
   // the double-layer split for padded contents).
   bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
 
+  // Applies the resolved CSS `transform` (parsed by HTMLStyleResolver into
+  // `box.transform.matrix`) to `layer->matrix`. Folds in `transform-origin: 50% 50%` (the
+  // only origin the importer supports) when the box has explicit width/height; without
+  // them the origin defaults to the top-left and a warning is emitted. Used by
+  // `convertContainer` and `convertTextLeaf` so both paths preserve rotation/skew/scale.
+  void applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
+                         const std::shared_ptr<DOMNode>& element);
+
   // Resolves a CSS gradient string ("linear-gradient(...)" / "radial-gradient(...)" /
   // "conic-gradient(...)") into a registered gradient node. Returns nullptr when the
   // value is empty, not a gradient, or fails to parse.

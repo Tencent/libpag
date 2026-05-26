@@ -23,6 +23,7 @@
 #include <vector>
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/types/Padding.h"
 
 namespace pagx {
@@ -97,13 +98,22 @@ struct HTMLInheritedStyle {
 };
 
 /**
- * Resolved CSS `transform` for a single HTML element. Populated when the inline `transform`
- * declaration uses one of the supported single-function forms (skewX/skewY/rotate/scale[X|Y]/
- * translate[X|Y]); compound chains and `matrix(...)` are dropped earlier in the subset
- * transformer. Values are pre-mapped onto the corresponding Group/TextBox fields, so the
- * importer can apply them verbatim without re-parsing the CSS function string. `valid` is
- * false when no usable transform was set; in that case all numeric members keep their
- * defaults (skew/rotation/translate = 0; scale = 1).
+ * Resolved CSS `transform` for a single HTML element. Populated when the
+ * `transform` declaration uses one of the supported single-function forms
+ * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]) or the `matrix(a, b, c, d,
+ * tx, ty)` shorthand. Compound function chains and 3D variants
+ * (`matrix3d`/`rotate3d`/`perspective`/…) are dropped earlier in the subset
+ * transformer.
+ *
+ * The single-function variants populate the discrete fields (skew/rotation/
+ * scale/translate) so the existing TextBox path can map them straight onto
+ * `TextBox.skew/skewAxis/rotation/scale`. ALL forms — including the
+ * compound ones reached only through `matrix(...)` — additionally fill
+ * `matrix` with the equivalent affine, so the new generic Layer path can
+ * write it onto `Layer.matrix` regardless of the source CSS function used.
+ * `valid` is false when no usable transform was set; in that case `matrix`
+ * stays at the identity and the discrete fields keep their defaults
+ * (skew/rotation/translate = 0; scale = 1).
  */
 struct HTMLTransform {
   bool valid = false;
@@ -114,6 +124,22 @@ struct HTMLTransform {
   float scaleY = 1.0f;      // pagx scale.y; from CSS scale*().
   float translateX = 0.0f;  // CSS translate*().x in px; folded into Layer left/top.
   float translateY = 0.0f;  // CSS translate*().y in px; folded into Layer left/top.
+  // Affine matrix equivalent of the parsed CSS transform. Single-function
+  // forms compose this from their discrete arguments; the `matrix(...)`
+  // form populates this directly. The matrix here is the *raw* CSS value;
+  // `transform-origin` is NOT folded in. Callers that consume the matrix on
+  // a non-text Layer must apply the origin themselves (typically `T(cx,cy)
+  // * matrix * T(-cx,-cy)` for the canonical `50% 50%` origin).
+  Matrix matrix = {};
+  // CSS `transform-origin` resolved to absolute pixels relative to the
+  // element's box. Both default to NaN, meaning "use the box's geometric
+  // centre" (the CSS default of `50% 50%` and the only origin Chromium
+  // emits when no source CSS overrides it). When the source CSS specifies
+  // a different origin, parseBoxTransform writes the resolved px values
+  // here so applyBoxTransform pivots around the requested point instead
+  // of the centre.
+  float originXPx = NAN;
+  float originYPx = NAN;
 };
 
 /**

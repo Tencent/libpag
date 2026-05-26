@@ -272,12 +272,15 @@ std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTr
   return Trim(value);
 }
 
-// CSS `transform` is mapped onto the TextBox / Group transform fields (skew,
-// skewAxis, rotation, scale, position) by HTMLStyleResolver. Only the simple
-// single-function forms below are accepted; compound chains like
-// `skewX(-5deg) rotate(10deg)` and the catch-all `matrix(...)` form would
-// require a 2x2 matrix decomposition that the importer does not currently
-// implement, so they are dropped with a warning.
+// CSS `transform` is mapped onto the TextBox / Layer transform fields by
+// HTMLStyleResolver. Single-function forms (skewX/skewY/rotate/scale[X|Y]/
+// translate[X|Y]) populate the discrete fields and TextBox uses them
+// directly. The `matrix(a, b, c, d, tx, ty)` shorthand is also accepted —
+// the resolver writes the six floats straight into `HTMLTransform.matrix`
+// so non-text Layers can forward the affine onto `Layer.matrix`. Compound
+// chains like `skewX(-5deg) rotate(10deg)` and 3D variants
+// (`matrix3d`/`rotate3d`/`perspective`) still require decomposition that
+// the importer does not implement, so they are dropped with a warning.
 std::string TransformTransform(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -313,12 +316,13 @@ std::string TransformTransform(const std::string& value, const PropertyContext&,
   }
   std::string fn = ToLower(Trim(trimmed.substr(0, openParen)));
   if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
-      fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey") {
+      fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey" ||
+      fn == "matrix") {
     return trimmed;
   }
   return DropProperty("transform", value,
                       "is not in the supported function set "
-                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y])",
+                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix)",
                       diags);
 }
 

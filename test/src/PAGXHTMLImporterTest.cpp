@@ -845,12 +845,15 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginWarnsWithTransform) {
-  // `transform-origin` is silently accepted on its own (no transform makes it a no-op);
-  // when paired with a transform we keep the default `50% 50%` (matching CSS) but warn
-  // for any other origin keyword/length so authors know the pivot is approximated.
+  // `transform-origin` resolved as `<x>px <y>px` is honoured by applyBoxTransform — the
+  // pivot lands at the requested point and no warning is emitted, because the html-snapshot
+  // tool always serialises the origin to absolute pixels (Chromium does the same in
+  // `getComputedStyle`). Other forms (keywords other than `center`, percentages other than
+  // `50% 50%`) cannot be resolved without further state and still warn so authors of
+  // hand-written subset HTML notice the pivot is being approximated.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
-      <h1 style="transform:skewX(-5deg);transform-origin:0 0;
+      <h1 style="transform:skewX(-5deg);transform-origin:left top;
                  width:200px;height:60px">Hello</h1>
     </body></html>
   )HTML");
