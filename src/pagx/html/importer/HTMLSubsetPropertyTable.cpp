@@ -210,17 +210,17 @@ std::string TransformBorder(const std::string& value, const PropertyContext&,
   if (trimmed.empty()) return std::string();
   std::string lc = ToLower(trimmed);
   if (lc == "none" || lc == "0" || lc == "0px") return std::string();
-  // Accept the canonical `Wpx solid <color>` form with arbitrary token order. We do NOT enforce
-  // that the value contains both a width and a style — the resolver downstream is tolerant of
-  // partial forms (e.g. `border: red`, which it treats as a 1px solid border) — but we DO want
-  // to downgrade non-solid styles to `solid` and warn on unknown style keywords. Width/colour
-  // tokens pass through unchanged.
+  // Accept the canonical `Wpx <style> <color>` form with arbitrary token order. `solid`,
+  // `dashed`, and `dotted` are first-class and pass through to the resolver, which routes
+  // them onto the Stroke node's dash pattern. Other style keywords (`double`, `groove`, …)
+  // have no Stroke equivalent and are downgraded to `solid` here. Width/colour tokens pass
+  // through unchanged.
   auto tokens = SplitTopLevelWhitespace(trimmed);
   for (auto& t : tokens) {
     std::string tl = ToLower(t);
-    if (tl == "solid") continue;
-    if (tl == "dashed" || tl == "dotted" || tl == "double" || tl == "groove" || tl == "ridge" ||
-        tl == "inset" || tl == "outset" || tl == "none" || tl == "hidden") {
+    if (tl == "solid" || tl == "dashed" || tl == "dotted") continue;
+    if (tl == "double" || tl == "groove" || tl == "ridge" || tl == "inset" || tl == "outset" ||
+        tl == "none" || tl == "hidden") {
       diags.warn("subset:unsupported-property",
                  "html: 'border' style '" + tl + "' downgraded to 'solid'");
       continue;

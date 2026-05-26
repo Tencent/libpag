@@ -1006,11 +1006,33 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipInvalidDropped) {
   EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDashedDowngradedToSolid) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDashedPreserved) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="border: 2px dashed #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "dashed"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDottedPreserved) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px dotted #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "dotted"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDoubleDowngradedToSolid) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px double #000"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
   EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));

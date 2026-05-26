@@ -2407,7 +2407,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedProducesDashPattern) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2417,11 +2417,35 @@ PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedWarns) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("dashed") != std::string::npos) warned = true;
+    EXPECT_EQ(msg.find("dashed"), std::string::npos);
   }
-  EXPECT_TRUE(warned);
+  auto* stroke = FindElementOfType<pagx::Stroke>(doc->layers.front()->children.front());
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  ASSERT_EQ(stroke->dashes.size(), 2u);
+  EXPECT_FLOAT_EQ(stroke->dashes[0], 4.0f);
+  EXPECT_FLOAT_EQ(stroke->dashes[1], 2.0f);
+  EXPECT_EQ(stroke->cap, pagx::LineCap::Butt);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawBorderDottedProducesRoundDots) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border:2px dotted #000"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* stroke = FindElementOfType<pagx::Stroke>(doc->layers.front()->children.front());
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  ASSERT_EQ(stroke->dashes.size(), 2u);
+  EXPECT_FLOAT_EQ(stroke->dashes[0], 0.0f);
+  EXPECT_FLOAT_EQ(stroke->dashes[1], 4.0f);
+  EXPECT_EQ(stroke->cap, pagx::LineCap::Round);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawOverflowAutoWarns) {

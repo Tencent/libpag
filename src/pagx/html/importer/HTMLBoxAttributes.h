@@ -143,6 +143,17 @@ struct HTMLTransform {
 };
 
 /**
+ * CSS border line styles supported by the HTML subset. Mirrors a subset of
+ * `border-style` keywords; other styles (`double`, `groove`, …) are downgraded
+ * to `Solid` by the resolver.
+ */
+enum class BorderStyle {
+  Solid,
+  Dashed,
+  Dotted,
+};
+
+/**
  * Resolved box-model attributes for a single HTML element. Anything left as NaN / empty
  * is "not specified" and falls back to PAGX defaults (which mirror CSS defaults for the
  * accepted subset).
@@ -187,6 +198,7 @@ struct HTMLBoxAttributes {
 
   float borderWidthPx = 0.0f;
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
+  BorderStyle borderStyle = BorderStyle::Solid;
   bool borderSet = false;
 
   std::string boxShadow = {};

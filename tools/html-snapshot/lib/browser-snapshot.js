@@ -230,14 +230,14 @@ function paddingBoxOrigin(rect, computed) {
   };
 }
 
-// True iff all four borders have the same non-zero width, the same `solid`
-// style, and the same color — i.e. the only case where the subset's single
-// `border` shorthand can losslessly express the page's border. Compares the
-// raw width string (not the parsed value) so 0.5px vs 0.5000001px noise from
+// True iff all four borders have the same non-zero width, the same supported
+// style (`solid`, `dashed`, or `dotted`), and the same color — i.e. cases the
+// subset's single `border` shorthand can losslessly express. Compares the raw
+// width string (not the parsed value) so 0.5px vs 0.5000001px noise from
 // computed-style serialisation never sneaks past the equality check.
 function isUniformBorder(computed) {
   const top = readBorderSide(computed, 'top');
-  if (top.style !== 'solid') return false;
+  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted') return false;
   if (top.width <= 0) return false;
   for (const side of SIDES) {
     if (side === 'top') continue;
@@ -439,14 +439,15 @@ function appendStyleProp(parts, computed, entry, ctx) {
   parts.push(`${outProp}: ${v}`);
 }
 
-// Forward a uniform `border` shorthand. Asymmetric borders are emitted as
-// overlay rectangles by borderOverlayHTML(); see that comment for the
-// trade-off.
+// Forward a uniform `border` shorthand, preserving the actual line style
+// (solid/dashed/dotted) so the importer can reproduce dash patterns. Asymmetric
+// borders are emitted as overlay rectangles by borderOverlayHTML(); see that
+// comment for the trade-off.
 function appendBorder(parts, computed) {
   if (!isUniformBorder(computed)) return;
   const top = readBorderSide(computed, 'top');
   if (top.width <= 0) return;
-  parts.push(`border: ${px(top.width)} solid ${top.color.trim()}`);
+  parts.push(`border: ${px(top.width)} ${top.style} ${top.color.trim()}`);
 }
 
 // Pass `box-shadow` through verbatim if non-none.

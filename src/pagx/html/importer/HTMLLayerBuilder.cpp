@@ -410,6 +410,20 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
     stroke->color = solid;
     stroke->width = box.borderWidthPx;
     stroke->align = StrokeAlign::Inside;
+    // CSS `border-style: dashed | dotted` maps onto Stroke's dash pattern.
+    // Chromium-ish proportions: `dashed` paints rectangular dashes 2x the line
+    // width separated by 1x gaps; `dotted` paints round dots with diameter
+    // equal to the line width, spaced 1 width apart (a zero-length dash with
+    // a Round cap renders as a circle of radius w/2, and centre-to-centre
+    // spacing of 2w yields a 1w gap between dot edges).
+    if (box.borderStyle == BorderStyle::Dashed) {
+      const float w = box.borderWidthPx;
+      stroke->dashes = {2.0f * w, w};
+    } else if (box.borderStyle == BorderStyle::Dotted) {
+      const float w = box.borderWidthPx;
+      stroke->cap = LineCap::Round;
+      stroke->dashes = {0.0f, 2.0f * w};
+    }
     layer->contents.push_back(stroke);
     emitted = true;
   }

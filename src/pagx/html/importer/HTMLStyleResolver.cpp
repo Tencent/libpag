@@ -527,8 +527,15 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
       }
       std::string lt = ToLower(t);
       if (lt == "solid" || lt == "none") continue;
-      if (lt == "dashed" || lt == "dotted" || lt == "double" || lt == "groove" || lt == "ridge" ||
-          lt == "inset" || lt == "outset") {
+      if (lt == "dashed") {
+        box.borderStyle = BorderStyle::Dashed;
+        continue;
+      }
+      if (lt == "dotted") {
+        box.borderStyle = BorderStyle::Dotted;
+        continue;
+      }
+      if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
         warn("html: border style '" + lt + "' not supported; treated as solid");
         continue;
       }
@@ -594,8 +601,8 @@ void HTMLParserContext::parseBoxTransform(
   std::string origin = ToLower(Trim(LookupProperty(props, "transform-origin")));
   float resolvedOriginX = NAN;
   float resolvedOriginY = NAN;
-  bool originIsCentre = origin.empty() || origin == "50% 50%" || origin == "center" ||
-                        origin == "center center";
+  bool originIsCentre =
+      origin.empty() || origin == "50% 50%" || origin == "center" || origin == "center center";
   if (!originIsCentre) {
     std::vector<std::string> originParts;
     size_t spaceIdx = origin.find(' ');
