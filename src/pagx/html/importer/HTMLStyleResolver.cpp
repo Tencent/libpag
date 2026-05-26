@@ -453,20 +453,25 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
     // top-right, bottom-right, bottom-left), with an optional '/' separating horizontal
     // and vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
     // uniform `roundness`, so:
-    //   - elliptical form (containing '/'): warn and drop the value;
-    //   - asymmetric corner values: warn and approximate with the largest radius
-    //     so the corners that should be rounded stay rounded (corners that should
-    //     be square become rounded, but losing all rounding is the worse failure);
-    //   - percentage tokens (e.g. `50%` for the classic pill / circle pattern) are
-    //     resolved against the box's known px dimensions. Because PAGX has only a
-    //     uniform corner radius, we resolve against `min(widthPx, heightPx)` so a
-    //     square element with `50%` produces a true circle. Percentages on elements
-    //     without a fixed px size are dropped with a warning.
+    //   - elliptical form (containing '/'): warn and drop the value (PAGX has no
+    //     per-axis radius primitive);
+    //   - 1-4 length / percentage tokens: expand to per-corner (TL, TR, BR, BL).
+    //     When all four resolved values are equal the layer builder emits a
+    //     `Rectangle` with that uniform `roundness`; when they differ it
+    //     synthesises a `Path` tracing the rounded outline so the "single
+    //     rounded corner" patterns used as corner decorations (e.g. Tailwind
+    //     `rounded-bl-full`) round-trip exactly.
+    //   - percentage tokens are resolved per corner against the box's known px
+    //     dimensions, picking `min(widthPx, heightPx)` (matches the existing
+    //     uniform behaviour so `border-radius: 50%` on a square still becomes a
+    //     true circle). Percentages on elements without fixed px sizes are
+    //     dropped with a warning, and the affected corner stays at 0.
     if (br.find('/') != std::string::npos) {
       warn("html: elliptical border-radius '" + br + "' not supported by PAGX Rectangle; ignored");
     } else {
       auto tokens = SplitTopLevelWhitespace(br);
       std::vector<float> nums;
+      nums.reserve(tokens.size());
       for (auto& t : tokens) {
         std::string trimmed = Trim(t);
         float v = NAN;
@@ -493,18 +498,72 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
         nums.push_back(v);
       }
       if (!nums.empty()) {
-        float maxR = nums[0];
-        bool asymmetric = false;
-        for (size_t i = 1; i < nums.size(); ++i) {
-          if (nums[i] != nums[0]) asymmetric = true;
-          if (nums[i] > maxR) maxR = nums[i];
+        // CSS shorthand expansion. We tolerate the irregular 0/empty-token case by
+        // padding with 0s so a malformed input doesn't lose unrelated corner data.
+        float tl = 0.0f;
+        float tr = 0.0f;
+        float brad = 0.0f;
+        float bl = 0.0f;
+        switch (nums.size()) {
+          case 1:
+            tl = tr = brad = bl = nums[0];
+            break;
+          case 2:
+            tl = brad = nums[0];
+            tr = bl = nums[1];
+            break;
+          case 3:
+            tl = nums[0];
+            tr = bl = nums[1];
+            brad = nums[2];
+            break;
+          default:  // 4+
+            tl = nums[0];
+            tr = nums[1];
+            brad = nums[2];
+            bl = nums[3];
+            break;
         }
-        if (asymmetric) {
-          warn("html: per-corner border-radius '" + br +
-               "' approximated with a single roundness (PAGX Rectangle does not "
-               "support per-corner radii)");
+        // Negative radii are invalid in CSS; clamp to 0 to avoid degenerate Bezier control
+        // points downstream.
+        tl = std::max(tl, 0.0f);
+        tr = std::max(tr, 0.0f);
+        brad = std::max(brad, 0.0f);
+        bl = std::max(bl, 0.0f);
+        // CSS edge-overlap clamp: shrink all radii uniformly so the sum of the two radii on
+        // any edge never exceeds that edge's length. Pre-clamp values like `9999px` collapse
+        // to the box dimension here (so `rounded-bl-full` on a 380x380 box yields BL=380, not
+        // 9999).
+        if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx) && box.widthPx > 0 &&
+            box.heightPx > 0) {
+          float f = 1.0f;
+          auto clampEdge = [&f](float sum, float edge) {
+            if (sum > edge && sum > 0.0f) {
+              float fe = edge / sum;
+              if (fe < f) f = fe;
+            }
+          };
+          clampEdge(tl + tr, box.widthPx);
+          clampEdge(bl + brad, box.widthPx);
+          clampEdge(tl + bl, box.heightPx);
+          clampEdge(tr + brad, box.heightPx);
+          if (f < 1.0f) {
+            tl *= f;
+            tr *= f;
+            brad *= f;
+            bl *= f;
+          }
         }
-        box.borderRadiusPx = maxR;
+        box.borderRadiusTLPx = tl;
+        box.borderRadiusTRPx = tr;
+        box.borderRadiusBRPx = brad;
+        box.borderRadiusBLPx = bl;
+        box.borderRadiusUniform = (tl == tr) && (tr == brad) && (brad == bl);
+        // Mirror the legacy behaviour: any successfully parsed border-radius (even all zeros)
+        // marks the box as "carrying border-radius styling". Downstream `hasBackgroundVisuals`
+        // uses this to decide whether the layer needs a background geometry; emitting a
+        // `Rectangle roundness=0` for an all-zero shorthand is harmless and keeps the legacy
+        // tests stable.
         box.borderRadiusSet = true;
       }
     }

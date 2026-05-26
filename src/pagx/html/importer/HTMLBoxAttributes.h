@@ -193,8 +193,17 @@ struct HTMLBoxAttributes {
   // painting a rectangle on this element.
   bool backgroundClipText = false;
 
-  float borderRadiusPx = 0.0f;
+  // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
+  // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
+  // exceed the box's edge length). When the input was uniform — or all four resolved values are
+  // equal after clamping — `borderRadiusUniform` is true and the importer emits a single
+  // `Rectangle roundness=...`; otherwise it synthesises a `Path` tracing the per-corner outline.
+  float borderRadiusTLPx = 0.0f;
+  float borderRadiusTRPx = 0.0f;
+  float borderRadiusBRPx = 0.0f;
+  float borderRadiusBLPx = 0.0f;
   bool borderRadiusSet = false;
+  bool borderRadiusUniform = true;
 
   float borderWidthPx = 0.0f;
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};

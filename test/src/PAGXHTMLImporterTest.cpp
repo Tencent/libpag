@@ -40,6 +40,8 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -1880,6 +1882,47 @@ PAG_TEST(PAGXHTMLImporterTest, ImageDefaultObjectFitIsStretch) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
+// Direct `border-radius` on `<img>` (the canonical "circular avatar" idiom: `<img
+// style="border-radius:50%">`) used to be silently dropped — `convertImage` emitted a plain
+// `Rectangle` regardless of the box's border-radius. The geometry helper now flows through it,
+// so a uniform radius rounds the Rectangle and an asymmetric one falls onto the Path emitter,
+// matching the `<div>` + background-image path.
+PAG_TEST(PAGXHTMLImporterTest, ImageWithUniformBorderRadiusRoundsRectangle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="avatar.png" style="width:64px;height:64px;border-radius:50%"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(leaf);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 32.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImageWithAsymmetricBorderRadiusEmitsPath) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="avatar.png" style="width:64px;height:64px;border-radius:12px 12px 0 0"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(leaf), nullptr);
+  auto* path = FindElementOfType<pagx::Path>(leaf);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  size_t cubicCount = 0;
+  for (auto v : path->data->verbs()) {
+    if (v == pagx::PathVerb::Cubic) cubicCount++;
+  }
+  EXPECT_EQ(cubicCount, 2u);
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitContainMapsToLetterBox) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
@@ -1908,6 +1951,41 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
+}
+
+// Folding rule also handles asymmetric `border-radius`: the image-pattern fill rides on top
+// of whatever geometry `applyBackgroundVisuals` emitted, so a card-style wrapper that uses
+// "rounded top, square bottom" (very common for media tiles) ends up with a Path geometry +
+// ImagePattern fill — no separate clip layer needed.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoPathForAsymmetricRadii) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:16px 16px 0 0;overflow:hidden">
+        <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  EXPECT_FALSE(wrapper->clipToBounds);
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(wrapper), nullptr);
+  auto* path = FindElementOfType<pagx::Path>(wrapper);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  // Path emitter starts at (W, TR) = (64, 16). The bottom corners stay sharp because BR/BL
+  // are 0, so the path has exactly two cubic segments (TL + TR).
+  size_t cubicCount = 0;
+  for (auto v : path->data->verbs()) {
+    if (v == pagx::PathVerb::Cubic) cubicCount++;
+  }
+  EXPECT_EQ(cubicCount, 2u);
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRespectsObjectFit) {
@@ -2387,7 +2465,13 @@ PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusDropped) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
+// Per-corner `border-radius` (e.g. the shorthand `4px 12px` which expands to TL=BR=4 /
+// TR=BL=12) cannot be expressed by PAGX's uniform-roundness `Rectangle`. The importer
+// synthesises a `Path` whose `PathData` traces the rounded outline so the geometry round-trips
+// faithfully; no Rectangle is emitted for the background shape in that case. The path's
+// bounding box still matches the layer's authored dimensions so layout downstream behaves the
+// same as before.
+PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricBorderRadiusEmitsPath) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2397,14 +2481,93 @@ PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricBorderRadiusUsesMaxAndWarns) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  auto* rect = FindElementOfType<pagx::Rectangle>(doc->layers.front()->children.front());
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->roundness, 12.0f);
-  bool warned = false;
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(div), nullptr);
+  auto* path = FindElementOfType<pagx::Path>(div);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  auto bounds = path->data->getBounds();
+  EXPECT_NEAR(bounds.x, 0.0f, kEps);
+  EXPECT_NEAR(bounds.y, 0.0f, kEps);
+  EXPECT_NEAR(bounds.width, 50.0f, kEps);
+  EXPECT_NEAR(bounds.height, 50.0f, kEps);
+  EXPECT_NE(FindElementOfType<pagx::Fill>(div), nullptr);
   for (const auto& msg : doc->errors) {
-    if (msg.find("per-corner border-radius") != std::string::npos) warned = true;
+    EXPECT_EQ(msg.find("per-corner border-radius"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
   }
-  EXPECT_TRUE(warned);
+}
+
+// Quarter-circle corner decoration (e.g. Tailwind `rounded-bl-full` on a 380x380 box). The CSS
+// edge-overlap clamp shrinks the authored `9999px` radius down to `min(W, H)` = 380 so the BL
+// arc fills the entire bottom-left quadrant of the box, and the remaining three corners stay
+// sharp. The result is the geometry the source HTML actually intended: a quarter-circle
+// anchored at the box's opposite corner, *not* a 380x380 disc inscribed inside it (which is
+// what the legacy single-roundness fallback produced).
+PAG_TEST(PAGXHTMLImporterTest, QuarterCircleCornerDecorationEmitsPath) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:380px;height:380px">
+      <div style="position:absolute;left:0;top:0;width:380px;height:380px;
+                  background-color:#C2B2E4;border-radius:0 0 0 9999px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(div), nullptr);
+  auto* path = FindElementOfType<pagx::Path>(div);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  // The path must reach the four edges of the box: tight bounds equal (0, 0, 380, 380). The
+  // PathData control-point bounds the helper returns can be a hair larger than the geometric
+  // hull, so we test reachability via specific on-curve points emitted by
+  // `BuildPerCornerRoundedRectPathData` instead of relying on `getBounds` precision.
+  const auto& verbs = path->data->verbs();
+  const auto& pts = path->data->points();
+  // Expected first move is at (W, TR) = (380, 0) since TR == 0.
+  ASSERT_FALSE(verbs.empty());
+  EXPECT_EQ(verbs.front(), pagx::PathVerb::Move);
+  ASSERT_GE(pts.size(), 1u);
+  EXPECT_NEAR(pts.front().x, 380.0f, kEps);
+  EXPECT_NEAR(pts.front().y, 0.0f, kEps);
+  EXPECT_EQ(verbs.back(), pagx::PathVerb::Close);
+  // Exactly one cubic — the BL quarter-circle. The three zero-radius corners are sharp.
+  size_t cubicCount = 0;
+  for (auto v : verbs) {
+    if (v == pagx::PathVerb::Cubic) cubicCount++;
+  }
+  EXPECT_EQ(cubicCount, 1u);
+}
+
+// CSS edge-overlap scaling: `border-radius: 200px 200px 0 0` on a 100x100 box expands to
+// TL=TR=200 / BR=BL=0. Every edge that touches a 200px corner constrains it:
+//   top:   TL + TR = 400 > 100 -> f_top   = 100 / 400 = 0.25
+//   right: TR + BR = 200 > 100 -> f_right = 100 / 200 = 0.5
+//   left:  TL + BL = 200 > 100 -> f_left  = 100 / 200 = 0.5
+// CSS picks the smallest factor (0.25) and applies it to *every* radius uniformly, so the
+// final TL/TR both land at 50. The remaining two corners stay at 0, so the four radii differ
+// and the layer builder emits a Path.
+PAG_TEST(PAGXHTMLImporterTest, OverlargeRadiiAreClampedToEdgeLength) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#000;border-radius:200px 200px 0 0"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(div), nullptr);
+  auto* path = FindElementOfType<pagx::Path>(div);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  // The path's first move starts at (W, TR_clamped) = (100, 50). Without the clamp the y
+  // coordinate would be 200, well outside the 100x100 box.
+  ASSERT_FALSE(path->data->verbs().empty());
+  EXPECT_EQ(path->data->verbs().front(), pagx::PathVerb::Move);
+  ASSERT_GE(path->data->points().size(), 1u);
+  EXPECT_NEAR(path->data->points().front().x, 100.0f, kEps);
+  EXPECT_NEAR(path->data->points().front().y, 50.0f, kEps);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedProducesDashPattern) {

@@ -229,6 +229,17 @@ class HTMLParserContext {
   // the double-layer split for padded contents).
   bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
 
+  // Builds the background geometry node for a layer that carries `border-radius`. Returns a
+  // `Rectangle` covering the layer (with `roundness` set) when all four corner radii are equal
+  // (the common case for `border-radius: 12px` / `border-radius: 50%` / etc.). Returns a `Path`
+  // tracing the per-corner rounded outline when the radii differ — the only way PAGX can
+  // faithfully represent CSS patterns like `border-radius: 0 0 0 9999px` (a quarter-circle
+  // anchored at one corner) since `Rectangle` exposes only a single uniform `roundness`. When
+  // the radii are asymmetric but the box has no resolved px width/height, falls back to a
+  // single-roundness Rectangle (max radius) and emits a diagnostic, matching the legacy
+  // behaviour for the rare unsized rounded boxes.
+  Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
+
   // Applies the resolved CSS `transform` (parsed by HTMLStyleResolver into
   // `box.transform.matrix`) to `layer->matrix`. Folds in `transform-origin: 50% 50%` (the
   // only origin the importer supports) when the box has explicit width/height; without

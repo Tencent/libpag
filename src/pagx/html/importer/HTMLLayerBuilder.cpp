@@ -246,6 +246,48 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   return ScaleMode::Stretch;
 }
 
+// Traces the outline of a rounded rectangle with per-corner radii (TL, TR, BR, BL) inside the
+// axis-aligned box (0, 0)-(W, H) onto `out`. Going clockwise starting at the top of the right
+// edge — matches the canonical PAGX rendering start point for rounded rectangles, so the path
+// reverses / orientation logic in shape modifiers (`ApplyRoundCorner`, `MergePath`, etc.) sees
+// the same winding it would from a uniform Rectangle. Corners with radius 0 collapse to a sharp
+// vertex (no cubic emitted). Caller is responsible for clamping the radii so adjacent pairs do
+// not exceed the box's edge length — see the CSS scaling clamp in `HTMLStyleResolver`.
+void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl, float tr,
+                                       float brad, float bl) {
+  const float k = 1.0f - BEZIER_KAPPA;
+  // Start at the top of the right edge (or the top-right corner when TR == 0). Mirrors the
+  // Rectangle-with-uniform-roundness writer in HTMLWriterShape.cpp so existing geometry tests
+  // (and any downstream RoundCorner modifier that relies on the start vertex landing on an
+  // edge) keep working.
+  out.moveTo(w, tr);
+  // Right edge.
+  out.lineTo(w, h - brad);
+  if (brad > 0) {
+    // BR corner: cubic from (W, H - BR) to (W - BR, H), bulging into (W, H).
+    out.cubicTo(w, h - brad * k, w - brad * k, h, w - brad, h);
+  }
+  // Bottom edge.
+  out.lineTo(bl, h);
+  if (bl > 0) {
+    // BL corner: cubic from (BL, H) to (0, H - BL), bulging into (0, H).
+    out.cubicTo(bl * k, h, 0, h - bl * k, 0, h - bl);
+  }
+  // Left edge.
+  out.lineTo(0, tl);
+  if (tl > 0) {
+    // TL corner: cubic from (0, TL) to (TL, 0), bulging into (0, 0).
+    out.cubicTo(0, tl * k, tl * k, 0, tl, 0);
+  }
+  // Top edge.
+  out.lineTo(w - tr, 0);
+  if (tr > 0) {
+    // TR corner: cubic from (W - TR, 0) back to (W, TR), bulging into (W, 0). Closes the loop.
+    out.cubicTo(w - tr * k, 0, w, tr * k, w, tr);
+  }
+  out.close();
+}
+
 }  // namespace
 
 Text* HTMLParserContext::buildTextElement(const TextFragment& fragment) {
@@ -354,6 +396,53 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
   }
 }
 
+Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
+  // Fast path: no border-radius authored, or every corner shares the same radius. PAGX
+  // `Rectangle` collapses to a single uniform `roundness`, so emit it as a `percentWidth /
+  // percentHeight = 100%` shape that adapts to whatever the parent layer ends up being. This
+  // keeps the common case (border-radius: 12px, border-radius: 50%, all-zeros, ...) on the
+  // same compact representation older optimisations and tests rely on.
+  if (!box.borderRadiusSet || box.borderRadiusUniform) {
+    auto* rect = _document->makeNode<Rectangle>();
+    rect->percentWidth = 100.0f;
+    rect->percentHeight = 100.0f;
+    rect->roundness = box.borderRadiusSet ? box.borderRadiusTLPx : 0.0f;
+    return rect;
+  }
+
+  // Asymmetric per-corner radii. PAGX has no native per-corner rounded-rectangle primitive
+  // (neither `Rectangle.roundness` nor `RoundCorner.radius` carries more than a single value),
+  // so we synthesise a `Path` whose `PathData` traces the exact outline. Concrete coordinates
+  // require the box's px size; for the rare case where the author left it unsized fall back to
+  // the legacy single-roundness approximation with a diagnostic — the importer otherwise can't
+  // honour the per-corner geometry without a layout pass.
+  if (std::isnan(box.widthPx) || std::isnan(box.heightPx) || box.widthPx <= 0.0f ||
+      box.heightPx <= 0.0f) {
+    float maxR = std::max({box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx,
+                           box.borderRadiusBLPx});
+    warn("html: per-corner border-radius without fixed px width/height; approximated with the "
+         "largest radius (PAGX Path requires concrete dimensions)");
+    auto* rect = _document->makeNode<Rectangle>();
+    rect->percentWidth = 100.0f;
+    rect->percentHeight = 100.0f;
+    rect->roundness = maxR;
+    return rect;
+  }
+
+  auto* data = _document->makeNode<PathData>();
+  BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
+                                    box.borderRadiusTRPx, box.borderRadiusBRPx,
+                                    box.borderRadiusBLPx);
+  auto* path = _document->makeNode<Path>();
+  path->data = data;
+  // Path geometry uses the parent layer's local coordinate space (already laid out at the
+  // layer's `width` x `height` by `applySizeAndPosition`), so the path's own origin offset
+  // stays at zero — `renderPosition` then resolves to the layer top-left and `renderScale`
+  // resolves to 1 since the path bounds equal the layer bounds.
+  path->position = {0.0f, 0.0f};
+  return path;
+}
+
 bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
@@ -364,22 +453,21 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
     return false;
   }
   bool emitted = false;
-  Rectangle* rect = nullptr;
+  // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
+  // emitted below. We only allocate it when the box actually carries a paintable visual.
+  Element* geometry = nullptr;
   if (box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
       box.borderSet) {
-    rect = _document->makeNode<Rectangle>();
-    rect->percentWidth = 100.0f;
-    rect->percentHeight = 100.0f;
-    rect->roundness = box.borderRadiusSet ? box.borderRadiusPx : 0.0f;
-    layer->contents.push_back(rect);
+    geometry = buildBackgroundGeometry(box);
+    layer->contents.push_back(geometry);
     emitted = true;
   }
 
   // Background colour / gradient.
-  if (rect && box.backgroundColorSet && box.backgroundImage.empty()) {
+  if (geometry && box.backgroundColorSet && box.backgroundImage.empty()) {
     layer->contents.push_back(buildSolidFill(box.backgroundColor));
     emitted = true;
-  } else if (rect && !box.backgroundImage.empty()) {
+  } else if (geometry && !box.backgroundImage.empty()) {
     auto fill = _document->makeNode<Fill>();
     std::string bg = Trim(box.backgroundImage);
     fill->color = parseGradientByValue(bg);
@@ -403,7 +491,7 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
   }
 
   // Border.
-  if (rect && box.borderSet) {
+  if (geometry && box.borderSet) {
     auto stroke = _document->makeNode<Stroke>();
     auto solid = _document->makeNode<SolidColor>();
     solid->color = box.borderColor;
@@ -642,10 +730,12 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   applySizeAndPosition(layer, box);
   applyLayerAttributes(layer, element, box);
 
-  auto rect = _document->makeNode<Rectangle>();
-  rect->percentWidth = 100.0f;
-  rect->percentHeight = 100.0f;
-  layer->contents.push_back(rect);
+  // Honour `border-radius` directly on `<img>`: a CSS `<img style="border-radius: 50%">` is the
+  // canonical way to draw a circular avatar, and per-corner radii (e.g. only the top corners
+  // rounded for a "card cover" image) follow the same Path-emission path the container code
+  // uses. When the image has no border-radius, `buildBackgroundGeometry` falls back to a plain
+  // `Rectangle width=100% height=100%`, preserving the legacy emission verbatim.
+  layer->contents.push_back(buildBackgroundGeometry(box));
 
   auto fill = _document->makeNode<Fill>();
   auto pattern = _document->makeNode<ImagePattern>();
