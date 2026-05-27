@@ -18,7 +18,7 @@
 
 #include "GlyphRunRenderer.h"
 #include <cmath>
-#include <unordered_map>
+#include "RenderCache.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
@@ -35,10 +35,6 @@
 #include "tgfx/core/TextBlobBuilder.h"
 
 namespace pagx {
-
-// Cache for typefaces built from Font nodes. Uses Font pointer as key since Font nodes are
-// immutable after parsing and have stable addresses within a document's lifetime.
-static std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> TypefaceCache;
 
 // Returns true if the matrix can be represented as an RSXform (uniform scale + rotation +
 // translation), i.e. the matrix has the form [scos, -ssin, tx; ssin, scos, ty; 0, 0, 1].
@@ -103,15 +99,17 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
-std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode,
+                                                                        RenderCache* renderCache) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
   }
 
-  // Check cache first
-  auto it = TypefaceCache.find(fontNode);
-  if (it != TypefaceCache.end()) {
-    return it->second;
+  if (renderCache != nullptr) {
+    auto cached = renderCache->getTypeface(fontNode);
+    if (cached != nullptr) {
+      return cached;
+    }
   }
 
   bool hasPath = false;
@@ -164,14 +162,14 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     typeface = builder.detach();
   }
 
-  // Cache the typeface for future use
-  if (typeface != nullptr) {
-    TypefaceCache[fontNode] = typeface;
+  if (typeface != nullptr && renderCache != nullptr) {
+    renderCache->setTypeface(fontNode, typeface);
   }
   return typeface;
 }
 
-void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix,
+                                     RenderCache* renderCache) {
   tgfx::TextBlobBuilder builder = {};
   std::vector<tgfx::Point> anchors;
 
@@ -180,7 +178,7 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
       continue;
     }
 
-    auto typeface = BuildTypefaceFromFont(run->font);
+    auto typeface = BuildTypefaceFromFont(run->font, renderCache);
     if (typeface == nullptr) {
       continue;
     }

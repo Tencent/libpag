@@ -23,8 +23,13 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
+#include "renderer/RenderCache.h"
 
 namespace pagx {
+
+PAGXDocument::PAGXDocument() = default;
+
+PAGXDocument::~PAGXDocument() = default;
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
   if (config != nullptr) {
@@ -56,6 +61,13 @@ std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight
   doc->width = docWidth;
   doc->height = docHeight;
   return doc;
+}
+
+RenderCache* PAGXDocument::getOrCreateRenderCache() {
+  if (renderCache == nullptr) {
+    renderCache = std::unique_ptr<RenderCache>(new RenderCache());
+  }
+  return renderCache.get();
 }
 
 Node* PAGXDocument::findNode(const std::string& id) const {

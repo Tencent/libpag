@@ -29,6 +29,8 @@
 namespace pagx {
 
 class LayoutContext;
+class LayerBuilder;
+class RenderCache;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -164,20 +166,25 @@ class PAGXDocument : public Node {
     return NodeType::Document;
   }
 
+  ~PAGXDocument() override;
+
  private:
-  PAGXDocument() = default;
+  PAGXDocument();
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
+  RenderCache* getOrCreateRenderCache();
 
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
+  std::unique_ptr<RenderCache> renderCache;
 
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
+  friend class LayerBuilder;
 };
 
 }  // namespace pagx

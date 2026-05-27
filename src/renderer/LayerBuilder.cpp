@@ -69,6 +69,7 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/RenderCache.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -125,7 +126,8 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  LayerBuilderContext() = default;
+  explicit LayerBuilderContext(RenderCache* renderCache) : _renderCache(renderCache) {
+  }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
@@ -234,12 +236,12 @@ class LayerBuilderContext {
   // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
   // For standalone Text (not inside TextBox), inverseMatrix is Identity.
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
-  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+  void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text->glyphData->layoutRuns.empty()) {
       text->glyphData->textBlob =
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
-      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix, _renderCache);
     }
   }
 
@@ -256,7 +258,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      PrepareTextBlob(childText[i], inverse);
+      prepareTextBlob(childText[i], inverse);
     }
   }
 
@@ -371,7 +373,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
     auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
-      PrepareTextBlob(node, tgfx::Matrix::I());
+      prepareTextBlob(node, tgfx::Matrix::I());
       textBlob = node->glyphData->textBlob;
     }
     if (textBlob == nullptr) {
@@ -892,6 +894,7 @@ class LayerBuilderContext {
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  RenderCache* _renderCache = nullptr;
 };
 
 // Public API implementation
@@ -906,7 +909,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(document->getOrCreateRenderCache());
   return context.build(*document);
 }
 
@@ -922,7 +925,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(document->getOrCreateRenderCache());
   return context.buildWithMap(*document);
 }
 
