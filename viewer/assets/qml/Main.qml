@@ -273,6 +273,7 @@ PAGWindow {
             if (settings.isAutoCheckUpdate) {
                 checkForUpdates(true);
             }
+            pluginInstaller.checkPluginOnStartup();
         }
     }
 
