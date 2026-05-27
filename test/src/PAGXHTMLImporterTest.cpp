@@ -808,6 +808,69 @@ PAG_TEST(PAGXHTMLImporterTest, LeadingBrPreservesNewline) {
   EXPECT_EQ(text->text.front(), '\n');
 }
 
+// Whitespace at the boundary between two differently styled fragments must be preserved
+// at the parent's font size. Without per-run-aware whitespace collapse, the trailing space
+// in the parent text (32px) gets stripped together with the leading whitespace of the
+// child span, gluing the two runs together visually.
+PAG_TEST(PAGXHTMLImporterTest, NestedSpanPreservesBoundaryWhitespace) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:48px">
+      <span style="font-size:32px;color:#fff;font-family:Arial;line-height:48px">Title <span style="font-size:16px;color:#888">subtitle</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "Title ");
+  EXPECT_EQ(texts[1]->text, "subtitle");
+}
+
+// Adjacent whitespace at a fragment boundary collapses to a single space, regardless of
+// which fragment carried the trailing/leading space. The merged space is hosted by the
+// fragment that owned the trailing whitespace, so its font size matches the run that
+// preceded the boundary.
+PAG_TEST(PAGXHTMLImporterTest, NestedSpanCollapsesBoundaryWhitespace) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:48px">
+      <span style="font-size:14px;color:#000;font-family:Arial">left <span style="color:#888">  right</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "left ");
+  EXPECT_EQ(texts[1]->text, "right");
+}
+
+// Trailing whitespace at the very end of an inline run is stripped even when it lives in
+// the first fragment because every following fragment collapsed away. The post-pass
+// re-trims the surviving last fragment so the run does not end with a stray space.
+PAG_TEST(PAGXHTMLImporterTest, NestedSpanTrimsTrailingWhitespaceAtRunEnd) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:48px">
+      <span style="font-size:14px;color:#000;font-family:Arial">text <span style="color:#888">   </span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(leaf);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "text");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ImageRegistersImageResource) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">

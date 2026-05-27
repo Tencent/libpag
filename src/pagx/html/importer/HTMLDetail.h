@@ -204,9 +204,15 @@ bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct);
 float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx, float canvasW,
                            float canvasH, bool& recognized);
 
-// Collapse HTML whitespace in a single fragment: convert tabs/CR to spaces, collapse
-// adjacent ASCII whitespace, and trim leading/trailing whitespace at the fragment level.
-std::string CollapseHTMLWhitespace(const std::string& raw);
+// Collapse HTML whitespace inside a fragment: convert tabs/CR to spaces and collapse
+// adjacent ASCII whitespace into a single space. `trimLeading` strips remaining ASCII
+// spaces from the front (leading `\n` is preserved so a leading `<br>` keeps its hard
+// newline), and `trimTrailing` strips trailing spaces and `\n`. When the fragment is
+// part of a multi-fragment inline run, the caller should disable the trim that falls in
+// the middle of the run so that whitespace at the boundary between two differently
+// styled fragments is preserved with its own font size — see `convertTextLeaf`.
+std::string CollapseHTMLWhitespace(const std::string& raw, bool trimLeading = true,
+                                   bool trimTrailing = true);
 
 // ----- Property-map helpers -----------------------------------------------------------------
 

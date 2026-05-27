@@ -615,14 +615,39 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
                                           const HTMLInheritedStyle& inherited) {
   std::vector<TextFragment> fragments;
   collectTextFragments(element, inherited, fragments);
+  // Collapse whitespace as if the inline-formatting-context were a single CSS run, not as
+  // independent fragments. Each fragment carries its own font size, so a trailing space in a
+  // parent span followed by a child span (`灵魂内核层 <span>SOUL...</span>`) must keep that
+  // space at the parent's font size — trimming the trailing space per-fragment would render
+  // the two runs glued together. Strategy: only the first non-empty fragment trims its
+  // leading whitespace; intermediate fragments keep both ends; cross-fragment boundary
+  // whitespace is collapsed by trimming a fragment's leading whitespace when the previous
+  // fragment ended with whitespace; trailing whitespace at the very end of the run is removed
+  // in a post-pass on the last surviving fragment.
   size_t writeIndex = 0;
+  bool prevEndsWithWhitespace = false;
   for (size_t i = 0; i < fragments.size(); ++i) {
-    fragments[i].text = CollapseHTMLWhitespace(fragments[i].text);
+    bool trimLeading = (writeIndex == 0) || prevEndsWithWhitespace;
+    fragments[i].text =
+        CollapseHTMLWhitespace(fragments[i].text, trimLeading, /*trimTrailing=*/false);
     if (fragments[i].text.empty()) continue;
+    char back = fragments[i].text.back();
+    prevEndsWithWhitespace = (back == ' ' || back == '\n');
     if (writeIndex != i) {
       fragments[writeIndex] = std::move(fragments[i]);
     }
     ++writeIndex;
+  }
+  while (writeIndex > 0) {
+    auto& last = fragments[writeIndex - 1].text;
+    while (!last.empty() && (last.back() == ' ' || last.back() == '\n')) {
+      last.pop_back();
+    }
+    if (last.empty()) {
+      --writeIndex;
+    } else {
+      break;
+    }
   }
   fragments.resize(writeIndex);
   if (fragments.empty()) {

@@ -504,7 +504,7 @@ float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx,
   return NAN;
 }
 
-std::string CollapseHTMLWhitespace(const std::string& raw) {
+std::string CollapseHTMLWhitespace(const std::string& raw, bool trimLeading, bool trimTrailing) {
   std::string normalized;
   normalized.reserve(raw.size());
   bool prevSpace = false;
@@ -518,7 +518,7 @@ std::string CollapseHTMLWhitespace(const std::string& raw) {
       continue;
     }
     if (c == ' ' || c == '\t' || c == '\r') {
-      if (!prevSpace && !normalized.empty()) {
+      if (!prevSpace) {
         normalized.push_back(' ');
         prevSpace = true;
       }
@@ -527,12 +527,16 @@ std::string CollapseHTMLWhitespace(const std::string& raw) {
       prevSpace = false;
     }
   }
-  while (!normalized.empty() && (normalized.back() == ' ' || normalized.back() == '\n')) {
-    normalized.pop_back();
+  if (trimTrailing) {
+    while (!normalized.empty() && (normalized.back() == ' ' || normalized.back() == '\n')) {
+      normalized.pop_back();
+    }
   }
-  size_t start = 0;
-  while (start < normalized.size() && normalized[start] == ' ') start++;
-  if (start > 0) normalized.erase(0, start);
+  if (trimLeading) {
+    size_t start = 0;
+    while (start < normalized.size() && normalized[start] == ' ') start++;
+    if (start > 0) normalized.erase(0, start);
+  }
   return normalized;
 }
 
