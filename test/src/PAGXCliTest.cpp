@@ -3022,8 +3022,7 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
   auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  auto fontFile = CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf",
-                                      "NotoSansSC-Regular.otf");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
   auto outPagx = TempDir() + "/embed_fontfile_out.pagx";
   StreamCapture outCapture(std::cout);
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
@@ -3078,8 +3077,7 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
   auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  auto fontFile = CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf",
-                                      "NotoSansSC-Regular.otf");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
   auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
   auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
   auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});

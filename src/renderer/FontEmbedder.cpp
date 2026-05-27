@@ -409,6 +409,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
             toRemove.insert(glyph->image);
           }
         }
+        font->glyphs.clear();
       } else {
         toRemove.insert(node.get());
         for (auto* glyph : font->glyphs) {
