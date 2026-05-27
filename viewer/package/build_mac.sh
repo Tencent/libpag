@@ -405,7 +405,6 @@ EOF
 
 # 3.6 Update plist
 printStep "Update plist"
-DSAPublicKeyName=$(basename "${DSAPublicKey}")
 SUPublicEDKey=""
 if [ -n "${EDDSAPublicKey}" ] && [ -f "${EDDSAPublicKey}" ];
 then
@@ -413,7 +412,11 @@ then
 fi
 /usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${ContentsDir}/Info.plist"
-/usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist"
+if [ -n "${DSAPublicKey}" ];
+then
+    DSAPublicKeyName=$(basename "${DSAPublicKey}")
+    /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist"
+fi
 /usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist"
 
 /usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist"
