@@ -299,6 +299,9 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
     $SignScript = Join-Path $SourceDir "package\sign_update.bat"
     $Base64Code = cmd /c $SignScript $OpenSSL $PAGViewerInstallerPath $DSAPrivateKey
     if ($LASTEXITCODE -ne 0) { Exit-WithError "Signing installer failed" }
+    # Collapse potentially multi-line cmd output into a single token before substitution;
+    # PowerShell -replace with a string[] would yield N substitutions and corrupt the XML.
+    $Base64Code = (($Base64Code -join '') -replace '\s', '')
     Log-Success "Installer signed"
 
     Print-Step "Update Appcast"
