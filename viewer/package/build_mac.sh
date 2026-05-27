@@ -536,6 +536,13 @@ then
     rm -rf "${TempDir}"
 
     mkdir -p "${TempDir}"
+    # Ensure notarization temp artifacts are removed even if a later step fails.
+    # Use absolute paths so the trap works regardless of the cwd at exit time.
+    NotarizeTempDir="${BuildDir}/${TempDir}"
+    NotarizeTempZip="${BuildDir}/${TempZip}"
+    NotarizeLog="${BuildDir}/notarize.log"
+    NotarizeDetail="${BuildDir}/notarize_detail.json"
+    trap 'rm -rf "${NotarizeTempDir}" "${NotarizeTempZip}" "${NotarizeLog}" "${NotarizeDetail}" 2>/dev/null || true' EXIT
     cp -fRP "${AppDir}" "${TempDir}"
     zip --symlinks -r -q -X "${TempZip}" "${TempDir}"
 
@@ -592,11 +599,10 @@ then
     fi
     logSuccess "Stapler validation passed."
 
-    # Clean up temp files
-    rm -f "${TempZip}"
-    rm -rf "${TempDir}"
-    rm -f notarize.log
     popd > /dev/null
+    # Notarization succeeded; run cleanup explicitly and disarm the EXIT trap
+    rm -rf "${NotarizeTempDir}" "${NotarizeTempZip}" "${NotarizeLog}" "${NotarizeDetail}" 2>/dev/null || true
+    trap - EXIT
 else
     logWarning "Certificate '${SignCertName}' not found in keychain, skipping code signing and notarization."
 fi
