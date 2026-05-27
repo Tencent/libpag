@@ -241,10 +241,10 @@ class LayerBuilderContext {
     }
   }
 
-  // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
-  // This must happen at render time (not layout time) so that tgfx's StrokePainter can
-  // detect the Group transform via geometry->matrix changes between apply() and draw().
   void prepareTextBoxTextBlobs(const TextBox* textBox) {
+    // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
+    // This must happen at render time (not layout time) so that tgfx's StrokePainter can
+    // detect the Group transform via geometry->matrix changes between apply() and draw().
     std::vector<Text*> childText;
     std::vector<tgfx::Matrix> matrices;
     TextLayout::CollectTextElements(textBox->elements, childText, matrices);
