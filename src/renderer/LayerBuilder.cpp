@@ -232,9 +232,6 @@ class LayerBuilderContext {
     return layer;
   }
 
-  // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
-  // For standalone Text (not inside TextBox), inverseMatrix is Identity.
-  // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
   void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text->glyphData->layoutRuns.empty()) {
       text->glyphData->textBlob =
