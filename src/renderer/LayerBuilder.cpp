@@ -128,22 +128,20 @@ class LayerBuilderContext {
   explicit LayerBuilderContext(PAGXDocument& document) : _document(document) {
   }
 
-  // Note: signatures are non-const because rendering populates the document's per-document
-  // typeface cache via GlyphRunRenderer. Logical const-ness was never preserved here.
-  LayerBuildResult buildWithMap(PAGXDocument& document) {
-    auto root = build(document);
+  LayerBuildResult buildWithMap() {
+    auto root = build();
     LayerBuildResult result = {};
     result.root = root;
     result.layerMap = std::move(_tgfxLayerByPagxLayer);
     return result;
   }
 
-  std::shared_ptr<tgfx::Layer> build(PAGXDocument& document) {
+  std::shared_ptr<tgfx::Layer> build() {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
-    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
-    for (const auto& layer : document.layers) {
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(_document.width, _document.height));
+    for (const auto& layer : _document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
         rootLayer->addChild(childLayer);
@@ -912,7 +910,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   }
 
   LayerBuilderContext context(*document);
-  return context.build(*document);
+  return context.build();
 }
 
 LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
@@ -928,7 +926,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   }
 
   LayerBuilderContext context(*document);
-  return context.buildWithMap(*document);
+  return context.buildWithMap();
 }
 
 }  // namespace pagx
