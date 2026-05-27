@@ -150,6 +150,11 @@ MajorVersion=${MajorVersion:-1}
 MinorVersion=${MinorVersion:-0}
 BuildNumber=${BuildNumber:-0}
 AppVersion=${MajorVersion}.${MinorVersion}.${BuildNumber}
+# Normalize isBetaVersion to a strict lowercase "true" so later string compares are predictable.
+case "${isBetaVersion:-}" in
+    [Tt][Rr][Uu][Ee]|1) IsBetaVersion="true" ;;
+    *)                  IsBetaVersion="false" ;;
+esac
 CurrentTime=$(date +"%Y-%m-%d %H:%M:%S")
 RFCTime=$(date -R)
 SourceDir=$(dirname "$(dirname "$(realpath "$0")")")
@@ -661,7 +666,7 @@ then
         ZipLength=$(stat -f%z "${BuildDir}/${ZipFile}")
 
         URL=$(curl -s https://pag.io/server.html)
-        if [ "${isBetaVersion}" == true ];
+        if [ "${IsBetaVersion}" == true ];
         then
             URL="${URL}beta/"
         fi
