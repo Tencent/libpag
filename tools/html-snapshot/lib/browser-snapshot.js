@@ -187,6 +187,15 @@ function readPadding(computed) {
   };
 }
 
+function readMargin(computed) {
+  return {
+    top:    parseFloat(computed.getPropertyValue('margin-top'))    || 0,
+    right:  parseFloat(computed.getPropertyValue('margin-right'))  || 0,
+    bottom: parseFloat(computed.getPropertyValue('margin-bottom')) || 0,
+    left:   parseFloat(computed.getPropertyValue('margin-left'))   || 0,
+  };
+}
+
 function borderWidthOf(computed, side) {
   return parseFloat(computed.getPropertyValue(`border-${side}-width`)) || 0;
 }
@@ -1582,6 +1591,18 @@ function isInlineRunChild(el) {
   if (hasBoxVisualsForInline(cs)) return false;
   const pad = readPadding(cs);
   if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  // A non-zero margin shifts the run's painted position, but the inline-run
+  // emit path (`emitInlineRunMarkup` → `STYLE_SCHEMA_TEXT`) only forwards
+  // text-scope properties (color, font-size, letter-spacing, line-height,
+  // text-decoration, white-space, writing-mode) and the PAGX HTML subset
+  // intentionally drops `margin*` (see HTMLSubsetPropertyTable: "use
+  // padding/gap/flex instead"). Inline-merging a margin-bearing run would
+  // therefore silently glue it to its sibling. Falling back to the
+  // absolute-positioned container path lets the browser-measured `left`
+  // encode the margin offset directly, so PAGX renders the gap correctly
+  // without needing a margin notion of its own.
+  const margin = readMargin(cs);
+  if (margin.top || margin.right || margin.bottom || margin.left) return false;
   for (const c of el.childNodes) {
     if (c.nodeType === Node.TEXT_NODE) continue;
     if (c.nodeType !== Node.ELEMENT_NODE) return false;
@@ -2392,6 +2413,7 @@ const HELPER_FNS = [
   nonZero,
   isVisible,
   readPadding,
+  readMargin,
   borderWidthOf,
   readBorderSide,
   paddingBoxOrigin,
