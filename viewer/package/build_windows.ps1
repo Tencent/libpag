@@ -259,10 +259,11 @@ if (-not (Test-Path $ISCCPath)) {
     Log-Info "InnoSetup not found, installing..."
     $Installer = "$env:TEMP\innosetup.exe"
     Invoke-WebRequest -Uri "https://www.jrsoftware.org/download.php/is.exe" -OutFile $Installer
-    Start-Process -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=$InnoSetupDir"
-    $InstallStatus = $?
+    $InstallProcess = Start-Process -PassThru -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=$InnoSetupDir"
     Remove-Item -Path $Installer -Force -ErrorAction SilentlyContinue
-    if (-not $InstallStatus) { Exit-WithError "Install InnoSetup failed" }
+    if ($InstallProcess.ExitCode -ne 0) { Exit-WithError "Install InnoSetup failed" }
+    # Guard against installers that report success but land outside $InnoSetupDir.
+    if (-not (Test-Path $ISCCPath)) { Exit-WithError "InnoSetup binary missing at $ISCCPath after install" }
     $UninstallInnoSetup = $true
     Log-Success "InnoSetup installed"
 } else {
