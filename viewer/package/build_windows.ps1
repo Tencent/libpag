@@ -55,6 +55,21 @@ function Exit-WithError {
     exit 1
 }
 
+function Invoke-CMakeBuild {
+    param(
+        [string]$SourceDir,
+        [string]$BuildDir,
+        [string]$Target,
+        [string[]]$ConfigureArgs,
+        [int]$Jobs = 16
+    )
+    & cmake -S $SourceDir -B $BuildDir @ConfigureArgs
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "CMake configure $Target failed" }
+
+    & cmake --build $BuildDir --config Release -j $Jobs
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "CMake build $Target failed" }
+}
+
 # ═══════════════════════════════════════════════════════════
 # 1 Initialize variables
 # ═══════════════════════════════════════════════════════════
@@ -127,19 +142,13 @@ Print-Step "PAGExporter"
 $PluginSourceDir = Join-Path $LibpagDir "exporter"
 $x64BuildDirForPlugin = Join-Path $x64BuildDir "Plugin"
 
-cmake -S $PluginSourceDir -B $x64BuildDirForPlugin -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DAE_SDK_PATH="$AESDKPath"
-if (-not $?) { Exit-WithError "CMake configure PAGExporter failed" }
-
-cmake --build $x64BuildDirForPlugin --config Release -j 16
-if (-not $?) { Exit-WithError "CMake build PAGExporter failed" }
+Invoke-CMakeBuild -SourceDir $PluginSourceDir -BuildDir $x64BuildDirForPlugin -Target "PAGExporter" `
+    -ConfigureArgs @("-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_PREFIX_PATH=$QtCMakePath", "-DAE_SDK_PATH=$AESDKPath")
 
 # 2.3 Compile PAGViewer
 Print-Step "PAGViewer"
-cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
-if (-not $?) { Exit-WithError "CMake configure PAGViewer failed" }
-
-cmake --build $x64BuildDir --config Release -j 16
-if (-not $?) { Exit-WithError "CMake build PAGViewer failed" }
+Invoke-CMakeBuild -SourceDir $SourceDir -BuildDir $x64BuildDir -Target "PAGViewer" `
+    -ConfigureArgs @("-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_PREFIX_PATH=$QtCMakePath", "-DPAG_PATH=$PAGPath", "-DPAG_OPTIONS=$PAGOptions")
 
 # 2.4 Compile H264EncoderTools
 Print-Step "H264EncoderTools"
