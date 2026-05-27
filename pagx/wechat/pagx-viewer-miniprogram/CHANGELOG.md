@@ -1,5 +1,78 @@
 # Changelog
 
+## v1.8.2
+
+### 变更
+
+- 版本号更新，用于在 v1.8 发布后重新发布小程序包；对外 API 与 v1.8 保持一致。
+
+---
+
+## v1.8
+
+### 破坏性变更
+
+- **删除 `View.zoomBy(scaleDelta, focalX, focalY)`**。该 API 在 v1.7 实现为
+  增量式 zoom（每帧 `newZoom = currentZoom × scaleDelta`），但与真实 pinch
+  手势的"基于会话起点的累计 scale"模型不匹配——连续调用时浮点累积 + focal
+  不在视野中心导致的几何挤压，会让画面在缩放过程中持续平移。请改用 v1.8 新增
+  的 pinchBy 系列 API。
+
+### 新增
+
+- `View.beginPinchGesture()` / `View.pinchBy(scale, focalX, focalY)` /
+  `View.endPinchGesture()`：基于手势会话的绝对式 pinch zoom，参考 iOS
+  `UIPinchGestureRecognizer` 设计。
+  - **手势模式**：`beginPinchGesture()` 抓 snapshot，后续每次 `pinchBy(scale)`
+    都基于 snapshot 重算 zoom/offset，无累积、无漂移；`endPinchGesture()` 清
+    snapshot
+  - **单次模式**：未调用 `beginPinchGesture()` 时直接调 `pinchBy(scale, x, y)`，
+    基于当前 view 状态做一次绝对 zoom，等价 v1.7 的 zoomBy 单次调用语义。适用
+    于鼠标滚轮、双击、按钮"+/-"等离散输入
+
+### 迁移指南
+
+| v1.7 写法 | v1.8 写法 |
+|---|---|
+| `view.zoomBy(perFrameRatio, focalX, focalY)` 每帧调用（手势）| `beginPinch → pinchBy(cumulativeScale, focalX, focalY) × N → endPinch` |
+| `view.zoomBy(1.1, mouseX, mouseY)` 单次调用 | `view.pinchBy(1.1, mouseX, mouseY)`（无 begin/end） |
+
+`updateZoomScaleAndOffset / panBy / setPadding / getViewportInfo` 完全不变。
+
+---
+
+## v1.7
+
+### 新增
+
+- 新增 `View.setPadding(logicalPx)` API：配置单 Frame 预览的单边预留留白（逻辑像素，默认 0）
+  - 影响 `panBy` / `zoomBy` 内部的 pan 上限与 zoom 下界，实现"文档加 padding 不会缩到比 canvas 还小"
+  - 默认值 0 保持与历史版本兼容，不调用此接口的业务方行为不变
+- 新增 `View.panBy(deltaX, deltaY)` API：增量 pan + 自动 clamp + 越界报告
+  - 入参为 canvas 物理像素增量
+  - 返回 `{ remainingX, remainingY }` —— 未消耗的 pan 量。非零意味着方向越界，业务层据此触发翻页 / 弹性反馈等 UI
+  - `panBy(0, 0)` 是合法的"重新 clamp"调用，可在外部直接修改 zoom 后用来收回越界的 offset
+- 新增 `View.zoomBy(scaleDelta, focalX, focalY)` API：增量 zoom + 锚点偏移 + 自动 clamp
+  - 内部按 zoom-around-point 公式更新 offset，保证捏合中心稳定
+  - 自动应用 zoom 下界（基于 `setPadding` 配置）：缩到"文档+padding"等于 canvas 时为底
+  - zoom 完成后再次 clamp offset，避免 zoom 改变后 offset 越界
+- 新增 `View.getViewportInfo()` API：一次性获取所有视口状态
+  - 返回字段：`{ zoom, offsetX, offsetY, canvasWidth, canvasHeight, contentWidth, contentHeight, fitScale, atLeft, atRight, atTop, atBottom }`
+  - `atLeft/atRight/atTop/atBottom` 表示文档边缘是否已贴到 canvas 边缘（0.5px 容差）
+  - 替代多次调用 `contentWidth()` / `contentHeight()` / `getContentTransform()` 等
+
+### 变更
+
+- `View.updateZoomScaleAndOffset(zoom, offsetX, offsetY)` 仍保留，但内部会同步更新 SDK 缓存的 zoom/offset
+- 推荐手势驱动的 viewport 修改改用 `panBy` / `zoomBy`，由 SDK 统一处理 clamp 策略；只有需要绝对跳转或自带 clamp 的调用方才直接用 `updateZoomScaleAndOffset`
+
+### 兼容性
+
+- 完全向后兼容：未调用 `setPadding` 的业务方，所有行为与 v1.6 一致
+- 业务方可以渐进迁移：原有 `updateZoomScaleAndOffset` 调用无需修改
+
+---
+
 ## v1.6
 
 ### 修复

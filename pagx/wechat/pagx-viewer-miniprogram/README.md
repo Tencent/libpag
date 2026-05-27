@@ -2,7 +2,7 @@
 
 微信小程序 PAGX 查看器 SDK，提供在微信小程序中渲染 PAGX 动画文件的能力。基于 TGFX 和 WebAssembly 实现高性能 WebGL 渲染。
 
-> 当前版本：**v1.6**
+> 当前版本：**v1.8.2**
 
 ## 目录结构
 
@@ -36,7 +36,7 @@ pagx-viewer-miniprogram/
 ```json
 {
   "dependencies": {
-    "@tencent/pagx-viewer-miniprogram": "1.4.0"
+    "@tencent/pagx-viewer-miniprogram": "1.8.2"
   }
 }
 ```
@@ -198,7 +198,13 @@ const module = await PAGXInit({
 | `View.buildLayers()` | 构建层树，完成渲染内容准备（三步加载第 3 步） |
 | `View.contentWidth()` | 获取 PAGX 内容宽度（物理像素） |
 | `View.contentHeight()` | 获取 PAGX 内容高度（物理像素） |
-| `View.updateZoomScaleAndOffset(zoom, offsetX, offsetY)` | 更新缩放比例和偏移量 |
+| `View.updateZoomScaleAndOffset(zoom, offsetX, offsetY)` | 直接设置缩放与偏移（绝对值，不做 clamp） |
+| `View.panBy(deltaX, deltaY)` | 增量 pan + 自动 clamp + 越界报告（推荐手势驱动） |
+| `View.beginPinchGesture()` | 开始 pinch 手势会话，抓 snapshot（v1.8+） |
+| `View.pinchBy(scale, focalX, focalY)` | 绝对式 pinch zoom + 自动 clamp（v1.8+，覆盖手势/单次离散两种场景） |
+| `View.endPinchGesture()` | 结束 pinch 手势会话，清 snapshot（v1.8+） |
+| `View.setPadding(logicalPx)` | 配置单 Frame 预览单边留白（逻辑像素，默认 0） |
+| `View.getViewportInfo()` | 一次性获取 viewport + content size + boundary 状态 |
 | `View.onZoomEnd()` | ~~缩放结束通知~~（已弃用，内部自动检测） |
 | `View.getContentTransform()` | 获取坐标转换参数，用于评论浮层定位 |
 | `View.getNodePosition(nodeId)` | 通过节点 ID 查询节点相对于画布的位置 |
@@ -575,6 +581,142 @@ if (result.found) {
 ### View.setBoundsOrigin(x, y)
 
 手动设置 boundsOrigin，覆盖 PAGX 文件中的值。当 PAGX 文件未嵌入 `bounds-origin` 数据时使用。
+
+## 单 Frame 预览与手势接入（v1.7+）
+
+`v1.7+` 提供了完整的"单 Frame 预览 + 手势"工具集：`setPadding` / `panBy` /
+`beginPinchGesture` / `pinchBy` / `endPinchGesture` / `getViewportInfo`。SDK
+内部统一处理 fitScale、padding、pan/zoom 边界 clamp，业务层只需把触摸事件
+翻译成对应调用。
+
+> **注意（v1.8 破坏性变更）**：v1.7 的 `zoomBy(scaleDelta, focalX, focalY)`
+> 已删除——它的增量式语义在连续 pinch 手势中会累积浮点误差 + focal 偏移挤压，
+> 视觉上表现为缩放过程中持续平移。请改用 `pinchBy` 系列接口。
+
+### 初始化
+
+```javascript
+// 加载完 PAGX 后配置单边留白（逻辑像素，默认 0）
+View.setPadding(100);
+// 复位到初始 fit + 居中
+View.updateZoomScaleAndOffset(1, 0, 0);
+```
+
+### 单指 pan（带越界报告）
+
+```javascript
+const dpr = wx.getSystemInfoSync().pixelRatio;
+let lastX, lastY;
+
+onTouchStart(e) {
+  if (e.touches.length === 1) {
+    lastX = e.touches[0].x;
+    lastY = e.touches[0].y;
+  }
+},
+onTouchMove(e) {
+  if (e.touches.length !== 1) return;
+  const deltaX = (e.touches[0].x - lastX) * dpr;  // 物理像素增量
+  const deltaY = (e.touches[0].y - lastY) * dpr;
+  lastX = e.touches[0].x;
+  lastY = e.touches[0].y;
+
+  const r = View.panBy(deltaX, deltaY);
+  // r.remainingX > 0：用户继续往右拖但 SDK 已 clamp（已贴右边界）
+  // r.remainingX < 0：用户继续往左拖但 SDK 已 clamp（已贴左边界）
+  // 业务层据此决定是否触发翻页 / 弹性反馈
+  if (r.remainingX !== 0) {
+    // ...更新越界 UI（如箭头提示）
+  }
+}
+```
+
+### 双指 pinch zoom（手势会话）
+
+```javascript
+let initialDist = 0;
+let focalX = 0;
+let focalY = 0;
+
+onTouchStart(e) {
+  if (e.touches.length === 2) {
+    initialDist = Math.hypot(
+      e.touches[1].x - e.touches[0].x,
+      e.touches[1].y - e.touches[0].y
+    );
+    // 锁定双指开始时的捏合中心作为 zoom 锚点（物理像素）。整个手势期间不变。
+    focalX = (e.touches[0].x + e.touches[1].x) * 0.5 * dpr;
+    focalY = (e.touches[0].y + e.touches[1].y) * 0.5 * dpr;
+    View.beginPinchGesture();   // SDK 抓 snapshot
+  }
+},
+onTouchMove(e) {
+  if (e.touches.length !== 2) return;
+  const currentDist = Math.hypot(
+    e.touches[1].x - e.touches[0].x,
+    e.touches[1].y - e.touches[0].y
+  );
+  // scale 是从手势起点到当前的累计比例（绝对值），不是每帧 delta
+  const scale = currentDist / initialDist;
+  View.pinchBy(scale, focalX, focalY);
+  // SDK 内部基于 begin 时的 snapshot 重算 zoom/offset，每帧都是绝对计算 →
+  // 无浮点累积、focal 那个像素视觉上不动、其他内容向 focal 辐射缩放。
+},
+onTouchEnd(e) {
+  if (e.touches.length < 2) {
+    View.endPinchGesture();   // 清 snapshot
+  }
+}
+```
+
+### 单次 zoom（鼠标滚轮 / 双击 / 按钮）
+
+无需 begin/end，直接调 `pinchBy` 单次：
+
+```javascript
+// 鼠标滚轮放大 10%
+View.pinchBy(1.1, mouseX, mouseY);
+
+// 双击放大 2 倍
+View.pinchBy(2, tapX, tapY);
+
+// 按钮 zoom-in 20%（围绕画布中心）
+View.pinchBy(1.2, canvasWidth / 2, canvasHeight / 2);
+```
+
+未在手势会话内调用时，`pinchBy` 基于当前 view 状态做一次绝对 zoom，等价于
+v1.7 旧版 `zoomBy(scale, x, y)` 的单次调用语义。
+
+### 查询当前视口
+
+```javascript
+const v = View.getViewportInfo();
+// {
+//   zoom, offsetX, offsetY,           // 当前 transform
+//   canvasWidth, canvasHeight,         // canvas 物理像素
+//   contentWidth, contentHeight,       // 文档原始尺寸
+//   fitScale,                          // SDK 内部 contain fit 系数
+//   atLeft, atRight, atTop, atBottom,  // 边界标记（0.5px 容差）
+// }
+
+if (v.atLeft) {
+  // 文档已贴到左边界
+}
+```
+
+### 复位
+
+```javascript
+View.updateZoomScaleAndOffset(1, 0, 0);
+```
+
+### 何时直接用 updateZoomScaleAndOffset？
+
+- **绝对跳转**：已知目标 zoom/offset 直接写入（例如恢复历史状态）
+- **自带 clamp 的业务**：业务层已经维护一套自己的边界策略，不希望 SDK 介入
+
+否则推荐用 `panBy / pinchBy` —— SDK 会自动应用 clamp 策略，业务层无需关心
+fitScale、padding、minZoom 等显示数学。
 
 ## 常见问题
 

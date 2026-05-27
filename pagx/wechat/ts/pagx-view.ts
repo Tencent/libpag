@@ -75,6 +75,12 @@ export interface TextureEventHandler {
   onTextureEvict?: (filePaths: string[]) => void;
 }
 
+interface PanBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
 
 export interface PAGXViewOptions {
   /**
@@ -180,6 +186,27 @@ export class View {
   private isRendering = false;
   private firstFrameCallbackFired = false;
   private animationFrameId: number = 0;
+
+  // Cached viewport state. Mutated by panBy/pinchBy and by direct
+  // updateZoomScaleAndOffset() callers; read by getViewportInfo() and the
+  // pan/zoom clamp math. Kept in canvas-physical-pixel space (offset) and
+  // unitless (zoom).
+  private currentZoom = 1;
+  private currentOffsetX = 0;
+  private currentOffsetY = 0;
+  // Single-side padding in logical pixels (default 0 keeps the legacy "fit to
+  // canvas" behavior for callers that haven't opted into single-frame preview).
+  // The zoom lower-bound and pan limits are computed against
+  // (effectiveContent + 2 × paddingLogical × dpr).
+  private paddingLogical = 0;
+
+  // Pinch-zoom session snapshot. Set by beginPinchGesture(), cleared by
+  // endPinchGesture(). When non-null, pinchBy() computes the new zoom/offset
+  // from this snapshot rather than the live view — so a continuous pinch
+  // gesture (typically called every animation frame) is immune to floating-
+  // point accumulation and to the focal-induced drift that arises when each
+  // frame's calculation depends on the previous frame's output.
+  private pinchSnapshot: { zoom: number; offsetX: number; offsetY: number } | null = null;
 
   private constructor(module: PAGX, canvas: WxCanvas) {
     this.module = module;
@@ -440,11 +467,20 @@ export class View {
 
   /**
    * Update zoom scale and content offset for display list.
+   *
+   * Prefer the higher-level panBy / pinchBy helpers when implementing
+   * gesture-driven viewport changes — they apply the SDK's clamp policy (zoom
+   * lower bound, pan limits, padding) automatically and report overscroll.
+   * This raw setter remains available for callers that already maintain their
+   * own clamp logic or need an absolute jump.
    * @param zoom Zoom scale
    * @param offsetX X offset
    * @param offsetY Y offset
    */
   public updateZoomScaleAndOffset(zoom: number, offsetX: number, offsetY: number): void {
+    this.currentZoom = zoom;
+    this.currentOffsetX = offsetX;
+    this.currentOffsetY = offsetY;
     this.nativeView!.updateZoomScaleAndOffset(zoom, offsetX, offsetY);
   }
 
@@ -503,6 +539,213 @@ export class View {
    */
   public getContentTransform(): ContentTransform {
     return this.nativeView!.getContentTransform();
+  }
+
+  /**
+   * Configure the single-side reserved padding (logical pixels) used by the
+   * single-frame preview clamp policy. The zoom lower bound is chosen so that
+   * the document plus 2× padding cannot shrink below the canvas, and the pan
+   * limits keep the document edge from leaving the canvas viewport.
+   *
+   * Default is 0, which preserves the legacy "fit to canvas" behavior for
+   * callers that have not opted into single-frame preview.
+   *
+   * @param logicalPx Single-side reserved padding in logical pixels (≥ 0).
+   */
+  public setPadding(logicalPx: number): void {
+    this.paddingLogical = Math.max(0, logicalPx);
+    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
+  }
+
+  /**
+   * Pan the viewport by an incremental delta (canvas physical pixels). The
+   * SDK applies the clamp policy and writes the new offset back to the native
+   * view in one round-trip.
+   *
+   * Returns the unconsumed portion of the requested pan in each axis. A
+   * non-zero `remainingX/Y` means the gesture pushed the document past its
+   * pan limit — callers can use this signal to drive overscroll UI such as
+   * page-flip arrows or rubber-band feedback. The consumed portion is simply
+   * `deltaX − remainingX` (the SDK does not return it explicitly).
+   *
+   * Calling `panBy(0, 0)` is a legitimate way to re-clamp the current offset,
+   * for example after a caller mutates zoom directly via
+   * updateZoomScaleAndOffset() and the offset is no longer in range.
+   *
+   * @param deltaX Horizontal delta in canvas physical pixels.
+   * @param deltaY Vertical delta in canvas physical pixels.
+   */
+  public panBy(deltaX: number, deltaY: number): { remainingX: number; remainingY: number } {
+    if (!this.nativeView) {
+      return { remainingX: 0, remainingY: 0 };
+    }
+    const bounds = this.computePanBounds();
+    const desiredX = this.currentOffsetX + deltaX;
+    const desiredY = this.currentOffsetY + deltaY;
+    const clampedX = clamp(desiredX, bounds.minX, bounds.maxX);
+    const clampedY = clamp(desiredY, bounds.minY, bounds.maxY);
+    if (clampedX !== this.currentOffsetX || clampedY !== this.currentOffsetY
+        || deltaX !== 0 || deltaY !== 0) {
+      this.updateZoomScaleAndOffset(this.currentZoom, clampedX, clampedY);
+    }
+    return {
+      remainingX: desiredX - clampedX,
+      remainingY: desiredY - clampedY,
+    };
+  }
+
+  /**
+   * Begin a pinch-zoom gesture session. The SDK snapshots the current zoom and
+   * offset; subsequent pinchBy() calls are computed from this snapshot rather
+   * than the live view, so the gesture stays free of accumulated floating-point
+   * drift even when called every frame for hundreds of frames.
+   *
+   * Designed to mirror UIPinchGestureRecognizer's "absolute scale" model:
+   * `scale` in pinchBy() is the cumulative ratio from the gesture start, not a
+   * per-frame delta.
+   *
+   * Calling beginPinchGesture() when a session is already active overwrites the
+   * snapshot — useful when the host wants to reset the anchor mid-gesture.
+   *
+   * @example
+   * ```ts
+   * // Two-finger pinch (continuous):
+   * onTouchStart: view.beginPinchGesture(); initialDist = ...; focalX = ...;
+   * onTouchMove:  view.pinchBy(currentDist / initialDist, focalX, focalY);
+   * onTouchEnd:   view.endPinchGesture();
+   *
+   * // Single-shot zoom (no begin/end needed):
+   * view.pinchBy(1.1, mouseX, mouseY);   // wheel zoom-in 10%
+   * view.pinchBy(2.0, tapX, tapY);       // double-tap zoom-in
+   * ```
+   */
+  public beginPinchGesture(): void {
+    this.pinchSnapshot = {
+      zoom: this.currentZoom,
+      offsetX: this.currentOffsetX,
+      offsetY: this.currentOffsetY,
+    };
+  }
+
+  /**
+   * Apply a pinch zoom around a focal point. Behavior depends on whether a
+   * gesture session is active:
+   *
+   * - **Inside a session** (between beginPinchGesture/endPinchGesture):
+   *   `scale` is the cumulative ratio from the session start. The SDK
+   *   recomputes the new zoom and offset from the snapshot every call, so
+   *   continuous gestures (e.g. two-finger pinch) are immune to floating-point
+   *   accumulation and to the focal-induced drift caused by per-frame relative
+   *   updates.
+   *
+   * - **Without a session** (no begin/end called):
+   *   `scale` is applied to the live view state, equivalent to a one-shot
+   *   absolute zoom. Suitable for discrete inputs like mouse wheel, double-tap,
+   *   or "+/-" buttons where there is no concept of a "gesture start".
+   *
+   * In both modes the SDK clamps the resulting zoom to its lower bound (so the
+   * document plus padding never shrinks below the canvas) and re-clamps the
+   * offset to the pan limits at the new zoom level.
+   *
+   * @param scale  Cumulative zoom ratio. Inside a session: relative to the
+   *               snapshot zoom. Without session: relative to the current zoom.
+   *               Values < 1 zoom out, > 1 zoom in.
+   * @param focalX Anchor X in canvas physical pixels (the point that should
+   *               stay visually fixed during the zoom).
+   * @param focalY Anchor Y in canvas physical pixels.
+   */
+  public pinchBy(scale: number, focalX: number, focalY: number): void {
+    if (!this.nativeView) {
+      return;
+    }
+    // Pick the base state: snapshot if in a session, live view otherwise.
+    // The single-shot path matches the previous (now-removed) zoomBy(scaleDelta)
+    // semantics so callers using pinchBy for wheel/tap zoom get the same
+    // result without any extra setup.
+    const baseZoom = this.pinchSnapshot ? this.pinchSnapshot.zoom : this.currentZoom;
+    const baseOffsetX = this.pinchSnapshot ? this.pinchSnapshot.offsetX : this.currentOffsetX;
+    const baseOffsetY = this.pinchSnapshot ? this.pinchSnapshot.offsetY : this.currentOffsetY;
+
+    const minZoom = this.computeMinZoom();
+    let newZoom = baseZoom * scale;
+    if (newZoom < minZoom) newZoom = minZoom;
+
+    // Standard zoom-around-focal formula:
+    //   newOffset = (baseOffset - focal) × (newZoom / baseZoom) + focal
+    // Computed from the base state, not the live view, so the focal stays
+    // visually fixed even across hundreds of frames.
+    const ratio = newZoom / baseZoom;
+    let newOffsetX = (baseOffsetX - focalX) * ratio + focalX;
+    let newOffsetY = (baseOffsetY - focalY) * ratio + focalY;
+
+    // Re-clamp the offset against the pan bounds at the new zoom level.
+    const boundsAtNewZoom = this.computePanBoundsForZoom(newZoom);
+    newOffsetX = clamp(newOffsetX, boundsAtNewZoom.minX, boundsAtNewZoom.maxX);
+    newOffsetY = clamp(newOffsetY, boundsAtNewZoom.minY, boundsAtNewZoom.maxY);
+
+    this.updateZoomScaleAndOffset(newZoom, newOffsetX, newOffsetY);
+  }
+
+  /**
+   * End a pinch-zoom gesture session and clear the snapshot. Subsequent
+   * pinchBy() calls revert to single-shot mode (operating on the live view).
+   *
+   * Idempotent: calling endPinchGesture() without an active session is a no-op.
+   */
+  public endPinchGesture(): void {
+    this.pinchSnapshot = null;
+  }
+
+  /**
+   * Snapshot of the current viewport. All fields reflect post-clamp state and
+   * are safe to consume from any rendering or UI code path. Boundary flags
+   * indicate the document edge has reached the canvas edge in that direction
+   * (within a 0.5-pixel tolerance) — callers that drive overscroll UI from
+   * non-pan sources (keyboard arrows, programmatic snap) can read these
+   * directly instead of inferring from panBy's remaining values.
+   *
+   * - zoom / offsetX / offsetY:    current display-list transform
+   * - canvasWidth / canvasHeight:  physical-pixel canvas size
+   * - contentWidth / contentHeight: PAGX document size in content units
+   * - fitScale:                    scale factor applied internally to fit the
+   *                                document into the canvas in contain mode
+   * - atLeft / atRight / atTop / atBottom: edge-reached flags
+   */
+  public getViewportInfo(): {
+    zoom: number;
+    offsetX: number;
+    offsetY: number;
+    canvasWidth: number;
+    canvasHeight: number;
+    contentWidth: number;
+    contentHeight: number;
+    fitScale: number;
+    atLeft: boolean;
+    atRight: boolean;
+    atTop: boolean;
+    atBottom: boolean;
+  } {
+    const canvasW = this.canvas ? this.canvas.width : 0;
+    const canvasH = this.canvas ? this.canvas.height : 0;
+    const contentW = this.nativeView ? this.nativeView.contentWidth() : 0;
+    const contentH = this.nativeView ? this.nativeView.contentHeight() : 0;
+    const fitScale = this.nativeView ? this.getContentTransform().fitScale : 1;
+    const bounds = this.computePanBounds();
+    const tol = 0.5;
+    return {
+      zoom: this.currentZoom,
+      offsetX: this.currentOffsetX,
+      offsetY: this.currentOffsetY,
+      canvasWidth: canvasW,
+      canvasHeight: canvasH,
+      contentWidth: contentW,
+      contentHeight: contentH,
+      fitScale,
+      atLeft: this.currentOffsetX <= bounds.minX + tol,
+      atRight: this.currentOffsetX >= bounds.maxX - tol,
+      atTop: this.currentOffsetY <= bounds.minY + tol,
+      atBottom: this.currentOffsetY >= bounds.maxY - tol,
+    };
   }
 
   /**
@@ -621,7 +864,63 @@ export class View {
 
     this.backendContext = null;
     this.canvas = null;
+    this.pinchSnapshot = null;
     this.isDestroyed = true;
+  }
+
+  /**
+   * Pan bounds at the current zoom. The interactive virtual canvas is the viewport plus
+   * padding on each side. Bounds are asymmetric when zoom < 1 so the shrunken virtual
+   * canvas stays centered instead of snapping to the top-left origin.
+   */
+  private computePanBounds(): PanBounds {
+    return this.computePanBoundsForZoom(this.currentZoom);
+  }
+
+  private computePanBoundsForZoom(zoom: number): PanBounds {
+    if (!this.canvas) {
+      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    }
+    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
+    const paddingPhysical = this.paddingLogical * dpr;
+    const canvasW = this.canvas.width;
+    const canvasH = this.canvas.height;
+    let minX = canvasW - (canvasW + paddingPhysical) * zoom;
+    let maxX = paddingPhysical * zoom;
+    let minY = canvasH - (canvasH + paddingPhysical) * zoom;
+    let maxY = paddingPhysical * zoom;
+    if (minX > maxX) {
+      const centerX = (minX + maxX) * 0.5;
+      minX = centerX;
+      maxX = centerX;
+    }
+    if (minY > maxY) {
+      const centerY = (minY + maxY) * 0.5;
+      minY = centerY;
+      maxY = centerY;
+    }
+    return { minX, maxX, minY, maxY };
+  }
+
+  /**
+   * Lower bound for zoom under dynamic pan-bound semantics. At min zoom the virtual canvas
+   * (viewport + padding on each side) just covers the viewport.
+   * Returns 0 when fields are not yet initialized — callers will subsequently use 1 as the
+   * fallback minimum.
+   */
+  private computeMinZoom(): number {
+    if (!this.nativeView || !this.canvas) {
+      return 0;
+    }
+    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
+    const paddingPhysical = this.paddingLogical * dpr;
+    const virtualW = this.canvas.width + 2 * paddingPhysical;
+    const virtualH = this.canvas.height + 2 * paddingPhysical;
+    return Math.min(
+      1,
+      this.canvas.width / virtualW,
+      this.canvas.height / virtualH,
+    );
   }
 
   private resetSize(): void {
@@ -766,4 +1065,10 @@ export class View {
       }
     }
   }
+}
+
+function clamp(v: number, min: number, max: number): number {
+  if (v < min) return min;
+  if (v > max) return max;
+  return v;
 }
