@@ -280,7 +280,7 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
     Print-Step "Sign installer"
     $SignScript = Join-Path $SourceDir "package\sign_update.bat"
     $Base64Code = cmd /c $SignScript $OpenSSL $PAGViewerInstallerPath $DSAPrivateKey
-    if (-not $?) { Exit-WithError "Signing installer failed" }
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "Signing installer failed" }
     Log-Success "Installer signed"
 
     Print-Step "Update Appcast"
