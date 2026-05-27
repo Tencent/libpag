@@ -205,7 +205,6 @@ cmakeBuild "${x86_64BuildDir}" "PAGViewer"
 
 # 2.4 Compile PAGViewer-arm64
 printStep "PAGViewer-arm64"
-arm64BuildDir="${BuildDir}/build_arm64"
 
 cmakeConfigure "${SourceDir}" "${arm64BuildDir}" "PAGViewer-arm64" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
