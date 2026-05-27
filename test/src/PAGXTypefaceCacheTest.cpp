@@ -128,13 +128,17 @@ CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   ASSERT_NE(fontNode, nullptr);
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  auto firstTypeface = doc->typefaceCache->typefaces[fontNode];
+  auto it1 = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(it1, doc->typefaceCache->typefaces.end());
+  auto firstTypeface = it1->second;
   ASSERT_TRUE(firstTypeface != nullptr);
   auto sizeAfterFirst = doc->typefaceCache->typefaces.size();
   auto refsAfterFirst = firstTypeface.use_count();
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  auto secondTypeface = doc->typefaceCache->typefaces[fontNode];
+  auto it2 = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(it2, doc->typefaceCache->typefaces.end());
+  auto secondTypeface = it2->second;
   // Cache must hit the early-return path on the second build: same shared_ptr instance, same map
   // size, and only the new local copy adds a strong reference.
   EXPECT_EQ(firstTypeface.get(), secondTypeface.get());
@@ -164,7 +168,9 @@ CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesCachedTypefaces) {
   ASSERT_NE(fontNode, nullptr);
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  std::weak_ptr<Typeface> weak = doc->typefaceCache->typefaces[fontNode];
+  auto cacheIt = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(cacheIt, doc->typefaceCache->typefaces.end());
+  std::weak_ptr<Typeface> weak = cacheIt->second;
   ASSERT_FALSE(weak.expired());
 
   doc.reset();
