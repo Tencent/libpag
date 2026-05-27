@@ -457,7 +457,13 @@ then
     logInfo "Get SignCertName: ${SignCertName}"
 fi
 
+HasSignCert=false
 if security find-certificate -c "${SignCertName}" >/dev/null 2>&1;
+then
+    HasSignCert=true
+fi
+
+if [ "${HasSignCert}" = true ];
 then
     # 4.1 Sign PAGViewer.app
     printStep "Sign PAGViewer.app"
@@ -704,7 +710,7 @@ fi
 
 SIGNED="No"
 NOTARIZED="No"
-if security find-certificate -c "${SignCertName}" >/dev/null 2>&1;
+if [ "${HasSignCert}" = true ];
 then
     SIGNED="Yes (${SignCertName})"
     NOTARIZED="Yes (stapled)"
