@@ -4,9 +4,10 @@
  *
  * Wraps the snapshot pipeline (the same one `snapshot.js` runs from the CLI)
  * behind a tiny HTTP server. Send an HTML string in the request body; receive
- * the processed, flat, absolute-positioned HTML back — the same output that
- * `node snapshot.js page.html` writes to disk and feeds to
- * `pagx import --format html`.
+ * either the processed, flat, absolute-positioned HTML, or the converted
+ * PAGX document, back — the same artefacts that
+ * `node snapshot.js page.html` and `pagx import --format html` produce on
+ * disk.
  *
  * Lifecycle:
  *   • One headless browser is launched at startup and kept alive for the
@@ -14,35 +15,53 @@
  *     pipeline, and closes the page — no temp tabs accumulate even under
  *     sustained load. Concurrent requests are served in parallel against
  *     the same browser.
+ *   • PAGX conversion (when requested) shells out to the `pagx` binary
+ *     once per request. The binary is located via --pagx-bin / $PAGX_BIN;
+ *     server boot does not require pagx to exist (only `format=pagx` /
+ *     `format=both` requests do).
  *
  * Endpoints:
  *   POST /snapshot
  *     Request body:
- *       - Content-Type: application/json  → { html | url: string, options?: { ... } }
+ *       - Content-Type: application/json  → { html | url: string,
+ *                                              format?: "html"|"pagx"|"both",
+ *                                              options?: { ... } }
  *                                            Provide exactly one of `html` or `url`.
  *       - Any other Content-Type           → the entire body is treated as the
- *                                            HTML payload.
+ *                                            HTML payload (format defaults to
+ *                                            "html"; use the JSON envelope or
+ *                                            the `?format=` query param to
+ *                                            request PAGX).
  *     Response:
- *       - Default                          → text/html with the processed HTML
+ *       - format=html (default)            → text/html with the processed HTML
  *                                            (plus X-Snapshot-Width /
- *                                            X-Snapshot-Height headers).
- *       - Accept: application/json         → { html, width, height }.
+ *                                            X-Snapshot-Height /
+ *                                            X-Snapshot-Format headers).
+ *       - format=pagx                      → application/xml with the PAGX
+ *                                            document (same headers).
+ *       - format=both                      → JSON only ({ html, pagx, width,
+ *                                            height }). Returns 406 unless the
+ *                                            client sends Accept: application/json.
+ *       - Accept: application/json (any
+ *         single-format request)           → { html|pagx, width, height }.
  *     The `options` object accepts: viewportWidth, viewportHeight, waitMs,
- *     selector, inlineIconFonts, plus cookies / headers for URL inputs
- *     (all optional).
+ *     selector, inlineIconFonts, inferFlex, plus cookies / headers for URL
+ *     inputs (all optional). `inferFlex` only applies to PAGX output.
  *
- *   GET /snapshot?url=<http(s)-url>&...options
+ *   GET /snapshot?url=<http(s)-url>&format=html|pagx|both&...options
  *     Convenience route for "fetch this page and snapshot it" — no body
  *     required. Same response semantics as POST. Supported query params:
- *       url (required), viewportWidth, viewportHeight, waitMs, selector,
- *       inlineIconFonts.
+ *       url (required), format, viewportWidth, viewportHeight, waitMs,
+ *       selector, inlineIconFonts, inferFlex.
  *
  *   GET /health
- *     200 { status: "ok", engine, activeRequests } once the browser is up.
+ *     200 { status: "ok", engine, pagxBin, pagxBinExists, activeRequests }
+ *     once the browser is up.
  *
  * Usage:
  *   node server.js [--port 8787] [--host 127.0.0.1]
  *                  [--browser-engine puppeteer|playwright]
+ *                  [--pagx-bin <path>]
  *                  [--max-body-mb 32]
  */
 
@@ -55,7 +74,16 @@ const path = require('path');
 
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
+const { runPagxImport, defaultPagxBin, PagxImportError } = require('./lib/pagx-runner');
 const { errMessage, isHttpUrl } = require('./lib/cli');
+
+// Output formats the server understands. `html` is the original (and default)
+// behaviour: return the flat snapshot HTML straight from the browser.
+// `pagx` runs the snapshot through `pagx import --format html` and returns
+// the resulting XML. `both` returns both in a single JSON envelope (only
+// available to JSON callers; text responses can carry one format).
+const SUPPORTED_FORMATS = ['html', 'pagx', 'both'];
+const DEFAULT_FORMAT = 'html';
 
 const LOG_PREFIX = 'html-snapshot-server: ';
 
@@ -76,17 +104,23 @@ Options:
   --host <addr>            Listen address (default 127.0.0.1; env: HOST)
   --browser-engine <name>  ${SUPPORTED_ENGINES.join(' | ')} (default puppeteer;
                            env: HTML_SNAPSHOT_BROWSER)
+  --pagx-bin <path>        Path to the pagx CLI used for format=pagx|both
+                           (default: \$PAGX_BIN or
+                           <repo-root>/cmake-build-debug/pagx)
   --max-body-mb <n>        Maximum request body size in MB (default 32;
                            env: MAX_BODY_MB)
   -h, --help               Show this help
 
 Endpoints:
-  POST /snapshot         — body is raw HTML, or JSON { html|url, options };
-                           response is the processed HTML string (text/html),
-                           or JSON when the client sends Accept: application/json.
+  POST /snapshot         — body is raw HTML, or JSON { html|url, format?,
+                           options? }. \`format\` is one of html (default),
+                           pagx, or both. text/html or application/xml is
+                           returned for single-format requests; format=both
+                           requires Accept: application/json.
   GET  /snapshot?url=…   — fetch the URL and run the same pipeline (no body).
-                           Optional query params: viewportWidth, viewportHeight,
-                           waitMs, selector, inlineIconFonts.
+                           Optional query params: format, viewportWidth,
+                           viewportHeight, waitMs, selector, inlineIconFonts,
+                           inferFlex.
   GET  /health           — liveness probe.`);
 }
 
@@ -96,6 +130,10 @@ function parseServerArgs(argv) {
     host: process.env.HOST || '127.0.0.1',
     browserEngine: resolveEngine(process.env.HTML_SNAPSHOT_BROWSER),
     maxBodyBytes: (Number(process.env.MAX_BODY_MB) || 32) * 1024 * 1024,
+    // `pagxBin` is resolved eagerly so logs show the absolute path the
+    // server will spawn. The binary itself is not required at boot — only
+    // requests that ask for `format=pagx`/`format=both` actually need it.
+    pagxBin: defaultPagxBin(),
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -117,6 +155,13 @@ function parseServerArgs(argv) {
         console.error(`${LOG_PREFIX}${errMessage(err)}`);
         process.exit(2);
       }
+    } else if (a === '--pagx-bin') {
+      const value = argv[++i];
+      if (!value) {
+        console.error(`${LOG_PREFIX}--pagx-bin requires a path argument`);
+        process.exit(2);
+      }
+      opts.pagxBin = path.resolve(value);
     } else if (a === '--max-body-mb') {
       const mb = Number(argv[++i]);
       if (!Number.isFinite(mb) || mb <= 0) {
@@ -219,6 +264,55 @@ function wantsJsonResponse(req) {
   return true;
 }
 
+// Validate and normalise the user-supplied `format` selector. Accepts a
+// string (single value), an array of strings (e.g. ["html", "pagx"], which
+// is the multi-format shorthand for "both"), or undefined (defaults to
+// html). Throws an HttpError 400 on anything we don't recognise so the
+// client gets a clear contract violation instead of a silent fallback.
+function normaliseFormat(rawFormat) {
+  if (rawFormat === undefined || rawFormat === null) return DEFAULT_FORMAT;
+  let candidate;
+  if (typeof rawFormat === 'string') {
+    const trimmed = rawFormat.trim().toLowerCase();
+    if (!trimmed) return DEFAULT_FORMAT;
+    // Accept comma-separated lists too (e.g. ?format=html,pagx) — handy
+    // in query strings where arrays don't have a native shape.
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',').map((p) => p.trim()).filter(Boolean);
+      candidate = parts;
+    } else {
+      candidate = trimmed;
+    }
+  } else if (Array.isArray(rawFormat)) {
+    candidate = rawFormat
+      .filter((p) => typeof p === 'string')
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+  } else {
+    throw new HttpError(400, `format must be a string or array of strings`);
+  }
+
+  if (Array.isArray(candidate)) {
+    const set = new Set(candidate);
+    for (const v of set) {
+      if (v !== 'html' && v !== 'pagx') {
+        throw new HttpError(400, `unsupported format value '${v}' (expected html|pagx)`);
+      }
+    }
+    if (set.size === 0) return DEFAULT_FORMAT;
+    if (set.size === 1) return [...set][0];
+    return 'both';
+  }
+
+  if (!SUPPORTED_FORMATS.includes(candidate)) {
+    throw new HttpError(
+      400,
+      `unsupported format '${candidate}' (expected ${SUPPORTED_FORMATS.join('|')})`,
+    );
+  }
+  return candidate;
+}
+
 // Materialise the incoming HTML on disk so the existing pipeline (which
 // drives the browser via `page.goto(url)`) can navigate to it as a file://
 // URL. Each call returns a `{ file, cleanup }` pair scoped to a unique
@@ -243,13 +337,27 @@ function writeHtmlToTempFile(html) {
   };
 }
 
-// Parse a POST body into a `{ html | url, options }` source descriptor.
-// JSON bodies may carry either an `html` string or a `url` string (exactly
-// one); any other Content-Type is treated as a raw HTML payload — that
-// shorthand only makes sense for HTML so we don't accept URLs through it.
+// Parse a POST body into a `{ html | url, format, options }` source
+// descriptor. JSON bodies may carry either an `html` string or a `url`
+// string (exactly one), plus an optional top-level `format` selector and
+// `options` object; any other Content-Type is treated as a raw HTML payload
+// (format defaults to html — the URL fallback isn't useful here, and PAGX
+// can be requested via the ?format=pagx query string instead).
 function parsePostSource(req, rawBuf) {
   const ct = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
   const rawText = rawBuf.toString('utf8');
+  // Allow `?format=pagx` on the URL even when posting raw HTML — handy for
+  // `curl --data-binary @page.html '/snapshot?format=pagx'`-style clients
+  // that don't want to construct a JSON envelope. Query takes effect only
+  // when the JSON body itself does not specify a format.
+  const queryFormat = (() => {
+    try {
+      return new URL(req.url, 'http://localhost').searchParams.get('format');
+    } catch (_) {
+      return null;
+    }
+  })();
+
   if (ct === 'application/json') {
     let parsed;
     try {
@@ -269,21 +377,22 @@ function parsePostSource(req, rawBuf) {
       throw new HttpError(400, 'json body must contain a string "html" or "url" field');
     }
     const options = (parsed.options && typeof parsed.options === 'object') ? parsed.options : {};
+    const format = normaliseFormat(parsed.format !== undefined ? parsed.format : queryFormat);
     if (hasUrl) {
       if (!isHttpUrl(parsed.url)) {
         throw new HttpError(400, 'url must start with http:// or https://');
       }
-      return { url: parsed.url, options };
+      return { url: parsed.url, options, format };
     }
     if (!parsed.html.trim()) {
       throw new HttpError(400, 'empty "html" field');
     }
-    return { html: parsed.html, options };
+    return { html: parsed.html, options, format };
   }
   if (!rawText || !rawText.trim()) {
     throw new HttpError(400, 'empty html body');
   }
-  return { html: rawText, options: {} };
+  return { html: rawText, options: {}, format: normaliseFormat(queryFormat) };
 }
 
 // Parse a GET query string into the same `{ url, options }` source
@@ -327,7 +436,14 @@ function parseGetSource(req) {
     else if (iif === 'false' || iif === '0') queryOptions.inlineIconFonts = false;
     else throw new HttpError(400, `inlineIconFonts must be true|false|1|0, got '${iif}'`);
   }
-  return { url, options: queryOptions };
+  const ifx = params.get('inferFlex');
+  if (ifx !== null) {
+    if (ifx === 'true' || ifx === '1') queryOptions.inferFlex = true;
+    else if (ifx === 'false' || ifx === '0') queryOptions.inferFlex = false;
+    else throw new HttpError(400, `inferFlex must be true|false|1|0, got '${ifx}'`);
+  }
+  const format = normaliseFormat(params.get('format'));
+  return { url, options: queryOptions, format };
 }
 
 // Whitelist + coerce the small set of pipeline options we expose over HTTP.
@@ -338,6 +454,11 @@ function parseGetSource(req) {
 // `cookies` and `headers` are only honoured for URL-source requests; the
 // snapshot pipeline ignores them for file:// URLs and forwarding them
 // would only confuse the caller. The flag is plumbed via `forUrl`.
+//
+// `inferFlex` is special: it does not affect the snapshot pipeline itself,
+// only the downstream `pagx import` step (`--html-infer-flex`). The
+// resolved value is therefore returned out-of-band so the caller can pass
+// it to runPagxImport without tangling it into runSnapshot's option set.
 function resolveOptions(reqOptions, forUrl) {
   const out = {};
   const r = reqOptions || {};
@@ -375,16 +496,44 @@ function resolveOptions(reqOptions, forUrl) {
   return out;
 }
 
+// Pull the PAGX-specific knobs out of the request's `options` object. Kept
+// separate from `resolveOptions` because they don't belong in the snapshot
+// pipeline's argument set — they only matter for the `pagx import` step.
+function resolvePagxOptions(reqOptions) {
+  const r = reqOptions || {};
+  // `inferFlex` defaults to true (matching html2pagx). Only flip it when the
+  // caller passes an explicit boolean false; a non-boolean value is ignored.
+  const inferFlex = r.inferFlex === false ? false : true;
+  return { inferFlex };
+}
+
 // Common pipeline path for both POST and GET. `source` is the descriptor
 // returned by parsePostSource / parseGetSource; it carries exactly one of
-// `html` or `url`. We resolve options, set up a temp file when needed,
-// run the snapshot, and shape the response — all wrapped in a single
+// `html` or `url`, plus a normalised `format` selector. We resolve options,
+// set up a temp file when needed, run the snapshot, optionally invoke
+// `pagx import`, and shape the response — all wrapped in a single
 // try/finally so the temp dir always gets cleaned up.
 async function handleSnapshot(req, res, ctx, source) {
   let tmp = null;
   try {
     const isUrlSource = typeof source.url === 'string';
     const runOpts = resolveOptions(source.options, isUrlSource);
+    const pagxOpts = resolvePagxOptions(source.options);
+    const format = source.format || DEFAULT_FORMAT;
+    const wantsPagx = format === 'pagx' || format === 'both';
+    const wantsHtml = format === 'html' || format === 'both';
+
+    // Multi-format requests must be JSON — text responses can carry only
+    // one body. Surface a 406 up front rather than picking one format and
+    // surprising the client.
+    const acceptsJson = wantsJsonResponse(req);
+    if (format === 'both' && !acceptsJson) {
+      throw new HttpError(
+        406,
+        'format=both requires Accept: application/json (text responses can carry only one format)',
+      );
+    }
+
     let targetUrl;
     let inputDesc;
     if (isUrlSource) {
@@ -396,17 +545,58 @@ async function handleSnapshot(req, res, ctx, source) {
       inputDesc = `in=${source.html.length}B`;
     }
     const result = await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
+
+    let pagx = null;
+    if (wantsPagx) {
+      try {
+        pagx = await runPagxImport({
+          pagxBin: ctx.opts.pagxBin,
+          html: result.html,
+          inferFlex: pagxOpts.inferFlex,
+          log: (msg) => log(`pagx: ${msg}`),
+        });
+      } catch (err) {
+        // The snapshot itself succeeded; we only failed downstream. 502
+        // (bad gateway) is the closest fit — pagx is the upstream that
+        // misbehaved, and the caller can tell snapshot-vs-pagx failures
+        // apart by the status code without parsing the message body.
+        const detail = err instanceof PagxImportError && err.stderr
+          ? `${err.message}: ${err.stderr.trim().split('\n').slice(-3).join(' / ')}`
+          : errMessage(err);
+        throw new HttpError(502, `pagx import failed: ${detail}`);
+      }
+    }
+
     log(
       `${req.method} /snapshot ok ${result.width}x${result.height} `
-      + `${inputDesc} out=${result.html.length}B ${Date.now() - source.startedAt}ms`,
+      + `${inputDesc} format=${format} html=${wantsHtml ? result.html.length : 0}B `
+      + `pagx=${pagx ? pagx.length : 0}B ${Date.now() - source.startedAt}ms`,
     );
-    if (wantsJsonResponse(req)) {
-      jsonResponse(res, 200, result);
+
+    res.setHeader('X-Snapshot-Width', String(result.width));
+    res.setHeader('X-Snapshot-Height', String(result.height));
+    res.setHeader('X-Snapshot-Format', format);
+
+    if (acceptsJson) {
+      const body = { width: result.width, height: result.height };
+      if (wantsHtml) body.html = result.html;
+      if (wantsPagx) body.pagx = pagx;
+      jsonResponse(res, 200, body);
+      return;
+    }
+
+    // Single-format text response. format is guaranteed to be 'html' or
+    // 'pagx' here (the 'both' case bailed out above with a 406).
+    res.statusCode = 200;
+    if (format === 'pagx') {
+      // PAGX is a UTF-8 XML document; application/xml is the closest
+      // standard MIME type. Servers behind the curl pipeline-into-file
+      // case still get a clean text payload they can pipe directly to
+      // `pagx resolve` if they save it to disk.
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.end(pagx);
     } else {
-      res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('X-Snapshot-Width', String(result.width));
-      res.setHeader('X-Snapshot-Height', String(result.height));
       res.end(result.html);
     }
   } finally {
@@ -446,7 +636,30 @@ async function startServer(opts) {
   const engineHandle = await launchBrowser({ engine: opts.browserEngine });
   log(`browser ready (engine=${engineHandle.engine})`);
 
-  const ctx = { engineHandle, opts, activeRequests: 0 };
+  // Probe the pagx binary up front so the operator gets one boot-time log
+  // line instead of discovering on the first PAGX request that the binary
+  // isn't built. We don't fail boot if it's missing — HTML-only callers
+  // shouldn't be blocked by an absent pagx — but the diagnostic surfaces
+  // the situation early.
+  const pagxBinExists = (() => {
+    try {
+      fs.accessSync(opts.pagxBin, fs.constants.X_OK);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  })();
+  if (pagxBinExists) {
+    log(`pagx binary found at ${opts.pagxBin}`);
+  } else {
+    log(
+      `pagx binary not executable at ${opts.pagxBin} `
+      + `(format=pagx|both requests will fail until it is built; `
+      + `pass --pagx-bin <path> or set $PAGX_BIN)`,
+    );
+  }
+
+  const ctx = { engineHandle, opts, activeRequests: 0, pagxBinExists };
 
   const server = http.createServer((req, res) => {
     // Strip query string for routing so future parameters can land on the
@@ -457,6 +670,8 @@ async function startServer(opts) {
       jsonResponse(res, 200, {
         status: 'ok',
         engine: engineHandle.engine,
+        pagxBin: opts.pagxBin,
+        pagxBinExists: ctx.pagxBinExists,
         activeRequests: ctx.activeRequests,
       });
       return;

@@ -297,20 +297,28 @@ Endpoints:
 - `POST /snapshot` — body is either raw HTML (any `Content-Type` other than
   `application/json`) or a JSON envelope. The JSON body must carry exactly one
   of `html` or `url`:
-  - `{ "html": "<!doctype …>", "options": {…} }` — snapshot the given HTML
-    string.
-  - `{ "url": "https://example.com/…", "options": {…} }` — fetch the URL in
-    the headless browser and snapshot the rendered page. URL inputs also
-    accept `cookies` / `headers` inside `options` (see below).
-  Response is the processed HTML (`text/html`) by default, plus
-  `X-Snapshot-Width` / `X-Snapshot-Height` headers. Send
-  `Accept: application/json` to get `{ html, width, height }` instead.
-- `GET /snapshot?url=<http(s)-url>&...options` — convenience route for
-  "fetch this URL and snapshot it". No body required. Same response
-  semantics as `POST /snapshot`. Supported query params: `url` (required),
-  `viewportWidth`, `viewportHeight`, `waitMs`, `selector`, `inlineIconFonts`
-  (any of `true`/`false`/`1`/`0`).
-- `GET /health` — `200 { status, engine, activeRequests }`.
+  - `{ "html": "<!doctype …>", "format": "pagx", "options": {…} }` — snapshot
+    the given HTML string and (optionally) convert to PAGX.
+  - `{ "url": "https://example.com/…", "format": "html", "options": {…} }` —
+    fetch the URL in the headless browser and snapshot the rendered page. URL
+    inputs also accept `cookies` / `headers` inside `options` (see below).
+  Response shape depends on `format`:
+  - `format: "html"` (default) → `text/html` with the processed HTML.
+  - `format: "pagx"` → `application/xml` with the PAGX document (the same
+    XML that `pagx import --format html` writes).
+  - `format: "both"` → JSON only (`{ html, pagx, width, height }`); requires
+    `Accept: application/json` (otherwise the server returns `406`).
+  All single-format requests also accept `Accept: application/json` to get
+  `{ html, width, height }` or `{ pagx, width, height }` back. Every
+  response carries `X-Snapshot-Width` / `X-Snapshot-Height` /
+  `X-Snapshot-Format` headers.
+- `GET /snapshot?url=<http(s)-url>&format=html|pagx|both&...options` —
+  convenience route for "fetch this URL and snapshot it". No body required.
+  Same response semantics as `POST /snapshot`. Supported query params:
+  `url` (required), `format`, `viewportWidth`, `viewportHeight`, `waitMs`,
+  `selector`, `inlineIconFonts`, `inferFlex` (booleans accept any of
+  `true`/`false`/`1`/`0`).
+- `GET /health` — `200 { status, engine, pagxBin, pagxBinExists, activeRequests }`.
 
 `options` accepts the same knobs the CLI exposes (all optional):
 
@@ -321,6 +329,7 @@ Endpoints:
 | `waitMs` | number | `800` | Extra settle delay after networkidle |
 | `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
 | `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
+| `inferFlex` | boolean | `true` | _PAGX output only_; passes `--html-infer-flex` to `pagx import` |
 | `cookies` | `[{name, value}]` | — | _URL inputs only_; scoped to the target URL |
 | `headers` | `[[key, value]]` or `{key: value}` | — | _URL inputs only_; extra request headers |
 
@@ -331,6 +340,7 @@ Server CLI flags:
 | `--port <n>` | `8787` | Listen port (env: `PORT`) |
 | `--host <addr>` | `127.0.0.1` | Listen address (env: `HOST`) |
 | `--browser-engine <name>` | `puppeteer` | `puppeteer` or `playwright` (env: `HTML_SNAPSHOT_BROWSER`) |
+| `--pagx-bin <path>` | `$PAGX_BIN` or `<repo-root>/cmake-build-debug/pagx` | `pagx` binary used for `format=pagx`/`format=both` requests. Boot succeeds even if the binary is missing — only PAGX requests fail until it is built. |
 | `--max-body-mb <n>` | `32` | Maximum request body size in MB (env: `MAX_BODY_MB`) |
 
 Examples:
@@ -372,6 +382,22 @@ curl -s -H 'Content-Type: application/json' \
 # Pipe straight into pagx import:
 curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot \
   | pagx import --format html --html-infer-flex --input - --output page.pagx
+
+# …or skip the local pagx step and ask the server to do it for you:
+curl -s --data-binary @page.html \
+     -H 'Content-Type: text/html' \
+     'http://127.0.0.1:8787/snapshot?format=pagx' > page.pagx
+
+# Get HTML and PAGX in one round-trip (JSON envelope):
+curl -s -H 'Content-Type: application/json' \
+     -H 'Accept: application/json' \
+     --data '{
+       "html": "<!doctype html><html><body><h1>hi</h1></body></html>",
+       "format": "both",
+       "options": { "inferFlex": true }
+     }' \
+     http://127.0.0.1:8787/snapshot
+# → {"width":1400,"height":900,"html":"<!DOCTYPE html>…","pagx":"<?xml …"}
 ```
 
 For HTML inputs, the pipeline runs the payload in a `file://` URL backed by
