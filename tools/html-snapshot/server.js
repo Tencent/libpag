@@ -76,6 +76,14 @@ const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/brows
 const { runSnapshot } = require('./lib/snapshot-runner');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./lib/pagx-runner');
 const { errMessage, isHttpUrl } = require('./lib/cli');
+const {
+  HttpError,
+  safeQueryParam,
+  setNumberParam,
+  setStringParam,
+  setBoolParam,
+  wantsJsonResponse,
+} = require('./lib/http-utils');
 
 // Output formats the server understands. `html` is the original (and default)
 // behaviour: return the flat snapshot HTML straight from the browser.
@@ -178,15 +186,6 @@ function parseServerArgs(argv) {
   return opts;
 }
 
-// Tagged error so the request handler can map a single throw into the
-// right HTTP status + message without losing the cause chain.
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-
 // Read the full request body, rejecting once the cumulative size exceeds
 // `maxBytes`. Node's `http` doesn't enforce body limits by default, so a
 // runaway POST would otherwise pin RAM until the browser pipeline blew up
@@ -247,70 +246,59 @@ function jsonError(res, status, message) {
   jsonResponse(res, status, { error: message });
 }
 
-function wantsJsonResponse(req) {
-  const accept = (req.headers['accept'] || '').toLowerCase();
-  if (!accept) return false;
-  // Prefer JSON only when the client explicitly asks for it and isn't also
-  // listing text/html with equal or higher priority. The lightweight check
-  // here covers the common cases (`Accept: application/json`,
-  // `Accept: text/html, application/json;q=0.9`) without pulling in a full
-  // RFC 7231 matcher.
-  if (!accept.includes('application/json')) return false;
-  if (accept.includes('text/html')) {
-    // Both listed — defer to text/html so browsers that send the standard
-    // `text/html, application/xhtml+xml, ..., */*` still get HTML.
-    return false;
-  }
-  return true;
-}
-
 // Validate and normalise the user-supplied `format` selector. Accepts a
-// string (single value), an array of strings (e.g. ["html", "pagx"], which
-// is the multi-format shorthand for "both"), or undefined (defaults to
-// html). Throws an HttpError 400 on anything we don't recognise so the
-// client gets a clear contract violation instead of a silent fallback.
+// string (single value, or comma-separated list — handy in query strings),
+// an array of strings (e.g. ["html", "pagx"], the multi-format shorthand),
+// or undefined (defaults to html). Throws an `HttpError 400` on anything we
+// don't recognise so the client gets a clear contract violation instead of
+// a silent fallback.
+//
+// Single values may be any of the supported formats including 'both'. Lists
+// (whether array-typed or comma-separated string) only accept 'html'/'pagx'
+// as elements; the literal 'both' as a list element makes no semantic sense
+// and is rejected.
 function normaliseFormat(rawFormat) {
   if (rawFormat === undefined || rawFormat === null) return DEFAULT_FORMAT;
-  let candidate;
+
+  let parts;
+  let isList;
   if (typeof rawFormat === 'string') {
     const trimmed = rawFormat.trim().toLowerCase();
     if (!trimmed) return DEFAULT_FORMAT;
-    // Accept comma-separated lists too (e.g. ?format=html,pagx) — handy
-    // in query strings where arrays don't have a native shape.
-    if (trimmed.includes(',')) {
-      const parts = trimmed.split(',').map((p) => p.trim()).filter(Boolean);
-      candidate = parts;
-    } else {
-      candidate = trimmed;
-    }
+    isList = trimmed.includes(',');
+    parts = isList
+      ? trimmed.split(',').map((p) => p.trim()).filter(Boolean)
+      : [trimmed];
   } else if (Array.isArray(rawFormat)) {
-    candidate = rawFormat
+    isList = true;
+    parts = rawFormat
       .filter((p) => typeof p === 'string')
       .map((p) => p.trim().toLowerCase())
       .filter(Boolean);
   } else {
-    throw new HttpError(400, `format must be a string or array of strings`);
+    throw new HttpError(400, 'format must be a string or array of strings');
   }
 
-  if (Array.isArray(candidate)) {
-    const set = new Set(candidate);
+  if (parts.length === 0) return DEFAULT_FORMAT;
+
+  if (isList) {
+    const set = new Set(parts);
     for (const v of set) {
       if (v !== 'html' && v !== 'pagx') {
         throw new HttpError(400, `unsupported format value '${v}' (expected html|pagx)`);
       }
     }
-    if (set.size === 0) return DEFAULT_FORMAT;
-    if (set.size === 1) return [...set][0];
-    return 'both';
+    return set.size === 1 ? [...set][0] : 'both';
   }
 
-  if (!SUPPORTED_FORMATS.includes(candidate)) {
+  const single = parts[0];
+  if (!SUPPORTED_FORMATS.includes(single)) {
     throw new HttpError(
       400,
-      `unsupported format '${candidate}' (expected ${SUPPORTED_FORMATS.join('|')})`,
+      `unsupported format '${single}' (expected ${SUPPORTED_FORMATS.join('|')})`,
     );
   }
-  return candidate;
+  return single;
 }
 
 // Materialise the incoming HTML on disk so the existing pipeline (which
@@ -350,13 +338,7 @@ function parsePostSource(req, rawBuf) {
   // `curl --data-binary @page.html '/snapshot?format=pagx'`-style clients
   // that don't want to construct a JSON envelope. Query takes effect only
   // when the JSON body itself does not specify a format.
-  const queryFormat = (() => {
-    try {
-      return new URL(req.url, 'http://localhost').searchParams.get('format');
-    } catch (_) {
-      return null;
-    }
-  })();
+  const queryFormat = safeQueryParam(req, 'format');
 
   if (ct === 'application/json') {
     let parsed;
@@ -421,27 +403,15 @@ function parseGetSource(req) {
   // Re-shape the query string into the same scalar object that
   // `resolveOptions` consumes from JSON bodies. We coerce here so
   // resolveOptions can stay JSON-shaped (booleans / numbers, not strings).
+  // Validation of numeric ranges is deferred to `resolveOptions`, which
+  // silently drops out-of-range values and falls back to its defaults.
   const queryOptions = {};
-  const vw = params.get('viewportWidth');
-  if (vw !== null) queryOptions.viewportWidth = Number(vw);
-  const vh = params.get('viewportHeight');
-  if (vh !== null) queryOptions.viewportHeight = Number(vh);
-  const wm = params.get('waitMs');
-  if (wm !== null) queryOptions.waitMs = Number(wm);
-  const sel = params.get('selector');
-  if (sel !== null) queryOptions.selector = sel;
-  const iif = params.get('inlineIconFonts');
-  if (iif !== null) {
-    if (iif === 'true' || iif === '1') queryOptions.inlineIconFonts = true;
-    else if (iif === 'false' || iif === '0') queryOptions.inlineIconFonts = false;
-    else throw new HttpError(400, `inlineIconFonts must be true|false|1|0, got '${iif}'`);
-  }
-  const ifx = params.get('inferFlex');
-  if (ifx !== null) {
-    if (ifx === 'true' || ifx === '1') queryOptions.inferFlex = true;
-    else if (ifx === 'false' || ifx === '0') queryOptions.inferFlex = false;
-    else throw new HttpError(400, `inferFlex must be true|false|1|0, got '${ifx}'`);
-  }
+  setNumberParam(params, queryOptions, 'viewportWidth');
+  setNumberParam(params, queryOptions, 'viewportHeight');
+  setNumberParam(params, queryOptions, 'waitMs');
+  setStringParam(params, queryOptions, 'selector');
+  setBoolParam(params, queryOptions, 'inlineIconFonts');
+  setBoolParam(params, queryOptions, 'inferFlex');
   const format = normaliseFormat(params.get('format'));
   return { url, options: queryOptions, format };
 }
@@ -631,6 +601,85 @@ async function runRoute(req, res, ctx, sourceFactory) {
   }
 }
 
+// Probe an executable file path. Returns true only if the path exists AND
+// is executable for the current user; any error (ENOENT, EACCES, …)
+// collapses to false so callers can render one diagnostic line instead of a
+// stack trace. Lives in server.js because it's only used at boot.
+function isExecutable(filepath) {
+  try {
+    fs.accessSync(filepath, fs.constants.X_OK);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Build a fallback error handler that maps an unexpected request-handler
+// throw to a clean 500 (or a socket destroy if headers already flushed).
+// Used as the trailing `.catch` on `runRoute`'s returned promise — in
+// practice runRoute should never let a throw escape, but the catch keeps an
+// unexpected error from killing the process.
+function makeUnexpectedHandler(res) {
+  return (err) => {
+    const message = errMessage(err);
+    log(`unhandled handler error: ${message}`);
+    if (!res.headersSent) {
+      jsonError(res, 500, message);
+    } else {
+      res.destroy();
+    }
+  };
+}
+
+function handleHealth(req, res, ctx) {
+  jsonResponse(res, 200, {
+    status: 'ok',
+    engine: ctx.engineHandle.engine,
+    pagxBin: ctx.opts.pagxBin,
+    pagxBinExists: ctx.pagxBinExists,
+    activeRequests: ctx.activeRequests,
+  });
+}
+
+function handlePostSnapshot(req, res, ctx) {
+  // Both /snapshot routes funnel through runRoute, which owns the try/catch
+  // and 4xx/5xx mapping. Fire-and-forget — runRoute manages its own response.
+  runRoute(req, res, ctx, async () => {
+    const raw = await readBody(req, ctx.opts.maxBodyBytes);
+    return parsePostSource(req, raw);
+  }).catch(makeUnexpectedHandler(res));
+}
+
+function handleGetSnapshot(req, res, ctx) {
+  // GET takes no body — the source is fully derived from the query string.
+  // Wrapped in an async factory so parse errors hit runRoute's error mapper
+  // instead of becoming a synchronous throw.
+  runRoute(req, res, ctx, async () => parseGetSource(req)).catch(makeUnexpectedHandler(res));
+}
+
+// Declarative route table. Adding a new endpoint is a one-line append here
+// instead of an extra `if` branch in the request callback. Three entries is
+// small enough that a linear scan is fine; the cost is dwarfed by the
+// per-request work downstream.
+const ROUTES = [
+  { method: 'GET', path: '/health', handle: handleHealth },
+  { method: 'POST', path: '/snapshot', handle: handlePostSnapshot },
+  { method: 'GET', path: '/snapshot', handle: handleGetSnapshot },
+];
+
+function dispatch(req, res, ctx) {
+  // Strip the query string so future parameters can land on the URL without
+  // breaking the route match.
+  const urlPath = (req.url || '').split('?')[0];
+  for (const route of ROUTES) {
+    if (route.method === req.method && route.path === urlPath) {
+      route.handle(req, res, ctx);
+      return;
+    }
+  }
+  jsonError(res, 404, `not found: ${req.method} ${urlPath}`);
+}
+
 async function startServer(opts) {
   log(`launching ${opts.browserEngine}…`);
   const engineHandle = await launchBrowser({ engine: opts.browserEngine });
@@ -641,14 +690,7 @@ async function startServer(opts) {
   // isn't built. We don't fail boot if it's missing — HTML-only callers
   // shouldn't be blocked by an absent pagx — but the diagnostic surfaces
   // the situation early.
-  const pagxBinExists = (() => {
-    try {
-      fs.accessSync(opts.pagxBin, fs.constants.X_OK);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  })();
+  const pagxBinExists = isExecutable(opts.pagxBin);
   if (pagxBinExists) {
     log(`pagx binary found at ${opts.pagxBin}`);
   } else {
@@ -661,77 +703,37 @@ async function startServer(opts) {
 
   const ctx = { engineHandle, opts, activeRequests: 0, pagxBinExists };
 
-  const server = http.createServer((req, res) => {
-    // Strip query string for routing so future parameters can land on the
-    // URL without breaking the route match.
-    const urlPath = (req.url || '').split('?')[0];
-
-    if (req.method === 'GET' && urlPath === '/health') {
-      jsonResponse(res, 200, {
-        status: 'ok',
-        engine: engineHandle.engine,
-        pagxBin: opts.pagxBin,
-        pagxBinExists: ctx.pagxBinExists,
-        activeRequests: ctx.activeRequests,
-      });
-      return;
-    }
-
-    // Both /snapshot routes funnel through runRoute, which owns the
-    // try/catch and 4xx/5xx mapping. Fire-and-forget — the handler manages
-    // its own response. The outer `.catch` only fires for synchronous
-    // throws outside runRoute's try block; in practice it should never
-    // run, but it keeps an unexpected throw from killing the process.
-    const onUnexpected = (err) => {
-      log(`unhandled handler error: ${errMessage(err)}`);
-      if (!res.headersSent) {
-        jsonError(res, 500, errMessage(err));
-      } else {
-        res.destroy();
-      }
-    };
-
-    if (req.method === 'POST' && urlPath === '/snapshot') {
-      runRoute(req, res, ctx, async () => {
-        const raw = await readBody(req, ctx.opts.maxBodyBytes);
-        return parsePostSource(req, raw);
-      }).catch(onUnexpected);
-      return;
-    }
-
-    if (req.method === 'GET' && urlPath === '/snapshot') {
-      // GET takes no body — the source is fully derived from the query
-      // string. Wrapped in an async factory so parse errors hit
-      // runRoute's error mapper instead of becoming a synchronous throw.
-      runRoute(req, res, ctx, async () => parseGetSource(req)).catch(onUnexpected);
-      return;
-    }
-
-    jsonError(res, 404, `not found: ${req.method} ${urlPath}`);
-  });
+  const server = http.createServer((req, res) => dispatch(req, res, ctx));
 
   server.listen(opts.port, opts.host, () => {
     log(`listening on http://${opts.host}:${opts.port}`);
   });
 
-  // Coordinated shutdown: stop accepting new connections, then close the
-  // browser. Long-running snapshots in flight get a few seconds to finish
-  // before we exit; after that, the process exits forcefully so a stuck
-  // page can't pin the service open forever.
+  // Coordinated shutdown: stop accepting new connections, drain in-flight
+  // requests, then close the browser. Long-running snapshots get up to ~10s
+  // to finish before the safety-net timer forces an exit so a stuck page
+  // can't pin the service open forever.
+  const closeServer = () => new Promise((resolve) => {
+    server.close((err) => {
+      if (err) log(`http server close error: ${errMessage(err)}`);
+      else log('http server closed');
+      resolve();
+    });
+  });
   let shuttingDown = false;
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`received ${signal}, shutting down…`);
-    server.close((err) => {
-      if (err) log(`http server close error: ${errMessage(err)}`);
-      else log('http server closed');
-    });
     const forceExitTimer = setTimeout(() => {
       log('forced exit after 10s shutdown timeout');
       process.exit(1);
     }, 10000);
     forceExitTimer.unref();
+    // server.close doesn't resolve until every keep-alive socket closes,
+    // so the safety-net timer above is what frees us if a client hangs on
+    // its end of the connection.
+    await closeServer();
     try {
       await engineHandle.browser.close();
       log('browser closed');
