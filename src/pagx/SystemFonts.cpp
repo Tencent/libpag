@@ -274,6 +274,7 @@ FontLocation SystemFonts::FindFont(const std::string& family, const std::string&
   CFSetRef mandatoryAttributes =
       CFSetCreate(kCFAllocatorDefault, mandatoryKeys, mandatoryCount, &kCFTypeSetCallBacks);
   if (mandatoryAttributes == nullptr) {
+    CFRelease(attributes);
     return {};
   }
   CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes(attributes);
