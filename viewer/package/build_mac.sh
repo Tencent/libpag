@@ -111,13 +111,13 @@ function generateUniversalDsym() {
 
 function createDmg()
 {
-    local creatDmg=${1}
-    local sourcePath=${2}
-    local dmgPath=${3}
-    local iconPath=${4}
-    local backgroundPath=${5}
+    local creatDmg="${1}"
+    local sourcePath="${2}"
+    local dmgPath="${3}"
+    local iconPath="${4}"
+    local backgroundPath="${5}"
 
-    ${creatDmg} \
+    "${creatDmg}" \
     --volname "PAGViewer" \
     --volicon "${iconPath}" \
     --background "${backgroundPath}" \
@@ -243,11 +243,11 @@ arm64ExePath="${arm64BuildDir}/PAGViewer"
 # Clean previous app bundle to avoid incremental build issues
 rm -rf "${AppDir}"
 
-install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" ${x86_64ExePath} 2>/dev/null || true
-install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64ExePath} 2>/dev/null || true
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" "${x86_64ExePath}" 2>/dev/null || true
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" "${arm64ExePath}" 2>/dev/null || true
 
-mkdir -p ${ExeDir}
-lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
+mkdir -p "${ExeDir}"
+lipo -create "${x86_64ExePath}" "${arm64ExePath}" -output "${ExePath}"
 
 # 3.1.1 Generate dSYM files for PAGViewer
 printStep "Generate dSYM for PAGViewer"
@@ -255,12 +255,12 @@ generateUniversalDsym "PAGViewer" "${x86_64BuildDir}" "${arm64BuildDir}" "${Buil
 
 # 3.2 Obtain the dependencies of PAGViewer
 printStep "Deploy Qt dependencies"
-${Deployqt} ${AppDir} -qmldir=${SourceDir}/assets/qml
+"${Deployqt}" "${AppDir}" -qmldir="${SourceDir}/assets/qml"
 if [ $? -ne 0 ];
 then
     exitWithError "Deploy Qt dependencies (viewer qml) failed"
 fi
-${Deployqt} ${AppDir} -qmldir=${PluginSourceDir}/assets/qml
+"${Deployqt}" "${AppDir}" -qmldir="${PluginSourceDir}/assets/qml"
 if [ $? -ne 0 ];
 then
     exitWithError "Deploy Qt dependencies (exporter qml) failed"
@@ -270,14 +270,14 @@ fi
 printStep "Copy Sparkle.framework"
 FrameworkDir="${AppDir}/Contents/Frameworks"
 SparklePath="${SourceDir}/vendor/sparkle/mac/Sparkle.framework"
-cp -f -R -P ${SparklePath} ${FrameworkDir}
+cp -f -R -P "${SparklePath}" "${FrameworkDir}"
 
 # 3.2.2 Merge and copy ffmovie
 printStep "Merge ffmovie.dylib"
 x64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/x64/libffmovie.dylib"
 arm64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/arm64/libffmovie.dylib"
 FfmoviePath="${FrameworkDir}/libffmovie.dylib"
-lipo -create ${x64FfmoviePath} ${arm64FfmoviePath} -output ${FfmoviePath}
+lipo -create "${x64FfmoviePath}" "${arm64FfmoviePath}" -output "${FfmoviePath}"
 
 # 3.3 Obtain public and private keys
 printStep "Obtain signing keys"
@@ -321,15 +321,15 @@ fi
 # 3.4 Copy resources
 printStep "Copy resources"
 ContentsDir="${AppDir}/Contents"
-PlistPath=${SourceDir}/package/templates/Info.plist
-cp -f ${PlistPath} ${ContentsDir}
+PlistPath="${SourceDir}/package/templates/Info.plist"
+cp -f "${PlistPath}" "${ContentsDir}"
 
 ResourcesDir="${AppDir}/Contents/Resources"
-cp -f ${SourceDir}/assets/images/appIcon.icns ${ResourcesDir}
-cp -f ${SourceDir}/assets/images/pagIcon.icns ${ResourcesDir}
+cp -f "${SourceDir}/assets/images/appIcon.icns" "${ResourcesDir}"
+cp -f "${SourceDir}/assets/images/pagIcon.icns" "${ResourcesDir}"
 if [ -n "${DSAPublicKey}" ] && [ -f "${DSAPublicKey}" ];
 then
-    cp -f ${DSAPublicKey} ${ResourcesDir}
+    cp -f "${DSAPublicKey}" "${ResourcesDir}"
 fi
 
 # 3.5 Merge PAGExporter and copy related tools
@@ -357,8 +357,8 @@ otool -l "${arm64PluginExePath}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.
     esac
 done
 
-cp -fr ${x86_64PluginPath} ${PluginPath}
-lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
+cp -fr "${x86_64PluginPath}" "${PluginPath}"
+lipo -create "${x86_64PluginExePath}" "${arm64PluginExePath}" -output "${PluginExePath}"
 
 # 3.5.1.1 Generate dSYM files for PAGExporter
 printStep "Generate dSYM for PAGExporter"
@@ -366,7 +366,7 @@ generateUniversalDsym "PAGExporter" "${x86_64BuildDirForPlugin}" "${arm64BuildDi
 
 # 3.5.2 Obtain the dependencies of PAGExporter
 printStep "Deploy PAGExporter Qt dependencies"
-${Deployqt} ${PluginPath} -qmldir=${PluginSourceDir}/assets/qml
+"${Deployqt}" "${PluginPath}" -qmldir="${PluginSourceDir}/assets/qml"
 if [ $? -ne 0 ];
 then
     exitWithError "Obtain the dependencies of PAGExporter failed"
@@ -392,7 +392,7 @@ rm -rf "${PluginPath}/Contents/Resources/qml"
 # 3.5.3 Copy related tools
 printStep "Copy tools and scripts"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
-cp -f ${EncoderToolsPath} ${ResourcesDir}
+cp -f "${EncoderToolsPath}" "${ResourcesDir}"
 cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/delete_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
@@ -439,14 +439,14 @@ fi
 
 # 3.7 Set rpath
 printStep "Set rpath"
-install_name_tool -delete_rpath "${QtPath}/lib" ${ExePath} 2>/dev/null || true
-install_name_tool -delete_rpath "${SourceDir}/vendor/sparkle/mac" ${ExePath} 2>/dev/null || true
-install_name_tool -add_rpath "@executable_path/../Frameworks" ${ExePath} 2>/dev/null || true
+install_name_tool -delete_rpath "${QtPath}/lib" "${ExePath}" 2>/dev/null || true
+install_name_tool -delete_rpath "${SourceDir}/vendor/sparkle/mac" "${ExePath}" 2>/dev/null || true
+install_name_tool -add_rpath "@executable_path/../Frameworks" "${ExePath}" 2>/dev/null || true
 
-install_name_tool -delete_rpath "${QtPath}/lib" ${PluginExePath} 2>/dev/null || true
-install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath} 2>/dev/null || true
-install_name_tool -add_rpath "@loader_path/../Frameworks" ${PluginExePath} 2>/dev/null || true
-install_name_tool -add_rpath "/Library/Application Support/PAGExporter/Frameworks" ${PluginExePath} 2>/dev/null || true
+install_name_tool -delete_rpath "${QtPath}/lib" "${PluginExePath}" 2>/dev/null || true
+install_name_tool -add_rpath "@executable_path/../Frameworks" "${PluginExePath}" 2>/dev/null || true
+install_name_tool -add_rpath "@loader_path/../Frameworks" "${PluginExePath}" 2>/dev/null || true
+install_name_tool -add_rpath "/Library/Application Support/PAGExporter/Frameworks" "${PluginExePath}" 2>/dev/null || true
 
 # 4 Sign & Notarize
 printSection 4 "Sign & Notarize"
@@ -622,15 +622,15 @@ then
         SignScript="${SourceDir}/package/sign_update.sh"
         chmod +x "${SignScript}"
 
-        ${SignScript} ${BuildDir}/${ZipFile} ${DSAPrivateKey} > DSASignHash.txt
+        "${SignScript}" "${BuildDir}/${ZipFile}" "${DSAPrivateKey}" > DSASignHash.txt
         ZipDSAHash=$(tr '\n' ' ' < DSASignHash.txt | sed '$s/ //g')
         logInfo "Get Zip DSA Hash: ${ZipDSAHash}"
 
-        ${SignScript} ${BuildDir}/${ZipFile} ${EDDSAPrivateKey} > EDDSASignHash.txt
+        "${SignScript}" "${BuildDir}/${ZipFile}" "${EDDSAPrivateKey}" > EDDSASignHash.txt
         ZipEDDSAHash=$(tr '\n' ' ' < EDDSASignHash.txt | sed '$s/ //g')
         logInfo "Get Zip EDDSA Hash: ${ZipEDDSAHash}"
 
-        ZipLength=$(stat -f%z ${BuildDir}/${ZipFile})
+        ZipLength=$(stat -f%z "${BuildDir}/${ZipFile}")
 
         URL=$(curl -s https://pag.io/server.html)
         if [ "${isBetaVersion}" == true ];
