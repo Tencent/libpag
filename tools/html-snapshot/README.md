@@ -295,10 +295,21 @@ parallel against the same browser.
 Endpoints:
 
 - `POST /snapshot` — body is either raw HTML (any `Content-Type` other than
-  `application/json`) or a JSON envelope `{ "html": "...", "options": {...} }`.
+  `application/json`) or a JSON envelope. The JSON body must carry exactly one
+  of `html` or `url`:
+  - `{ "html": "<!doctype …>", "options": {…} }` — snapshot the given HTML
+    string.
+  - `{ "url": "https://example.com/…", "options": {…} }` — fetch the URL in
+    the headless browser and snapshot the rendered page. URL inputs also
+    accept `cookies` / `headers` inside `options` (see below).
   Response is the processed HTML (`text/html`) by default, plus
   `X-Snapshot-Width` / `X-Snapshot-Height` headers. Send
   `Accept: application/json` to get `{ html, width, height }` instead.
+- `GET /snapshot?url=<http(s)-url>&...options` — convenience route for
+  "fetch this URL and snapshot it". No body required. Same response
+  semantics as `POST /snapshot`. Supported query params: `url` (required),
+  `viewportWidth`, `viewportHeight`, `waitMs`, `selector`, `inlineIconFonts`
+  (any of `true`/`false`/`1`/`0`).
 - `GET /health` — `200 { status, engine, activeRequests }`.
 
 `options` accepts the same knobs the CLI exposes (all optional):
@@ -310,6 +321,8 @@ Endpoints:
 | `waitMs` | number | `800` | Extra settle delay after networkidle |
 | `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
 | `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
+| `cookies` | `[{name, value}]` | — | _URL inputs only_; scoped to the target URL |
+| `headers` | `[[key, value]]` or `{key: value}` | — | _URL inputs only_; extra request headers |
 
 Server CLI flags:
 
@@ -338,17 +351,37 @@ curl -s -H 'Content-Type: application/json' \
      http://127.0.0.1:8787/snapshot
 # → {"html":"<!DOCTYPE html>…","width":800,"height":900}
 
+# Fetch a live page and snapshot it (GET, no body):
+curl -sG --data-urlencode 'url=https://example.com/' \
+     --data-urlencode 'viewportWidth=1280' \
+     --data-urlencode 'waitMs=500' \
+     http://127.0.0.1:8787/snapshot > example.subset.html
+
+# Same thing via POST JSON (lets you also pass cookies / headers):
+curl -s -H 'Content-Type: application/json' \
+     --data '{
+       "url": "https://example.com/dashboard",
+       "options": {
+         "cookies": [{ "name": "session", "value": "abc123" }],
+         "headers": { "X-User": "alice" },
+         "waitMs": 1500
+       }
+     }' \
+     http://127.0.0.1:8787/snapshot > dashboard.subset.html
+
 # Pipe straight into pagx import:
 curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot \
   | pagx import --format html --html-infer-flex --input - --output page.pagx
 ```
 
-The pipeline runs the HTML in a `file://` URL backed by a per-request temp
-file under `$TMPDIR`, so relative external resources (`<img src="…">`,
-`<link href="…">`, …) will not resolve. Inline everything (data URIs, CSS
-`<style>` blocks) or absolute URLs in the payload — the snapshot pipeline
-itself will still inline images / canvases / icon fonts before emitting the
-final HTML.
+For HTML inputs, the pipeline runs the payload in a `file://` URL backed by
+a per-request temp file under `$TMPDIR`, so relative external resources
+(`<img src="…">`, `<link href="…">`, …) will not resolve. Inline everything
+(data URIs, CSS `<style>` blocks) or use absolute URLs in the payload — the
+snapshot pipeline itself will still inline images / canvases / icon fonts
+before emitting the final HTML. URL inputs avoid this entirely: the
+browser navigates to the live page and resolves resources against its
+real origin.
 
 ### Manual pipeline (for debugging individual steps)
 

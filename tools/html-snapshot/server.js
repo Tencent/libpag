@@ -18,7 +18,8 @@
  * Endpoints:
  *   POST /snapshot
  *     Request body:
- *       - Content-Type: application/json  → { html: string, options?: { ... } }
+ *       - Content-Type: application/json  → { html | url: string, options?: { ... } }
+ *                                            Provide exactly one of `html` or `url`.
  *       - Any other Content-Type           → the entire body is treated as the
  *                                            HTML payload.
  *     Response:
@@ -27,7 +28,14 @@
  *                                            X-Snapshot-Height headers).
  *       - Accept: application/json         → { html, width, height }.
  *     The `options` object accepts: viewportWidth, viewportHeight, waitMs,
- *     selector, inlineIconFonts (booleans / numbers / strings, all optional).
+ *     selector, inlineIconFonts, plus cookies / headers for URL inputs
+ *     (all optional).
+ *
+ *   GET /snapshot?url=<http(s)-url>&...options
+ *     Convenience route for "fetch this page and snapshot it" — no body
+ *     required. Same response semantics as POST. Supported query params:
+ *       url (required), viewportWidth, viewportHeight, waitMs, selector,
+ *       inlineIconFonts.
  *
  *   GET /health
  *     200 { status: "ok", engine, activeRequests } once the browser is up.
@@ -47,7 +55,7 @@ const path = require('path');
 
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
-const { errMessage } = require('./lib/cli');
+const { errMessage, isHttpUrl } = require('./lib/cli');
 
 const LOG_PREFIX = 'html-snapshot-server: ';
 
@@ -73,10 +81,13 @@ Options:
   -h, --help               Show this help
 
 Endpoints:
-  POST /snapshot  — body is raw HTML (or JSON { html, options }); response is
-                    the processed HTML string (text/html), or JSON when the
-                    client sends Accept: application/json.
-  GET  /health    — liveness probe.`);
+  POST /snapshot         — body is raw HTML, or JSON { html|url, options };
+                           response is the processed HTML string (text/html),
+                           or JSON when the client sends Accept: application/json.
+  GET  /snapshot?url=…   — fetch the URL and run the same pipeline (no body).
+                           Optional query params: viewportWidth, viewportHeight,
+                           waitMs, selector, inlineIconFonts.
+  GET  /health           — liveness probe.`);
 }
 
 function parseServerArgs(argv) {
@@ -232,7 +243,11 @@ function writeHtmlToTempFile(html) {
   };
 }
 
-function parseRequestPayload(req, rawBuf) {
+// Parse a POST body into a `{ html | url, options }` source descriptor.
+// JSON bodies may carry either an `html` string or a `url` string (exactly
+// one); any other Content-Type is treated as a raw HTML payload — that
+// shorthand only makes sense for HTML so we don't accept URLs through it.
+function parsePostSource(req, rawBuf) {
   const ct = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
   const rawText = rawBuf.toString('utf8');
   if (ct === 'application/json') {
@@ -242,23 +257,88 @@ function parseRequestPayload(req, rawBuf) {
     } catch (err) {
       throw new HttpError(400, `invalid JSON body: ${errMessage(err)}`);
     }
-    if (!parsed || typeof parsed.html !== 'string') {
-      throw new HttpError(400, 'json body must contain a string "html" field');
+    if (!parsed || typeof parsed !== 'object') {
+      throw new HttpError(400, 'json body must be an object');
     }
-    return { html: parsed.html, options: (parsed.options && typeof parsed.options === 'object') ? parsed.options : {} };
+    const hasHtml = typeof parsed.html === 'string';
+    const hasUrl = typeof parsed.url === 'string';
+    if (hasHtml && hasUrl) {
+      throw new HttpError(400, 'json body must contain either "html" or "url", not both');
+    }
+    if (!hasHtml && !hasUrl) {
+      throw new HttpError(400, 'json body must contain a string "html" or "url" field');
+    }
+    const options = (parsed.options && typeof parsed.options === 'object') ? parsed.options : {};
+    if (hasUrl) {
+      if (!isHttpUrl(parsed.url)) {
+        throw new HttpError(400, 'url must start with http:// or https://');
+      }
+      return { url: parsed.url, options };
+    }
+    if (!parsed.html.trim()) {
+      throw new HttpError(400, 'empty "html" field');
+    }
+    return { html: parsed.html, options };
   }
-  // Default: treat the raw body as the HTML payload. This covers
-  // text/html, text/plain, application/octet-stream, and missing
-  // Content-Type, so callers can `curl --data-binary @file.html` without
-  // having to wrap the payload in JSON.
+  if (!rawText || !rawText.trim()) {
+    throw new HttpError(400, 'empty html body');
+  }
   return { html: rawText, options: {} };
+}
+
+// Parse a GET query string into the same `{ url, options }` source
+// descriptor that `parsePostSource` produces. The GET route is the
+// "fetch and snapshot" convenience path: it requires a `url` parameter
+// and accepts the same scalar options the JSON body exposes (cookies /
+// headers are deliberately omitted — repeatable structured params get
+// awkward in query strings; use POST when you need them).
+function parseGetSource(req) {
+  let parsedUrl;
+  try {
+    // `req.url` is always a relative URL; the base is only there so the
+    // `URL` constructor can parse it.
+    parsedUrl = new URL(req.url, 'http://localhost');
+  } catch (err) {
+    throw new HttpError(400, `malformed request URL: ${errMessage(err)}`);
+  }
+  const params = parsedUrl.searchParams;
+  const url = params.get('url');
+  if (!url) {
+    throw new HttpError(400, 'missing required query param: url');
+  }
+  if (!isHttpUrl(url)) {
+    throw new HttpError(400, 'url must start with http:// or https://');
+  }
+  // Re-shape the query string into the same scalar object that
+  // `resolveOptions` consumes from JSON bodies. We coerce here so
+  // resolveOptions can stay JSON-shaped (booleans / numbers, not strings).
+  const queryOptions = {};
+  const vw = params.get('viewportWidth');
+  if (vw !== null) queryOptions.viewportWidth = Number(vw);
+  const vh = params.get('viewportHeight');
+  if (vh !== null) queryOptions.viewportHeight = Number(vh);
+  const wm = params.get('waitMs');
+  if (wm !== null) queryOptions.waitMs = Number(wm);
+  const sel = params.get('selector');
+  if (sel !== null) queryOptions.selector = sel;
+  const iif = params.get('inlineIconFonts');
+  if (iif !== null) {
+    if (iif === 'true' || iif === '1') queryOptions.inlineIconFonts = true;
+    else if (iif === 'false' || iif === '0') queryOptions.inlineIconFonts = false;
+    else throw new HttpError(400, `inlineIconFonts must be true|false|1|0, got '${iif}'`);
+  }
+  return { url, options: queryOptions };
 }
 
 // Whitelist + coerce the small set of pipeline options we expose over HTTP.
 // Anything else in `reqOptions` is silently dropped — this matches the CLI
 // (which only forwards documented flags) and prevents callers from
 // accidentally toggling internal knobs (e.g. browser engine, init scripts).
-function resolveOptions(reqOptions) {
+//
+// `cookies` and `headers` are only honoured for URL-source requests; the
+// snapshot pipeline ignores them for file:// URLs and forwarding them
+// would only confuse the caller. The flag is plumbed via `forUrl`.
+function resolveOptions(reqOptions, forUrl) {
   const out = {};
   const r = reqOptions || {};
   if (Number.isFinite(r.viewportWidth) && r.viewportWidth > 0) out.viewportWidth = r.viewportWidth;
@@ -266,29 +346,59 @@ function resolveOptions(reqOptions) {
   if (Number.isFinite(r.waitMs) && r.waitMs >= 0) out.waitMs = r.waitMs;
   if (typeof r.selector === 'string') out.selector = r.selector;
   if (typeof r.inlineIconFonts === 'boolean') out.inlineIconFonts = r.inlineIconFonts;
+  if (forUrl) {
+    if (Array.isArray(r.cookies)) {
+      // Expected shape: [{ name, value }]. Drop anything that doesn't
+      // fit the contract rather than letting puppeteer throw a
+      // less-helpful error mid-pipeline.
+      const valid = r.cookies.filter(
+        (c) => c && typeof c.name === 'string' && typeof c.value === 'string',
+      );
+      if (valid.length > 0) out.cookies = valid;
+    }
+    if (Array.isArray(r.headers)) {
+      // Array shape: [[key, value], …] matches the CLI parser output.
+      const valid = r.headers.filter(
+        (h) => Array.isArray(h) && h.length === 2
+          && typeof h[0] === 'string' && typeof h[1] === 'string',
+      );
+      if (valid.length > 0) out.headers = valid;
+    } else if (r.headers && typeof r.headers === 'object') {
+      // Object shape: { "X-User": "alice" } — convenient for JSON
+      // callers; converted to the same `[[k, v]]` form internally.
+      const entries = Object.entries(r.headers).filter(
+        ([k, v]) => typeof k === 'string' && typeof v === 'string',
+      );
+      if (entries.length > 0) out.headers = entries;
+    }
+  }
   return out;
 }
 
-async function handleSnapshot(req, res, ctx) {
-  ctx.activeRequests += 1;
+// Common pipeline path for both POST and GET. `source` is the descriptor
+// returned by parsePostSource / parseGetSource; it carries exactly one of
+// `html` or `url`. We resolve options, set up a temp file when needed,
+// run the snapshot, and shape the response — all wrapped in a single
+// try/finally so the temp dir always gets cleaned up.
+async function handleSnapshot(req, res, ctx, source) {
   let tmp = null;
-  const startedAt = Date.now();
   try {
-    // readBody throws HttpError(413) on size overflow and rethrows any
-    // socket-level error verbatim; the outer catch maps both to a clean
-    // JSON response.
-    const raw = await readBody(req, ctx.opts.maxBodyBytes);
-    const { html, options } = parseRequestPayload(req, raw);
-    if (!html || !html.trim()) {
-      throw new HttpError(400, 'empty html body');
+    const isUrlSource = typeof source.url === 'string';
+    const runOpts = resolveOptions(source.options, isUrlSource);
+    let targetUrl;
+    let inputDesc;
+    if (isUrlSource) {
+      targetUrl = source.url;
+      inputDesc = `url=${source.url}`;
+    } else {
+      tmp = writeHtmlToTempFile(source.html);
+      targetUrl = `file://${tmp.file}`;
+      inputDesc = `in=${source.html.length}B`;
     }
-    const runOpts = resolveOptions(options);
-    tmp = writeHtmlToTempFile(html);
-    const result = await runSnapshot(ctx.engineHandle, `file://${tmp.file}`, runOpts);
-    const elapsed = Date.now() - startedAt;
+    const result = await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
     log(
-      `/snapshot ok ${result.width}x${result.height} `
-      + `in=${html.length}B out=${result.html.length}B ${elapsed}ms`,
+      `${req.method} /snapshot ok ${result.width}x${result.height} `
+      + `${inputDesc} out=${result.html.length}B ${Date.now() - source.startedAt}ms`,
     );
     if (wantsJsonResponse(req)) {
       jsonResponse(res, 200, result);
@@ -299,22 +409,35 @@ async function handleSnapshot(req, res, ctx) {
       res.setHeader('X-Snapshot-Height', String(result.height));
       res.end(result.html);
     }
+  } finally {
+    if (tmp) tmp.cleanup();
+  }
+}
+
+// Common error-mapping shell shared by both routes. Captures `startedAt`
+// for the source descriptor so handleSnapshot can log elapsed time.
+async function runRoute(req, res, ctx, sourceFactory) {
+  ctx.activeRequests += 1;
+  const startedAt = Date.now();
+  try {
+    const source = await sourceFactory();
+    source.startedAt = startedAt;
+    await handleSnapshot(req, res, ctx, source);
   } catch (err) {
     const status = err instanceof HttpError ? err.status : 500;
     const message = errMessage(err);
-    log(`/snapshot ${status} ${message}`);
+    log(`${req.method} ${(req.url || '').split('?')[0]} ${status} ${message}`);
     if (!res.headersSent) {
       jsonError(res, status, message);
     } else {
-      // Headers already flushed (shouldn't happen for our handler, but
-      // guard against future changes that stream the body). Close the
-      // socket so the client sees a truncated response rather than a
-      // silent hang.
+      // Headers already flushed (shouldn't happen for our handlers,
+      // but guard against future changes that stream the body). Close
+      // the socket so the client sees a truncated response rather
+      // than a silent hang.
       res.destroy();
     }
   } finally {
     ctx.activeRequests -= 1;
-    if (tmp) tmp.cleanup();
   }
 }
 
@@ -339,20 +462,33 @@ async function startServer(opts) {
       return;
     }
 
+    // Both /snapshot routes funnel through runRoute, which owns the
+    // try/catch and 4xx/5xx mapping. Fire-and-forget — the handler manages
+    // its own response. The outer `.catch` only fires for synchronous
+    // throws outside runRoute's try block; in practice it should never
+    // run, but it keeps an unexpected throw from killing the process.
+    const onUnexpected = (err) => {
+      log(`unhandled handler error: ${errMessage(err)}`);
+      if (!res.headersSent) {
+        jsonError(res, 500, errMessage(err));
+      } else {
+        res.destroy();
+      }
+    };
+
     if (req.method === 'POST' && urlPath === '/snapshot') {
-      // Fire-and-forget — the handler manages its own response and
-      // error handling. The promise itself is allowed to settle in the
-      // background; we attach a catch so an unexpected synchronous
-      // throw outside the handler's try block doesn't crash the
-      // process.
-      handleSnapshot(req, res, ctx).catch((err) => {
-        log(`unhandled handler error: ${errMessage(err)}`);
-        if (!res.headersSent) {
-          jsonError(res, 500, errMessage(err));
-        } else {
-          res.destroy();
-        }
-      });
+      runRoute(req, res, ctx, async () => {
+        const raw = await readBody(req, ctx.opts.maxBodyBytes);
+        return parsePostSource(req, raw);
+      }).catch(onUnexpected);
+      return;
+    }
+
+    if (req.method === 'GET' && urlPath === '/snapshot') {
+      // GET takes no body — the source is fully derived from the query
+      // string. Wrapped in an async factory so parse errors hit
+      // runRoute's error mapper instead of becoming a synchronous throw.
+      runRoute(req, res, ctx, async () => parseGetSource(req)).catch(onUnexpected);
       return;
     }
 
