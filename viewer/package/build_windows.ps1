@@ -116,6 +116,9 @@ Log-Info "Using MSVC toolset: $LatestMSVCToolSet"
 
 $WindowsSdkDir = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Windows Kits", "10")
 $LatestSdkVersion = (Get-ChildItem (Join-Path $WindowsSdkDir "Lib") | Sort-Object Name -Descending | Select-Object -First 1).Name
+if ([string]::IsNullOrEmpty($LatestSdkVersion)) {
+    Exit-WithError "Windows SDK Lib directory not found or empty: $WindowsSdkDir\Lib"
+}
 $env:LIB = "${WindowsSdkDir}\Lib\${LatestSdkVersion}\um\x64;${WindowsSdkDir}\Lib\${LatestSdkVersion}\ucrt\x64;" + $env:LIB
 Log-Info "Windows SDK: $LatestSdkVersion"
 
