@@ -143,8 +143,12 @@ Print-Step "H264EncoderTools"
 $EncoderToolsSourceDir = Join-Path $SourceDir "third_party\H264EncoderTools"
 $EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir "H264EncoderTools.sln"
 $EncoderToolsVcxprojPath = Join-Path $EncoderToolsSourceDir "H264EncoderTools.vcxproj"
-(Get-Content "$EncoderToolsVcxprojPath" -Raw) -replace "<PlatformToolset>v142</PlatformToolset>", "<PlatformToolset>$LatestMSVCToolSet</PlatformToolset>" | Set-Content "$EncoderToolsVcxprojPath"
-if (-not $?) { Exit-WithError "Failed to update H264EncoderTools toolset" }
+(Get-Content $EncoderToolsVcxprojPath -Raw) -replace '<PlatformToolset>v14\d</PlatformToolset>', "<PlatformToolset>$LatestMSVCToolSet</PlatformToolset>" | Set-Content $EncoderToolsVcxprojPath
+# Verify the substitution actually took effect; the regex above only matches v14x toolsets
+$ToolsetCheck = Get-Content $EncoderToolsVcxprojPath -Raw
+if ($ToolsetCheck -notmatch "<PlatformToolset>$([regex]::Escape($LatestMSVCToolSet))</PlatformToolset>") {
+    Exit-WithError "Failed to set PlatformToolset to $LatestMSVCToolSet in vcxproj"
+}
 
 $process = Start-Process -FilePath $VSDevEnv -ArgumentList "`"$EncoderToolsSlnPath`" /Rebuild `"Release|x64`"" -Wait -PassThru
 if ($process.ExitCode -ne 0) { Exit-WithError "Build H264EncoderTools failed" }
