@@ -104,10 +104,10 @@ class PluginInstaller : public QObject {
   /// Single source of truth for the install/update prompts. Shared between the manual
   /// installPlugin() path and the startup checkPluginOnStartup() path so wording stays in
   /// sync — keep this list aligned with the matching messages in Chinese.ts.
-  static QString installPromptTitle();
-  static QString installPromptMessage();
-  static QString updatePromptTitle();
-  static QString updatePromptMessage();
+  static QString InstallPromptTitle();
+  static QString InstallPromptMessage();
+  static QString UpdatePromptTitle();
+  static QString UpdatePromptMessage();
 
   QStringList getAeInstallPaths();
   QString getPluginSourcePath(const QString& pluginName) const;

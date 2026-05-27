@@ -62,11 +62,11 @@ InstallResult PluginInstaller::installPlugin() {
   bool hasUpdateAvailable = hasUpdate();
 
   if (!pluginInstalled) {
-    if (!requestConfirmation(installPromptTitle(), installPromptMessage())) {
+    if (!requestConfirmation(InstallPromptTitle(), InstallPromptMessage())) {
       return InstallResult::UserCancelled;
     }
   } else if (hasUpdateAvailable) {
-    if (!requestConfirmation(updatePromptTitle(), updatePromptMessage())) {
+    if (!requestConfirmation(UpdatePromptTitle(), UpdatePromptMessage())) {
       return InstallResult::UserCancelled;
     }
   } else {
@@ -101,14 +101,14 @@ void PluginInstaller::checkPluginOnStartup() {
       return;
     }
     qDebug() << "[PluginInstaller] startup: plugin not installed, sourceVersion=" << sourceVersion;
-    promptAndInstall(installPromptTitle(), installPromptMessage());
+    promptAndInstall(InstallPromptTitle(), InstallPromptMessage());
     return;
   }
 
   if (hasUpdate()) {
     qDebug() << "[PluginInstaller] startup: update available, source=" << sourceVersion
              << "installed=" << installedVersion;
-    promptAndInstall(updatePromptTitle(), updatePromptMessage());
+    promptAndInstall(UpdatePromptTitle(), UpdatePromptMessage());
     return;
   }
 
@@ -123,19 +123,19 @@ void PluginInstaller::promptAndInstall(const QString& title, const QString& mess
   performInstall();
 }
 
-QString PluginInstaller::installPromptTitle() {
+QString PluginInstaller::InstallPromptTitle() {
   return tr("Install Adobe After Effects Plug-in");
 }
 
-QString PluginInstaller::installPromptMessage() {
+QString PluginInstaller::InstallPromptMessage() {
   return tr("Do you want to install the Adobe After Effects plugins?");
 }
 
-QString PluginInstaller::updatePromptTitle() {
+QString PluginInstaller::UpdatePromptTitle() {
   return tr("Update Adobe After Effects Plug-in");
 }
 
-QString PluginInstaller::updatePromptMessage() {
+QString PluginInstaller::UpdatePromptMessage() {
   return tr(
       "A new version of the Adobe After Effects plugin is available. "
       "Would you like to update it now?");
