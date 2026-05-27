@@ -128,7 +128,9 @@ class LayerBuilderContext {
   explicit LayerBuilderContext(PAGXDocument& document) : _document(document) {
   }
 
-  LayerBuildResult buildWithMap(const PAGXDocument& document) {
+  // Note: signatures are non-const because rendering populates the document's per-document
+  // typeface cache via GlyphRunRenderer. Logical const-ness was never preserved here.
+  LayerBuildResult buildWithMap(PAGXDocument& document) {
     auto root = build(document);
     LayerBuildResult result = {};
     result.root = root;
@@ -136,7 +138,7 @@ class LayerBuilderContext {
     return result;
   }
 
-  std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
+  std::shared_ptr<tgfx::Layer> build(PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
@@ -889,11 +891,12 @@ class LayerBuilderContext {
       return h1 ^ (h2 << 1);
     }
   };
+  // Bound first so any other member's initializer can rely on it being live.
+  PAGXDocument& _document;
   std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  PAGXDocument& _document;
 };
 
 // Public API implementation

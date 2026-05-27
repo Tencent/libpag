@@ -157,9 +157,11 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
-  // After clearing embedded glyph runs the next embed() will recreate Font nodes at fresh
-  // addresses; drop the typeface cache so we don't retain typefaces keyed on stale Font* that
-  // will never be looked up again.
+  // ClearEmbeddedGlyphRuns() detaches every GlyphRun from its Text; the embedded Font nodes still
+  // live in `nodes` but are no longer reachable from any rendering path. A subsequent embed()
+  // creates new Font nodes (new pointers), so cached entries keyed on the old Font* would never
+  // be hit again and would accumulate across re-embed cycles. Drop them now.
+  DEBUG_ASSERT(typefaceCache != nullptr);
   typefaceCache->typefaces.clear();
 }
 

@@ -19,6 +19,7 @@
 #include "GlyphRunRenderer.h"
 #include <cmath>
 #include "TypefaceCache.h"
+#include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
@@ -106,6 +107,7 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     return nullptr;
   }
 
+  DEBUG_ASSERT(document.typefaceCache != nullptr);
   auto& cache = document.typefaceCache->typefaces;
   auto it = cache.find(fontNode);
   if (it != cache.end()) {

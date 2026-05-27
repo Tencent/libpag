@@ -130,12 +130,16 @@ CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   auto firstTypeface = doc->typefaceCache->typefaces[fontNode];
   ASSERT_TRUE(firstTypeface != nullptr);
+  auto sizeAfterFirst = doc->typefaceCache->typefaces.size();
+  auto refsAfterFirst = firstTypeface.use_count();
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   auto secondTypeface = doc->typefaceCache->typefaces[fontNode];
-  // Repeated Build calls on the same document must hit the cache rather than rebuilding the
-  // typeface, so both lookups must return the very same shared_ptr instance.
+  // Cache must hit the early-return path on the second build: same shared_ptr instance, same map
+  // size, and only the new local copy adds a strong reference.
   EXPECT_EQ(firstTypeface.get(), secondTypeface.get());
+  EXPECT_EQ(doc->typefaceCache->typefaces.size(), sizeAfterFirst);
+  EXPECT_EQ(firstTypeface.use_count(), refsAfterFirst + 1);
 }
 
 CLI_TEST(PAGXTypefaceCacheTest, PerDocumentCachesAreIsolated) {
