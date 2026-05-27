@@ -391,8 +391,15 @@ then
         libName=$(basename "${existingLib}")
         rm -f "${PluginPath}/Contents/Frameworks/${libName}"
     done
-    # Copy remaining plugin Frameworks into the main app
-    find "${PluginPath}/Contents/Frameworks" -mindepth 1 -maxdepth 1 -exec cp -fRP {} "${AppDir}/Contents/Frameworks/" \;
+    # Copy remaining plugin Frameworks into the main app.
+    # Use process substitution so exitWithError aborts the whole script;
+    # find -exec swallows cp failures and a piped while runs in a subshell.
+    while IFS= read -r -d '' Item; do
+        if ! cp -fRP "${Item}" "${AppDir}/Contents/Frameworks/";
+        then
+            exitWithError "Failed to copy plugin framework item: ${Item}"
+        fi
+    done < <(find "${PluginPath}/Contents/Frameworks" -mindepth 1 -maxdepth 1 -print0)
 fi
 if [ -d "${PluginPath}/Contents/Plugins" ];
 then
