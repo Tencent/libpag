@@ -86,7 +86,7 @@ $RFCTime = Get-Date -Format "r"
 $SourceDir = Split-Path $PSScriptRoot -Parent
 $LibpagDir = Split-Path $SourceDir -Parent
 $BuildDir = Join-Path $SourceDir "build_viewer"
-$IsBetaVersion = if ($env:isBetaVersion) { $env:isBetaVersion } else { $false }
+$IsBetaVersion = if ($env:isBetaVersion -eq "true") { $true } else { $false }
 
 Log-Info "Build Time: $CurrentTime"
 Log-Info "Version: $AppVersion"
