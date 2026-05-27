@@ -23,10 +23,12 @@ Two execution modes share the same per-case loop:
   envelope numbers.
 - **Native** (`run-native.sh`) — same `snapshot.js` + `sampler.js`,
   invoked directly on the host. Works on macOS and Linux. No
-  container, no cgroup metrics; on macOS no PSS either (Darwin
-  doesn't expose proportional shared memory). Use this when you
-  just want to validate the pipeline locally or get rough host
-  numbers without standing up Docker.
+  container and no cgroup *memory* accounting; on macOS no PSS
+  either (Darwin doesn't expose proportional shared memory). CPU
+  numbers **are** reported on both platforms via a per-PID
+  proc-tree fallback (see "Why a process-tree sampler" below).
+  Use this when you just want to validate the pipeline locally or
+  get rough host numbers without standing up Docker.
 
 Both modes can drive either headless browser engine — pass
 `--engine puppeteer` (default) or `--engine playwright` to switch.
@@ -104,9 +106,25 @@ descendant tree every 50ms — `/proc/<pid>/` reads on Linux,
   after the first one to hit the global peak. The proc-tree numbers
   stay per-case correct. Native runs pass `--no-cgroup` to sampler.js
   because the global cgroup is contaminated by other host processes.
-- `cgroup_cpu_user_sec` / `cgroup_cpu_system_sec` — from
-  `/sys/fs/cgroup/cpu.stat`, also kernel-accounted (no sampling holes).
-  Container only, same caveat.
+- `cgroup_cpu_user_sec` / `cgroup_cpu_system_sec` /
+  `cgroup_cpu_usage_pct_of_one_core` — from `/sys/fs/cgroup/cpu.stat`,
+  also kernel-accounted (no sampling holes). Container only, same
+  caveat. The Markdown / HTML reports prefer these over the proc-tree
+  fallback whenever they're populated.
+- `proc_tree_cpu_user_sec` / `proc_tree_cpu_system_sec` /
+  `proc_tree_cpu_total_sec` / `proc_tree_cpu_usage_pct_of_one_core` —
+  per-PID cumulative CPU summed across the process tree, tracked at
+  every sampler tick. On **Linux** the breakdown comes from
+  `/proc/<pid>/stat`'s `utime` / `stime` fields converted via
+  `sysconf(_SC_CLK_TCK)`, so all four columns populate. On **macOS**
+  only the combined total comes from `ps -A -o time=` (BSD ps doesn't
+  expose the user/system split), so the user/system columns are
+  null and only `proc_tree_cpu_total_sec` + the % field are
+  populated. Available on **every** platform — this is what makes
+  the CPU columns work in native mode (Linux + macOS) without
+  cgroup. Limitation: processes whose entire lifetime fits between
+  two sampler ticks are invisible to this stream, so the cgroup
+  numbers (when available) are strictly more accurate.
 
 ## Baseline (browser opens about:blank)
 
@@ -230,20 +248,32 @@ tools/html-snapshot/bench/run-native.sh --engine playwright \
   --label pw-1 ~/Desktop/tmp_case
 ```
 
-The native path drops two columns of metrics vs. Docker:
+The native path drops the cgroup-only memory columns vs. Docker, but
+CPU is now reported on every platform via the proc-tree fallback:
 
-| metric                       | Docker | Linux native | macOS native |
-| ---                          | :---:  | :---:        | :---:        |
-| `wall_ms`                    |  ✔     |  ✔           |  ✔           |
-| `peak_proc_tree_rss_mb`      |  ✔     |  ✔           |  ✔           |
-| `peak_proc_tree_pss_mb`      |  ✔     |  ✔           |  —           |
-| `peak_proc_count`            |  ✔     |  ✔           |  ✔           |
-| `cgroup_memory_peak_delta_mb`|  ✔     |  —           |  —           |
-| `cgroup_cpu_*_sec`           |  ✔     |  —           |  —           |
-| per-comm RSS breakdown       |  ✔     |  ✔           |  ✔           |
+| metric                            | Docker | Linux native | macOS native |
+| ---                               | :---:  | :---:        | :---:        |
+| `wall_ms`                         |  ✔     |  ✔           |  ✔           |
+| `peak_proc_tree_rss_mb`           |  ✔     |  ✔           |  ✔           |
+| `peak_proc_tree_pss_mb`           |  ✔     |  ✔           |  —           |
+| `peak_proc_count`                 |  ✔     |  ✔           |  ✔           |
+| `cgroup_memory_peak_delta_mb`     |  ✔     |  —           |  —           |
+| `cgroup_cpu_*`                    |  ✔     |  —           |  —           |
+| `proc_tree_cpu_user_sec`          |  ✔     |  ✔           |  —           |
+| `proc_tree_cpu_system_sec`        |  ✔     |  ✔           |  —           |
+| `proc_tree_cpu_total_sec`         |  ✔     |  ✔           |  ✔           |
+| `proc_tree_cpu_usage_pct_of_one_core` | ✔  |  ✔           |  ✔           |
+| per-comm RSS breakdown            |  ✔     |  ✔           |  ✔           |
 
-cgroup columns come back `null` and render as `n/a` in `summary.md`
-when unavailable; aggregate rows skip them automatically.
+The CPU columns in `summary.md` / `summary.html` are populated by
+the `cpuUserSec` / `cpuSystemSec` / `cpuPctOfOneCore` accessors in
+`report-utils.js`, which read `cgroup_cpu_*` when available and fall
+back to `proc_tree_cpu_*` otherwise. End result: every mode shows
+CPU; Docker just gets the kernel-accounted version, native gets the
+sampling-based version. Columns that have no source at all (e.g.
+`cgroup_memory_peak_delta_mb` in native mode, `proc_tree_cpu_user_sec`
+on macOS) come back `null` and render as `n/a`; aggregate rows skip
+them automatically.
 
 ### Outputs
 
@@ -279,8 +309,19 @@ Both modes write the same files to the output directory:
   don't exist; on Linux native the global cgroup is contaminated by
   every other host process and the values would be meaningless.
   `run-native.sh` passes `--no-cgroup` to `sampler.js` and the cgroup
-  columns come back `null`. Use the proc-tree numbers (RSS sum, and
-  PSS sum on Linux) as the per-case truth.
+  columns come back `null`. The CPU columns are then populated from
+  the `proc_tree_cpu_*` per-PID polling fallback; the cgroup
+  *memory* columns stay `n/a`. Use the proc-tree numbers (RSS sum,
+  and PSS sum on Linux) for memory attribution.
+- **Native CPU has sampling holes.** The proc-tree CPU stream polls
+  `/proc/<pid>/stat` (Linux) or `ps -A -o time=` (macOS) at the
+  sampler tick rate (default 50 ms). A process whose entire lifetime
+  fits between two ticks contributes 0 CPU to the report — typically
+  irrelevant for Chromium-heavy workloads where the renderer / GPU
+  helpers live for the whole page, but worth knowing if you're
+  comparing native numbers against a Docker run with cgroup
+  accounting. Lower `INTERVAL_MS` to narrow the window at the cost
+  of a tiny per-tick overhead.
 - **macOS RSS is upper-bound only.** `ps -A`'s RSS double-counts
   shared / mapped pages across fork+CoW children; for Chromium this
   inflates the reported peak by a noticeable amount vs. what

@@ -46,7 +46,10 @@ const {
   statValues,
   fmt,
   topBy,
+  cpuUserSec,
+  cpuSystemSec,
   cpuTotalSec,
+  cpuPctOfOneCore,
   minOf,
   maxOf,
 } = require('./report-utils');
@@ -135,13 +138,20 @@ function histogramSvg({ values, width = 560, height = 160, bins = 20,
 
 // ---- aggregate stats (computed once, shared by multiple sections) --------
 
+// CPU stats go through cpuUserSec/cpuSystemSec/cpuPctOfOneCore so the
+// dashboard picks the cgroup numbers when available (Docker mode) and
+// falls back to sampler.js's proc-tree CPU stream when not (native
+// macOS / Linux). The proc-tree fallback is computed by per-PID
+// polling and misses processes whose lifetime fits between two sampler
+// ticks, but that's still strictly better than the previous behaviour
+// of rendering 'n/a' for every CPU column outside Docker.
 const stats = {
-  wall:    stat('wall_ms', ok),
-  procRss: stat('peak_proc_tree_rss_mb', ok),
-  procPss: stat('peak_proc_tree_pss_mb', ok),
-  cgUser:  stat('cgroup_cpu_user_sec', ok),
-  cgSys:   stat('cgroup_cpu_system_sec', ok),
-  cgPct:   stat('cgroup_cpu_usage_pct_of_one_core', ok),
+  wall:     stat('wall_ms', ok),
+  procRss:  stat('peak_proc_tree_rss_mb', ok),
+  procPss:  stat('peak_proc_tree_pss_mb', ok),
+  cpuUser:  statValues(ok.map(cpuUserSec)),
+  cpuSys:   statValues(ok.map(cpuSystemSec)),
+  cpuPct:   statValues(ok.map(cpuPctOfOneCore)),
   cpuTotal: statValues(ok.map(cpuTotalSec)),
 };
 const cgMemMax = ok.reduce((m, r) => Math.max(m, r.cgroup_memory_peak_mb || 0), 0);
@@ -150,8 +160,7 @@ const peakProcCountMax = ok.reduce((m, r) => Math.max(m, r.peak_proc_count || 0)
 // Distribution values for the histogram chart row.
 const wallVals = ok.map((r) => r.wall_ms).filter((v) => typeof v === 'number');
 const pssVals  = ok.map((r) => r.peak_proc_tree_pss_mb).filter((v) => typeof v === 'number');
-const cpuVals  = ok.map((r) => r.cgroup_cpu_usage_pct_of_one_core)
-                  .filter((v) => typeof v === 'number');
+const cpuVals  = ok.map(cpuPctOfOneCore).filter((v) => typeof v === 'number');
 
 const generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
@@ -312,7 +321,7 @@ function renderTiles() {
   <div class="tile">
     <div class="lbl">CPU per case (user+sys)</div>
     <div class="v">${fixed(stats.cpuTotal.p50, 1, 's')}</div>
-    <div class="sub">p95 ${fixed(stats.cpuTotal.p95, 1, 's')} · 占 1 核 ${fixed(stats.cgPct.p50, 0, '%')}</div>
+    <div class="sub">p95 ${fixed(stats.cpuTotal.p95, 1, 's')} · 占 1 核 ${fixed(stats.cpuPct.p50, 0, '%')}</div>
   </div>
   <div class="tile">
     <div class="lbl">单 case 进程数</div>
@@ -350,7 +359,7 @@ function renderBaseline() {
           <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
           <td class="num">${fmt(r.cgroup_memory_peak_delta_mb)}</td>
           <td class="num">${fmt(cpuTotalSec(r))}</td>
-          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+          <td class="num">${fmt(cpuPctOfOneCore(r))}</td>
           <td class="num">${r.peak_proc_count ?? 'n/a'}</td>
         </tr>`).join('');
   return `
@@ -464,9 +473,9 @@ function renderAggregateTable() {
 ${aggregateRow('wall (ms)', stats.wall)}
 ${aggregateRow('进程树 RSS 峰值 (MB)', stats.procRss)}
 ${aggregateRow('进程树 PSS 峰值 (MB)', stats.procPss)}
-${aggregateRow('cgroup CPU user (s)', stats.cgUser)}
-${aggregateRow('cgroup CPU system (s)', stats.cgSys)}
-${aggregateRow('CPU 占用 (% of 1 core)', stats.cgPct)}
+${aggregateRow('CPU user (s)', stats.cpuUser)}
+${aggregateRow('CPU system (s)', stats.cpuSys)}
+${aggregateRow('CPU 占用 (% of 1 core)', stats.cpuPct)}
   </tbody>
 </table>`;
 }
@@ -486,7 +495,7 @@ function renderTopCases() {
           <td class="lbl">${esc(r.label)}</td>
           <td class="num">${fmt(r.wall_ms)}</td>
           <td class="num">${fmt(cpuTotalSec(r))}</td>
-          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+          <td class="num">${fmt(cpuPctOfOneCore(r))}</td>
         </tr>`).join('');
   return `
 <h2>Top 用例</h2>
@@ -558,9 +567,9 @@ function renderPerCaseDetail() {
           <td class="num">${fmt(r.peak_proc_tree_rss_mb)}</td>
           <td class="num">${fmt(r.peak_proc_tree_pss_mb)}</td>
           <td class="num">${fmt(r.cgroup_memory_peak_delta_mb)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_user_sec)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_system_sec)}</td>
-          <td class="num">${fmt(r.cgroup_cpu_usage_pct_of_one_core)}</td>
+          <td class="num">${fmt(cpuUserSec(r))}</td>
+          <td class="num">${fmt(cpuSystemSec(r))}</td>
+          <td class="num">${fmt(cpuPctOfOneCore(r))}</td>
           <td class="num">${r.peak_proc_count ?? 'n/a'}</td>
         </tr>`;
   }).join('');

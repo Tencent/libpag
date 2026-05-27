@@ -14,7 +14,7 @@
 //                       (only emitted if BASELINE_RUNS > 0 in run-cases.sh)
 //   3. Aggregate     — count of cases, success rate, p50/p95/max for
 //                       wall_ms, peak_proc_tree_rss_mb, cgroup_memory_peak_mb,
-//                       cgroup_cpu_*sec, cpu_pct_of_one_core
+//                       cpu user/sys/total sec, cpu_pct_of_one_core
 //                       (baseline rows excluded so floor-cost samples
 //                        don't drag percentiles toward zero)
 //   4. Top cases     — top 5 by peak memory, top 5 by wall time, listed
@@ -22,13 +22,20 @@
 //   5. Failures      — every case row with exit_code != 0
 //   6. Per-case      — full table, sorted by relative path
 //
+// CPU columns read through the cpuUserSec/cpuSystemSec/cpuTotalSec/
+// cpuPctOfOneCore accessors so the report prefers cgroup numbers when
+// available (Docker mode) and transparently falls back to the per-PID
+// proc-tree sum that sampler.js computes from /proc or `ps` (native
+// mode on Linux + macOS).
+//
 // Stats / formatting helpers live in report-utils.js so the Markdown
 // and HTML reports share one source of truth for percentile math.
 
 'use strict';
 
 const {
-  loadReport, stat, fmt, topBy, cpuTotalSec,
+  loadReport, stat, statValues, fmt, topBy,
+  cpuUserSec, cpuSystemSec, cpuTotalSec, cpuPctOfOneCore,
 } = require('./report-utils');
 
 const [, , resultsPath, hostMetaPath] = process.argv;
@@ -83,7 +90,7 @@ if (baseline.length) {
   out.push('|-------|-----:|--------:|-----------------:|-----------------:|-----------------:|-----------:|----------:|-----------:|------:|');
   for (const r of baseline) {
     out.push(
-      `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(r.cgroup_cpu_user_sec)} | ${fmt(r.cgroup_cpu_system_sec)} | ${fmt(r.cgroup_cpu_usage_pct_of_one_core)} | ${r.peak_proc_count ?? 'n/a'} |`,
+      `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(cpuUserSec(r))} | ${fmt(cpuSystemSec(r))} | ${fmt(cpuPctOfOneCore(r))} | ${r.peak_proc_count ?? 'n/a'} |`,
     );
   }
   out.push('');
@@ -103,9 +110,12 @@ const wallStat    = stat('wall_ms', ok);
 const procRssStat = stat('peak_proc_tree_rss_mb', ok);
 const procPssStat = stat('peak_proc_tree_pss_mb', ok);
 const cgMemStat   = stat('cgroup_memory_peak_delta_mb', ok);
-const cgUserStat  = stat('cgroup_cpu_user_sec', ok);
-const cgSysStat   = stat('cgroup_cpu_system_sec', ok);
-const cgPctStat   = stat('cgroup_cpu_usage_pct_of_one_core', ok);
+// CPU columns go through the accessors so this table renders the
+// same regardless of whether the row came from a Docker run (cgroup
+// numbers populated) or a native run (only proc_tree_cpu_* populated).
+const cpuUserStat = statValues(ok.map(cpuUserSec));
+const cpuSysStat  = statValues(ok.map(cpuSystemSec));
+const cpuPctStat  = statValues(ok.map(cpuPctOfOneCore));
 
 out.push('| metric | p50 | p95 | max | mean |');
 out.push('|--------|----:|----:|----:|-----:|');
@@ -113,9 +123,9 @@ out.push(`| wall (ms) | ${fmt(wallStat.p50)} | ${fmt(wallStat.p95)} | ${fmt(wall
 out.push(`| proc-tree RSS peak (MB) | ${fmt(procRssStat.p50)} | ${fmt(procRssStat.p95)} | ${fmt(procRssStat.max)} | ${fmt(procRssStat.mean)} |`);
 out.push(`| proc-tree PSS peak (MB) | ${fmt(procPssStat.p50)} | ${fmt(procPssStat.p95)} | ${fmt(procPssStat.max)} | ${fmt(procPssStat.mean)} |`);
 out.push(`| cgroup memory peak Δ (MB) | ${fmt(cgMemStat.p50)} | ${fmt(cgMemStat.p95)} | ${fmt(cgMemStat.max)} | ${fmt(cgMemStat.mean)} |`);
-out.push(`| cgroup CPU user (s) | ${fmt(cgUserStat.p50)} | ${fmt(cgUserStat.p95)} | ${fmt(cgUserStat.max)} | ${fmt(cgUserStat.mean)} |`);
-out.push(`| cgroup CPU system (s) | ${fmt(cgSysStat.p50)} | ${fmt(cgSysStat.p95)} | ${fmt(cgSysStat.max)} | ${fmt(cgSysStat.mean)} |`);
-out.push(`| CPU usage (% of 1 core) | ${fmt(cgPctStat.p50)} | ${fmt(cgPctStat.p95)} | ${fmt(cgPctStat.max)} | ${fmt(cgPctStat.mean)} |`);
+out.push(`| CPU user (s) | ${fmt(cpuUserStat.p50)} | ${fmt(cpuUserStat.p95)} | ${fmt(cpuUserStat.max)} | ${fmt(cpuUserStat.mean)} |`);
+out.push(`| CPU system (s) | ${fmt(cpuSysStat.p50)} | ${fmt(cpuSysStat.p95)} | ${fmt(cpuSysStat.max)} | ${fmt(cpuSysStat.mean)} |`);
+out.push(`| CPU usage (% of 1 core) | ${fmt(cpuPctStat.p50)} | ${fmt(cpuPctStat.p95)} | ${fmt(cpuPctStat.max)} | ${fmt(cpuPctStat.mean)} |`);
 out.push('');
 
 out.push('### Top cases');
@@ -159,7 +169,7 @@ out.push('|-------|-----:|--------:|-----------------:|-----------------:|------
 // strictly per-snapshot-case so floor cost samples don't show up twice.
 for (const r of cases.slice().sort((a, b) => (a.label > b.label ? 1 : -1))) {
   out.push(
-    `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(r.cgroup_cpu_user_sec)} | ${fmt(r.cgroup_cpu_system_sec)} | ${fmt(r.cgroup_cpu_usage_pct_of_one_core)} | ${r.peak_proc_count ?? 'n/a'} |`,
+    `| ${r.label} | ${r.exit_code} | ${fmt(r.wall_ms)} | ${fmt(r.peak_proc_tree_rss_mb)} | ${fmt(r.peak_proc_tree_pss_mb)} | ${fmt(r.cgroup_memory_peak_delta_mb)} | ${fmt(cpuUserSec(r))} | ${fmt(cpuSystemSec(r))} | ${fmt(cpuPctOfOneCore(r))} | ${r.peak_proc_count ?? 'n/a'} |`,
   );
 }
 out.push('');

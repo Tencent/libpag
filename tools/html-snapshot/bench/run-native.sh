@@ -48,15 +48,26 @@
 #     tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
 #
 # Caveats vs. the Dockerised run-bench.sh:
-#   - No cgroup metrics. On macOS cgroups don't exist; on Linux native
-#     the global cgroup is contaminated by other host processes, so
-#     the numbers would be misleading. The `cgroup_*` columns in
-#     results.jsonl come back null and summary.md renders them as
-#     `n/a`.
+#   - No cgroup memory accounting. On macOS cgroups don't exist; on
+#     Linux native the global cgroup is contaminated by other host
+#     processes, so the numbers would be misleading. The
+#     `cgroup_memory_*` columns in results.jsonl come back null and
+#     summary.md renders them as `n/a`.
+#   - CPU is reported via the per-PID proc-tree fallback that sampler.js
+#     computes from /proc/<pid>/stat (Linux native) or `ps -A -o time=`
+#     (macOS), stored in `proc_tree_cpu_*`. The summary picks this up
+#     transparently — the CPU columns and tiles now populate outside
+#     Docker. Caveat: a process whose entire lifetime fits between two
+#     sampler ticks is invisible to this stream; cgroup cpu.stat (Docker
+#     mode) is still the holes-free source.
 #   - macOS uses `ps -A` for the process-tree walk and reports VmRSS
 #     in KB; PSS isn't exposed by macOS, so `peak_proc_tree_pss_mb`
-#     is null. Linux native keeps the full /proc + smaps_rollup path,
-#     so PSS is still available.
+#     is null. macOS `ps` also reports CPU as a single user+system
+#     total, so `proc_tree_cpu_user_sec` / `proc_tree_cpu_system_sec`
+#     are null on Darwin (only the combined `proc_tree_cpu_total_sec`
+#     and the % field are populated). Linux native keeps the full
+#     /proc + smaps_rollup path, so PSS and the user/system split are
+#     still available.
 #   - No `--cpus` / `--memory` envelope. The host runs as configured;
 #     numbers reflect that, not a constrained container.
 

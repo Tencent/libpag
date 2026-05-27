@@ -17,11 +17,19 @@
 //   - stat(field, src) → { min, p50, p95, max, mean } | { all-null }
 //   - fmt(v, suffix?) → string  (n/a-aware, integer >= 1000)
 //   - topBy(rows, field, n)     → rows sorted desc by field, top-n only
-//   - cpuTotalSec(row)          → user+sys cgroup CPU; null if both
-//                                  inputs are null (e.g. native macOS
-//                                  has no cgroups, so reporting 0
-//                                  would falsely imply "measured zero
-//                                  CPU" rather than "not measured")
+//   - cpuUserSec(row) / cpuSystemSec(row) / cpuTotalSec(row) /
+//     cpuPctOfOneCore(row)
+//                                → CPU accessors. Prefer the cgroup
+//                                  number when available (kernel-
+//                                  accounted, no sampling holes), fall
+//                                  back to the proc-tree number
+//                                  derived by sampler.js's per-PID
+//                                  polling (the only CPU signal we
+//                                  have on macOS / Linux native).
+//                                  All four return null when neither
+//                                  source has a value, so summarize.js
+//                                  / summarize-html.js render 'n/a'
+//                                  instead of misleading zeros.
 //
 // All numeric helpers ignore non-number entries (`null`, `undefined`,
 // strings) so the same code path works for both fully-populated Docker
@@ -143,13 +151,53 @@ function topBy(rows, field, n) {
     .slice(0, n);
 }
 
+// Prefer cgroup numbers (kernel-accounted, includes processes that
+// exited between sampler ticks) over the per-PID proc-tree sum (which
+// sampler.js derives from /proc/<pid>/stat on Linux or `ps -o time=`
+// on macOS, and which misses processes whose lifetime fits between
+// two ticks). The proc-tree source is the only CPU signal available
+// natively (Linux without --cgroup, macOS), so falling back keeps the
+// summary tables populated outside the Docker harness.
+function cpuUserSec(row) {
+  if (!row) return null;
+  if (row.cgroup_cpu_user_sec != null) return row.cgroup_cpu_user_sec;
+  if (row.proc_tree_cpu_user_sec != null) return row.proc_tree_cpu_user_sec;
+  return null;
+}
+
+function cpuSystemSec(row) {
+  if (!row) return null;
+  if (row.cgroup_cpu_system_sec != null) return row.cgroup_cpu_system_sec;
+  if (row.proc_tree_cpu_system_sec != null) return row.proc_tree_cpu_system_sec;
+  return null;
+}
+
 function cpuTotalSec(row) {
-  const u = row.cgroup_cpu_user_sec;
-  const s = row.cgroup_cpu_system_sec;
+  if (!row) return null;
+  // Prefer cgroup user+sys; cgroup is the canonical Docker-mode signal.
+  const cgU = row.cgroup_cpu_user_sec;
+  const cgS = row.cgroup_cpu_system_sec;
+  if (cgU != null || cgS != null) {
+    return +((cgU || 0) + (cgS || 0)).toFixed(2);
+  }
+  // Native fallback. macOS only populates the combined total (ps
+  // doesn't expose utime/stime separately), so we read total directly
+  // rather than re-summing user + system fields that may be null.
+  if (row.proc_tree_cpu_total_sec != null) return row.proc_tree_cpu_total_sec;
   // Both unmeasured → return null so downstream stat()/fmt() show
   // 'n/a' instead of a misleading "0.0s" tile or table cell.
-  if (u == null && s == null) return null;
-  return (u || 0) + (s || 0);
+  return null;
+}
+
+function cpuPctOfOneCore(row) {
+  if (!row) return null;
+  if (row.cgroup_cpu_usage_pct_of_one_core != null) {
+    return row.cgroup_cpu_usage_pct_of_one_core;
+  }
+  if (row.proc_tree_cpu_usage_pct_of_one_core != null) {
+    return row.proc_tree_cpu_usage_pct_of_one_core;
+  }
+  return null;
 }
 
 module.exports = {
@@ -161,7 +209,10 @@ module.exports = {
   statValues,
   fmt,
   topBy,
+  cpuUserSec,
+  cpuSystemSec,
   cpuTotalSec,
+  cpuPctOfOneCore,
   minOf,
   maxOf,
 };
