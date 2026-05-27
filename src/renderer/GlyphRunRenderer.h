@@ -47,11 +47,11 @@ class GlyphRunRenderer {
   /**
    * Builds a TextBlob from a Text element's embedded GlyphRuns (pagx::GlyphRun), applying the
    * inverse matrix to convert from layout coordinates to Text local coordinates. Writes the
-   * resulting TextBlob and per-glyph anchors directly into text->glyphData. When renderCache is
-   * non-null, built typefaces are cached on it for reuse within the same document.
+   * resulting TextBlob and per-glyph anchors directly into text->glyphData. Built typefaces are
+   * cached on the supplied RenderCache for reuse within the same document.
    */
   static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix,
-                            RenderCache* renderCache);
+                            RenderCache& renderCache);
 
   /**
    * Builds a TextBlob from runtime layout glyph runs (TextLayoutGlyphRun), applying the inverse
@@ -62,7 +62,7 @@ class GlyphRunRenderer {
 
  private:
   static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode,
-                                                               RenderCache* renderCache);
+                                                               RenderCache& renderCache);
 };
 
 }  // namespace pagx

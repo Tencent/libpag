@@ -166,6 +166,11 @@ class PAGXDocument : public Node {
     return NodeType::Document;
   }
 
+  PAGXDocument(const PAGXDocument&) = delete;
+  PAGXDocument& operator=(const PAGXDocument&) = delete;
+  PAGXDocument(PAGXDocument&&) = delete;
+  PAGXDocument& operator=(PAGXDocument&&) = delete;
+
   ~PAGXDocument() override;
 
  private:

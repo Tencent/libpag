@@ -126,7 +126,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(RenderCache* renderCache) : _renderCache(renderCache) {
+  explicit LayerBuilderContext(RenderCache& renderCache) : _renderCache(renderCache) {
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
@@ -894,7 +894,7 @@ class LayerBuilderContext {
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  RenderCache* _renderCache = nullptr;
+  RenderCache& _renderCache;
 };
 
 // Public API implementation
@@ -909,7 +909,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context(document->getOrCreateRenderCache());
+  LayerBuilderContext context(*document->getOrCreateRenderCache());
   return context.build(*document);
 }
 
@@ -925,7 +925,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context(document->getOrCreateRenderCache());
+  LayerBuilderContext context(*document->getOrCreateRenderCache());
   return context.buildWithMap(*document);
 }
 

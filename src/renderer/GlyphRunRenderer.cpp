@@ -100,16 +100,14 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
 }
 
 std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode,
-                                                                        RenderCache* renderCache) {
+                                                                        RenderCache& renderCache) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
   }
 
-  if (renderCache != nullptr) {
-    auto cached = renderCache->getTypeface(fontNode);
-    if (cached != nullptr) {
-      return cached;
-    }
+  auto cached = renderCache.getTypeface(fontNode);
+  if (cached != nullptr) {
+    return cached;
   }
 
   bool hasPath = false;
@@ -162,14 +160,14 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     typeface = builder.detach();
   }
 
-  if (typeface != nullptr && renderCache != nullptr) {
-    renderCache->setTypeface(fontNode, typeface);
+  if (typeface != nullptr) {
+    renderCache.setTypeface(fontNode, typeface);
   }
   return typeface;
 }
 
 void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix,
-                                     RenderCache* renderCache) {
+                                     RenderCache& renderCache) {
   tgfx::TextBlobBuilder builder = {};
   std::vector<tgfx::Point> anchors;
 
