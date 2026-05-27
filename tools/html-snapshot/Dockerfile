@@ -42,11 +42,11 @@ FROM node:22-bookworm-slim
 # `libegl1` + `libgles2` + `libfontconfig1` are the runtime libs the
 # Linux `pagx` binary itself links against (see top-level CMakeLists.txt
 # where the pagx-cli target pulls in EGL + GLESv2 + Fontconfig on Linux).
-# Without them a bind-mounted pagx fails at startup with
-# `error while loading shared libraries: libEGL.so: cannot open shared
-# object file`. They're cheap (<2 MB combined) and harmless if pagx is
-# never used, so we install them unconditionally to keep the
-# "drop in a pagx binary and it works" UX promised above.
+# These ship only the versioned SONAMEs (`libEGL.so.1`, `libGLESv2.so.2`)
+# — the unversioned `.so` symlinks the pagx binary actually asks for are
+# recreated in a follow-up RUN below. They're cheap (<2 MB combined) and
+# harmless if pagx is never used, so we install them unconditionally to
+# keep the "drop in a pagx binary and it works" UX promised above.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       chromium \
       ca-certificates \
@@ -90,6 +90,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       wget \
       xdg-utils \
   && rm -rf /var/lib/apt/lists/*
+
+# The libpag Linux build emits a `pagx` binary whose DT_NEEDED entries are
+# the unversioned `libEGL.so` / `libGLESv2.so` (this matches the vendored
+# SwiftShader SONAMEs used by the libpag build setup, not the versioned
+# `libEGL.so.1` / `libGLESv2.so.2` that Debian's runtime `libegl1` and
+# `libgles2` packages ship). Without the unversioned symlinks the bind-
+# mounted pagx aborts at startup with
+# `error while loading shared libraries: libEGL.so: cannot open shared
+# object file`. The dev packages (`libegl-dev`/`libgles-dev`) would
+# provide these symlinks but also drag in headers and pkgconfig files we
+# don't need, so we just create the two symlinks ourselves. `uname -m`
+# resolves to `x86_64` on amd64 and `aarch64` on arm64, matching Debian's
+# multiarch dir layout on both architectures.
+RUN set -eux; \
+    libdir="/usr/lib/$(uname -m)-linux-gnu"; \
+    ln -sf libEGL.so.1 "$libdir/libEGL.so"; \
+    ln -sf libGLESv2.so.2 "$libdir/libGLESv2.so"
 
 WORKDIR /app
 
