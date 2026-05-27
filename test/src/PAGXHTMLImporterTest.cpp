@@ -757,6 +757,57 @@ PAG_TEST(PAGXHTMLImporterTest, BrTagInsertsNewline) {
   EXPECT_NE(text->text.find('\n'), std::string::npos);
 }
 
+// Source HTML inside a text-leaf may carry indentation between the opening
+// tag and the first character of visible content (`<h1>\n        Title…`).
+// CSS's inline-formatting-context boundary trim removes that whitespace
+// before laying out the text, so PAGX has to reproduce the same trim or
+// the rendered baseline gets pushed right by one space and / or onto a
+// second line. The downstream `CollapseHTMLWhitespace` pass only strips
+// leading ASCII spaces — it intentionally preserves leading `\n` so that
+// `<br>Title…` keeps its hard break — so the normalisation must happen
+// when the text node is first ingested: convert collapsible whitespace
+// (`\n`, `\r`, `\t`) to a regular space, and the existing collapse pass
+// handles the rest.
+PAG_TEST(PAGXHTMLImporterTest, IndentedTextLeafTrimsSourceWhitespace) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:40px">
+      <p style="font-size:14px;color:#000;font-family:Arial">
+        1.3 Title——<span style="color:#E8612C">"quoted"</span>
+      </p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "1.3 Title——");
+  EXPECT_EQ(texts[1]->text, "\"quoted\"");
+}
+
+// A leading `<br>` keeps its hard newline even after the boundary trim:
+// the snapshot path appends `<br>` as a literal `\n` (not via a text node)
+// so it isn't subject to the source-whitespace-to-space normalisation,
+// and `CollapseHTMLWhitespace`'s front-trim deliberately leaves leading
+// `\n` alone. The result is an empty first visual line followed by the
+// text, matching what the browser draws for the same markup.
+PAG_TEST(PAGXHTMLImporterTest, LeadingBrPreservesNewline) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="font-size:14px;color:#000;font-family:Arial"><br/>after</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* text = FindElementOfType<pagx::Text>(leaf);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text.front(), '\n');
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ImageRegistersImageResource) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">

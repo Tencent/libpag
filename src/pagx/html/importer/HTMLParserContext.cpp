@@ -579,7 +579,23 @@ void HTMLParserContext::collectTextFragments(const std::shared_ptr<DOMNode>& ele
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
-      appendTextFragment(out, inherited, child->name);
+      // Map every collapsible whitespace character in the text node — newline,
+      // carriage return, tab — to a regular space before handing the run to
+      // `appendTextFragment`. CSS treats these as equivalent to spaces inside
+      // a `white-space: normal | nowrap` inline-formatting-context, so the
+      // downstream `CollapseHTMLWhitespace` pass (whose front-trim only drops
+      // ASCII spaces, intentionally, to preserve `<br>`-originated `\n`) can
+      // collapse and trim them away just like the browser would. Without this
+      // step, indented source HTML such as `<h1>\n        Title</h1>` leaks
+      // its source newline into the first fragment ("\n Title"), shifting the
+      // rendered baseline by one space and / or introducing a phantom line
+      // break. `<br>` keeps its hard `\n` because that path appends the
+      // newline directly (not via a text node), so its semantics are unaffected.
+      std::string text = child->name;
+      for (char& c : text) {
+        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+      }
+      appendTextFragment(out, inherited, std::move(text));
     } else if (child->type == DOMNodeType::Element) {
       if (child->name == "br") {
         appendTextFragment(out, inherited, "\n");
