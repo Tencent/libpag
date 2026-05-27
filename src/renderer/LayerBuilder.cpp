@@ -125,22 +125,22 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  LayerBuilderContext() = default;
+  explicit LayerBuilderContext(PAGXDocument& document) : _document(document) {
+  }
 
-  LayerBuildResult buildWithMap(const PAGXDocument& document) {
-    auto root = build(document);
+  LayerBuildResult buildWithMap() {
+    auto root = build();
     LayerBuildResult result = {};
     result.root = root;
     result.layerMap = std::move(_tgfxLayerByPagxLayer);
     return result;
   }
 
-  std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
-    // Build layer tree.
+  std::shared_ptr<tgfx::Layer> build() {
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
-    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
-    for (const auto& layer : document.layers) {
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(_document.width, _document.height));
+    for (const auto& layer : _document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
         rootLayer->addChild(childLayer);
@@ -231,22 +231,19 @@ class LayerBuilderContext {
     return layer;
   }
 
-  // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
-  // For standalone Text (not inside TextBox), inverseMatrix is Identity.
-  // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
-  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+  void prepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text->glyphData->layoutRuns.empty()) {
       text->glyphData->textBlob =
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
-      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix, _document);
     }
   }
 
-  // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
-  // This must happen at render time (not layout time) so that tgfx's StrokePainter can
-  // detect the Group transform via geometry->matrix changes between apply() and draw().
   void prepareTextBoxTextBlobs(const TextBox* textBox) {
+    // Prepare TextBlobs for all Text children of a TextBox by applying inverse matrices.
+    // This must happen at render time (not layout time) so that tgfx's StrokePainter can
+    // detect the Group transform via geometry->matrix changes between apply() and draw().
     std::vector<Text*> childText;
     std::vector<tgfx::Matrix> matrices;
     TextLayout::CollectTextElements(textBox->elements, childText, matrices);
@@ -256,7 +253,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      PrepareTextBlob(childText[i], inverse);
+      prepareTextBlob(childText[i], inverse);
     }
   }
 
@@ -371,7 +368,7 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
     auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
-      PrepareTextBlob(node, tgfx::Matrix::I());
+      prepareTextBlob(node, tgfx::Matrix::I());
       textBlob = node->glyphData->textBlob;
     }
     if (textBlob == nullptr) {
@@ -888,6 +885,8 @@ class LayerBuilderContext {
       return h1 ^ (h2 << 1);
     }
   };
+  // Bound first so any other member's initializer can rely on it being live.
+  PAGXDocument& _document;
   std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
@@ -906,8 +905,8 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context;
-  return context.build(*document);
+  LayerBuilderContext context(*document);
+  return context.build();
 }
 
 LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
@@ -922,8 +921,8 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context;
-  return context.buildWithMap(*document);
+  LayerBuilderContext context(*document);
+  return context.buildWithMap();
 }
 
 }  // namespace pagx

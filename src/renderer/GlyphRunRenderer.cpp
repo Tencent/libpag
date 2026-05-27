@@ -18,7 +18,10 @@
 
 #include "GlyphRunRenderer.h"
 #include <cmath>
+#include "TypefaceCache.h"
+#include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -98,9 +101,17 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
-std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode,
+                                                                        PAGXDocument& document) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
+  }
+
+  DEBUG_ASSERT(document.typefaceCache != nullptr);
+  auto& cache = document.typefaceCache->typefaces;
+  auto it = cache.find(fontNode);
+  if (it != cache.end()) {
+    return it->second;
   }
 
   bool hasPath = false;
@@ -153,10 +164,14 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     typeface = builder.detach();
   }
 
+  if (typeface != nullptr) {
+    cache[fontNode] = typeface;
+  }
   return typeface;
 }
 
-void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix,
+                                     PAGXDocument& document) {
   tgfx::TextBlobBuilder builder = {};
   std::vector<tgfx::Point> anchors;
 
@@ -165,7 +180,7 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
       continue;
     }
 
-    auto typeface = BuildTypefaceFromFont(run->font);
+    auto typeface = BuildTypefaceFromFont(run->font, document);
     if (typeface == nullptr) {
       continue;
     }

@@ -37,6 +37,11 @@ struct LayerBuildResult {
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
  * The document must have applyLayout() called before building.
+ *
+ * Threading: Build / BuildWithMap calls on the same PAGXDocument instance must be serialized by
+ * the caller. They mutate document-owned render-time state (typeface cache) and are not safe to
+ * invoke concurrently on a single document. Calls on distinct PAGXDocument instances do not share
+ * state and may run in parallel.
  */
 class LayerBuilder {
  public:

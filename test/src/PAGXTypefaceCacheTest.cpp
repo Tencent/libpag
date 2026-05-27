@@ -1,0 +1,196 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <memory>
+#include "base/PAGTest.h"
+#include "pagx/FontConfig.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Text.h"
+#include "renderer/FontEmbedder.h"
+#include "renderer/LayerBuilder.h"
+#include "renderer/TypefaceCache.h"
+#include "tgfx/core/Typeface.h"
+#include "utils/ProjectPath.h"
+
+namespace pag {
+using namespace tgfx;
+
+// Builds a minimal text document, embeds fonts, and reloads it from XML so the embedded glyphRun
+// path (the one that consults the typeface cache) is exercised by LayerBuilder. Returns nullptr
+// if the fallback font asset is missing on disk so the test is skipped gracefully.
+static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto typeface = Typeface::MakeFromPath(fontPath);
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+
+  auto authoredDoc = pagx::PAGXDocument::Make(100, 60);
+  auto* layer = authoredDoc->makeNode<pagx::Layer>();
+  auto* group = authoredDoc->makeNode<pagx::Group>();
+  auto* text = authoredDoc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontSize = 24;
+  auto* fill = authoredDoc->makeNode<pagx::Fill>();
+  auto* solid = authoredDoc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  authoredDoc->layers.push_back(layer);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  authoredDoc->applyLayout(&fontConfig);
+  if (!pagx::FontEmbedder().embed(authoredDoc.get())) {
+    return nullptr;
+  }
+
+  auto xml = pagx::PAGXExporter::ToXML(*authoredDoc);
+  if (xml.empty()) {
+    return nullptr;
+  }
+  // Re-import a fresh doc so glyphData->layoutRuns is empty and prepareTextBlob falls into the
+  // embedded glyphRun branch (the only branch that consults the typeface cache).
+  auto reloadedDoc = pagx::PAGXImporter::FromXML(xml);
+  if (reloadedDoc == nullptr) {
+    return nullptr;
+  }
+  reloadedDoc->applyLayout();
+  return reloadedDoc;
+}
+
+// Locates the embedded Font node via the first GlyphRun on the first Text in the document.
+static pagx::Font* FindFirstEmbeddedFont(pagx::PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) {
+      continue;
+    }
+    auto* t = static_cast<pagx::Text*>(node.get());
+    if (!t->glyphRuns.empty() && t->glyphRuns[0]->font != nullptr) {
+      return t->glyphRuns[0]->font;
+    }
+  }
+  return nullptr;
+}
+
+CLI_TEST(PAGXTypefaceCacheTest, BuildPopulatesPerDocumentCache) {
+  auto doc = MakeReloadedEmbeddedTextDocument();
+  if (doc == nullptr) {
+    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
+  }
+
+  auto* fontNode = FindFirstEmbeddedFont(doc.get());
+  ASSERT_NE(fontNode, nullptr);
+
+  auto& typefaces = doc->typefaceCache->typefaces;
+  EXPECT_EQ(typefaces.find(fontNode), typefaces.end());
+
+  auto rootLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(rootLayer != nullptr);
+
+  auto it = typefaces.find(fontNode);
+  ASSERT_NE(it, typefaces.end());
+  EXPECT_TRUE(it->second != nullptr);
+}
+
+CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
+  auto doc = MakeReloadedEmbeddedTextDocument();
+  if (doc == nullptr) {
+    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
+  }
+
+  auto* fontNode = FindFirstEmbeddedFont(doc.get());
+  ASSERT_NE(fontNode, nullptr);
+
+  ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
+  auto it1 = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(it1, doc->typefaceCache->typefaces.end());
+  auto firstTypeface = it1->second;
+  ASSERT_TRUE(firstTypeface != nullptr);
+  auto sizeAfterFirst = doc->typefaceCache->typefaces.size();
+  auto refsAfterFirst = firstTypeface.use_count();
+
+  ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
+  auto it2 = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(it2, doc->typefaceCache->typefaces.end());
+  auto secondTypeface = it2->second;
+  // Cache must hit the early-return path on the second build: same shared_ptr instance, same map
+  // size, and only the new local copy adds a strong reference.
+  EXPECT_EQ(firstTypeface.get(), secondTypeface.get());
+  EXPECT_EQ(doc->typefaceCache->typefaces.size(), sizeAfterFirst);
+  EXPECT_EQ(firstTypeface.use_count(), refsAfterFirst + 1);
+}
+
+CLI_TEST(PAGXTypefaceCacheTest, PerDocumentCachesAreIsolated) {
+  auto docA = MakeReloadedEmbeddedTextDocument();
+  auto docB = MakeReloadedEmbeddedTextDocument();
+  if (docA == nullptr || docB == nullptr) {
+    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
+  }
+
+  ASSERT_TRUE(pagx::LayerBuilder::Build(docA.get()) != nullptr);
+  EXPECT_FALSE(docA->typefaceCache->typefaces.empty());
+  EXPECT_TRUE(docB->typefaceCache->typefaces.empty());
+}
+
+CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesCachedTypefaces) {
+  auto doc = MakeReloadedEmbeddedTextDocument();
+  if (doc == nullptr) {
+    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
+  }
+
+  auto* fontNode = FindFirstEmbeddedFont(doc.get());
+  ASSERT_NE(fontNode, nullptr);
+
+  ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
+  auto cacheIt = doc->typefaceCache->typefaces.find(fontNode);
+  ASSERT_NE(cacheIt, doc->typefaceCache->typefaces.end());
+  std::weak_ptr<Typeface> weak = cacheIt->second;
+  ASSERT_FALSE(weak.expired());
+
+  doc.reset();
+  // Document destruction tears down the typeface cache, which drops its strong references.
+  EXPECT_TRUE(weak.expired());
+}
+
+CLI_TEST(PAGXTypefaceCacheTest, ClearEmbedClearsTypefaceCache) {
+  auto doc = MakeReloadedEmbeddedTextDocument();
+  if (doc == nullptr) {
+    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
+  }
+
+  ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
+  ASSERT_FALSE(doc->typefaceCache->typefaces.empty());
+
+  // clearEmbed() recreates Font nodes on the next embed(); the cache must drop entries keyed on
+  // the now-orphaned old Font pointers to prevent unbounded growth across repeated embed cycles.
+  doc->clearEmbed();
+  EXPECT_TRUE(doc->typefaceCache->typefaces.empty());
+}
+
+}  // namespace pag

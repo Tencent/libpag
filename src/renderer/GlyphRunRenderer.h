@@ -28,6 +28,7 @@ namespace pagx {
 
 class GlyphRun;
 class Font;
+class PAGXDocument;
 class Text;
 struct TextLayoutGlyphRun;
 
@@ -46,9 +47,10 @@ class GlyphRunRenderer {
   /**
    * Builds a TextBlob from a Text element's embedded GlyphRuns (pagx::GlyphRun), applying the
    * inverse matrix to convert from layout coordinates to Text local coordinates. Writes the
-   * resulting TextBlob and per-glyph anchors directly into text->glyphData.
+   * resulting TextBlob and per-glyph anchors directly into text->glyphData. Built typefaces are
+   * cached on the document for reuse within the same document.
    */
-  static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix);
+  static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix, PAGXDocument& document);
 
   /**
    * Builds a TextBlob from runtime layout glyph runs (TextLayoutGlyphRun), applying the inverse
@@ -58,7 +60,8 @@ class GlyphRunRenderer {
       const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
  private:
-  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode);
+  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode,
+                                                               PAGXDocument& document);
 };
 
 }  // namespace pagx
