@@ -258,6 +258,10 @@ install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" "${arm64
 
 mkdir -p "${ExeDir}"
 lipo -create "${x86_64ExePath}" "${arm64ExePath}" -output "${ExePath}"
+if [ $? -ne 0 ];
+then
+    exitWithError "Failed to merge PAGViewer universal binary at ${ExePath}"
+fi
 
 # 3.1.1 Generate dSYM files for PAGViewer
 printStep "Generate dSYM for PAGViewer"
@@ -288,6 +292,10 @@ x64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/x64/libffmovie.dylib"
 arm64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/arm64/libffmovie.dylib"
 FfmoviePath="${FrameworkDir}/libffmovie.dylib"
 lipo -create "${x64FfmoviePath}" "${arm64FfmoviePath}" -output "${FfmoviePath}"
+if [ $? -ne 0 ];
+then
+    exitWithError "Failed to merge ffmovie universal dylib at ${FfmoviePath}"
+fi
 
 # 3.3 Obtain public and private keys
 printStep "Obtain signing keys"
