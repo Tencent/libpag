@@ -676,7 +676,6 @@ for vol in /Volumes/PAGViewer*; do
         hdiutil detach "$vol" -force 2>/dev/null || true
     fi
 done
-sleep 1
 
 if [ -d "${BuildDir}/dmg_content" ];
 then
