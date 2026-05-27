@@ -29,9 +29,8 @@ namespace pagx {
  *
  * URL-form paths (containing "://") are silently skipped; production PAGX does not use them.
  *
- * On the first read failure, embed() returns false and lastErrorPath() identifies the
- * offending file. The document may be partially mutated on failure (earlier successful
- * reads are already applied); callers must not write the output on failure.
+ * embed() is all-or-nothing with respect to document state — the document is only
+ * mutated when all files are successfully read. On failure, no mutations are applied.
  */
 class ImageEmbedder {
  public:
