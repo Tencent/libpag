@@ -217,9 +217,16 @@ EncoderToolSourceDir="${SourceDir}/third_party/H264EncoderTools"
 EncoderToolBuildDir="${BuildDir}/EncoderTools"
 
 xcodebuild clean -project "${EncoderToolSourceDir}/H264EncoderTools.xcodeproj" -scheme H264EncoderTools -configuration Release -quiet > /dev/null 2>&1
-xcodebuild -project "${EncoderToolSourceDir}/H264EncoderTools.xcodeproj" -scheme H264EncoderTools -configuration Release SYMROOT="${EncoderToolBuildDir}" CODE_SIGN_IDENTITY="" ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO -quiet > /dev/null 2>&1
 if [ $? -ne 0 ];
 then
+    exitWithError "Clean H264EncoderTools failed"
+fi
+
+BUILD_OUTPUT=$(xcodebuild -project "${EncoderToolSourceDir}/H264EncoderTools.xcodeproj" -scheme H264EncoderTools -configuration Release SYMROOT="${EncoderToolBuildDir}" CODE_SIGN_IDENTITY="" ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO -quiet 2>&1)
+BUILD_STATUS=$?
+if [ ${BUILD_STATUS} -ne 0 ];
+then
+    echo "${BUILD_OUTPUT}"
     exitWithError "Build H264EncoderTools failed"
 fi
 
