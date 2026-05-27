@@ -665,7 +665,11 @@ then
 
         ZipLength=$(stat -f%z "${BuildDir}/${ZipFile}")
 
-        URL=$(curl -s https://pag.io/server.html)
+        URL=$(curl -fsS --retry 3 --connect-timeout 10 https://pag.io/server.html)
+        if [ -z "${URL}" ];
+        then
+            exitWithError "Failed to fetch update URL from pag.io/server.html"
+        fi
         if [ "${IsBetaVersion}" == true ];
         then
             URL="${URL}beta/"
