@@ -69,7 +69,6 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/GlyphRunRenderer.h"
-#include "renderer/RenderCache.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -126,7 +125,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(RenderCache& renderCache) : _renderCache(renderCache) {
+  explicit LayerBuilderContext(PAGXDocument& document) : _document(document) {
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
@@ -241,7 +240,7 @@ class LayerBuilderContext {
       text->glyphData->textBlob =
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
-      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix, _renderCache);
+      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix, _document);
     }
   }
 
@@ -894,7 +893,7 @@ class LayerBuilderContext {
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  RenderCache& _renderCache;
+  PAGXDocument& _document;
 };
 
 // Public API implementation
@@ -909,7 +908,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context(*document->getOrCreateRenderCache());
+  LayerBuilderContext context(*document);
   return context.build(*document);
 }
 
@@ -925,7 +924,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context(*document->getOrCreateRenderCache());
+  LayerBuilderContext context(*document);
   return context.buildWithMap(*document);
 }
 

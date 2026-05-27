@@ -23,11 +23,12 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
-#include "renderer/RenderCache.h"
+#include "renderer/TypefaceCache.h"
 
 namespace pagx {
 
-PAGXDocument::PAGXDocument() = default;
+PAGXDocument::PAGXDocument() : typefaceCache(std::make_unique<TypefaceCache>()) {
+}
 
 PAGXDocument::~PAGXDocument() = default;
 
@@ -61,13 +62,6 @@ std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight
   doc->width = docWidth;
   doc->height = docHeight;
   return doc;
-}
-
-RenderCache* PAGXDocument::getOrCreateRenderCache() {
-  if (renderCache == nullptr) {
-    renderCache = std::unique_ptr<RenderCache>(new RenderCache());
-  }
-  return renderCache.get();
 }
 
 Node* PAGXDocument::findNode(const std::string& id) const {
@@ -163,6 +157,10 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
+  // After clearing embedded glyph runs the next embed() will recreate Font nodes at fresh
+  // addresses; drop the typeface cache so we don't retain typefaces keyed on stale Font* that
+  // will never be looked up again.
+  typefaceCache->typefaces.clear();
 }
 
 }  // namespace pagx

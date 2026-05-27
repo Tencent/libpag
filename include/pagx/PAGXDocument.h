@@ -29,8 +29,8 @@
 namespace pagx {
 
 class LayoutContext;
-class LayerBuilder;
-class RenderCache;
+class GlyphRunRenderer;
+struct TypefaceCache;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -179,17 +179,19 @@ class PAGXDocument : public Node {
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
-  RenderCache* getOrCreateRenderCache();
 
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
-  std::unique_ptr<RenderCache> renderCache;
+  // Storage host for the per-document typeface cache. PAGXDocument itself does not read or write
+  // this map; GlyphRunRenderer is the sole consumer and accesses it via friend access. See
+  // src/renderer/TypefaceCache.h for the contract.
+  std::unique_ptr<TypefaceCache> typefaceCache;
 
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
-  friend class LayerBuilder;
+  friend class GlyphRunRenderer;
 };
 
 }  // namespace pagx

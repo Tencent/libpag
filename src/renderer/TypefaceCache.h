@@ -26,17 +26,20 @@ namespace pagx {
 
 class Font;
 
-// Per-document render-time cache. Owned by PAGXDocument and shares its lifetime, so cached
-// entries cannot outlive the Font nodes they key on. Keying on the raw Font pointer is sound only
-// because the cache is bounded to a single document (Font addresses become invalid on document
-// destruction, but so does the cache). Single-threaded by contract: rendering on a given document
-// is serialized by the caller.
-class RenderCache {
- public:
-  std::shared_ptr<tgfx::Typeface> getTypeface(const Font* fontNode) const;
-  void setTypeface(const Font* fontNode, std::shared_ptr<tgfx::Typeface> typeface);
-
- private:
+// Per-document render-time typeface cache. Held by PAGXDocument purely as a storage host so the
+// cache shares the document's lifetime; PAGXDocument itself never reads or writes this data.
+// GlyphRunRenderer is the sole consumer and accesses the map directly via friend access.
+//
+// Key: raw Font pointer. Sound only because the cache is bounded to a single document — Font
+// addresses become invalid on document destruction, but so does the cache. Single-threaded by
+// contract: rendering on a given document is serialized by the caller.
+//
+// Immutability contract: once a Font node is cached its content (glyphs, unitsPerEm, glyph
+// offsets/advances) MUST be treated as immutable for the remaining lifetime of the document. The
+// cache uses the Font pointer as identity and does not detect content changes; mutating a cached
+// Font in place will silently return a stale typeface on subsequent lookups. Callers that mutate
+// Font content (e.g. PAGXDocument::clearEmbed) are responsible for clearing the cache.
+struct TypefaceCache {
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };
 
