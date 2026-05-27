@@ -109,6 +109,16 @@ function generateUniversalDsym() {
     logInfo "  arm64: ${armDsym}"
 }
 
+function cleanAbsoluteRpaths() {
+    local binary="$1"
+    otool -l "${binary}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.*path \(.*\) (offset.*/\1/' | while IFS= read -r rpath; do
+        case "${rpath}" in
+            @*|/Library/*) ;;
+            *) install_name_tool -delete_rpath "${rpath}" "${binary}" 2>/dev/null || true ;;
+        esac
+    done
+}
+
 function createDmg()
 {
     local creatDmg="${1}"
@@ -344,18 +354,8 @@ x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
 arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
 
 # Remove absolute build rpaths from each architecture before merging
-otool -l "${x86_64PluginExePath}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.*path \(.*\) (offset.*/\1/' | while IFS= read -r rpath; do
-    case "${rpath}" in
-        @*|/Library/*) ;;
-        *) install_name_tool -delete_rpath "${rpath}" "${x86_64PluginExePath}" 2>/dev/null || true ;;
-    esac
-done
-otool -l "${arm64PluginExePath}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.*path \(.*\) (offset.*/\1/' | while IFS= read -r rpath; do
-    case "${rpath}" in
-        @*|/Library/*) ;;
-        *) install_name_tool -delete_rpath "${rpath}" "${arm64PluginExePath}" 2>/dev/null || true ;;
-    esac
-done
+cleanAbsoluteRpaths "${x86_64PluginExePath}"
+cleanAbsoluteRpaths "${arm64PluginExePath}"
 
 cp -fr "${x86_64PluginPath}" "${PluginPath}"
 lipo -create "${x86_64PluginExePath}" "${arm64PluginExePath}" -output "${PluginExePath}"
