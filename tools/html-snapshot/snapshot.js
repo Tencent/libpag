@@ -6,9 +6,11 @@
  * the DOM at runtime) in a headless browser and emit a flat, absolute-positioned snapshot
  * that conforms to spec/html_subset.md.
  *
- * This file is the Node-side driver only. CLI parsing lives in `lib/cli.js`; the actual
- * in-page snapshot logic lives in `lib/browser-snapshot.js` and is shipped to Chromium
- * via `page.evaluate(...)`. See those files for details.
+ * This file is the Node-side CLI driver. CLI parsing lives in `lib/cli.js`; the pipeline
+ * itself (open page → inline images/canvases/icons → evaluate `takeSnapshot`) is shared
+ * with the HTTP service (`server.js`) via `lib/snapshot-runner.js`. The in-page snapshot
+ * logic lives in `lib/browser-snapshot.js` and is shipped to Chromium via
+ * `page.evaluate(...)`. See those files for details.
  *
  * Pipeline:
  *   1. Launch headless Chromium, navigate to the source file.
@@ -26,46 +28,8 @@
 
 const fs = require('fs');
 const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
-const {
-  TAKE_SNAPSHOT_EXPR,
-  SNAPSHOT_INIT_SCRIPT,
-  inlineExternalImages,
-  inlineCanvases,
-} = require('./lib/browser-snapshot');
-const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./lib/icon-font');
-const { openAndSettlePage } = require('./lib/page-loader');
-const { launchBrowser, responseBytes } = require('./lib/browser-engine');
-
-// Build a `page.on('response')` listener that captures every successful
-// image response into `cache` as a `url -> data:URI` mapping. The map is
-// later handed to `inlineExternalImages` so the in-page pass reuses the
-// browser's already-loaded bytes instead of re-fetching cross-origin
-// images (which the legacy `fetch(url, { mode: 'cors' })` path silently
-// failed for, since most image CDNs do not return CORS headers).
-//
-// We capture by URL key (not by element ref) so the same image used by
-// multiple <img> tags pays a single base64 conversion. The listener never
-// throws — a detached response or scheme we don't support just leaves the
-// URL absent from the cache, and the in-page fetch fallback will retry.
-function makeImageCaptureListener(engine, cache, log) {
-  return async function captureImageResponse(resp) {
-    try {
-      const req = resp.request();
-      if (req.resourceType() !== 'image') return;
-      const url = req.url();
-      if (!url || url.startsWith('data:')) return;
-      if (!resp.ok()) return;
-      const buf = await responseBytes(resp, engine);
-      const ct = resp.headers()['content-type'] || 'application/octet-stream';
-      cache.set(url, `data:${ct};base64,${buf.toString('base64')}`);
-    } catch (err) {
-      // Common case: response detached after a navigation, or the request
-      // was served from cache and the body is no longer accessible. Drop
-      // it — the in-page fetch fallback handles cache misses.
-      if (log) log(`image capture skipped: ${errMessage(err)}`);
-    }
-  };
-}
+const { launchBrowser } = require('./lib/browser-engine');
+const { runSnapshot } = require('./lib/snapshot-runner');
 
 async function main() {
   const opts = parseArgs(process.argv);
@@ -75,8 +39,8 @@ async function main() {
     process.exit(1);
   }
 
-  // page-loader expects a fully-qualified URL. Local paths become file:// URLs
-  // here so the loader stays scheme-agnostic.
+  // The runner expects a fully-qualified URL. Local paths become file:// URLs
+  // here so the runner stays scheme-agnostic.
   const targetUrl = opts.isUrl ? opts.input : `file://${opts.input}`;
 
   let engineHandle;
@@ -99,76 +63,19 @@ async function main() {
     }
     throw err;
   }
-  const { browser, engine } = engineHandle;
+
   try {
-    const imageBytesByUrl = new Map();
-    const page = await openAndSettlePage(engineHandle, targetUrl, {
+    const result = await runSnapshot(engineHandle, targetUrl, {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
       cookies: opts.cookies,
       headers: opts.headers,
-      onConsole: (msg) => {
-        if (msg.type() === 'error') {
-          console.error(`${LOG_PREFIX}page error: ${msg.text()}`);
-        }
-      },
-      onPageError: (err) => {
-        console.error(`${LOG_PREFIX}page exception: ${errMessage(err)}`);
-      },
-      onResponse: makeImageCaptureListener(engine, imageBytesByUrl, null),
-      // Ship both helper bundles to the page exactly once at navigation
-      // time. Subsequent `page.evaluate(...)` calls only have to send the
-      // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
-      // dispatch wrappers in lib/icon-font.js), instead of re-encoding the
-      // ~80 KB helper source for every snapshot.
-      initScripts: [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
+      inlineIconFonts: opts.inlineIconFonts,
+      log: (msg) => console.error(`${LOG_PREFIX}${msg}`),
     });
 
-    // PAGX's renderer can read `data:` URIs and local files but not `http(s)://`
-    // URLs. Inline every external image into a base64 data URI here so the
-    // downstream `pagx render` step can decode them directly. We stash the result
-    // on `data-snapshot-src` rather than mutating `src` so that the live layout
-    // (which has already settled around the original image) is left untouched.
-    // The Map captured above is handed in as a plain object so `page.evaluate`
-    // can serialise it across the CDP boundary; misses fall back to in-page
-    // fetch (limited to 8 concurrent requests inside the helper).
-    await page.evaluate(inlineExternalImages, Object.fromEntries(imageBytesByUrl));
-
-    // Capture each <canvas>'s live bitmap as a data URI so the snapshot
-    // walker can emit it as an <img>. Without this, every chart / scripted
-    // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
-    await page.evaluate(inlineCanvases);
-
-    // Convert webfont-backed icon glyphs (`::before { content: "\eXXX";
-    // font-family: "Phosphor" }`) to inline `<svg>` paths so the resulting
-    // PAGX is self-contained — `pagx render` no longer needs the icon font
-    // installed on the rendering host. See lib/icon-font.js for details.
-    // Disable with `--no-inline-icon-fonts` when the source page does not
-    // use webfont icons (or when network egress is undesirable, since the
-    // pass downloads each unique font URL once to extract glyph outlines).
-    if (opts.inlineIconFonts) {
-      try {
-        const stats = await inlineIconFontsOnPage(page, {
-          logger: (msg) => console.error(`${LOG_PREFIX}${msg}`),
-        });
-        if (stats.total > 0) {
-          console.error(`${LOG_PREFIX}inlined ${stats.inlined}/${stats.total} icon-font glyph(s) as SVG`);
-        }
-      } catch (err) {
-        // The icon-font pass is best-effort: failures degrade to the
-        // legacy font-named span path. Surface the diagnostic so the
-        // operator can decide whether to investigate, but never abort
-        // the snapshot — the rest of the page still has to make it out.
-        console.error(`${LOG_PREFIX}inline-icon-fonts failed: ${errMessage(err)}`);
-      }
-    }
-
-    // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
-    // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
-    // ships the ~70-byte entry expression now.
-    const result = await page.evaluate(TAKE_SNAPSHOT_EXPR);
     if (opts.outputToStdout) {
       // Stdout mode (triggered by `-o -`, used by pagx's `--html-snapshot`
       // integration): the HTML is the sole stdout payload, and the
@@ -181,7 +88,7 @@ async function main() {
       console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
     }
   } finally {
-    await browser.close();
+    await engineHandle.browser.close();
   }
 }
 

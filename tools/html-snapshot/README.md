@@ -273,6 +273,83 @@ The browser bundle covers step 1 of the HTML → PAGX pipeline (snapshot).
 Step 2 (`pagx import --format html`) is currently a C++ binary; running it in
 the browser would require a WebAssembly build of libpag's HTML importer.
 
+### HTTP service
+
+For workflows that want to keep one warm browser around and POST HTML to it
+on demand (e.g. an LLM agent that iterates on a page and re-renders after
+each edit), launch the snapshot pipeline as an HTTP server:
+
+```bash
+cd tools/html-snapshot
+npm install                # one-time
+node server.js             # listens on http://127.0.0.1:8787
+# or via npm:
+npm run server
+```
+
+The server launches one headless Chromium at startup and keeps it alive for
+the lifetime of the process. Each request opens a fresh page, runs the
+snapshot pipeline, and closes the page; concurrent requests are served in
+parallel against the same browser.
+
+Endpoints:
+
+- `POST /snapshot` — body is either raw HTML (any `Content-Type` other than
+  `application/json`) or a JSON envelope `{ "html": "...", "options": {...} }`.
+  Response is the processed HTML (`text/html`) by default, plus
+  `X-Snapshot-Width` / `X-Snapshot-Height` headers. Send
+  `Accept: application/json` to get `{ html, width, height }` instead.
+- `GET /health` — `200 { status, engine, activeRequests }`.
+
+`options` accepts the same knobs the CLI exposes (all optional):
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `viewportWidth` | number | `1400` | Headless viewport width in px |
+| `viewportHeight` | number | `900` | Headless viewport height in px |
+| `waitMs` | number | `800` | Extra settle delay after networkidle |
+| `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
+| `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
+
+Server CLI flags:
+
+| Flag | Default | Notes |
+|------|---------|-------|
+| `--port <n>` | `8787` | Listen port (env: `PORT`) |
+| `--host <addr>` | `127.0.0.1` | Listen address (env: `HOST`) |
+| `--browser-engine <name>` | `puppeteer` | `puppeteer` or `playwright` (env: `HTML_SNAPSHOT_BROWSER`) |
+| `--max-body-mb <n>` | `32` | Maximum request body size in MB (env: `MAX_BODY_MB`) |
+
+Examples:
+
+```bash
+# Raw HTML in, processed HTML out:
+curl -s --data-binary @page.html \
+     -H 'Content-Type: text/html' \
+     http://127.0.0.1:8787/snapshot > page.subset.html
+
+# JSON envelope with custom viewport:
+curl -s -H 'Content-Type: application/json' \
+     -H 'Accept: application/json' \
+     --data '{
+       "html": "<!doctype html><html><body><h1>hi</h1></body></html>",
+       "options": { "viewportWidth": 800, "waitMs": 200 }
+     }' \
+     http://127.0.0.1:8787/snapshot
+# → {"html":"<!DOCTYPE html>…","width":800,"height":900}
+
+# Pipe straight into pagx import:
+curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot \
+  | pagx import --format html --html-infer-flex --input - --output page.pagx
+```
+
+The pipeline runs the HTML in a `file://` URL backed by a per-request temp
+file under `$TMPDIR`, so relative external resources (`<img src="…">`,
+`<link href="…">`, …) will not resolve. Inline everything (data URIs, CSS
+`<style>` blocks) or absolute URLs in the payload — the snapshot pipeline
+itself will still inline images / canvases / icon fonts before emitting the
+final HTML.
+
 ### Manual pipeline (for debugging individual steps)
 
 ```bash

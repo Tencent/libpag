@@ -5,10 +5,12 @@
   "description": "Render a JS/React-driven HTML page in a headless browser and emit a flat, absolute-positioned snapshot that conforms to spec/html_subset.md.",
   "main": "snapshot.js",
   "bin": {
-    "html-snapshot": "./snapshot.js"
+    "html-snapshot": "./snapshot.js",
+    "html-snapshot-server": "./server.js"
   },
   "scripts": {
     "snapshot": "node snapshot.js",
+    "server": "node server.js",
     "build:browser": "node build-browser-bundle.js"
   },
   "dependencies": {
