@@ -472,11 +472,19 @@ then
     xattr -rc "${AppDir}"
     xattr -rc "${PluginPath}"
 
-    # Sign all dylibs in Frameworks/ directory first
+    # Sign all dylibs in Frameworks/ directory first.
+    # Use process substitution so exitWithError aborts the whole script;
+    # a piped `while` would only exit the subshell.
     logInfo "Signing all libraries in Frameworks/..."
-    find "${FrameworkDir}" -name "*.dylib" -type f | while IFS= read -r dylib; do
-        codesign --force --timestamp --options "runtime" --sign "${SignCertName}" "${dylib}" 2>/dev/null
-    done
+    while IFS= read -r dylib; do
+        SIGN_OUTPUT=$(codesign --force --timestamp --options "runtime" --sign "${SignCertName}" "${dylib}" 2>&1)
+        SIGN_STATUS=$?
+        if [ ${SIGN_STATUS} -ne 0 ];
+        then
+            echo "${SIGN_OUTPUT}"
+            exitWithError "Failed to sign dylib: ${dylib}"
+        fi
+    done < <(find "${FrameworkDir}" -name "*.dylib" -type f)
 
     # Sign standalone executables not inside a bundle
     logInfo "Signing: ${ResourcesDir}/H264EncoderTools"
