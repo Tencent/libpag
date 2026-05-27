@@ -410,18 +410,25 @@ if [ -n "${EDDSAPublicKey}" ] && [ -f "${EDDSAPublicKey}" ];
 then
     SUPublicEDKey=$(awk '/-----BEGIN PUBLIC KEY-----/{flag=1; next} /-----END PUBLIC KEY-----/{flag=0} flag' "${EDDSAPublicKey}")
 fi
-/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${ContentsDir}/Info.plist"
-/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${ContentsDir}/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${ContentsDir}/Info.plist" \
+    || exitWithError "Failed to update CFBundleVersion in ${ContentsDir}/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${ContentsDir}/Info.plist" \
+    || exitWithError "Failed to update CFBundleShortVersionString in ${ContentsDir}/Info.plist"
 if [ -n "${DSAPublicKey}" ];
 then
     DSAPublicKeyName=$(basename "${DSAPublicKey}")
-    /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist"
+    /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist" \
+        || exitWithError "Failed to update SUPublicDSAKeyFile in ${ContentsDir}/Info.plist"
 fi
-/usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist"
+/usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist" \
+    || exitWithError "Failed to update SUPublicEDKey in ${ContentsDir}/Info.plist"
 
-/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist"
-/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${PluginPath}/Contents/Info.plist"
-/usr/libexec/Plistbuddy -c "Set CFBundleIdentifier im.pag.exporter" "${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist" \
+    || exitWithError "Failed to update CFBundleVersion in ${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${PluginPath}/Contents/Info.plist" \
+    || exitWithError "Failed to update CFBundleShortVersionString in ${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleIdentifier im.pag.exporter" "${PluginPath}/Contents/Info.plist" \
+    || exitWithError "Failed to update CFBundleIdentifier in ${PluginPath}/Contents/Info.plist"
 
 # 3.7 Set rpath
 printStep "Set rpath"
