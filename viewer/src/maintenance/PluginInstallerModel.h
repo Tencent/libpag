@@ -41,6 +41,11 @@ class PluginInstallerModel : public QObject {
 
   Q_INVOKABLE bool isPluginInstalled() const;
 
+  /// Run once at app startup to keep the AE plugin in sync with the bundled version.
+  /// Prompts the user to install (if missing) or update (if version differs); no-op when
+  /// already up to date. Idempotent within a session.
+  Q_INVOKABLE void checkPluginOnStartup();
+
  Q_SIGNALS:
   void updateCheckCompleted(bool hasUpdate);
   void installationCompleted(InstallResult result, const QString& message);
