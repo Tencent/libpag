@@ -209,7 +209,7 @@ Copy-Item -Path $PAGExporterPdbPath -Destination $BuildDir -Force
 Print-Step "Deploy Qt dependencies"
 $QmlDir = Join-Path $SourceDir "assets\qml"
 & $Deployqt $ExePath --qmldir=$QmlDir
-if (-not $?) { Exit-WithError "Deploy Qt dependencies failed" }
+if ($LASTEXITCODE -ne 0) { Exit-WithError "Deploy Qt dependencies failed" }
 
 # 3.5 Copy vendor libraries
 Print-Step "Copy vendor libraries"
@@ -281,7 +281,7 @@ Copy-Item -Path $TemplateIslPath -Destination $IslPath -Force
 
 (Get-Content $IssPath -Raw -Encoding UTF8) -replace "~PAGViewerVersion~", $AppVersion | Set-Content $IssPath -Encoding UTF8
 & $ISCCPath $IssPath
-if (-not $?) { Exit-WithError "InnoSetup compilation failed" }
+if ($LASTEXITCODE -ne 0) { Exit-WithError "InnoSetup compilation failed" }
 
 $PAGViewerInstallerPath = Join-Path $BuildDir "PAGViewer_Installer.exe"
 if (-not (Test-Path $PAGViewerInstallerPath)) {
