@@ -38,6 +38,15 @@ FROM node:22-bookworm-slim
 # server.js installs SIGTERM/SIGINT handlers and we need PID 1 to forward
 # the signal (otherwise `docker stop` will hang until the 10s force-exit
 # timer fires).
+#
+# `libegl1` + `libgles2` + `libfontconfig1` are the runtime libs the
+# Linux `pagx` binary itself links against (see top-level CMakeLists.txt
+# where the pagx-cli target pulls in EGL + GLESv2 + Fontconfig on Linux).
+# Without them a bind-mounted pagx fails at startup with
+# `error while loading shared libraries: libEGL.so: cannot open shared
+# object file`. They're cheap (<2 MB combined) and harmless if pagx is
+# never used, so we install them unconditionally to keep the
+# "drop in a pagx binary and it works" UX promised above.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       chromium \
       ca-certificates \
@@ -53,8 +62,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libcups2 \
       libdbus-1-3 \
       libdrm2 \
+      libegl1 \
       libexpat1 \
+      libfontconfig1 \
       libgbm1 \
+      libgles2 \
       libglib2.0-0 \
       libgtk-3-0 \
       libnspr4 \
