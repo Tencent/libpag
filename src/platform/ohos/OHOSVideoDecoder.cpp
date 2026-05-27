@@ -29,6 +29,7 @@
 #include "base/utils/Log.h"
 #include "rendering/video/SoftwareData.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 #define NV12_PLANE_COUNT 2
@@ -111,17 +112,37 @@ OHOSVideoDecoder::OHOSVideoDecoder(const VideoFormat& format, bool hardware) {
 }
 
 OHOSVideoDecoder::~OHOSVideoDecoder() {
-  if (videoCodec != nullptr) {
-    releaseOutputBuffer();
-    OH_VideoDecoder_Flush(videoCodec);
-    OH_VideoDecoder_Stop(videoCodec);
-    OH_VideoDecoder_Destroy(videoCodec);
-    videoCodec = nullptr;
+  // Move ownership of the codec and user data to a background task to avoid blocking the
+  // caller thread (e.g. ArkUI main thread) on synchronous IPC into av_codec_service.
+  // OH_VideoDecoder_Flush/Stop/Destroy wait for all pending callbacks to finish, which can
+  // take seconds on busy devices and trigger ANR when invoked on the UI thread.
+  // Per the OHOS documentation, after OH_VideoDecoder_Destroy returns the codec will not
+  // deliver any further callbacks, so it is safe to release CodecUserData afterwards.
+  if (videoCodec == nullptr) {
+    if (codecUserData) {
+      delete codecUserData;
+      codecUserData = nullptr;
+    }
+    return;
   }
-  if (codecUserData) {
-    codecUserData->clearQueue();
-    delete codecUserData;
-  }
+  auto codec = videoCodec;
+  auto userData = codecUserData;
+  auto pendingBuffer = codecBufferInfo;
+  videoCodec = nullptr;
+  codecUserData = nullptr;
+  codecBufferInfo = {0, nullptr};
+  tgfx::Task::Run([codec, userData, pendingBuffer]() {
+    if (pendingBuffer.buffer) {
+      OH_VideoDecoder_FreeOutputBuffer(codec, pendingBuffer.bufferIndex);
+    }
+    OH_VideoDecoder_Flush(codec);
+    OH_VideoDecoder_Stop(codec);
+    OH_VideoDecoder_Destroy(codec);
+    if (userData) {
+      userData->clearQueue();
+      delete userData;
+    }
+  });
 }
 
 bool OHOSVideoDecoder::initDecoder(const OH_AVCodecCategory avCodecCategory) {
