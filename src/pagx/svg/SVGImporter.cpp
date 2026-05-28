@@ -1890,6 +1890,33 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
 
+    // SVG <circle>/<ellipse> path starts at 3 o'clock (cx+r, cy) and proceeds
+    // clockwise. PAGX <Ellipse> path starts at 12 o'clock, also clockwise. The
+    // 90-degree phase difference would offset every dash by perimeter/4 if left
+    // untouched, breaking donut charts that rely on stroke-dasharray. We shift
+    // the dash phase by perimeter/4 so the first dash anchors at 3 o'clock,
+    // matching SVG. Pixel tests on the renderer show that tgfx's dashOffset
+    // shifts the phase along the reverse path direction, so a negative value
+    // is required to advance the start point clockwise.
+    if (!strokeNode->dashes.empty() && (element->name == "circle" || element->name == "ellipse")) {
+      float rx = 0.0f;
+      float ry = 0.0f;
+      if (element->name == "circle") {
+        rx = ry = parseLength(getAttribute(element, "r"), _viewBoxWidth);
+      } else {
+        rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+        ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+      }
+      const float sum = rx + ry;
+      if (sum > 0.0f) {
+        // Ramanujan's first approximation; exact when rx == ry.
+        const float h = (rx - ry) * (rx - ry) / (sum * sum);
+        const float perimeter = static_cast<float>(M_PI) * sum *
+                                (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
+        strokeNode->dashOffset -= perimeter / 4.0f;
+      }
+    }
+
     contents.push_back(strokeNode);
   }
 }
