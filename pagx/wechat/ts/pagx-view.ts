@@ -521,6 +521,17 @@ export class View {
   }
 
   /**
+   * Toggles the fitSnapshot fast path. When enabled (default), the renderer caches a
+   * fit-to-canvas snapshot and blits it during gestures and at zoom <= 1.02 to skip the
+   * full displayList.render() cost. Disable to force a full render every frame, trading
+   * per-frame rendering cost for first-frame clarity and freshness under progressive
+   * image loading. The setting persists across loadPAGX/buildLayers.
+   */
+  public setSnapshotEnabled(enabled: boolean): void {
+    this.nativeView!.setSnapshotEnabled(enabled);
+  }
+
+  /**
    * Returns the content transform parameters for mapping cocraft canvas coordinates to canvas
    * pixel positions. Call this once after loading a PAGX file to get the static transform needed
    * for comment overlay positioning.

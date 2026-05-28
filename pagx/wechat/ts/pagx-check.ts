@@ -576,11 +576,11 @@ function uint8ArrayToString(data: Uint8Array): string {
  *
  * @example
  * ```typescript
- * import { checkPagx } from './pagx-check';
+ * import { CheckPagx } from './pagx-check';
  *
  * const fs = wx.getFileSystemManager();
  * const data = fs.readFileSync(filePath);
- * const result = await checkPagx(new Uint8Array(data));
+ * const result = await CheckPagx(new Uint8Array(data));
  *
  * const minScore = result.platform === 'android' ? 65 : 75;
  * if (result.score < minScore) {

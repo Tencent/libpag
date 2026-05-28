@@ -1310,6 +1310,25 @@ void PAGXView::setGestureActive(bool active) {
   gestureActive = active;
 }
 
+void PAGXView::setSnapshotEnabled(bool enabled) {
+  if (snapshotEnabled == enabled) {
+    return;
+  }
+  snapshotEnabled = enabled;
+  if (!enabled) {
+    // Drop the captured snapshot so a stale image cannot resurface if the switch is later
+    // re-enabled mid-session, and bump fitVersion so any TS-side observer notices the
+    // invalidation. Also clear the zoom-out idle token so the next draw() runs a full
+    // render instead of short-circuiting on a now-disabled path. gestureActive stays as-is
+    // (the caller's gesture lifecycle is independent), but with no snapshot the fast path
+    // in draw() naturally falls through to the full-render branch.
+    fitSnapshot = nullptr;
+    fitSnapshotPixelScale = 1.0f;
+    fitVersion++;
+    zoomedOutFrameSettled = false;
+  }
+}
+
 val PAGXView::getContentTransform() const {
   float fitScale = computeFitScale();
   float centerOffsetX = 0.0f;
@@ -1432,7 +1451,7 @@ bool PAGXView::draw() {
   // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
   // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
   // those post-first-render content changes would be silently dropped.
-  if (zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f &&
+  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f &&
       !displayList.hasContentChanged()) {
     return true;
   }
@@ -1449,9 +1468,10 @@ bool PAGXView::draw() {
   // hide the new content. Active gestures override this because the user expects steady
   // pan/zoom feedback even when async upgrades land mid-gesture; the snapshot will be
   // refreshed on the next non-gesture frame.
-  bool fitOnly = !gestureActive && fitSnapshot != nullptr && liveZoom <= 1.02f &&
-                 !displayList.hasContentChanged();
-  if ((gestureActive || fitOnly) && surface != nullptr && fitSnapshot != nullptr) {
+  bool fitOnly = snapshotEnabled && !gestureActive && fitSnapshot != nullptr &&
+                 liveZoom <= 1.02f && !displayList.hasContentChanged();
+  if (snapshotEnabled && (gestureActive || fitOnly) && surface != nullptr &&
+      fitSnapshot != nullptr) {
     auto context = device->lockContext();
     if (context == nullptr) {
       return false;
@@ -1600,7 +1620,7 @@ bool PAGXView::draw() {
       // 切页/首帧后第一次有内容时抓 fit。超宽/超长文档用 offscreen 高清抓，避免放大糊。
       bool hasContent = contentLayer != nullptr;
       bool fitMissing = fitSnapshot == nullptr;
-      if (hasContent && fitMissing) {
+      if (snapshotEnabled && hasContent && fitMissing) {
         float fitContentScale = computeFitScale();
         // 内存按 N² 增长（2x≈57MB, 4x≈230MB），iOS 512MB 限制下封顶 2x。
         float pixelScale = fitContentScale < 0.15f ? 2.0f : 1.0f;

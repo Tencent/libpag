@@ -110,6 +110,8 @@ export interface PAGXViewNative {
     setBoundsOrigin: (x: number, y: number) => void;
     /** Toggles gesture-freeze rendering; true during active pan/zoom, false otherwise. */
     setGestureActive: (active: boolean) => void;
+    /** Toggles the fitSnapshot fast path. Default true. Disable to force full render every frame. */
+    setSnapshotEnabled: (enabled: boolean) => void;
     /** Returns content transform parameters for mapping cocraft coordinates to canvas positions. */
     getContentTransform: () => ContentTransform;
     /** Looks up a node by ID and returns its position relative to the canvas. */
