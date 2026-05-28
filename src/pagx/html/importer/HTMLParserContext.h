@@ -117,6 +117,12 @@ class HTMLParserContext {
     // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
     // `background-clip: text` semantics from the nearest clip-to-text ancestor).
     std::string fillImage = {};
+    // Resolved CSS line-height in pixels for this run, captured at fragment creation time so
+    // an inner-span override (e.g. <span style="line-height:20px"> inside a fixed-height
+    // outer span used as a digit/badge box) survives to the TextBox, where it determines the
+    // line-box height. NaN means the run inherited an empty/`normal` value and contributes no
+    // explicit line-height — convertTextLeaf then leaves TextBox.lineHeight at its auto default.
+    float lineHeight = NAN;
   };
   void collectTextFragments(const std::shared_ptr<DOMNode>& element,
                             const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out,

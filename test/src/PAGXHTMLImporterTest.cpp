@@ -1855,6 +1855,45 @@ PAG_TEST(PAGXHTMLImporterTest, TextAlignAndLineHeightOnParagraph) {
   EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
 }
 
+// `<div style="height:20px"><span style="line-height:20px">02</span></div>` is the canonical
+// "centre text in a fixed-height badge" idiom (digit boxes, pill buttons, status chips). The
+// outer element only carries the box visuals (height + background); the line-height that
+// vertically centres the glyph lives on the inner span. Without lifting that value to the
+// TextBox the glyph renders at its natural font height aligned to the top of the box, which
+// is exactly the misalignment the JD home countdown reproduced before this fix.
+PAG_TEST(PAGXHTMLImporterTest, InnerSpanLineHeightLiftedToTextBoxForFixedHeightBadge) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:20px">
+      <span style="display:inline-block;width:22px;height:20px;background-color:#1A1A1A"><span style="font-size:12px;line-height:20px;color:#FFFFFF">02</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  // The outer span carries `background-color`, so convertTextLeaf splits it into an outer
+  // Layer (Rectangle+Fill) and an inner host Layer that hosts the TextBox.
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  ASSERT_FALSE(outer->children.empty());
+  auto* innerHost = outer->children.front();
+  auto* tb = FindElementOfType<pagx::TextBox>(innerHost);
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
+}
+
+// CSS computes line-box height as the max of every participant's line-height, so a child run
+// with a taller line-height must override an outer run with a shorter one. The merge in
+// appendTextFragment must preserve that max even when the two runs share glyph styling.
+PAG_TEST(PAGXHTMLImporterTest, InnerSpanWithLargerLineHeightWinsAgainstOuter) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <p style="line-height:10px">Hi <span style="line-height:30px">World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FLOAT_EQ(tb->lineHeight, 30.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextAlignJustifyMapped) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">

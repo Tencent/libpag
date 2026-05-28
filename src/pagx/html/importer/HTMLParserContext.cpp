@@ -527,6 +527,10 @@ HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
   frag.color = inherited.resolvedTextColor;
   frag.textDecoration = inherited.textDecoration;
   frag.fillImage = inherited.textFillImage;
+  // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
+  // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
+  // explicit contribution" — the line-box then collapses to the parent's font metrics.
+  frag.lineHeight = resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
   return frag;
 }
 
@@ -562,6 +566,16 @@ void HTMLParserContext::appendTextFragment(std::vector<TextFragment>& out,
   // typical rich-text inputs.
   if (!out.empty() && fragmentMatchesInherited(out.back(), inherited)) {
     out.back().text += text;
+    // CSS line-box height is the max of all participants' line-heights, so a later run that
+    // shares glyph styling but carries a taller `line-height` (e.g. a nested span used for
+    // vertical centring inside a fixed-height badge) must still raise the merged fragment's
+    // value. Without this, the merged line-height freezes at the first run's resolution and
+    // later inner-span overrides would be silently dropped.
+    float incomingLh = resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+    if (!std::isnan(incomingLh) && incomingLh > 0 &&
+        (std::isnan(out.back().lineHeight) || incomingLh > out.back().lineHeight)) {
+      out.back().lineHeight = incomingLh;
+    }
     return;
   }
   TextFragment frag = makeTextFragment(inherited);
@@ -663,6 +677,19 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
   std::string wm = ToLower(Trim(inherited.writingMode));
   bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
+  // A child inline run that carries an explicit `line-height` (e.g. the digit-badge idiom
+  // `<div height:20><span line-height:20>02</span></div>`) raises the line-box height
+  // beyond the run's font metrics. The bare `<Text>+<Fill>` no-TextBox path has nowhere to
+  // record that, so the glyph would render at its intrinsic font height aligned to the
+  // top of the box instead of being vertically padded to the line-box. Force a TextBox in
+  // that case so the line-height fallback below has somewhere to land.
+  bool fragmentHasExplicitLineHeight = false;
+  for (const auto& f : fragments) {
+    if (!std::isnan(f.lineHeight) && f.lineHeight > 0) {
+      fragmentHasExplicitLineHeight = true;
+      break;
+    }
+  }
   // CSS `transform` is reproduced via `Layer.matrix` on the outer Layer (handled below by
   // applyBoxTransform); it does NOT force a TextBox to be synthesised. The earlier
   // codepath set TextBox.skew/rotation/scale and required an explicit TextBox to host
@@ -670,7 +697,8 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   // descendant uniformly — including the bare `<Text>+<Fill>` pair the no-TextBox branch
   // emits — so the extra TextBox is no longer needed.
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
-                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap || isVertical;
+                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
+                      isVertical || fragmentHasExplicitLineHeight;
 
   auto outer = _document->makeNode<Layer>();
   applySizeAndPosition(outer, box);
@@ -719,6 +747,19 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     if (!inherited.lineHeight.empty()) {
       float lh = resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
       if (!std::isnan(lh) && lh > 0) textBox->lineHeight = lh;
+    }
+    // CSS line-box height = max of the parent's line-height and every inline child's
+    // line-height. The block above only consulted the outer element's cascade, so it
+    // would silently drop a child run's `line-height` whenever the outer was `normal` or
+    // had no explicit value (for example the `<div height:20><span line-height:20>02</span></div>`
+    // digit-badge pattern, where the outer span only carries background/size and the
+    // inner span supplies the line-height that vertically centres the glyph). Walk the
+    // fragments and lift their resolved values to TextBox.lineHeight when they exceed the
+    // outer-driven value, mirroring the browser's max-of-participants rule.
+    for (const auto& f : fragments) {
+      if (!std::isnan(f.lineHeight) && f.lineHeight > textBox->lineHeight) {
+        textBox->lineHeight = f.lineHeight;
+      }
     }
     if (hasNoWrap) {
       textBox->wordWrap = false;
