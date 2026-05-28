@@ -102,9 +102,14 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
   if (fontNode == nullptr) {
     return nullptr;
   }
-  if (fontNode->renderTypeface != nullptr) {
+  if (fontNode->typefaceBuilt) {
     return fontNode->renderTypeface;
   }
+
+  // Mark the build as attempted up-front so that pathological Fonts (empty glyphs, mixed
+  // path+image, or builders that fail to detach) are not retried on every render call.
+  fontNode->typefaceBuilt = true;
+
   if (fontNode->glyphs.empty()) {
     return nullptr;
   }
@@ -119,9 +124,12 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
       hasImage = true;
     }
   }
+  if (hasPath == hasImage) {
+    return nullptr;
+  }
 
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-  if (hasPath && !hasImage) {
+  if (hasPath) {
     tgfx::PathTypefaceBuilder builder;
     for (const auto& glyph : fontNode->glyphs) {
       if (glyph->path != nullptr) {
@@ -135,33 +143,32 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
       }
     }
     typeface = builder.detach();
-  } else if (hasImage && !hasPath) {
+  } else {
     tgfx::ImageTypefaceBuilder builder;
     for (const auto& glyph : fontNode->glyphs) {
-      if (glyph->image != nullptr) {
-        std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
-        auto imageNode = glyph->image;
-        if (imageNode->data != nullptr) {
-          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
-        } else if (imageNode->filePath.find("data:") == 0) {
-          auto data = DecodeBase64DataURI(imageNode->filePath);
-          if (data) {
-            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
-          }
-        } else if (!imageNode->filePath.empty()) {
-          codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+      if (glyph->image == nullptr) {
+        continue;
+      }
+      std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
+      auto imageNode = glyph->image;
+      if (imageNode->data != nullptr) {
+        codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        auto data = DecodeBase64DataURI(imageNode->filePath);
+        if (data) {
+          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
         }
-        if (codec) {
-          builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
-        }
+      } else if (!imageNode->filePath.empty()) {
+        codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+      }
+      if (codec) {
+        builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
       }
     }
     typeface = builder.detach();
   }
 
-  if (typeface != nullptr) {
-    fontNode->renderTypeface = typeface;
-  }
+  fontNode->renderTypeface = typeface;
   return typeface;
 }
 

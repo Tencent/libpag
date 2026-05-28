@@ -157,7 +157,9 @@ void PAGXDocument::clearEmbed() {
   // fresh Font nodes) does not leave the now-detached Fonts holding stale tgfx::Typeface objects.
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Font) {
-      static_cast<Font*>(node.get())->renderTypeface.reset();
+      auto* font = static_cast<Font*>(node.get());
+      font->renderTypeface.reset();
+      font->typefaceBuilt = false;
     }
   }
 }

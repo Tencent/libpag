@@ -98,6 +98,7 @@ class Font : public Node {
   Font() = default;
 
   std::shared_ptr<tgfx::Typeface> renderTypeface = nullptr;
+  bool typefaceBuilt = false;
 
   friend class PAGXDocument;
   friend class GlyphRunRenderer;
