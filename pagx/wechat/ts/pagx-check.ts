@@ -11,7 +11,9 @@ declare const wx: any;
  *   B. "Path geometry overload"        path_data_bytes (MB)
  *   C. "Big canvas × element density"  (pix_M/100) × (imgPat + layer/30 + grad/20)
  *
- * Verdicts: >80 GREEN (safe), 50-80 YELLOW (risky), ≤50 RED (likely lag)
+ * 渲染建议（按运行平台判定）：
+ *   - Android：score >= 65 可正常渲染，否则可能卡顿
+ *   - 其他平台（iOS 等）：score >= 75 可正常渲染，否则可能卡顿
  *
  * 根据设备性能等级 (benchmarkLevel) 动态调整阈值：
  *   - 高端机：阈值放宽，允许更复杂的文件
@@ -28,7 +30,7 @@ type Platform = 'ios' | 'android' | 'other';
 
 /** checkPagx 返回的完整结果 */
 export interface PagxCheckResult {
-  /** 评分（0-100），>80 安全，50-80 有风险，≤50 可能卡顿 */
+  /** 评分（0-100），分数越高越流畅；Android 平台 >= 65 可正常渲染，其他平台 >= 75 可正常渲染 */
   score: number;
   /** 设备性能等级（微信 API 返回的原始值，-1 表示未知） */
   benchmarkLevel: number;
@@ -105,12 +107,7 @@ async function fetchDeviceInfoAsync(): Promise<DeviceInfoCache> {
         },
       });
     });
-
-    console.log("benchmarkLevel:", benchmarkLevel);
-    console.log("platform:", platform);
     const tier = getDeviceTier(benchmarkLevel, rawPlatform);
-    console.log("deviceTier:", tier);
-    
     cachedDeviceInfo = { tier, benchmarkLevel, platform };
   } catch {
     // 获取失败，使用保守的 unknown
@@ -130,7 +127,7 @@ async function fetchDeviceInfoAsync(): Promise<DeviceInfoCache> {
  * - 中端机：阈值收紧到 0.77 倍
  * - 低端机：阈值收紧到 0.54 倍
  * - 未知：保守处理，使用 0.62 倍
- * 
+ *
  * 注：原校准数据基于中端机，现改为高端机为基准
  * 原系数：high=1.3, mid=1.0, low=0.7, unknown=0.8
  * 换算后：high=1.0, mid=0.77, low=0.54, unknown=0.62
@@ -144,12 +141,12 @@ const TIER_MULTIPLIERS: Record<DeviceTier, number> = {
 
 /**
  * 平台系数：iOS 小程序渲染性能比 Android 差，需要更严格的阈值
- * 
+ *
  * 原因分析：
  * - iOS 小程序 WebView 的 WebGL 实现与 Android 有差异
  * - iOS 对复杂图层合成的处理效率较低
  * - iOS 小程序的内存管理更严格，容易触发 GC
- * 
+ *
  * 系数说明（乘到阈值上，系数越小阈值越低，评分越严格）：
  * - iOS: 0.6 (阈值降低到 60%，更严格)
  * - Android: 1.0 (基准)
@@ -182,9 +179,7 @@ function getAdjustedRiskPaths(tier: DeviceTier, platform: Platform): Record<stri
   const tierMultiplier = TIER_MULTIPLIERS[tier];
   const platformMultiplier = PLATFORM_MULTIPLIERS[platform];
   const finalMultiplier = tierMultiplier * platformMultiplier;
-  
-  console.log(`阈值调整: tier=${tier}(${tierMultiplier}) × platform=${platform}(${platformMultiplier}) = ${finalMultiplier}`);
-  
+
   const adjusted: Record<string, RiskPathConfig> = {};
 
   for (const [key, cfg] of Object.entries(BASE_RISK_PATHS)) {
@@ -565,6 +560,10 @@ function uint8ArrayToString(data: Uint8Array): string {
 /**
  * 检查 PAGX 文件是否可以安全渲染（不会卡顿）
  *
+ * 渲染建议（按运行平台判定）：
+ * - Android：score >= 65 可正常渲染
+ * - 其他平台（iOS 等）：score >= 75 可正常渲染
+ *
  * 内部会自动获取设备性能信息，根据设备档位动态调整阈值：
  * - 高端机 (benchmarkLevel ≥30/36)：阈值放宽 1.3 倍
  * - 中端机 (benchmarkLevel 23-29/30-35)：使用默认阈值
@@ -581,15 +580,16 @@ function uint8ArrayToString(data: Uint8Array): string {
  * const data = fs.readFileSync(filePath);
  * const result = await checkPagx(new Uint8Array(data));
  *
- * if (result.score <= 80) {
+ * const minScore = result.platform === 'android' ? 65 : 75;
+ * if (result.score < minScore) {
  *   wx.showToast({ title: '该文件可能导致卡顿', icon: 'none' });
  * }
  * ```
  */
-export async function checkPagx(pagxData: Uint8Array): Promise<PagxCheckResult> {
+export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> {
   // 先获取设备信息（即使解析失败也需要返回设备信息）
   const deviceInfo = await fetchDeviceInfoAsync();
-  
+
   // 默认返回值（解析失败时使用）
   const defaultResult: PagxCheckResult = {
     score: 0,
@@ -667,8 +667,6 @@ export async function checkPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     const score = normalize(riskRaw[key], cfg.yellow, cfg.red);
     if (score < minScore) minScore = score;
   }
-
-  console.log("minScore:", minScore);
 
   // 返回完整结果
   return {
