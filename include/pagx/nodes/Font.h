@@ -18,12 +18,18 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
 
+namespace tgfx {
+class Typeface;
+}
+
 namespace pagx {
 
+class GlyphRunRenderer;
 class Image;
 class PathData;
 
@@ -86,10 +92,15 @@ class Font : public Node {
     return NodeType::Font;
   }
 
+  ~Font() override;
+
  private:
   Font() = default;
 
+  std::shared_ptr<tgfx::Typeface> renderTypeface = nullptr;
+
   friend class PAGXDocument;
+  friend class GlyphRunRenderer;
 };
 
 }  // namespace pagx

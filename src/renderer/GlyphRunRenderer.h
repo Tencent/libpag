@@ -58,7 +58,7 @@ class GlyphRunRenderer {
       const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
  private:
-  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode);
+  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(Font* fontNode);
 };
 
 }  // namespace pagx

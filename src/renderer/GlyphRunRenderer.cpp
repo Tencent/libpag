@@ -98,9 +98,12 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
-std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fontNode) {
   if (fontNode == nullptr || fontNode->glyphs.empty()) {
     return nullptr;
+  }
+  if (fontNode->renderTypeface != nullptr) {
+    return fontNode->renderTypeface;
   }
 
   bool hasPath = false;
@@ -153,6 +156,7 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
     typeface = builder.detach();
   }
 
+  fontNode->renderTypeface = typeface;
   return typeface;
 }
 

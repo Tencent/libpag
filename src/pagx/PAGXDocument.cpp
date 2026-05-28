@@ -20,6 +20,7 @@
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
@@ -151,6 +152,11 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      static_cast<Font*>(node.get())->renderTypeface.reset();
+    }
+  }
 }
 
 }  // namespace pagx
