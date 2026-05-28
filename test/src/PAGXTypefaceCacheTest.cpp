@@ -125,8 +125,8 @@ CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   auto secondTypeface = fontNode->renderTypeface;
-  // Second build must hit the early-return path: same shared_ptr instance, no rebuild.
-  EXPECT_EQ(firstTypeface.get(), secondTypeface.get());
+  EXPECT_EQ(firstTypeface.get(), secondTypeface.get())
+      << "second LayerBuilder::Build should hit the cache, not rebuild the typeface";
 }
 
 CLI_TEST(PAGXTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
@@ -157,9 +157,9 @@ CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   std::weak_ptr<Typeface> weak = fontNode->renderTypeface;
   ASSERT_FALSE(weak.expired());
+  fontNode = nullptr;
 
   doc.reset();
-  // Document destruction tears down the Font node, which drops its strong reference.
   EXPECT_TRUE(weak.expired());
 }
 
@@ -174,8 +174,6 @@ CLI_TEST(PAGXTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   ASSERT_NE(fontNode, nullptr);
   ASSERT_TRUE(fontNode->renderTypeface != nullptr);
 
-  // clearEmbed() detaches embedded GlyphRuns from Text nodes; we additionally reset every Font
-  // node's renderTypeface so detached Font nodes do not retain typefaces until document teardown.
   doc->clearEmbed();
   EXPECT_EQ(fontNode->renderTypeface, nullptr);
 }

@@ -47,6 +47,10 @@ class GlyphRunRenderer {
    * Builds a TextBlob from a Text element's embedded GlyphRuns (pagx::GlyphRun), applying the
    * inverse matrix to convert from layout coordinates to Text local coordinates. Writes the
    * resulting TextBlob and per-glyph anchors directly into text->glyphData.
+   *
+   * Side effect: lazily caches a built tgfx::Typeface on each referenced pagx::Font node, so
+   * concurrent calls touching overlapping Font nodes are not safe; callers must serialize per
+   * PAGXDocument.
    */
   static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix);
 
