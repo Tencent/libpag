@@ -1461,6 +1461,48 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
+// True when an element child of a flex container can be safely rendered as a
+// bare <span> flex item rather than wrapped in a sized <div>. Bare emission
+// lets PAGX measure the text's natural width with its own font metrics, so a
+// font-fallback-driven width divergence between Chromium (which produced the
+// snapshot's measured wrapper rect) and PAGX (which renders the result)
+// cannot bleed past the wrapper edge into the gap with the next flex
+// sibling — the bug the wrapped form had on tight-fitting price labels like
+// "¥4799" inside a 16 px bold Times row, where the Chromium-measured 40 px
+// wrapper had no headroom for PAGX's wider rendering and the strikethrough
+// ¥5299 sibling visibly overlapped.
+//
+// Eligibility is conservative: only inline-by-default tags (their CSS box
+// has no independent size, so PAGX recovering content-driven sizing matches
+// what the source HTML asked for) with no box visuals, padding,
+// border-radius, text-clipped background, or inline transform. Anything
+// else keeps the wrapped form so the authored layout semantics (button
+// padding, inline-flex cluster shape, rounded badge, …) survive the trip
+// to PAGX intact.
+//
+// `computed.display` cannot be consulted directly: CSS Flexbox blockifies
+// every flex item, so a `<span>` flex item reports `display: block` even
+// though the source CSS leaves it inline. Falling back to the tag list
+// captures the same intent (no author-defined size) without false negatives.
+// An inline-style `display: block` / `flex` / `grid` override on the host
+// is rejected via `el.style.display` so an author who deliberately turned
+// the span into a sized box keeps the wrapper.
+function isPureInlineTextLeaf(el, computed) {
+  if (!el || !el.tagName) return false;
+  if (!INLINE_BY_DEFAULT_TAGS.has(el.tagName.toLowerCase())) return false;
+  const inlineDisplay = (el.style && el.style.display ? el.style.display : '').trim().toLowerCase();
+  if (inlineDisplay && inlineDisplay !== 'inline') return false;
+  if (hasBoxVisualsForInline(computed)) return false;
+  const pad = readPadding(computed);
+  if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  const br = (computed.getPropertyValue('border-radius') || '').trim();
+  if (br && br !== '0px' && br !== '0px 0px 0px 0px' && br !== '0') return false;
+  const bgClip = (computed.getPropertyValue('background-clip') || '').trim().toLowerCase();
+  if (bgClip === 'text') return false;
+  if (readInlineTransform(el)) return false;
+  return true;
+}
+
 // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
 // a flex item. The outer flexItem branch in renderTextLeaf cannot anchor an
 // absolutely-positioned line span (the wrapper itself is no longer
@@ -1519,6 +1561,12 @@ function textLeafInnerLayout(computed) {
 // in `collectTextFragments` and gets merged into a single TextBox with one
 // `<Text>` run per style change.
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
+
+const INLINE_BY_DEFAULT_TAGS = new Set([
+  'span', 'a', 'b', 'i', 'em', 'strong', 'small', 'big', 'sub', 'sup',
+  'mark', 'time', 'abbr', 'cite', 'code', 'kbd', 'samp', 'var', 'q', 's',
+  'u', 'del', 'ins', 'dfn', 'bdo', 'bdi', 'wbr', 'ruby', 'rt', 'rp',
+]);
 
 // True when `cs` declares any property that paints outside the element's
 // text — background, border, shadow, outline, filter, clip. Inline-text-leaf
@@ -1806,6 +1854,21 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       box: false, text: true, positioned: false,
     });
     const textStyle = withNowrap(baseTextStyle);
+    // Pure-inline text leaf (no box visuals, no padding, no rounding, no
+    // background-clip:text, no inline transform) ⇒ emit a bare <span> flex
+    // item so PAGX measures the text natural width with its own font
+    // metrics. Encoding Chromium's measured width into a `width: Npx`
+    // wrapper otherwise overflows when PAGX's font fallback renders wider
+    // than Chromium's Times metrics — a tight 40 px "¥4799" wrapper has no
+    // headroom and visibly overlaps the next strikethrough ¥5299 sibling.
+    // The flex container's `gap` and `align-items` continue to drive
+    // sibling spacing because PAGX takes the layer's intrinsic content
+    // width as its main-axis size when no explicit width is authored.
+    const isPure = isPureInlineTextLeaf(el, computed);
+    if (isPure) {
+      const parts = [textStyle, 'flex-shrink: 0'].filter(Boolean);
+      return `<span style="${parts.join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
+    }
     // Mirror the source's own flex / padding declaration onto the wrapper
     // so the inline span lands where the browser painted it. A text-only
     // flex container — e.g. `<button class="inline-flex items-center
@@ -1933,10 +1996,16 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
 
 // Emit a bare text-node child of a flex container as a sized <span> flex
 // item. The text inherits color/font-* from the container's computed style;
-// we only need to forward the inherited text props plus the explicit
-// dimensions (so the flex engine can place it). `withNowrap` is mandatory:
-// the measured rect was for a single line and PAGX's text engine must not
-// rewrap at a sub-pixel divergence.
+// we forward the inherited text props plus an explicit height (so the flex
+// engine's cross-axis centring lands on the line-box), but deliberately
+// omit `width` so PAGX measures the glyph natural width with its own font
+// metrics. Encoding Chromium's `Range.getClientRects` width into the span
+// otherwise overflows when PAGX's font fallback renders wider, eating the
+// gap to adjacent siblings (the same divergence that motivates
+// `isPureInlineTextLeaf` for element-kind children — anonymous text-nodes
+// hit the bug too because their measured rect is also Chromium-driven).
+// `withNowrap` is mandatory: the measured rect was for a single line and
+// PAGX's text engine must not rewrap at a sub-pixel divergence.
 //
 // Height is expanded to `line-height` when Chromium's `getClientRects`
 // reports a shorter glyph-bounds rect than the inherited line-height (e.g.
@@ -1954,10 +2023,12 @@ function renderFlexTextItem(child, parentComputed) {
   const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
   const lineHeightPx = parseFloat(parentComputed.getPropertyValue('line-height')) || 0;
   const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
-  const baseStyle = buildStyle(0, 0, r.width, height, parentComputed, {
-    box: false, text: true, flexItem: true,
+  const baseStyle = buildStyle(0, 0, 0, 0, parentComputed, {
+    box: false, text: true, positioned: false,
   });
-  return `<span style="${withNowrap(baseStyle)}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
+  const flexBits = `height: ${px(height)}; flex-shrink: 0`;
+  const style = withNowrap([baseStyle, flexBits].filter(Boolean).join('; '));
+  return `<span style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
 }
 
 // Render an element + its subtree as a flex container. The container itself
@@ -2339,6 +2410,12 @@ const DROP_TAGS = new Set(${JSON.stringify(DROP_TAG_NAMES)});
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
+const INLINE_BY_DEFAULT_TAGS = new Set([
+  'span', 'a', 'b', 'i', 'em', 'strong', 'small', 'big', 'sub', 'sup',
+  'mark', 'time', 'abbr', 'cite', 'code', 'kbd', 'samp', 'var', 'q', 's',
+  'u', 'del', 'ins', 'dfn', 'bdo', 'bdi', 'wbr', 'ruby', 'rt', 'rp',
+]);
+
 const NON_TEXT_INPUT_TYPES = new Set([
   'checkbox', 'radio', 'file', 'range', 'color', 'image', 'hidden',
   'date', 'datetime-local', 'month', 'time', 'week',
@@ -2469,6 +2546,7 @@ const HELPER_FNS = [
   isInlineRunChild,
   isInlineTextLeafCandidate,
   emitInlineRunMarkup,
+  isPureInlineTextLeaf,
   renderInlineTextLeaf,
   flexMainGapPx,
   collectFlexProps,
