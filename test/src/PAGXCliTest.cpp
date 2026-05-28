@@ -3050,7 +3050,6 @@ CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
 
 CLI_TEST(PAGXCliTest, Embed_FileFlag_RejectedAsUnknown) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
-  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
   StreamCapture errCapture(std::cerr);
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", "font.ttf", tempPagx});
   EXPECT_EQ(ret, 1);
@@ -3070,8 +3069,7 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   StreamCapture errCapture(std::cerr);
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
   EXPECT_EQ(ret, 1);
-  EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"),
-            std::string::npos);
+  EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"), std::string::npos);
   EXPECT_FALSE(std::filesystem::exists(outPagx));
 }
 
