@@ -1661,33 +1661,47 @@ function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
   // future work; for now bail.
   const pad = readPadding(computed);
   if (pad.top || pad.right || pad.bottom || pad.left) return false;
-  // Must produce a single visual line of inline content. `getClientRects()`
-  // returns one rect per inline box on the range, so a `<p>` containing
-  // text + a nested `<span>` legitimately yields three rects on a single
-  // line (the outer text run, the inner span's inline box, the inner text
-  // run). Reject only when the union vertical extent exceeds roughly one
-  // line-height — that's the unambiguous signature of a wrap.
+  // Must produce a single visual line of inline content.
+  //
+  // `range.getClientRects()` reports glyph INK bounds, which systematically
+  // under-report the line-box height for scripts whose typical glyph ink
+  // is shorter than the chosen leading — most notably CJK at 14px / 22.75px
+  // line-height, where two wrapped lines union to ~36 px (well under any
+  // reasonable `N × line-height` threshold) while the actual border-box is
+  // 45.5 px. Slipping past the threshold here would route a multi-line
+  // wrapper into `renderInlineTextLeaf`, which then emits a wrapper carrying
+  // the layout-truth height plus a forced `white-space: nowrap`; the PAGX
+  // importer reads the nowrap and sets `wordWrap="false"`, crushing the
+  // wrapped text back onto a single line that overflows its column.
+  //
+  // Use the element's border-box height as the layout truth. Padding is
+  // already pinned to 0 above (`readPadding` reject); subtract the
+  // top/bottom border widths so the remaining value is the rendered
+  // content/line-box height regardless of script-specific ink quirks.
+  // `getClientRects()` is still consulted for the empty-content early-out
+  // — an element whose range has no rects is invisible and shouldn't be
+  // emitted as an inline text leaf.
   const range = document.createRange();
   range.selectNodeContents(el);
   const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
   range.detach && range.detach();
   if (rects.length === 0) return false;
-  let minTop = Infinity;
-  let maxBottom = -Infinity;
-  for (const r of rects) {
-    if (r.top < minTop) minTop = r.top;
-    if (r.top + r.height > maxBottom) maxBottom = r.top + r.height;
-  }
-  const unionHeight = maxBottom - minTop;
   let lineHeightPx = parseFloat(computed.getPropertyValue('line-height'));
   if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
     const fs = parseFloat(computed.getPropertyValue('font-size')) || 0;
     lineHeightPx = fs * 1.2;
   }
-  // Allow generous headroom for tall ink (CJK accents, italic descenders)
-  // that legitimately overshoots the line box without implying a wrap.
   if (lineHeightPx <= 0) return false;
-  if (unionHeight > lineHeightPx * 1.8) return false;
+  const borderTop = readBorderSide(computed, 'top').width;
+  const borderBottom = readBorderSide(computed, 'bottom').width;
+  const layoutHeight = Math.max(0, el.getBoundingClientRect().height - borderTop - borderBottom);
+  // Tight `1.5 ×` ratio: the border-box height never overshoots the line
+  // box (unlike ink), so the historical `1.8 ×` headroom for tall ink is
+  // no longer needed. The remaining slack absorbs one slightly-taller
+  // inline-block child — e.g. an emoji rendered at 1.2 em, or a `<sup>`
+  // whose own line-height bumps the host's used line-box — without
+  // misclassifying a single-line element as wrapped.
+  if (layoutHeight > lineHeightPx * 1.5) return false;
   return true;
 }
 
