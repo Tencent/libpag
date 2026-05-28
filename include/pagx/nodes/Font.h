@@ -78,9 +78,11 @@ class Font : public Node {
   int unitsPerEm = 1000;
 
   /**
-   * Path to an external font file. When set, glyph data is extracted from this file during embed
-   * instead of being read from Glyph children. The path is resolved relative to the PAGX file's
-   * directory. An empty string means no external reference.
+   * Path to an external font file. When set, this Font node serves as a font source declaration:
+   * `pagx embed` loads and registers the referenced font for text shaping. Extracted glyph data
+   * is stored in separate Font nodes (the source node's `glyphs` is preserved as empty across
+   * embed). The path is resolved relative to the PAGX file's directory. An empty string means
+   * no external reference.
    */
   std::string file = {};
 
