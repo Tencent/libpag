@@ -29,6 +29,11 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/html/importer/HTMLIdAllocator.h"
+#include "pagx/html/importer/HTMLImageResources.h"
+#include "pagx/html/importer/HTMLInlineSvgEmitter.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -79,7 +84,6 @@ class HTMLParserContext {
   // High-level traversal --------------------------------------------------------------
   void collectStyles(const std::shared_ptr<DOMNode>& head);
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
-  void collectAllIds(const std::shared_ptr<DOMNode>& node, int depth = 0);
 
   // body / canvas size detection
   bool resolveCanvasSize(const std::shared_ptr<DOMNode>& body, float& outW, float& outH);
@@ -171,10 +175,6 @@ class HTMLParserContext {
   bool foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                const HTMLBoxAttributes& box, Layer* layer);
 
-  // Resolves a raw `src` URL to a final image source path: absolute URLs pass through,
-  // relative paths are anchored at the document's `_basePath`.
-  std::string resolveImageSource(const std::string& src) const;
-
   // Inline <svg> conversion.
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
@@ -228,7 +228,13 @@ class HTMLParserContext {
                        std::unordered_map<std::string, std::string>& out);
 
   // Reads element id (or generates a unique one on collision) and assigns it to `layer`.
+  // Thin forwarder to `_idAllocator->assign` so existing call sites across the four
+  // implementation TUs keep their syntax.
   void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
+
+  // Returns a fresh id of the form `<prefix><n>` that does not collide with any reserved id.
+  // Thin forwarder to `_idAllocator->generateUnique`.
+  std::string generateUniqueId(const std::string& prefix);
 
   // Returns the property's resolved value, or `fallback`. Looks up inline style, class
   // rules, element defaults (in that priority), respecting CSS rules.
@@ -330,67 +336,16 @@ class HTMLParserContext {
   // path (container / text leaf / image / inline svg) participates uniformly.
   Layer* wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box);
 
-  // Parses a CSS color-like value into a PAGX Color. Returns transparent on empty/"none".
-  Color parseColor(const std::string& value);
+  // Value parsing -----------------------------------------------------------------------
+  // CSS string-to-typed-value conversion lives in `HTMLValueParser` (see member field
+  // `_valueParser`). The parser borrows `_diagnostics`, `_canvasWidth/_canvasHeight` and
+  // `_document` so callers don't have to thread the context through every call.
 
-  // Parses a non-negative pixel length (no % allowed). Returns NaN on empty.
-  float parsePxLength(const std::string& value);
-
-  // Resolves a CSS line-height value into pixels. Supports unitless multipliers (CSS spec:
-  // "the used value is this unitless <number> multiplied by the element's font size"), `px`,
-  // `em`/`rem` (treated as 16px and current font size respectively), and percentages relative to
-  // font size. Returns NaN when the value is empty or unparseable.
-  float resolveLineHeightPx(const std::string& value, float fontSizePx);
-
-  // Parses a `box-shadow` value into a list of resolved shadows. Inset shadows have
-  // `inset == true`.
-  struct ShadowSpec {
-    float offsetX = 0;
-    float offsetY = 0;
-    float blur = 0;
-    float spread = 0;  // ignored (warning) but parsed away
-    Color color = {};
-    bool inset = false;
-  };
-  std::vector<ShadowSpec> parseShadowList(const std::string& value);
-
-  // Parses a `filter` chain (filter, drop-shadow, backdrop-filter shares blur parsing).
-  struct FilterStep {
-    enum class Kind { Blur, DropShadow, Unsupported };
-    Kind kind = Kind::Unsupported;
-    float blurX = 0;
-    float blurY = 0;
-    ShadowSpec shadow = {};
-    std::string raw = {};
-  };
-  std::vector<FilterStep> parseFilterChain(const std::string& value);
-
-  // Parses `linear-gradient(...)` into a LinearGradient node (registered with the
-  // document) plus its color stops. Returns nullptr on parse failure.
-  LinearGradient* parseLinearGradient(const std::string& value);
-  RadialGradient* parseRadialGradient(const std::string& value);
-  ConicGradient* parseConicGradient(const std::string& value);
-
-  // Shared parsed-but-unfinalised stops representation produced by gradient parsers.
-  using GradientStops = std::vector<std::pair<float, Color>>;
-
-  // Parses the comma-separated trailing portion of a gradient call (`stop, stop, ...`)
-  // into colour/offset pairs. `interpretAngularOffset` enables `<deg>` offsets used by
-  // conic-gradient. Offsets that fail to parse are left as NaN for finalisation.
-  GradientStops parseGradientStops(const std::vector<std::string>& parts, size_t startIndex,
-                                   bool interpretAngularOffset);
-
-  // Fills NaN offsets in `stops` with sensible defaults: first/last default to 0/1, and
-  // intermediate gaps are spread evenly between known anchors. Returns false when no
-  // stops are present.
-  static bool finaliseGradientStops(GradientStops& stops);
-
-  // Appends ColorStop nodes for every entry of `stops` to `targetStops`.
-  template <typename T>
-  void emitColorStops(T& targetStops, const GradientStops& stops);
-
-  // Image resource registration.
+  // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Resolves a raw `<img src>` URL via `_imageResources->resolveSource`.
+  std::string resolveImageSource(const std::string& src) const;
 
   // Inline SVG capture -----------------------------------------------------------------
   // Serialises the given <svg> DOM node back into XML so that we can use it as a PAGX
@@ -398,22 +353,19 @@ class HTMLParserContext {
   std::string serializeSvg(const std::shared_ptr<DOMNode>& svgNode);
 
   // ID handling ------------------------------------------------------------------------
-  std::string consumeId(const std::shared_ptr<DOMNode>& element);
-  std::string generateUniqueId(const std::string& prefix);
+  // (Implementation lives in `HTMLIdAllocator`; the forwarders above provide the existing
+  // call-site syntax.)
 
   // Diagnostics ------------------------------------------------------------------------
+  // Thin forwarders to `_diagnostics` for in-class call sites. Kept as members so the four
+  // implementation TUs (HTMLParserContext.cpp / HTMLStyleResolver.cpp / HTMLLayerBuilder.cpp /
+  // HTMLValueParser.cpp) need not reach across to the sink directly.
   void warn(const std::string& message);
   void hardError(const std::string& message);
-
-  // Routes `message` to either `_document->errors` (when the document already exists) or
-  // `_pendingDiagnostics` (before the document is constructed). Used by both warn() and
-  // hardError() so the destination logic lives in exactly one place.
-  void pushDiagnostic(std::string message);
 
   // Member fields ----------------------------------------------------------------------
   HTMLImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
-  std::string _basePath = {};
 
   // CSS class selectors (key = class name without dot). Value is the parsed PropertyMap so
   // that mergeClassRules() can copy entries instead of re-running ParseStyleString on every
@@ -429,15 +381,25 @@ class HTMLParserContext {
   std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
       _stylePropertiesCache = {};
 
-  // IDs already seen in the HTML; used to avoid generating colliding IDs.
-  std::unordered_set<std::string> _existingIds = {};
+  // Allocates / reserves DOM-side ids and generates fresh non-colliding ones for synthetic
+  // layers (e.g. registered images).
+  std::unique_ptr<HTMLIdAllocator> _idAllocator = nullptr;
 
-  // Image deduplication.
-  std::unordered_map<std::string, Image*> _imageSourceToId = {};
+  // Parses CSS string values (color / length / shadow / filter / gradient) into typed PAGX
+  // values. Borrows `_diagnostics`, `_canvasWidth` / `_canvasHeight` and `_document`.
+  std::unique_ptr<HTMLValueParser> _valueParser = nullptr;
 
-  // Diagnostics queued before _document was constructed (so that errors raised during
-  // canvas-size resolution can still be surfaced once the document exists).
-  std::vector<std::string> _pendingDiagnostics = {};
+  // Image deduplication, source-path resolution, and synthesis of the document-side `Image`
+  // resource nodes used by `<img>` and CSS `background-image: url(...)` references.
+  std::unique_ptr<HTMLImageResources> _imageResources = nullptr;
+
+  // Captures inline `<svg>` subtrees as PAGX import-directive content (currentColor resolution
+  // + XML serialisation).
+  std::unique_ptr<HTMLInlineSvgEmitter> _svgEmitter = nullptr;
+
+  // Routes warnings / hard errors. Owns the pre-document buffer and the strict-mode policy;
+  // see `HTMLDiagnosticSink` for the binding contract.
+  std::unique_ptr<HTMLDiagnosticSink> _diagnostics = nullptr;
 
   // Concrete (post-quote-strip, post-generic-map) family names seen anywhere in the
   // document's font-family stacks. Insertion-ordered for deterministic FontConfig
@@ -445,11 +407,8 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
-  int _nextGeneratedId = 0;
   float _canvasWidth = 0;
   float _canvasHeight = 0;
-  bool _hadHardError = false;
-
   // Records concrete family names from a font-family stack into the document-wide
   // dedup set. Empty inputs and duplicates are silently skipped.
   void recordFontFallbacks(const std::vector<std::string>& chain);

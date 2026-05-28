@@ -34,6 +34,11 @@ using namespace pagx::html;
 //==================================================================================================
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
+  _diagnostics = std::make_unique<HTMLDiagnosticSink>(_options.strict);
+  _idAllocator = std::make_unique<HTMLIdAllocator>();
+  _valueParser = std::make_unique<HTMLValueParser>(*_diagnostics, _canvasWidth, _canvasHeight);
+  _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
+  _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {
@@ -41,7 +46,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& fi
   if (!dom) {
     return nullptr;
   }
-  _basePath = DirectoryOf(filePath);
+  _imageResources->setBasePath(DirectoryOf(filePath));
   return parseDOM(dom);
 }
 
@@ -68,7 +73,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
 
   // Run the subset transformer as a pre-pass so the remainder of this routine only ever sees
   // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
-  // into _pendingDiagnostics so they end up on PAGXDocument::errors once the document exists.
+  // through `_diagnostics` so they end up on PAGXDocument::errors once the document exists.
   if (_options.autoNormalize) {
     HTMLSubsetTransformer::Options topts = {};
     topts.strict = _options.strict;
@@ -82,10 +87,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
       if (!diag.code.empty()) {
         formatted += " [" + diag.code + "]";
       }
-      _pendingDiagnostics.push_back(std::move(formatted));
+      _diagnostics->warn(formatted);
     }
     if (!report.ok) {
-      _hadHardError = true;
+      _diagnostics->flagHardError();
       return nullptr;
     }
   }
@@ -139,11 +144,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     _document->fontConfig() = *_options.fontConfig;
   }
 
-  // Now that the document exists, flush any pending diagnostics gathered before its creation.
-  for (auto& msg : _pendingDiagnostics) {
-    _document->errors.push_back(std::move(msg));
-  }
-  _pendingDiagnostics.clear();
+  // Now that the document exists, flush any diagnostics buffered before its creation.
+  _diagnostics->bindDocument(_document.get());
+  _valueParser->bindDocument(_document.get());
+  _imageResources->bindDocument(_document.get());
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -157,10 +161,11 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     }
   }
 
-  collectAllIds(root);
+  _idAllocator->collectAll(root, *_diagnostics);
+
 
   Layer* bodyLayer = convertBody(body, canvasW, canvasH);
-  if (_hadHardError) {
+  if (_diagnostics->hadHardError()) {
     return nullptr;
   }
   if (bodyLayer) {
@@ -191,28 +196,15 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
 }
 
 //==================================================================================================
-// Diagnostics
+// Diagnostics — thin forwarders to `_diagnostics` so existing call sites keep their syntax.
 //==================================================================================================
 
-void HTMLParserContext::pushDiagnostic(std::string message) {
-  if (_document) {
-    _document->errors.push_back(std::move(message));
-  } else {
-    _pendingDiagnostics.push_back(std::move(message));
-  }
-}
-
 void HTMLParserContext::warn(const std::string& message) {
-  if (_options.strict) {
-    hardError(message);
-    return;
-  }
-  pushDiagnostic(message);
+  _diagnostics->warn(message);
 }
 
 void HTMLParserContext::hardError(const std::string& message) {
-  _hadHardError = true;
-  pushDiagnostic(message);
+  _diagnostics->hardError(message);
 }
 
 //==================================================================================================
@@ -226,8 +218,8 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
   // for later resolveBox() in convertBody. This also means class rules and element rules
   // (collected just before this call) participate in canvas-size resolution.
   const auto& props = getResolvedStyle(body);
-  float bodyW = parsePxLength(LookupProperty(props, "width"));
-  float bodyH = parsePxLength(LookupProperty(props, "height"));
+  float bodyW = _valueParser->parsePxLength(LookupProperty(props, "width"));
+  float bodyH = _valueParser->parsePxLength(LookupProperty(props, "height"));
   bool haveBody = !std::isnan(bodyW) && !std::isnan(bodyH) && bodyW > 0 && bodyH > 0;
 
   if (haveTarget && (!haveBody || !_options.preferBodySize)) {
@@ -244,50 +236,15 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 }
 
 //==================================================================================================
-// ID handling
+// ID handling — thin forwarders to `_idAllocator`.
 //==================================================================================================
 
-void HTMLParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node, int depth) {
-  if (!node) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    warn("html: maximum recursion depth reached during id collection; subtree skipped");
-    return;
-  }
-  if (node->type == DOMNodeType::Element) {
-    auto* idAttr = node->findAttribute("id");
-    if (idAttr && !idAttr->empty()) {
-      _existingIds.insert(*idAttr);
-    }
-  }
-  auto child = node->getFirstChild();
-  while (child) {
-    collectAllIds(child, depth + 1);
-    child = child->getNextSibling();
-  }
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+  _idAllocator->assign(layer, element);
 }
 
 std::string HTMLParserContext::generateUniqueId(const std::string& prefix) {
-  std::string id;
-  do {
-    id = prefix + std::to_string(_nextGeneratedId++);
-  } while (_existingIds.count(id) > 0);
-  _existingIds.insert(id);
-  return id;
-}
-
-std::string HTMLParserContext::consumeId(const std::shared_ptr<DOMNode>& element) {
-  auto* idAttr = element->findAttribute("id");
-  if (!idAttr || idAttr->empty()) return {};
-  // The PAGX layer registry is populated lazily by `makeNode<>`, never with an explicit id from
-  // this importer, so collisions can only come from the source DOM itself. `_existingIds` already
-  // tracks every DOM-side id discovered by `collectAllIds`, so we trust the author and forward
-  // the id verbatim.
-  return *idAttr;
-}
-
-void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
-  std::string id = consumeId(element);
-  if (!id.empty()) layer->id = id;
+  return _idAllocator->generateUnique(prefix);
 }
 
 bool HTMLParserContext::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
@@ -530,7 +487,7 @@ HTMLParserContext::TextFragment HTMLParserContext::makeTextFragment(
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
-  frag.lineHeight = resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+  frag.lineHeight = _valueParser->resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
   return frag;
 }
 
@@ -571,7 +528,7 @@ void HTMLParserContext::appendTextFragment(std::vector<TextFragment>& out,
     // vertical centring inside a fixed-height badge) must still raise the merged fragment's
     // value. Without this, the merged line-height freezes at the first run's resolution and
     // later inner-span overrides would be silently dropped.
-    float incomingLh = resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+    float incomingLh = _valueParser->resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
     if (!std::isnan(incomingLh) && incomingLh > 0 &&
         (std::isnan(out.back().lineHeight) || incomingLh > out.back().lineHeight)) {
       out.back().lineHeight = incomingLh;
@@ -745,7 +702,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
         warn("html: unsupported text-align '" + ta + "'");
     }
     if (!inherited.lineHeight.empty()) {
-      float lh = resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
+      float lh = _valueParser->resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
       if (!std::isnan(lh) && lh > 0) textBox->lineHeight = lh;
     }
     // CSS line-box height = max of the parent's line-height and every inline child's
@@ -791,7 +748,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
     Color decorationColor = textColor;
     bool decorationColorDiffers = false;
     if (!inherited.textDecorationColor.empty()) {
-      Color parsed = parseColor(inherited.textDecorationColor);
+      Color parsed = _valueParser->parseColor(inherited.textDecorationColor);
       if (!(parsed == textColor)) {
         decorationColor = parsed;
         decorationColorDiffers = true;

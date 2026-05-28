@@ -222,10 +222,19 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLDetail.cpp
             src/pagx/html/importer/HTMLDetail.h
+            src/pagx/html/importer/HTMLDiagnosticSink.cpp
+            src/pagx/html/importer/HTMLDiagnosticSink.h
+            src/pagx/html/importer/HTMLIdAllocator.cpp
+            src/pagx/html/importer/HTMLIdAllocator.h
+            src/pagx/html/importer/HTMLImageResources.cpp
+            src/pagx/html/importer/HTMLImageResources.h
             src/pagx/html/importer/HTMLImporter.cpp
+            src/pagx/html/importer/HTMLInlineSvgEmitter.cpp
+            src/pagx/html/importer/HTMLInlineSvgEmitter.h
             src/pagx/html/importer/HTMLStyleResolver.cpp
             src/pagx/html/importer/HTMLLayerBuilder.cpp
             src/pagx/html/importer/HTMLValueParser.cpp
+            src/pagx/html/importer/HTMLValueParser.h
             src/pagx/html/importer/HTMLParserContext.cpp
             src/pagx/html/importer/HTMLParserContext.h
             src/pagx/html/importer/HTMLSubsetTransformer.cpp

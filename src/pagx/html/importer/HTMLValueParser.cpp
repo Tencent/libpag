@@ -16,13 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pagx/html/importer/HTMLValueParser.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLDetail.h"
-#include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -35,7 +40,16 @@ constexpr float HtmlPi = 3.14159265358979323846f;
 
 }  // namespace
 
-Color HTMLParserContext::parseColor(const std::string& valueRaw) {
+HTMLValueParser::HTMLValueParser(HTMLDiagnosticSink& sink, const float& canvasWidth,
+                                 const float& canvasHeight)
+    : _diagnostics(sink), _canvasWidth(canvasWidth), _canvasHeight(canvasHeight) {
+}
+
+void HTMLValueParser::bindDocument(PAGXDocument* document) {
+  _document = document;
+}
+
+Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   std::string value = Trim(valueRaw);
   if (value.empty()) {
     return {0, 0, 0, 0, ColorSpace::SRGB};
@@ -90,11 +104,11 @@ Color HTMLParserContext::parseColor(const std::string& valueRaw) {
   if (it != named.end()) {
     return HexToColor(it->second, /*hasAlpha=*/false);
   }
-  warn("html: unrecognised color value '" + value + "'; falling back to opaque black");
+  _diagnostics.warn("html: unrecognised color value '" + value + "'; falling back to opaque black");
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
-float HTMLParserContext::parsePxLength(const std::string& valueRaw) {
+float HTMLValueParser::parsePxLength(const std::string& valueRaw) {
   std::string value = Trim(valueRaw);
   if (value.empty()) return NAN;
   char* end = nullptr;
@@ -106,22 +120,22 @@ float HTMLParserContext::parsePxLength(const std::string& valueRaw) {
   }
   bool recognized = false;
   // fontSize is not known at this layer (see ResolveLength for the context-aware path); pass NaN
-  // so em falls back to 16px to match the long-standing behaviour. _canvasWidth/_canvasHeight are
-  // populated before any per-element parsePxLength call; they are 0 only during canvas-size
+  // so em falls back to 16px to match the long-standing behaviour. _canvasWidth / _canvasHeight
+  // are populated before any per-element parsePxLength call; they are 0 only during canvas-size
   // resolution itself, where vw/vh are necessarily a self-referential mistake.
   float px = ConvertCssLengthToPx(num, suffix, /*fontSizePx=*/NAN, _canvasWidth, _canvasHeight,
                                   recognized);
   if (recognized) {
     if (suffix == "em" || suffix == "rem") {
-      warn("html: em/rem unit not supported here; treated as 16px");
+      _diagnostics.warn("html: em/rem unit not supported here; treated as 16px");
     }
     return px;
   }
-  warn("html: length unit '" + suffix + "' not supported; treated as px");
+  _diagnostics.warn("html: length unit '" + suffix + "' not supported; treated as px");
   return num;
 }
 
-float HTMLParserContext::resolveLineHeightPx(const std::string& valueRaw, float fontSizePx) {
+float HTMLValueParser::resolveLineHeightPx(const std::string& valueRaw, float fontSizePx) {
   std::string value = Trim(valueRaw);
   if (value.empty()) return NAN;
   std::string lowered = ToLower(value);
@@ -146,11 +160,11 @@ float HTMLParserContext::resolveLineHeightPx(const std::string& valueRaw, float 
     if (std::isnan(fontSizePx) || fontSizePx <= 0) return NAN;
     return num * fontSizePx;
   }
-  warn("html: line-height unit '" + suffix + "' not supported");
+  _diagnostics.warn("html: line-height unit '" + suffix + "' not supported");
   return NAN;
 }
 
-std::vector<HTMLParserContext::ShadowSpec> HTMLParserContext::parseShadowList(
+std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
     const std::string& value) {
   std::vector<ShadowSpec> out;
   if (value.empty()) return out;
@@ -185,10 +199,12 @@ std::vector<HTMLParserContext::ShadowSpec> HTMLParserContext::parseShadowList(
       if (lengths.size() >= 3) s.blur = lengths[2];
       if (lengths.size() >= 4) {
         s.spread = lengths[3];
-        if (s.spread != 0) warn("html: box-shadow spread is not supported and was ignored");
+        if (s.spread != 0) {
+          _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
+        }
       }
     } else {
-      warn("html: malformed box-shadow '" + item + "'");
+      _diagnostics.warn("html: malformed box-shadow '" + item + "'");
       continue;
     }
     if (!nonLengths.empty()) {
@@ -207,7 +223,7 @@ std::vector<HTMLParserContext::ShadowSpec> HTMLParserContext::parseShadowList(
   return out;
 }
 
-std::vector<HTMLParserContext::FilterStep> HTMLParserContext::parseFilterChain(
+std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
     const std::string& value) {
   std::vector<FilterStep> out;
   if (value.empty()) return out;
@@ -251,7 +267,7 @@ std::vector<HTMLParserContext::FilterStep> HTMLParserContext::parseFilterChain(
   return out;
 }
 
-LinearGradient* HTMLParserContext::parseLinearGradient(const std::string& value) {
+LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
   std::string args = ExtractParenArgs(value);
   if (args.empty()) return nullptr;
   auto parts = SplitTopLevelCommas(args);
@@ -282,7 +298,7 @@ LinearGradient* HTMLParserContext::parseLinearGradient(const std::string& value)
   return grad;
 }
 
-RadialGradient* HTMLParserContext::parseRadialGradient(const std::string& value) {
+RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
   std::string args = ExtractParenArgs(value);
   if (args.empty()) return nullptr;
   auto parts = SplitTopLevelCommas(args);
@@ -304,7 +320,7 @@ RadialGradient* HTMLParserContext::parseRadialGradient(const std::string& value)
   return grad;
 }
 
-ConicGradient* HTMLParserContext::parseConicGradient(const std::string& value) {
+ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
   std::string args = ExtractParenArgs(value);
   if (args.empty()) return nullptr;
   auto parts = SplitTopLevelCommas(args);
@@ -327,7 +343,7 @@ ConicGradient* HTMLParserContext::parseConicGradient(const std::string& value) {
   return grad;
 }
 
-HTMLParserContext::GradientStops HTMLParserContext::parseGradientStops(
+HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
     const std::vector<std::string>& parts, size_t startIndex, bool interpretAngularOffset) {
   GradientStops stops;
   for (size_t i = startIndex; i < parts.size(); i++) {
@@ -351,7 +367,7 @@ HTMLParserContext::GradientStops HTMLParserContext::parseGradientStops(
   return stops;
 }
 
-bool HTMLParserContext::finaliseGradientStops(GradientStops& stops) {
+bool HTMLValueParser::finaliseGradientStops(GradientStops& stops) {
   if (stops.empty()) return false;
   if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
   if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
@@ -373,7 +389,7 @@ bool HTMLParserContext::finaliseGradientStops(GradientStops& stops) {
 }
 
 template <typename T>
-void HTMLParserContext::emitColorStops(T& targetStops, const GradientStops& stops) {
+void HTMLValueParser::emitColorStops(T& targetStops, const GradientStops& stops) {
   for (const auto& [offset, color] : stops) {
     auto stop = _document->makeNode<ColorStop>();
     stop->offset = offset;
@@ -381,5 +397,8 @@ void HTMLParserContext::emitColorStops(T& targetStops, const GradientStops& stop
     targetStops.push_back(stop);
   }
 }
+
+// Explicit instantiations for the gradient containers that emit ColorStops.
+template void HTMLValueParser::emitColorStops(std::vector<ColorStop*>&, const GradientStops&);
 
 }  // namespace pagx
