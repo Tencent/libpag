@@ -134,9 +134,9 @@ class HTMLParserContext {
   // Implementation lives in `HTMLStyleCascade`.
   const std::unordered_map<std::string, std::string>& getResolvedStyle(
       const std::shared_ptr<DOMNode>& node);
-  HTMLBoxAttributes resolveBox(const std::shared_ptr<DOMNode>& element);
-  HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
-                                      const HTMLInheritedStyle& parent);
+  HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
+  HTMLInheritedStyle resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                           const HTMLInheritedStyle& parent);
 
   // Reads element id (or generates a unique one on collision) and assigns it to `layer`.
   // Thin forwarder to `_idAllocator->assign` so existing call sites across the four
@@ -166,7 +166,7 @@ class HTMLParserContext {
   Fill* buildSolidFill(const Color& color);
   ColorSource* parseGradientByValue(const std::string& value);
   Layer* maybeSplitBoxShadowFromClip(Layer* inner);
-  Layer* wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box);
+  Layer* wrapForMargin(Layer* inner, const HTMLBoxAttributes& box);
   Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
   void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
                               bool decorationColorDiffers, float bottom, float centerY);

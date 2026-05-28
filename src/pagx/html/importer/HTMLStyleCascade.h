@@ -51,7 +51,7 @@ class HTMLStyleCascade {
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
   /** Wires the callback that receives concrete font-family chains discovered by
-   *  `computeInherited`. Caller pools them for FontConfig fallback registration. */
+   *  `resolveInheritedStyle`. Caller pools them for FontConfig fallback registration. */
   void setFontFallbackSink(FontFallbackSink sink);
 
   /** Walks `<head>` and populates the class / element rule tables from `<style>` blocks. */
@@ -68,12 +68,12 @@ class HTMLStyleCascade {
   /** Computes the inherited style for `element` based on `parent`. Mirrors the CSS cascade for
    *  text-related properties and pre-resolves the numeric forms (font-size, letter-spacing,
    *  resolved text colour) so text-leaf conversion can read them without re-parsing. */
-  HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
-                                      const HTMLInheritedStyle& parent);
+  HTMLInheritedStyle resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                           const HTMLInheritedStyle& parent);
 
   /** Resolves the box-model attributes from the element's resolved style (sizing, positioning,
    *  layout, visuals, transform). */
-  HTMLBoxAttributes resolveBox(const std::shared_ptr<DOMNode>& element);
+  HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
  private:
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);

@@ -262,6 +262,21 @@ const std::unordered_map<std::string, std::string>& ElementDefaults() {
   return table;
 }
 
+static std::unordered_map<std::string, std::unordered_map<std::string, std::string>>
+BuildParsedElementDefaults() {
+  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> out;
+  for (const auto& kv : ElementDefaults()) {
+    ParseStyleString(kv.second, out[kv.first]);
+  }
+  return out;
+}
+
+const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>&
+ParsedElementDefaults() {
+  static const auto table = BuildParsedElementDefaults();
+  return table;
+}
+
 void LowercaseTagsInPlace(const std::shared_ptr<DOMNode>& node, int depth) {
   if (!node) return;
   if (depth >= MAX_HTML_RECURSION_DEPTH) return;

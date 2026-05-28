@@ -565,7 +565,7 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   return outer;
 }
 
-Layer* HTMLLayerBuilder::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box) {
+Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& box) {
   if (inner == nullptr) return inner;
   if (box.marginTopPx == 0.0f && box.marginRightPx == 0.0f && box.marginBottomPx == 0.0f &&
       box.marginLeftPx == 0.0f) {

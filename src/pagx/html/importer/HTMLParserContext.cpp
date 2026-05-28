@@ -229,13 +229,13 @@ const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolv
   return _styleCascade->getResolvedStyle(node);
 }
 
-HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& element) {
-  return _styleCascade->resolveBox(element);
+HTMLBoxAttributes HTMLParserContext::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
+  return _styleCascade->computeBoxAttributes(element);
 }
 
-HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOMNode>& element,
-                                                       const HTMLInheritedStyle& parent) {
-  return _styleCascade->computeInherited(element, parent);
+HTMLInheritedStyle HTMLParserContext::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                                            const HTMLInheritedStyle& parent) {
+  return _styleCascade->resolveInheritedStyle(element, parent);
 }
 
 //==================================================================================================
@@ -246,11 +246,11 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
                                           float& outH) {
   bool haveTarget = !std::isnan(_options.targetWidth) && !std::isnan(_options.targetHeight);
   // Reuse getResolvedStyle so the body's resolved property map is parsed once and cached
-  // for later resolveBox() in convertBody. This also means class rules and element rules
+  // for later computeBoxAttributes() in convertBody. This also means class rules and element rules
   // (collected just before this call) participate in canvas-size resolution.
   const auto& props = getResolvedStyle(body);
-  float bodyW = _valueParser->parsePxLength(LookupProperty(props, "width"));
-  float bodyH = _valueParser->parsePxLength(LookupProperty(props, "height"));
+  float bodyW = _valueParser->parseAbsoluteLengthPx(LookupProperty(props, "width"));
+  float bodyH = _valueParser->parseAbsoluteLengthPx(LookupProperty(props, "height"));
   bool haveBody = !std::isnan(bodyW) && !std::isnan(bodyH) && bodyW > 0 && bodyH > 0;
 
   if (haveTarget && (!haveBody || !_options.preferBodySize)) {
@@ -332,8 +332,8 @@ Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
   return _layerBuilder->maybeSplitBoxShadowFromClip(inner);
 }
 
-Layer* HTMLParserContext::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box) {
-  return _layerBuilder->wrapWithMargin(inner, box);
+Layer* HTMLParserContext::wrapForMargin(Layer* inner, const HTMLBoxAttributes& box) {
+  return _layerBuilder->wrapForMargin(inner, box);
 }
 
 void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& textColor,
@@ -350,8 +350,8 @@ void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& textCol
 
 Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, float canvasW,
                                       float canvasH) {
-  HTMLInheritedStyle inherited = computeInherited(body, HTMLInheritedStyle{});
-  HTMLBoxAttributes box = resolveBox(body);
+  HTMLInheritedStyle inherited = resolveInheritedStyle(body, HTMLInheritedStyle{});
+  HTMLBoxAttributes box = computeBoxAttributes(body);
 
   auto layer = _document->makeNode<Layer>();
   layer->width = canvasW;
@@ -426,19 +426,19 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return layer;
   }
   if (tag == "svg") {
-    HTMLBoxAttributes box = resolveBox(element);
-    return wrapWithMargin(convertInlineSvg(element, box, inherited), box);
+    HTMLBoxAttributes box = computeBoxAttributes(element);
+    return wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
-    HTMLBoxAttributes box = resolveBox(element);
-    return wrapWithMargin(convertImage(element, box), box);
+    HTMLBoxAttributes box = computeBoxAttributes(element);
+    return wrapForMargin(convertImage(element, box), box);
   }
 
-  HTMLInheritedStyle childInherited = computeInherited(element, inherited);
-  HTMLBoxAttributes box = resolveBox(element);
+  HTMLInheritedStyle childInherited = resolveInheritedStyle(element, inherited);
+  HTMLBoxAttributes box = computeBoxAttributes(element);
 
   if (IsContainerTag(tag)) {
-    return wrapWithMargin(convertContainer(element, box, childInherited, depth), box);
+    return wrapForMargin(convertContainer(element, box, childInherited, depth), box);
   }
   if (IsTextLeafTag(tag)) {
     // HTML allows mixed content: a <span> / <p> may contain inline-block children
@@ -453,9 +453,9 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       break;
     }
     if (hasBlockChild) {
-      return wrapWithMargin(convertContainer(element, box, childInherited, depth), box);
+      return wrapForMargin(convertContainer(element, box, childInherited, depth), box);
     }
-    return wrapWithMargin(convertTextLeaf(element, box, childInherited), box);
+    return wrapForMargin(convertTextLeaf(element, box, childInherited), box);
   }
   if (_options.preserveUnknownElements) {
     warn("html: unknown element '" + tag + "' preserved as placeholder");

@@ -190,10 +190,12 @@ const HTMLStyleCascade::PropertyMap& HTMLStyleCascade::getResolvedStyle(
   auto& slot = _resolvedCache[node.get()];
 
   // Priority: element defaults -> element rules from <style> -> class rules -> inline.
-  const auto& tagDefaults = ElementDefaults();
+  const auto& tagDefaults = ParsedElementDefaults();
   auto tagIt = tagDefaults.find(node->name);
   if (tagIt != tagDefaults.end()) {
-    ParseStyleString(tagIt->second, slot);
+    for (const auto& kv : tagIt->second) {
+      slot[kv.first] = kv.second;
+    }
   }
   auto elemRuleIt = _elementRules.find(node->name);
   if (elemRuleIt != _elementRules.end()) {
@@ -221,8 +223,8 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
   return fallback;
 }
 
-HTMLInheritedStyle HTMLStyleCascade::computeInherited(const std::shared_ptr<DOMNode>& element,
-                                                      const HTMLInheritedStyle& parent) {
+HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                                           const HTMLInheritedStyle& parent) {
   HTMLInheritedStyle out = parent;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
@@ -301,14 +303,14 @@ HTMLInheritedStyle HTMLStyleCascade::computeInherited(const std::shared_ptr<DOMN
   if (out.fontSize.empty()) {
     out.fontSizePx = HTML_DEFAULT_FONT_SIZE;
   } else {
-    float fontSizePx = _valueParser.parsePxLength(out.fontSize);
+    float fontSizePx = _valueParser.parseAbsoluteLengthPx(out.fontSize);
     if (std::isnan(fontSizePx) || fontSizePx <= 0) fontSizePx = HTML_DEFAULT_FONT_SIZE;
     out.fontSizePx = fontSizePx;
   }
   if (out.letterSpacing.empty()) {
     out.letterSpacingPx = 0.0f;
   } else {
-    float ls = _valueParser.parsePxLength(out.letterSpacing);
+    float ls = _valueParser.parseAbsoluteLengthPx(out.letterSpacing);
     out.letterSpacingPx = std::isnan(ls) ? 0.0f : ls;
   }
   out.resolvedTextColor =
@@ -316,7 +318,7 @@ HTMLInheritedStyle HTMLStyleCascade::computeInherited(const std::shared_ptr<DOMN
   return out;
 }
 
-HTMLBoxAttributes HTMLStyleCascade::resolveBox(const std::shared_ptr<DOMNode>& element) {
+HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
@@ -353,20 +355,20 @@ void HTMLStyleCascade::parseBoxPositioning(HTMLBoxAttributes& box, const Propert
   }
   if (!box.absolute) return;
   const std::string& left = LookupProperty(props, "left");
-  if (!left.empty()) box.leftPx = _valueParser.parsePxLength(left);
+  if (!left.empty()) box.leftPx = _valueParser.parseAbsoluteLengthPx(left);
   const std::string& right = LookupProperty(props, "right");
-  if (!right.empty()) box.rightPx = _valueParser.parsePxLength(right);
+  if (!right.empty()) box.rightPx = _valueParser.parseAbsoluteLengthPx(right);
   const std::string& top = LookupProperty(props, "top");
-  if (!top.empty()) box.topPx = _valueParser.parsePxLength(top);
+  if (!top.empty()) box.topPx = _valueParser.parseAbsoluteLengthPx(top);
   const std::string& bottom = LookupProperty(props, "bottom");
-  if (!bottom.empty()) box.bottomPx = _valueParser.parsePxLength(bottom);
+  if (!bottom.empty()) box.bottomPx = _valueParser.parseAbsoluteLengthPx(bottom);
 }
 
 void HTMLStyleCascade::applyMarginLonghand(const PropertyMap& props, const char* propName,
                                            float& outPx) {
   const std::string& v = LookupProperty(props, propName);
   if (v.empty()) return;
-  float n = _valueParser.parsePxLength(v);
+  float n = _valueParser.parseAbsoluteLengthPx(v);
   if (std::isnan(n)) {
     _diagnostics.warn(std::string("html: invalid ") + propName + " value '" + v + "'");
     return;
@@ -394,7 +396,7 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
   }
   const std::string& gap = LookupProperty(props, "gap");
   if (!gap.empty()) {
-    box.gapPx = _valueParser.parsePxLength(gap);
+    box.gapPx = _valueParser.parseAbsoluteLengthPx(gap);
     box.gapSet = !std::isnan(box.gapPx);
     if (!box.gapSet) box.gapPx = 0;
   }
@@ -403,7 +405,7 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
     auto tokens = SplitTopLevelWhitespace(padding);
     std::vector<float> nums;
     for (auto& t : tokens) {
-      float v = _valueParser.parsePxLength(t);
+      float v = _valueParser.parseAbsoluteLengthPx(t);
       if (std::isnan(v)) {
         _diagnostics.warn("html: invalid padding token '" + t + "'");
         continue;
@@ -449,14 +451,14 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
     // already normalised every accepted unit to plain px, so any token that fails to parse
     // here is malformed input and is reported and skipped (the corresponding side stays at
     // its default 0). Resulting per-side values are routed onto positioning / padding by
-    // `wrapWithMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
+    // `wrapForMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
     const std::string& margin = LookupProperty(props, "margin");
     if (!margin.empty()) {
       auto tokens = SplitTopLevelWhitespace(margin);
       std::vector<float> nums;
       nums.reserve(tokens.size());
       for (auto& t : tokens) {
-        float v = _valueParser.parsePxLength(t);
+        float v = _valueParser.parseAbsoluteLengthPx(t);
         if (std::isnan(v)) {
           _diagnostics.warn("html: invalid margin token '" + t + "'");
           continue;
@@ -602,8 +604,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
       originParts.push_back(Trim(origin.substr(spaceIdx + 1)));
     }
     if (originParts.size() == 2) {
-      float ox = _valueParser.parsePxLength(originParts[0]);
-      float oy = _valueParser.parsePxLength(originParts[1]);
+      float ox = _valueParser.parseAbsoluteLengthPx(originParts[0]);
+      float oy = _valueParser.parseAbsoluteLengthPx(originParts[1]);
       if (!std::isnan(ox) && !std::isnan(oy)) {
         // Suppress the warning when the px values are exactly the box's
         // geometric centre — Chromium emits this for the CSS default and
@@ -691,7 +693,7 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
       _diagnostics.warn("html: translate expects 1 or 2 length arguments; got '" + transform + "'");
       return;
     }
-    float tx = _valueParser.parsePxLength(parts[0]);
+    float tx = _valueParser.parseAbsoluteLengthPx(parts[0]);
     if (std::isnan(tx)) {
       _diagnostics.warn("html: translate first argument '" + parts[0] +
                         "' is not a px length; ignored");
@@ -699,7 +701,7 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
     }
     float ty = 0.0f;
     if (parts.size() == 2) {
-      ty = _valueParser.parsePxLength(parts[1]);
+      ty = _valueParser.parseAbsoluteLengthPx(parts[1]);
       if (std::isnan(ty)) {
         _diagnostics.warn("html: translate second argument '" + parts[1] +
                           "' is not a px length; ignored");
@@ -714,7 +716,7 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
       _diagnostics.warn("html: " + fn + " expects 1 length argument; got '" + transform + "'");
       return;
     }
-    float v = _valueParser.parsePxLength(parts[0]);
+    float v = _valueParser.parseAbsoluteLengthPx(parts[0]);
     if (std::isnan(v)) {
       _diagnostics.warn("html: " + fn + " argument '" + parts[0] + "' is not a px length; ignored");
       return;
@@ -858,7 +860,7 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
       }
       v = pct * std::min(box.widthPx, box.heightPx) / 100.0f;
     } else {
-      v = _valueParser.parsePxLength(trimmed);
+      v = _valueParser.parseAbsoluteLengthPx(trimmed);
       if (std::isnan(v)) {
         _diagnostics.warn("html: invalid border-radius token '" + t + "'");
         continue;
@@ -940,7 +942,7 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
   std::string colorToken;
   bool sawExtraColor = false;
   for (auto& t : tokens) {
-    float w = _valueParser.parsePxLength(t);
+    float w = _valueParser.parseAbsoluteLengthPx(t);
     if (!std::isnan(w)) {
       box.borderWidthPx = w;
       continue;

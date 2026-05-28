@@ -108,7 +108,7 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
-float HTMLValueParser::parsePxLength(const std::string& valueRaw) {
+float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw) {
   std::string value = Trim(valueRaw);
   if (value.empty()) return NAN;
   char* end = nullptr;
@@ -116,12 +116,12 @@ float HTMLValueParser::parsePxLength(const std::string& valueRaw) {
   if (end == value.c_str()) return NAN;
   std::string suffix = ToLower(Trim(end));
   if (suffix == "%") {
-    return NAN;  // percent not allowed for properties parsed via parsePxLength
+    return NAN;  // percent not allowed for properties parsed via parseAbsoluteLengthPx
   }
   bool recognized = false;
   // fontSize is not known at this layer (see ResolveLength for the context-aware path); pass NaN
   // so em falls back to 16px to match the long-standing behaviour. _canvasWidth / _canvasHeight
-  // are populated before any per-element parsePxLength call; they are 0 only during canvas-size
+  // are populated before any per-element parseAbsoluteLengthPx call; they are 0 only during canvas-size
   // resolution itself, where vw/vh are necessarily a self-referential mistake.
   float px = ConvertCssLengthToPx(num, suffix, /*fontSizePx=*/NAN, _canvasWidth, _canvasHeight,
                                   recognized);
@@ -248,7 +248,7 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
     FilterStep step;
     step.raw = value.substr(start, end - start + 1);
     if (name == "blur") {
-      float b = parsePxLength(args);
+      float b = parseAbsoluteLengthPx(args);
       step.kind = FilterStep::Kind::Blur;
       step.blurX = std::isnan(b) ? 0 : b;
       step.blurY = step.blurX;
@@ -358,7 +358,7 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
       } else if (interpretAngularOffset && !off.empty() && off.find("deg") != std::string::npos) {
         offset = ParseAngle(off) / 360.0f;
       } else if (!interpretAngularOffset) {
-        float v = parsePxLength(off);
+        float v = parseAbsoluteLengthPx(off);
         if (!std::isnan(v)) offset = v;
       }
     }

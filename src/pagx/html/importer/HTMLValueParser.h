@@ -80,7 +80,7 @@ class HTMLValueParser {
   void bindDocument(PAGXDocument* document);
 
   Color parseColor(const std::string& valueRaw);
-  float parsePxLength(const std::string& valueRaw);
+  float parseAbsoluteLengthPx(const std::string& valueRaw);
   float resolveLineHeightPx(const std::string& valueRaw, float fontSizePx);
 
   std::vector<ShadowSpec> parseShadowList(const std::string& value);

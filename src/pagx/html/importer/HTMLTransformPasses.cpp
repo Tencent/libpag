@@ -343,10 +343,12 @@ void ResolveElement(const std::shared_ptr<DOMNode>& element, const PropertyMap& 
     resolved[kv.first] = kv.second;
   }
   // 2. Element defaults.
-  const auto& defaults = ElementDefaults();
+  const auto& defaults = ParsedElementDefaults();
   auto defaultIt = defaults.find(element->name);
   if (defaultIt != defaults.end()) {
-    ParseStyleString(defaultIt->second, resolved);
+    for (const auto& kv : defaultIt->second) {
+      resolved[kv.first] = kv.second;
+    }
   }
   // 3. Element rules from <style> block.
   auto elemRuleIt = ctx.elementRules().find(element->name);

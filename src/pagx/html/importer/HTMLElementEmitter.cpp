@@ -83,7 +83,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   // The image must exactly cover the wrapper's content box, anchored at top-left —
   // otherwise the rounded clip would shape only part of the visible image and folding
   // would stretch it across the wrapper.
-  HTMLBoxAttributes imgBox = resolveBox(img);
+  HTMLBoxAttributes imgBox = computeBoxAttributes(img);
   if (std::isnan(imgBox.widthPx) || std::isnan(box.widthPx) ||
       !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
     return false;
@@ -167,10 +167,10 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   applyLayerAttributes(layer, element, box);
 
   // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
-  // `computeInherited` returns the style descendants see, but `resolvedTextColor`
+  // `resolveInheritedStyle` returns the style descendants see, but `resolvedTextColor`
   // is the *element's own* colour after applying any `style="color: …"` on the
   // SVG itself — exactly what `currentColor` should resolve to at the SVG root.
-  HTMLInheritedStyle svgStyle = computeInherited(element, inherited);
+  HTMLInheritedStyle svgStyle = resolveInheritedStyle(element, inherited);
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 

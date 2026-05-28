@@ -178,7 +178,7 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
       if (child->name == "br") {
         appendFragment(out, inherited, "\n");
       } else if (IsInlineRunTag(child->name)) {
-        HTMLInheritedStyle childInherited = _styleCascade.computeInherited(child, inherited);
+        HTMLInheritedStyle childInherited = _styleCascade.resolveInheritedStyle(child, inherited);
         collectFragments(child, childInherited, out, depth + 1);
       } else {
         _diagnostics.warn("html: '<" + child->name + ">' not supported inside text leaf; skipped");

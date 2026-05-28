@@ -105,7 +105,7 @@ class HTMLLayerBuilder {
 
   /** Materialises CSS `margin` on `inner` through positioning / padding (PAGX has no
    *  margin concept on Layer). Returns `inner` unchanged when every side is zero. */
-  Layer* wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box);
+  Layer* wrapForMargin(Layer* inner, const HTMLBoxAttributes& box);
 
   /** Emits a single text-decoration line (underline or line-through) onto `host`. */
   void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,

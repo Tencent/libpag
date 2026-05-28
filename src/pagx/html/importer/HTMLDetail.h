@@ -120,6 +120,12 @@ const std::unordered_map<std::string, uint32_t>& NamedColors();
 // Default style sheet by element tag.
 const std::unordered_map<std::string, std::string>& ElementDefaults();
 
+// Same as `ElementDefaults` but with each style string pre-parsed into a property map. Built
+// once on first call from `ElementDefaults`. Hot paths that resolve element defaults during
+// a DOM walk should consult this overload instead of re-parsing the same CSS string per node.
+const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>&
+ParsedElementDefaults();
+
 // ----- DOM helpers --------------------------------------------------------------------------
 
 // Lower-case the tag name of every element node in place. `depth` is internal recursion

@@ -80,14 +80,14 @@ struct HTMLInheritedStyle {
   std::string textFillImage = {};
 
   // Pre-resolved numeric forms of the cascade. Kept in lock-step with the string fields by
-  // `computeInherited` so text-leaf conversion doesn't re-parse the same `font-size` /
+  // `resolveInheritedStyle` so text-leaf conversion doesn't re-parse the same `font-size` /
   // `letter-spacing` / `color` strings for every fragment.
   float fontSizePx = HTML_DEFAULT_FONT_SIZE;
   float letterSpacingPx = 0.0f;
   Color resolvedTextColor = {0, 0, 0, 1, ColorSpace::SRGB};
 
   // Pre-resolved CSS font-family stack. Kept in lock-step with `fontFamily` by
-  // `computeInherited`. `primaryFontFamily` is the first concrete name (after surrounding
+  // `resolveInheritedStyle`. `primaryFontFamily` is the first concrete name (after surrounding
   // quotes are stripped and generic keywords are mapped to platform fonts) and gets
   // written to `Text::fontFamily`. `fontFamilyChain` holds the same first name followed by
   // every additional concrete name from the stack, in CSS order; the importer unions all
@@ -193,7 +193,7 @@ struct HTMLBoxAttributes {
   //   - flow / flex children → wrapped in an outer Layer whose `padding` equals the margin,
   //     reproducing CSS's "outer size = inner size + margin" measurement contract for the
   //     parent flex / constraint pass.
-  // See `HTMLParserContext::wrapWithMargin` for the apply-side logic.
+  // See `HTMLParserContext::wrapForMargin` for the apply-side logic.
   float marginTopPx = 0.0f;
   float marginRightPx = 0.0f;
   float marginBottomPx = 0.0f;

@@ -405,7 +405,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // warning per flex item with no actionable diagnostic.
     {"flex-shrink", PropAction::Transform, &TransformFlexShrink, nullptr},
     // CSS `margin` is preserved in the subset and routed onto positioning / padding at apply
-    // time (`HTMLParserContext::wrapWithMargin`). The shorthand resolves the 1-4 token form
+    // time (`HTMLParserContext::wrapForMargin`). The shorthand resolves the 1-4 token form
     // through `ResolveLengthShorthand`; the longhands resolve a single length each.
     {"margin", PropAction::Transform, &ResolveLengthShorthand, nullptr},
     {"margin-top", PropAction::Transform, &ResolveLength, nullptr},
@@ -521,7 +521,7 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
     return EmitPercent(n);
   }
   // Delegate em / rem / pt / vw / vh / unknown unit handling to the shared helper so
-  // ResolveLength and parsePxLength agree on numeric semantics. ResolveLength keeps the
+  // ResolveLength and parseAbsoluteLengthPx agree on numeric semantics. ResolveLength keeps the
   // richer diagnostics here (the helper just answers "what px does this resolve to?").
   bool recognized = false;
   float fontBase = IsFiniteNonZero(ctx.currentFontSizePx) ? ctx.currentFontSizePx : RemBasePx;
