@@ -97,6 +97,11 @@ class Font : public Node {
  private:
   Font() = default;
 
+  // Drops every render-side cache entry held by this Font (typeface and the build sentinel).
+  // Called by PAGXDocument::clearEmbed so that a subsequent embed() cycle starts from a clean
+  // state on Font nodes that survive into the next cycle.
+  void resetRenderCache();
+
   std::shared_ptr<tgfx::Typeface> renderTypeface = nullptr;
   bool typefaceBuilt = false;
 

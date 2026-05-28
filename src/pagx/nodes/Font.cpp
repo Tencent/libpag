@@ -23,4 +23,9 @@ namespace pagx {
 
 Font::~Font() = default;
 
+void Font::resetRenderCache() {
+  renderTypeface.reset();
+  typefaceBuilt = false;
+}
+
 }  // namespace pagx
