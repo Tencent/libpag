@@ -126,6 +126,10 @@ HTMLSubsetTransformer::Builder& HTMLSubsetTransformer::Builder::addDefaultPasses
   // AbsoluteToFlexInference is always wired in; it self-disables when
   // `Options::inferFlexFromAbsolute` is false so the default pipeline behaviour is unchanged.
   _impl->passes.push_back(std::make_unique<html::AbsoluteToFlexInferencePass>());
+  // Must run after both PropertyFilter (so that values are normalised to plain px) and
+  // AbsoluteToFlexInference (so newly-inferred flex containers are also covered), and before
+  // InlineStyleEmitter (which reads the resolved map back out into the `style="…"` attribute).
+  _impl->passes.push_back(std::make_unique<html::SpaceJustifyOverflowCollapsePass>());
   _impl->passes.push_back(std::make_unique<html::StructureNormalizationPass>());
   _impl->passes.push_back(std::make_unique<html::InlineStyleEmitterPass>());
   return *this;

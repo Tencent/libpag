@@ -117,6 +117,31 @@ class AbsoluteToFlexInferencePass : public HTMLTransformPass {
 };
 
 /**
+ * Pass — SpaceJustifyOverflowCollapse.
+ *
+ * CSS Flexbox falls back to `flex-start` packing whenever the leftover free space along the
+ * main axis is negative (i.e. the children's combined main-axis size exceeds the container).
+ * PAGX's runtime flex engine, in contrast, keeps the negative gap and lets adjacent items
+ * overlap. To preserve spec-compatible visuals when importing HTML, this pass walks every
+ * `display: flex` container with `justify-content: space-between` / `space-around` /
+ * `space-evenly`, sums the main-axis size of its in-flow children (skipping
+ * `position: absolute` siblings), and rewrites the property to `flex-start` whenever the
+ * children overflow the container's content box.
+ *
+ * The check is conservative: if any participating child's main-axis size cannot be resolved
+ * as plain px (or as a percentage of the container's main extent), or if any in-flow child
+ * declares `flex` grow > 0, the container is left untouched. Emits
+ * `subset:space-justify-collapsed-on-overflow` for each rewrite.
+ */
+class SpaceJustifyOverflowCollapsePass : public HTMLTransformPass {
+ public:
+  const char* name() const override {
+    return "SpaceJustifyOverflowCollapse";
+  }
+  void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
+};
+
+/**
  * Pass 5 — StructureNormalization.
  *
  * Removes tags outside the subset (`<table>`, `<form>`, `<input>`, `<script>`, ...), wraps

@@ -1092,6 +1092,157 @@ void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
 }
 
 //==================================================================================================
+// SpaceJustifyOverflowCollapsePass
+//==================================================================================================
+
+namespace {
+
+// Returns true when the property `flex` shorthand resolves to a positive grow factor. The subset
+// pipeline only emits `flex: <grow>` (see SubsetPropertyTable), so a single numeric token is the
+// only shape we need to recognise here.
+bool ChildHasFlexGrow(const PropertyMap& props) {
+  const std::string& flex = LookupResolved(props, "flex");
+  if (flex.empty()) return false;
+  std::string trimmed = Trim(flex);
+  if (trimmed.empty()) return false;
+  char* end = nullptr;
+  float v = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str()) return false;
+  if (!std::isfinite(v)) return false;
+  return v > 0.0f;
+}
+
+// Resolves a child's main-axis size against `props`. Tries plain px first; falls back to a
+// percentage of `containerMain` (when finite). Returns false when the value is missing or in a
+// shape we cannot resolve numerically (e.g. `auto`, `min-content`).
+bool ResolveChildMainSize(const PropertyMap& props, bool row, float containerMain, float& outMain) {
+  const std::string& raw = LookupResolved(props, row ? "width" : "height");
+  if (raw.empty()) return false;
+  float px = 0.0f;
+  if (ParseNormalisedPx(raw, px)) {
+    outMain = px;
+    return true;
+  }
+  std::string trimmed = Trim(raw);
+  if (trimmed.size() >= 2 && trimmed.back() == '%' && std::isfinite(containerMain)) {
+    std::string num = trimmed.substr(0, trimmed.size() - 1);
+    char* end = nullptr;
+    float pct = std::strtof(num.c_str(), &end);
+    if (end != num.c_str() && std::isfinite(pct)) {
+      outMain = containerMain * pct / 100.0f;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Resolves the parent's content-box main-axis size and the gap between flex items. Returns
+// false when the parent lacks an explicit px main-axis size, or padding/gap declarations are
+// not plain px (so we cannot reason about overflow).
+bool ResolveParentMainGeometry(const PropertyMap& props, bool row, float& outAvailableMain,
+                               float& outGap) {
+  const std::string& raw = LookupResolved(props, row ? "width" : "height");
+  if (raw.empty()) return false;
+  float main = 0.0f;
+  if (!ParseNormalisedPx(raw, main)) return false;
+  if (!std::isfinite(main)) return false;
+  float padTop = 0.0f;
+  float padRight = 0.0f;
+  float padBottom = 0.0f;
+  float padLeft = 0.0f;
+  if (!ParsePaddingFromResolved(props, padTop, padRight, padBottom, padLeft)) return false;
+  outAvailableMain = main - (row ? padLeft + padRight : padTop + padBottom);
+  outGap = 0.0f;
+  const std::string& gap = LookupResolved(props, "gap");
+  if (!gap.empty()) {
+    float gpx = 0.0f;
+    if (!ParseNormalisedPx(gap, gpx)) return false;
+    outGap = gpx;
+  }
+  return true;
+}
+
+// Inspects a single flex container and rewrites `justify-content` to `flex-start` when the
+// children overflow the main axis. Conservative: bails out of any container where size data
+// is incomplete.
+void TryCollapseSpaceJustify(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
+  if (!parent || parent->type != DOMNodeType::Element) return;
+  auto* parentResolved = ctx.findResolved(parent.get());
+  if (!parentResolved) return;
+  if (LookupResolvedLower(*parentResolved, "display") != "flex") return;
+  std::string jc = LookupResolvedLower(*parentResolved, "justify-content");
+  if (jc != "space-between" && jc != "space-around" && jc != "space-evenly") return;
+
+  bool row = LookupResolvedLower(*parentResolved, "flex-direction") != "column";
+  float availableMain = 0.0f;
+  float gap = 0.0f;
+  if (!ResolveParentMainGeometry(*parentResolved, row, availableMain, gap)) return;
+  if (!std::isfinite(availableMain)) return;
+
+  float total = 0.0f;
+  size_t inFlowCount = 0;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    if (c->type != DOMNodeType::Element) continue;
+    auto* childResolved = ctx.findResolved(c.get());
+    if (!childResolved) return;
+    // Out-of-flow children (position: absolute / fixed) do not participate in the flex line;
+    // skip them entirely without aborting the analysis.
+    std::string pos = LookupResolvedLower(*childResolved, "position");
+    if (pos == "absolute" || pos == "fixed") continue;
+    // A grow factor would make the spec route the leftover space into the child rather than the
+    // packing gaps, so negative free space is not reachable. Be conservative and skip the
+    // entire container.
+    if (ChildHasFlexGrow(*childResolved)) return;
+    float childMain = 0.0f;
+    if (!ResolveChildMainSize(*childResolved, row, availableMain, childMain)) return;
+    if (!std::isfinite(childMain)) return;
+    total += childMain;
+    inFlowCount++;
+  }
+  if (inFlowCount < 2) return;
+  total += gap * static_cast<float>(inFlowCount - 1);
+
+  // 0.5px tolerance absorbs sub-pixel rounding from snapshot output. Anything tighter routinely
+  // misfires on legitimate fits.
+  if (total <= availableMain + 0.5f) return;
+
+  (*parentResolved)["justify-content"] = "flex-start";
+  ctx.warn("subset:space-justify-collapsed-on-overflow",
+           "html: <" + parent->name + "> children overflow main axis; justify-content '" + jc +
+               "' collapsed to flex-start to avoid PAGX flex overlap",
+           parent);
+}
+
+void WalkCollapseSpaceJustify(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx,
+                              int depth) {
+  if (!node || node->type != DOMNodeType::Element) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn("subset:max-depth",
+             "html: maximum recursion depth reached during space-justify collapse; subtree skipped",
+             node);
+    return;
+  }
+  // SVG subtrees use an independent layout model; skip them entirely.
+  if (node->name == "svg") return;
+  TryCollapseSpaceJustify(node, ctx);
+  auto child = node->firstChild;
+  while (child) {
+    WalkCollapseSpaceJustify(child, ctx, depth + 1);
+    child = child->nextSibling;
+  }
+}
+
+}  // namespace
+
+void SpaceJustifyOverflowCollapsePass::apply(const std::shared_ptr<DOMNode>& root,
+                                             HTMLTransformContext& ctx) {
+  if (!root || ctx.hasFatal()) return;
+  auto body = root->getFirstChild("body");
+  if (!body) return;
+  WalkCollapseSpaceJustify(body, ctx, 0);
+}
+
+//==================================================================================================
 // StructureNormalizationPass
 //==================================================================================================
 

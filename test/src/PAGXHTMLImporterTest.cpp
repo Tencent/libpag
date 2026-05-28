@@ -1547,6 +1547,71 @@ PAG_TEST(PAGXHTMLImporterTest, AlignItemsAndJustifyContentVariants) {
   }
 }
 
+PAG_TEST(PAGXHTMLImporterTest, OverflowingSpaceBetweenColumnCollapsesToStart) {
+  // Children's combined height (60+60=120) exceeds the parent's content-box height
+  // (height 100 - padding 10*2 = 80), so the importer must rewrite `space-between`
+  // to `flex-start` to keep PAGX's flex engine from drawing the items overlapped.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="display:flex;flex-direction:column;justify-content:space-between;
+                  width:200px;height:100px;padding:10px">
+        <div style="width:50px;height:60px"></div>
+        <div style="width:50px;height:60px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->layers.front()->children.front()->arrangement, pagx::Arrangement::Start);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, OverflowingSpaceAroundRowCollapsesToStart) {
+  // Row direction with `space-around`: children width sum 100+100=200 exceeds available
+  // 200-padding(10*2)=180, so the importer must collapse to flex-start.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:300px;height:100px">
+      <div style="display:flex;flex-direction:row;justify-content:space-around;
+                  width:200px;height:100px;padding:10px">
+        <div style="width:100px;height:50px"></div>
+        <div style="width:100px;height:50px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->layers.front()->children.front()->arrangement, pagx::Arrangement::Start);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, NonOverflowingSpaceBetweenStaysSpaceBetween) {
+  // Children fit comfortably (50+50=100 <= 200-20=180), so no rewrite should happen.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:300px;height:100px">
+      <div style="display:flex;flex-direction:row;justify-content:space-between;
+                  width:200px;height:100px;padding:10px">
+        <div style="width:50px;height:50px"></div>
+        <div style="width:50px;height:50px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->layers.front()->children.front()->arrangement, pagx::Arrangement::SpaceBetween);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, OverflowingSpaceBetweenWithFlexGrowChildSkipsRewrite) {
+  // A `flex` grow child absorbs leftover space in CSS, so the spec never produces
+  // negative free space. The importer must not rewrite this container even if a
+  // naive sum of declared widths would suggest overflow.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:300px;height:100px">
+      <div style="display:flex;flex-direction:row;justify-content:space-between;
+                  width:200px;height:100px;padding:10px">
+        <div style="width:100px;height:50px"></div>
+        <div style="flex:1;width:200px;height:50px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->layers.front()->children.front()->arrangement, pagx::Arrangement::SpaceBetween);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, PaddingShorthandTwoAndThreeValues) {
   auto two = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
