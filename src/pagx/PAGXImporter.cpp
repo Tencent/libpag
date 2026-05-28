@@ -2113,6 +2113,13 @@ static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocume
 // Public API implementation
 //==============================================================================
 
+static void ResolveRelativePath(const std::string& basePath, std::string& path) {
+  if (path.empty() || path[0] == '/' || path.find("://") != std::string::npos) {
+    return;
+  }
+  path = basePath + path;
+}
+
 std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
   std::ifstream file(filePath, std::ios::binary | std::ios::ate);
   if (!file) {
@@ -2141,17 +2148,11 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
       for (auto& node : doc->nodes) {
         if (node->nodeType() == NodeType::Image) {
           auto* image = static_cast<Image*>(node.get());
-          if (!image->filePath.empty() && image->filePath[0] != '/' &&
-              image->filePath.find("://") == std::string::npos) {
-            image->filePath = basePath + image->filePath;
-          }
+          ResolveRelativePath(basePath, image->filePath);
         }
         if (node->nodeType() == NodeType::Font) {
           auto* font = static_cast<Font*>(node.get());
-          if (!font->file.empty() && font->file[0] != '/' &&
-              font->file.find("://") == std::string::npos) {
-            font->file = basePath + font->file;
-          }
+          ResolveRelativePath(basePath, font->file);
         }
       }
     }
