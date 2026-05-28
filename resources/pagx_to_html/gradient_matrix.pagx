@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Gradient matrix transforms — ConicGradient.matrix, DiamondGradient.matrix -->
-<pagx version="1.0" width="380" height="280">
+<pagx width="380" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -33,7 +33,7 @@
           <Layer width="120" height="120">
             <Rectangle position="60,60" size="120,120" roundness="12"/>
             <Fill>
-              <ConicGradient center="70,70" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
+              <ConicGradient center="0.583,0.583" startAngle="0" endAngle="360" matrix="0.707,-0.707,0.707,0.707,0,0">
                 <ColorStop offset="0" color="#3B82F6"/>
                 <ColorStop offset="0.33" color="#10B981"/>
                 <ColorStop offset="0.66" color="#F59E0B"/>
@@ -52,7 +52,7 @@
           <Layer width="120" height="120">
             <Rectangle position="60,60" size="120,120" roundness="12"/>
             <Fill>
-              <DiamondGradient center="70,70" radius="60" matrix="1.2,0.3,-0.3,1.2,0,0">
+              <DiamondGradient center="0.583,0.583" radius="0.5" matrix="1.2,0.3,-0.3,1.2,0,0">
                 <ColorStop offset="0" color="#FFFFFF"/>
                 <ColorStop offset="0.5" color="#EC4899"/>
                 <ColorStop offset="1" color="#1E1B4B"/>

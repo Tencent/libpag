@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
      different transforms on each instance -->
-<pagx version="1.0" width="420" height="280">
+<pagx width="420" height="280">
   <Resources>
     <!-- Reusable icon component: a colored circle with an inner diamond -->
     <Composition id="icon" width="60" height="60">
       <Layer>
         <Ellipse position="30,30" size="56,56"/>
         <Fill>
-          <RadialGradient center="30,30" radius="28">
+          <RadialGradient center="0.5,0.5" radius="0.5">
             <ColorStop offset="0" color="#60A5FA"/>
             <ColorStop offset="1" color="#3B82F6"/>
           </RadialGradient>

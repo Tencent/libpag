@@ -19,8 +19,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 #include "base/utils/MathUtil.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -32,6 +36,7 @@
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "renderer/LineBreaker.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 
@@ -39,6 +44,10 @@ namespace pagx {
 
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
+
+//==============================================================================
+// Color Conversion
+//==============================================================================
 
 void ColorToRGB(const Color& color, int& r, int& g, int& b) {
   r = std::clamp(static_cast<int>(std::round(color.red * 255.0f)), 0, 255);
@@ -48,8 +57,8 @@ void ColorToRGB(const Color& color, int& r, int& g, int& b) {
 
 std::string ColorToHex(const Color& color) {
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-           FloatToString(color.blue) + ")";
+    return "color(display-p3 " + CssFloatToString(color.red) + " " + CssFloatToString(color.green) +
+           " " + CssFloatToString(color.blue) + ")";
   }
   int r = 0, g = 0, b = 0;
   ColorToRGB(color, r, g, b);
@@ -71,8 +80,8 @@ std::string ColorToSVGHex(const Color& color) {
 std::string ColorToRGBA(const Color& color, float extra) {
   float a = color.alpha * extra;
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-           FloatToString(color.blue) + " / " + FloatToString(a) + ")";
+    return "color(display-p3 " + CssFloatToString(color.red) + " " + CssFloatToString(color.green) +
+           " " + CssFloatToString(color.blue) + " / " + CssFloatToString(a) + ")";
   }
   if (a >= 1.0f) {
     return ColorToHex(color);
@@ -80,8 +89,12 @@ std::string ColorToRGBA(const Color& color, float extra) {
   int r = 0, g = 0, b = 0;
   ColorToRGB(color, r, g, b);
   return "rgba(" + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
-         FloatToString(a) + ")";
+         CssFloatToString(a) + ")";
 }
+
+//==============================================================================
+// Image Utilities
+//==============================================================================
 
 const char* DetectImageMime(const uint8_t* bytes, size_t size) {
   if (size >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
@@ -144,7 +157,81 @@ static bool IsSafeImageUrl(const std::string& url) {
   return scheme == "http" || scheme == "https" || scheme == "data";
 }
 
-std::string GetImageSrc(const Image* image) {
+// Returns the basename of `path` restricted to filesystem-safe ASCII ([A-Za-z0-9_.-]). Any
+// other byte (path separators, whitespace, non-ASCII) is replaced with '_'. Used when copying
+// external image files into staticImgDir; combined with the same-source dedup cache, this
+// prevents a crafted filePath from escaping the destination directory through path-traversal
+// sequences.
+static std::string SanitizeBasename(const std::string& path) {
+  size_t slash = path.find_last_of("/\\");
+  std::string base = (slash == std::string::npos) ? path : path.substr(slash + 1);
+  std::string out;
+  out.reserve(base.size());
+  for (char c : base) {
+    auto uc = static_cast<unsigned char>(c);
+    bool allowed = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z') ||
+                   (uc >= '0' && uc <= '9') || c == '_' || c == '.' || c == '-';
+    out += allowed ? c : '_';
+  }
+  if (out.empty() || out == "." || out == "..") {
+    out = "img";
+  }
+  return out;
+}
+
+// Splits a filename into (stem, extension-including-dot). For "logo.png" returns ("logo",
+// ".png"); for "no_dot" returns ("no_dot", ""); for ".hidden" returns (".hidden", "").
+static std::pair<std::string, std::string> SplitStemExt(const std::string& filename) {
+  size_t dot = filename.find_last_of('.');
+  if (dot == std::string::npos || dot == 0) {
+    return {filename, std::string()};
+  }
+  return {filename.substr(0, dot), filename.substr(dot)};
+}
+
+// Copies the external image file referenced by `srcPath` into the writer's staticImgDir, and
+// returns the relative URL the HTML should reference. Same-source paths are copied at most
+// once per document via ctx->externalImageCopies; distinct sources sharing a basename receive
+// disambiguated names (e.g. "logo.png", "logo_1.png", ...) tracked in
+// ctx->externalImageClaimedNames. Returns an empty string when the destination cannot be
+// prepared or the file cannot be copied — the caller falls back to inlining.
+static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
+                                                HTMLWriterContext* ctx) {
+  if (!ctx || ctx->staticImgDir.empty()) {
+    return {};
+  }
+  std::error_code ec;
+  auto absSrc = std::filesystem::weakly_canonical(srcPath, ec);
+  std::string keyPath = ec ? srcPath : absSrc.string();
+
+  auto cached = ctx->externalImageCopies.find(keyPath);
+  if (cached != ctx->externalImageCopies.end()) {
+    return ctx->staticImgUrlPrefix + cached->second;
+  }
+
+  std::filesystem::create_directories(ctx->staticImgDir, ec);
+  if (ec) {
+    return {};
+  }
+
+  std::string baseName = SanitizeBasename(srcPath);
+  auto [stem, ext] = SplitStemExt(baseName);
+  std::string candidate = baseName;
+  for (int suffix = 1; ctx->externalImageClaimedNames.count(candidate) > 0; suffix++) {
+    candidate = stem + "_" + std::to_string(suffix) + ext;
+  }
+
+  std::filesystem::path dst = std::filesystem::path(ctx->staticImgDir) / candidate;
+  std::filesystem::copy_file(srcPath, dst, std::filesystem::copy_options::overwrite_existing, ec);
+  if (ec) {
+    return {};
+  }
+  ctx->externalImageCopies[keyPath] = candidate;
+  ctx->externalImageClaimedNames.insert(candidate);
+  return ctx->staticImgUrlPrefix + candidate;
+}
+
+std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
     if (!mime) {
@@ -155,6 +242,35 @@ std::string GetImageSrc(const Image* image) {
   }
   if (!IsSafeImageUrl(image->filePath)) {
     return {};
+  }
+  size_t colon = image->filePath.find(':');
+  bool hasScheme = (colon != std::string::npos && colon > 0);
+  if (!hasScheme) {
+    auto codec = tgfx::ImageCodec::MakeFrom(image->filePath);
+    if (codec) {
+      // Preferred path: copy the file alongside the HTML output (under staticImgDir) and
+      // emit a relative URL. Keeps the HTML small and lets browsers cache the image
+      // separately. Falls through to base64 inlining when staticImgDir is unset or the
+      // copy fails, so callers that omit staticImgDir still get a self-contained HTML.
+      auto copiedUrl = CopyExternalImageToStaticDir(image->filePath, ctx);
+      if (!copiedUrl.empty()) {
+        return copiedUrl;
+      }
+      // Re-read the file bytes directly — ImageCodec decodes lazily, so we cannot pull the raw
+      // encoded bytes out of it. Use a plain std::ifstream to slurp the file.
+      std::ifstream f(image->filePath, std::ios::binary | std::ios::ate);
+      if (f.good()) {
+        auto sz = f.tellg();
+        f.seekg(0, std::ios::beg);
+        std::vector<uint8_t> buf(static_cast<size_t>(sz));
+        if (f.read(reinterpret_cast<char*>(buf.data()), sz)) {
+          auto mime = DetectImageMime(buf.data(), buf.size());
+          if (mime) {
+            return "data:" + std::string(mime) + ";base64," + Base64Encode(buf.data(), buf.size());
+          }
+        }
+      }
+    }
   }
   return EscapeCSSUrl(image->filePath);
 }
@@ -176,6 +292,10 @@ std::pair<int, int> GetImageNativeSize(const Image* image) {
   return {codec->width(), codec->height()};
 }
 
+//==============================================================================
+// CSS Gradient Stops
+//==============================================================================
+
 std::string CSSStops(const std::vector<ColorStop*>& stops) {
   if (stops.empty()) {
     return "transparent,transparent";
@@ -193,7 +313,8 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
   }
   if (stops.size() == 1) {
     auto c = ColorToRGBA(firstValid->color);
-    return c + "," + c;
+    auto pct = CssFloatToString(firstValid->offset * 100.0f);
+    return c + " " + pct + "%," + c + " " + pct + "%";
   }
   std::string r;
   r.reserve(stops.size() * 32);
@@ -208,16 +329,20 @@ std::string CSSStops(const std::vector<ColorStop*>& stops) {
     first = false;
     r += ColorToRGBA(stops[i]->color);
     r += ' ';
-    r += FloatToString(stops[i]->offset * 100.0f);
+    r += CssFloatToString(stops[i]->offset * 100.0f);
     r += '%';
   }
   return r;
 }
 
+//==============================================================================
+// Matrix & Transform
+//==============================================================================
+
 std::string MatrixToCSS(const Matrix& m) {
   std::string r = "matrix(";
-  r += FloatToString(m.a) + ',' + FloatToString(m.b) + ',' + FloatToString(m.c) + ',' +
-       FloatToString(m.d) + ',' + FloatToString(m.tx) + ',' + FloatToString(m.ty) + ')';
+  r += CssFloatToString(m.a) + ',' + CssFloatToString(m.b) + ',' + CssFloatToString(m.c) + ',' +
+       CssFloatToString(m.d) + ',' + CssFloatToString(m.tx) + ',' + CssFloatToString(m.ty) + ')';
   return r;
 }
 
@@ -232,7 +357,7 @@ std::string MatrixTransformToCSS(const Matrix& m) {
     if (!hasTranslate) {
       return {};
     }
-    return "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+    return "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
   }
 
   // Uniform scale + rotation: matrix has the form [a, b, -b, a] (i.e. a==d, b==-c).
@@ -244,19 +369,19 @@ std::string MatrixTransformToCSS(const Matrix& m) {
 
     std::string r;
     if (hasTranslate) {
-      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+      r += "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
     }
     if (!FloatNearlyZero(angle)) {
       if (!r.empty()) {
         r += ' ';
       }
-      r += "rotate(" + FloatToString(angle) + "deg)";
+      r += "rotate(" + CssFloatToString(angle) + "deg)";
     }
     if (!FloatNearlyZero(s - 1.0f)) {
       if (!r.empty()) {
         r += ' ';
       }
-      r += "scale(" + FloatToString(s) + ")";
+      r += "scale(" + CssFloatToString(s) + ")";
     }
     if (!r.empty()) {
       return r;
@@ -268,7 +393,7 @@ std::string MatrixTransformToCSS(const Matrix& m) {
   if (isNonUniformScale) {
     std::string r;
     if (hasTranslate) {
-      r += "translate(" + FloatToString(m.tx) + "px," + FloatToString(m.ty) + "px)";
+      r += "translate(" + CssFloatToString(m.tx) + "px," + CssFloatToString(m.ty) + "px)";
     }
     bool sxOne = FloatNearlyZero(m.a - 1.0f);
     bool syOne = FloatNearlyZero(m.d - 1.0f);
@@ -277,13 +402,13 @@ std::string MatrixTransformToCSS(const Matrix& m) {
         r += ' ';
       }
       if (sxOne && !syOne) {
-        r += "scaleY(" + FloatToString(m.d) + ")";
+        r += "scaleY(" + CssFloatToString(m.d) + ")";
       } else if (!sxOne && syOne) {
-        r += "scaleX(" + FloatToString(m.a) + ")";
+        r += "scaleX(" + CssFloatToString(m.a) + ")";
       } else if (FloatNearlyZero(m.a - m.d)) {
-        r += "scale(" + FloatToString(m.a) + ")";
+        r += "scale(" + CssFloatToString(m.a) + ")";
       } else {
-        r += "scale(" + FloatToString(m.a) + "," + FloatToString(m.d) + ")";
+        r += "scale(" + CssFloatToString(m.a) + "," + CssFloatToString(m.d) + ")";
       }
     }
     if (!r.empty()) {
@@ -292,8 +417,9 @@ std::string MatrixTransformToCSS(const Matrix& m) {
   }
 
   // Fallback: full matrix().
-  return "matrix(" + FloatToString(m.a) + ',' + FloatToString(m.b) + ',' + FloatToString(m.c) +
-         ',' + FloatToString(m.d) + ',' + FloatToString(m.tx) + ',' + FloatToString(m.ty) + ')';
+  return "matrix(" + CssFloatToString(m.a) + ',' + CssFloatToString(m.b) + ',' +
+         CssFloatToString(m.c) + ',' + CssFloatToString(m.d) + ',' + CssFloatToString(m.tx) + ',' +
+         CssFloatToString(m.ty) + ')';
 }
 
 std::string Matrix3DToCSS(const Matrix3D& m) {
@@ -302,11 +428,15 @@ std::string Matrix3DToCSS(const Matrix3D& m) {
     if (i > 0) {
       r += ',';
     }
-    r += FloatToString(m.values[i]);
+    r += CssFloatToString(m.values[i]);
   }
   r += ')';
   return r;
 }
+
+//==============================================================================
+// Blend Mode & Layout
+//==============================================================================
 
 const char* BlendModeToMixBlendMode(BlendMode mode) {
   auto svgStr = BlendModeToSVGString(mode);
@@ -346,12 +476,17 @@ std::string LayerTransformCSS(const Layer* layer) {
   return MatrixTransformToCSS(m);
 }
 
-Matrix BuildGroupMatrix(const Group* group) {
-  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  // renderPosition() returns the layout-resolved top-left (incorporates constraint layout such as
-  // centerX/centerY/left/right). When the group has no layout constraints, renderPosition equals
-  // (position.x, position.y), so this subsumes the explicit position property.
+// HTML-local skew sign fix. Mirrors pagx::BuildGroupMatrix line-for-line except for one shear:
+// the shear coefficient uses `tan(-group->skew)` so the result agrees with tgfx native rendering
+// (VectorGroup::ApplySkew passes `DegreesToRadians(-skew)` into the shear). The shared
+// pagx::BuildGroupMatrix uses the +skew sign because main's PAGXSVGTest.SVGExport_GroupSkew
+// pinned that convention for SVG output, and the SVG/PPT exporters depend on it. Rather than
+// flipping the shared helper (which would break those exporters and the pinned test) we keep
+// the HTML exporter's path bake aligned with native by routing every BuildGroupMatrix call
+// through this wrapper. Any change to the rest of BuildGroupMatrix must be mirrored here.
+Matrix BuildGroupMatrixForHTML(const Group* group) {
   auto renderPos = group->renderPosition();
+  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
   bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
   bool hasRotation = !FloatNearlyZero(group->rotation);
   bool hasScale =
@@ -372,6 +507,7 @@ Matrix BuildGroupMatrix(const Group* group) {
   if (hasSkew) {
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
+    // Sign deliberately negated relative to pagx::BuildGroupMatrix; see function comment.
     shear.c = std::tan(DegreesToRadians(-group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
@@ -384,6 +520,40 @@ Matrix BuildGroupMatrix(const Group* group) {
   }
 
   return m;
+}
+
+//==============================================================================
+// Text & Font
+//==============================================================================
+
+CSSFontProps ParseFontStyleToCSS(const std::string& fontStyle) {
+  CSSFontProps props;
+  if (fontStyle.empty()) {
+    return props;
+  }
+  // OpenType weight keyword → CSS font-weight mapping. Ordered longest-first within each
+  // weight class so "SemiBold" is checked before "Bold", avoiding substring false positives.
+  static const struct {
+    const char* keyword;
+    int weight;
+  } weightMap[] = {
+      {"ExtraLight", 200}, {"UltraLight", 200}, {"Hairline", 100},  {"Thin", 100},
+      {"Light", 300},      {"Medium", 500},     {"SemiBold", 600},  {"Semibold", 600},
+      {"DemiBold", 600},   {"ExtraBold", 800},  {"UltraBold", 800}, {"Black", 900},
+      {"Heavy", 900},      {"Bold", 700},
+  };
+  for (const auto& entry : weightMap) {
+    if (fontStyle.find(entry.keyword) != std::string::npos) {
+      props.weight = entry.weight;
+      break;
+    }
+  }
+  if (fontStyle.find("Italic") != std::string::npos) {
+    props.italic = true;
+  } else if (fontStyle.find("Oblique") != std::string::npos) {
+    props.oblique = true;
+  }
+  return props;
 }
 
 const char* AlignmentToCSS(Alignment alignment) {
@@ -422,14 +592,59 @@ std::string PaddingToCSS(const Padding& padding) {
   if (FloatNearlyZero(padding.right - padding.left) &&
       FloatNearlyZero(padding.bottom - padding.top) &&
       FloatNearlyZero(padding.top - padding.left)) {
-    return FloatToString(padding.top) + "px";
+    return CssFloatToString(padding.top) + "px";
   }
   if (FloatNearlyZero(padding.top - padding.bottom) &&
       FloatNearlyZero(padding.left - padding.right)) {
-    return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px";
+    return CssFloatToString(padding.top) + "px " + CssFloatToString(padding.right) + "px";
   }
-  return FloatToString(padding.top) + "px " + FloatToString(padding.right) + "px " +
-         FloatToString(padding.bottom) + "px " + FloatToString(padding.left) + "px";
+  return CssFloatToString(padding.top) + "px " + CssFloatToString(padding.right) + "px " +
+         CssFloatToString(padding.bottom) + "px " + CssFloatToString(padding.left) + "px";
+}
+
+bool TextStartsWithRTL(const std::string& utf8Text) {
+  // Walk the UTF-8 string and return true if the first Unicode codepoint with a strong BiDi
+  // directional type is RTL (Hebrew, Arabic, or other RTL scripts). This matches the UAX#9
+  // P2 paragraph-direction algorithm's "first strong character" rule so the HTML
+  // `direction:rtl` CSS property is added on exactly the same TextBox containers that tgfx
+  // marks as RTL paragraphs.
+  const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text.c_str());
+  const unsigned char* end = p + utf8Text.size();
+  while (p < end) {
+    uint32_t cp = 0;
+    if (*p < 0x80) {
+      cp = *p++;
+    } else if ((*p & 0xE0) == 0xC0 && p + 1 < end) {
+      cp = ((*p & 0x1F) << 6) | (p[1] & 0x3F);
+      p += 2;
+    } else if ((*p & 0xF0) == 0xE0 && p + 2 < end) {
+      cp = ((*p & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+      p += 3;
+    } else if ((*p & 0xF8) == 0xF0 && p + 3 < end) {
+      cp = ((*p & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+      p += 4;
+    } else {
+      p++;
+      continue;
+    }
+    // Skip neutral/weak characters (spaces, digits, punctuation) that don't determine direction.
+    // Hebrew block: U+0590–U+05FF
+    // Arabic block: U+0600–U+06FF, U+0750–U+077F, U+08A0–U+08FF
+    // Arabic Supplement/Extended: U+0600–U+08FF covers most cases
+    // Arabic Presentation Forms: U+FB1D–U+FDFF, U+FE70–U+FEFF
+    if ((cp >= 0x0590 && cp <= 0x05FF) || (cp >= 0x0600 && cp <= 0x08FF) ||
+        (cp >= 0xFB1D && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFF)) {
+      return true;
+    }
+    // Latin letters and CJK are strongly LTR — stop scanning on the first strong LTR character.
+    if ((cp >= 0x0041 && cp <= 0x007A) || (cp >= 0x00C0 && cp <= 0x02AF) ||
+        (cp >= 0x0400 && cp <= 0x052F) || (cp >= 0x4E00 && cp <= 0x9FFF) ||
+        (cp >= 0xAC00 && cp <= 0xD7AF)) {
+      return false;
+    }
+    // Digits, spaces, and other neutrals: keep scanning.
+  }
+  return false;
 }
 
 }  // namespace pagx

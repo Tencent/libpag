@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Default values and edge cases — default Rectangle/Ellipse/Fill/Stroke/Polystar,
      zero-size shapes, ConicGradient defaults, minimal Text, RadialGradient, evenOdd, TrimPath -->
-<pagx version="1.0" width="480" height="420">
+<pagx width="480" height="420">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -135,7 +135,7 @@
           <Layer width="60" height="60">
             <Rectangle position="30,30" size="56,56" roundness="8"/>
             <Fill>
-              <RadialGradient center="30,30" radius="40">
+              <RadialGradient center="0.5,0.5" radius="1.43">
                 <ColorStop offset="0" color="#FFFFFF"/>
                 <ColorStop offset="1" color="#8B5CF6"/>
               </RadialGradient>

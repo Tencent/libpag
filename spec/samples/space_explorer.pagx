@@ -3,7 +3,7 @@
   <Layer id="sky" left="600" top="400">
     <Rectangle left="-600" top="-400" width="1200" height="800"/>
     <Fill>
-      <LinearGradient startPoint="0,-400" endPoint="0,400" fitsToGeometry="false">
+      <LinearGradient endPoint="0,1">
         <ColorStop color="#020810" offset="0"/>
         <ColorStop color="#06122E" offset="0.15"/>
         <ColorStop color="#0E1450" offset="0.35"/>

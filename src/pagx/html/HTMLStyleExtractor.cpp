@@ -18,6 +18,7 @@
 #include "pagx/html/HTMLStyleExtractor.h"
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace pagx {
@@ -79,6 +80,10 @@ static std::string DecodeHTMLEntities(const std::string& str) {
             valid = false;
             break;
           }
+          if (codePoint > 0x10FFFF) {
+            valid = false;
+            break;
+          }
         }
       } else {
         for (size_t j = numStart; j < end; j++) {
@@ -86,6 +91,10 @@ static std::string DecodeHTMLEntities(const std::string& str) {
           if (c >= '0' && c <= '9') {
             codePoint = codePoint * 10 + static_cast<unsigned long>(c - '0');
           } else {
+            valid = false;
+            break;
+          }
+          if (codePoint > 0x10FFFF) {
             valid = false;
             break;
           }
@@ -117,6 +126,26 @@ static std::string DecodeHTMLEntities(const std::string& str) {
     }
   }
   return result;
+}
+
+// Re-encode only the entity subset that can break a double-quoted HTML attribute value.
+// The inline style values produced by Pass 1.5 come from entity-decoded declarations
+// (via DecodeHTMLEntities during parse), so any raw " or & must be escaped before being
+// embedded back into a style="..." attribute. Other characters are safe inside a
+// double-quoted attribute per the HTML5 parser.
+static std::string EncodeAttrValue(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (char c : s) {
+    if (c == '&') {
+      out += "&amp;";
+    } else if (c == '"') {
+      out += "&quot;";
+    } else {
+      out += c;
+    }
+  }
+  return out;
 }
 
 //==============================================================================
@@ -296,6 +325,8 @@ struct StyleEntry {
 struct ClassRule {
   std::string className;
   std::string declarations;
+  bool isPaired = false;  // emitted by the base+modifier split branch (either role)
+  bool isRoot = false;    // document root class; never eligible for inline collapse
 };
 
 struct PropertyClassification {
@@ -486,7 +517,7 @@ static std::string InferStandalonePrefix(const std::string& tagName,
 // so they're appended at the end in source order (via stable_sort). Vendor-prefixed variants
 // sit next to their standard counterpart (e.g., backdrop-filter 55 then -webkit-backdrop-filter 56).
 static int CSSPropertyOrder(const std::string& name) {
-  static const std::unordered_map<std::string, int> kOrder = {
+  static const std::unordered_map<std::string, int> ORDER = {
       // Position & flow
       {"position", 10},
       {"inset", 11},
@@ -568,15 +599,29 @@ static int CSSPropertyOrder(const std::string& name) {
       {"shape-rendering", 105},
       {"image-rendering", 106},
   };
-  auto it = kOrder.find(name);
-  return it != kOrder.end() ? it->second : 999;
+  auto it = ORDER.find(name);
+  return it != ORDER.end() ? it->second : 999;
+}
+
+static bool CompareCSSProperty(const CSSProperty& a, const CSSProperty& b) {
+  return CSSPropertyOrder(a.name) < CSSPropertyOrder(b.name);
+}
+
+namespace {
+struct GroupInfo {
+  std::string signature;
+  int firstEntryIndex;
+  int firstTagIndex;
+};
+}  // namespace
+
+static bool CompareGroupInfo(const GroupInfo& a, const GroupInfo& b) {
+  return a.firstTagIndex < b.firstTagIndex;
 }
 
 static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props) {
   std::vector<CSSProperty> sorted(props);
-  std::stable_sort(sorted.begin(), sorted.end(), [](const CSSProperty& a, const CSSProperty& b) {
-    return CSSPropertyOrder(a.name) < CSSPropertyOrder(b.name);
-  });
+  std::stable_sort(sorted.begin(), sorted.end(), CompareCSSProperty);
   std::string result;
   for (size_t i = 0; i < sorted.size(); i++) {
     if (i > 0) result += ';';
@@ -585,13 +630,70 @@ static std::string BuildDeclarationsString(const std::vector<CSSProperty>& props
   return result;
 }
 
+// Returns true when `pos` falls inside any of the half-open [start,end) byte ranges. Used to
+// filter out tags nested inside <foreignObject> elements during style extraction.
+static bool IsPosInsideRange(size_t pos, const std::vector<std::pair<size_t, size_t>>& ranges) {
+  for (const auto& r : ranges) {
+    if (pos >= r.first && pos < r.second) return true;
+  }
+  return false;
+}
+
 //==============================================================================
 // Extract
 //==============================================================================
 
-std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) {
+std::string HTMLStyleExtractor::Extract(const std::string& html) {
   if (html.empty()) return html;
   auto tags = Tokenize(html);
+
+  // Pre-build a set of positions that lie inside <foreignObject>…</foreignObject> blocks.
+  // Elements nested inside foreignObject are HTML-in-SVG; they cannot access the document's
+  // <style> block, so their inline styles must NOT be extracted into CSS classes.
+  // We collect the [start,end) byte ranges of every foreignObject element and test each tag's
+  // tagStart against those ranges.
+  std::vector<std::pair<size_t, size_t>> foreignObjectRanges;
+  {
+    std::vector<size_t> foOpenStack;
+    size_t pos = 0;
+    while (pos < html.size()) {
+      size_t lt = html.find('<', pos);
+      if (lt == std::string::npos) break;
+      if (lt + 1 < html.size() && html[lt + 1] == '/') {
+        // Closing tag: check if it's </foreignObject>
+        size_t nameStart = lt + 2;
+        size_t nameEnd = nameStart;
+        while (nameEnd < html.size() && html[nameEnd] != '>' && html[nameEnd] != ' ') {
+          nameEnd++;
+        }
+        std::string closeName = html.substr(nameStart, nameEnd - nameStart);
+        // case-insensitive compare
+        for (auto& ch : closeName)
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (closeName == "foreignobject" && !foOpenStack.empty()) {
+          size_t openPos = foOpenStack.back();
+          foOpenStack.pop_back();
+          size_t closeEnd = html.find('>', nameEnd);
+          if (closeEnd != std::string::npos) {
+            foreignObjectRanges.push_back({openPos, closeEnd + 1});
+          }
+        }
+        pos = nameEnd + 1;
+      } else if (lt + 14 <= html.size()) {
+        // Opening tag: check for <foreignObject
+        std::string prefix = html.substr(lt + 1, 13);
+        for (auto& ch : prefix)
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (prefix == "foreignobject" && (lt + 14 >= html.size() || html[lt + 14] == ' ' ||
+                                          html[lt + 14] == '>' || html[lt + 14] == '\n')) {
+          foOpenStack.push_back(lt);
+        }
+        pos = lt + 1;
+      } else {
+        pos = lt + 1;
+      }
+    }
+  }
 
   // Pass 1: parse style values into StyleEntry structures.
   std::vector<StyleEntry> entries;
@@ -600,6 +702,10 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   for (size_t ti = 0; ti < tags.size(); ti++) {
     const auto& tag = tags[ti];
     if (!tag.hasStyle || tag.tagName == "body") continue;
+    // Do not extract styles from elements inside <foreignObject>: those elements live in a
+    // separate HTML document context where the outer <style> block is not accessible, so
+    // replacing their inline style with a CSS class name would leave them unstyled.
+    if (IsPosInsideRange(tag.tagStart, foreignObjectRanges)) continue;
     auto rawValue = html.substr(tag.styleValueStart, tag.styleValueEnd - tag.styleValueStart);
     if (rawValue.empty()) continue;
     StyleEntry entry;
@@ -619,19 +725,12 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   }
 
   // Sort groups by first entry's tag position to maintain first-seen order.
-  struct GroupInfo {
-    std::string signature;
-    int firstEntryIndex;
-    int firstTagIndex;
-  };
   std::vector<GroupInfo> sortedGroups;
   for (const auto& pair : sigGroups) {
     int firstEntry = pair.second[0];
     sortedGroups.push_back({pair.first, firstEntry, entries[firstEntry].tagIndex});
   }
-  std::sort(sortedGroups.begin(), sortedGroups.end(), [](const GroupInfo& a, const GroupInfo& b) {
-    return a.firstTagIndex < b.firstTagIndex;
-  });
+  std::sort(sortedGroups.begin(), sortedGroups.end(), CompareGroupInfo);
 
   // Per-tag class name list (may be 1 or 2 names for base+modifier).
   std::vector<std::vector<std::string>> tagClassNames(tags.size());
@@ -654,9 +753,24 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     }
 
     auto classification = ClassifyGroupProperties(members);
+    // Split into base+modifier whenever at least two shared declarations can be hoisted out.
+    // The previous upper bound of 2 varying properties was too tight for text outputs where
+    // per-character spans typically vary by 3 properties (top/left/transform along a path).
+    // For a group of N members with S shared and V varying decls, splitting saves (N-1)*S
+    // declarations; once V <= 3 the per-modifier overhead never outweighs that gain on real
+    // documents.
     bool shouldSplit = groupSize >= 2 && classification.sharedProps.size() >= 2 &&
                        classification.varyingPropNames.size() >= 1 &&
-                       classification.varyingPropNames.size() <= 2;
+                       classification.varyingPropNames.size() <= 3;
+
+    // Never split when `background` (shorthand) is a varying prop AND `background-clip`
+    // is a shared prop. CSS background shorthand implicitly resets background-clip to its
+    // initial value (border-box), which would silently undo the shared background-clip:text
+    // set in the base class and make gradient text render as a solid rectangle.
+    if (shouldSplit && VectorContains(classification.varyingPropNames, "background") &&
+        HasPropValue(classification.sharedProps, "background-clip", "text")) {
+      shouldSplit = false;
+    }
 
     if (shouldSplit) {
       // Use first tag for semantic prefix inference.
@@ -665,7 +779,9 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
                                         members[0]->properties, classification.varyingPropNames);
       // Emit base class.
       auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
-      classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps)});
+      classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps),
+                            /*isPaired=*/true,
+                            /*isRoot=*/false});
 
       // Emit modifier classes (dedup by varying-value key within this group).
       std::unordered_map<std::string, std::string> varyingKeyToModifierName;
@@ -698,7 +814,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
             }
           }
           modName = prefix + std::to_string(prefixCounters[prefix]++);
-          classRules.push_back({modName, BuildDeclarationsString(varyingProps)});
+          classRules.push_back({modName, BuildDeclarationsString(varyingProps),
+                                /*isPaired=*/true, /*isRoot=*/false});
           varyingKeyToModifierName[varyingKey] = modName;
         }
         tagClassNames[entry.tagIndex] = {baseName, modName};
@@ -724,11 +841,54 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
           // Normalize declaration order for professional front-end readability.
           // dedup key (styleToClassName) continues to use decodedStyle: two tags with the
           // same source style trivially map to the same sorted output, so the cache works.
-          classRules.push_back({className, BuildDeclarationsString(entry.properties)});
+          classRules.push_back({className, BuildDeclarationsString(entry.properties),
+                                /*isPaired=*/false, /*isRoot=*/(prefix == "root")});
           styleToClassName[entry.decodedStyle] = className;
           tagClassNames[entry.tagIndex] = {className};
         }
       }
+    }
+  }
+
+  // Pass 1.5: inline single-use standalone classes back into style="..." attributes.
+  // When a generated class is referenced by exactly one tag and is not part of a
+  // base+modifier pair and is not the document root, the class form costs more bytes
+  // (rule header + class="name") than the equivalent inline style="..."; restore the
+  // latter. Keeping root and paired members preserves base-class sharing and the
+  // externally-visible root selector.
+  std::vector<std::string> inlineStyle(tags.size());
+  std::vector<bool> hasInlineStyle(tags.size(), false);
+  if (!classRules.empty()) {
+    std::unordered_map<std::string, int> classRefCount;
+    for (const auto& names : tagClassNames) {
+      for (const auto& n : names) classRefCount[n]++;
+    }
+    std::unordered_map<std::string, size_t> classIndex;
+    for (size_t ri = 0; ri < classRules.size(); ri++) {
+      classIndex[classRules[ri].className] = ri;
+    }
+    std::unordered_set<std::string> droppedClasses;
+    for (size_t ti = 0; ti < tags.size(); ti++) {
+      if (tagClassNames[ti].size() != 1) continue;
+      const auto& name = tagClassNames[ti][0];
+      auto it = classIndex.find(name);
+      if (it == classIndex.end()) continue;
+      const auto& rule = classRules[it->second];
+      if (rule.isRoot) continue;
+      if (rule.isPaired) continue;
+      if (classRefCount[name] != 1) continue;
+      inlineStyle[ti] = rule.declarations;  // already in canonical property order
+      hasInlineStyle[ti] = true;
+      tagClassNames[ti].clear();
+      droppedClasses.insert(name);
+    }
+    if (!droppedClasses.empty()) {
+      std::vector<ClassRule> kept;
+      kept.reserve(classRules.size() - droppedClasses.size());
+      for (auto& r : classRules) {
+        if (!droppedClasses.count(r.className)) kept.push_back(std::move(r));
+      }
+      classRules = std::move(kept);
     }
   }
 
@@ -740,7 +900,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     const auto& tag = tags[ti];
     if (tagToEntry[ti] < 0) continue;
     const auto& classNames = tagClassNames[ti];
-    if (classNames.empty()) continue;
+    bool hasInline = hasInlineStyle[ti];
+    if (classNames.empty() && !hasInline) continue;
 
     // Copy everything from prev to the start of this tag.
     output.append(html, prev, tag.tagStart - prev);
@@ -754,22 +915,28 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
     // Copy '<tagName'.
     output.append(html, tag.tagStart, nameEnd - tag.tagStart);
 
-    // Build the class value string.
+    // Build the class value string. Pre-existing source class (e.g. class="pagx-group"
+    // emitted by HTMLWriterText) is preserved verbatim; extractor-assigned class names
+    // are appended after it. When Pass 1.5 inlined the tag's only extractor class,
+    // classNames is empty — then we only keep whatever the source already had.
     std::string classValue;
     if (tag.hasClass) {
-      auto existingClass =
-          html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
-      if (!existingClass.empty()) {
-        classValue = existingClass + " ";
-      }
+      classValue = html.substr(tag.classValueStart, tag.classValueEnd - tag.classValueStart);
     }
-    for (size_t ci = 0; ci < classNames.size(); ci++) {
-      if (ci > 0) classValue += " ";
-      classValue += classNames[ci];
+    for (const auto& cn : classNames) {
+      if (!classValue.empty()) classValue += " ";
+      classValue += cn;
     }
-    output += " class=\"";
-    output += classValue;
-    output += "\"";
+    if (!classValue.empty()) {
+      output += " class=\"";
+      output += classValue;
+      output += "\"";
+    }
+    if (hasInline) {
+      output += " style=\"";
+      output += EncodeAttrValue(inlineStyle[ti]);
+      output += "\"";
+    }
 
     // Re-emit all other attributes (skip class and style).
     size_t attrPos = nameEnd;
@@ -841,32 +1008,21 @@ std::string HTMLStyleExtractor::Extract(const std::string& html, Format format) 
   }
   output.append(html, prev, html.size() - prev);
 
-  // Pass 3: insert <style> block before </head>.
-  std::string styleBlock;
-  if (format == Format::Minify) {
-    styleBlock = "<style>";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + "{" + rule.declarations + "}";
-    }
-    styleBlock += "</style>";
-  } else if (format == Format::Pretty) {
-    styleBlock = "<style>\n";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + " {\n";
-      auto props = ParseStyleProperties(rule.declarations);
-      for (const auto& p : props) {
-        styleBlock += "  " + p.name + ": " + p.value + ";\n";
-      }
-      styleBlock += "}\n";
-    }
-    styleBlock += "</style>\n";
-  } else {
-    styleBlock = "<style>\n";
-    for (const auto& rule : classRules) {
-      styleBlock += "." + rule.className + "{" + rule.declarations + "}\n";
-    }
-    styleBlock += "</style>\n";
+  // Pass 3: insert <style> block before </head>. Skipped entirely when every class
+  // was inlined in Pass 1.5, so we never emit an empty <style></style>.
+  if (classRules.empty()) {
+    return output;
   }
+  std::string styleBlock = "<style>\n";
+  for (const auto& rule : classRules) {
+    styleBlock += "." + rule.className + " {\n";
+    auto props = ParseStyleProperties(rule.declarations);
+    for (const auto& p : props) {
+      styleBlock += "  " + p.name + ": " + p.value + ";\n";
+    }
+    styleBlock += "}\n";
+  }
+  styleBlock += "</style>\n";
   size_t headEndPos = output.find("</head>");
   if (headEndPos != std::string::npos) {
     output.insert(headEndPos, styleBlock);

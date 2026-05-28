@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath type="continuous" vs type="separate" on multi-shape groups with gradient strokes -->
-<pagx version="1.0" width="420" height="220">
+<pagx width="420" height="220">
   <Resources>
     <!-- Gradient for continuous trim strokes -->
-    <LinearGradient id="gradContinuous" startPoint="10,10" endPoint="290,10">
+    <LinearGradient id="gradContinuous" startPoint="10,10" endPoint="290,10" fitsToGeometry="false">
       <ColorStop offset="0" color="#8B5CF6"/>
       <ColorStop offset="0.5" color="#EC4899"/>
       <ColorStop offset="1" color="#F59E0B"/>
     </LinearGradient>
     <!-- Gradient for separate trim strokes -->
-    <LinearGradient id="gradSeparate" startPoint="10,10" endPoint="290,10">
+    <LinearGradient id="gradSeparate" startPoint="10,10" endPoint="290,10" fitsToGeometry="false">
       <ColorStop offset="0" color="#3B82F6"/>
       <ColorStop offset="0.5" color="#10B981"/>
       <ColorStop offset="1" color="#06B6D4"/>

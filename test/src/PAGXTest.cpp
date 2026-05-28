@@ -30,6 +30,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
@@ -74,20 +75,12 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
-
-static int CallRun(int (*fn)(int, char*[]), std::vector<std::string> args) {
-  std::vector<char*> argv = {};
-  argv.reserve(args.size());
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return fn(static_cast<int>(argv.size()), argv.data());
-}
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
@@ -96,16 +89,6 @@ static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& fil
     doc = pagx::PAGXImporter::FromFile(filePath);
   }
   return doc;
-}
-
-static void VerifyFile(const std::string& filePath, const std::string& key) {
-  std::streambuf* oldErr = std::cerr.rdbuf();
-  std::ostringstream verifyErr;
-  std::cerr.rdbuf(verifyErr.rdbuf());
-  auto verifyRet =
-      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", filePath});
-  std::cerr.rdbuf(oldErr);
-  EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }
 
 static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& content,
@@ -150,28 +133,6 @@ static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
   return typefaces;
 }
 
-// Registers system fonts referenced by PAGX test resources. Fonts are looked up by well-known
-// file paths on each platform. When a platform does not provide a font, the lookup silently
-// falls back to the existing Noto fallback typefaces, preserving legacy rendering behavior.
-static void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
-#ifdef __APPLE__
-  const char* arialPaths[] = {
-      "/System/Library/Fonts/Supplemental/Arial.ttf",
-      "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-      "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
-      "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
-  };
-  for (const char* path : arialPaths) {
-    auto typeface = Typeface::MakeFromPath(path);
-    if (typeface) {
-      fontConfig.registerTypeface(std::move(typeface));
-    }
-  }
-#else
-  (void)fontConfig;
-#endif
-}
-
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -206,7 +167,6 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   // Create FontConfig for text layout
   pagx::FontConfig svgFontConfig;
   svgFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  RegisterSystemFonts(svgFontConfig);
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -225,6 +185,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
+    // Step 1b: Simplify the imported structure before layout so verify doesn't flag the raw
+    // Layer/Group tree produced by the SVG importer.
+    pagx::PAGXOptimizer::Optimize(doc.get());
+
     // Step 2: Layout and embed fonts
     doc->applyLayout(&svgFontConfig);
     pagx::FontEmbedder().embed(doc.get());
@@ -233,6 +197,10 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
     auto key = "svg_" + baseName;
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + key + ".pagx");
+
+    // Step 3b: The PAGXOptimizer is responsible for eliminating every structural warning
+    // verify can flag.
+    VerifyFile(pagxPath, key);
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
     auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
@@ -529,7 +497,6 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 
   pagx::FontConfig embedFontConfig;
   embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  RegisterSystemFonts(embedFontConfig);
   doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -714,7 +681,6 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  RegisterSystemFonts(fontConfig);
 
   for (const auto& [name, xmlContent] : patterns) {
     auto key = prefix + name;
@@ -778,7 +744,6 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
 
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  RegisterSystemFonts(fontConfig);
 
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
@@ -5201,178 +5166,126 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
  * Test all HTML-related PAGX files in resources/pagx_to_html directory.
  */
 PAGX_TEST(PAGXTest, HtmlFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html");
+  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
 }
 
 /**
- * Generate a side-by-side comparison page: PAGX native rendering vs HTML rendering.
- * Run: PAGFullTest --gtest_filter=PAGXTest.GenerateComparisonPage
- * Then: open test/out/PAGXHtmlTest/comparison.html
+ * Test case: PAGXDocument::embed() returns false when layout is not applied.
  */
-PAGX_TEST(PAGXTest, GenerateComparisonPage) {
-  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
-  std::filesystem::create_directories(outDir);
+PAGX_TEST(PAGXTest, DocumentEmbedWithoutLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  EXPECT_FALSE(doc->embed());
+}
 
-  struct DirectoryInfo {
-    std::string path;
-    std::string label;
-  };
-  std::vector<DirectoryInfo> directories = {
-      {ProjectPath::Absolute("resources/pagx_to_html"), "resources/pagx_to_html"},
-  };
+/**
+ * Test case: PAGXDocument::embed() succeeds when layout is applied.
+ */
+PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-  RegisterSystemFonts(fontConfig);
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
 
-  // Build comparison page. The HTML column embeds live iframes so reviewers can F12 into
-  // each sample instead of inspecting a flattened screenshot; this also eliminates the
-  // Puppeteer/Chromium screenshot pipeline from this test path, keeping regeneration under
-  // a second and letting the page reflect whatever browser the user opens it in.
-  std::string page = R"(<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>PAGX vs HTML Rendering Comparison</title>
-<style>
-body{font-family:-apple-system,Arial,sans-serif;background:#f1f5f9;margin:0;padding:20px}
-h1{text-align:center;color:#1e293b;margin-bottom:4px}
-.sub{text-align:center;color:#94a3b8;font-size:14px;margin-bottom:24px}
-.sep{margin:40px 0 24px;padding:16px 24px;background:#1e293b;border-radius:8px;color:white;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
-.sep span{font-size:12px;font-weight:400;color:#94a3b8}
-.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px;overflow:hidden}
-.hd{padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
-.hd h3{margin:0;font-size:14px;color:#334155}
-.sz{font-size:11px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#166534}
-.cmp{display:flex}
-.cmp>div{flex:1;padding:12px;text-align:center}
-.cmp>div:first-child{border-right:1px solid #e2e8f0}
-.cmp label{display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.cmp .lbl{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;min-height:19px}
-.cmp .lbl label{margin:0}
-.cmp .lbl .open{max-width:100%;font-size:11px;color:#2563eb;text-decoration:none;padding:2px 8px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.cmp .lbl .open:hover{background:#dbeafe;border-color:#60a5fa}
-.cmp img{max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px}
-.cmp iframe{max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 50%/16px 16px;display:block;margin:0 auto}
-</style></head><body>
-<h1>PAGX vs HTML Rendering Comparison</h1>
-<p class="sub">Left: PAGX native rendering &nbsp;|&nbsp; Right: live HTML in this browser (open DevTools on the iframe to inspect)</p>
-)";
+  EXPECT_TRUE(doc->embed());
+  EXPECT_FALSE(text->glyphRuns.empty());
+}
 
-  int count = 0;
+/**
+ * Test case: PAGXDocument::clearEmbed() clears embedded GlyphRuns.
+ */
+PAGX_TEST(PAGXTest, DocumentClearEmbed) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
 
-  for (const auto& dirInfo : directories) {
-    std::vector<std::string> files;
-    if (!std::filesystem::exists(dirInfo.path)) {
-      continue;
-    }
-    for (const auto& entry : std::filesystem::directory_iterator(dirInfo.path)) {
-      if (entry.path().extension() == ".pagx") {
-        files.push_back(entry.path().string());
-      }
-    }
-    std::sort(files.begin(), files.end());
-    if (files.empty()) {
-      continue;
-    }
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
 
-    int sectionCount = 0;
-    for (const auto& filePath : files) {
-      auto baseName = std::filesystem::path(filePath).stem().string();
-      auto doc = pagx::PAGXImporter::FromFile(filePath);
-      if (!doc || doc->width <= 0 || doc->height <= 0) {
-        continue;
-      }
-      sectionCount++;
-    }
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
 
-    page += "<div class=\"sep\">" + dirInfo.label + "<span>" + std::to_string(sectionCount) +
-            " files</span></div>\n";
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
 
-    for (const auto& filePath : files) {
-      auto baseName = std::filesystem::path(filePath).stem().string();
-      auto doc = pagx::PAGXImporter::FromFile(filePath);
-      if (!doc || doc->width <= 0 || doc->height <= 0) {
-        continue;
-      }
-      int w = static_cast<int>(doc->width);
-      int h = static_cast<int>(doc->height);
-      int scale = 2;
-      int rw = w * scale;
-      int rh = h * scale;
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+  doc->embed();
 
-      // Render PAGX native at 2x resolution
-      auto nativePng = outDir + "/" + baseName + "_pagx.png";
-      doc->applyLayout(&fontConfig);
-      auto layer = pagx::LayerBuilder::Build(doc.get());
-      if (layer) {
-        layer->setMatrix(tgfx::Matrix::MakeScale(static_cast<float>(scale)));
-        auto surface = tgfx::Surface::Make(context, rw, rh);
-        if (surface) {
-          tgfx::DisplayList displayList;
-          displayList.root()->addChild(layer);
-          displayList.render(surface.get(), false);
-          tgfx::Bitmap bitmap(rw, rh, false, false);
-          tgfx::Pixmap pixmap(bitmap);
-          surface->readPixels(pixmap.info(), pixmap.writablePixels());
-          auto data = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::PNG, 100);
-          if (data) {
-            std::ofstream f(nativePng, std::ios::binary);
-            f.write(reinterpret_cast<const char*>(data->data()),
-                    static_cast<std::streamsize>(data->size()));
-          }
-        }
-      }
+  ASSERT_FALSE(text->glyphRuns.empty());
 
-      // Generate HTML for this file
-      auto htmlPath = outDir + "/" + baseName + ".html";
-      doc->applyLayout();
-      pagx::HTMLExporter::Options htmlOpts;
-      // Rasterize Diamond/ImagePattern fills to PNG next to the HTML file. Using a single
-      // shared static-img/ directory with a per-document filename prefix avoids name collisions
-      // when multiple HTMLs live in the same folder.
-      htmlOpts.staticImgDir = outDir + "/static-img";
-      htmlOpts.staticImgUrlPrefix = "static-img/";
-      htmlOpts.staticImgNamePrefix = baseName + "-";
-      htmlOpts.staticImgPixelRatio = static_cast<float>(scale);
-      auto htmlFragment = pagx::HTMLExporter::ToHTML(*doc, htmlOpts);
-      if (!htmlFragment.empty()) {
-        auto htmlContent =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>body{margin:0;padding:0;"
-            "background:transparent;width:" +
-            std::to_string(w) + "px;height:" + std::to_string(h) +
-            "px;overflow:hidden}</style></head>\n<body>\n" + htmlFragment + "\n</body></html>";
-        std::ofstream hf(htmlPath, std::ios::binary);
-        hf.write(htmlContent.data(), static_cast<std::streamsize>(htmlContent.size()));
-      }
+  doc->clearEmbed();
+  EXPECT_TRUE(text->glyphRuns.empty());
+}
 
-      page += "<div class=\"card\" id=\"" + baseName + "\">\n";
-      page += "  <div class=\"hd\"><h3>" + std::to_string(count + 1) + ". " + baseName +
-              "</h3><span class=\"sz\">" + std::to_string(w) + "x" + std::to_string(h) + " @" +
-              std::to_string(scale) + "x</span></div>\n";
-      page += "  <div class=\"cmp\">\n";
-      page += "    <div><div class=\"lbl\"><label>PAGX Native</label></div><img src=\"" + baseName +
-              "_pagx.png\" width=\"" + std::to_string(w) + "\"></div>\n";
-      // `loading=\"lazy\"` keeps the initial page open quickly when the sample count grows;
-      // sandbox=\"allow-same-origin\" is deliberately omitted so each iframe stays in its own
-      // origin and its styles/scripts cannot leak into the comparison page chrome. The `.open`
-      // link next to the label opens the sample in a new tab so reviewers can jump straight to a
-      // full-viewport render when the iframe thumbnail is too small to debug in.
-      page += "    <div><div class=\"lbl\"><label>HTML (Browser)</label><a class=\"open\" href=\"" +
-              baseName + ".html\" target=\"_blank\" rel=\"noopener\" title=\"" + baseName +
-              ".html\">" + baseName + ".html</a></div><iframe src=\"" + baseName +
-              ".html\" width=\"" + std::to_string(w) + "\" height=\"" + std::to_string(h) +
-              "\" loading=\"lazy\" scrolling=\"no\"></iframe></div>\n";
-      page += "  </div>\n</div>\n";
-      count++;
-    }
-  }
+/**
+ * Test case: PAGXDocument re-embedding after clearEmbed.
+ * Embeds fonts, clears, re-embeds, and verifies the result is consistent.
+ */
+PAGX_TEST(PAGXTest, DocumentReEmbed) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
 
-  page += "<p class=\"sub\">" + std::to_string(count) + " files compared</p></body></html>";
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
 
-  auto pagePath = outDir + "/comparison.html";
-  std::ofstream f(pagePath, std::ios::binary);
-  f.write(page.data(), static_cast<std::streamsize>(page.size()));
-  std::cout << "\nComparison page: " << pagePath << std::endl;
-  std::cout << "Open: open \"" << pagePath << "\"" << std::endl;
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+  doc->embed();
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  size_t firstGlyphCount = text->glyphRuns[0]->glyphs.size();
+  auto firstGlyphs = text->glyphRuns[0]->glyphs;
+
+  // Re-embed: clear existing glyphs, re-layout, re-embed.
+  doc->clearEmbed();
+  EXPECT_TRUE(text->glyphRuns.empty());
+
+  doc->applyLayout();
+  doc->embed();
+
+  ASSERT_FALSE(text->glyphRuns.empty());
+  // Glyph count and IDs should match after re-embedding.
+  EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), firstGlyphCount);
+  EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
 }  // namespace pag

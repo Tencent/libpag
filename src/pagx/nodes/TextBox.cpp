@@ -143,7 +143,6 @@ void TextBox::updateLayout(LayoutContext* context) {
     auto* text = childText[i];
     text->textBounds = result.getTextBounds(text);
     text->glyphData->layoutRuns = result.extractLayoutRuns(text);
-    text->glyphData->fontLineHeight = result.getFontLineHeight(text);
     if (hasPadding) {
       text->textBounds.x += padding.left;
       text->textBounds.y += padding.top;

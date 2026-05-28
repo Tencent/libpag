@@ -35,6 +35,7 @@ option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
 option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
 option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
 option(PAG_COVERAGE "Build with clang source-based coverage instrumentation" OFF)
+option(PAG_BUILD_PPT "Enable PPT export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -93,12 +94,16 @@ elseif (PAG_USE_SWIFTSHADER)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-# PAG_BUILD_CLI requires PAG_BUILD_PAGX and PAG_BUILD_SVG
+# PAG_BUILD_CLI requires PAG_BUILD_PAGX, PAG_BUILD_SVG and PAG_BUILD_PPT
 if (PAG_BUILD_CLI)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_PPT ON)
 endif ()
 if (PAG_BUILD_SVG)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+if (PAG_BUILD_PPT)
     set(PAG_BUILD_PAGX ON)
 endif ()
 
@@ -120,6 +125,7 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_CLI ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_PPT ON)
     set(PAG_USE_HARFBUZZ ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
     set(PAG_BUILD_SHARED OFF)
@@ -133,6 +139,7 @@ message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
 message("PAG_BUILD_PAGX: ${PAG_BUILD_PAGX}")
 message("PAG_BUILD_CLI: ${PAG_BUILD_CLI}")
 message("PAG_BUILD_SVG: ${PAG_BUILD_SVG}")
+message("PAG_BUILD_PPT: ${PAG_BUILD_PPT}")
 message("PAG_USE_SYSTEM_LZ4: ${PAG_USE_SYSTEM_LZ4}")
 message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
@@ -205,12 +212,41 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_SVG)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
-        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGTextLayout.cpp)
+        list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp)
+    endif ()
+
+    if (PAG_BUILD_PPT)
+        file(GLOB_RECURSE PAGX_PPT_SOURCES src/pagx/ppt/*.*)
+        list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
+        set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+        list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
+        list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 
     # HTML exporter
     file(GLOB_RECURSE HTML_EXPORTER_SOURCES src/pagx/html/*.*)
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
+
+    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)
+    set(WOFF2_DIR third_party/woff2)
+    set(BROTLI_DIR ${WOFF2_DIR}/brotli)
+    set(WOFF2_SOURCES
+            ${WOFF2_DIR}/src/font.cc
+            ${WOFF2_DIR}/src/glyph.cc
+            ${WOFF2_DIR}/src/normalize.cc
+            ${WOFF2_DIR}/src/table_tags.cc
+            ${WOFF2_DIR}/src/transform.cc
+            ${WOFF2_DIR}/src/variable_length.cc
+            ${WOFF2_DIR}/src/woff2_common.cc
+            ${WOFF2_DIR}/src/woff2_enc.cc
+            ${WOFF2_DIR}/src/woff2_out.cc)
+    file(GLOB BROTLI_COMMON_SOURCES ${BROTLI_DIR}/c/common/*.c)
+    file(GLOB BROTLI_ENC_SOURCES ${BROTLI_DIR}/c/enc/*.c)
+    set(WOFF2_ALL_SOURCES ${WOFF2_SOURCES} ${BROTLI_COMMON_SOURCES} ${BROTLI_ENC_SOURCES})
+    list(APPEND PAG_FILES ${WOFF2_ALL_SOURCES})
+    list(APPEND PAG_INCLUDES ${WOFF2_DIR}/include ${BROTLI_DIR}/c/include)
+    # Suppress warnings for third-party woff2/brotli code that does not pass -Werror -Weffc++.
+    set_source_files_properties(${WOFF2_ALL_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 endif ()
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
@@ -313,6 +349,11 @@ endif ()
 
 if (PAG_BUILD_SVG)
     list(APPEND PAG_DEFINES PAG_BUILD_SVG)
+endif ()
+
+if (PAG_BUILD_PPT)
+    list(APPEND PAG_DEFINES PAG_BUILD_PPT)
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)

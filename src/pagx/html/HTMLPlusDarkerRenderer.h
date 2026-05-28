@@ -59,8 +59,7 @@ class HTMLPlusDarkerRenderer {
    * document concurrently during this call.
    */
   static void RenderAll(const PAGXDocument& doc, const std::string& staticImgDir,
-                        const std::string& staticImgUrlPrefix,
-                        const std::string& staticImgNamePrefix, float pixelRatio,
+                        const std::string& staticImgUrlPrefix, float rasterScale,
                         std::unordered_map<const Layer*, PlusDarkerBackdrop>& out);
 };
 

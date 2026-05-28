@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Stroke all 12 attributes: color, width, alpha, blendMode, cap, join, miterLimit, dashes, dashOffset, dashAdaptive, align, placement -->
-<pagx version="1.0" width="440" height="480">
+<pagx width="440" height="480">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -155,7 +155,7 @@
           <Layer width="356" height="46">
             <Path data="M 10,23 Q 178,3 346,23"/>
             <Stroke width="6" cap="round">
-              <LinearGradient startPoint="10,13" endPoint="346,13">
+              <LinearGradient startPoint="0,0.5" endPoint="1,0.5">
                 <ColorStop offset="0" color="#EC4899"/>
                 <ColorStop offset="1" color="#3B82F6"/>
               </LinearGradient>

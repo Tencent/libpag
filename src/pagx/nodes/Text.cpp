@@ -30,10 +30,6 @@ Text::~Text() {
 Text::Text() : glyphData(new GlyphData()) {
 }
 
-float Text::fontLineHeight() const {
-  return glyphData->fontLineHeight;
-}
-
 static TextLayoutParams MakeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -56,7 +52,6 @@ void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
-  glyphData->fontLineHeight = result.getFontLineHeight(this);
   textBounds = result.bounds;
   // position is the text origin (x, baseline); textBounds is relative to position.
   preferredX = position.x + textBounds.x;
@@ -86,7 +81,6 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
     params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
-    glyphData->fontLineHeight = result.getFontLineHeight(this);
     textBounds = result.bounds;
   }
   // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font

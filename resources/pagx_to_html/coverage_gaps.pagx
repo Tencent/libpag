@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Remaining coverage gaps — ImagePattern.mipmapMode (non-default), Repeater.offset (non-zero),
      textAnchor="end", RangeSelector.offset (non-zero), TextPath.baselineAngle (non-zero) -->
-<pagx version="1.0" width="460" height="500">
+<pagx width="460" height="500">
   <Resources>
     <Image id="tinyImg" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGP8Oo/7PwMSYELmECcAAKy6AqWSorM1AAAAAElFTkSuQmCC"/>
     <PathData id="wavePath" data="M 0,30 C 40,0 80,60 120,30 C 160,0 200,60 240,30"/>
@@ -44,7 +44,7 @@
             <Layer width="100" height="70">
               <Rectangle position="50,35" size="100,70" roundness="6"/>
               <Fill>
-                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0"/>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="nearest" matrix="4,0,0,4,0,0" scaleMode="none"/>
               </Fill>
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>
@@ -58,7 +58,7 @@
             <Layer width="100" height="70">
               <Rectangle position="50,35" size="100,70" roundness="6"/>
               <Fill>
-                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0"/>
+                <ImagePattern image="@tinyImg" tileModeX="repeat" tileModeY="repeat" mipmapMode="none" matrix="4,0,0,4,0,0" scaleMode="none"/>
               </Fill>
               <Stroke color="#CBD5E1" width="1"/>
             </Layer>

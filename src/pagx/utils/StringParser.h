@@ -241,6 +241,18 @@ std::string FloatToString(float value);
  */
 std::string CoordToString(float value);
 
+/**
+ * Formats a float for CSS/HTML output using at most three decimal places, with trailing
+ * zeros and a bare trailing dot stripped. Unlike FloatToString (which uses %g and prints
+ * up to 6 significant digits, producing inconsistent precision such as 0.0823529 next to
+ * -1.90915 next to -11.31), this gives uniform fractional precision suitable for
+ * transform matrix coefficients, rotation degrees, scale factors, alpha values, gradient
+ * stop percentages, SVG path data, and other CSS numerics. Px coordinates should still
+ * use CoordToString (two decimal places). PAGX serialization and SVG export keep
+ * FloatToString to preserve full roundtrip precision.
+ */
+std::string CssFloatToString(float value);
+
 //==============================================================================
 // Custom data key validation
 //==============================================================================

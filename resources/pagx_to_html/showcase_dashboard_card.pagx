@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Integration showcase — glassmorphism dashboard card combining LinearGradient, BackgroundBlurStyle,
      DropShadowStyle, groupOpacity, RoundCorner, Polystar stars, dashed Stroke, Text styles, data-* attributes -->
-<pagx version="1.0" width="420" height="320">
+<pagx width="420" height="320">
   <Resources>
     <!-- Dark gradient background -->
-    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="410,310">
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="1,1">
       <ColorStop offset="0" color="#1E293B"/>
       <ColorStop offset="1" color="#0F172A"/>
     </LinearGradient>
     <!-- Blue accent gradient for progress bar fill -->
-    <LinearGradient id="accentGrad" startPoint="10,10" endPoint="210,10">
+    <LinearGradient id="accentGrad" startPoint="0,0" endPoint="1,0">
       <ColorStop offset="0" color="#3B82F6"/>
       <ColorStop offset="1" color="#10B981"/>
     </LinearGradient>
     <!-- Card glass fill -->
-    <LinearGradient id="cardGlass" startPoint="70,50" endPoint="350,270">
+    <LinearGradient id="cardGlass" startPoint="0,0" endPoint="1,1">
       <ColorStop offset="0" color="#FFFFFF20"/>
       <ColorStop offset="1" color="#FFFFFF10"/>
     </LinearGradient>

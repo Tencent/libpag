@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
-#include "pagx/html/FontHoist.h"
+#include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -43,11 +43,250 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
 using pag::FloatNearlyZero;
+
+// Sentinel large value used to seed min/max accumulators when computing axis-aligned bounds.
+// Any realistic layer coordinate is many orders of magnitude smaller, so the first observation
+// always overwrites the seed. Mirrors the same sentinel used in HTMLWriter::ComputeGeosBoundingBox.
+static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
+
+// Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
+// fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
+
+static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
+  style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
+  positionSet = true;
+}
+
+// CollectRichTextSpans pre-scans an element list to pull out every Group that should be hoisted
+// into the enclosing TextBox as a single <span> child instead of being rendered as a stand-alone
+// DOM wrapper. A Group qualifies when its children are exactly one Text plus at least one
+// Fill/Stroke (and nothing else); see HTMLWriter.h for the RichTextSpan struct itself.
+
+// Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
+// text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
+// a TextBox with no inline elements but at least two qualifying sibling Groups).
+struct RichTextScanResult {
+  bool hasUpcomingRepeater = false;
+  const TextBox* preScannedTextBox = nullptr;
+  std::vector<RichTextSpan> richTextSpans;
+  bool useRichText = false;
+};
+
+// A single text span emitted inside a TextBox container. Collected from TextBox children at the
+// top level (Text + Fill / Stroke painters that apply to the spans below them) and recursively
+// from nested Group children. Used by renderTextBoxWithSpans.
+struct TBSpan {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+};
+
+// Recursive helper that flattens Group children into TBSpans. Each Group level may carry its
+// own Fill/Stroke which applies to every Text at that same level regardless of their relative
+// order (e.g. a Group with [Text, Fill] and a Group with [Fill, Text] both paint the Text with
+// the Group's Fill). The painter is resolved with a first pass over direct children before
+// emitting spans, otherwise a [Text, Fill] order would leak the caller's parentFill onto the
+// Text. Defined as a struct with a static method rather than a free function so the recursive
+// call can refer to its own type without an explicit forward declaration.
+struct GroupSpanCollector {
+  static void Collect(const Group* grp, const Fill* parentFill, const Stroke* parentStroke,
+                      std::vector<TBSpan>& spans) {
+    const Fill* grpFill = parentFill;
+    const Stroke* grpStroke = parentStroke;
+    for (auto* ge : grp->elements) {
+      if (ge->nodeType() == NodeType::Fill) {
+        grpFill = static_cast<const Fill*>(ge);
+      } else if (ge->nodeType() == NodeType::Stroke) {
+        grpStroke = static_cast<const Stroke*>(ge);
+      }
+    }
+    for (auto* ge : grp->elements) {
+      if (ge->nodeType() == NodeType::Text) {
+        // Collect all Text nodes in the Group; the previous single-capture pattern dropped any
+        // Text beyond the first (e.g. "\nAB" in Box I).
+        spans.push_back({static_cast<const Text*>(ge), grpFill, grpStroke});
+      } else if (ge->nodeType() == NodeType::Group) {
+        Collect(static_cast<const Group*>(ge), grpFill, grpStroke, spans);
+      }
+    }
+  }
+};
+
+static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elements) {
+  RichTextScanResult r;
+  int richTextGroupCount = 0;
+  for (auto* e : elements) {
+    if (e->nodeType() == NodeType::Repeater) {
+      r.hasUpcomingRepeater = true;
+    } else if (e->nodeType() == NodeType::TextBox) {
+      r.preScannedTextBox = static_cast<const TextBox*>(e);
+    } else if (e->nodeType() == NodeType::Group && r.preScannedTextBox == nullptr) {
+      auto grp = static_cast<const Group*>(e);
+      const Text* spanText = nullptr;
+      const Fill* spanFill = nullptr;
+      const Stroke* spanStroke = nullptr;
+      bool isTextSpan = true;
+      for (auto* ge : grp->elements) {
+        auto gt = ge->nodeType();
+        if (gt == NodeType::Text) {
+          spanText = static_cast<const Text*>(ge);
+        } else if (gt == NodeType::Fill) {
+          spanFill = static_cast<const Fill*>(ge);
+        } else if (gt == NodeType::Stroke) {
+          spanStroke = static_cast<const Stroke*>(ge);
+        } else {
+          isTextSpan = false;
+          break;
+        }
+      }
+      if (isTextSpan && spanText && (spanFill || spanStroke)) {
+        richTextGroupCount++;
+        r.richTextSpans.push_back({spanText, spanFill, spanStroke});
+      }
+    }
+  }
+  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 2;
+  return r;
+}
+
+// Pre-scan Fill/Stroke pairing at targetPlacement so the Fill branch in the main dispatch can
+// skip Text elements that a later Stroke will consume (otherwise two stacked <span>s with
+// identical CSS end up sub-pixel offset from each other in Chromium, producing a doubled stroke
+// edge around the glyphs - visible as e.g. TYPE's "E" sprouting an extra stroke stub to its
+// right, or STROKE's "R" showing stroke bleed inside the letter body). Stroke then paints Text
+// with (curFill, curStroke) as a single span.
+//
+// Matching rule: walk elements in order, pairing each Fill at targetPlacement with the next
+// Stroke at targetPlacement before another Fill appears. Unpaired Fills still paint Text
+// normally. TextModifier / TextPath paths have their own dispatch and are not covered here.
+static std::vector<bool> ComputeFillStrokePairing(const std::vector<Element*>& elements,
+                                                  LayerPlacement targetPlacement) {
+  std::vector<bool> fillWillBePairedWithStroke(elements.size(), false);
+  const Fill* lastUnpairedFill = nullptr;
+  size_t lastUnpairedFillIndex = 0;
+  for (size_t i = 0; i < elements.size(); i++) {
+    auto* e = elements[i];
+    auto et = e->nodeType();
+    if (et == NodeType::Fill) {
+      auto* f = static_cast<const Fill*>(e);
+      if (f->placement == targetPlacement) {
+        lastUnpairedFill = f;
+        lastUnpairedFillIndex = i;
+      }
+    } else if (et == NodeType::Stroke) {
+      auto* s = static_cast<const Stroke*>(e);
+      if (s->placement == targetPlacement && lastUnpairedFill != nullptr) {
+        fillWillBePairedWithStroke[lastUnpairedFillIndex] = true;
+        lastUnpairedFill = nullptr;
+      }
+    }
+  }
+  return fillWillBePairedWithStroke;
+}
+
+//==============================================================================
+// HTMLWriter – TextBox span helpers
+//==============================================================================
+
+// Builds the CSS style string for a single TextBox span (shared by renderTextBoxWithSpans and
+// renderTextBoxAsRichText). The caller passes the existing spanStyle prefix (which may already
+// contain white-space/tab-size from the tab detection in renderTextBoxWithSpans).
+std::string HTMLWriter::buildTextBoxSpanStyle(const Text* text, const Fill* fill,
+                                              const Stroke* stroke, const std::string& prefix) {
+  std::string style = prefix;
+  bool fontHoisted =
+      !_ctx->fontHoistSignature.fontFamily.empty() || _ctx->fontHoistSignature.renderFontSize > 0;
+  if (!fontHoisted) {
+    if (!text->fontFamily.empty()) {
+      if (!style.empty()) style += ';';
+      style += "font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
+    }
+    if (!style.empty()) style += ';';
+    style += "font-size:" + CssFloatToString(text->renderFontSize()) + "px";
+    if (!text->fontStyle.empty()) {
+      auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+      if (fontProps.weight != 400) {
+        style += ";font-weight:" + fontProps.weightString();
+      }
+      if (fontProps.italic) {
+        style += ";font-style:italic";
+      } else if (fontProps.oblique) {
+        style += ";font-style:oblique";
+      }
+    }
+    if (text->letterSpacing != 0.0f) {
+      style += ";letter-spacing:" + CssFloatToString(text->letterSpacing) + "px";
+    }
+  }
+  if (fill && fill->color) {
+    auto ct = fill->color->nodeType();
+    if (ct == NodeType::SolidColor) {
+      auto sc = static_cast<const SolidColor*>(fill->color);
+      if (!style.empty()) style += ';';
+      style += "color:" + ColorToRGBA(sc->color, fill->alpha);
+    } else {
+      float ca = 1.0f;
+      std::string css = colorToCSS(fill->color, &ca);
+      if (!css.empty()) {
+        if (!style.empty()) style += ';';
+        style += "background:" + css;
+        style += ";-webkit-background-clip:text;background-clip:text";
+        style += ";-webkit-text-fill-color:transparent";
+      }
+    }
+  }
+  if (text->fauxBold) {
+    if (!style.empty()) style += ';';
+    style += "font-weight:bold";
+  }
+  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+    auto sc = static_cast<const SolidColor*>(stroke->color);
+    bool hasFill = fill && fill->color;
+    auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+    if (strokeCss.width > 0.0f) {
+      if (!style.empty()) style += ';';
+      style += "-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+               ColorToRGBA(sc->color, stroke->alpha);
+      if (strokeCss.paintOrderStrokeFill) {
+        style += ";paint-order:stroke fill";
+      }
+    }
+  }
+  if (text->fauxItalic) {
+    if (!style.empty()) style += ';';
+    style += "font-style:italic";
+  }
+  return style;
+}
+
+// Emits between-span <br> elements for TextBox rendering. Empty lines are wrapped in the
+// owner span's font-size so the line box matches what tgfx computed.
+static void EmitBetweenSpanBreaks(HTMLBuilder& out, size_t prevTrailingBreaks, size_t leadingBreaks,
+                                  float prevFontSize, float spanFontSize, bool isFirstSpan) {
+  size_t totalBreaks = prevTrailingBreaks + leadingBreaks;
+  for (size_t bi = 0; bi < totalBreaks; ++bi) {
+    if (bi == 0 && isFirstSpan && prevTrailingBreaks == 0) {
+      // Leading \n at TextBox start: tgfx gives this empty line height 0. Emit nothing
+      // so Chromium starts the first content line at the box top.
+    } else if (bi == 0) {
+      out.emitBreaks(1);
+    } else {
+      float ownerFontSize = (bi <= prevTrailingBreaks) ? prevFontSize : spanFontSize;
+      if (ownerFontSize > 0) {
+        out.emitRaw("<span style=\"font-size:" + CssFloatToString(ownerFontSize) +
+                    "px\"><br></span>");
+      } else {
+        out.emitBreaks(1);
+      }
+    }
+  }
+}
 
 //==============================================================================
 // HTMLWriter – element processing
@@ -81,65 +320,30 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 }
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                               bool distribute, LayerPlacement targetPlacement) {
+                               bool distribute, LayerPlacement targetPlacement,
+                               const Padding* containerPadding) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
   }
-  std::vector<GeoInfo> geos = {};
-  const Fill* curFill = nullptr;
-  const Stroke* curStroke = nullptr;
+  ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
-  bool hasTrim = false;
-  const TrimPath* curTrim = nullptr;
-  bool hasMerge = false;
-  MergePathMode mergeMode = MergePathMode::Append;
   float roundCornerRadius = 0.0f;
-  const TextModifier* curTextModifier = nullptr;
-  const TextPath* curTextPath = nullptr;
 
   bool hasUpcomingRepeater = false;
-  const TextBox* preScannedTextBox = nullptr;
-  struct RichTextSpan {
-    const Text* text = nullptr;
-    const Fill* fill = nullptr;
-    const Stroke* stroke = nullptr;
-  };
   std::vector<RichTextSpan> richTextSpans = {};
-  int richTextGroupCount = 0;
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::Repeater) {
-      hasUpcomingRepeater = true;
-    } else if (e->nodeType() == NodeType::TextBox) {
-      preScannedTextBox = static_cast<const TextBox*>(e);
-    } else if (e->nodeType() == NodeType::Group && preScannedTextBox == nullptr) {
-      auto grp = static_cast<const Group*>(e);
-      const Text* spanText = nullptr;
-      const Fill* spanFill = nullptr;
-      const Stroke* spanStroke = nullptr;
-      bool isTextSpan = true;
-      for (auto* ge : grp->elements) {
-        auto gt = ge->nodeType();
-        if (gt == NodeType::Text) {
-          spanText = static_cast<const Text*>(ge);
-        } else if (gt == NodeType::Fill) {
-          spanFill = static_cast<const Fill*>(ge);
-        } else if (gt == NodeType::Stroke) {
-          spanStroke = static_cast<const Stroke*>(ge);
-        } else {
-          isTextSpan = false;
-          break;
-        }
-      }
-      if (isTextSpan && spanText && (spanFill || spanStroke)) {
-        richTextGroupCount++;
-        richTextSpans.push_back({spanText, spanFill, spanStroke});
-      }
-    }
+  bool useRichText = false;
+  {
+    auto scan = CollectRichTextSpans(elements);
+    hasUpcomingRepeater = scan.hasUpcomingRepeater;
+    richTextSpans = std::move(scan.richTextSpans);
+    useRichText = scan.useRichText;
   }
-  bool useRichText = preScannedTextBox != nullptr && richTextGroupCount >= 2;
 
-  for (auto* element : elements) {
+  auto fillWillBePairedWithStroke = ComputeFillStrokePairing(elements, targetPlacement);
+
+  for (size_t elemIndex = 0; elemIndex < elements.size(); elemIndex++) {
+    auto* element = elements[elemIndex];
     auto type = element->nodeType();
     switch (type) {
       case NodeType::Rectangle:
@@ -147,36 +351,89 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::Path:
       case NodeType::Polystar:
       case NodeType::Text:
-        geos.push_back({type, element, {}});
+        state.geos.push_back({type, element, {}, containerPadding});
         break;
       case NodeType::Fill: {
         auto fill = static_cast<const Fill*>(element);
-        curFill = fill;
+        state.curFill = fill;
         if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
-          if (curTextModifier && !geos.empty()) {
-            writeTextModifier(out, geos, curTextModifier, curFill, nullptr, curTextBox, a);
-          } else if (curTextPath && !geos.empty()) {
-            writeTextPath(out, geos, curTextPath, curFill, nullptr, curTextBox, a);
+          bool deferToStroke = fillWillBePairedWithStroke[elemIndex];
+          if (state.curTextModifier && !state.geos.empty()) {
+            if (!deferToStroke) {
+              writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
+                                curTextBox, a);
+            }
+          } else if (state.curTextPath && !state.geos.empty()) {
+            if (!deferToStroke) {
+              writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox,
+                            a);
+            }
+          } else if (deferToStroke) {
+            // A later Stroke at this placement will paint Text with (fill, stroke) as a
+            // single span. Paint shapes here with fill-only, but skip Text geos so the
+            // Stroke pass can merge them into one span instead of two stacked spans.
+            std::vector<GeoInfo> shapeGeos;
+            for (auto& g : state.geos) {
+              if (g.type != NodeType::Text) {
+                shapeGeos.push_back(g);
+              }
+            }
+            if (!shapeGeos.empty()) {
+              paintGeos(out, shapeGeos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
+            }
           } else {
-            paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+            paintGeos(out, state.geos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
           }
         }
         break;
       }
       case NodeType::Stroke: {
         auto stroke = static_cast<const Stroke*>(element);
-        curStroke = stroke;
+        state.curStroke = stroke;
         if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
           float a = distribute ? alpha : 1.0f;
-          if (curTextModifier && !geos.empty()) {
-            writeTextModifier(out, geos, curTextModifier, nullptr, curStroke, curTextBox, a);
-          } else if (curTextPath && !geos.empty()) {
-            writeTextPath(out, geos, curTextPath, nullptr, curStroke, curTextBox, a);
+          if (state.curTextModifier && !state.geos.empty()) {
+            // Merge with the deferred Fill so per-character spans carry both fill and
+            // stroke in a single CSS declaration, avoiding Chromium's sub-pixel offset
+            // between two stacked <div>s.
+            writeTextModifier(out, state.geos, state.curTextModifier, state.curFill,
+                              state.curStroke, curTextBox, a);
+          } else if (state.curTextPath && !state.geos.empty()) {
+            writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
+                          curTextBox, a);
+          } else if (state.curFill != nullptr) {
+            // Split geos into Text vs Shape: the Fill+Stroke span merge only matters for Text
+            // (Chromium sub-pixel offset between two stacked spans produces doubled glyph
+            // edges). For Shapes, the preceding Fill branch already painted every Shape geo
+            // as a standalone div/SVG, so carrying curFill here would re-paint it a second
+            // time on top — which silently overwrites an earlier Fill in a multi-Fill stack
+            // (e.g. painter_multiple's Fill#1 blue + Fill#2 red-multiply: curFill becomes
+            // Fill#2, and emitting it again inside Stroke#1's SVG buries Fill#1's blue).
+            // Shape geos only need the stroke overlay; fill is intentionally nullptr so the
+            // SVG emits fill="none".
+            std::vector<GeoInfo> textGeos;
+            std::vector<GeoInfo> shapeGeos;
+            for (auto& g : state.geos) {
+              if (g.type == NodeType::Text) {
+                textGeos.push_back(g);
+              } else {
+                shapeGeos.push_back(g);
+              }
+            }
+            if (!textGeos.empty()) {
+              paintGeos(out, textGeos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
+            }
+            if (!shapeGeos.empty()) {
+              paintGeos(out, shapeGeos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
+                        state.curTrim, state.hasMerge, state.mergeMode);
+            }
           } else {
-            paintGeos(out, geos, nullptr, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                      mergeMode);
+            paintGeos(out, state.geos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
           }
         }
         break;
@@ -184,310 +441,21 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
         if (!curTextBox->elements.empty()) {
-          // TextBox with child elements: render as a positioned container with text styling.
-          auto tb = curTextBox;
-          auto tbBounds = tb->layoutBounds();
-          auto tbPos = tb->renderPosition();
-          float tbW = !std::isnan(tb->width) ? tb->width : tbBounds.width;
-          float tbH = !std::isnan(tb->height) ? tb->height : tbBounds.height;
-          float tbLeft = tbPos.x;
-          float tbTop = tbPos.y;
-          std::string style = "position:absolute;left:" + FloatToString(tbLeft) +
-                              "px;top:" + FloatToString(tbTop) + "px";
-          if (!std::isnan(tbW) && tbW > 0) {
-            style += ";width:" + FloatToString(tbW) + "px";
-          }
-          if (!std::isnan(tbH) && tbH > 0) {
-            style += ";height:" + FloatToString(tbH) + "px";
-          }
-          if (tb->textAlign == TextAlign::Center) {
-            style += ";text-align:center";
-          } else if (tb->textAlign == TextAlign::End) {
-            style += ";text-align:end";
-          } else if (tb->textAlign == TextAlign::Justify) {
-            style += ";text-align:justify";
-          }
-          if (tb->paragraphAlign != ParagraphAlign::Near) {
-            style += ";display:flex;flex-direction:column";
-            if (tb->paragraphAlign == ParagraphAlign::Middle) {
-              style += ";justify-content:center";
-            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
-              style += ";justify-content:flex-end";
-            }
-          }
-          if (tb->writingMode == WritingMode::Vertical) {
-            style += ";writing-mode:vertical-rl";
-          }
-          if (tb->lineHeight > 0) {
-            style += ";line-height:" + FloatToString(tb->lineHeight) + "px";
-          }
-          if (tb->wordWrap && !std::isnan(tbW) && tbW > 0) {
-            style += ";word-wrap:break-word";
-          } else {
-            style += ";white-space:nowrap";
-          }
-          if (tb->overflow == Overflow::Hidden) {
-            style += ";overflow:hidden";
-          }
-          // Collect text spans from TextBox children (Text+Fill at top level, and Group children)
-          struct TBSpan {
-            const Text* text = nullptr;
-            const Fill* fill = nullptr;
-            const Stroke* stroke = nullptr;
-          };
-          std::vector<TBSpan> tbSpans;
-          const Fill* topFill = nullptr;
-          const Stroke* topStroke = nullptr;
-          for (auto* childElem : tb->elements) {
-            if (childElem->nodeType() == NodeType::Fill) {
-              auto fill = static_cast<const Fill*>(childElem);
-              topFill = fill;
-              for (auto& s : tbSpans) {
-                if (!s.fill) {
-                  s.fill = fill;
-                }
-              }
-            } else if (childElem->nodeType() == NodeType::Stroke) {
-              auto stroke = static_cast<const Stroke*>(childElem);
-              topStroke = stroke;
-              for (auto& s : tbSpans) {
-                if (!s.stroke) {
-                  s.stroke = stroke;
-                }
-              }
-            } else if (childElem->nodeType() == NodeType::Text) {
-              tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
-            } else if (childElem->nodeType() == NodeType::Group) {
-              auto grp = static_cast<const Group*>(childElem);
-              const Text* grpText = nullptr;
-              const Fill* grpFill = nullptr;
-              const Stroke* grpStroke = nullptr;
-              for (auto* ge : grp->elements) {
-                if (ge->nodeType() == NodeType::Text) {
-                  if (!grpText) {
-                    grpText = static_cast<const Text*>(ge);
-                  }
-                } else if (ge->nodeType() == NodeType::Fill) {
-                  grpFill = static_cast<const Fill*>(ge);
-                } else if (ge->nodeType() == NodeType::Stroke) {
-                  grpStroke = static_cast<const Stroke*>(ge);
-                }
-              }
-              if (grpText) {
-                tbSpans.push_back(
-                    {grpText, grpFill ? grpFill : topFill, grpStroke ? grpStroke : topStroke});
-              }
-            }
-          }
-          if (!tbSpans.empty()) {
-            // Pin font-size on the container so Chromium's line-box strut uses this value
-            // instead of the inherited ancestor default (typically 16px body), which would
-            // otherwise inflate each line-box above the declared `line-height` and push every
-            // text line further down than tgfx renders it. Use the smallest span font-size so
-            // the strut contribution never exceeds what any child span would produce on its own.
-            float strutSize = tbSpans[0].text->renderFontSize();
-            for (const auto& s : tbSpans) {
-              float fs = s.text->renderFontSize();
-              if (fs > 0 && fs < strutSize) {
-                strutSize = fs;
-              }
-            }
-            if (strutSize > 0) {
-              style += ";font-size:" + FloatToString(strutSize) + "px";
-            }
-            out.openTag("div");
-            out.addAttr("style", style);
-            out.closeTagStart();
-            bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
-            if (needsInnerWrap) {
-              out.openTag("div");
-              out.closeTagStart();
-            }
-            for (auto& span : tbSpans) {
-              std::string spanStyle;
-              bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
-                                     _ctx->fontHoistSignature.renderFontSize > 0;
-              if (!spanFontHoisted) {
-                if (!span.text->fontFamily.empty()) {
-                  if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-                }
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "font-size:" + FloatToString(span.text->renderFontSize()) + "px";
-                if (!span.text->fontStyle.empty()) {
-                  if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                    spanStyle += ";font-weight:bold";
-                  }
-                  if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                    spanStyle += ";font-style:italic";
-                  }
-                }
-                if (span.text->letterSpacing != 0.0f) {
-                  spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
-                }
-              }
-              if (span.fill && span.fill->color) {
-                auto ct = span.fill->color->nodeType();
-                if (ct == NodeType::SolidColor) {
-                  auto sc = static_cast<const SolidColor*>(span.fill->color);
-                  if (!spanStyle.empty()) spanStyle += ';';
-                  spanStyle += "color:" + ColorToRGBA(sc->color, span.fill->alpha);
-                } else {
-                  float ca = 1.0f;
-                  std::string css = colorToCSS(span.fill->color, &ca);
-                  if (!css.empty()) {
-                    if (!spanStyle.empty()) spanStyle += ';';
-                    spanStyle += "background:" + css;
-                    spanStyle += ";-webkit-background-clip:text;background-clip:text";
-                    spanStyle += ";-webkit-text-fill-color:transparent";
-                  }
-                }
-              }
-              if (span.text->fauxBold && !span.stroke) {
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "-webkit-text-stroke:" +
-                             FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
-                             "px currentColor";
-              }
-              if (span.stroke && span.stroke->color &&
-                  span.stroke->color->nodeType() == NodeType::SolidColor) {
-                auto sc = static_cast<const SolidColor*>(span.stroke->color);
-                if (!spanStyle.empty()) spanStyle += ';';
-                spanStyle += "-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
-                             ColorToRGBA(sc->color, span.stroke->alpha);
-                spanStyle += ";paint-order:stroke fill";
-              }
-              if (span.text->fauxItalic) {
-                if (!spanStyle.empty()) spanStyle += ';';
-                // `transform` is a no-op on pure inline boxes, so promote the span to
-                // inline-block. Each tbSpan is a short text run, so losing word-wrap inside
-                // the span is acceptable and matches the single-run expectation of fauxItalic.
-                spanStyle += "display:inline-block;transform:skewX(-12deg)";
-              }
-              out.openTag("span");
-              out.addAttr("style", spanStyle);
-              out.closeTagWithText(span.text->text);
-            }
-            if (needsInnerWrap) {
-              out.closeTag();
-            }
-            out.closeTag();
-          }
+          renderTextBoxWithSpans(out, curTextBox);
         } else if (useRichText && !richTextSpans.empty()) {
-          auto tb = curTextBox;
-          auto tbPos = tb->renderPosition();
-          std::string style = "position:absolute;left:" + FloatToString(tbPos.x) +
-                              "px;top:" + FloatToString(tbPos.y) + "px";
-          if (!std::isnan(tb->width)) {
-            style += ";width:" + FloatToString(tb->width) + "px";
-          }
-          if (!std::isnan(tb->height)) {
-            style += ";height:" + FloatToString(tb->height) + "px";
-          }
-          if (tb->paragraphAlign != ParagraphAlign::Near) {
-            style += ";display:flex;flex-direction:column";
-            if (tb->paragraphAlign == ParagraphAlign::Middle) {
-              style += ";justify-content:center";
-            } else if (tb->paragraphAlign == ParagraphAlign::Far) {
-              style += ";justify-content:flex-end";
-            }
-          }
-          if (tb->textAlign == TextAlign::Center) {
-            style += ";text-align:center";
-          } else if (tb->textAlign == TextAlign::End) {
-            style += ";text-align:end";
-          } else if (tb->textAlign == TextAlign::Justify) {
-            style += ";text-align:justify";
-          }
-          if (tb->wordWrap) {
-            style += ";word-wrap:break-word";
-          }
-          if (tb->overflow == Overflow::Hidden) {
-            style += ";overflow:hidden";
-          }
-          out.openTag("div");
-          out.addAttr("style", style);
-          out.closeTagStart();
-          bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
-          if (needsInnerWrap) {
-            out.openTag("div");
-            out.closeTagStart();
-          }
-          for (auto& span : richTextSpans) {
-            std::string spanStyle = tb->wordWrap ? "white-space:pre-wrap" : "white-space:pre";
-            bool spanFontHoisted = !_ctx->fontHoistSignature.fontFamily.empty() ||
-                                   _ctx->fontHoistSignature.renderFontSize > 0;
-            if (!spanFontHoisted) {
-              if (!span.text->fontFamily.empty()) {
-                spanStyle += ";font-family:'" + EscapeCssFontFamily(span.text->fontFamily) + "'";
-              }
-              spanStyle += ";font-size:" + FloatToString(span.text->renderFontSize()) + "px";
-              if (!span.text->fontStyle.empty()) {
-                if (span.text->fontStyle.find("Bold") != std::string::npos) {
-                  spanStyle += ";font-weight:bold";
-                }
-                if (span.text->fontStyle.find("Italic") != std::string::npos) {
-                  spanStyle += ";font-style:italic";
-                }
-              }
-              if (span.text->letterSpacing != 0.0f) {
-                spanStyle += ";letter-spacing:" + FloatToString(span.text->letterSpacing) + "px";
-              }
-            }
-            if (span.fill && span.fill->color) {
-              auto ct = span.fill->color->nodeType();
-              if (ct == NodeType::SolidColor) {
-                auto sc = static_cast<const SolidColor*>(span.fill->color);
-                spanStyle += ";color:" + ColorToRGBA(sc->color, span.fill->alpha);
-              } else {
-                float ca = 1.0f;
-                std::string css = colorToCSS(span.fill->color, &ca);
-                if (!css.empty()) {
-                  spanStyle += ";background:" + css;
-                  spanStyle += ";-webkit-background-clip:text;background-clip:text";
-                  spanStyle += ";-webkit-text-fill-color:transparent";
-                }
-              }
-            }
-            if (span.text->fauxBold && !span.stroke) {
-              spanStyle += ";-webkit-text-stroke:" +
-                           FloatToString(FauxBoldStrokeWidth(span.text->renderFontSize())) +
-                           "px currentColor";
-            }
-            if (span.stroke && span.stroke->color &&
-                span.stroke->color->nodeType() == NodeType::SolidColor) {
-              auto sc = static_cast<const SolidColor*>(span.stroke->color);
-              spanStyle += ";-webkit-text-stroke:" + FloatToString(span.stroke->width) + "px " +
-                           ColorToRGBA(sc->color, span.stroke->alpha);
-              spanStyle += ";paint-order:stroke fill";
-            }
-            if (span.text->fauxItalic) {
-              // `transform` is a no-op on pure inline boxes, so promote the span to
-              // inline-block. Each rich-text span is a short text run, so losing word-wrap
-              // inside the span is acceptable and matches the single-run expectation of
-              // fauxItalic.
-              spanStyle += ";display:inline-block;transform:skewX(-12deg)";
-            }
-            out.openTag("span");
-            out.addAttr("style", spanStyle);
-            out.closeTagWithText(span.text->text);
-          }
-          if (needsInnerWrap) {
-            out.closeTag();
-          }
-          out.closeTag();
+          renderTextBoxAsRichText(out, curTextBox, richTextSpans);
         }
         break;
       }
       case NodeType::TrimPath:
-        hasTrim = true;
-        curTrim = static_cast<const TrimPath*>(element);
+        state.hasTrim = true;
+        state.curTrim = static_cast<const TrimPath*>(element);
         break;
       case NodeType::RoundCorner: {
         auto rc = static_cast<const RoundCorner*>(element);
         roundCornerRadius = rc->radius;
         if (roundCornerRadius > 0) {
-          for (auto& g : geos) {
+          for (auto& g : state.geos) {
             if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
                 g.type == NodeType::Path || g.type == NodeType::Polystar) {
               PathData pathData = PathDataFromSVGString("");
@@ -502,17 +470,17 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       }
       case NodeType::MergePath: {
         auto mp = static_cast<const MergePath*>(element);
-        hasMerge = true;
-        mergeMode = mp->mode;
-        curFill = nullptr;
-        curStroke = nullptr;
+        state.hasMerge = true;
+        state.mergeMode = mp->mode;
+        state.curFill = nullptr;
+        state.curStroke = nullptr;
         break;
       }
       case NodeType::TextModifier:
-        curTextModifier = static_cast<const TextModifier*>(element);
+        state.curTextModifier = static_cast<const TextModifier*>(element);
         break;
       case NodeType::TextPath:
-        curTextPath = static_cast<const TextPath*>(element);
+        state.curTextPath = static_cast<const TextPath*>(element);
         break;
       case NodeType::Group: {
         auto group = static_cast<const Group*>(element);
@@ -536,74 +504,42 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           }
         }
         bool hasPainter = false;
+        bool hasText = false;
+        bool hasTextBox = false;
         for (auto* ge : group->elements) {
           auto gt = ge->nodeType();
           if (gt == NodeType::Fill || gt == NodeType::Stroke) {
             hasPainter = true;
-            break;
+          } else if (gt == NodeType::Text) {
+            hasText = true;
+          } else if (gt == NodeType::TextBox) {
+            hasTextBox = true;
           }
         }
-        if (hasPainter && group->alpha < 1.0f) {
+        // A Group with a non-identity transform (centerX/top/left constraints, scale, rotation…)
+        // must keep its own DOM wrapper when it contains a Text child. The flatten path inlines
+        // path/ellipse geos via TransformPathDataToSVG but Text is emitted by writeText, which
+        // reads Text::renderPosition relative to the Group — not the enclosing Layer — so a
+        // flattened Group would drop its constraint offset from the span's top/left and the
+        // text would collapse onto the Layer's origin (app_icons Calendar "17" symptom).
+        bool groupHasTransform = !BuildGroupMatrixForHTML(group).isIdentity();
+        // Only use the DOM wrapper (writeGroup) when the Group has a transform AND contains
+        // Text — the wrapper is needed so Text can resolve its renderPosition in Group space.
+        // Groups with alpha but no transform/text must use the flatten path so their geometry
+        // propagates upward to the enclosing scope (per PAGX spec §6.3 "Child Group geometry
+        // propagates upward"). A DOM-isolated div would block that propagation, causing outer
+        // Painters to miss the geometry (group_isolation: outer cyan Fill can't reach the
+        // inner red Rectangle, making it appear unaffected by the group's own fill).
+        // TextBox children always need the DOM wrapper: the flatten loop below has no case
+        // for NodeType::TextBox (TextBox carries a TextLayout subtree, not bare geometry, and
+        // is not something we can fold into the geos vector). Without writeGroup the TextBox
+        // would be silently dropped — pagx_features Pipeline buttons (".pagx", ".pag",
+        // "Production" labels) symptom: button background renders, label text disappears.
+        if ((hasPainter && hasText && groupHasTransform) || hasTextBox) {
           writeGroup(out, group, alpha, distribute);
         } else {
-          auto savedFill = curFill;
-          auto savedStroke = curStroke;
-          auto savedHasTrim = hasTrim;
-          auto savedTrim = curTrim;
-          curFill = nullptr;
-          curStroke = nullptr;
-          hasTrim = false;
-          curTrim = nullptr;
-          auto savedGeos = std::move(geos);
-          geos.clear();
-          std::vector<GeoInfo> groupGeos;
-          Matrix gm = BuildGroupMatrix(group);
-          for (auto* ge : group->elements) {
-            auto gt = ge->nodeType();
-            if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
-                gt == NodeType::Polystar) {
-              PathData pathData = PathDataFromSVGString("");
-              GeoToPathData(ge, gt, pathData);
-              if (!pathData.isEmpty()) {
-                std::string svgPath = gm.isIdentity() ? PathDataToSVGString(pathData)
-                                                      : TransformPathDataToSVG(pathData, gm);
-                GeoInfo info = {gt, ge, svgPath};
-                geos.push_back(info);
-                groupGeos.push_back(info);
-              }
-            } else if (gt == NodeType::Text) {
-              GeoInfo info = {gt, ge, {}};
-              geos.push_back(info);
-              groupGeos.push_back(info);
-            } else if (gt == NodeType::Fill) {
-              auto fill = static_cast<const Fill*>(ge);
-              curFill = fill;
-              if (fill->placement == targetPlacement && !hasUpcomingRepeater) {
-                float a = distribute ? alpha : 1.0f;
-                paintGeos(out, geos, curFill, nullptr, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
-              }
-            } else if (gt == NodeType::Stroke) {
-              auto stroke = static_cast<const Stroke*>(ge);
-              curStroke = stroke;
-              if (stroke->placement == targetPlacement && !hasUpcomingRepeater) {
-                float a = distribute ? alpha : 1.0f;
-                paintGeos(out, geos, curFill, curStroke, curTextBox, a, hasTrim, curTrim, hasMerge,
-                          mergeMode);
-              }
-            } else if (gt == NodeType::TrimPath) {
-              hasTrim = true;
-              curTrim = static_cast<const TrimPath*>(ge);
-            } else if (gt == NodeType::Group) {
-              writeGroup(out, static_cast<const Group*>(ge), alpha, distribute);
-            }
-          }
-          curFill = savedFill;
-          curStroke = savedStroke;
-          hasTrim = savedHasTrim;
-          curTrim = savedTrim;
-          savedGeos.insert(savedGeos.end(), groupGeos.begin(), groupGeos.end());
-          geos = std::move(savedGeos);
+          flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
+                       curTextBox, state);
         }
         break;
       }
@@ -615,8 +551,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // Mirror this ordering so the HTML decay (div opacity per copy) only kicks in when
         // the fill/stroke was declared before the Repeater (showcase_mandala Middle Ring has
         // the Stroke after, so every petal must render at full alpha).
-        const Fill* repFillBefore = curFill;
-        const Stroke* repStrokeBefore = curStroke;
+        const Fill* repFillBefore = state.curFill;
+        const Stroke* repStrokeBefore = state.curStroke;
         const Fill* repFillAfter = nullptr;
         const Stroke* repStrokeAfter = nullptr;
         if (!repFillBefore || !repStrokeBefore) {
@@ -640,18 +576,22 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         const Fill* repFill = repFillBefore ? repFillBefore : repFillAfter;
         const Stroke* repStroke = repStrokeBefore ? repStrokeBefore : repStrokeAfter;
         bool applyDecay = (repFillBefore != nullptr) || (repStrokeBefore != nullptr);
-        writeRepeater(out, rep, geos, repFill, repStroke, distribute ? alpha : 1.0f, curTrim,
-                      applyDecay);
-        geos.clear();
-        curFill = nullptr;
-        curStroke = nullptr;
-        hasTrim = false;
-        curTrim = nullptr;
-        hasMerge = false;
-        mergeMode = MergePathMode::Append;
+        writeRepeater(out, rep, state.geos, repFill, repStroke, distribute ? alpha : 1.0f,
+                      state.curTrim, applyDecay);
+        state.geos.clear();
+        state.curFill = nullptr;
+        state.curStroke = nullptr;
+        state.hasTrim = false;
+        state.curTrim = nullptr;
+        state.hasMerge = false;
+        state.mergeMode = MergePathMode::Append;
         roundCornerRadius = 0.0f;
-        curTextModifier = nullptr;
-        curTextPath = nullptr;
+        state.curTextModifier = nullptr;
+        state.curTextPath = nullptr;
+        // Clear the flag so that geometry appearing after this Repeater (e.g. rotated Group lines
+        // in game_hud Background) can be painted immediately by a subsequent Fill/Stroke rather
+        // than being deferred indefinitely and silently discarded.
+        hasUpcomingRepeater = false;
         break;
       }
       default:
@@ -660,7 +600,668 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   }
 }
 
-static std::string clipPathFromContents(const Layer* layer) {
+struct ElementDispatchStateGuard {
+  HTMLWriter::ElementDispatchState& state;
+  const Fill* savedFill;
+  const Stroke* savedStroke;
+  bool savedHasTrim;
+  const TrimPath* savedTrim;
+  const TextPath* savedTextPath;
+  const TextModifier* savedTextModifier;
+  bool savedHasMerge;
+  MergePathMode savedMergeMode;
+  std::vector<HTMLWriter::GeoInfo> savedGeos;
+
+  ElementDispatchStateGuard(HTMLWriter::ElementDispatchState& s) : state(s) {
+    savedFill = state.curFill;
+    savedStroke = state.curStroke;
+    savedHasTrim = state.hasTrim;
+    savedTrim = state.curTrim;
+    savedTextPath = state.curTextPath;
+    savedTextModifier = state.curTextModifier;
+    savedHasMerge = state.hasMerge;
+    savedMergeMode = state.mergeMode;
+    savedGeos = std::move(state.geos);
+    state.curFill = nullptr;
+    state.curStroke = nullptr;
+    state.hasTrim = false;
+    state.curTrim = nullptr;
+    state.hasMerge = false;
+    state.mergeMode = MergePathMode::Append;
+    state.curTextPath = nullptr;
+    state.curTextModifier = nullptr;
+    state.geos.clear();
+  }
+
+  ~ElementDispatchStateGuard() {
+    state.curFill = savedFill;
+    state.curStroke = savedStroke;
+    state.hasTrim = savedHasTrim;
+    state.curTrim = savedTrim;
+    state.curTextPath = savedTextPath;
+    state.curTextModifier = savedTextModifier;
+    state.hasMerge = savedHasMerge;
+    state.mergeMode = savedMergeMode;
+    state.geos = std::move(savedGeos);
+  }
+};
+
+void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
+                              LayerPlacement targetPlacement, bool hasUpcomingRepeater,
+                              const TextBox* curTextBox, ElementDispatchState& state) {
+  ElementDispatchStateGuard stateGuard(state);
+  std::vector<GeoInfo> groupGeos;
+  Matrix gm = BuildGroupMatrixForHTML(group);
+  // When a Group has alpha < 1, its Painters render with that alpha applied. In the
+  // flatten path, carry the group's alpha into every paintGeos/writeTextPath/
+  // writeTextModifier call so the fill-opacity matches the tgfx compositing result.
+  float groupAlpha = group->alpha;
+  // The group's own padding insets its children's constraint frame, mirroring Layer's
+  // behaviour; propagate it so stretch-rect children avoid the `inset:0` shortcut.
+  const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
+  // Mirror the outer `hasUpcomingRepeater` scan: a Fill/Stroke that appears before a
+  // Repeater inside the group must NOT paint immediately, otherwise the pre-repeater
+  // single copy would render and the Repeater's path-level expansion would have no
+  // painter to attach to (complete_example Modifiers cyan ellipse only shows 1 of 5).
+  bool groupHasUpcomingRepeater = false;
+  for (auto* ge : group->elements) {
+    if (ge->nodeType() == NodeType::Repeater) {
+      groupHasUpcomingRepeater = true;
+      break;
+    }
+  }
+  for (auto* ge : group->elements) {
+    auto gt = ge->nodeType();
+    if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
+        gt == NodeType::Polystar) {
+      PathData pathData = PathDataFromSVGString("");
+      GeoToPathData(ge, gt, pathData);
+      if (!pathData.isEmpty()) {
+        std::string svgPath =
+            gm.isIdentity() ? PathDataToSVGString(pathData) : TransformPathDataToSVG(pathData, gm);
+        GeoInfo info = {gt, ge, svgPath, groupPadding};
+        state.geos.push_back(info);
+        groupGeos.push_back(info);
+      }
+    } else if (gt == NodeType::Text) {
+      GeoInfo info = {gt, ge, {}, groupPadding};
+      state.geos.push_back(info);
+      groupGeos.push_back(info);
+    } else if (gt == NodeType::TextPath) {
+      // Flatten path mirrors the top-level TextPath handler: capture the element so
+      // the subsequent Fill/Stroke triggers per-character path emission via
+      // writeTextPath instead of a plain <span> (text_path Group TextPath symptom).
+      state.curTextPath = static_cast<const TextPath*>(ge);
+    } else if (gt == NodeType::TextModifier) {
+      state.curTextModifier = static_cast<const TextModifier*>(ge);
+    } else if (gt == NodeType::Fill) {
+      auto fill = static_cast<const Fill*>(ge);
+      state.curFill = fill;
+      if (fill->placement == targetPlacement && !hasUpcomingRepeater && !groupHasUpcomingRepeater) {
+        float a = groupAlpha * (distribute ? alpha : 1.0f);
+        if (state.curTextPath && !state.geos.empty()) {
+          writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox, a);
+          state.geos.clear();
+          groupGeos.clear();
+        } else if (state.curTextModifier && !state.geos.empty()) {
+          writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
+                            curTextBox, a);
+          state.geos.clear();
+          groupGeos.clear();
+        } else {
+          paintGeos(out, state.geos, state.curFill, nullptr, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
+        }
+      }
+    } else if (gt == NodeType::Stroke) {
+      auto stroke = static_cast<const Stroke*>(ge);
+      state.curStroke = stroke;
+      if (stroke->placement == targetPlacement && !hasUpcomingRepeater &&
+          !groupHasUpcomingRepeater) {
+        float a = groupAlpha * (distribute ? alpha : 1.0f);
+        if (state.curTextPath && !state.geos.empty()) {
+          writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
+                        curTextBox, a);
+          state.geos.clear();
+          groupGeos.clear();
+        } else if (state.curTextModifier && !state.geos.empty()) {
+          writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, state.curStroke,
+                            curTextBox, a);
+          state.geos.clear();
+          groupGeos.clear();
+        } else {
+          paintGeos(out, state.geos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
+        }
+      }
+    } else if (gt == NodeType::TrimPath) {
+      state.hasTrim = true;
+      state.curTrim = static_cast<const TrimPath*>(ge);
+    } else if (gt == NodeType::Repeater) {
+      // Expand the Repeater at path level inside the Group: instead of emitting N copy
+      // <div>s here (which would need Group-internal painters, undoing the "defer Fill
+      // to outer Repeater" contract), we grow groupGeos from K to K*copies and stamp
+      // each copy's transform into the geo's modifiedPathData. The outer Repeater then
+      // sees the fully expanded path set and applies its own transforms on top, which
+      // matches tgfx's Repeater-inside-Group semantics (inner multiplies geometry,
+      // outer multiplies the result). Alpha decay ramps on the inner Repeater would
+      // need a per-geo alpha to survive this collapse; carrying one through GeoInfo is
+      // an open issue, so samples relying on inner startAlpha/endAlpha will lose the
+      // decay — we keep the default alpha=1 case (verify_c6) correct and flag the
+      // restriction for follow-up if it surfaces.
+      auto innerRep = static_cast<const Repeater*>(ge);
+      if (!std::isfinite(innerRep->copies) || innerRep->copies <= 0) {
+        break;
+      }
+      int copies = static_cast<int>(std::ceil(innerRep->copies));
+      if (copies <= 0 || groupGeos.empty()) {
+        break;
+      }
+      std::vector<GeoInfo> originalGeos = groupGeos;
+      // Drop original-index entries we are about to re-emit in the expansion loop. We
+      // also trim `geos` (which mirrors groupGeos at this point thanks to the dual
+      // push_back pattern above) so we do not paint the pre-expansion copy twice.
+      state.geos.resize(state.geos.size() - originalGeos.size());
+      groupGeos.clear();
+      for (int i = 0; i < copies; i++) {
+        Matrix cm = BuildRepeaterCopyMatrix(innerRep, i);
+        // Compose (gm ∘ cm): apply the repeater copy transform in Group-local space
+        // first, then translate/rotate/scale the whole Group into the enclosing Layer's
+        // space via gm. The previous code pulled the already-gm-baked path out of
+        // `modifiedPathData` and rotated it around the Layer origin, which multiplied
+        // any Group offset by sin/cos of the rotation angle and produced huge
+        // off-viewBox coordinates (complete_example Modifiers cyan Repeater symptom:
+        // ellipses scattered at ±500px instead of ±28px around the Group centre).
+        Matrix combined = gm.isIdentity() ? cm : (gm * cm);
+        for (const auto& orig : originalGeos) {
+          GeoInfo copy = orig;
+          PathData pathData = PathDataFromSVGString("");
+          if (orig.type == NodeType::Rectangle || orig.type == NodeType::Ellipse ||
+              orig.type == NodeType::Path || orig.type == NodeType::Polystar) {
+            GeoToPathData(orig.element, orig.type, pathData);
+          }
+          if (!pathData.isEmpty()) {
+            copy.modifiedPathData = combined.isIdentity()
+                                        ? PathDataToSVGString(pathData)
+                                        : TransformPathDataToSVG(pathData, combined);
+          }
+          groupGeos.push_back(copy);
+          state.geos.push_back(copy);
+        }
+      }
+      // If a Fill or Stroke was declared BEFORE this Repeater, its paint was deferred
+      // (see `groupHasUpcomingRepeater` above) so the expansion now needs to render the
+      // N copies explicitly. Without this a Group shaped like `<Ellipse/> <Fill/>
+      // <Repeater copies=5/>` would fall off the end of the loop with `groupGeos`
+      // holding all 5 copies but no paintGeos call to emit them (complete_example
+      // Modifiers cyan 5-ellipse symptom: only 1 copy visible when the later Fill path
+      // also forgot to paint).
+      if (state.curFill || state.curStroke) {
+        if (hasUpcomingRepeater) {
+          // An outer Repeater will consume the expanded geos as its geometry source;
+          // calling paintGeos here would render them once and then clear the vector,
+          // leaving the outer Repeater with an empty geo list and producing only the
+          // outer copy-0 div (verify_c6_nested_repeater: 1 row instead of 18).
+          // Instead, keep geos in place so the outer Repeater sees all 30 copies.
+        } else {
+          float a = groupAlpha * (distribute ? alpha : 1.0f);
+          paintGeos(out, state.geos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                    state.curTrim, state.hasMerge, state.mergeMode);
+          state.geos.clear();
+          groupGeos.clear();
+          // `groupHasUpcomingRepeater` was only about deferring the pre-repeater paint;
+          // now that we have painted, any later Fill/Stroke for the same group should
+          // paint immediately again (not that PAGX samples normally need both).
+          groupHasUpcomingRepeater = false;
+        }
+      }
+    } else if (gt == NodeType::Group) {
+      writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
+    } else if (gt == NodeType::RoundCorner) {
+      // Mirror the top-level RoundCorner handler (case above): apply the radius to
+      // every shape geo that came before it in the group's element list, replacing
+      // each geo's modifiedPathData with the rounded path. Without this a Group that
+      // wraps `<Rectangle/> <RoundCorner/> <Fill/>` would paint a sharp rectangle
+      // (complete_example Modifiers emerald rect symptom).
+      auto rc = static_cast<const RoundCorner*>(ge);
+      float rcRadius = rc->radius;
+      if (rcRadius > 0) {
+        for (auto& g : groupGeos) {
+          if (g.type == NodeType::Rectangle || g.type == NodeType::Ellipse ||
+              g.type == NodeType::Path || g.type == NodeType::Polystar) {
+            PathData pathData = PathDataFromSVGString("");
+            GeoToPathData(g.element, g.type, pathData);
+            PathData rounded = PathDataFromSVGString("");
+            ApplyRoundCorner(pathData, rcRadius, rounded);
+            std::string svgPath = gm.isIdentity() ? PathDataToSVGString(rounded)
+                                                  : TransformPathDataToSVG(rounded, gm);
+            g.modifiedPathData = svgPath;
+          }
+        }
+        // `geos` mirrors groupGeos — keep them in sync so the later paintGeos sees
+        // the rounded data as well.
+        size_t headSize = state.geos.size() - groupGeos.size();
+        for (size_t i = 0; i < groupGeos.size(); i++) {
+          state.geos[headSize + i].modifiedPathData = groupGeos[i].modifiedPathData;
+        }
+      }
+    } else if (gt == NodeType::MergePath) {
+      // Propagate MergePath into the shared flag used by renderSVG / canCSS, mirroring
+      // the top-level element handler. Without this, a Group containing
+      // `<Rectangle/> <Ellipse/> <MergePath mode="xor"/> <Fill/>` would emit the two
+      // shapes as independent SVG paths instead of combining them (complete_example
+      // Modifiers purple rect+ellipse xor symptom).
+      auto mp = static_cast<const MergePath*>(ge);
+      state.hasMerge = true;
+      state.mergeMode = mp->mode;
+      state.curFill = nullptr;
+      state.curStroke = nullptr;
+    }
+  }
+  // Propagate the Group's Fill/Stroke out to the enclosing element stream. Without
+  // this, a Group that declares a Fill (to be consumed by an outer Repeater that
+  // copies the Group's geos 18× worth of times, say) would lose the Fill on Group exit
+  // — the outer Repeater would then paint uncoloured paths. Only override the outer
+  // painter when it was unset; an outer painter that existed before the Group enters
+  // is preserved to keep the existing "Repeater consumes pre-existing painter" rule.
+  if (!stateGuard.savedFill && state.curFill) {
+    stateGuard.savedFill = state.curFill;
+  }
+  if (!stateGuard.savedStroke && state.curStroke) {
+    stateGuard.savedStroke = state.curStroke;
+  }
+  stateGuard.savedGeos.insert(stateGuard.savedGeos.end(), groupGeos.begin(), groupGeos.end());
+}
+
+void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
+  // TextBox with child elements: render as a positioned container with text styling.
+  auto tbBounds = tb->layoutBounds();
+  auto tbPos = tb->renderPosition();
+  // Determine whether the TextBox has an externally-determined width/height (as opposed to
+  // auto-sizing from text content). The width can come from three sources:
+  //   1. Explicit authored attribute: width="160"
+  //   2. Opposite-edge constraints: left="0" right="0" (resolved by PerformConstraintLayout)
+  //   3. Percent of parent: percentWidth="50"
+  // When none of these apply, the box is auto-sized and we emit `width:max-content` so
+  // Chromium sizes it to its own text measurement (avoiding unwanted line breaks from the
+  // slight metric difference between tgfx and Chromium).
+  bool layoutW = !std::isnan(tb->width) || (!std::isnan(tb->left) && !std::isnan(tb->right)) ||
+                 !std::isnan(tb->percentWidth);
+  bool layoutH = !std::isnan(tb->height) || (!std::isnan(tb->top) && !std::isnan(tb->bottom)) ||
+                 !std::isnan(tb->percentHeight);
+  float tbW = tbBounds.width;
+  float tbH = tbBounds.height;
+  float tbLeft = tbPos.x;
+  float tbTop = tbPos.y;
+  std::string style = "position:absolute;left:" + CssFloatToString(tbLeft) +
+                      "px;top:" + CssFloatToString(tbTop) + "px";
+  if (layoutW && tbW > 0) {
+    style += ";width:" + CssFloatToString(tbW) + "px";
+  } else if (!layoutW) {
+    // For vertical writing-mode TextBoxes, tgfx has already measured the exact column
+    // width needed; use that fixed value so Chromium produces the same column layout.
+    // For horizontal auto-sized boxes, keep max-content so Chromium's slightly wider
+    // font metrics don't trigger an unwanted line break at the tgfx boundary.
+    if (tb->writingMode == WritingMode::Vertical && tbW > 0) {
+      style += ";width:" + CssFloatToString(tbW) + "px";
+    } else {
+      style += ";width:max-content";
+    }
+  }
+  if (layoutH && tbH > 0) {
+    style += ";height:" + CssFloatToString(tbH) + "px";
+  }
+  // PAGX `<TextBox padding="...">` insets the text content from the box edges:
+  // tgfx subtracts padding from layoutWidth/Height before line breaking, so the
+  // wrapped lines obey the inner content rectangle. Emit the same inset in CSS
+  // via `padding:...; box-sizing:border-box` so Chromium wraps at the same
+  // inner width — without this, layoutWidth=200 leaks the full 200 to the line
+  // breaker and we get one fewer line wrap than PAGX (visible in
+  // layout/padding_unified where the HTML squeezes "The text" onto line 1).
+  if (!tb->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(tb->padding);
+    style += ";box-sizing:border-box";
+  }
+  if (tb->textAlign == TextAlign::Center) {
+    style += ";text-align:center";
+  } else if (tb->textAlign == TextAlign::End) {
+    style += ";text-align:end";
+  } else if (tb->textAlign == TextAlign::Justify) {
+    // text-align-last:left aligns the final paragraph line (after the last <br> or at end
+    // of content) to the start, matching tgfx where the last line is not justified.
+    style += ";text-align:justify;text-align-last:left";
+  }
+  // Anchor mode: TextBox authored with width="0" / height="0" (explicit zero, not NaN)
+  // uses the TextBox's origin as a single anchor point and relies on textAlign /
+  // paragraphAlign to place the text relative to that point. tgfx collapses the box to
+  // zero size and lets each line flow past the anchor. CSS `text-align` alone can't
+  // reproduce the horizontal case because our emitted container has `width:max-content`
+  // (hugging the glyph run); `display:flex; justify-content:center/flex-end` alone can't
+  // reproduce the vertical case because the box height is also `max-content`. Shift the
+  // entire box with `transform:translate(-X%, -Y%)` so the anchor lands on the correct
+  // glyph edge — -50% for Center/Middle, -100% for End/Far.
+  bool widthAnchor =
+      !std::isnan(tb->width) && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
+  bool heightAnchor =
+      !std::isnan(tb->height) && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
+  if (widthAnchor || heightAnchor) {
+    std::string tx = "0";
+    std::string ty = "0";
+    if (widthAnchor) {
+      tx = (tb->textAlign == TextAlign::Center) ? "-50%" : "-100%";
+    }
+    if (heightAnchor) {
+      ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
+    }
+    style += ";transform:translate(" + tx + "," + ty + ")";
+  }
+  if (tb->paragraphAlign != ParagraphAlign::Near) {
+    style += ";display:flex;flex-direction:column";
+    if (tb->paragraphAlign == ParagraphAlign::Middle) {
+      style += ";justify-content:center";
+    } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+      style += ";justify-content:flex-end";
+    }
+  }
+  if (tb->writingMode == WritingMode::Vertical) {
+    style += ";writing-mode:vertical-rl";
+  }
+  // Only enable word-wrap when the box has an explicit width that was authored
+  // to contain multi-line text. When the width comes from tgfx's own content
+  // measurement (no explicit width), Chromium's slightly wider font metrics would
+  // immediately overflow that measured width and trigger an unwanted line break.
+  // Vertical writing-mode boxes rely on the box height to trigger column breaks;
+  // white-space:nowrap would suppress column wrapping entirely, so skip it.
+  //
+  // Note: container-level `white-space:pre-wrap` is avoided because pretty-printed
+  // HTML puts indentation and newlines between the container <div> and its inner
+  // <span> tags; `pre-wrap` on the container would render those as leading blank
+  // lines. TAB handling is applied per-span instead (see spanStyle below).
+  if (tb->wordWrap && layoutW && tbW > 0) {
+    style += ";word-wrap:break-word";
+  } else if (tb->writingMode != WritingMode::Vertical) {
+    style += ";white-space:nowrap";
+  }
+  // Defer the Overflow::Hidden emit until after tbSpans is collected: when the
+  // TextBox has a known height and line-height we can translate tgfx's whole-line
+  // drop semantics into CSS `-webkit-line-clamp`, which matches tgfx much more
+  // closely than a raw `overflow:hidden` pixel clip (which otherwise renders a
+  // partial line whose glyphs tgfx would have dropped entirely).
+  std::vector<TBSpan> tbSpans;
+  const Fill* topFill = nullptr;
+  const Stroke* topStroke = nullptr;
+  for (auto* childElem : tb->elements) {
+    if (childElem->nodeType() == NodeType::Fill) {
+      auto fill = static_cast<const Fill*>(childElem);
+      topFill = fill;
+      for (auto& s : tbSpans) {
+        if (!s.fill) {
+          s.fill = fill;
+        }
+      }
+    } else if (childElem->nodeType() == NodeType::Stroke) {
+      auto stroke = static_cast<const Stroke*>(childElem);
+      topStroke = stroke;
+      for (auto& s : tbSpans) {
+        if (!s.stroke) {
+          s.stroke = stroke;
+        }
+      }
+    } else if (childElem->nodeType() == NodeType::Text) {
+      tbSpans.push_back({static_cast<const Text*>(childElem), topFill, topStroke});
+    } else if (childElem->nodeType() == NodeType::Group) {
+      GroupSpanCollector::Collect(static_cast<const Group*>(childElem), topFill, topStroke,
+                                  tbSpans);
+    }
+  }
+  if (!tbSpans.empty()) {
+    // Honour the authored TextBox.lineHeight only. The previous fallback derived a
+    // container line-height from per-glyph fontLineHeight metrics; that path was removed
+    // along with Text::fontLineHeight(), so when no lineHeight is authored Chromium falls
+    // back to its own line-height:normal (read from the font's OS/2 metrics).
+    float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+    if (lineH > 0) {
+      style += ";line-height:" + CssFloatToString(lineH) + "px";
+    }
+    // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
+    // any line whose bottom extends past the box. A max-height based on tgfx's line count
+    // would differ from CSS when Chromium wraps lines differently; using only overflow:hidden
+    // clips at the declared box boundary and matches tgfx when line counts agree, and
+    // gracefully clips at the box edge when they diverge.
+    if (tb->overflow == Overflow::Hidden) {
+      style += ";overflow:hidden";
+      if (tb->writingMode == WritingMode::Vertical) {
+        // CSS overflow:hidden pixel-clips; tgfx drops entire columns. The visual difference
+        // (partial column visible in HTML vs fully hidden in PAGX) is accepted as a known
+        // divergence until tgfx aligns with CSS pixel-clip semantics.
+      } else {
+        // Horizontal overflow:hidden — CSS pixel-clips naturally; no height manipulation.
+      }
+    }
+    // Detect RTL paragraph direction from the first span's text so text aligns right
+    // within the box, matching tgfx's bidi-resolved layout (paragraphRTL=true).
+    if (!tbSpans.empty() && !tbSpans[0].text->text.empty()) {
+      if (TextStartsWithRTL(tbSpans[0].text->text)) {
+        style += ";direction:rtl";
+      }
+    }
+    out.openTag("div");
+    out.addAttr("style", style);
+    out.closeTagStart();
+    bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+    if (needsInnerWrap) {
+      out.openTag("div");
+      out.closeTagStart();
+    }
+    // Track the previous span's trailing newline count and font-size so we can wrap
+    // empty-line `<br>`s in the previous span's font-size when the next span has its
+    // own font-size. PAGX uses the fontLineHeight of the `\n` glyph that started the
+    // empty line; CSS `<br>` inherits its parent's font-size, so a bare `<br>` between
+    // two spans of different sizes would inherit the container's strut and produce a
+    // line-box too short for what tgfx renders.
+    size_t prevTrailingBreaks = 0;
+    float prevFontSize = 0;
+    bool isFirstSpan = true;
+    for (auto& span : tbSpans) {
+      // Detect TAB characters for pre-wrap handling.
+      std::string spanPrefix;
+      if (span.text && span.text->text.find('\t') != std::string::npos) {
+        float spanSize = span.text->renderFontSize();
+        spanPrefix += "white-space:pre-wrap";
+        if (spanSize > 0) {
+          spanPrefix += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+        }
+      }
+      std::string spanStyle = buildTextBoxSpanStyle(span.text, span.fill, span.stroke, spanPrefix);
+      float spanFontSize = span.text->renderFontSize();
+      size_t leadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
+      EmitBetweenSpanBreaks(out, prevTrailingBreaks, leadingBreaks, prevFontSize, spanFontSize,
+                            isFirstSpan);
+      // Detect single-span horizontal justify-with-\n upfront — when true, we emit
+      // a <div> per \n-segment instead of a single <span>...<br>... so each segment
+      // becomes its own justify paragraph. CSS treats every <br> as a paragraph
+      // terminator for `text-align:justify` purposes, so this rewrite is the only
+      // way to get the line-before-<br> justified the way tgfx does.
+      //
+      // PAGX justify semantic: lines before \n ARE justified.
+      // CSS justify semantic: lines before <br> are NOT justified (treated as last line).
+      // When tgfx aligns with CSS justify semantics (not justifying lines before \n),
+      // this paragraph-split logic should be removed.
+      bool useJustifyParagraphSplit =
+          tb->textAlign == TextAlign::Justify && tb->writingMode != WritingMode::Vertical &&
+          tbSpans.size() == 1 && span.text && span.text->text.find('\n') != std::string::npos;
+      if (useJustifyParagraphSplit) {
+        const std::string& src = span.text->text;
+        size_t pos = 0;
+        std::vector<std::string> segments;
+        while (pos <= src.size()) {
+          size_t nl = src.find('\n', pos);
+          if (nl == std::string::npos) {
+            segments.push_back(src.substr(pos));
+            break;
+          }
+          segments.push_back(src.substr(pos, nl - pos));
+          pos = nl + 1;
+        }
+        for (size_t si = 0; si < segments.size(); ++si) {
+          bool isLast = (si + 1 == segments.size());
+          std::string segStyle = spanStyle;
+          if (!isLast) {
+            if (!segStyle.empty()) segStyle += ';';
+            segStyle += "text-align-last:justify";
+          }
+          out.openTag("div");
+          if (!segStyle.empty()) {
+            out.addAttr("style", segStyle);
+          }
+          out.closeTagWithText(segments[si]);
+        }
+        prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
+      out.openTag("span");
+      out.addAttr("style", spanStyle);
+      // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
+      // lineHeight that exceeds the glyph's natural advance), emit per-CJK-character
+      // wrappers so each CJK glyph's inline-axis advance is pinned to the value tgfx
+      // computed (including justifyGap). CSS `text-align:justify` in vertical-rl does
+      // not insert inter-CJK gaps (only inter-word), so we have to wrap the glyphs
+      // ourselves to reproduce tgfx's justify distribution on mixed CJK/Latin runs.
+      {
+        // Use closeTagWithTextBreaks so U+000A (from &#10;) inside the inner content
+        // renders as <br> rather than being folded into a space by the browser's
+        // default white-space handling. Leading/trailing <br>s are hoisted outside
+        // the span by HTMLWriterLayer (above) so they can be wrapped in the
+        // appropriate empty-line owner font-size.
+        std::string spanText = span.text->text;
+        out.closeTagWithTextBreaks(spanText);
+      }
+      prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+      prevFontSize = spanFontSize;
+      isFirstSpan = false;
+    }
+    // Flush any trailing breaks left over from the last span. These are dangling
+    // empty lines after the final visible content; emit them so the box's reported
+    // ink height matches PAGX (relevant for boxes that auto-measure cross-axis).
+    for (size_t bi = 0; bi < prevTrailingBreaks; ++bi) {
+      if (bi == 0) {
+        out.emitBreaks(1);
+      } else if (prevFontSize > 0) {
+        out.emitRaw("<span style=\"font-size:" + CssFloatToString(prevFontSize) +
+                    "px\"><br></span>");
+      } else {
+        out.emitBreaks(1);
+      }
+    }
+    if (needsInnerWrap) {
+      out.closeTag();
+    }
+    out.closeTag();
+  }
+}
+
+void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
+                                         const std::vector<RichTextSpan>& richTextSpans) {
+  auto tbPos = tb->renderPosition();
+  std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
+                      "px;top:" + CssFloatToString(tbPos.y) + "px";
+  if (!std::isnan(tb->width)) {
+    style += ";width:" + CssFloatToString(tb->width) + "px";
+  }
+  if (!std::isnan(tb->height)) {
+    style += ";height:" + CssFloatToString(tb->height) + "px";
+  }
+  // Match the tbSpans branch above: emit TextBox padding so Chromium wraps at
+  // the same inner content rect tgfx used during layout.
+  if (!tb->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(tb->padding);
+    style += ";box-sizing:border-box";
+  }
+  if (tb->paragraphAlign != ParagraphAlign::Near) {
+    style += ";display:flex;flex-direction:column";
+    if (tb->paragraphAlign == ParagraphAlign::Middle) {
+      style += ";justify-content:center";
+    } else if (tb->paragraphAlign == ParagraphAlign::Far) {
+      style += ";justify-content:flex-end";
+    }
+  }
+  if (tb->textAlign == TextAlign::Center) {
+    style += ";text-align:center";
+  } else if (tb->textAlign == TextAlign::End) {
+    style += ";text-align:end";
+  } else if (tb->textAlign == TextAlign::Justify) {
+    style += ";text-align:justify;text-align-last:left";
+  }
+  if (tb->wordWrap) {
+    style += ";word-wrap:break-word";
+  }
+  // Defer Overflow::Hidden until after line-height is known so we can apply
+  // `-webkit-line-clamp` (matching tgfx's whole-line drop) whenever eligible.
+  // Honour the authored TextBox.lineHeight only. The previous fallback derived a
+  // container line-height from per-glyph fontLineHeight metrics; that path was removed
+  // along with Text::fontLineHeight().
+  float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
+  if (rtLineH > 0) {
+    style += ";line-height:" + CssFloatToString(rtLineH) + "px";
+  }
+  if (tb->overflow == Overflow::Hidden) {
+    style += ";overflow:hidden";
+  }
+  out.openTag("div");
+  out.addAttr("style", style);
+  out.closeTagStart();
+  bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+  if (needsInnerWrap) {
+    out.openTag("div");
+    out.closeTagStart();
+  }
+  // Same between-span <br> handling as the tbSpans branch above: empty-line <br>s
+  // (those that aren't terminating the prior span's content line) need to inherit
+  // the fontLineHeight of the `\n` that produced them, not the container strut.
+  size_t rtPrevTrailingBreaks = 0;
+  float rtPrevFontSize = 0;
+  for (auto& span : richTextSpans) {
+    std::string spanPrefix = tb->wordWrap ? "" : "white-space:nowrap";
+    if (span.text && span.text->text.find('\t') != std::string::npos) {
+      float spanSize = span.text->renderFontSize();
+      if (!spanPrefix.empty()) spanPrefix += ';';
+      spanPrefix += "white-space:pre-wrap";
+      if (spanSize > 0) {
+        spanPrefix += ";tab-size:" + CssFloatToString(spanSize * 4) + "px";
+      }
+    }
+    std::string spanStyle = buildTextBoxSpanStyle(span.text, span.fill, span.stroke, spanPrefix);
+    float rtSpanFontSize = span.text->renderFontSize();
+    size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
+    EmitBetweenSpanBreaks(out, rtPrevTrailingBreaks, rtLeadingBreaks, rtPrevFontSize,
+                          rtSpanFontSize, false);
+    out.openTag("span");
+    out.addAttr("style", spanStyle);
+    std::string rtSpanText = span.text->text;
+    out.closeTagWithTextBreaks(rtSpanText);
+    rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+    rtPrevFontSize = rtSpanFontSize;
+  }
+  // Flush remaining trailing breaks from the last rich-text span.
+  for (size_t bi = 0; bi < rtPrevTrailingBreaks; ++bi) {
+    if (bi == 0) {
+      out.emitBreaks(1);
+    } else if (rtPrevFontSize > 0) {
+      out.emitRaw("<span style=\"font-size:" + CssFloatToString(rtPrevFontSize) +
+                  "px\"><br></span>");
+    } else {
+      out.emitBreaks(1);
+    }
+  }
+  if (needsInnerWrap) {
+    out.closeTag();
+  }
+  out.closeTag();
+}
+
+static std::string ClipPathFromContents(const Layer* layer) {
   auto layerBounds = layer->layoutBounds();
   float containerW = layerBounds.width;
   float containerH = layerBounds.height;
@@ -682,10 +1283,11 @@ static std::string clipPathFromContents(const Layer* layer) {
       if (left < 0) left = 0;
       if (bottom < 0) bottom = 0;
       if (right < 0) right = 0;
-      std::string clip = ";clip-path:inset(" + FloatToString(top) + "px " + FloatToString(right) +
-                         "px " + FloatToString(bottom) + "px " + FloatToString(left) + "px";
+      std::string clip = ";clip-path:inset(" + CssFloatToString(top) + "px " +
+                         CssFloatToString(right) + "px " + CssFloatToString(bottom) + "px " +
+                         CssFloatToString(left) + "px";
       if (r->roundness > 0) {
-        clip += " round " + FloatToString(r->roundness) + "px";
+        clip += " round " + CssFloatToString(r->roundness) + "px";
       }
       clip += ")";
       return clip;
@@ -698,9 +1300,9 @@ static std::string clipPathFromContents(const Layer* layer) {
       }
       float cx = bounds.x + bounds.width / 2;
       float cy = bounds.y + bounds.height / 2;
-      return ";clip-path:ellipse(" + FloatToString(bounds.width / 2) + "px " +
-             FloatToString(bounds.height / 2) + "px at " + FloatToString(cx) + "px " +
-             FloatToString(cy) + "px)";
+      return ";clip-path:ellipse(" + CssFloatToString(bounds.width / 2) + "px " +
+             CssFloatToString(bounds.height / 2) + "px at " + CssFloatToString(cx) + "px " +
+             CssFloatToString(cy) + "px)";
     }
   }
   return {};
@@ -717,7 +1319,7 @@ static std::string clipPathFromContents(const Layer* layer) {
 // `backdrop-filter` sampling path. `box-shadow` does not establish that context, but it paints
 // along the element's own border-box — only correct when we can also put the matching
 // border-radius on that border-box.
-static std::string layerBoxShadowBorderRadius(const Layer* layer) {
+static std::string LayerBoxShadowBorderRadius(const Layer* layer) {
   auto layerBounds = layer->layoutBounds();
   float containerW = layerBounds.width;
   float containerH = layerBounds.height;
@@ -731,14 +1333,14 @@ static std::string layerBoxShadowBorderRadius(const Layer* layer) {
       if (bounds.isEmpty()) {
         continue;
       }
-      // Rectangle must fully cover the layer (same logic as clipPathFromContents: top/left/
+      // Rectangle must fully cover the layer (same logic as ClipPathFromContents: top/left/
       // bottom/right insets are all zero). Otherwise box-shadow would trace the wrong outline.
       if (bounds.x > 0.5f || bounds.y > 0.5f || bounds.x + bounds.width < containerW - 0.5f ||
           bounds.y + bounds.height < containerH - 0.5f) {
         return {};
       }
       if (r->roundness > 0) {
-        return FloatToString(r->roundness) + "px";
+        return CssFloatToString(r->roundness) + "px";
       }
       return "0";
     }
@@ -782,8 +1384,21 @@ struct ShadowShape {
   bool valid = false;
 };
 
-static ShadowShape findLayerShadowShape(const Layer* layer) {
+static ShadowShape FindLayerShadowShape(const Layer* layer) {
   ShadowShape s = {};
+  // The shadow source div is a solid-filled CSS box. This only makes sense when the layer has a
+  // Fill — a stroke-only layer (e.g. game_hud circle outline) must not produce a filled shadow
+  // div because that would paint a solid disc over the interior of the stroke shape.
+  bool hasFill = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      hasFill = true;
+      break;
+    }
+  }
+  if (!hasFill) {
+    return s;
+  }
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto r = static_cast<const Rectangle*>(e);
@@ -796,7 +1411,7 @@ static ShadowShape findLayerShadowShape(const Layer* layer) {
       s.width = bounds.width;
       s.height = bounds.height;
       if (r->roundness > 0) {
-        s.radius = FloatToString(r->roundness) + "px";
+        s.radius = CssFloatToString(r->roundness) + "px";
       }
       s.valid = true;
       return s;
@@ -824,7 +1439,268 @@ static ShadowShape findLayerShadowShape(const Layer* layer) {
 
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
-  writeElements(out, layer->contents, alpha, distribute, targetPlacement);
+  // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
+  // pointer when padding is zero keeps downstream fast paths unchanged for the common case.
+  const Padding* layerPadding = layer->padding.isZero() ? nullptr : &layer->padding;
+  writeElements(out, layer->contents, alpha, distribute, targetPlacement, layerPadding);
+}
+
+//==============================================================================
+// HTMLWriter – layer helpers
+//==============================================================================
+
+void HTMLWriter::emitFlexContainerStyle(std::string& style, const Layer* layer, bool isFlexItem) {
+  style += ";display:flex;box-sizing:border-box";
+  if (layer->layout == LayoutMode::Horizontal) {
+    style += ";flex-direction:row";
+  } else {
+    style += ";flex-direction:column";
+  }
+  bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
+                 layer->arrangement == Arrangement::SpaceEvenly ||
+                 layer->arrangement == Arrangement::SpaceAround;
+  if (!isSpace && layer->gap > 0) {
+    style += ";gap:" + CssFloatToString(layer->gap) + "px";
+  }
+  if (!layer->padding.isZero()) {
+    style += ";padding:" + PaddingToCSS(layer->padding);
+  }
+  if (layer->alignment != Alignment::Stretch) {
+    style += ";align-items:";
+    style += AlignmentToCSS(layer->alignment);
+  }
+  if (layer->arrangement != Arrangement::Start) {
+    style += ";justify-content:";
+    style += ArrangementToCSS(layer->arrangement);
+  }
+  if (isSpace && isFlexItem && layer->flex <= 0) {
+    bool horizontal = layer->layout == LayoutMode::Horizontal;
+    auto bounds = layer->layoutBounds();
+    if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
+      if (style.find("width:") == std::string::npos) {
+        style += ";width:" + CssFloatToString(bounds.width) + "px";
+      }
+    } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
+      if (style.find("height:") == std::string::npos) {
+        style += ";height:" + CssFloatToString(bounds.height) + "px";
+      }
+    }
+  }
+}
+
+void HTMLWriter::emitBlendAndIsolation(std::string& style, const Layer* layer) {
+  if (layer->blendMode != BlendMode::Normal) {
+    bool emittedPlusDarkerFilter = false;
+    if (layer->blendMode == BlendMode::PlusDarker) {
+      auto it = _ctx->plusDarkerBackdrops.find(layer);
+      if (it != _ctx->plusDarkerBackdrops.end()) {
+        emitPlusDarkerFilterDef(it->second);
+        style += ";filter:url(#" + it->second.filterId + ")";
+        emittedPlusDarkerFilter = true;
+      }
+    }
+    if (!emittedPlusDarkerFilter) {
+      auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
+      if (blendStr) {
+        style += ";mix-blend-mode:";
+        style += blendStr;
+      }
+    }
+  }
+  bool needsPainterBlendIsolation = false;
+  for (auto* element : layer->contents) {
+    if (element == nullptr) {
+      continue;
+    }
+    auto et = element->nodeType();
+    if (et == NodeType::Fill) {
+      if (static_cast<const Fill*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    } else if (et == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(element)->blendMode != BlendMode::Normal) {
+        needsPainterBlendIsolation = true;
+        break;
+      }
+    }
+  }
+  if (!layer->passThroughBackground || needsPainterBlendIsolation) {
+    style += ";isolation:isolate";
+  }
+}
+
+//==============================================================================
+// HTMLWriter – layer style filter helpers
+//==============================================================================
+
+std::string HTMLWriter::emitDropShadowFilterDef(const DropShadowStyle* ds) {
+  std::string signature = "dss:" + CssFloatToString(ds->offsetX) + "," +
+                          CssFloatToString(ds->offsetY) + "," + CssFloatToString(ds->blurX) + "," +
+                          CssFloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
+                          (ds->showBehindLayer ? "1" : "0");
+  std::string fid = lookupFilterId(signature);
+  if (fid.empty()) {
+    fid = _ctx->nextId("filter");
+    _defs->openTag("filter");
+    _defs->addAttr("id", fid);
+    _defs->addAttr("x", "-50%");
+    _defs->addAttr("y", "-50%");
+    _defs->addAttr("width", "200%");
+    _defs->addAttr("height", "200%");
+    _defs->addAttr("color-interpolation-filters", "sRGB");
+    _defs->closeTagStart();
+    // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
+    // erase mask below operate on the layer contour, as required by the spec
+    // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
+    // "use layer contour as erase mask"). Without this, semi-transparent fills would
+    // produce a weaker shadow and leave partially-visible shadow inside the layer.
+    _defs->openTag("feColorMatrix");
+    _defs->addAttr("in", "SourceAlpha");
+    _defs->addAttr("type", "matrix");
+    _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
+    _defs->addAttr("result", "opaqueAlpha");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feGaussianBlur");
+    _defs->addAttr("in", "opaqueAlpha");
+    _defs->addAttr("stdDeviation", CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
+    _defs->addAttr("result", "blur");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feOffset");
+    _defs->addAttr("in", "blur");
+    if (!FloatNearlyZero(ds->offsetX)) {
+      _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+    }
+    if (!FloatNearlyZero(ds->offsetY)) {
+      _defs->addAttr("dy", CssFloatToString(ds->offsetY));
+    }
+    _defs->addAttr("result", "off");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feColorMatrix");
+    _defs->addAttr("in", "off");
+    _defs->addAttr("type", "matrix");
+    _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
+                                 CssFloatToString(ds->color.green) + " 0 0 0 0 " +
+                                 CssFloatToString(ds->color.blue) + " 0 0 0 " +
+                                 CssFloatToString(ds->color.alpha) + " 0");
+    _defs->addAttr("result", "shadow");
+    _defs->closeTagSelfClosing();
+    if (!ds->showBehindLayer) {
+      _defs->openTag("feComposite");
+      _defs->addAttr("in", "shadow");
+      _defs->addAttr("in2", "opaqueAlpha");
+      _defs->addAttr("operator", "out");
+      _defs->addAttr("result", "shadowClipped");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feMerge");
+      _defs->closeTagStart();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "shadowClipped");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "SourceGraphic");
+      _defs->closeTagSelfClosing();
+      _defs->closeTag();
+    } else {
+      _defs->openTag("feMerge");
+      _defs->closeTagStart();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "shadow");
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", "SourceGraphic");
+      _defs->closeTagSelfClosing();
+      _defs->closeTag();
+    }
+    _defs->closeTag();
+    registerFilterId(signature, fid);
+  }
+  return "url(#" + fid + ")";
+}
+
+std::string HTMLWriter::emitInnerShadowFilterDef(const InnerShadowStyle* is) {
+  std::string signature = "iss:" + CssFloatToString(is->offsetX) + "," +
+                          CssFloatToString(is->offsetY) + "," + CssFloatToString(is->blurX) + "," +
+                          CssFloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+  std::string fid = lookupFilterId(signature);
+  if (fid.empty()) {
+    fid = _ctx->nextId("filter");
+    _defs->openTag("filter");
+    _defs->addAttr("id", fid);
+    _defs->addAttr("x", "-50%");
+    _defs->addAttr("y", "-50%");
+    _defs->addAttr("width", "200%");
+    _defs->addAttr("height", "200%");
+    _defs->addAttr("color-interpolation-filters", "sRGB");
+    _defs->closeTagStart();
+    // Invert source alpha -> blur -> offset -> flood -> clip twice. Matches tgfx
+    // ImageFilter::InnerShadowOnly that InnerShadowStyle::onDraw uses; the old
+    // arithmetic "SourceAlpha - offsetAlpha" only produced a one-sided band that
+    // vanished for low-alpha shadow colours (e.g. showcase_infographic #00000010).
+    _defs->openTag("feComponentTransfer");
+    _defs->addAttr("in", "SourceAlpha");
+    _defs->addAttr("result", "iInv");
+    _defs->closeTagStart();
+    _defs->openTag("feFuncA");
+    _defs->addAttr("type", "table");
+    _defs->addAttr("tableValues", "1 0");
+    _defs->closeTagSelfClosing();
+    _defs->closeTag();
+    std::string sd = CssFloatToString(is->blurX);
+    if (is->blurX != is->blurY) {
+      sd += " " + CssFloatToString(is->blurY);
+    }
+    _defs->openTag("feGaussianBlur");
+    _defs->addAttr("in", "iInv");
+    _defs->addAttr("stdDeviation", sd);
+    _defs->addAttr("result", "iBlur");
+    _defs->closeTagSelfClosing();
+    std::string blurredResult = "iBlur";
+    if (!FloatNearlyZero(is->offsetX) || !FloatNearlyZero(is->offsetY)) {
+      _defs->openTag("feOffset");
+      _defs->addAttr("in", blurredResult);
+      if (!FloatNearlyZero(is->offsetX)) {
+        _defs->addAttr("dx", CssFloatToString(is->offsetX));
+      }
+      if (!FloatNearlyZero(is->offsetY)) {
+        _defs->addAttr("dy", CssFloatToString(is->offsetY));
+      }
+      _defs->addAttr("result", "iOff");
+      _defs->closeTagSelfClosing();
+      blurredResult = "iOff";
+    }
+    _defs->openTag("feFlood");
+    _defs->addAttr("flood-color", ColorToSVGHex(is->color));
+    if (is->color.alpha < 1.0f) {
+      _defs->addAttr("flood-opacity", CssFloatToString(is->color.alpha));
+    }
+    _defs->addAttr("result", "iFlood");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feComposite");
+    _defs->addAttr("in", "iFlood");
+    _defs->addAttr("in2", blurredResult);
+    _defs->addAttr("operator", "in");
+    _defs->addAttr("result", "iShadow");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feComposite");
+    _defs->addAttr("in", "iShadow");
+    _defs->addAttr("in2", "SourceAlpha");
+    _defs->addAttr("operator", "in");
+    _defs->addAttr("result", "iClip");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feMerge");
+    _defs->closeTagStart();
+    _defs->openTag("feMergeNode");
+    _defs->addAttr("in", "SourceGraphic");
+    _defs->closeTagSelfClosing();
+    _defs->openTag("feMergeNode");
+    _defs->addAttr("in", "iClip");
+    _defs->closeTagSelfClosing();
+    _defs->closeTag();
+    _defs->closeTag();
+    registerFilterId(signature, fid);
+  }
+  return "url(#" + fid + ")";
 }
 
 //==============================================================================
@@ -832,11 +1708,17 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
 //==============================================================================
 
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
-                            bool distributeAlpha, bool isFlexItem) {
+                            bool distributeAlpha, bool isFlexItem, LayoutMode parentLayout) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
   }
+  // Save-and-restore the six Repeater-related offset fields across this entire writeLayer
+  // scope: the setters below mutate them in place, and at least one early-return path
+  // (hasContent == false, after the ctx writes) exits without clearing them, which would leak
+  // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
+  // caller's offsets at destruction regardless of how writeLayer returns.
+  RepeaterOffsetGuard offsetGuard(_ctx);
   if (!layer->visible) {
     out.openTag("div");
     out.addAttr("style", "display:none");
@@ -854,8 +1736,22 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   if (isFlexItem) {
     // Flex item: positioned by parent's flexbox, no absolute positioning needed.
-    if (layer->flex > 0) {
-      style += "flex:" + FloatToString(layer->flex);
+    //
+    // PAGX flex semantics (src/pagx/nodes/Layer.cpp:370, HasExplicitMainSize): a child with
+    // `flex > 0` only participates in flex distribution when the main-axis size is NOT declared.
+    // When the child has an explicit main-axis width/height (or percent) the declared value is
+    // used verbatim and the `flex` factor is ignored. CSS shorthand `flex: N` expands to
+    // `flex: N 1 0%`, which resets flex-basis to 0 and would grow the child past its declared
+    // width, so we must skip the `flex` declaration whenever the PAGX child already has an
+    // explicit main-axis size. `parentLayout` tells us which axis is the main axis.
+    bool mainAxisDeclared = false;
+    if (parentLayout == LayoutMode::Horizontal) {
+      mainAxisDeclared = !std::isnan(layer->width) || !std::isnan(layer->percentWidth);
+    } else if (parentLayout == LayoutMode::Vertical) {
+      mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
+    }
+    if (layer->flex > 0 && !mainAxisDeclared) {
+      style += "flex:" + CssFloatToString(layer->flex);
     }
     // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
     // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
@@ -868,13 +1764,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (!style.empty()) {
         style += ';';
       }
-      style += "width:" + FloatToString(outputW) + "px";
+      style += "width:" + CssFloatToString(outputW) + "px";
     }
     if (!std::isnan(outputH) && outputH > 0) {
       if (!style.empty()) {
         style += ';';
       }
-      style += "height:" + FloatToString(outputH) + "px";
+      style += "height:" + CssFloatToString(outputH) + "px";
     }
     // Flex item needs position:relative for absolute-positioned contents or child layers.
     if (isFlexContainer || needsSize || !layer->children.empty()) {
@@ -886,16 +1782,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   } else {
     style += "position:absolute";
     auto renderPos = layer->renderPosition();
+    // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
+    // the inverse shift added to their own left/top so they still paint at the correct document
+    // position. Consume and clear the offset so it is not applied to grandchild layers.
+    if (!FloatNearlyZero(_ctx->childLayerOffsetX) || !FloatNearlyZero(_ctx->childLayerOffsetY)) {
+      renderPos.x += _ctx->childLayerOffsetX;
+      renderPos.y += _ctx->childLayerOffsetY;
+      _ctx->childLayerOffsetX = 0;
+      _ctx->childLayerOffsetY = 0;
+    }
     std::string transform = LayerTransformCSS(layer);
     // `positionSet` becomes true after we emit `left/top`. The Repeater branch below may need
     // to shift `renderPos` by the union-bounds offset (uL, uT) so the layer div extends into
     // the negative quadrants of the layer origin (needed for stacking-context clipping like
     // mix-blend-mode, which otherwise drops Repeater copies that live at negative x/y).
     bool positionSet = false;
-    auto emitLeftTop = [&](float x, float y) {
-      style += ";left:" + FloatToString(x) + "px;top:" + FloatToString(y) + "px";
-      positionSet = true;
-    };
     // Absolute-positioned layers need explicit size when they have contents that use inset:0,
     // or when they are flex containers that need a reference frame for child layout.
     // When contents contain a Repeater, compute the union bounds of all repeated copies
@@ -915,7 +1816,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     float repeaterOffsetY = 0;
     if (repeater && repeater->copies > 0) {
       // Collect bounds of geometry elements before the Repeater.
-      float geoL = 1e9f, geoT = 1e9f, geoR = -1e9f, geoB = -1e9f;
+      float geoL = BBOX_SENTINEL_LARGE, geoT = BBOX_SENTINEL_LARGE, geoR = -BBOX_SENTINEL_LARGE,
+            geoB = -BBOX_SENTINEL_LARGE;
       bool hasGeo = false;
       for (auto* e : layer->contents) {
         if (e == repeater) {
@@ -937,8 +1839,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       if (hasGeo) {
         // Transform this rect through every Repeater copy matrix and compute union bounds.
-        float uL = 1e9f, uT = 1e9f, uR = -1e9f, uB = -1e9f;
-        int n = static_cast<int>(std::ceil(repeater->copies));
+        float uL = BBOX_SENTINEL_LARGE, uT = BBOX_SENTINEL_LARGE, uR = -BBOX_SENTINEL_LARGE,
+              uB = -BBOX_SENTINEL_LARGE;
+        int n = std::isfinite(repeater->copies) ? static_cast<int>(std::ceil(repeater->copies)) : 0;
         for (int i = 0; i < n; i++) {
           float prog = static_cast<float>(i) + repeater->offset;
           Matrix m = {};
@@ -983,21 +1886,22 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           repeaterOffsetX = uL;
           repeaterOffsetY = uT;
         }
-        emitLeftTop(renderPos.x + repeaterOffsetX, renderPos.y + repeaterOffsetY);
+        EmitLeftTopCss(style, positionSet, renderPos.x + repeaterOffsetX,
+                       renderPos.y + repeaterOffsetY);
         if (uw > 0) {
-          style += ";width:" + FloatToString(uw) + "px";
+          style += ";width:" + CssFloatToString(uw) + "px";
         }
         if (uh > 0) {
-          style += ";height:" + FloatToString(uh) + "px";
+          style += ";height:" + CssFloatToString(uh) + "px";
         }
         style += ";overflow:visible";
       }
     }
     if (!positionSet) {
       if (!FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y)) {
-        emitLeftTop(renderPos.x, renderPos.y);
+        EmitLeftTopCss(style, positionSet, renderPos.x, renderPos.y);
       } else if (!transform.empty()) {
-        emitLeftTop(0, 0);
+        EmitLeftTopCss(style, positionSet, 0, 0);
       }
     }
     if (!transform.empty()) {
@@ -1008,68 +1912,31 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     // to each copy's transform; the matrix stays in layer-local coordinates as before.
     _ctx->repeaterOriginOffsetX = repeaterOffsetX;
     _ctx->repeaterOriginOffsetY = repeaterOffsetY;
+    // Child layers (layer->children) are absolutely positioned inside this div and use their
+    // own renderPos for CSS left/top. When this div was shifted up/left by the union-bounds
+    // expansion, child layers need the inverse offset added to their renderPos so they remain
+    // at the correct document position (e.g. game_hud ReticleComplex: div shifts up by 228px
+    // but the circle/triangle children must still paint at the layer origin, not 228px higher).
+    _ctx->childLayerOffsetX = -repeaterOffsetX;
+    _ctx->childLayerOffsetY = -repeaterOffsetY;
+    _ctx->savedChildLayerOffsetX = _ctx->childLayerOffsetX;
+    _ctx->savedChildLayerOffsetY = _ctx->childLayerOffsetY;
     // The legacy branch below handled non-Repeater layers and still runs when `repeater` is
     // null. When a Repeater was present and sized the div above, skip this fallback.
     if (!repeater && (isFlexContainer || !layer->contents.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
-        style += ";width:" + FloatToString(bounds.width) + "px";
+        style += ";width:" + CssFloatToString(bounds.width) + "px";
       }
       if (bounds.height > 0) {
-        style += ";height:" + FloatToString(bounds.height) + "px";
+        style += ";height:" + CssFloatToString(bounds.height) + "px";
       }
     }
   }
 
   // Flex container properties
   if (isFlexContainer) {
-    style += ";display:flex;box-sizing:border-box";
-    if (layer->layout == LayoutMode::Horizontal) {
-      style += ";flex-direction:row";
-    } else {
-      style += ";flex-direction:column";
-    }
-
-    // Space-* arrangement handling. PAGX's layout fully absorbs the declared gap into the
-    // redistribution (extraGap = (availableMain - totalChildMain) / denom). CSS flex instead
-    // treats `gap` as a minimum and adds justify-content's distribution on top. To make CSS
-    // match PAGX, emit `justify-content:space-*` natively but *drop* the declared gap, then
-    // make sure the container has a concrete main-axis size equal to PAGX's measured layout
-    // size (totalChildMain + totalGap when shrink-to-fit; the stretched parent size when
-    // stretched). Without the explicit size, a shrink-to-fit flex container would collapse to
-    // the children's bare total width and space-* would have no room to distribute.
-    bool isSpace = layer->arrangement == Arrangement::SpaceBetween ||
-                   layer->arrangement == Arrangement::SpaceEvenly ||
-                   layer->arrangement == Arrangement::SpaceAround;
-    if (!isSpace && layer->gap > 0) {
-      style += ";gap:" + FloatToString(layer->gap) + "px";
-    }
-    if (!layer->padding.isZero()) {
-      style += ";padding:" + PaddingToCSS(layer->padding);
-    }
-    if (layer->alignment != Alignment::Stretch) {
-      style += ";align-items:";
-      style += AlignmentToCSS(layer->alignment);
-    }
-    if (layer->arrangement != Arrangement::Start) {
-      style += ";justify-content:";
-      style += ArrangementToCSS(layer->arrangement);
-    }
-    // If a space-* row doesn't already carry an explicit main-axis size, pin it to the pagx
-    // measured size so CSS has the same distribution budget as the tgfx layout.
-    if (isSpace && isFlexItem && layer->flex <= 0) {
-      bool horizontal = layer->layout == LayoutMode::Horizontal;
-      auto bounds = layer->layoutBounds();
-      if (horizontal && std::isnan(layer->width) && bounds.width > 0) {
-        if (style.find("width:") == std::string::npos) {
-          style += ";width:" + FloatToString(bounds.width) + "px";
-        }
-      } else if (!horizontal && std::isnan(layer->height) && bounds.height > 0) {
-        if (style.find("height:") == std::string::npos) {
-          style += ";height:" + FloatToString(bounds.height) + "px";
-        }
-      }
-    }
+    emitFlexContainerStyle(style, layer, isFlexItem);
   }
 
   if (layer->preserve3D) {
@@ -1087,30 +1954,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   bool childDistribute = !groupOp && layerAlpha < 1.0f;
   bool suppressGroupOpacity = false;  // set by the box-shadow fallback path below
 
-  if (layer->blendMode != BlendMode::Normal) {
-    // PlusDarker takes a dedicated filter-based path when the pre-pass has rendered a backdrop
-    // for this layer; otherwise it falls through to the mix-blend-mode:darken approximation.
-    bool emittedPlusDarkerFilter = false;
-    if (layer->blendMode == BlendMode::PlusDarker) {
-      auto it = _ctx->plusDarkerBackdrops.find(layer);
-      if (it != _ctx->plusDarkerBackdrops.end()) {
-        emitPlusDarkerFilterDef(it->second);
-        style += ";filter:url(#" + it->second.filterId + ")";
-        emittedPlusDarkerFilter = true;
-      }
-    }
-    if (!emittedPlusDarkerFilter) {
-      auto blendStr = BlendModeToMixBlendMode(layer->blendMode);
-      if (blendStr) {
-        style += ";mix-blend-mode:";
-        style += blendStr;
-      }
-    }
-  }
-
-  if (!layer->passThroughBackground) {
-    style += ";isolation:isolate";
-  }
+  emitBlendAndIsolation(style, layer);
 
   if (!layer->antiAlias) {
     style += ";shape-rendering:crispEdges;image-rendering:pixelated";
@@ -1123,7 +1967,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // grid wrapper instead), and the outer div gains `overflow:hidden` to clip the mirrored tiles
   // back to the source layer's size. The tile geometry uses the layer's own size, falling back
   // to its laid-out bounds when width/height are NaN.
-  bool useMirrorTile = needsMirrorTiling(layer);
+  bool useMirrorTile = NeedsMirrorTiling(layer);
   float mirrorTileWidth = 0;
   float mirrorTileHeight = 0;
   if (useMirrorTile) {
@@ -1158,7 +2002,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // the same stacking context as the element's siblings, so the child backdrop-filter still
   // sees the pre-layer backdrop. `box-shadow` only reproduces the right outline when the
   // layer's visible contour IS the element's rounded border-box, which we detect via
-  // layerBoxShadowBorderRadius.
+  // LayerBoxShadowBorderRadius.
   bool hasBackdropBlurFill = false;
   for (auto* ls : layer->styles) {
     if (ls->nodeType() == NodeType::BackgroundBlurStyle && ls->blendMode == BlendMode::Normal) {
@@ -1189,13 +2033,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
       } else if (ds->blurX == ds->blurY && ds->showBehindLayer && hasBackdropBlurFill &&
                  boxShadowValue.empty()) {
-        std::string radius = layerBoxShadowBorderRadius(layer);
+        std::string radius = LayerBoxShadowBorderRadius(layer);
         if (!radius.empty()) {
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
           // would re-introduce the stacking context we just eliminated.
-          boxShadowValue = FloatToString(ds->offsetX) + "px " + FloatToString(ds->offsetY) + "px " +
-                           FloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+          boxShadowValue = CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
+                           "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
           boxShadowBorderRadius = radius;
           suppressGroupOpacity = true;
           continue;
@@ -1211,13 +2055,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       // false requires an erase-mask that CSS has no direct equivalent for, so it continues
       // down the SVG filter path.
       if (!hasBlendMode && ds->showBehindLayer) {
-        ShadowShape shape = findLayerShadowShape(layer);
+        ShadowShape shape = FindLayerShadowShape(layer);
         if (shape.valid) {
-          std::string style = "position:absolute;left:" + FloatToString(shape.left + ds->offsetX) +
-                              "px;top:" + FloatToString(shape.top + ds->offsetY) +
-                              "px;width:" + FloatToString(shape.width) +
-                              "px;height:" + FloatToString(shape.height) +
-                              "px;background-color:" + ColorToRGBA(ds->color);
+          std::string style =
+              "position:absolute;left:" + CssFloatToString(shape.left + ds->offsetX) +
+              "px;top:" + CssFloatToString(shape.top + ds->offsetY) +
+              "px;width:" + CssFloatToString(shape.width) +
+              "px;height:" + CssFloatToString(shape.height) +
+              "px;background-color:" + ColorToRGBA(ds->color);
           if (!shape.radius.empty()) {
             style += ";border-radius:" + shape.radius;
           }
@@ -1225,188 +2070,25 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           // stdDeviation numerically when the values are equal.
           float blurAvg = (ds->blurX + ds->blurY) * 0.5f;
           if (blurAvg > 0) {
-            style += ";filter:blur(" + FloatToString(blurAvg) + "px)";
+            style += ";filter:blur(" + CssFloatToString(blurAvg) + "px)";
           }
           pendingSiblingShadows.push_back(style);
           continue;
         }
       }
       {
-        std::string signature = "dss:" + FloatToString(ds->offsetX) + "," +
-                                FloatToString(ds->offsetY) + "," + FloatToString(ds->blurX) + "," +
-                                FloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
-                                (ds->showBehindLayer ? "1" : "0");
-        std::string fid = lookupFilterId(signature);
-        if (fid.empty()) {
-          fid = _ctx->nextId("filter");
-          _defs->openTag("filter");
-          _defs->addAttr("id", fid);
-          _defs->addAttr("x", "-50%");
-          _defs->addAttr("y", "-50%");
-          _defs->addAttr("width", "200%");
-          _defs->addAttr("height", "200%");
-          _defs->addAttr("color-interpolation-filters", "sRGB");
-          _defs->closeTagStart();
-          // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
-          // erase mask below operate on the layer contour, as required by the spec
-          // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
-          // "use layer contour as erase mask"). Without this, semi-transparent fills would
-          // produce a weaker shadow and leave partially-visible shadow inside the layer.
-          _defs->openTag("feColorMatrix");
-          _defs->addAttr("in", "SourceAlpha");
-          _defs->addAttr("type", "matrix");
-          _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
-          _defs->addAttr("result", "opaqueAlpha");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feGaussianBlur");
-          _defs->addAttr("in", "opaqueAlpha");
-          _defs->addAttr("stdDeviation", FloatToString(ds->blurX) + " " + FloatToString(ds->blurY));
-          _defs->addAttr("result", "blur");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feOffset");
-          _defs->addAttr("in", "blur");
-          if (!FloatNearlyZero(ds->offsetX)) {
-            _defs->addAttr("dx", FloatToString(ds->offsetX));
-          }
-          if (!FloatNearlyZero(ds->offsetY)) {
-            _defs->addAttr("dy", FloatToString(ds->offsetY));
-          }
-          _defs->addAttr("result", "off");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feColorMatrix");
-          _defs->addAttr("in", "off");
-          _defs->addAttr("type", "matrix");
-          _defs->addAttr("values", "0 0 0 0 " + FloatToString(ds->color.red) + " 0 0 0 0 " +
-                                       FloatToString(ds->color.green) + " 0 0 0 0 " +
-                                       FloatToString(ds->color.blue) + " 0 0 0 " +
-                                       FloatToString(ds->color.alpha) + " 0");
-          _defs->addAttr("result", "shadow");
-          _defs->closeTagSelfClosing();
-          if (!ds->showBehindLayer) {
-            _defs->openTag("feComposite");
-            _defs->addAttr("in", "shadow");
-            _defs->addAttr("in2", "opaqueAlpha");
-            _defs->addAttr("operator", "out");
-            _defs->addAttr("result", "shadowClipped");
-            _defs->closeTagSelfClosing();
-            _defs->openTag("feMerge");
-            _defs->closeTagStart();
-            _defs->openTag("feMergeNode");
-            _defs->addAttr("in", "shadowClipped");
-            _defs->closeTagSelfClosing();
-            _defs->openTag("feMergeNode");
-            _defs->addAttr("in", "SourceGraphic");
-            _defs->closeTagSelfClosing();
-            _defs->closeTag();
-          } else {
-            _defs->openTag("feMerge");
-            _defs->closeTagStart();
-            _defs->openTag("feMergeNode");
-            _defs->addAttr("in", "shadow");
-            _defs->closeTagSelfClosing();
-            _defs->openTag("feMergeNode");
-            _defs->addAttr("in", "SourceGraphic");
-            _defs->closeTagSelfClosing();
-            _defs->closeTag();
-          }
-          _defs->closeTag();
-          registerFilterId(signature, fid);
-        }
-        if (!filterValues.empty()) {
-          filterValues += ' ';
-        }
-        filterValues += "url(#" + fid + ")";
+        std::string filterRef = emitDropShadowFilterDef(ds);
+        if (!filterValues.empty()) filterValues += ' ';
+        filterValues += filterRef;
       }
     } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
       } else {
-        std::string signature = "iss:" + FloatToString(is->offsetX) + "," +
-                                FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
-                                FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
-        std::string fid = lookupFilterId(signature);
-        if (fid.empty()) {
-          fid = _ctx->nextId("filter");
-          _defs->openTag("filter");
-          _defs->addAttr("id", fid);
-          _defs->addAttr("x", "-50%");
-          _defs->addAttr("y", "-50%");
-          _defs->addAttr("width", "200%");
-          _defs->addAttr("height", "200%");
-          _defs->addAttr("color-interpolation-filters", "sRGB");
-          _defs->closeTagStart();
-          // Invert source alpha -> blur -> offset -> flood -> clip twice. Matches tgfx
-          // ImageFilter::InnerShadowOnly that InnerShadowStyle::onDraw uses; the old
-          // arithmetic "SourceAlpha - offsetAlpha" only produced a one-sided band that
-          // vanished for low-alpha shadow colours (e.g. showcase_infographic #00000010).
-          _defs->openTag("feComponentTransfer");
-          _defs->addAttr("in", "SourceAlpha");
-          _defs->addAttr("result", "iInv");
-          _defs->closeTagStart();
-          _defs->openTag("feFuncA");
-          _defs->addAttr("type", "table");
-          _defs->addAttr("tableValues", "1 0");
-          _defs->closeTagSelfClosing();
-          _defs->closeTag();
-          std::string sd = FloatToString(is->blurX);
-          if (is->blurX != is->blurY) {
-            sd += " " + FloatToString(is->blurY);
-          }
-          _defs->openTag("feGaussianBlur");
-          _defs->addAttr("in", "iInv");
-          _defs->addAttr("stdDeviation", sd);
-          _defs->addAttr("result", "iBlur");
-          _defs->closeTagSelfClosing();
-          std::string blurredResult = "iBlur";
-          if (!FloatNearlyZero(is->offsetX) || !FloatNearlyZero(is->offsetY)) {
-            _defs->openTag("feOffset");
-            _defs->addAttr("in", blurredResult);
-            if (!FloatNearlyZero(is->offsetX)) {
-              _defs->addAttr("dx", FloatToString(is->offsetX));
-            }
-            if (!FloatNearlyZero(is->offsetY)) {
-              _defs->addAttr("dy", FloatToString(is->offsetY));
-            }
-            _defs->addAttr("result", "iOff");
-            _defs->closeTagSelfClosing();
-            blurredResult = "iOff";
-          }
-          _defs->openTag("feFlood");
-          _defs->addAttr("flood-color", ColorToSVGHex(is->color));
-          if (is->color.alpha < 1.0f) {
-            _defs->addAttr("flood-opacity", FloatToString(is->color.alpha));
-          }
-          _defs->addAttr("result", "iFlood");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feComposite");
-          _defs->addAttr("in", "iFlood");
-          _defs->addAttr("in2", blurredResult);
-          _defs->addAttr("operator", "in");
-          _defs->addAttr("result", "iShadow");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feComposite");
-          _defs->addAttr("in", "iShadow");
-          _defs->addAttr("in2", "SourceAlpha");
-          _defs->addAttr("operator", "in");
-          _defs->addAttr("result", "iClip");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feMerge");
-          _defs->closeTagStart();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "SourceGraphic");
-          _defs->closeTagSelfClosing();
-          _defs->openTag("feMergeNode");
-          _defs->addAttr("in", "iClip");
-          _defs->closeTagSelfClosing();
-          _defs->closeTag();
-          _defs->closeTag();
-          registerFilterId(signature, fid);
-        }
-        if (!filterValues.empty()) {
-          filterValues += ' ';
-        }
-        filterValues += "url(#" + fid + ")";
+        std::string filterRef = emitInnerShadowFilterDef(is);
+        if (!filterValues.empty()) filterValues += ' ';
+        filterValues += filterRef;
       }
     } else if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
       if (hasBlendMode) {
@@ -1434,7 +2116,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (suppressGroupOpacity) {
       childDistribute = true;
     } else {
-      style += ";opacity:" + FloatToString(layerAlpha);
+      style += ";opacity:" + CssFloatToString(layerAlpha);
     }
   }
 
@@ -1445,7 +2127,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       auto clipId = writeClipDef(layer->mask);
       style += ";clip-path:url(#" + clipId + ")";
     } else {
-      style += writeMaskCSS(layer->mask, layer->maskType);
+      auto pos = layer->renderPosition();
+      style += writeMaskCSS(layer->mask, layer->maskType, pos);
     }
   }
 
@@ -1474,6 +2157,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     out.addAttr("data-name", layer->name);
   }
   for (auto& [key, value] : layer->customData) {
+    // IsValidCustomDataKey() is enforced at import time, but programmatic PAGXDocument
+    // construction can bypass that check. Re-validate here so a crafted key cannot inject
+    // attribute boundary characters (", >, space) into the emitted HTML tag.
+    if (!IsValidCustomDataKey(key)) {
+      continue;
+    }
     out.addAttr(("data-" + key).c_str(), value);
   }
   out.addAttr("style", style);
@@ -1508,8 +2197,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       bool isUniformBlur = FloatNearlyZero(ds->blurX - ds->blurY);
       if (isUniformBlur && ds->showBehindLayer) {
-        shadowStyle += ";filter:drop-shadow(" + FloatToString(ds->offsetX) + "px " +
-                       FloatToString(ds->offsetY) + "px " + FloatToString(ds->blurX) + "px " +
+        shadowStyle += ";filter:drop-shadow(" + CssFloatToString(ds->offsetX) + "px " +
+                       CssFloatToString(ds->offsetY) + "px " + CssFloatToString(ds->blurX) + "px " +
                        ColorToRGBA(ds->color) + ")";
         out.openTag("div");
         out.addAttr("style", shadowStyle);
@@ -1526,19 +2215,19 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "SourceGraphic");
         _defs->addAttr("stdDeviation",
-                       FloatToString(ds->blurX / 2) + " " + FloatToString(ds->blurY / 2));
+                       CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
         _defs->addAttr("result", "blur");
         _defs->closeTagSelfClosing();
         _defs->openTag("feOffset");
         _defs->addAttr("in", "blur");
-        _defs->addAttr("dx", FloatToString(ds->offsetX));
-        _defs->addAttr("dy", FloatToString(ds->offsetY));
+        _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+        _defs->addAttr("dy", CssFloatToString(ds->offsetY));
         _defs->addAttr("result", "offsetBlur");
         _defs->closeTagSelfClosing();
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(ds->color));
         if (ds->color.alpha < 1.0f) {
-          _defs->addAttr("flood-opacity", FloatToString(ds->color.alpha));
+          _defs->addAttr("flood-opacity", CssFloatToString(ds->color.alpha));
         }
         _defs->addAttr("result", "color");
         _defs->closeTagSelfClosing();
@@ -1567,9 +2256,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
-                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                FloatToString(avg) + "px)";
-        blurStyle += clipPathFromContents(layer);
+                                CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                CssFloatToString(avg) + "px)";
+        blurStyle += ClipPathFromContents(layer);
         if (blendStr) {
           blurStyle += ";mix-blend-mode:";
           blurStyle += blendStr;
@@ -1587,13 +2276,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       float avg = (blur->blurX + blur->blurY) / 2.0f;
       if (avg > 0) {
         std::string blurStyle = "position:absolute;inset:0;backdrop-filter:blur(" +
-                                FloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
-                                FloatToString(avg) + "px)" + clipPathFromContents(layer);
+                                CssFloatToString(avg) + "px);-webkit-backdrop-filter:blur(" +
+                                CssFloatToString(avg) + "px)" + ClipPathFromContents(layer);
         // The box-shadow fallback pushes group opacity down to siblings. The backdrop-filter
         // div is its own sibling, so it also needs the distributed alpha; otherwise the blurred
         // backdrop renders at full strength while the glass/inner content appear dimmed.
         if (suppressGroupOpacity && layerAlpha < 1.0f) {
-          blurStyle += ";opacity:" + FloatToString(layerAlpha);
+          blurStyle += ";opacity:" + CssFloatToString(layerAlpha);
         }
         out.openTag("div");
         out.addAttr("style", blurStyle);
@@ -1605,12 +2294,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   if (needScrollRectWrapper) {
     auto& sr = layer->scrollRect;
     out.openTag("div");
-    out.addAttr("style", "position:absolute;left:0px;top:0px;width:" + FloatToString(sr.width) +
-                             "px;height:" + FloatToString(sr.height) + "px;overflow:hidden");
+    out.addAttr("style", "position:absolute;left:0px;top:0px;width:" + CssFloatToString(sr.width) +
+                             "px;height:" + CssFloatToString(sr.height) + "px;overflow:hidden");
     out.closeTagStart();
     out.openTag("div");
-    out.addAttr("style", "position:relative;left:" + FloatToString(-sr.x) +
-                             "px;top:" + FloatToString(-sr.y) + "px");
+    out.addAttr("style", "position:relative;left:" + CssFloatToString(-sr.x) +
+                             "px;top:" + CssFloatToString(-sr.y) + "px");
     out.closeTagStart();
   }
 
@@ -1637,7 +2326,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     //                  layer's original W x H plus a `margin`-wide halo on every side.
     auto* bf = static_cast<const BlurFilter*>(layer->filters[0]);
     float blurRadius =
-        bf->blurX;  // needsMirrorTiling only matches uniform blur (filters.size()==1)
+        bf->blurX;  // NeedsMirrorTiling only matches uniform blur (filters.size()==1)
     // Match tgfx's GaussianBlurImageFilter::onFilterBounds which outsets by 2*sigma. Using the
     // same margin keeps HTML's visible halo bbox consistent with PAGX native rendering.
     float margin = 2.0f * blurRadius;
@@ -1645,17 +2334,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     float clipH = mirrorTileHeight + 2.0f * margin;
 
     out.openTag("div");
-    std::string clipStyle = "position:absolute;left:" + FloatToString(-margin) +
-                            "px;top:" + FloatToString(-margin) +
-                            "px;width:" + FloatToString(clipW) +
-                            "px;height:" + FloatToString(clipH) + "px;overflow:hidden";
+    std::string clipStyle = "position:absolute;left:" + CssFloatToString(-margin) +
+                            "px;top:" + CssFloatToString(-margin) +
+                            "px;width:" + CssFloatToString(clipW) +
+                            "px;height:" + CssFloatToString(clipH) + "px;overflow:hidden";
     out.addAttr("style", clipStyle);
     out.closeTagStart();
 
     out.openTag("div");
-    std::string gridStyle = "position:absolute;left:0;top:0;width:" + FloatToString(clipW) +
-                            "px;height:" + FloatToString(clipH) + "px;filter:blur(" +
-                            FloatToString(blurRadius) + "px)";
+    std::string gridStyle = "position:absolute;left:0;top:0;width:" + CssFloatToString(clipW) +
+                            "px;height:" + CssFloatToString(clipH) + "px;filter:blur(" +
+                            CssFloatToString(blurRadius) + "px)";
     out.addAttr("style", gridStyle);
     out.closeTagStart();
 
@@ -1684,12 +2373,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     };
     for (const auto& t : tiles) {
       out.openTag("div");
-      std::string ts = "position:absolute;left:0;top:0;width:" + FloatToString(W) +
-                       "px;height:" + FloatToString(H) + "px";
+      std::string ts = "position:absolute;left:0;top:0;width:" + CssFloatToString(W) +
+                       "px;height:" + CssFloatToString(H) + "px";
       if (t.tx != 0 || t.ty != 0 || t.sx != 1.0f || t.sy != 1.0f) {
-        ts += ";transform:translate(" + FloatToString(t.tx) + "px," + FloatToString(t.ty) + "px)";
+        ts += ";transform:translate(" + CssFloatToString(t.tx) + "px," + CssFloatToString(t.ty) +
+              "px)";
         if (t.sx != 1.0f || t.sy != 1.0f) {
-          ts += " scale(" + FloatToString(t.sx) + "," + FloatToString(t.sy) + ")";
+          ts += " scale(" + CssFloatToString(t.sx) + "," + CssFloatToString(t.sy) + ")";
         }
       }
       out.addAttr("style", ts);
@@ -1707,9 +2397,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     auto blendStr = BlendModeToMixBlendMode(ls->blendMode);
     if (styleType == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
-      std::string signature = "issb:" + FloatToString(is->offsetX) + "," +
-                              FloatToString(is->offsetY) + "," + FloatToString(is->blurX) + "," +
-                              FloatToString(is->blurY) + "," + ColorToRGBA(is->color);
+      std::string signature = "issb:" + CssFloatToString(is->offsetX) + "," +
+                              CssFloatToString(is->offsetY) + "," + CssFloatToString(is->blurX) +
+                              "," + CssFloatToString(is->blurY) + "," + ColorToRGBA(is->color);
       std::string fid = lookupFilterId(signature);
       if (fid.empty()) {
         fid = _ctx->nextId("isf");
@@ -1724,10 +2414,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feOffset");
         _defs->addAttr("in", "SourceAlpha");
         if (!FloatNearlyZero(is->offsetX)) {
-          _defs->addAttr("dx", FloatToString(is->offsetX));
+          _defs->addAttr("dx", CssFloatToString(is->offsetX));
         }
         if (!FloatNearlyZero(is->offsetY)) {
-          _defs->addAttr("dy", FloatToString(is->offsetY));
+          _defs->addAttr("dy", CssFloatToString(is->offsetY));
         }
         _defs->addAttr("result", "iOff");
         _defs->closeTagSelfClosing();
@@ -1739,9 +2429,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->addAttr("k3", "1");
         _defs->addAttr("result", "iComp");
         _defs->closeTagSelfClosing();
-        std::string sd = FloatToString(is->blurX);
+        std::string sd = CssFloatToString(is->blurX);
         if (is->blurX != is->blurY) {
-          sd += " " + FloatToString(is->blurY);
+          sd += " " + CssFloatToString(is->blurY);
         }
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "iComp");
@@ -1751,10 +2441,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         _defs->openTag("feColorMatrix");
         _defs->addAttr("in", "iBlur");
         _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(is->color.red) + " 0 0 0 0 " +
-                                     FloatToString(is->color.green) + " 0 0 0 0 " +
-                                     FloatToString(is->color.blue) + " 0 0 0 " +
-                                     FloatToString(is->color.alpha) + " 0");
+        _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(is->color.red) + " 0 0 0 0 " +
+                                     CssFloatToString(is->color.green) + " 0 0 0 0 " +
+                                     CssFloatToString(is->color.blue) + " 0 0 0 " +
+                                     CssFloatToString(is->color.alpha) + " 0");
         _defs->closeTagSelfClosing();
         _defs->closeTag();
         registerFilterId(signature, fid);
@@ -1782,6 +2472,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
 void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float contentAlpha,
                                  bool childDistribute, bool isFlexContainer) {
+  // Snapshot the child-layer offset before any recursive processing; writeLayerContents and
+  // writeComposition may invoke nested writeLayer calls that overwrite savedChildLayerOffset.
+  float childOffX = _ctx->savedChildLayerOffsetX;
+  float childOffY = _ctx->savedChildLayerOffsetY;
+
   bool hasForeground = false;
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Fill) {
@@ -1803,10 +2498,20 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
     writeComposition(out, layer->composition, contentAlpha, childDistribute);
   }
 
+  // Restore childLayerOffset before each child writeLayer call: the offset is consumed (cleared)
+  // by each child's own writeLayer entry, so it must be re-set for every sibling. We snapshot
+  // the value into local variables here — after writeLayerContents, the ctx values may have been
+  // overwritten by recursive writeLayer calls inside nested Group/Composition processing.
+  // savedChildLayerOffset* was set by the parent writeLayer immediately after computing the
+  // Repeater union-bounds shift; for layers without a Repeater it is (0,0).
   for (auto* child : layer->children) {
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
-    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem);
+    _ctx->childLayerOffsetX = childOffX;
+    _ctx->childLayerOffsetY = childOffY;
+    writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem, layer->layout);
   }
+  _ctx->savedChildLayerOffsetX = 0;
+  _ctx->savedChildLayerOffsetY = 0;
 
   if (hasForeground) {
     writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Foreground);
@@ -1823,8 +2528,8 @@ void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {
   _defs->addAttr("id", backdrop.filterId);
   _defs->addAttr("x", "0");
   _defs->addAttr("y", "0");
-  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
-  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("width", CssFloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", CssFloatToString(backdrop.cropHeight));
   _defs->addAttr("filterUnits", "userSpaceOnUse");
   _defs->addAttr("primitiveUnits", "userSpaceOnUse");
   _defs->addAttr("color-interpolation-filters", "sRGB");
@@ -1833,8 +2538,8 @@ void HTMLWriter::emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop) {
   _defs->addAttr("href", backdrop.backdropDataURL);
   _defs->addAttr("x", "0");
   _defs->addAttr("y", "0");
-  _defs->addAttr("width", FloatToString(backdrop.cropWidth));
-  _defs->addAttr("height", FloatToString(backdrop.cropHeight));
+  _defs->addAttr("width", CssFloatToString(backdrop.cropWidth));
+  _defs->addAttr("height", CssFloatToString(backdrop.cropHeight));
   _defs->addAttr("preserveAspectRatio", "none");
   _defs->addAttr("result", "bg");
   _defs->closeTagSelfClosing();

@@ -2,15 +2,15 @@
 <!-- Tests: Integration showcase — text-focused art combining TextModifier with anchor/skew/rotation/scale/fillColor,
      TextPath along circle, fauxBold/fauxItalic, TextBox writingMode="vertical", GlyphRun with per-glyph transforms,
      Stroke on text, RadialGradient fill on text, multiple RangeSelector, letterSpacing -->
-<pagx version="1.0" width="420" height="380">
+<pagx width="420" height="380">
   <Resources>
     <PathData id="circlePath" data="M 80,10 A 70,70 0 1,1 79.99,10"/>
-    <RadialGradient id="textRadial" center="210,210" radius="180">
+    <RadialGradient id="textRadial" center="210,210" radius="180" fitsToGeometry="false">
       <ColorStop offset="0" color="#FF6B6B"/>
       <ColorStop offset="0.5" color="#C084FC"/>
       <ColorStop offset="1" color="#3B82F6"/>
     </RadialGradient>
-    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="410,350">
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="1,1">
       <ColorStop offset="0" color="#0F172A"/>
       <ColorStop offset="1" color="#1E1040"/>
     </LinearGradient>

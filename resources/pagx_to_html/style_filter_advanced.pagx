@@ -2,7 +2,7 @@
 <!-- Tests: Advanced style/filter attributes — LayerStyle.blendMode (non-normal), excludeChildEffects=true,
      BackgroundBlurStyle.tileMode (non-default), BlurFilter.tileMode (non-default),
      DropShadowStyle with blendMode, Stroke.alpha, Stroke.placement=foreground, Path.reversed=true -->
-<pagx version="1.0" width="420" height="480">
+<pagx width="420" height="480">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -117,7 +117,7 @@
               <Layer name="blurMirror" width="88" height="52" centerX="0" centerY="0">
                 <Rectangle position="44,26" size="88,52"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="88,0">
+                  <LinearGradient startPoint="0,0" endPoint="1,0">
                     <ColorStop offset="0" color="#06B6D4"/>
                     <ColorStop offset="0.33" color="#06B6D4"/>
                     <ColorStop offset="0.34" color="#EC4899"/>

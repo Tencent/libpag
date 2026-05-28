@@ -22,6 +22,7 @@
 #include <fstream>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
@@ -40,14 +41,25 @@ namespace pagx {
 namespace {
 
 // Builds a fresh DiamondGradient inside `doc` whose coordinate space is the target tile's
-// local space. The original gradient is defined in the enclosing layer's coordinate space,
-// so we need to shift center by (-left, -top) to move the tile's top-left to the origin. The
-// gradient matrix stays the same (it operates on gradient-space vectors, not world positions).
+// local space. The source may author its centre/radius in either the geometry's normalized
+// 0..1 bounding box (when fitsToGeometry is true) or in the enclosing layer's absolute
+// coordinate space. For the normalized case the gradient lives in the geometry's own frame,
+// which after cloning becomes the new tile's frame 1:1 — no shift is needed. For the absolute
+// case we must translate by (-left, -top) so the tile's top-left corresponds to the gradient
+// origin. Previously the code always subtracted left/top, which in the common default
+// (fitsToGeometry=true, centre=(0.5,0.5)) pushed the centre by tens of pixels — turning the
+// entire tile into the gradient's last-stop colour (diamond_gradient symptom: flat #1E293B).
 DiamondGradient* CloneDiamondGradientShifted(PAGXDocument* doc, const DiamondGradient* src,
                                              float left, float top) {
   auto clone = doc->makeNode<DiamondGradient>();
-  clone->center = {src->center.x - left, src->center.y - top};
-  clone->radius = src->radius;
+  clone->fitsToGeometry = src->fitsToGeometry;
+  if (src->fitsToGeometry) {
+    clone->center = src->center;
+    clone->radius = src->radius;
+  } else {
+    clone->center = {src->center.x - left, src->center.y - top};
+    clone->radius = src->radius;
+  }
   clone->matrix = src->matrix;
   for (auto* srcStop : src->colorStops) {
     auto stop = doc->makeNode<ColorStop>();
@@ -73,6 +85,11 @@ ImagePattern* CloneImagePatternShifted(PAGXDocument* doc, const ImagePattern* sr
   clone->tileModeY = src->tileModeY;
   clone->filterMode = src->filterMode;
   clone->mipmapMode = src->mipmapMode;
+  // Preserve scaleMode so the offline PNG render honors the source's absolute-vs-fit intent.
+  // Without this the clone inherits tgfx's new default (LetterBox), which stretches the image
+  // to cover the geometry and silently breaks mirror/clamp tile tests that expect absolute
+  // pattern coordinates.
+  clone->scaleMode = src->scaleMode;
   // New matrix = src->matrix * translate(-left, -top)
   auto m = src->matrix;
   // Let T = [1 0 -left; 0 1 -top; 0 0 1]. Then src->matrix * T has translation components
@@ -111,7 +128,7 @@ bool WriteSurfaceAsPng(tgfx::Surface* surface, int pxWidth, int pxHeight,
 // Core render helper: builds a minimal PAGXDocument consisting of one geo element filled with
 // `colorSourceInDoc` (already translated into the tile's local coordinate space), rasterizes it
 // via tgfx, and writes the result to `outputPath`.
-bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float pixelRatio,
+bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float rasterScale,
                      const std::string& outputPath) {
   if (cssWidth <= 0 || cssHeight <= 0) {
     return false;
@@ -127,15 +144,15 @@ bool RenderTileToPng(PAGXDocument* doc, int cssWidth, int cssHeight, float pixel
     return false;
   }
 
-  int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * pixelRatio));
-  int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * pixelRatio));
+  int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * rasterScale));
+  int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * rasterScale));
 
   auto layer = LayerBuilder::Build(doc);
   if (!layer) {
     device->unlock();
     return false;
   }
-  layer->setMatrix(tgfx::Matrix::MakeScale(pixelRatio));
+  layer->setMatrix(tgfx::Matrix::MakeScale(rasterScale));
 
   auto surface = tgfx::Surface::Make(context, pxWidth, pxHeight);
   if (!surface) {
@@ -166,7 +183,7 @@ Layer* BuildSingleElementLayer(PAGXDocument* doc, int width, int height) {
 
 bool HTMLStaticImageRenderer::RenderDiamondToPng(float left, float top, float width, float height,
                                                  float roundness, const DiamondGradient* gradient,
-                                                 float pixelRatio, const std::string& outputPath) {
+                                                 float rasterScale, const std::string& outputPath) {
   if (!gradient || width <= 0 || height <= 0) {
     return false;
   }
@@ -184,13 +201,13 @@ bool HTMLStaticImageRenderer::RenderDiamondToPng(float left, float top, float wi
   fill->color = CloneDiamondGradientShifted(doc.get(), gradient, left, top);
   layer->contents = {rect, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderDiamondEllipseToPng(float left, float top, float width,
                                                         float height,
                                                         const DiamondGradient* gradient,
-                                                        float pixelRatio,
+                                                        float rasterScale,
                                                         const std::string& outputPath) {
   if (!gradient || width <= 0 || height <= 0) {
     return false;
@@ -208,12 +225,13 @@ bool HTMLStaticImageRenderer::RenderDiamondEllipseToPng(float left, float top, f
   fill->color = CloneDiamondGradientShifted(doc.get(), gradient, left, top);
   layer->contents = {ellipse, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderImagePatternToPng(float left, float top, float width,
                                                       float height, float roundness,
-                                                      const ImagePattern* pattern, float pixelRatio,
+                                                      const ImagePattern* pattern,
+                                                      float rasterScale,
                                                       const std::string& outputPath) {
   if (!pattern || !pattern->image || width <= 0 || height <= 0) {
     return false;
@@ -232,13 +250,13 @@ bool HTMLStaticImageRenderer::RenderImagePatternToPng(float left, float top, flo
   fill->color = CloneImagePatternShifted(doc.get(), pattern, left, top);
   layer->contents = {rect, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 bool HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(float left, float top, float width,
                                                              float height,
                                                              const ImagePattern* pattern,
-                                                             float pixelRatio,
+                                                             float rasterScale,
                                                              const std::string& outputPath) {
   if (!pattern || !pattern->image || width <= 0 || height <= 0) {
     return false;
@@ -256,7 +274,50 @@ bool HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(float left, float t
   fill->color = CloneImagePatternShifted(doc.get(), pattern, left, top);
   layer->contents = {ellipse, fill};
 
-  return RenderTileToPng(doc.get(), w, h, pixelRatio, outputPath);
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
+}
+
+bool HTMLStaticImageRenderer::RenderConicGradientToPng(float left, float top, float width,
+                                                       float height, const ConicGradient* gradient,
+                                                       float rasterScale,
+                                                       const std::string& outputPath) {
+  if (!gradient || width <= 0 || height <= 0) {
+    return false;
+  }
+  int w = static_cast<int>(std::ceil(width));
+  int h = static_cast<int>(std::ceil(height));
+  auto doc = PAGXDocument::Make(static_cast<float>(w), static_cast<float>(h));
+  auto layer = BuildSingleElementLayer(doc.get(), w, h);
+
+  auto rect = doc->makeNode<Rectangle>();
+  rect->position = {static_cast<float>(w) / 2.0f, static_cast<float>(h) / 2.0f};
+  rect->size = {static_cast<float>(w), static_cast<float>(h)};
+
+  auto fill = doc->makeNode<Fill>();
+  auto clone = doc->makeNode<ConicGradient>();
+  clone->fitsToGeometry = gradient->fitsToGeometry;
+  clone->startAngle = gradient->startAngle;
+  clone->endAngle = gradient->endAngle;
+  clone->matrix = gradient->matrix;
+  if (gradient->fitsToGeometry) {
+    // fitsToGeometry: centre is already normalized 0..1; pass through unchanged so the
+    // renderer evaluates it against the tile bounding box.
+    clone->center = gradient->center;
+  } else {
+    // Absolute pixel space: shift origin from the layer coordinate system to the tile's
+    // top-left corner so the gradient evaluates correctly within the PNG tile.
+    clone->center = {gradient->center.x - left, gradient->center.y - top};
+  }
+  for (auto* srcStop : gradient->colorStops) {
+    auto stop = doc->makeNode<ColorStop>();
+    stop->offset = srcStop->offset;
+    stop->color = srcStop->color;
+    clone->colorStops.push_back(stop);
+  }
+  fill->color = clone;
+  layer->contents = {rect, fill};
+
+  return RenderTileToPng(doc.get(), w, h, rasterScale, outputPath);
 }
 
 }  // namespace pagx

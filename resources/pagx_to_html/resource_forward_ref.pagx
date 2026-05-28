@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Forward resource reference (resource used before defined); two-pass parsing required.
      Resources are referenced by layers that appear before the Resources block in document order. -->
-<pagx version="1.0" width="320" height="260">
+<pagx width="320" height="260">
   <!-- Background using a forward-referenced gradient (defined below in Resources) -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -81,11 +81,11 @@
   <Resources>
     <SolidColor id="titleColor" color="#1E293B"/>
     <SolidColor id="cardPurple" color="#8B5CF6"/>
-    <LinearGradient id="cardGrad" startPoint="10,10" endPoint="130,110">
+    <LinearGradient id="cardGrad" startPoint="0,0" endPoint="1,1">
       <ColorStop offset="0" color="#3B82F6"/>
       <ColorStop offset="1" color="#10B981"/>
     </LinearGradient>
-    <LinearGradient id="bgGrad" startPoint="10,10" endPoint="310,250">
+    <LinearGradient id="bgGrad" startPoint="0,0" endPoint="1,1">
       <ColorStop offset="0" color="#F8FAFC"/>
       <ColorStop offset="1" color="#EFF6FF"/>
     </LinearGradient>

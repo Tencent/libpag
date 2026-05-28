@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer blendMode → mix-blend-mode (all 18 modes) -->
-<pagx version="1.0" width="440" height="376">
+<pagx width="440" height="376">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -31,7 +31,7 @@
       <Layer left="8" right="8" top="8" bottom="8">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
         <Fill>
-          <LinearGradient startPoint="0,0" endPoint="380,260">
+          <LinearGradient startPoint="0,0" endPoint="0.896,0.722">
             <ColorStop offset="0" color="#3B82F6"/>
             <ColorStop offset="0.5" color="#EF4444"/>
             <ColorStop offset="1" color="#10B981"/>

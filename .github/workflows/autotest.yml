@@ -37,6 +37,22 @@ jobs:
           depsync
         shell: bash
 
+      - name: Get Puppeteer Cache
+        id: puppeteer-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            test/node_modules
+            ~/.cache/puppeteer
+          key: puppeteer-autotest-mac-${{ hashFiles('test/package-lock.json') }}
+          restore-keys: puppeteer-autotest-mac-
+
+      - name: Install Puppeteer
+        run: |
+          cd test
+          npm ci
+        shell: bash
+
       - name: Check Code Format
         run: |
           chmod +x codeformat.sh

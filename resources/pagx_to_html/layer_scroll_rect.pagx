@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: scrollRect dedicated test — viewport clipping with content extending beyond -->
-<pagx version="1.0" width="380" height="300">
+<pagx width="380" height="300">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -40,7 +40,7 @@
               <Layer scrollRect="20,20,120,80" x="0" y="0">
                 <Rectangle position="80,50" size="200,120" roundness="12"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="200,120">
+                  <LinearGradient startPoint="0,0" endPoint="1,1">
                     <ColorStop offset="0" color="#3B82F6"/>
                     <ColorStop offset="0.5" color="#8B5CF6"/>
                     <ColorStop offset="1" color="#EC4899"/>
@@ -62,7 +62,7 @@
               <Layer scrollRect="40,20,120,80" x="0" y="0">
                 <Rectangle position="80,50" size="200,120" roundness="12"/>
                 <Fill>
-                  <LinearGradient startPoint="0,0" endPoint="200,120">
+                  <LinearGradient startPoint="0,0" endPoint="1,1">
                     <ColorStop offset="0" color="#10B981"/>
                     <ColorStop offset="0.5" color="#F59E0B"/>
                     <ColorStop offset="1" color="#EF4444"/>
@@ -83,7 +83,7 @@
             <Rectangle position="140,25" size="280,50"/>
             <Stroke color="#94A3B8" width="1" dashes="4,3"/>
             <Layer scrollRect="0,0,280,50" x="0" y="0">
-              <TextBox left="0" top="0" width="500" height="50" wordWrap="false" paragraphAlign="middle">
+              <TextBox width="500" height="50" wordWrap="false" paragraphAlign="middle">
                 <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14"/>
                 <Fill color="#1F2937"/>
               </TextBox>

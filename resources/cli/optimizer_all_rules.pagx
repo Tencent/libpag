@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Comprehensive PAGXOptimizer fixture.
+
+  This file is hand-crafted so that EVERY optimizer rule (and the major sub-cases of
+  each rule) fires at least once on the first optimization pass. Each section is
+  labelled with the rule(s) it exercises and a short note describing the expected
+  post-optimization shape, so any structural drift surfaces as a precise diff in the
+  round-trip stability test that loads this file.
+
+  Rule coverage map:
+
+    - canonicalizePaths            -> Path-to-Rectangle (sections C1, C3) and
+                                      Path-to-Ellipse (section C2). Recursion into
+                                      nested Groups (C3) and into mask layers (D2).
+    - rectMaskToScrollRect         -> Pre-built Rectangle mask (D1) and a Path-mask
+                                      that only becomes eligible after canonicalize
+                                      runs first (D2, multi-iteration).
+    - pruneEmpty                   -> Empty top-level Layer (A1), empty Group nested
+                                      inside a non-empty Group (B6), and an empty
+                                      shell child that is dropped during downgrade
+                                      (A2).
+    - unwrapRedundantFirstGroup    -> Single Group child (B1) and the painter-leak
+                                      guard NOT firing in B2/B3/B4 because those
+                                      Groups have multiple siblings.
+    - mergeAdjacentGroups          -> Identical Fill (B2: 3 mergers + 1 different),
+                                      identical Stroke (B3), identical Fill+Stroke
+                                      combo on different geometry (B4), and merging
+                                      inside a nested Group (B5).
+    - downgradeShellChildren       -> Parent with all-shell children including one
+                                      empty shell that is dropped (A2).
+    - mergeAdjacentShellLayers     -> Run of 3 unnamed shells at top level (A1) and
+                                      a run nested inside a named container (A3).
+    - dedupPathData                -> 3 identical PathData resources at the top
+                                      level (E1) and 2 identical PathData resources
+                                      inside a Composition (F1).
+    - pruneUnreferencedResources   -> Orphan PathData (E1), orphan SolidColor (E2),
+                                      orphan LinearGradient (E2), orphan Image (E2).
+    - Composition layer-list pass  -> Composition with empty Layer + redundant first
+                                      Group + duplicate PathData inside (F1, F2).
+-->
+<pagx width="800" height="800">
+
+  <!-- ================================================================== -->
+  <!-- Section A: layer-list rules                                        -->
+  <!-- ================================================================== -->
+
+  <!-- A1. mergeAdjacentShellLayers + pruneEmpty: three consecutive unnamed shell
+       layers at top level. The middle one is empty so the merge step drops it
+       outright and the surviving wrapper Layer ends up holding two Groups. -->
+  <Layer>
+    <Rectangle position="10,10" size="20,20"/>
+    <Fill color="#AA0000"/>
+  </Layer>
+  <Layer/>
+  <Layer>
+    <Rectangle position="50,10" size="30,30"/>
+    <Fill color="#00AA00"/>
+  </Layer>
+
+  <!-- A2. downgradeShellChildren (with empty-shell drop): a named container with
+       three shell children. The empty middle child is dropped during downgrade;
+       the other two become inline Groups inside the parent's contents. -->
+  <Layer name="downgradeContainer" width="300" height="200">
+    <Layer>
+      <Rectangle position="20,100" size="40,40"/>
+      <Fill color="#0000AA"/>
+    </Layer>
+    <Layer/>
+    <Layer>
+      <Rectangle position="80,100" size="50,50"/>
+      <Fill color="#AAAAAA"/>
+    </Layer>
+  </Layer>
+
+  <!-- A3. mergeAdjacentShellLayers nested inside a container layer. The container
+       is named (so it is NOT itself merged with its siblings); inside it, a run of
+       shell child Layers must collapse the same way as at top level. A trailing
+       named child blocks downgradeShellChildren so this section isolates the
+       shell-merge behaviour. -->
+  <Layer name="nestedShellMerge" width="300" height="200">
+    <Layer>
+      <Rectangle position="10,10" size="40,40"/>
+      <Fill color="#553300"/>
+    </Layer>
+    <Layer>
+      <Rectangle position="60,10" size="40,40"/>
+      <Fill color="#003355"/>
+    </Layer>
+    <Layer name="blocker">
+      <Rectangle position="120,10" size="40,40"/>
+      <Fill color="#335500"/>
+    </Layer>
+  </Layer>
+
+  <!-- ================================================================== -->
+  <!-- Section B: Group / Element rules                                   -->
+  <!-- ================================================================== -->
+
+  <!-- B1. unwrapRedundantFirstGroup: the single default-transform Group inside
+       this named Layer is unwrapped (no following siblings can leak painters
+       onto). -->
+  <Layer name="unwrapSingle">
+    <Group>
+      <Rectangle position="200,100" size="80,80"/>
+      <Fill color="#AAAA00"/>
+    </Group>
+  </Layer>
+
+  <!-- B2. mergeAdjacentGroups (Fill, multi-merge): three Groups share an identical
+       Fill and collapse into one (geometry from groups 2 and 3 is folded into
+       group 1's prefix); the trailing Group has a different Fill and stays. -->
+  <Layer name="mergeFills">
+    <Group>
+      <Rectangle position="10,300" size="20,20"/>
+      <Fill color="#AA00AA"/>
+    </Group>
+    <Group>
+      <Rectangle position="50,300" size="30,30"/>
+      <Fill color="#AA00AA"/>
+    </Group>
+    <Group>
+      <Rectangle position="90,300" size="20,30"/>
+      <Fill color="#AA00AA"/>
+    </Group>
+    <Group>
+      <Rectangle position="160,300" size="40,40"/>
+      <Fill color="#00AAAA"/>
+    </Group>
+  </Layer>
+
+  <!-- B3. mergeAdjacentGroups (Stroke): two Groups sharing an identical Stroke
+       collapse just like the Fill case. -->
+  <Layer name="mergeStrokes">
+    <Group>
+      <Rectangle position="10,360" size="20,20"/>
+      <Stroke color="#000000" width="2"/>
+    </Group>
+    <Group>
+      <Rectangle position="50,360" size="30,30"/>
+      <Stroke color="#000000" width="2"/>
+    </Group>
+  </Layer>
+
+  <!-- B4. mergeAdjacentGroups (Fill + Stroke combo): the painter signature must
+       compare BOTH painters; only when every trailing painter matches do the two
+       Groups merge. -->
+  <Layer name="mergeFillAndStroke">
+    <Group>
+      <Rectangle position="10,420" size="20,20"/>
+      <Fill color="#FFFF00"/>
+      <Stroke color="#000000" width="2"/>
+    </Group>
+    <Group>
+      <Ellipse position="60,430" size="40,20"/>
+      <Fill color="#FFFF00"/>
+      <Stroke color="#000000" width="2"/>
+    </Group>
+  </Layer>
+
+  <!-- B5. mergeAdjacentGroups + pruneEmpty inside a nested Group. The outer Group
+       has TWO siblings inside the parent layer (so the painter-leak guard keeps
+       the outer Group intact); inside the outer Group, an empty inner Group is
+       pruned and two more inner Groups with identical Fill collapse. -->
+  <Layer name="nestedMerge">
+    <Group>
+      <Group/>
+      <Group>
+        <Rectangle position="10,500" size="20,20"/>
+        <Fill color="#3366CC"/>
+      </Group>
+      <Group>
+        <Rectangle position="40,500" size="20,20"/>
+        <Fill color="#3366CC"/>
+      </Group>
+      <Fill color="#FFFFFF" alpha="0.001"/>
+    </Group>
+    <Group>
+      <Rectangle position="10,540" size="80,20"/>
+      <Fill color="#FFFFFF" alpha="0.001"/>
+    </Group>
+  </Layer>
+
+  <!-- B6. pruneEmpty for an empty Group sandwiched between non-empty siblings.
+       The empty Group is dropped, the surviving siblings keep their relative
+       order. -->
+  <Layer name="emptyGroupSibling">
+    <Group>
+      <Rectangle position="10,580" size="20,20"/>
+      <Fill color="#888888"/>
+    </Group>
+    <Group/>
+    <Group>
+      <Rectangle position="40,580" size="20,20"/>
+      <Fill color="#222222"/>
+    </Group>
+  </Layer>
+
+  <!-- ================================================================== -->
+  <!-- Section C: Path canonicalization                                   -->
+  <!-- ================================================================== -->
+
+  <!-- C1. Path -> Rectangle: an axis-aligned 4-corner path is rewritten in place
+       to a Rectangle node (and the original anonymous PathData becomes orphaned;
+       it has no id so the resource pruner skips it silently). -->
+  <Layer name="pathToRect">
+    <Path data="M 10,400 L 50,400 L 50,420 L 10,420 Z"/>
+    <Fill color="#666666"/>
+  </Layer>
+
+  <!-- C2. Path -> Ellipse: a 4-cubic Bezier circle is rewritten to an Ellipse.
+       Control-point offsets are at the standard kappa = 4*(sqrt(2)-1)/3 ~ 0.5523
+       distance from the on-curve points, well within CP_TOLERANCE = 2px. -->
+  <Layer name="pathToEllipse">
+    <Path data="M 100,400 C 122.09,400 140,417.91 140,440 C 140,462.09 122.09,480 100,480 C 77.91,480 60,462.09 60,440 C 60,417.91 77.91,400 100,400 Z"/>
+    <Fill color="#3399AA"/>
+  </Layer>
+
+  <!-- C3. canonicalizePaths recursing into a nested Group. The Path inside the
+       inner Group is rewritten to a Rectangle even though the parent Layer never
+       sees it directly. Two siblings inside the outer Group block the unwrap
+       rule so the recursion path is the only thing being exercised here. -->
+  <Layer name="pathInNestedGroup">
+    <Group>
+      <Group>
+        <Path data="M 200,400 L 240,400 L 240,420 L 200,420 Z"/>
+        <Fill color="#996633"/>
+      </Group>
+      <Group>
+        <Rectangle position="260,410" size="20,20"/>
+        <Fill color="#669933"/>
+      </Group>
+    </Group>
+  </Layer>
+
+  <!-- ================================================================== -->
+  <!-- Section D: mask -> scrollRect rewrites                             -->
+  <!-- ================================================================== -->
+
+  <!-- D1. rectMaskToScrollRect (direct): the mask layer's only contents are a
+       single Rectangle + opaque Fill, so the mask collapses to an equivalent
+       scrollRect on the masked layer and the mask reference is detached. The
+       mask Rectangle uses `size` (not width/height) because the optimizer reads
+       Rectangle::size when computing the equivalent scrollRect bounds. -->
+  <Layer id="rectMask" name="RectMask" visible="false">
+    <Rectangle position="50,50" size="100,100"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="maskedRect" mask="@rectMask" maskType="alpha">
+    <Rectangle position="100,100" size="200,200"/>
+    <Fill color="#888800"/>
+  </Layer>
+
+  <!-- D2. Path-mask -> Rectangle-mask -> scrollRect (multi-iteration). The mask
+       initially uses a Path that describes a rectangle; canonicalizePaths
+       rewrites the inner Path to Rectangle in iteration 1, and then
+       rectMaskToScrollRect recognizes it and detaches the mask in iteration 2.
+       This pins down the rule loop's two-pass interaction. -->
+  <Layer id="pathMask" name="PathMask" visible="false">
+    <Path data="M 0,0 L 60,0 L 60,40 L 0,40 Z"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="maskedFromPath" mask="@pathMask" maskType="alpha">
+    <Rectangle position="200,600" size="80,60"/>
+    <Fill color="#993399"/>
+  </Layer>
+
+  <!-- ================================================================== -->
+  <!-- Section E: dedupPathData + pruneUnreferencedResources               -->
+  <!-- ================================================================== -->
+
+  <!-- E1. dedupPathData (multi-way): three PathData entries with identical
+       triangle geometry collapse into one; the two duplicates lose their ids
+       so the exporter drops them from <Resources>. Path geometry is
+       intentionally NOT a rectangle so canonicalizePaths leaves the references
+       intact and dedup actually has work to do. -->
+  <Layer name="dedup1">
+    <Path data="@triA"/>
+    <Fill color="#123456"/>
+  </Layer>
+  <Layer name="dedup2">
+    <Path data="@triB"/>
+    <Fill color="#7890AB"/>
+  </Layer>
+  <Layer name="dedup3">
+    <Path data="@triC"/>
+    <Fill color="#234567"/>
+  </Layer>
+
+  <!-- E2. pruneUnreferencedResources across multiple resource types. Every
+       resource declared in <Resources> below with `*Orphan*` in its id is
+       referenced nowhere in the layer tree and must lose its id (and therefore
+       disappear from the exported <Resources> block). -->
+  <Layer name="resourceUser">
+    <Rectangle position="300,580" size="60,40"/>
+    <Fill color="@usedSolidColor"/>
+  </Layer>
+  <Layer name="gradientUser">
+    <Rectangle position="380,580" size="60,40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="60,0" fitsToGeometry="false">
+        <ColorStop color="#FF0000" offset="0"/>
+        <ColorStop color="#0000FF" offset="1"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- ================================================================== -->
+  <!-- Section F: Composition layer-list optimization                     -->
+  <!-- ================================================================== -->
+
+  <!-- F1. The Composition's internal layer list is optimized by the same rule
+       loop as the document root: an empty Layer is pruned, the redundant
+       single-Group child is unwrapped, and (F2) duplicate PathData resources
+       inside the Composition are deduplicated by the same resource pass. -->
+  <Layer name="usesComp" width="120" height="120" composition="@compInner"/>
+
+  <Resources>
+    <!-- Used in section E. -->
+    <SolidColor id="usedSolidColor" color="#447733"/>
+
+    <!-- Section E1 deduplication targets. -->
+    <PathData id="triA" data="M 0,0 L 12,0 L 6,8 Z"/>
+    <PathData id="triB" data="M 0,0 L 12,0 L 6,8 Z"/>
+    <PathData id="triC" data="M 0,0 L 12,0 L 6,8 Z"/>
+
+    <!-- Section E2 orphan resources (must all be pruned). -->
+    <PathData id="orphanPath" data="M 0,0 L 9,0 L 0,9 Z"/>
+    <SolidColor id="orphanColor" color="#998877"/>
+    <LinearGradient id="orphanGradient" startPoint="0,0" endPoint="10,10" fitsToGeometry="false">
+      <ColorStop color="#000000" offset="0"/>
+      <ColorStop color="#FFFFFF" offset="1"/>
+    </LinearGradient>
+    <Image id="orphanImage" source="placeholder.png"/>
+
+    <!-- Section F: Composition with internal optimizations. -->
+    <Composition id="compInner" width="120" height="120">
+      <Layer/>
+      <Layer name="compRoot">
+        <Group>
+          <Rectangle position="60,60" size="80,80"/>
+          <Fill color="#AABBCC"/>
+        </Group>
+      </Layer>
+      <Layer name="compDedupUser">
+        <Path data="@compTriA"/>
+        <Fill color="#445566"/>
+      </Layer>
+      <Layer name="compDedupUser2">
+        <Path data="@compTriB"/>
+        <Fill color="#778899"/>
+      </Layer>
+    </Composition>
+
+    <!-- PathData consumed only inside the Composition above. Both have the same
+         geometry so dedupPathData runs there too. -->
+    <PathData id="compTriA" data="M 0,0 L 8,0 L 4,6 Z"/>
+    <PathData id="compTriB" data="M 0,0 L 8,0 L 4,6 Z"/>
+  </Resources>
+
+</pagx>

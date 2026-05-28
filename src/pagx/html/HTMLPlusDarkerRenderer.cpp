@@ -131,17 +131,17 @@ bool ComputeScreenBounds(const Layer* target,
 }
 
 // Renders the whole document (with one Layer already flipped to visible=false) into a Surface
-// sized to `bw*pixelRatio x bh*pixelRatio`, translated so that screen-space (bx, by) maps to (0,0)
-// in the Surface. Writes the result to outputPath (PNG) and returns the raw PNG bytes so the
-// caller can also embed them as a base64 data URL in the generated HTML.
+// sized to `bw*rasterScale x bh*rasterScale`, translated so that screen-space (bx, by) maps to
+// (0,0) in the Surface. Writes the result to outputPath (PNG) and returns the raw PNG bytes so
+// the caller can also embed them as a base64 data URL in the generated HTML.
 bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx, float by,
-                           float bw, float bh, float pixelRatio, const std::string& outputPath,
+                           float bw, float bh, float rasterScale, const std::string& outputPath,
                            std::shared_ptr<tgfx::Data>* outEncoded) {
   if (bw <= 0 || bh <= 0) {
     return false;
   }
-  int pxW = static_cast<int>(std::ceil(bw * pixelRatio));
-  int pxH = static_cast<int>(std::ceil(bh * pixelRatio));
+  int pxW = static_cast<int>(std::ceil(bw * rasterScale));
+  int pxH = static_cast<int>(std::ceil(bh * rasterScale));
   if (pxW <= 0 || pxH <= 0) {
     return false;
   }
@@ -149,9 +149,9 @@ bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx
   if (!layer) {
     return false;
   }
-  // Apply (scale by pixelRatio) composed with (translate by -bx,-by). Order matters: we want the
-  // world-space point (bx, by) to land at Surface pixel (0, 0), then scale up.
-  tgfx::Matrix transform = tgfx::Matrix::MakeScale(pixelRatio);
+  // Apply (scale by rasterScale) composed with (translate by -bx,-by). Order matters: we want
+  // the world-space point (bx, by) to land at Surface pixel (0, 0), then scale up.
+  tgfx::Matrix transform = tgfx::Matrix::MakeScale(rasterScale);
   transform.preTranslate(-bx, -by);
   layer->setMatrix(transform);
 
@@ -191,8 +191,7 @@ bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx
 }  // namespace
 
 void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::string& staticImgDir,
-                                       const std::string& /*urlPrefix*/,
-                                       const std::string& staticImgNamePrefix, float pixelRatio,
+                                       const std::string& /*urlPrefix*/, float rasterScale,
                                        std::unordered_map<const Layer*, PlusDarkerBackdrop>& out) {
   std::unordered_map<const Layer*, const Layer*> parentMap;
   std::vector<Layer*> candidates;
@@ -240,10 +239,10 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::strin
     } guard{target, target->visible};
     target->visible = false;
 
-    std::string fileName = staticImgNamePrefix + "pd_" + std::to_string(idx) + ".png";
+    std::string fileName = "pd_" + std::to_string(idx) + ".png";
     std::string absPath = staticImgDir + "/" + fileName;
     std::shared_ptr<tgfx::Data> encoded;
-    if (!RenderCroppedBackdrop(doc, ctx, bx, by, bw, bh, pixelRatio, absPath, &encoded)) {
+    if (!RenderCroppedBackdrop(doc, ctx, bx, by, bw, bh, rasterScale, absPath, &encoded)) {
       continue;
     }
 

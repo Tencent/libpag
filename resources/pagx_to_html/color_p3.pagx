@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Display P3 wide gamut colors: p3(r,g,b) and p3(r,g,b,a) formats,
      comparison between sRGB and P3 colors -->
-<pagx version="1.0" width="380" height="280">
+<pagx width="380" height="280">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -34,7 +34,7 @@
       <Layer width="280" height="10">
         <Rectangle left="0" right="0" top="0" bottom="0" roundness="4"/>
         <Fill>
-          <LinearGradient startPoint="10,10" endPoint="290,10">
+          <LinearGradient startPoint="0,0" endPoint="1,0">
             <ColorStop offset="0" color="p3(1.0, 0.0, 0.5)"/>
             <ColorStop offset="0.5" color="p3(0.0, 1.0, 0.3)"/>
             <ColorStop offset="1" color="p3(0.2, 0.1, 1.0)"/>

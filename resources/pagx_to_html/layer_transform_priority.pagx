@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: transform priority: matrix3D > matrix > x/y. Higher overrides lower. -->
-<pagx version="1.0" width="420" height="260">
+<pagx width="420" height="260">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

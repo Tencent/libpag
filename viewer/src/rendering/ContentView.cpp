@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContentView.h"
-#include <QDateTime>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include "RenderThread.h"
@@ -28,24 +27,24 @@ ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
-  if (window() != nullptr) {
-    initDrawable();
-  } else {
-    connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
-  }
+  connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
 }
 
 ContentView::~ContentView() {
-  if (renderThread != nullptr && renderThread->isRunning()) {
-    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
-    renderThread->wait();
-  }
+  resizeTimer->stop();
+  releaseDrawable();
 }
 
 void ContentView::onWindowChanged(QQuickWindow* win) {
   if (win != nullptr) {
-    disconnect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
     initDrawable();
+  }
+}
+
+void ContentView::itemChange(ItemChange change, const ItemChangeData& value) {
+  QQuickItem::itemChange(change, value);
+  if (change == ItemSceneChange && value.window == nullptr) {
+    releaseDrawable();
   }
 }
 
@@ -53,8 +52,26 @@ void ContentView::initDrawable() {
   // Base implementation does nothing, subclasses will override
 }
 
+void ContentView::releaseDrawable() {
+  if (renderThread != nullptr && renderThread->isRunning()) {
+    QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
+    renderThread->wait();
+  }
+  drawable = nullptr;
+}
+
+void ContentView::prepareForRemoval() {
+  // Called explicitly before QML Loader switches components, because itemChange alone
+  // fires after the item is detached from the window. RenderThread::shutDown() needs
+  // the item still attached so it can move the drawable back to the main thread safely.
+  releaseDrawable();
+}
+
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
+  if (sizeChanged) {
+    return;
+  }
   sizeChanged = true;
   onSizeChangedDelayHandled();
   if (renderThread != nullptr) {
@@ -67,17 +84,7 @@ void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeo
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  // Skip starting the timer if:
-  // 1. We're within the skip window (subclass handled size change immediately)
-  // 2. sizeChanged is already true (a size change is pending)
-  // This prevents redundant updateSize() calls that invalidate the surface.
-  auto now = QDateTime::currentMSecsSinceEpoch();
-  if (now < skipResizeTimerUntil) {
-    return;
-  }
-  if (!sizeChanged) {
-    resizeTimer->start(400);
-  }
+  resizeTimer->start(400);
 }
 
 RenderThread* ContentView::getRenderThread() const {

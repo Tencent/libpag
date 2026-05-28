@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Path with inline SVG data and @id resource reference, reversed -->
-<pagx version="1.0" width="420" height="280">
+<pagx width="420" height="280">
   <Resources>
     <PathData id="heart" data="M 60,22 C 60,10 48,0 36,0 C 18,0 0,16 0,36 C 0,54 20,72 60,96 C 100,72 120,54 120,36 C 120,16 102,0 84,0 C 72,0 60,10 60,22 Z"/>
   </Resources>

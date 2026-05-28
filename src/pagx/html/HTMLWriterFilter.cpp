@@ -38,11 +38,35 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
+// Emits a feColorMatrix that extracts the alpha channel of `currentInput` into a fresh result
+// node, but only if the cached `alphaResult` is stale. Mutates the four pipeline state
+// variables in place (allocating a fresh result name through `si`) and returns the name of the
+// alpha-only result that downstream filter primitives should reference. The four references
+// match the local pipeline state of writeFilterDefs verbatim so the helper reads as if it were
+// still inline; pulling them out as parameters lets writeFilterDefs avoid a local lambda per
+// the project's no-lambda rule.
+static std::string EnsurePipelineAlpha(HTMLBuilder* defs, int& si, const std::string& currentInput,
+                                       std::string& alphaResult, bool& alphaDirty) {
+  if (!alphaDirty) {
+    return alphaResult;
+  }
+  std::string aId = "a" + std::to_string(si++);
+  defs->openTag("feColorMatrix");
+  defs->addAttr("in", currentInput);
+  defs->addAttr("type", "matrix");
+  defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
+  defs->addAttr("result", aId);
+  defs->closeTagSelfClosing();
+  alphaResult = aId;
+  alphaDirty = false;
+  return alphaResult;
+}
+
 //==============================================================================
 // HTMLWriter – mirror-tile eligibility
 //==============================================================================
 
-bool HTMLWriter::needsMirrorTiling(const Layer* layer) {
+bool HTMLWriter::NeedsMirrorTiling(const Layer* layer) {
   // Guard: need exactly one filter that is a BlurFilter with tileMode=Mirror, and no layer
   // styles (which would need to be applied outside the tile container and require separate
   // stacking-context handling). Mixed filter chains also fall through because the tile wrapper
@@ -95,11 +119,12 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       }
       if (f->nodeType() == NodeType::BlurFilter) {
         auto b = static_cast<const BlurFilter*>(f);
-        css += "blur(" + FloatToString(b->blurX) + "px)";
+        css += "blur(" + CssFloatToString(b->blurX) + "px)";
       } else if (f->nodeType() == NodeType::DropShadowFilter) {
         auto s = static_cast<const DropShadowFilter*>(f);
-        css += "drop-shadow(" + FloatToString(s->offsetX) + "px " + FloatToString(s->offsetY) +
-               "px " + FloatToString(s->blurX) + "px " + ColorToRGBA(s->color) + ")";
+        css += "drop-shadow(" + CssFloatToString(s->offsetX) + "px " +
+               CssFloatToString(s->offsetY) + "px " + CssFloatToString(s->blurX) + "px " +
+               ColorToRGBA(s->color) + ")";
       }
     }
     return css;
@@ -114,28 +139,28 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
         auto b = static_cast<const BlurFilter*>(f);
-        signature += FloatToString(b->blurX) + "," + FloatToString(b->blurY) + "," +
+        signature += CssFloatToString(b->blurX) + "," + CssFloatToString(b->blurY) + "," +
                      std::to_string(static_cast<int>(b->tileMode));
         break;
       }
       case NodeType::DropShadowFilter: {
         auto s = static_cast<const DropShadowFilter*>(f);
-        signature += FloatToString(s->offsetX) + "," + FloatToString(s->offsetY) + "," +
-                     FloatToString(s->blurX) + "," + FloatToString(s->blurY) + "," +
+        signature += CssFloatToString(s->offsetX) + "," + CssFloatToString(s->offsetY) + "," +
+                     CssFloatToString(s->blurX) + "," + CssFloatToString(s->blurY) + "," +
                      ColorToRGBA(s->color) + "," + (s->shadowOnly ? "1" : "0");
         break;
       }
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
-        signature += FloatToString(s->offsetX) + "," + FloatToString(s->offsetY) + "," +
-                     FloatToString(s->blurX) + "," + FloatToString(s->blurY) + "," +
+        signature += CssFloatToString(s->offsetX) + "," + CssFloatToString(s->offsetY) + "," +
+                     CssFloatToString(s->blurX) + "," + CssFloatToString(s->blurY) + "," +
                      ColorToRGBA(s->color) + "," + (s->shadowOnly ? "1" : "0");
         break;
       }
       case NodeType::ColorMatrixFilter: {
         auto c = static_cast<const ColorMatrixFilter*>(f);
         for (int i = 0; i < 20; i++) {
-          signature += FloatToString(c->matrix[i]) + ",";
+          signature += CssFloatToString(c->matrix[i]) + ",";
         }
         break;
       }
@@ -174,22 +199,6 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
   std::string alphaResult = "SourceAlpha";
   bool alphaDirty = false;
 
-  auto ensureAlpha = [&]() -> std::string {
-    if (!alphaDirty) {
-      return alphaResult;
-    }
-    std::string aId = "a" + std::to_string(si++);
-    _defs->openTag("feColorMatrix");
-    _defs->addAttr("in", currentInput);
-    _defs->addAttr("type", "matrix");
-    _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0");
-    _defs->addAttr("result", aId);
-    _defs->closeTagSelfClosing();
-    alphaResult = aId;
-    alphaDirty = false;
-    return alphaResult;
-  };
-
   for (auto* f : filters) {
     switch (f->nodeType()) {
       case NodeType::BlurFilter: {
@@ -199,9 +208,9 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         std::string blurId = "blur" + std::to_string(si++);
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", currentInput);
-        std::string sd = FloatToString(b->blurX);
+        std::string sd = CssFloatToString(b->blurX);
         if (b->blurX != b->blurY) {
-          sd += " " + FloatToString(b->blurY);
+          sd += " " + CssFloatToString(b->blurY);
         }
         _defs->addAttr("stdDeviation", sd);
         _defs->addAttr("result", blurId);
@@ -213,12 +222,12 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::DropShadowFilter: {
         auto s = static_cast<const DropShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", alphaIn);
-        std::string sd = FloatToString(s->blurX);
+        std::string sd = CssFloatToString(s->blurX);
         if (s->blurX != s->blurY) {
-          sd += " " + FloatToString(s->blurY);
+          sd += " " + CssFloatToString(s->blurY);
         }
         _defs->addAttr("stdDeviation", sd);
         _defs->addAttr("result", "sBlur" + i);
@@ -228,10 +237,10 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           _defs->openTag("feOffset");
           _defs->addAttr("in", offsetRes);
           if (!FloatNearlyZero(s->offsetX)) {
-            _defs->addAttr("dx", FloatToString(s->offsetX));
+            _defs->addAttr("dx", CssFloatToString(s->offsetX));
           }
           if (!FloatNearlyZero(s->offsetY)) {
-            _defs->addAttr("dy", FloatToString(s->offsetY));
+            _defs->addAttr("dy", CssFloatToString(s->offsetY));
           }
           _defs->addAttr("result", "sOff" + i);
           _defs->closeTagSelfClosing();
@@ -240,10 +249,10 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->openTag("feColorMatrix");
         _defs->addAttr("in", offsetRes);
         _defs->addAttr("type", "matrix");
-        _defs->addAttr("values", "0 0 0 0 " + FloatToString(s->color.red) + " 0 0 0 0 " +
-                                     FloatToString(s->color.green) + " 0 0 0 0 " +
-                                     FloatToString(s->color.blue) + " 0 0 0 " +
-                                     FloatToString(s->color.alpha) + " 0");
+        _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(s->color.red) + " 0 0 0 0 " +
+                                     CssFloatToString(s->color.green) + " 0 0 0 0 " +
+                                     CssFloatToString(s->color.blue) + " 0 0 0 " +
+                                     CssFloatToString(s->color.alpha) + " 0");
         _defs->addAttr("result", "sDrop" + i);
         _defs->closeTagSelfClosing();
         if (s->shadowOnly) {
@@ -269,7 +278,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::InnerShadowFilter: {
         auto s = static_cast<const InnerShadowFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         // Invert current alpha so that exterior becomes opaque and interior becomes transparent.
         // Blurring the inverted alpha produces a falloff that bleeds into the shape from every
         // edge, then offsetting and clipping back to the source mask yields the inner shadow.
@@ -284,9 +293,9 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->addAttr("tableValues", "1 0");
         _defs->closeTagSelfClosing();
         _defs->closeTag();
-        std::string sd = FloatToString(s->blurX);
+        std::string sd = CssFloatToString(s->blurX);
         if (s->blurX != s->blurY) {
-          sd += " " + FloatToString(s->blurY);
+          sd += " " + CssFloatToString(s->blurY);
         }
         _defs->openTag("feGaussianBlur");
         _defs->addAttr("in", "iInv" + i);
@@ -298,10 +307,10 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           _defs->openTag("feOffset");
           _defs->addAttr("in", blurredResult);
           if (!FloatNearlyZero(s->offsetX)) {
-            _defs->addAttr("dx", FloatToString(s->offsetX));
+            _defs->addAttr("dx", CssFloatToString(s->offsetX));
           }
           if (!FloatNearlyZero(s->offsetY)) {
-            _defs->addAttr("dy", FloatToString(s->offsetY));
+            _defs->addAttr("dy", CssFloatToString(s->offsetY));
           }
           _defs->addAttr("result", "iOff" + i);
           _defs->closeTagSelfClosing();
@@ -310,7 +319,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(s->color));
         if (s->color.alpha < 1.0f) {
-          _defs->addAttr("flood-opacity", FloatToString(s->color.alpha));
+          _defs->addAttr("flood-opacity", CssFloatToString(s->color.alpha));
         }
         _defs->addAttr("result", "iFlood" + i);
         _defs->closeTagSelfClosing();
@@ -362,7 +371,7 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           if (j > 0) {
             v += ' ';
           }
-          v += FloatToString(cm->matrix[j]);
+          v += CssFloatToString(cm->matrix[j]);
         }
         _defs->addAttr("values", v);
         _defs->addAttr("result", cmId);
@@ -374,11 +383,11 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
       case NodeType::BlendFilter: {
         auto bf = static_cast<const BlendFilter*>(f);
         std::string i = std::to_string(si++);
-        std::string alphaIn = ensureAlpha();
+        std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feFlood");
         _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
-          _defs->addAttr("flood-opacity", FloatToString(bf->color.alpha));
+          _defs->addAttr("flood-opacity", CssFloatToString(bf->color.alpha));
         }
         _defs->addAttr("result", "bFlood" + i);
         _defs->closeTagSelfClosing();
@@ -425,7 +434,7 @@ void HTMLWriter::registerFilterId(const std::string& signature, const std::strin
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
-std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
+std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos) {
   const Fill* maskFill = nullptr;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Fill) {
@@ -438,31 +447,43 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   std::string fillAttr = "white";
   float fillOpacity = 1.0f;
 
-  // Compute bounding box of mask geometry for SVG viewBox.
-  float maxX = 0;
-  float maxY = 0;
+  // Compute bounding box of mask geometry for SVG viewBox. Track both min and max
+  // extents so that masks positioned at negative coordinates are fully enclosed.
+  float minX = 1e9f;
+  float minY = 1e9f;
+  float maxX = -1e9f;
+  float maxY = -1e9f;
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
-      float r = rect->position.x + rect->size.width / 2;
-      float b = rect->position.y + rect->size.height / 2;
-      maxX = std::max(maxX, r);
-      maxY = std::max(maxY, b);
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
+      minX = std::min(minX, pos.x - sz.width / 2);
+      minY = std::min(minY, pos.y - sz.height / 2);
+      maxX = std::max(maxX, pos.x + sz.width / 2);
+      maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
-      maxX = std::max(maxX, el->position.x + el->size.width / 2);
-      maxY = std::max(maxY, el->position.y + el->size.height / 2);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
+      minX = std::min(minX, pos.x - sz.width / 2);
+      minY = std::min(minY, pos.y - sz.height / 2);
+      maxX = std::max(maxX, pos.x + sz.width / 2);
+      maxY = std::max(maxY, pos.y + sz.height / 2);
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);
       float r = std::max(ps->outerRadius, ps->innerRadius);
-      maxX = std::max(maxX, ps->position.x + r);
-      maxY = std::max(maxY, ps->position.y + r);
+      auto pos = ps->renderPosition();
+      minX = std::min(minX, pos.x - r);
+      minY = std::min(minY, pos.y - r);
+      maxX = std::max(maxX, pos.x + r);
+      maxY = std::max(maxY, pos.y + r);
     }
   }
-  if (FloatNearlyZero(maxX)) {
+  if (minX >= 1e9f) {
+    minX = 0;
+    minY = 0;
     maxX = _ctx->docWidth;
-  }
-  if (FloatNearlyZero(maxY)) {
     maxY = _ctx->docHeight;
   }
 
@@ -471,9 +492,12 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   // xmlns is required for SVG inside data: URLs — the browser parses this as a standalone SVG
   // document, not as part of the HTML5 DOM where xmlns would be redundant.
   svg.addAttr("xmlns", "http://www.w3.org/2000/svg");
-  svg.addAttr("width", FloatToString(maxX));
-  svg.addAttr("height", FloatToString(maxY));
-  svg.addAttr("viewBox", "0 0 " + FloatToString(maxX) + " " + FloatToString(maxY));
+  float svgW = maxX - minX;
+  float svgH = maxY - minY;
+  svg.addAttr("width", CssFloatToString(svgW));
+  svg.addAttr("height", CssFloatToString(svgH));
+  svg.addAttr("viewBox", CssFloatToString(minX) + " " + CssFloatToString(minY) + " " +
+                             CssFloatToString(svgW) + " " + CssFloatToString(svgH));
   svg.closeTagStart();
 
   if (useFillColor) {
@@ -487,21 +511,25 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         auto g = static_cast<const LinearGradient*>(src);
         svg.openTag("linearGradient");
         svg.addAttr("id", gradId);
-        svg.addAttr("x1", FloatToString(g->startPoint.x));
-        svg.addAttr("y1", FloatToString(g->startPoint.y));
-        svg.addAttr("x2", FloatToString(g->endPoint.x));
-        svg.addAttr("y2", FloatToString(g->endPoint.y));
-        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        svg.addAttr("x1", CssFloatToString(g->startPoint.x));
+        svg.addAttr("y1", CssFloatToString(g->startPoint.y));
+        svg.addAttr("x2", CssFloatToString(g->endPoint.x));
+        svg.addAttr("y2", CssFloatToString(g->endPoint.y));
+        // fitsToGeometry maps to SVG objectBoundingBox, where coords live in [0,1] of the
+        // filled shape's bbox — this matches PAGX's normalized default. When fitsToGeometry
+        // is false the gradient parameters are pixel values in the mask's own coordinate
+        // space and must be emitted as userSpaceOnUse so SVG consumes them verbatim.
+        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
         if (!g->matrix.isIdentity()) {
           svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
         }
         svg.closeTagStart();
         for (auto* stop : g->colorStops) {
           svg.openTag("stop");
-          svg.addAttr("offset", FloatToString(stop->offset));
+          svg.addAttr("offset", CssFloatToString(stop->offset));
           svg.addAttr("stop-color", ColorToSVGHex(stop->color));
           if (stop->color.alpha < 1.0f) {
-            svg.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+            svg.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
           }
           svg.closeTagSelfClosing();
         }
@@ -510,20 +538,20 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         auto g = static_cast<const RadialGradient*>(src);
         svg.openTag("radialGradient");
         svg.addAttr("id", gradId);
-        svg.addAttr("cx", FloatToString(g->center.x));
-        svg.addAttr("cy", FloatToString(g->center.y));
-        svg.addAttr("r", FloatToString(g->radius));
-        svg.addAttr("gradientUnits", "userSpaceOnUse");
+        svg.addAttr("cx", CssFloatToString(g->center.x));
+        svg.addAttr("cy", CssFloatToString(g->center.y));
+        svg.addAttr("r", CssFloatToString(g->radius));
+        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
         if (!g->matrix.isIdentity()) {
           svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
         }
         svg.closeTagStart();
         for (auto* stop : g->colorStops) {
           svg.openTag("stop");
-          svg.addAttr("offset", FloatToString(stop->offset));
+          svg.addAttr("offset", CssFloatToString(stop->offset));
           svg.addAttr("stop-color", ColorToSVGHex(stop->color));
           if (stop->color.alpha < 1.0f) {
-            svg.addAttr("stop-opacity", FloatToString(stop->color.alpha));
+            svg.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
           }
           svg.closeTagSelfClosing();
         }
@@ -542,35 +570,45 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   for (auto* e : mask->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
+      // Use renderPosition/renderSize so that Rectangle instances authored as
+      // <Rectangle width="W" height="H"/> (which leave the intrinsic `size`
+      // member at its default {0,0}) are emitted with their layout-resolved
+      // geometry; otherwise the mask rect degenerates to width=0/height=0 and
+      // the masked layer becomes fully transparent. Matches HTMLWriterShape's
+      // handling of the same element.
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
       svg.openTag("rect");
-      float x = rect->position.x - rect->size.width / 2;
-      float y = rect->position.y - rect->size.height / 2;
+      float x = pos.x - sz.width / 2;
+      float y = pos.y - sz.height / 2;
       if (!FloatNearlyZero(x)) {
-        svg.addAttr("x", FloatToString(x));
+        svg.addAttr("x", CssFloatToString(x));
       }
       if (!FloatNearlyZero(y)) {
-        svg.addAttr("y", FloatToString(y));
+        svg.addAttr("y", CssFloatToString(y));
       }
-      svg.addAttr("width", FloatToString(rect->size.width));
-      svg.addAttr("height", FloatToString(rect->size.height));
+      svg.addAttr("width", CssFloatToString(sz.width));
+      svg.addAttr("height", CssFloatToString(sz.height));
       if (rect->roundness > 0) {
-        svg.addAttr("rx", FloatToString(rect->roundness));
+        svg.addAttr("rx", CssFloatToString(rect->roundness));
       }
       svg.addAttr("fill", fillAttr);
       if (fillOpacity < 1.0f) {
-        svg.addAttr("fill-opacity", FloatToString(fillOpacity));
+        svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
       }
       svg.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
       svg.openTag("ellipse");
-      svg.addAttr("cx", FloatToString(el->position.x));
-      svg.addAttr("cy", FloatToString(el->position.y));
-      svg.addAttr("rx", FloatToString(el->size.width / 2));
-      svg.addAttr("ry", FloatToString(el->size.height / 2));
+      svg.addAttr("cx", CssFloatToString(pos.x));
+      svg.addAttr("cy", CssFloatToString(pos.y));
+      svg.addAttr("rx", CssFloatToString(sz.width / 2));
+      svg.addAttr("ry", CssFloatToString(sz.height / 2));
       svg.addAttr("fill", fillAttr);
       if (fillOpacity < 1.0f) {
-        svg.addAttr("fill-opacity", FloatToString(fillOpacity));
+        svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
       }
       svg.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Path) {
@@ -581,7 +619,7 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         svg.addAttr("d", d);
         svg.addAttr("fill", fillAttr);
         if (fillOpacity < 1.0f) {
-          svg.addAttr("fill-opacity", FloatToString(fillOpacity));
+          svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
         }
         svg.closeTagSelfClosing();
       }
@@ -593,7 +631,7 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
         svg.addAttr("d", d);
         svg.addAttr("fill", fillAttr);
         if (fillOpacity < 1.0f) {
-          svg.addAttr("fill-opacity", FloatToString(fillOpacity));
+          svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
         }
         svg.closeTagSelfClosing();
       }
@@ -625,6 +663,9 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
       case '"':
         encoded += "%22";
         break;
+      case '\'':
+        encoded += "%27";
+        break;
       default:
         encoded += c;
         break;
@@ -638,6 +679,24 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   } else {
     css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
   }
+  // The mask SVG uses document-absolute coordinates (the maskLayer sits at the document
+  // origin), but CSS mask-image starts at the masked element's own (0,0). Shift the mask
+  // back by the masked layer's render position so the two coordinate systems align.
+  if (!FloatNearlyZero(maskedLayerPos.x) || !FloatNearlyZero(maskedLayerPos.y)) {
+    std::string px = CssFloatToString(-maskedLayerPos.x) + "px";
+    std::string py = CssFloatToString(-maskedLayerPos.y) + "px";
+    css += ";-webkit-mask-position:" + px + " " + py;
+    css += ";mask-position:" + px + " " + py;
+  }
+  // mask-size and mask-repeat must always be pinned, not just when mask-position is used.
+  // CSS defaults to `mask-size:auto` which resolves to `cover` in some browsers and to the
+  // SVG's intrinsic size in others, and `mask-repeat:repeat` which would tile the mask SVG
+  // across the masked element. Without explicit values a 100×100 mask on a 200×200 element
+  // either stretches to fill (mask loses its clipping geometry, D1 section of
+  // optimizer_all_rules) or tiles into a checkerboard.
+  css += ";-webkit-mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  css += ";mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   return css;
 }
 
@@ -652,6 +711,14 @@ std::string HTMLWriter::writeClipDef(const Layer* mask) {
 }
 
 void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent) {
+  // Depth-limit the clip-content descent. The sibling recursive paths writeLayer,
+  // writeGroup, writeComposition and writeElements each acquire a RecursionGuard; this
+  // one used to be the only recursive entry point without one, so a crafted mask graph
+  // deeper than MAX_RECURSION_DEPTH would overflow the stack here.
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
   Matrix lm = layer->matrix;
   if (layer->x != 0 || layer->y != 0) {
     lm = Matrix::Translate(layer->x, layer->y) * lm;
@@ -679,15 +746,15 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
       float x = r->position.x - r->size.width / 2;
       float y = r->position.y - r->size.height / 2;
       if (!FloatNearlyZero(x)) {
-        out.addAttr("x", FloatToString(x));
+        out.addAttr("x", CssFloatToString(x));
       }
       if (!FloatNearlyZero(y)) {
-        out.addAttr("y", FloatToString(y));
+        out.addAttr("y", CssFloatToString(y));
       }
-      out.addAttr("width", FloatToString(r->size.width));
-      out.addAttr("height", FloatToString(r->size.height));
+      out.addAttr("width", CssFloatToString(r->size.width));
+      out.addAttr("height", CssFloatToString(r->size.height));
       if (r->roundness > 0) {
-        out.addAttr("rx", FloatToString(r->roundness));
+        out.addAttr("rx", CssFloatToString(r->roundness));
       }
       out.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
@@ -696,10 +763,10 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
       if (!tr.empty()) {
         out.addAttr("transform", tr);
       }
-      out.addAttr("cx", FloatToString(el->position.x));
-      out.addAttr("cy", FloatToString(el->position.y));
-      out.addAttr("rx", FloatToString(el->size.width / 2));
-      out.addAttr("ry", FloatToString(el->size.height / 2));
+      out.addAttr("cx", CssFloatToString(el->position.x));
+      out.addAttr("cy", CssFloatToString(el->position.y));
+      out.addAttr("rx", CssFloatToString(el->size.width / 2));
+      out.addAttr("ry", CssFloatToString(el->size.height / 2));
       out.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);

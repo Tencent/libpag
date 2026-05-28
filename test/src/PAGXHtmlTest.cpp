@@ -29,27 +29,17 @@
 
 namespace pag {
 
-static std::string SaveFile(const std::string& content, const std::string& key) {
-  auto outPath = ProjectPath::Absolute("test/out/" + key);
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  if (file) {
-    file.write(content.data(), static_cast<std::streamsize>(content.size()));
-  }
-  return outPath;
-}
-
 static std::string LoadAndConvert(const std::string& pagxPath,
                                   const pagx::HTMLExportOptions& options = {}) {
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
   if (doc == nullptr) {
     return "";
   }
-  doc->applyLayout();
-  return pagx::HTMLExporter::ToHTML(*doc, options);
+  // Shared tmp asset dir for all string-assertion tests. Individual tests assert HTML text
+  // content only; the PNG files written here are not validated, so cross-test filename
+  // collisions (e.g. dgc0.png from two different samples) are harmless.
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
+  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
 }
 
 static std::vector<std::string> GetHtmlTestFiles() {
@@ -68,10 +58,68 @@ static std::vector<std::string> GetHtmlTestFiles() {
 }
 
 static std::string WrapHtmlDocument(const std::string& fragment, int width, int height) {
-  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>body{margin:0;padding:0;"
-         "background:transparent;width:" +
+  return "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>"
+         "body{margin:0;padding:0;background:transparent;width:" +
          std::to_string(width) + "px;height:" + std::to_string(height) +
          "px;overflow:hidden}</style></head>\n<body>\n" + fragment + "\n</body></html>";
+}
+
+// Result of exporting one PAGX sample into a wrapped HTML file on disk.
+struct ExportedSample {
+  bool success = false;  // false when load/export fails; inspect logs for the reason
+  int width = 0;         // document width, needed by screenshot callers
+  int height = 0;        // document height, same
+  std::string htmlPath;  // absolute path of the wrapped HTML file written to disk
+};
+
+// Generates the wrapped HTML for one PAGX sample and writes it next to `outDir`. Rasterizes
+// any Diamond / tiled-ImagePattern / PlusDarker fills into `outDir/static-img/` using a
+// per-sample name prefix so multiple samples can share that single directory without id
+// collisions. This helper is shared by BatchConvertAll (structural smoke test) and
+// HtmlScreenshotCompare (Puppeteer pixel comparison) so the two paths stay in lockstep —
+// any change to HTMLExportOptions, wrapper contents, or output paths needs to happen here
+// and affect both call sites at once.
+static ExportedSample ExportSampleHtmlToFile(const std::string& pagxPath,
+                                             const std::string& outDir) {
+  ExportedSample result;
+  auto baseName = std::filesystem::path(pagxPath).stem().string();
+  result.htmlPath = outDir + "/" + baseName + ".html";
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  if (!doc) {
+    std::cerr << "ExportSampleHtmlToFile: failed to load " << pagxPath << "\n";
+    return result;
+  }
+
+  result.width = static_cast<int>(doc->width);
+  result.height = static_cast<int>(doc->height);
+
+  pagx::HTMLExportOptions opts;
+  // Resource directory follows the new HTMLExporter convention: sibling directory named after
+  // the HTML file stem. Multiple samples in the same outDir therefore get independent asset
+  // sub-directories (outDir/<baseName>/), no filename-prefix gymnastics required.
+  auto resourceDir = outDir + "/" + baseName;
+  auto fragment =
+      pagx::HTMLExporter::ToHTML(*doc, resourceDir, pagx::HTMLOutputMode::Fragment, opts);
+  if (fragment.empty()) {
+    std::cerr << "ExportSampleHtmlToFile: ToHTML returned empty for " << baseName << "\n";
+    return result;
+  }
+  if (fragment.find("data-pagx-version") == std::string::npos) {
+    std::cerr << "ExportSampleHtmlToFile: missing data-pagx-version in " << baseName << "\n";
+    return result;
+  }
+
+  auto fullHtml = WrapHtmlDocument(fragment, result.width, result.height);
+  std::ofstream htmlFile(result.htmlPath, std::ios::binary);
+  if (!htmlFile) {
+    std::cerr << "ExportSampleHtmlToFile: cannot open " << result.htmlPath << " for writing\n";
+    return result;
+  }
+  htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
+
+  result.success = true;
+  return result;
 }
 
 // =============================================================================
@@ -81,18 +129,11 @@ static std::string WrapHtmlDocument(const std::string& fragment, int width, int 
 CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
   auto files = GetHtmlTestFiles();
   ASSERT_FALSE(files.empty()) << "No .pagx files found in resources/pagx_to_html/";
+  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
+  std::filesystem::create_directories(outDir);
   for (const auto& filePath : files) {
-    auto baseName = std::filesystem::path(filePath).stem().string();
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    ASSERT_NE(doc, nullptr) << "Failed to load: " << baseName;
-    doc->applyLayout();
-    auto html = pagx::HTMLExporter::ToHTML(*doc);
-    EXPECT_FALSE(html.empty()) << "Failed to convert: " << baseName;
-    EXPECT_NE(html.find("data-pagx-version"), std::string::npos)
-        << "Missing data-pagx-version attribute in: " << baseName;
-    auto fullHtml =
-        WrapHtmlDocument(html, static_cast<int>(doc->width), static_cast<int>(doc->height));
-    SaveFile(fullHtml, "PAGXHtmlTest/" + baseName + ".html");
+    auto result = ExportSampleHtmlToFile(filePath, outDir);
+    EXPECT_TRUE(result.success) << "Failed to export: " << filePath;
   }
 }
 
@@ -118,7 +159,10 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
 CLI_TEST(PAGXHtmlTest, LayerVisibility) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_visibility.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("display: none"), std::string::npos);
+  // Accept either the class form ("display: none" in a CSS rule) or the inlined form
+  // ("display:none" in a style="..." attribute) — both are valid Pretty output.
+  EXPECT_TRUE(html.find("display: none") != std::string::npos ||
+              html.find("display:none") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerAlpha) {
@@ -151,7 +195,10 @@ CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_matrix3d.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("matrix3d("), std::string::npos);
-  EXPECT_NE(html.find("transform-style: preserve-3d"), std::string::npos);
+  // Accept both Pretty class-rule ("transform-style: preserve-3d") and inlined
+  // ("transform-style:preserve-3d") forms.
+  EXPECT_TRUE(html.find("transform-style: preserve-3d") != std::string::npos ||
+              html.find("transform-style:preserve-3d") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
@@ -221,7 +268,9 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_ellipse.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("border-radius: 50%"), std::string::npos);
+  // Accept both class-rule and inlined forms.
+  EXPECT_TRUE(html.find("border-radius: 50%") != std::string::npos ||
+              html.find("border-radius:50%") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPolystar) {
@@ -260,30 +309,37 @@ CLI_TEST(PAGXHtmlTest, ColorRadialGradient) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_radial_gradient.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("radial-gradient"), std::string::npos);
+  // RadialGradient is emitted as CSS `radial-gradient()` on square geometries and as SVG
+  // `<radialGradient>` when fitsToGeometry=true with a non-square bounding box (CSS gradients
+  // cannot reproduce tgfx's objectBoundingBox non-uniform scale). Either path is valid — the
+  // test only asserts that the gradient is exported, not which form it takes.
+  EXPECT_TRUE(html.find("radial-gradient") != std::string::npos ||
+              html.find("<radialGradient") != std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorConicGradient) {
   auto html =
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_conic_gradient.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("conic-gradient"), std::string::npos);
+  // ConicGradient now always rasterizes to a PNG: the new HTMLExporter contract requires a
+  // resource directory, so the writer takes the rasterization path that produces stable pixels
+  // across browsers (in particular headless Chromium, where SVG pattern + foreignObject
+  // delivery of CSS conic-gradient is unreliable). The PNG is referenced via SVG <image>
+  // (not HTML <img>) because the gradient lives inside an SVG <foreignObject>-free path that
+  // pairs the rasterized image with a clipPath built from the geometry.
+  EXPECT_NE(html.find("<image"), std::string::npos);
+  EXPECT_NE(html.find("tmp-assets/cgc"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorDiamondGradient) {
-  auto outDir = ProjectPath::Absolute("test/out/PAGXHtmlTest");
-  std::filesystem::create_directories(outDir);
-  pagx::HTMLExportOptions opts;
-  opts.staticImgDir = outDir + "/static-img";
-  opts.staticImgUrlPrefix = "static-img/";
-  opts.staticImgNamePrefix = "color_diamond_gradient-";
-  auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"), opts);
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_diamond_gradient.pagx"));
   ASSERT_FALSE(html.empty());
   // DiamondGradient rasterizes to a PNG because CSS has no native diamond shape; the HTML
-  // references that PNG through an <img> tag.
+  // references that PNG through an <img> tag. URL prefix is derived from the resource
+  // directory's basename ("tmp-assets/"), and the id follows the "dgc" naming scheme.
   EXPECT_NE(html.find("<img"), std::string::npos);
-  EXPECT_NE(html.find("static-img/color_diamond_gradient-"), std::string::npos);
+  EXPECT_NE(html.find("tmp-assets/dgc"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
@@ -382,11 +438,14 @@ CLI_TEST(PAGXHtmlTest, TextPath) {
   EXPECT_NE(htmlAdv.find("#3B82F6"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, TextGlyphRun) {
-  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_glyph_run.pagx"));
+CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/shape_glyph_run.pagx"));
   ASSERT_FALSE(html.empty());
-  // GlyphRun produces SVG paths per glyph
-  EXPECT_NE(html.find("<path"), std::string::npos);
+  // All embedded font glyphs (vector and bitmap) render via WOFF2 @font-face with PUA characters.
+  // No SVG <path> or <image> elements should be present for glyph rendering.
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_EQ(html.find("<path"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, TextRich) {
@@ -410,7 +469,13 @@ CLI_TEST(PAGXHtmlTest, Repeater) {
 CLI_TEST(PAGXHtmlTest, Group) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/group.pagx"));
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("pagx-group"), std::string::npos);
+  // Shape-only Groups (no Text child) are flattened: their transform is baked into the SVG
+  // path data via TransformPathDataToSVG. Verify expected fill colors are present.
+  EXPECT_NE(html.find("#3B82F6"), std::string::npos) << "Rotate+Scale fill color missing";
+  // Scope Isolation: outer Fill(green) must only paint the outer Rectangle, not the Group ellipse.
+  EXPECT_NE(html.find("#10B981"), std::string::npos) << "Scope Isolation outer fill missing";
+  // Propagation: Group geometry propagates upward so the outer Fill can paint it.
+  EXPECT_NE(html.find("#F59E0B"), std::string::npos) << "Propagation fill missing";
 }
 
 // =============================================================================
@@ -497,78 +562,6 @@ CLI_TEST(PAGXHtmlTest, LayerPassThrough) {
 // Export options
 // =============================================================================
 
-CLI_TEST(PAGXHtmlTest, ExportOptions_Indent) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
-  ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
-
-  pagx::HTMLExportOptions opts = {};
-  opts.indent = 4;
-  auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
-  ASSERT_FALSE(html.empty());
-  // With 4-space indent, first child should be indented by 4 spaces
-  EXPECT_NE(html.find("    "), std::string::npos);
-}
-
-CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPretty) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
-  ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
-
-  pagx::HTMLExportOptions opts = {};
-  opts.format = pagx::HTMLFormat::Pretty;
-  auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
-  ASSERT_FALSE(html.empty());
-  // Pretty CSS: selector on its own line, declarations indented.
-  EXPECT_NE(html.find(".root0 {\n"), std::string::npos);
-  EXPECT_NE(html.find("\n  position: relative;\n"), std::string::npos);
-  // Generated comment is still present in non-minify modes.
-  EXPECT_NE(html.find("Generated by PAGX HTMLExporter"), std::string::npos);
-}
-
-CLI_TEST(PAGXHtmlTest, ExportOptions_FormatMinify) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
-  ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
-
-  pagx::HTMLExportOptions compactOpts = {};
-  auto compact = pagx::HTMLExporter::ToHTML(*doc, compactOpts);
-
-  pagx::HTMLExportOptions minifyOpts = {};
-  minifyOpts.format = pagx::HTMLFormat::Minify;
-  auto minified = pagx::HTMLExporter::ToHTML(*doc, minifyOpts);
-
-  ASSERT_FALSE(minified.empty());
-  // No generated comment in minify mode.
-  EXPECT_EQ(minified.find("Generated by PAGX HTMLExporter"), std::string::npos);
-  // No newlines anywhere in the minified output.
-  EXPECT_EQ(minified.find('\n'), std::string::npos);
-  // Style block is single-line with rules concatenated.
-  EXPECT_NE(minified.find("<style>.root0{"), std::string::npos);
-  // Minify output is strictly smaller than compact output.
-  EXPECT_LT(minified.size(), compact.size());
-}
-
-CLI_TEST(PAGXHtmlTest, ExportOptions_FormatPrettyIsDefault) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
-  ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
-
-  pagx::HTMLExportOptions defaulted = {};
-  auto defaultedHtml = pagx::HTMLExporter::ToHTML(*doc, defaulted);
-
-  pagx::HTMLExportOptions explicitPretty = {};
-  explicitPretty.format = pagx::HTMLFormat::Pretty;
-  auto prettyHtml = pagx::HTMLExporter::ToHTML(*doc, explicitPretty);
-
-  // Default and explicit Pretty must produce byte-identical output.
-  EXPECT_EQ(defaultedHtml, prettyHtml);
-}
-
 CLI_TEST(PAGXHtmlTest, FilterDedup_ShowcaseInfographic) {
   // showcase_infographic.pagx has 3 layers with identical DropShadowStyle parameters.
   // The signature-keyed filter cache should emit one <filter> and reuse it.
@@ -587,7 +580,6 @@ CLI_TEST(PAGXHtmlTest, ExportToFile) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
-  doc->applyLayout();
 
   auto outPath = ProjectPath::Absolute("test/out/PAGXHtmlTest/export_to_file.html");
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -615,8 +607,7 @@ static bool NodeAvailable() {
 // `screenshot.js --batch` so all screenshots share a single Chromium process. macOS
 // Chromium becomes unstable across repeated cold-starts (see
 // `feedback_puppeteer_screenshot_hang.md`), which fails this test after just a few
-// per-sample Puppeteer launches. Reusing one browser mirrors what
-// PAGXTest.GenerateComparisonPage already does for the comparison page.
+// per-sample Puppeteer launches. Reusing one browser sidesteps that entirely.
 static bool BatchCaptureHtmlScreenshots(
     const std::vector<std::tuple<std::string, std::string, int, int>>& tasks) {
   if (tasks.empty()) {
@@ -669,41 +660,17 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
   entries.reserve(files.size());
   screenshotTasks.reserve(files.size());
   for (const auto& filePath : files) {
+    auto result = ExportSampleHtmlToFile(filePath, outDir);
+    if (!result.success) {
+      ADD_FAILURE() << "Failed to export HTML for " << filePath;
+      continue;
+    }
+    if (result.width <= 0 || result.height <= 0) {
+      continue;
+    }
     auto baseName = std::filesystem::path(filePath).stem().string();
-
-    auto doc = pagx::PAGXImporter::FromFile(filePath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to load: " << baseName;
-      continue;
-    }
-    doc->applyLayout();
-
-    int width = static_cast<int>(doc->width);
-    int height = static_cast<int>(doc->height);
-    if (width <= 0 || height <= 0) {
-      continue;
-    }
-
-    auto htmlPath = outDir + "/" + baseName + ".html";
-    pagx::HTMLExportOptions opts;
-    // Rasterize Diamond/tiled-ImagePattern fills into PNG next to the HTML so that browser
-    // screenshots pick up the exact pixels tgfx produced, instead of a WebGL approximation.
-    opts.staticImgDir = outDir + "/static-img";
-    opts.staticImgUrlPrefix = "static-img/";
-    opts.staticImgNamePrefix = baseName + "-";
-    auto html = pagx::HTMLExporter::ToHTML(*doc, opts);
-    if (html.empty()) {
-      ADD_FAILURE() << "Failed to export HTML: " << baseName;
-      continue;
-    }
-
-    auto fullHtml = WrapHtmlDocument(html, width, height);
-    {
-      std::ofstream htmlFile(htmlPath, std::ios::binary);
-      htmlFile.write(fullHtml.data(), static_cast<std::streamsize>(fullHtml.size()));
-    }
     auto pngPath = outDir + "/" + baseName + ".png";
-    screenshotTasks.emplace_back(htmlPath, pngPath, width, height);
+    screenshotTasks.emplace_back(result.htmlPath, pngPath, result.width, result.height);
     entries.push_back({baseName, pngPath});
   }
 

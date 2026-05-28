@@ -21,18 +21,36 @@
 #include <QObject>
 #include <QRunnable>
 
+class QNetworkAccessManager;
+class QNetworkReply;
+
 namespace pag {
 
 class PAGNetworkFetcher : public QObject {
   Q_OBJECT
  public:
   explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
+
+  /// Performs an asynchronous fetch without blocking the caller.
+  /// Subsequent calls while a fetch is in flight are silently ignored.
+  void fetchAsync();
+
+  /// Emitted after the response body has been delivered via fetched().
   Q_SIGNAL void finished();
+  /// Emitted with the response body on success, or an empty QByteArray on error.
+  /// Always emitted before finished().
   Q_SIGNAL void fetched(const QByteArray& data);
 
  protected:
+  /// Performs a synchronous fetch using a nested event loop.
+  /// Only intended for use on worker threads (e.g. QRunnable::run()).
+  void fetch();
+
   QString url = "";
+
+ private:
+  Q_SLOT void onReplyFinished(QNetworkReply* reply);
+  QNetworkAccessManager* asyncManager = nullptr;
 };
 
 class PAGUpdateVersionFetcher : public PAGNetworkFetcher {

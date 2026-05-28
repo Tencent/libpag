@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: SolidColor in all formats: #RGB, #RRGGBB, #RRGGBBAA, srgb(), p3(), @id reference -->
-<pagx version="1.0" width="420" height="300">
+<pagx width="420" height="300">
   <Resources>
     <SolidColor id="resBrandColor" color="#8B5CF6"/>
   </Resources>
