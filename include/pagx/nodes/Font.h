@@ -103,6 +103,10 @@ class Font : public Node {
   void resetRenderCache();
 
   std::shared_ptr<tgfx::Typeface> renderTypeface = nullptr;
+  // Sentinel that tracks whether the typeface build was already attempted (success or failure).
+  // Read/write of these two fields is not atomic: callers that share the same Font across
+  // threads (e.g. multiple LayerBuilder::Build calls) must serialize externally — see the
+  // contract on GlyphRunRenderer::BuildTextBlob.
   bool typefaceBuilt = false;
 
   friend class PAGXDocument;
