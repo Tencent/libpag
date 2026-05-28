@@ -404,15 +404,15 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // `flex-shrink: 0` on every flex item; treating it as a generic drop would produce one
     // warning per flex item with no actionable diagnostic.
     {"flex-shrink", PropAction::Transform, &TransformFlexShrink, nullptr},
+    // CSS `margin` is preserved in the subset and routed onto positioning / padding at apply
+    // time (`HTMLParserContext::wrapWithMargin`). The shorthand resolves the 1-4 token form
+    // through `ResolveLengthShorthand`; the longhands resolve a single length each.
+    {"margin", PropAction::Transform, &ResolveLengthShorthand, nullptr},
+    {"margin-top", PropAction::Transform, &ResolveLength, nullptr},
+    {"margin-right", PropAction::Transform, &ResolveLength, nullptr},
+    {"margin-bottom", PropAction::Transform, &ResolveLength, nullptr},
+    {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
-    {"margin", PropAction::Drop, nullptr, "is not in the subset; use padding/gap/flex instead"},
-    {"margin-top", PropAction::Drop, nullptr, "is not in the subset; use padding/gap/flex instead"},
-    {"margin-right", PropAction::Drop, nullptr,
-     "is not in the subset; use padding/gap/flex instead"},
-    {"margin-bottom", PropAction::Drop, nullptr,
-     "is not in the subset; use padding/gap/flex instead"},
-    {"margin-left", PropAction::Drop, nullptr,
-     "is not in the subset; use padding/gap/flex instead"},
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
     {"clip-path", PropAction::Drop, nullptr, "is not in the subset"},
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},

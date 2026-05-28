@@ -412,13 +412,75 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
       warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
-  if (!LookupProperty(props, "margin").empty()) {
-    warn("html: margin not supported; use padding/gap/flex");
+  if (!LookupProperty(props, "margin").empty() || !LookupProperty(props, "margin-top").empty() ||
+      !LookupProperty(props, "margin-right").empty() ||
+      !LookupProperty(props, "margin-bottom").empty() ||
+      !LookupProperty(props, "margin-left").empty()) {
+    // CSS `margin` shorthand: 1-4 length tokens (T / TB,RL / T,RL,B / T,R,B,L). Longhands
+    // override individual sides after the shorthand expansion. The subset transformer has
+    // already normalised every accepted unit to plain px, so any token that fails to parse
+    // here is malformed input and is reported and skipped (the corresponding side stays at
+    // its default 0). Resulting per-side values are routed onto positioning / padding by
+    // `wrapWithMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
+    const std::string& margin = LookupProperty(props, "margin");
+    if (!margin.empty()) {
+      auto tokens = SplitTopLevelWhitespace(margin);
+      std::vector<float> nums;
+      nums.reserve(tokens.size());
+      for (auto& t : tokens) {
+        float v = parsePxLength(t);
+        if (std::isnan(v)) {
+          warn("html: invalid margin token '" + t + "'");
+          continue;
+        }
+        nums.push_back(v);
+      }
+      float t = 0.0f;
+      float r = 0.0f;
+      float b = 0.0f;
+      float l = 0.0f;
+      switch (nums.size()) {
+        case 0:
+          break;
+        case 1:
+          t = r = b = l = nums[0];
+          break;
+        case 2:
+          t = b = nums[0];
+          r = l = nums[1];
+          break;
+        case 3:
+          t = nums[0];
+          r = l = nums[1];
+          b = nums[2];
+          break;
+        default:
+          t = nums[0];
+          r = nums[1];
+          b = nums[2];
+          l = nums[3];
+          break;
+      }
+      box.marginTopPx = t;
+      box.marginRightPx = r;
+      box.marginBottomPx = b;
+      box.marginLeftPx = l;
+    }
+    auto applyMarginLonghand = [&](const char* propName, float& outPx) {
+      const std::string& v = LookupProperty(props, propName);
+      if (v.empty()) return;
+      float n = parsePxLength(v);
+      if (std::isnan(n)) {
+        warn(std::string("html: invalid ") + propName + " value '" + v + "'");
+        return;
+      }
+      outPx = n;
+    };
+    applyMarginLonghand("margin-top", box.marginTopPx);
+    applyMarginLonghand("margin-right", box.marginRightPx);
+    applyMarginLonghand("margin-bottom", box.marginBottomPx);
+    applyMarginLonghand("margin-left", box.marginLeftPx);
   }
-  if (!LookupProperty(props, "margin-top").empty()) warn("html: margin-top not supported");
-  if (!LookupProperty(props, "margin-right").empty()) warn("html: margin-right not supported");
-  if (!LookupProperty(props, "margin-bottom").empty()) warn("html: margin-bottom not supported");
-  if (!LookupProperty(props, "margin-left").empty()) warn("html: margin-left not supported");
   if (!LookupProperty(props, "grid-template-columns").empty()) {
     warn("html: grid layout not supported");
   }

@@ -543,6 +543,20 @@ function buildStyle(left, top, width, height, computed, opts) {
     parts.push(`width: ${px(width)}`);
     parts.push(`height: ${px(height)}`);
     parts.push(`flex-shrink: 0`);
+    // CSS `margin` on a flex item shifts where its outer box sits inside the flex
+    // container's main + cross axes (e.g. `mt-[8px]` on a 6×6 dot to align it with
+    // text baseline). The PAGX HTML subset honours margin via padding-wrapper /
+    // edge-fold (`HTMLParserContext::wrapWithMargin`), so forwarding the resolved
+    // margin onto the subset HTML preserves the visual offset both in the live
+    // browser preview and in `pagx render`. Suppress when every side is zero so
+    // the common case stays as a clean `position/width/height/flex-shrink` row.
+    const flexMargin = readMargin(computed);
+    if (flexMargin.top || flexMargin.right || flexMargin.bottom || flexMargin.left) {
+      parts.push(
+        `margin: ${paddingShorthand(flexMargin.top, flexMargin.right,
+                                    flexMargin.bottom, flexMargin.left)}`,
+      );
+    }
   } else if (opts.positioned !== false) {
     parts.push(`position: absolute`);
     parts.push(`left: ${px(left)}`);

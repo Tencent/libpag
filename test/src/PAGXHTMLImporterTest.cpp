@@ -1032,18 +1032,35 @@ PAG_TEST(PAGXHTMLImporterTest, UnknownElementWarningEmitted) {
   EXPECT_TRUE(hasWarning);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, MarginEmitsWarning) {
+PAG_TEST(PAGXHTMLImporterTest, MarginIsResolvedThroughPaddingWrapper) {
+  // CSS margin used to be dropped at import with a warning. The importer now reproduces it
+  // through positioning + padding (`HTMLParserContext::wrapWithMargin`), so this case must
+  // (1) parse cleanly without any margin diagnostic and (2) materialise an outer Layer
+  // whose padding equals the four-side margin (8/8/8/8) wrapping the original 30x30 box.
+  // The body is only 50x50 so the full footprint (30 + 8 + 8 = 46) still fits.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="margin:8px;width:30px;height:30px;background-color:#000"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  bool hasWarning = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("margin") != std::string::npos) hasWarning = true;
+    EXPECT_EQ(msg.find("margin"), std::string::npos)
+        << "unexpected margin diagnostic on accepted input: " << msg;
   }
-  EXPECT_TRUE(hasWarning);
+  // body Layer -> wrapper Layer (padding=8) -> inner div (30x30, background)
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* body = doc->layers.front();
+  ASSERT_EQ(body->children.size(), 1u);
+  auto* wrapper = body->children.front();
+  EXPECT_FLOAT_EQ(wrapper->padding.top, 8.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.right, 8.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.bottom, 8.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.left, 8.0f);
+  ASSERT_EQ(wrapper->children.size(), 1u);
+  auto* inner = wrapper->children.front();
+  EXPECT_FLOAT_EQ(inner->width, 30.0f);
+  EXPECT_FLOAT_EQ(inner->height, 30.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, DisallowedSizingPropertiesEmitWarnings) {
@@ -2723,7 +2740,12 @@ PAG_TEST(PAGXHTMLImporterTest, RawFlexWrapWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawMarginTopBottomWarn) {
+PAG_TEST(PAGXHTMLImporterTest, RawMarginIsResolvedThroughPaddingWrapper) {
+  // Mirror of MarginIsResolvedThroughPaddingWrapper but with autoNormalize=false so the
+  // resolver consumes the raw `margin-top/right/bottom/left` longhands directly. The
+  // four sides resolve to 5/8/6/7 (top/right/bottom/left) and land verbatim on the
+  // wrapper's padding. The longer name avoids confusion with the autoNormalize=true
+  // shorthand variant above.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -2734,17 +2756,22 @@ PAG_TEST(PAGXHTMLImporterTest, RawMarginTopBottomWarn) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  bool top = false, bottom = false, left = false, right = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("margin-top") != std::string::npos) top = true;
-    if (msg.find("margin-bottom") != std::string::npos) bottom = true;
-    if (msg.find("margin-left") != std::string::npos) left = true;
-    if (msg.find("margin-right") != std::string::npos) right = true;
+    EXPECT_EQ(msg.find("margin"), std::string::npos)
+        << "unexpected margin diagnostic on accepted input: " << msg;
   }
-  EXPECT_TRUE(top);
-  EXPECT_TRUE(bottom);
-  EXPECT_TRUE(left);
-  EXPECT_TRUE(right);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* body = doc->layers.front();
+  ASSERT_EQ(body->children.size(), 1u);
+  auto* wrapper = body->children.front();
+  EXPECT_FLOAT_EQ(wrapper->padding.top, 5.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.right, 8.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.bottom, 6.0f);
+  EXPECT_FLOAT_EQ(wrapper->padding.left, 7.0f);
+  ASSERT_EQ(wrapper->children.size(), 1u);
+  auto* inner = wrapper->children.front();
+  EXPECT_FLOAT_EQ(inner->width, 30.0f);
+  EXPECT_FLOAT_EQ(inner->height, 30.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawGridTemplateWarns) {

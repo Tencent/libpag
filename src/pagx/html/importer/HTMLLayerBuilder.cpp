@@ -740,6 +740,68 @@ Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
   return outer;
 }
 
+Layer* HTMLParserContext::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box) {
+  if (inner == nullptr) return inner;
+  if (box.marginTopPx == 0.0f && box.marginRightPx == 0.0f && box.marginBottomPx == 0.0f &&
+      box.marginLeftPx == 0.0f) {
+    return inner;
+  }
+
+  // Absolute children: CSS positions the box `margin-<side>` further from the containing
+  // block's padding edge than the matching offset the author already wrote, so folding
+  // margin straight into the existing edge anchors reproduces the visual position without
+  // an extra Layer. Anchors that the author left unset stay unset — CSS would not have
+  // moved that side either.
+  if (box.absolute) {
+    if (!std::isnan(inner->left)) inner->left += box.marginLeftPx;
+    if (!std::isnan(inner->right)) inner->right += box.marginRightPx;
+    if (!std::isnan(inner->top)) inner->top += box.marginTopPx;
+    if (!std::isnan(inner->bottom)) inner->bottom += box.marginBottomPx;
+    return inner;
+  }
+
+  // Flow / flex children: build a transparent outer Layer whose `padding` reproduces the
+  // four-side margin, and hand the parent-facing layout slot (flex, percent size, explicit
+  // edge anchors, includeInLayout) over to it. The original `inner` keeps its visuals and
+  // its own width/height; padding then nests `inner` inside the wrapper's padded box,
+  // which is the same offset CSS margin produces relative to the parent's flow / flex
+  // measurement (`outer size = inner size + margin` on every side). When `inner` carries
+  // no positional constraints, `LayoutNode::PerformConstraintLayout` already routes its
+  // resolved position through the wrapper's `padding.left / padding.top`, so we don't
+  // need to write explicit `inner->left / inner->top` here — the default (NaN, NaN) origin
+  // lands on the padded-box top-left automatically.
+  auto* outer = _document->makeNode<Layer>();
+  outer->padding.top = box.marginTopPx;
+  outer->padding.right = box.marginRightPx;
+  outer->padding.bottom = box.marginBottomPx;
+  outer->padding.left = box.marginLeftPx;
+
+  outer->left = inner->left;
+  outer->right = inner->right;
+  outer->top = inner->top;
+  outer->bottom = inner->bottom;
+  outer->centerX = inner->centerX;
+  outer->centerY = inner->centerY;
+  outer->percentWidth = inner->percentWidth;
+  outer->percentHeight = inner->percentHeight;
+  outer->includeInLayout = inner->includeInLayout;
+  outer->flex = inner->flex;
+
+  inner->left = NAN;
+  inner->right = NAN;
+  inner->top = NAN;
+  inner->bottom = NAN;
+  inner->centerX = NAN;
+  inner->centerY = NAN;
+  inner->percentWidth = NAN;
+  inner->percentHeight = NAN;
+  inner->includeInLayout = true;
+  inner->flex = 0.0f;
+
+  outer->children.push_back(inner);
+  return outer;
+}
+
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;

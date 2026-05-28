@@ -391,18 +391,18 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = resolveBox(element);
-    return convertInlineSvg(element, box, inherited);
+    return wrapWithMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = resolveBox(element);
-    return convertImage(element, box);
+    return wrapWithMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = computeInherited(element, inherited);
   HTMLBoxAttributes box = resolveBox(element);
 
   if (IsContainerTag(tag)) {
-    return convertContainer(element, box, childInherited, depth);
+    return wrapWithMargin(convertContainer(element, box, childInherited, depth), box);
   }
   if (IsTextLeafTag(tag)) {
     // HTML allows mixed content: a <span> / <p> may contain inline-block children
@@ -417,9 +417,9 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       break;
     }
     if (hasBlockChild) {
-      return convertContainer(element, box, childInherited, depth);
+      return wrapWithMargin(convertContainer(element, box, childInherited, depth), box);
     }
-    return convertTextLeaf(element, box, childInherited);
+    return wrapWithMargin(convertTextLeaf(element, box, childInherited), box);
   }
   if (_options.preserveUnknownElements) {
     warn("html: unknown element '" + tag + "' preserved as placeholder");

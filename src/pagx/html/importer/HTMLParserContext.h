@@ -314,6 +314,22 @@ class HTMLParserContext {
   // stay on `inner` since CSS inset shadows / `backdrop-filter` paint within the box.
   Layer* maybeSplitBoxShadowFromClip(Layer* inner);
 
+  // Materialises CSS `margin` on `inner`. PAGX has no margin concept, so the importer
+  // reproduces it through positioning / padding:
+  //   - position: absolute → margin folds into the matching edge anchor (left/right/top/bottom)
+  //     since CSS positions an absolute box `margin-<side>` away from the containing block's
+  //     padding edge in addition to whatever offset the author already wrote.
+  //   - flow / flex children → wrapped in a transparent outer Layer whose `padding` equals the
+  //     four-side margin. The wrapper takes over the parent-facing layout slot (flex,
+  //     percent size, edge anchors, includeInLayout); `inner` keeps its visuals and own
+  //     dimensions and sits inside the wrapper's padded box, which is exactly the CSS
+  //     "outer size = inner size + margin" measurement contract the parent's flex /
+  //     constraint pass needs to honour.
+  // Returns `inner` unchanged when every side is zero (the common case) or when `inner`
+  // is null. Called from convertElement at the unified return point so every element
+  // path (container / text leaf / image / inline svg) participates uniformly.
+  Layer* wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box);
+
   // Parses a CSS color-like value into a PAGX Color. Returns transparent on empty/"none".
   Color parseColor(const std::string& value);
 

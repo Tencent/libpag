@@ -180,7 +180,11 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, AtRuleIsDroppedWithDiagnostic) {
 // Property normalisation
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginIsDroppedWithDiagnostic) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginIsForwardedAsResolvedPx) {
+  // CSS `margin` (and the four longhands) are now first-class subset properties: the
+  // transformer routes them through `ResolveLength{,Shorthand}` to normalise units to
+  // plain px and then forwards them on the inline `style="…"` attribute so the resolver
+  // can fold them onto Layer positioning / padding. No diagnostic should fire.
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
@@ -188,9 +192,9 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginIsDroppedWithDiagnostic) {
       &root);
   ASSERT_TRUE(result.ok);
   auto div = FirstBodyChild(root, "div");
-  EXPECT_FALSE(StyleContains(div, "margin"));
+  EXPECT_TRUE(StyleContains(div, "margin: 8px"));
   EXPECT_TRUE(StyleContains(div, "padding: 4px"));
-  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, SupportedTransformIsKept) {
@@ -441,9 +445,12 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, StrictModeFailsOnUnsupportedProperty) {
   pagx::HTMLSubsetTransformer::Options opts = {};
   opts.strict = true;
   std::shared_ptr<pagx::DOMNode> root;
+  // `clip-path` stays on the explicit-drop list (PAGX has no equivalent geometry primitive),
+  // so it remains a clean trigger for strict-mode failures even after `margin` was promoted
+  // out of the drop set in MarginIsResolvedThroughPaddingWrapper.
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
-               <div style="margin: 8px"></div></body></html>)HTML",
+               <div style="clip-path: inset(10px)"></div></body></html>)HTML",
       &root, opts);
   EXPECT_FALSE(result.ok);
   EXPECT_FALSE(result.diagnostics.empty());

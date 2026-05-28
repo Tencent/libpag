@@ -184,6 +184,21 @@ struct HTMLBoxAttributes {
   float flexGrow = 0.0f;
   bool flexGrowSet = false;
 
+  // CSS `margin` (outer offsets, not size) resolved to pixels per side. Defaults to 0 so the
+  // common "no margin authored" case forwards through the importer unchanged. PAGX has no
+  // margin concept on Layer / LayoutNode, so the importer materialises margin entirely
+  // through positioning + padding at apply time:
+  //   - position: absolute → folded directly into the matching edge anchor
+  //     (left += marginLeft, top += marginTop, right += marginRight, bottom += marginBottom);
+  //   - flow / flex children → wrapped in an outer Layer whose `padding` equals the margin,
+  //     reproducing CSS's "outer size = inner size + margin" measurement contract for the
+  //     parent flex / constraint pass.
+  // See `HTMLParserContext::wrapWithMargin` for the apply-side logic.
+  float marginTopPx = 0.0f;
+  float marginRightPx = 0.0f;
+  float marginBottomPx = 0.0f;
+  float marginLeftPx = 0.0f;
+
   // Effects
   Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
   bool backgroundColorSet = false;
