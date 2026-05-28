@@ -53,8 +53,8 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
