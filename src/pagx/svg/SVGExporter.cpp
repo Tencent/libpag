@@ -53,6 +53,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
@@ -150,7 +151,10 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
 
 static std::string GetImageHref(const Image* image) {
   if (image->data) {
-    return "data:image/png;base64," + Base64Encode(image->data->bytes(), image->data->size());
+    const auto* bytes = image->data->bytes();
+    auto size = image->data->size();
+    return std::string("data:") + DetectImageMimeOrPNG(bytes, size) + ";base64," +
+           Base64Encode(bytes, size);
   }
   if (!image->filePath.empty()) {
     return image->filePath;

@@ -108,7 +108,8 @@ std::string PaddingToCSS(const Padding& padding);
 bool TextStartsWithRTL(const std::string& utf8Text);
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx);
-const char* DetectImageMime(const uint8_t* bytes, size_t size);
+// DetectImageMime / DetectImageMimeOrPNG now live in pagx/utils/ImageMime.h.
+// Include that header directly when sniffing image data.
 
 /**
  * Decodes just the header of the given image to recover its native pixel dimensions. Returns

@@ -35,6 +35,7 @@
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/LineBreaker.h"
 #include "tgfx/core/Data.h"
@@ -96,21 +97,9 @@ std::string ColorToRGBA(const Color& color, float extra) {
 // Image Utilities
 //==============================================================================
 
-const char* DetectImageMime(const uint8_t* bytes, size_t size) {
-  if (size >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
-    return "image/png";
-  }
-  if (size >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
-    return "image/jpeg";
-  }
-  if (size >= 4 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F') {
-    return "image/webp";
-  }
-  if (size >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
-    return "image/gif";
-  }
-  return nullptr;
-}
+// DetectImageMime now lives in pagx/utils/ImageMime so PAGXExporter / SVGExporter
+// can sniff image data without pulling in the HTML writer. The declaration kept
+// in pagx/html/HTMLWriter.h forwards to that shared implementation.
 
 std::string EscapeCSSUrl(const std::string& url) {
   std::string r;
