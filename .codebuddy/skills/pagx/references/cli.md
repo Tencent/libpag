@@ -246,33 +246,35 @@ element, an error is reported.
 
 ## pagx font
 
-Query font identity and metrics from a font file or system font. (The old `info` and `embed` subcommands have been removed — use `pagx font --file` / `pagx font --name` for font info, and `pagx embed` for font embedding.)
-
-### pagx font info
-
-Query font identity and metrics from a font file or system font.
+Query font identity and metrics from a font file or system font, or enumerate installed
+system font families.
 
 ```bash
-pagx font info --file ./CustomFont.ttf
-pagx font info --file ./CustomFont.ttf --size 24
-pagx font info --name "PingFang SC,Bold"
-pagx font info --name "Arial" --size 24 --json
+pagx font --file ./CustomFont.ttf
+pagx font --file ./CustomFont.ttf --size 24
+pagx font --name "PingFang SC,Bold"
+pagx font --name "Arial" --size 24 --json
+pagx font --list
+pagx font --list --json
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--file <path>` | Font file path |
-| `--name <family[,style]>` | System font by name (e.g., `"Arial"` or `"Arial,Bold"`) |
+| `--file <path>` | Query a font file |
+| `--name <family[,style]>` | Query a system font (e.g., `"Arial"` or `"Arial,Bold"`) |
 | `--size <pt>` | Font size in points (default: 12, the PAGX spec default) |
-| `--json` | JSON output |
+| `--json` | Output in JSON format |
+| `--list` | List every installed system font family |
 
-Either `--file` or `--name` is required (mutually exclusive).
+Exactly one of `--file`, `--name`, or `--list` is required. `--list` cannot be combined
+with `--file` or `--name`; `--file` and `--name` are mutually exclusive.
 
 Returns typeface info (fontFamily, fontStyle, glyphsCount, unitsPerEm, hasColor, hasOutlines)
 and all FontMetrics fields at the specified size (top, ascent, descent, bottom, leading, xMin,
 xMax, xHeight, capHeight, underlineThickness, underlinePosition).
 
-`pagx font embed` was removed in Phase 1. Use `pagx embed` instead.
+The retired `pagx font info` and `pagx font embed` subcommands now error out with a redirect
+message; use `pagx font ...` for font queries and `pagx embed` for font embedding.
 
 ---
 
