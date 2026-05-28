@@ -457,23 +457,46 @@ void HTMLParserContext::applyBackgroundFill(Layer* layer, const HTMLBoxAttribute
   }
   if (box.backgroundImage.empty()) return;
 
-  auto fill = _document->makeNode<Fill>();
+  // CSS allows stacking multiple gradients in `background-image` separated by top-level
+  // commas, with the first listed gradient painted on top. PAGX paints Fills in the order
+  // they appear in `contents` (later Fills cover earlier ones), so we emit gradients in
+  // reverse so the CSS-topmost gradient becomes the last (topmost) Fill.
   std::string bg = Trim(box.backgroundImage);
-  fill->color = parseGradientByValue(bg);
-  if (!fill->color) {
-    std::string lower = ToLower(bg);
-    if (lower.compare(0, 4, "url(") == 0) {
-      warn("html: background-image '" + bg + "' (url) not supported; use <img>");
+  auto layers = SplitTopLevelCommas(bg);
+  std::vector<ColorSource*> colors;
+  colors.reserve(layers.size());
+  bool anyUnsupported = false;
+  for (const auto& part : layers) {
+    if (auto* color = parseGradientByValue(part)) {
+      colors.push_back(color);
     } else {
-      warn("html: background-image '" + bg + "' not supported");
+      anyUnsupported = true;
+      std::string lower = ToLower(part);
+      if (lower.compare(0, 4, "url(") == 0) {
+        warn("html: background-image '" + part + "' (url) not supported; use <img>");
+      } else {
+        warn("html: background-image '" + part + "' not supported");
+      }
     }
   }
-  if (!fill->color && box.backgroundColorSet) {
+
+  if (!colors.empty()) {
+    for (auto it = colors.rbegin(); it != colors.rend(); ++it) {
+      auto fill = _document->makeNode<Fill>();
+      fill->color = *it;
+      layer->contents.push_back(fill);
+    }
+    emitted = true;
+    return;
+  }
+
+  // Every gradient failed to parse. Fall back to the background-color, matching the
+  // previous single-gradient behaviour so text on top of the box stays legible.
+  if (anyUnsupported && box.backgroundColorSet) {
+    auto fill = _document->makeNode<Fill>();
     auto solid = _document->makeNode<SolidColor>();
     solid->color = box.backgroundColor;
     fill->color = solid;
-  }
-  if (fill->color) {
     layer->contents.push_back(fill);
     emitted = true;
   }

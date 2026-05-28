@@ -380,10 +380,25 @@ float CssDirectionToAngle(const std::string& kw) {
 }
 
 std::string ExtractParenArgs(const std::string& value) {
+  // Match the first '(' to its corresponding ')' by tracking nesting depth, instead of
+  // using rfind(')'). When the input contains multiple top-level groups such as
+  // `radial-gradient(...), radial-gradient(...)`, rfind would jump to the very last ')'
+  // and treat all groups as one, producing nonsensical args.
   auto open = value.find('(');
-  auto close = value.rfind(')');
-  if (open == std::string::npos || close == std::string::npos || close <= open) return {};
-  return value.substr(open + 1, close - open - 1);
+  if (open == std::string::npos) return {};
+  int depth = 0;
+  for (size_t i = open; i < value.size(); ++i) {
+    char c = value[i];
+    if (c == '(') {
+      ++depth;
+    } else if (c == ')') {
+      --depth;
+      if (depth == 0) {
+        return value.substr(open + 1, i - open - 1);
+      }
+    }
+  }
+  return {};
 }
 
 std::string DirectoryOf(const std::string& filePath) {
