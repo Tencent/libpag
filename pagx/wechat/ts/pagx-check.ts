@@ -4,21 +4,23 @@ declare const wx: any;
 /**
  * PAGX render-risk evaluator for mini-program (WeChat) target.
  *
- * Risk model: "max-risk-path" scoring (May 2026 calibration, 22 files).
+ * Risk model: "max-risk-path" scoring (May 2026 calibration, high-end device as baseline).
  *
- * Three independent failure paths:
+ * Five independent failure paths:
  *   A. "BgBlur × uncacheable below"    bg_count × (inner + blur + grad/10)
  *   B. "Path geometry overload"        path_data_bytes (MB)
  *   C. "Big canvas × element density"  (pix_M/100) × (imgPat + layer/30 + grad/20)
+ *   D. "BgBlur count"                  bg_count
+ *   E. "Layer XML count"               raw <Layer> count in source XML
  *
  * 渲染建议（按运行平台判定）：
  *   - Android：score >= 65 可正常渲染，否则可能卡顿
  *   - 其他平台（iOS 等）：score >= 75 可正常渲染，否则可能卡顿
  *
  * 根据设备性能等级 (benchmarkLevel) 动态调整阈值：
- *   - 高端机：阈值放宽，允许更复杂的文件
- *   - 中端机：使用默认阈值（校准基准）
- *   - 低端机：阈值收紧，更严格的限制
+ *   - 高端机：使用默认阈值（校准基准）
+ *   - 中端机：阈值收紧
+ *   - 低端机：阈值进一步收紧，更严格的限制
  */
 
 // ============================================================================
@@ -558,16 +560,16 @@ function uint8ArrayToString(data: Uint8Array): string {
 // ============================================================================
 
 /**
- * 检查 PAGX 文件是否可以安全渲染（不会卡顿）
+ * 评估 PAGX 文件的渲染卡顿风险，分数越高代表越流畅
  *
  * 渲染建议（按运行平台判定）：
  * - Android：score >= 65 可正常渲染
  * - 其他平台（iOS 等）：score >= 75 可正常渲染
  *
  * 内部会自动获取设备性能信息，根据设备档位动态调整阈值：
- * - 高端机 (benchmarkLevel ≥30/36)：阈值放宽 1.3 倍
- * - 中端机 (benchmarkLevel 23-29/30-35)：使用默认阈值
- * - 低端机 (benchmarkLevel ≤22/29)：阈值收紧 0.7 倍
+ * - 高端机 (benchmarkLevel ≥30/36)：使用默认阈值（校准基准）
+ * - 中端机 (benchmarkLevel 23-29/30-35)：阈值收紧
+ * - 低端机 (benchmarkLevel ≤22/29)：阈值进一步收紧
  *
  * @param pagxData - PAGX 文件的二进制数据 (Uint8Array)
  * @returns Promise<PagxCheckResult> - 包含评分、设备性能等级和设备档位
