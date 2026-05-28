@@ -16,16 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pagx/html/importer/HTMLStyleCascade.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
-#include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
 
@@ -90,18 +94,27 @@ void ClampBorderRadiusScale(float sum, float edge, float& scale) {
 
 }  // namespace
 
-void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
+HTMLStyleCascade::HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser)
+    : _diagnostics(sink), _valueParser(valueParser) {
+}
+
+void HTMLStyleCascade::setFontFallbackSink(FontFallbackSink sink) {
+  _fontFallbackSink = std::move(sink);
+}
+
+void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "style") {
         parseStyleBlock(child);
       } else if (child->name != "title" && child->name != "meta" && child->name != "link") {
-        warn("html: element '<" + child->name + ">' inside <head> is not allowed; skipped");
+        _diagnostics.warn("html: element '<" + child->name +
+                          ">' inside <head> is not allowed; skipped");
       } else if (child->name == "link") {
         auto* rel = child->findAttribute("rel");
         if (rel && ToLower(Trim(*rel)) == "stylesheet") {
-          warn("html: external <link rel=\"stylesheet\"> is not supported; ignored");
+          _diagnostics.warn("html: external <link rel=\"stylesheet\"> is not supported; ignored");
         }
         // Other <link> uses (preconnect/icon/etc.) are silently ignored.
       }
@@ -110,7 +123,7 @@ void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
   }
 }
 
-void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode) {
+void HTMLStyleCascade::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode) {
   // The text content is stored as a child Text node whose `name` field carries the text.
   auto textChild = styleNode->getFirstChild();
   if (!textChild || textChild->type != DOMNodeType::Text) {
@@ -119,7 +132,7 @@ void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNod
   std::vector<std::string> droppedAtRules;
   auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules);
   for (auto& at : droppedAtRules) {
-    warn("html: at-rule '" + at + "' not supported in <style>; dropped");
+    _diagnostics.warn("html: at-rule '" + at + "' not supported in <style>; dropped");
   }
   for (auto& rule : rules) {
     if (rule.declarations.empty()) continue;
@@ -129,26 +142,27 @@ void HTMLParserContext::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNod
       if (sel.empty()) continue;
       ParsedSelector parsed = ClassifySelector(sel);
       if (parsed.kind == SelectorKind::Universal) {
-        warn("html: universal selector '*' not allowed in <style>; declarations dropped");
+        _diagnostics.warn(
+            "html: universal selector '*' not allowed in <style>; declarations dropped");
         continue;
       }
       // Parse each rule's declarations once at <style> collection time so per-element
       // resolution can copy the resulting PropertyMap instead of re-parsing the same string.
       if (parsed.kind == SelectorKind::Class) {
-        ParseStyleString(rule.declarations, _cssClassRules[parsed.key]);
+        ParseStyleString(rule.declarations, _classRules[parsed.key]);
         continue;
       }
       if (parsed.kind == SelectorKind::Element) {
-        ParseStyleString(rule.declarations, _cssElementRules[parsed.key]);
+        ParseStyleString(rule.declarations, _elementRules[parsed.key]);
         continue;
       }
-      warn("html: unsupported selector '" + sel + "' in <style>; declarations dropped");
+      _diagnostics.warn("html: unsupported selector '" + sel +
+                        "' in <style>; declarations dropped");
     }
   }
 }
 
-void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
-                                        std::unordered_map<std::string, std::string>& out) {
+void HTMLStyleCascade::mergeClassRules(const std::string& classAttribute, PropertyMap& out) {
   size_t p = 0;
   const auto& s = classAttribute;
   while (p < s.size()) {
@@ -156,8 +170,8 @@ void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
     if (p >= s.size()) break;
     size_t e = p;
     while (e < s.size() && !std::isspace(static_cast<unsigned char>(s[e]))) e++;
-    auto it = _cssClassRules.find(s.substr(p, e - p));
-    if (it != _cssClassRules.end()) {
+    auto it = _classRules.find(s.substr(p, e - p));
+    if (it != _classRules.end()) {
       // Last writer wins, matching the inline-style cascade order.
       for (const auto& kv : it->second) {
         out[kv.first] = kv.second;
@@ -167,13 +181,13 @@ void HTMLParserContext::mergeClassRules(const std::string& classAttribute,
   }
 }
 
-const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolvedStyle(
+const HTMLStyleCascade::PropertyMap& HTMLStyleCascade::getResolvedStyle(
     const std::shared_ptr<DOMNode>& node) {
-  auto it = _stylePropertiesCache.find(node.get());
-  if (it != _stylePropertiesCache.end()) {
+  auto it = _resolvedCache.find(node.get());
+  if (it != _resolvedCache.end()) {
     return it->second;
   }
-  auto& slot = _stylePropertiesCache[node.get()];
+  auto& slot = _resolvedCache[node.get()];
 
   // Priority: element defaults -> element rules from <style> -> class rules -> inline.
   const auto& tagDefaults = ElementDefaults();
@@ -181,8 +195,8 @@ const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolv
   if (tagIt != tagDefaults.end()) {
     ParseStyleString(tagIt->second, slot);
   }
-  auto elemRuleIt = _cssElementRules.find(node->name);
-  if (elemRuleIt != _cssElementRules.end()) {
+  auto elemRuleIt = _elementRules.find(node->name);
+  if (elemRuleIt != _elementRules.end()) {
     for (const auto& kv : elemRuleIt->second) {
       slot[kv.first] = kv.second;
     }
@@ -198,17 +212,17 @@ const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolv
   return slot;
 }
 
-std::string HTMLParserContext::getStyleProperty(const std::shared_ptr<DOMNode>& node,
-                                                const std::string& property,
-                                                const std::string& fallback) {
+std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& node,
+                                               const std::string& property,
+                                               const std::string& fallback) {
   const auto& props = getResolvedStyle(node);
   auto it = props.find(property);
   if (it != props.end()) return it->second;
   return fallback;
 }
 
-HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOMNode>& element,
-                                                       const HTMLInheritedStyle& parent) {
+HTMLInheritedStyle HTMLStyleCascade::computeInherited(const std::shared_ptr<DOMNode>& element,
+                                                      const HTMLInheritedStyle& parent) {
   HTMLInheritedStyle out = parent;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
@@ -227,7 +241,8 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
         // Recognised generic with no concrete mapping on this platform (cursive,
         // fantasy, ...). Drop with a single diagnostic so a stack like
         // `cursive, "Foo"` still falls through to "Foo".
-        warn("html: font-family generic '" + token + "' not mapped on this platform; dropped");
+        _diagnostics.warn("html: font-family generic '" + token +
+                          "' not mapped on this platform; dropped");
         continue;
       }
       out.fontFamilyChain.push_back(resolved);
@@ -235,7 +250,9 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
     if (!out.fontFamilyChain.empty()) {
       out.primaryFontFamily = out.fontFamilyChain.front();
     }
-    recordFontFallbacks(out.fontFamilyChain);
+    if (_fontFallbackSink) {
+      _fontFallbackSink(out.fontFamilyChain);
+    }
   }
   CopyProperty(props, "font-size", out.fontSize);
   CopyProperty(props, "font-weight", out.fontWeight);
@@ -271,12 +288,12 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
       "font-variant",   "font-stretch", "font"};
   for (const auto* prop : TextDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
-      warn(std::string("html: ") + prop + " not supported; ignored");
+      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
   std::string textOverflow = LookupLowerTrimmed(props, "text-overflow");
   if (textOverflow == "ellipsis") {
-    warn("html: text-overflow: ellipsis is not implemented in PAGX");
+    _diagnostics.warn("html: text-overflow: ellipsis is not implemented in PAGX");
   }
 
   // Refresh the pre-resolved numeric forms so text-leaf conversion can read them directly
@@ -284,22 +301,22 @@ HTMLInheritedStyle HTMLParserContext::computeInherited(const std::shared_ptr<DOM
   if (out.fontSize.empty()) {
     out.fontSizePx = HTML_DEFAULT_FONT_SIZE;
   } else {
-    float fontSizePx = _valueParser->parsePxLength(out.fontSize);
+    float fontSizePx = _valueParser.parsePxLength(out.fontSize);
     if (std::isnan(fontSizePx) || fontSizePx <= 0) fontSizePx = HTML_DEFAULT_FONT_SIZE;
     out.fontSizePx = fontSizePx;
   }
   if (out.letterSpacing.empty()) {
     out.letterSpacingPx = 0.0f;
   } else {
-    float ls = _valueParser->parsePxLength(out.letterSpacing);
+    float ls = _valueParser.parsePxLength(out.letterSpacing);
     out.letterSpacingPx = std::isnan(ls) ? 0.0f : ls;
   }
   out.resolvedTextColor =
-      _valueParser->parseColor(out.color.empty() ? std::string(HTML_DEFAULT_TEXT_COLOR) : out.color);
+      _valueParser.parseColor(out.color.empty() ? std::string(HTML_DEFAULT_TEXT_COLOR) : out.color);
   return out;
 }
 
-HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& element) {
+HTMLBoxAttributes HTMLStyleCascade::resolveBox(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
@@ -310,63 +327,74 @@ HTMLBoxAttributes HTMLParserContext::resolveBox(const std::shared_ptr<DOMNode>& 
   return box;
 }
 
-void HTMLParserContext::parseBoxSizing(HTMLBoxAttributes& box,
-                                       const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::parseBoxSizing(HTMLBoxAttributes& box, const PropertyMap& props) {
   ParseSizingDimension(LookupProperty(props, "width"), box.widthPx, box.widthPct);
   ParseSizingDimension(LookupProperty(props, "height"), box.heightPx, box.heightPct);
   std::string boxSizing = LookupLowerTrimmed(props, "box-sizing");
   if (!boxSizing.empty() && boxSizing != "border-box") {
-    warn("html: box-sizing: " + boxSizing + " not supported; treated as border-box");
+    _diagnostics.warn("html: box-sizing: " + boxSizing + " not supported; treated as border-box");
   }
   static const char* SizingDisallowed[] = {"min-width", "min-height", "max-width", "max-height",
                                            "aspect-ratio"};
   for (const auto* prop : SizingDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
-      warn(std::string("html: ") + prop + " not supported; ignored");
+      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
 }
 
-void HTMLParserContext::parseBoxPositioning(
-    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props) {
   std::string pos = LookupLowerTrimmed(props, "position");
   if (pos == "absolute") {
     box.absolute = true;
   } else if (!pos.empty() && pos != "static") {
-    warn("html: position: " + pos + " not supported; downgraded to absolute");
+    _diagnostics.warn("html: position: " + pos + " not supported; downgraded to absolute");
     box.absolute = true;
   }
   if (!box.absolute) return;
   const std::string& left = LookupProperty(props, "left");
-  if (!left.empty()) box.leftPx = _valueParser->parsePxLength(left);
+  if (!left.empty()) box.leftPx = _valueParser.parsePxLength(left);
   const std::string& right = LookupProperty(props, "right");
-  if (!right.empty()) box.rightPx = _valueParser->parsePxLength(right);
+  if (!right.empty()) box.rightPx = _valueParser.parsePxLength(right);
   const std::string& top = LookupProperty(props, "top");
-  if (!top.empty()) box.topPx = _valueParser->parsePxLength(top);
+  if (!top.empty()) box.topPx = _valueParser.parsePxLength(top);
   const std::string& bottom = LookupProperty(props, "bottom");
-  if (!bottom.empty()) box.bottomPx = _valueParser->parsePxLength(bottom);
+  if (!bottom.empty()) box.bottomPx = _valueParser.parsePxLength(bottom);
 }
 
-void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
-                                       const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::applyMarginLonghand(const PropertyMap& props, const char* propName,
+                                           float& outPx) {
+  const std::string& v = LookupProperty(props, propName);
+  if (v.empty()) return;
+  float n = _valueParser.parsePxLength(v);
+  if (std::isnan(n)) {
+    _diagnostics.warn(std::string("html: invalid ") + propName + " value '" + v + "'");
+    return;
+  }
+  outPx = n;
+}
+
+void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props) {
   std::string disp = LookupLowerTrimmed(props, "display");
   if (disp == "flex") {
     box.displayFlex = true;
   } else if (!disp.empty() && disp != "block" && disp != "inline" && disp != "inline-block") {
-    warn("html: display: " + disp + " not supported; ignored");
+    _diagnostics.warn("html: display: " + disp + " not supported; ignored");
   } else if (disp == "inline-block") {
-    warn("html: display: inline-block not supported; treated as block");
+    _diagnostics.warn("html: display: inline-block not supported; treated as block");
   }
   std::string fd = LookupLowerTrimmed(props, "flex-direction");
   if (fd == "column" || fd == "column-reverse") {
     box.flexRow = false;
-    if (fd == "column-reverse") warn("html: flex-direction: column-reverse not supported");
+    if (fd == "column-reverse") {
+      _diagnostics.warn("html: flex-direction: column-reverse not supported");
+    }
   } else if (fd == "row-reverse") {
-    warn("html: flex-direction: row-reverse not supported");
+    _diagnostics.warn("html: flex-direction: row-reverse not supported");
   }
   const std::string& gap = LookupProperty(props, "gap");
   if (!gap.empty()) {
-    box.gapPx = _valueParser->parsePxLength(gap);
+    box.gapPx = _valueParser.parsePxLength(gap);
     box.gapSet = !std::isnan(box.gapPx);
     if (!box.gapSet) box.gapPx = 0;
   }
@@ -375,9 +403,9 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
     auto tokens = SplitTopLevelWhitespace(padding);
     std::vector<float> nums;
     for (auto& t : tokens) {
-      float v = _valueParser->parsePxLength(t);
+      float v = _valueParser.parsePxLength(t);
       if (std::isnan(v)) {
-        warn("html: invalid padding token '" + t + "'");
+        _diagnostics.warn("html: invalid padding token '" + t + "'");
         continue;
       }
       nums.push_back(v);
@@ -399,17 +427,17 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
       box.flexGrow = v;
       box.flexGrowSet = true;
     } else {
-      warn("html: flex shorthand '" + flex + "' not supported beyond 'flex: N'");
+      _diagnostics.warn("html: flex shorthand '" + flex + "' not supported beyond 'flex: N'");
     }
   }
   if (!LookupProperty(props, "flex-wrap").empty()) {
-    warn("html: flex-wrap not supported; ignored");
+    _diagnostics.warn("html: flex-wrap not supported; ignored");
   }
   static const char* LayoutDisallowed[] = {"flex-grow", "flex-shrink",   "flex-basis", "float",
                                            "order",     "align-content", "align-self", "direction"};
   for (const auto* prop : LayoutDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
-      warn(std::string("html: ") + prop + " not supported; ignored");
+      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
   if (!LookupProperty(props, "margin").empty() || !LookupProperty(props, "margin-top").empty() ||
@@ -428,9 +456,9 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
       std::vector<float> nums;
       nums.reserve(tokens.size());
       for (auto& t : tokens) {
-        float v = _valueParser->parsePxLength(t);
+        float v = _valueParser.parsePxLength(t);
         if (std::isnan(v)) {
-          warn("html: invalid margin token '" + t + "'");
+          _diagnostics.warn("html: invalid margin token '" + t + "'");
           continue;
         }
         nums.push_back(v);
@@ -466,31 +494,20 @@ void HTMLParserContext::parseBoxLayout(HTMLBoxAttributes& box,
       box.marginBottomPx = b;
       box.marginLeftPx = l;
     }
-    auto applyMarginLonghand = [&](const char* propName, float& outPx) {
-      const std::string& v = LookupProperty(props, propName);
-      if (v.empty()) return;
-      float n = _valueParser->parsePxLength(v);
-      if (std::isnan(n)) {
-        warn(std::string("html: invalid ") + propName + " value '" + v + "'");
-        return;
-      }
-      outPx = n;
-    };
-    applyMarginLonghand("margin-top", box.marginTopPx);
-    applyMarginLonghand("margin-right", box.marginRightPx);
-    applyMarginLonghand("margin-bottom", box.marginBottomPx);
-    applyMarginLonghand("margin-left", box.marginLeftPx);
+    applyMarginLonghand(props, "margin-top", box.marginTopPx);
+    applyMarginLonghand(props, "margin-right", box.marginRightPx);
+    applyMarginLonghand(props, "margin-bottom", box.marginBottomPx);
+    applyMarginLonghand(props, "margin-left", box.marginLeftPx);
   }
   if (!LookupProperty(props, "grid-template-columns").empty()) {
-    warn("html: grid layout not supported");
+    _diagnostics.warn("html: grid layout not supported");
   }
   if (!LookupProperty(props, "grid-template-rows").empty()) {
-    warn("html: grid layout not supported");
+    _diagnostics.warn("html: grid layout not supported");
   }
 }
 
-void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
-                                        const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
   std::string bgColor = LookupProperty(props, "background-color");
   if (bgColor.empty()) {
     bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
@@ -499,7 +516,7 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
   // out when the value is actually a non-color shorthand (gradient / url-image).
   if (!bgColor.empty() && bgColor.find("gradient") == std::string::npos &&
       bgColor.find("url(") == std::string::npos) {
-    box.backgroundColor = _valueParser->parseColor(bgColor);
+    box.backgroundColor = _valueParser.parseColor(bgColor);
     box.backgroundColorSet = true;
   }
   std::string bgImage = LookupProperty(props, "background-image");
@@ -548,7 +565,7 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
   if (overflow == "hidden") {
     box.clipOverflow = true;
   } else if (!overflow.empty() && overflow != "visible") {
-    warn("html: overflow: " + overflow + " not fully supported");
+    _diagnostics.warn("html: overflow: " + overflow + " not fully supported");
   }
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
@@ -558,13 +575,12 @@ void HTMLParserContext::parseBoxVisuals(HTMLBoxAttributes& box,
                                             "perspective",         "clip-path"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
-      warn(std::string("html: ") + prop + " not supported; ignored");
+      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
 }
 
-void HTMLParserContext::parseBoxTransform(
-    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props) {
   // CSS `transform-origin` resolved by Chromium's computed style is almost
   // always emitted as `<x>px <y>px` (the centre of the element box, the CSS
   // default). Hand-written subset HTML still sometimes carries `50% 50%` or
@@ -586,8 +602,8 @@ void HTMLParserContext::parseBoxTransform(
       originParts.push_back(Trim(origin.substr(spaceIdx + 1)));
     }
     if (originParts.size() == 2) {
-      float ox = _valueParser->parsePxLength(originParts[0]);
-      float oy = _valueParser->parsePxLength(originParts[1]);
+      float ox = _valueParser.parsePxLength(originParts[0]);
+      float oy = _valueParser.parsePxLength(originParts[1]);
       if (!std::isnan(ox) && !std::isnan(oy)) {
         // Suppress the warning when the px values are exactly the box's
         // geometric centre — Chromium emits this for the CSS default and
@@ -603,7 +619,8 @@ void HTMLParserContext::parseBoxTransform(
       }
     }
     if (!originIsCentre) {
-      warn("html: transform-origin '" + origin + "' is not supported; assuming default '50% 50%'");
+      _diagnostics.warn("html: transform-origin '" + origin +
+                        "' is not supported; assuming default '50% 50%'");
     }
   }
 
@@ -613,7 +630,7 @@ void HTMLParserContext::parseBoxTransform(
   std::string fn;
   std::string args;
   if (!SplitTransformFunction(transform, fn, args)) {
-    warn("html: transform '" + transform + "' is malformed; ignored");
+    _diagnostics.warn("html: transform '" + transform + "' is malformed; ignored");
     return;
   }
   auto parts = SplitCommaArgs(args);
@@ -621,7 +638,7 @@ void HTMLParserContext::parseBoxTransform(
 
   if (fn == "skewx") {
     if (parts.size() != 1) {
-      warn("html: skewX expects 1 argument; got '" + transform + "'");
+      _diagnostics.warn("html: skewX expects 1 argument; got '" + transform + "'");
       return;
     }
     parsed.skew = -ParseAngle(parts[0]);
@@ -629,7 +646,7 @@ void HTMLParserContext::parseBoxTransform(
     parsed.valid = true;
   } else if (fn == "skewy") {
     if (parts.size() != 1) {
-      warn("html: skewY expects 1 argument; got '" + transform + "'");
+      _diagnostics.warn("html: skewY expects 1 argument; got '" + transform + "'");
       return;
     }
     parsed.skew = ParseAngle(parts[0]);
@@ -637,7 +654,7 @@ void HTMLParserContext::parseBoxTransform(
     parsed.valid = true;
   } else if (fn == "rotate") {
     if (parts.size() != 1) {
-      warn("html: rotate expects 1 argument; got '" + transform + "'");
+      _diagnostics.warn("html: rotate expects 1 argument; got '" + transform + "'");
       return;
     }
     parsed.rotation = ParseAngle(parts[0]);
@@ -651,7 +668,7 @@ void HTMLParserContext::parseBoxTransform(
                ParseScalarFloat(parts[1], sy)) {
       // sx/sy already filled.
     } else {
-      warn("html: scale expects 1 or 2 numeric arguments; got '" + transform + "'");
+      _diagnostics.warn("html: scale expects 1 or 2 numeric arguments; got '" + transform + "'");
       return;
     }
     parsed.scaleX = sx;
@@ -660,7 +677,7 @@ void HTMLParserContext::parseBoxTransform(
   } else if (fn == "scalex" || fn == "scaley") {
     float v = 1.0f;
     if (parts.size() != 1 || !ParseScalarFloat(parts[0], v)) {
-      warn("html: " + fn + " expects 1 numeric argument; got '" + transform + "'");
+      _diagnostics.warn("html: " + fn + " expects 1 numeric argument; got '" + transform + "'");
       return;
     }
     if (fn == "scalex") {
@@ -671,19 +688,21 @@ void HTMLParserContext::parseBoxTransform(
     parsed.valid = true;
   } else if (fn == "translate") {
     if (parts.empty() || parts.size() > 2) {
-      warn("html: translate expects 1 or 2 length arguments; got '" + transform + "'");
+      _diagnostics.warn("html: translate expects 1 or 2 length arguments; got '" + transform + "'");
       return;
     }
-    float tx = _valueParser->parsePxLength(parts[0]);
+    float tx = _valueParser.parsePxLength(parts[0]);
     if (std::isnan(tx)) {
-      warn("html: translate first argument '" + parts[0] + "' is not a px length; ignored");
+      _diagnostics.warn("html: translate first argument '" + parts[0] +
+                        "' is not a px length; ignored");
       return;
     }
     float ty = 0.0f;
     if (parts.size() == 2) {
-      ty = _valueParser->parsePxLength(parts[1]);
+      ty = _valueParser.parsePxLength(parts[1]);
       if (std::isnan(ty)) {
-        warn("html: translate second argument '" + parts[1] + "' is not a px length; ignored");
+        _diagnostics.warn("html: translate second argument '" + parts[1] +
+                          "' is not a px length; ignored");
         return;
       }
     }
@@ -692,12 +711,12 @@ void HTMLParserContext::parseBoxTransform(
     parsed.valid = true;
   } else if (fn == "translatex" || fn == "translatey") {
     if (parts.size() != 1) {
-      warn("html: " + fn + " expects 1 length argument; got '" + transform + "'");
+      _diagnostics.warn("html: " + fn + " expects 1 length argument; got '" + transform + "'");
       return;
     }
-    float v = _valueParser->parsePxLength(parts[0]);
+    float v = _valueParser.parsePxLength(parts[0]);
     if (std::isnan(v)) {
-      warn("html: " + fn + " argument '" + parts[0] + "' is not a px length; ignored");
+      _diagnostics.warn("html: " + fn + " argument '" + parts[0] + "' is not a px length; ignored");
       return;
     }
     if (fn == "translatex") {
@@ -720,13 +739,13 @@ void HTMLParserContext::parseBoxTransform(
     // is therefore not engaged for matrix-form transforms — that's
     // intentional, the new generic Layer path covers the same case.
     if (parts.size() != 6) {
-      warn("html: matrix expects 6 numeric arguments; got '" + transform + "'");
+      _diagnostics.warn("html: matrix expects 6 numeric arguments; got '" + transform + "'");
       return;
     }
     float m[6];
     for (size_t i = 0; i < 6; i++) {
       if (!ParseScalarFloat(parts[i], m[i])) {
-        warn("html: matrix argument '" + parts[i] + "' is not a number; ignored");
+        _diagnostics.warn("html: matrix argument '" + parts[i] + "' is not a number; ignored");
         return;
       }
     }
@@ -738,7 +757,7 @@ void HTMLParserContext::parseBoxTransform(
     parsed.matrix.ty = m[5];
     parsed.valid = !parsed.matrix.isIdentity();
   } else {
-    warn("html: transform function '" + fn + "' is not in the supported subset");
+    _diagnostics.warn("html: transform function '" + fn + "' is not in the supported subset");
     return;
   }
 
@@ -795,8 +814,7 @@ void HTMLParserContext::parseBoxTransform(
   box.transform = parsed;
 }
 
-void HTMLParserContext::parseBorderRadius(
-    HTMLBoxAttributes& box, const std::unordered_map<std::string, std::string>& props) {
+void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props) {
   // CSS `border-radius` shorthand accepts up to 4 lengths or percentages (top-left,
   // top-right, bottom-right, bottom-left), with an optional '/' separating horizontal
   // and vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
@@ -816,7 +834,8 @@ void HTMLParserContext::parseBorderRadius(
   //     dropped with a warning, and the affected corner stays at 0.
   const std::string& br = LookupProperty(props, "border-radius");
   if (br.find('/') != std::string::npos) {
-    warn("html: elliptical border-radius '" + br + "' not supported by PAGX Rectangle; ignored");
+    _diagnostics.warn("html: elliptical border-radius '" + br +
+                      "' not supported by PAGX Rectangle; ignored");
     return;
   }
   auto tokens = SplitTopLevelWhitespace(br);
@@ -829,19 +848,19 @@ void HTMLParserContext::parseBorderRadius(
       char* end = nullptr;
       float pct = std::strtof(trimmed.c_str(), &end);
       if (end == trimmed.c_str()) {
-        warn("html: invalid border-radius token '" + t + "'");
+        _diagnostics.warn("html: invalid border-radius token '" + t + "'");
         continue;
       }
       if (std::isnan(box.widthPx) || std::isnan(box.heightPx)) {
-        warn("html: percentage border-radius '" + t +
-             "' requires fixed px width/height on the same element; ignored");
+        _diagnostics.warn("html: percentage border-radius '" + t +
+                          "' requires fixed px width/height on the same element; ignored");
         continue;
       }
       v = pct * std::min(box.widthPx, box.heightPx) / 100.0f;
     } else {
-      v = _valueParser->parsePxLength(trimmed);
+      v = _valueParser.parsePxLength(trimmed);
       if (std::isnan(v)) {
-        warn("html: invalid border-radius token '" + t + "'");
+        _diagnostics.warn("html: invalid border-radius token '" + t + "'");
         continue;
       }
     }
@@ -912,7 +931,7 @@ void HTMLParserContext::parseBorderRadius(
   box.borderRadiusSet = true;
 }
 
-void HTMLParserContext::parseBorder(HTMLBoxAttributes& box, const std::string& border) {
+void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& border) {
   auto tokens = SplitTopLevelWhitespace(border);
   // Collect candidate colour tokens — anything that's not a width / known style keyword.
   // Take the FIRST candidate as the border colour and warn on any subsequent ones so the
@@ -921,7 +940,7 @@ void HTMLParserContext::parseBorder(HTMLBoxAttributes& box, const std::string& b
   std::string colorToken;
   bool sawExtraColor = false;
   for (auto& t : tokens) {
-    float w = _valueParser->parsePxLength(t);
+    float w = _valueParser.parsePxLength(t);
     if (!std::isnan(w)) {
       box.borderWidthPx = w;
       continue;
@@ -937,7 +956,7 @@ void HTMLParserContext::parseBorder(HTMLBoxAttributes& box, const std::string& b
       continue;
     }
     if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
-      warn("html: border style '" + lt + "' not supported; treated as solid");
+      _diagnostics.warn("html: border style '" + lt + "' not supported; treated as solid");
       continue;
     }
     if (colorToken.empty()) {
@@ -947,10 +966,11 @@ void HTMLParserContext::parseBorder(HTMLBoxAttributes& box, const std::string& b
     }
   }
   if (sawExtraColor) {
-    warn("html: border value '" + border + "' has multiple colour tokens; first one used");
+    _diagnostics.warn("html: border value '" + border +
+                      "' has multiple colour tokens; first one used");
   }
   if (!colorToken.empty()) {
-    box.borderColor = _valueParser->parseColor(colorToken);
+    box.borderColor = _valueParser.parseColor(colorToken);
   }
   box.borderSet = box.borderWidthPx > 0;
 }

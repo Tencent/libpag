@@ -33,6 +33,9 @@
 #include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLImageResources.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
+#include "pagx/html/importer/HTMLLayerBuilder.h"
+#include "pagx/html/importer/HTMLStyleCascade.h"
+#include "pagx/html/importer/HTMLTextFragmentBuilder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -82,8 +85,8 @@ class HTMLParserContext {
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   // High-level traversal --------------------------------------------------------------
+  // CSS rule collection from `<head>`. Thin forwarder to `_styleCascade->collectStyles`.
   void collectStyles(const std::shared_ptr<DOMNode>& head);
-  void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
 
   // body / canvas size detection
   bool resolveCanvasSize(const std::shared_ptr<DOMNode>& body, float& outW, float& outH);
@@ -103,64 +106,10 @@ class HTMLParserContext {
   Layer* convertContainer(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited, int depth);
 
-  // Text leaf conversion (for <p>, <h1..6>, <span>, <a>).
+  // Text leaf conversion (for <p>, <h1..6>, <span>, <a>). Thin forwarder to
+  // `_textFragmentBuilder->convertTextLeaf`.
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                          const HTMLInheritedStyle& inherited);
-
-  // Internal: a stretch of text content with a single resolved style. Multiple fragments
-  // produced by walking inline children compose a rich-text TextBox.
-  struct TextFragment {
-    std::string text = {};
-    std::string fontFamily = {};
-    std::string fontStyleName = {};  // e.g. "Bold", "Italic", "Bold Italic"
-    float fontSize = HTML_DEFAULT_FONT_SIZE;
-    float letterSpacing = 0.0f;
-    Color color = {0, 0, 0, 1, ColorSpace::SRGB};
-    std::string textDecoration = {};
-    // Gradient string copied from `HTMLInheritedStyle::textFillImage`. When non-empty,
-    // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
-    // `background-clip: text` semantics from the nearest clip-to-text ancestor).
-    std::string fillImage = {};
-    // Resolved CSS line-height in pixels for this run, captured at fragment creation time so
-    // an inner-span override (e.g. <span style="line-height:20px"> inside a fixed-height
-    // outer span used as a digit/badge box) survives to the TextBox, where it determines the
-    // line-box height. NaN means the run inherited an empty/`normal` value and contributes no
-    // explicit line-height — convertTextLeaf then leaves TextBox.lineHeight at its auto default.
-    float lineHeight = NAN;
-  };
-  void collectTextFragments(const std::shared_ptr<DOMNode>& element,
-                            const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out,
-                            int depth = 0);
-
-  // Builds a TextFragment whose style fields mirror `inherited`. The `text` field is
-  // left empty for the caller to fill in.
-  TextFragment makeTextFragment(const HTMLInheritedStyle& inherited);
-
-  // Returns true when two fragments share every style fingerprint (everything except
-  // `text`), and therefore can be merged into a single run.
-  static bool fragmentsShareStyle(const TextFragment& a, const TextFragment& b);
-
-  // Fast fingerprint check used by appendTextFragment to skip the full makeTextFragment()
-  // materialisation (which copies four std::string fields) when the new run shares style with
-  // the previous fragment. Mirrors the field selection of makeTextFragment +
-  // fragmentsShareStyle — keep them in sync.
-  static bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
-
-  // Appends `text` to the fragment list, merging into the previous fragment when their
-  // style fingerprints match.
-  void appendTextFragment(std::vector<TextFragment>& out, const HTMLInheritedStyle& inherited,
-                          std::string text);
-
-  // Builds a Text Element from a fragment.
-  Text* buildTextElement(const TextFragment& fragment);
-
-  // Builds a Fill Element with a SolidColor of `color`.
-  Fill* buildSolidFill(const Color& color);
-
-  // Builds a Fill from a TextFragment: emits a gradient Fill when `fragment.fillImage` is set,
-  // otherwise falls back to `buildSolidFill(fragment.color)`. Used by `convertTextLeaf` so a
-  // CSS `background-clip: text` ancestor can fill the glyphs with its gradient.
-  Fill* buildTextFill(const TextFragment& fragment);
 
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
@@ -180,52 +129,14 @@ class HTMLParserContext {
                           const HTMLInheritedStyle& inherited);
 
   // Style / property helpers ----------------------------------------------------------
+  // Style cascade ----------------------------------------------------------------------
+  // Thin forwarders to `_styleCascade` so existing in-class call sites keep their syntax.
+  // Implementation lives in `HTMLStyleCascade`.
   const std::unordered_map<std::string, std::string>& getResolvedStyle(
       const std::shared_ptr<DOMNode>& node);
-
   HTMLBoxAttributes resolveBox(const std::shared_ptr<DOMNode>& element);
-
-  // resolveBox sub-steps. Each consumes the shared resolved style map.
-  void parseBoxSizing(HTMLBoxAttributes& box,
-                      const std::unordered_map<std::string, std::string>& props);
-  void parseBoxPositioning(HTMLBoxAttributes& box,
-                           const std::unordered_map<std::string, std::string>& props);
-  void parseBoxLayout(HTMLBoxAttributes& box,
-                      const std::unordered_map<std::string, std::string>& props);
-  void parseBoxVisuals(HTMLBoxAttributes& box,
-                       const std::unordered_map<std::string, std::string>& props);
-  void parseBoxTransform(HTMLBoxAttributes& box,
-                         const std::unordered_map<std::string, std::string>& props);
-
-  // parseBoxVisuals sub-step. Parses `border-radius` shorthand into the four `borderRadius*Px`
-  // fields, expanding 1-4 tokens per CSS spec, resolving percentages against the box size, and
-  // applying the CSS edge-overlap scaling clamp. Caller has already established that
-  // `props["border-radius"]` is non-empty.
-  void parseBorderRadius(HTMLBoxAttributes& box,
-                         const std::unordered_map<std::string, std::string>& props);
-
-  // parseBoxVisuals sub-step. Parses the `border` shorthand value (already looked up by the
-  // caller; guaranteed non-empty) into `borderWidthPx`, `borderStyle`, and `borderColor`.
-  // Recognised tokens: a px length, the keywords `solid`/`none`/`dashed`/`dotted`, and a
-  // single colour. Unsupported style keywords downgrade to solid with a warning.
-  void parseBorder(HTMLBoxAttributes& box, const std::string& border);
-
   HTMLInheritedStyle computeInherited(const std::shared_ptr<DOMNode>& element,
                                       const HTMLInheritedStyle& parent);
-
-  // Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke
-  // chain on the outer Layer. Used to decide whether a double-host split is needed.
-  static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
-
-  // Returns true when an inner host Layer is needed (the outer carries the background and
-  // the inner carries padding / layout). Mirrors the rule that padding cannot live on the
-  // same Layer as the background rectangle without changing geometry.
-  static bool requiresInnerHost(const HTMLBoxAttributes& box);
-
-  // Splits class attribute on whitespace and merges the matching class rule declarations
-  // into `out`. Used by both canvas-size detection and full style resolution.
-  void mergeClassRules(const std::string& classAttribute,
-                       std::unordered_map<std::string, std::string>& out);
 
   // Reads element id (or generates a unique one on collision) and assigns it to `layer`.
   // Thin forwarder to `_idAllocator->assign` so existing call sites across the four
@@ -241,100 +152,26 @@ class HTMLParserContext {
   std::string getStyleProperty(const std::shared_ptr<DOMNode>& node, const std::string& property,
                                const std::string& fallback = "");
 
-  // Output building helpers -----------------------------------------------------------
-  // Applies size / position attributes from box to layer (width, height, percentWidth,
-  // percentHeight, left/right/top/bottom, includeInLayout).
+  // Layer-side helpers ----------------------------------------------------------------
+  // Thin forwarders to `_layerBuilder` so existing in-class call sites (incl. element-conversion
+  // paths in `HTMLElementEmitter.cpp`) keep their syntax.
   void applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box);
-
-  // Applies layout attributes (layout, gap, padding, alignment, arrangement, flex).
   void applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box);
-
-  // Applies background visuals: bg-color, bg-gradient, border, border-radius, box-shadow,
-  // backdrop-filter. Returns true if any visual was applied (the caller should consider
-  // the double-layer split for padded contents).
   bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
-
-  // applyBackgroundVisuals sub-steps. Each consumes the `geometry` node already attached to
-  // `layer->contents` (when relevant) and toggles `emitted` true when it pushes a visual that
-  // would force the caller to honour the double-host split.
-  void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
-                           bool& emitted);
-  void applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
-                         bool& emitted);
-  void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
-  void applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
-
-  // Builds the background geometry node for a layer that carries `border-radius`. Returns a
-  // `Rectangle` covering the layer (with `roundness` set) when all four corner radii are equal
-  // (the common case for `border-radius: 12px` / `border-radius: 50%` / etc.). Returns a `Path`
-  // tracing the per-corner rounded outline when the radii differ — the only way PAGX can
-  // faithfully represent CSS patterns like `border-radius: 0 0 0 9999px` (a quarter-circle
-  // anchored at one corner) since `Rectangle` exposes only a single uniform `roundness`. When
-  // the radii are asymmetric but the box has no resolved px width/height, falls back to a
-  // single-roundness Rectangle (max radius) and emits a diagnostic, matching the legacy
-  // behaviour for the rare unsized rounded boxes.
-  Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
-
-  // Applies the resolved CSS `transform` (parsed by HTMLStyleResolver into
-  // `box.transform.matrix`) to `layer->matrix`. Folds in `transform-origin: 50% 50%` (the
-  // only origin the importer supports) when the box has explicit width/height; without
-  // them the origin defaults to the top-left and a warning is emitted. Used by
-  // `convertContainer` and `convertTextLeaf` so both paths preserve rotation/skew/scale.
   void applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
                          const std::shared_ptr<DOMNode>& element);
-
-  // Resolves a CSS gradient string ("linear-gradient(...)" / "radial-gradient(...)" /
-  // "conic-gradient(...)") into a registered gradient node. Returns nullptr when the
-  // value is empty, not a gradient, or fails to parse.
-  ColorSource* parseGradientByValue(const std::string& value);
-
-  // Emits a single text-decoration line (underline or line-through) onto `host`. When the
-  // decoration colour differs from the text colour the rectangle and its solid fill are
-  // wrapped in a Group so they don't bleed onto subsequent contents. `bottom` and
-  // `centerY` are mutually exclusive — pass NaN for the one that should not be set.
-  void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
-                              bool decorationColorDiffers, float bottom, float centerY);
-
-  // Creates the inner host Layer for the standard "outer background + inner padded
-  // container" double-layer pattern. Caller decides when to invoke based on
-  // `hasBackgroundVisuals(box) && requiresInnerHost(box)`.
-  Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
-
-  // Applies layer-level attributes that don't depend on background: opacity, blend mode,
-  // filter chain, overflow clip, data-* attributes.
   void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                             const HTMLBoxAttributes& box);
-
-  // Hoists `DropShadowStyle` entries off `inner` onto a fresh outer wrapper Layer when
-  // `inner` would also clip its bounds (`clipToBounds == true`). PAGX's `clipToBounds`
-  // (mapped to tgfx's `scrollRect`) is applied to the canvas before the layer's "Below"
-  // styles are drawn, so a shadow on the same layer as `clipToBounds` would be cut off
-  // along with the children — the opposite of CSS, where `overflow: hidden` clips
-  // descendants but `box-shadow` keeps spilling outside the element's box. The wrapper
-  // takes over the layout slot (size / position / flex / includeInLayout), the
-  // through-effects that wrap the shadow (alpha, blendMode, transform, filters,
-  // customData) and the hoisted shadows; `inner` becomes a 100% × 100% child that
-  // retains its `clipToBounds` plus its painted background. Returns the new outer
-  // wrapper, or `inner` unchanged when no split is needed (no `clipToBounds`, no
-  // outset shadows, or `inner` is null). `InnerShadowStyle` and `BackgroundBlurStyle`
-  // stay on `inner` since CSS inset shadows / `backdrop-filter` paint within the box.
+  Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
+  Fill* buildSolidFill(const Color& color);
+  ColorSource* parseGradientByValue(const std::string& value);
   Layer* maybeSplitBoxShadowFromClip(Layer* inner);
-
-  // Materialises CSS `margin` on `inner`. PAGX has no margin concept, so the importer
-  // reproduces it through positioning / padding:
-  //   - position: absolute → margin folds into the matching edge anchor (left/right/top/bottom)
-  //     since CSS positions an absolute box `margin-<side>` away from the containing block's
-  //     padding edge in addition to whatever offset the author already wrote.
-  //   - flow / flex children → wrapped in a transparent outer Layer whose `padding` equals the
-  //     four-side margin. The wrapper takes over the parent-facing layout slot (flex,
-  //     percent size, edge anchors, includeInLayout); `inner` keeps its visuals and own
-  //     dimensions and sits inside the wrapper's padded box, which is exactly the CSS
-  //     "outer size = inner size + margin" measurement contract the parent's flex /
-  //     constraint pass needs to honour.
-  // Returns `inner` unchanged when every side is zero (the common case) or when `inner`
-  // is null. Called from convertElement at the unified return point so every element
-  // path (container / text leaf / image / inline svg) participates uniformly.
   Layer* wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box);
+  Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
+  void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
+                              bool decorationColorDiffers, float bottom, float centerY);
+  static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
+  static bool requiresInnerHost(const HTMLBoxAttributes& box);
 
   // Value parsing -----------------------------------------------------------------------
   // CSS string-to-typed-value conversion lives in `HTMLValueParser` (see member field
@@ -367,20 +204,6 @@ class HTMLParserContext {
   HTMLImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
 
-  // CSS class selectors (key = class name without dot). Value is the parsed PropertyMap so
-  // that mergeClassRules() can copy entries instead of re-running ParseStyleString on every
-  // element that references a class — for documents that use the same class on hundreds of
-  // nodes this is the difference between O(rules·elements) and O(rules+elements).
-  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> _cssClassRules = {};
-
-  // CSS element selectors (key = tag name). Same parsed-up-front shape as _cssClassRules.
-  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> _cssElementRules =
-      {};
-
-  // Cached resolved style per DOM node. Each entry merges inline + class + element rules.
-  std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
-      _stylePropertiesCache = {};
-
   // Allocates / reserves DOM-side ids and generates fresh non-colliding ones for synthetic
   // layers (e.g. registered images).
   std::unique_ptr<HTMLIdAllocator> _idAllocator = nullptr;
@@ -388,6 +211,19 @@ class HTMLParserContext {
   // Parses CSS string values (color / length / shadow / filter / gradient) into typed PAGX
   // values. Borrows `_diagnostics`, `_canvasWidth` / `_canvasHeight` and `_document`.
   std::unique_ptr<HTMLValueParser> _valueParser = nullptr;
+
+  // Owns the CSS rule tables, the resolved-style cache, the inheritance walk, and the
+  // box-attribute parser. Borrows `_diagnostics` and `_valueParser`.
+  std::unique_ptr<HTMLStyleCascade> _styleCascade = nullptr;
+
+  // Builds and mutates `Layer` instances from `HTMLBoxAttributes`. Borrows `_diagnostics`,
+  // `_valueParser` and `_idAllocator`; document handle is bound after `PAGXDocument::Make`.
+  std::unique_ptr<HTMLLayerBuilder> _layerBuilder = nullptr;
+
+  // Converts text-leaf elements (`<p>`, `<h1..6>`, `<span>`, `<a>`) into Layer subtrees.
+  // Borrows `_diagnostics`, `_valueParser`, `_layerBuilder`, `_styleCascade`, `_idAllocator`;
+  // document handle is bound after `PAGXDocument::Make`.
+  std::unique_ptr<HTMLTextFragmentBuilder> _textFragmentBuilder = nullptr;
 
   // Image deduplication, source-path resolution, and synthesis of the document-side `Image`
   // resource nodes used by `<img>` and CSS `background-image: url(...)` references.

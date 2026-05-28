@@ -16,14 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pagx/html/importer/HTMLLayerBuilder.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
-#include "base/utils/MathUtil.h"
+#include <utility>
+#include "pagx/PAGXDocument.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/html/importer/HTMLDetail.h"
-#include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/html/importer/HTMLIdAllocator.h"
+#include "pagx/html/importer/HTMLValueParser.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
 
@@ -31,66 +52,35 @@ using namespace pagx::html;
 
 namespace {
 
-// External `.svg` URL — i.e. ends with `.svg` and is not an inline `data:` URI. Such
-// sources route through an SVG import directive rather than a raster image fill.
-bool IsExternalSvgSrc(const std::string& src) {
-  if (src.size() <= 4) return false;
-  if (src.compare(0, 5, "data:") == 0) return false;
-  return ToLower(src.substr(src.size() - 4)) == ".svg";
-}
-
-// Maps a CSS `object-fit` keyword onto a PAGX `ScaleMode`. Empty input means
-// "unset" and yields the CSS default `fill` -> `Stretch` so a plain `<img>` with
-// explicit width/height matches the browser's stretch behaviour rather than the
-// `ImagePattern` default `LetterBox` (which preserves aspect ratio and would
-// shrink images whose intrinsic aspect differs from the box's).
-ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
-  if (objectFit.empty() || objectFit == "fill") return ScaleMode::Stretch;
-  if (objectFit == "contain") return ScaleMode::LetterBox;
-  if (objectFit == "cover") return ScaleMode::Zoom;
-  // The SubsetTransformer normalises any other keyword to one of the above before
-  // emitting the subset HTML; reaching this branch means a hand-written subset
-  // file slipped through. Fall back to the CSS default.
-  return ScaleMode::Stretch;
-}
-
 // Traces the outline of a rounded rectangle with per-corner radii (TL, TR, BR, BL) inside the
 // axis-aligned box (0, 0)-(W, H) onto `out`. Going clockwise starting at the top of the right
 // edge — matches the canonical PAGX rendering start point for rounded rectangles, so the path
 // reverses / orientation logic in shape modifiers (`ApplyRoundCorner`, `MergePath`, etc.) sees
 // the same winding it would from a uniform Rectangle. Corners with radius 0 collapse to a sharp
 // vertex (no cubic emitted). Caller is responsible for clamping the radii so adjacent pairs do
-// not exceed the box's edge length — see the CSS scaling clamp in `HTMLStyleResolver`.
+// not exceed the box's edge length — see the CSS scaling clamp in `HTMLStyleCascade`.
 void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl, float tr,
                                        float brad, float bl) {
   const float k = 1.0f - BEZIER_KAPPA;
-  // Start at the top of the right edge (or the top-right corner when TR == 0). Mirrors the
-  // Rectangle-with-uniform-roundness writer in HTMLWriterShape.cpp so existing geometry tests
-  // (and any downstream RoundCorner modifier that relies on the start vertex landing on an
-  // edge) keep working.
   out.moveTo(w, tr);
   // Right edge.
   out.lineTo(w, h - brad);
   if (brad > 0) {
-    // BR corner: cubic from (W, H - BR) to (W - BR, H), bulging into (W, H).
     out.cubicTo(w, h - brad * k, w - brad * k, h, w - brad, h);
   }
   // Bottom edge.
   out.lineTo(bl, h);
   if (bl > 0) {
-    // BL corner: cubic from (BL, H) to (0, H - BL), bulging into (0, H).
     out.cubicTo(bl * k, h, 0, h - bl * k, 0, h - bl);
   }
   // Left edge.
   out.lineTo(0, tl);
   if (tl > 0) {
-    // TL corner: cubic from (0, TL) to (TL, 0), bulging into (0, 0).
     out.cubicTo(0, tl * k, tl * k, 0, tl, 0);
   }
   // Top edge.
   out.lineTo(w - tr, 0);
   if (tr > 0) {
-    // TR corner: cubic from (W - TR, 0) back to (W, TR), bulging into (W, 0). Closes the loop.
     out.cubicTo(w - tr * k, 0, w, tr * k, w, tr);
   }
   out.close();
@@ -98,17 +88,35 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
 
 }  // namespace
 
-Text* HTMLParserContext::buildTextElement(const TextFragment& fragment) {
-  auto t = _document->makeNode<Text>();
-  t->text = fragment.text;
-  t->fontFamily = fragment.fontFamily;
-  t->fontStyle = fragment.fontStyleName;
-  t->fontSize = fragment.fontSize;
-  t->letterSpacing = fragment.letterSpacing;
-  return t;
+HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
+                                   HTMLIdAllocator& idAllocator)
+    : _diagnostics(sink), _valueParser(valueParser), _idAllocator(idAllocator) {
+  (void)_idAllocator;  // Reserved for future per-layer id assignment paths.
 }
 
-Fill* HTMLParserContext::buildSolidFill(const Color& color) {
+void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
+  _document = document;
+}
+
+bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
+  return box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
+         box.borderSet || !box.boxShadow.empty() || !box.backdropFilter.empty();
+}
+
+bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
+  return box.paddingSet || box.displayFlex || box.gapSet;
+}
+
+Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
+  auto inner = _document->makeNode<Layer>();
+  inner->percentWidth = 100.0f;
+  inner->percentHeight = 100.0f;
+  applyLayoutAttributes(inner, box);
+  outer->children.push_back(inner);
+  return inner;
+}
+
+Fill* HTMLLayerBuilder::buildSolidFill(const Color& color) {
   auto fill = _document->makeNode<Fill>();
   auto solid = _document->makeNode<SolidColor>();
   solid->color = color;
@@ -116,37 +124,23 @@ Fill* HTMLParserContext::buildSolidFill(const Color& color) {
   return fill;
 }
 
-Fill* HTMLParserContext::buildTextFill(const TextFragment& fragment) {
-  if (fragment.fillImage.empty()) {
-    return buildSolidFill(fragment.color);
-  }
-  auto fill = _document->makeNode<Fill>();
-  fill->color = parseGradientByValue(fragment.fillImage);
-  if (!fill->color) {
-    // Unparseable gradient: fall back to solid color so text stays visible. This mirrors
-    // what `applyBackgroundVisuals` does for an unparseable box gradient.
-    return buildSolidFill(fragment.color);
-  }
-  return fill;
-}
-
-ColorSource* HTMLParserContext::parseGradientByValue(const std::string& value) {
+ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value) {
   std::string trimmed = Trim(value);
   if (trimmed.empty()) return nullptr;
   std::string lower = ToLower(trimmed);
   if (lower.compare(0, 16, "linear-gradient(") == 0) {
-    return _valueParser->parseLinearGradient(trimmed);
+    return _valueParser.parseLinearGradient(trimmed);
   }
   if (lower.compare(0, 16, "radial-gradient(") == 0) {
-    return _valueParser->parseRadialGradient(trimmed);
+    return _valueParser.parseRadialGradient(trimmed);
   }
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
-    return _valueParser->parseConicGradient(trimmed);
+    return _valueParser.parseConicGradient(trimmed);
   }
   return nullptr;
 }
 
-void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
+void HTMLLayerBuilder::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
   if (!std::isnan(box.widthPx)) layer->width = box.widthPx;
   if (!std::isnan(box.heightPx)) layer->height = box.heightPx;
   if (!std::isnan(box.widthPct)) layer->percentWidth = box.widthPct;
@@ -165,7 +159,7 @@ void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttribut
   }
 }
 
-void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box) {
+void HTMLLayerBuilder::applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box) {
   if (box.displayFlex) {
     layer->layout = box.flexRow ? LayoutMode::Horizontal : LayoutMode::Vertical;
   }
@@ -181,7 +175,7 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
     if (it != alignTable.end()) {
       layer->alignment = it->second;
     } else {
-      warn("html: unsupported align-items '" + box.alignItems + "'");
+      _diagnostics.warn("html: unsupported align-items '" + box.alignItems + "'");
     }
   }
   if (!box.justifyContent.empty()) {
@@ -199,12 +193,12 @@ void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribu
     if (it != arrangementTable.end()) {
       layer->arrangement = it->second;
     } else {
-      warn("html: unsupported justify-content '" + box.justifyContent + "'");
+      _diagnostics.warn("html: unsupported justify-content '" + box.justifyContent + "'");
     }
   }
 }
 
-Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
+Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
   // Fast path: no border-radius authored, or every corner shares the same radius. PAGX
   // `Rectangle` collapses to a single uniform `roundness`, so emit it as a `percentWidth /
   // percentHeight = 100%` shape that adapts to whatever the parent layer ends up being. This
@@ -228,7 +222,7 @@ Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box
       box.heightPx <= 0.0f) {
     float maxR = std::max(
         {box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx, box.borderRadiusBLPx});
-    warn(
+    _diagnostics.warn(
         "html: per-corner border-radius without fixed px width/height; approximated with the "
         "largest radius (PAGX Path requires concrete dimensions)");
     auto* rect = _document->makeNode<Rectangle>();
@@ -252,7 +246,7 @@ Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box
   return path;
 }
 
-bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
   // `background-image`, suppress the rectangle + gradient Fill that would otherwise
@@ -278,8 +272,8 @@ bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttrib
   return emitted;
 }
 
-void HTMLParserContext::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
-                                            Element* geometry, bool& emitted) {
+void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
+                                           Element* geometry, bool& emitted) {
   if (!geometry) return;
   if (box.backgroundColorSet && box.backgroundImage.empty()) {
     layer->contents.push_back(buildSolidFill(box.backgroundColor));
@@ -304,9 +298,9 @@ void HTMLParserContext::applyBackgroundFill(Layer* layer, const HTMLBoxAttribute
       anyUnsupported = true;
       std::string lower = ToLower(part);
       if (lower.compare(0, 4, "url(") == 0) {
-        warn("html: background-image '" + part + "' (url) not supported; use <img>");
+        _diagnostics.warn("html: background-image '" + part + "' (url) not supported; use <img>");
       } else {
-        warn("html: background-image '" + part + "' not supported");
+        _diagnostics.warn("html: background-image '" + part + "' not supported");
       }
     }
   }
@@ -333,8 +327,8 @@ void HTMLParserContext::applyBackgroundFill(Layer* layer, const HTMLBoxAttribute
   }
 }
 
-void HTMLParserContext::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,
-                                          Element* geometry, bool& emitted) {
+void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,
+                                         Element* geometry, bool& emitted) {
   if (!geometry || !box.borderSet) return;
   auto stroke = _document->makeNode<Stroke>();
   auto solid = _document->makeNode<SolidColor>();
@@ -360,7 +354,7 @@ void HTMLParserContext::applyBorderStroke(Layer* layer, const HTMLBoxAttributes&
   emitted = true;
 }
 
-void HTMLParserContext::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted) {
+void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted) {
   if (box.boxShadow.empty()) return;
   // CSS spec defines the `box-shadow` blur-radius as the standard deviation of the Gaussian
   // blur, doubled. PAGX layer-style `blurX/blurY` values flow into tgfx's `ImageFilter::Blur`
@@ -368,7 +362,7 @@ void HTMLParserContext::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& b
   // the parsed blur-radius lands on the matching σ. NOTE: this conversion is specific to
   // `box-shadow` — the `filter: drop-shadow()` consumer keeps its blur as-is, since the CSS
   // Filter spec defines that function's blur-radius as σ already.
-  auto shadows = _valueParser->parseShadowList(box.boxShadow);
+  auto shadows = _valueParser.parseShadowList(box.boxShadow);
   for (auto& s : shadows) {
     const float sigma = s.blur * 0.5f;
     if (s.inset) {
@@ -392,10 +386,10 @@ void HTMLParserContext::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& b
   if (!shadows.empty()) emitted = true;
 }
 
-void HTMLParserContext::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box,
-                                            bool& emitted) {
+void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box,
+                                           bool& emitted) {
   if (box.backdropFilter.empty()) return;
-  auto steps = _valueParser->parseFilterChain(box.backdropFilter);
+  auto steps = _valueParser.parseFilterChain(box.backdropFilter);
   for (auto& step : steps) {
     if (step.kind == HTMLValueParser::FilterStep::Kind::Blur) {
       auto bg = _document->makeNode<BackgroundBlurStyle>();
@@ -404,13 +398,13 @@ void HTMLParserContext::applyBackdropFilter(Layer* layer, const HTMLBoxAttribute
       layer->styles.push_back(bg);
       emitted = true;
     } else {
-      warn("html: backdrop-filter '" + step.raw + "' not supported");
+      _diagnostics.warn("html: backdrop-filter '" + step.raw + "' not supported");
     }
   }
 }
 
-void HTMLParserContext::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                                          const std::shared_ptr<DOMNode>& element) {
+void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
+                                         const std::shared_ptr<DOMNode>& element) {
   if (!box.transform.valid) return;
   Matrix m = box.transform.matrix;
   if (m.isIdentity()) return;
@@ -430,9 +424,9 @@ void HTMLParserContext::applyBoxTransform(Layer* layer, const HTMLBoxAttributes&
     cy = box.heightPx * 0.5f;
   } else {
     std::string tag = (element ? element->name : std::string("?"));
-    warn("html: transform on '<" + tag +
-         ">' without explicit width/height; transform-origin defaults to top-left and "
-         "may differ from CSS transform-origin: 50% 50%");
+    _diagnostics.warn("html: transform on '<" + tag +
+                      ">' without explicit width/height; transform-origin defaults to top-left "
+                      "and may differ from CSS transform-origin: 50% 50%");
   }
   if (!std::isnan(cx) && !std::isnan(cy)) {
     Matrix toCenter = Matrix::Translate(cx, cy);
@@ -442,8 +436,8 @@ void HTMLParserContext::applyBoxTransform(Layer* layer, const HTMLBoxAttributes&
   layer->matrix = m;
 }
 
-void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                                             const HTMLBoxAttributes& box) {
+void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
+                                            const HTMLBoxAttributes& box) {
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
     BlendMode mode = BlendModeFromString(box.mixBlendMode);
@@ -453,7 +447,7 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
 
   // filter chain (excluding backdrop-filter, which is handled as a Layer style).
   if (!box.filter.empty()) {
-    auto steps = _valueParser->parseFilterChain(box.filter);
+    auto steps = _valueParser.parseFilterChain(box.filter);
     for (auto& step : steps) {
       if (step.kind == HTMLValueParser::FilterStep::Kind::Blur) {
         auto blur = _document->makeNode<BlurFilter>();
@@ -469,7 +463,7 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
       } else {
-        warn("html: filter '" + step.raw + "' not supported");
+        _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }
     }
   }
@@ -481,7 +475,7 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
       if (IsValidCustomDataKey(key)) {
         layer->customData[key] = attr.value;
       } else {
-        warn("html: invalid data-* attribute name '" + attr.name + "'");
+        _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");
       }
     }
   }
@@ -494,7 +488,7 @@ void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr
   }
 }
 
-Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
+Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   if (inner == nullptr || !inner->clipToBounds || inner->styles.empty()) {
     return inner;
   }
@@ -571,7 +565,7 @@ Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
   return outer;
 }
 
-Layer* HTMLParserContext::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box) {
+Layer* HTMLLayerBuilder::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& box) {
   if (inner == nullptr) return inner;
   if (box.marginTopPx == 0.0f && box.marginRightPx == 0.0f && box.marginBottomPx == 0.0f &&
       box.marginLeftPx == 0.0f) {
@@ -633,149 +627,10 @@ Layer* HTMLParserContext::wrapWithMargin(Layer* inner, const HTMLBoxAttributes& 
   return outer;
 }
 
-bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
-                                                const HTMLBoxAttributes& box, Layer* layer) {
-  if (!box.borderRadiusSet || !box.clipOverflow) return false;
-  if (requiresInnerHost(box)) return false;
-
-  std::shared_ptr<DOMNode> img = nullptr;
-  for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
-    if (c->type == DOMNodeType::Element) {
-      if (img) return false;
-      if (c->name != "img") return false;
-      img = c;
-    } else if (c->type == DOMNodeType::Text) {
-      if (!IsBlankText(c->name)) return false;
-    }
-  }
-  if (!img) return false;
-
-  // Reject SVG sources up front: they ride an import directive, not a raster fill.
-  auto* srcAttr = img->findAttribute("src");
-  if (!srcAttr || srcAttr->empty()) return false;
-  const std::string& src = *srcAttr;
-  if (IsExternalSvgSrc(src)) return false;
-
-  // The image must exactly cover the wrapper's content box, anchored at top-left —
-  // otherwise the rounded clip would shape only part of the visible image and folding
-  // would stretch it across the wrapper.
-  HTMLBoxAttributes imgBox = resolveBox(img);
-  if (std::isnan(imgBox.widthPx) || std::isnan(box.widthPx) ||
-      !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
-    return false;
-  }
-  if (std::isnan(imgBox.heightPx) || std::isnan(box.heightPx) ||
-      !pag::FloatNearlyEqual(imgBox.heightPx, box.heightPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
-    return false;
-  }
-  float imgLeft = std::isnan(imgBox.leftPx) ? 0.0f : imgBox.leftPx;
-  float imgTop = std::isnan(imgBox.topPx) ? 0.0f : imgBox.topPx;
-  if (!pag::FloatNearlyEqual(imgLeft, 0.0f, HTML_IMAGE_WRAPPER_TOLERANCE_PX) ||
-      !pag::FloatNearlyEqual(imgTop, 0.0f, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
-    return false;
-  }
-
-  auto* imageNode = registerImageResource(resolveImageSource(src));
-  if (!imageNode) return false;
-
-  // The rounded Rectangle emitted by applyBackgroundVisuals() above is now the actual
-  // fill geometry, so the rectangular clip the importer would have written from
-  // `overflow: hidden` is redundant.
-  layer->clipToBounds = false;
-
-  auto fill = _document->makeNode<Fill>();
-  auto pattern = _document->makeNode<ImagePattern>();
-  pattern->image = imageNode;
-  pattern->scaleMode = ResolveImageScaleMode(imgBox.objectFit);
-  fill->color = pattern;
-  layer->contents.push_back(fill);
-  assignElementId(layer, element);
-  return true;
-}
-
-Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
-                                       const HTMLBoxAttributes& box) {
-  auto* srcAttr = element->findAttribute("src");
-  if (!srcAttr || srcAttr->empty()) {
-    warn("html: <img> missing src; skipped");
-    return nullptr;
-  }
-  const std::string& src = *srcAttr;
-  if (IsExternalSvgSrc(src)) {
-    auto layer = _document->makeNode<Layer>();
-    applySizeAndPosition(layer, box);
-    applyLayerAttributes(layer, element, box);
-    layer->importDirective.source = resolveImageSource(src);
-    layer->importDirective.format = "svg";
-    assignElementId(layer, element);
-    return layer;
-  }
-
-  auto* imageNode = registerImageResource(resolveImageSource(src));
-  if (!imageNode) return nullptr;
-
-  auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
-
-  // Honour `border-radius` directly on `<img>`: a CSS `<img style="border-radius: 50%">` is the
-  // canonical way to draw a circular avatar, and per-corner radii (e.g. only the top corners
-  // rounded for a "card cover" image) follow the same Path-emission path the container code
-  // uses. When the image has no border-radius, `buildBackgroundGeometry` falls back to a plain
-  // `Rectangle width=100% height=100%`, preserving the legacy emission verbatim.
-  layer->contents.push_back(buildBackgroundGeometry(box));
-
-  auto fill = _document->makeNode<Fill>();
-  auto pattern = _document->makeNode<ImagePattern>();
-  pattern->image = imageNode;
-  pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
-  fill->color = pattern;
-  layer->contents.push_back(fill);
-  assignElementId(layer, element);
-  return layer;
-}
-
-Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLBoxAttributes& box,
-                                           const HTMLInheritedStyle& inherited) {
-  auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
-
-  // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
-  // `computeInherited` returns the style descendants see, but `resolvedTextColor`
-  // is the *element's own* colour after applying any `style="color: …"` on the
-  // SVG itself — exactly what `currentColor` should resolve to at the SVG root.
-  // We pre-resolve here (mutating the captured subtree in place) because the
-  // downstream SVG importer treats anything other than a literal colour token
-  // as black, dropping the wrapper's tint that the snapshot relied on for
-  // icon-font glyphs.
-  HTMLInheritedStyle svgStyle = computeInherited(element, inherited);
-  std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
-  _svgEmitter->resolveCurrentColor(element, rootColor);
-
-  layer->importDirective.content = _svgEmitter->serialize(element);
-  layer->importDirective.format = "svg";
-  assignElementId(layer, element);
-  return layer;
-}
-
-std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
-  return _svgEmitter->serialize(svgNode);
-}
-
-Image* HTMLParserContext::registerImageResource(const std::string& imageSource) {
-  return _imageResources->registerResource(imageSource);
-}
-
-std::string HTMLParserContext::resolveImageSource(const std::string& src) const {
-  return _imageResources->resolveSource(src);
-}
-
-void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& /*textColor*/,
-                                               const Color& decorationColor,
-                                               bool decorationColorDiffers, float bottom,
-                                               float centerY) {
+void HTMLLayerBuilder::emitTextDecorationLine(Layer* host, const Color& /*textColor*/,
+                                              const Color& decorationColor,
+                                              bool decorationColorDiffers, float bottom,
+                                              float centerY) {
   auto rect = _document->makeNode<Rectangle>();
   rect->percentWidth = 100.0f;
   rect->height = 1.0f;
