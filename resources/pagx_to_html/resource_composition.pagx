@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition resource → inline expansion; composition width/height defines coordinate system -->
-<pagx version="1.0" width="420" height="300">
+<pagx width="420" height="300">
   <Resources>
     <Composition id="badge" width="100" height="100">
       <Layer>

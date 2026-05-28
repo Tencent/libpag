@@ -273,6 +273,7 @@ PAGWindow {
             if (settings.isAutoCheckUpdate) {
                 checkForUpdates(true);
             }
+            pluginInstaller.checkPluginOnStartup();
         }
     }
 
@@ -433,8 +434,12 @@ PAGWindow {
         });
         menuBar.command.connect(onCommand);
 
-        startupTimer.start();
-        updateTimer.start();
+        pagWindow.requestOpenFile.connect(mainForm.loadFile);
+
+        if (shouldRunStartupTasks) {
+            startupTimer.start();
+            updateTimer.start();
+        }
 
         connectContentViewSignals();
     }

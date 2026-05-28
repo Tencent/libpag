@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Layer matrix="a,b,c,d,tx,ty" → transform: matrix(a,b,c,d,tx,ty) -->
-<pagx version="1.0" width="340" height="300">
+<pagx width="340" height="300">
   <!-- Background -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

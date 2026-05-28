@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Composition with width/height coordinate system, multiple references to same composition,
      different transforms on each instance -->
-<pagx version="1.0" width="420" height="280">
+<pagx width="420" height="280">
   <Resources>
     <!-- Reusable icon component: a colored circle with an inner diamond -->
     <Composition id="icon" width="60" height="60">

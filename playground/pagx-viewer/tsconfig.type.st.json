@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.type.json",
+  "compilerOptions": {
+    "paths": {
+      "@tgfx/*": ["../../third_party/tgfx/web/src/*"],
+      "pagx-glue": ["./wasm/pagx-viewer"]
+    }
+  }
+}

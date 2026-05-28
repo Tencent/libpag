@@ -40,12 +40,13 @@ class PAGWindow : public QObject {
   explicit PAGWindow(QObject* parent = nullptr);
 
   Q_SIGNAL void destroyWindow(PAGWindow* window);
+  Q_SIGNAL void requestOpenFile(const QString& filePath);
 
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
   Q_INVOKABLE void notifyContentViewChanged(ContentView* newContentView);
 
-  void open();
+  void open(const QString& initialViewType = "pag");
   QString getFilePath();
   QQmlApplicationEngine* getEngine();
   bool isUseEnglish();
@@ -55,6 +56,7 @@ class PAGWindow : public QObject {
  private:
   void connectContentViewSignals();
   void disconnectContentViewSignals();
+  void updateFilePath(const QString& path);
 
   QString filePath = "";
   QQuickWindow* window = nullptr;

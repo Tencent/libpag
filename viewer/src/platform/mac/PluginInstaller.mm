@@ -268,57 +268,88 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 }
 
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
-  QStringList commands;
+  QStringList adminCommands;
+  bool userPluginSuccess = true;
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
     QString target = getPluginInstallPath(plugin);
+    auto permission = getPluginPermission(plugin);
 
     fs::path sourcePath(source.toStdString());
     if (!fs::exists(sourcePath)) {
+      // User-permission plugins (e.g. H264EncoderTools) are auxiliary — a missing source
+      // is tolerable and should not abort the entire batch install. Admin-permission plugins
+      // (e.g. PAGExporter) are the core deliverable, so a missing source is fatal.
+      if (permission == PluginPermission::User) {
+        userPluginSuccess = false;
+        continue;
+      }
       return false;
     }
 
     QString targetDir = QFileInfo(target).absolutePath();
-    commands << QString("mkdir -p '%1'").arg(targetDir);
-    commands << QString("rm -rf '%1'").arg(target);
-    commands << QString("ditto '%1' '%2'").arg(source).arg(target);
+
+    if (permission == PluginPermission::User) {
+      if (!QDir().mkpath(targetDir)) {
+        userPluginSuccess = false;
+        continue;
+      }
+      QFile::remove(target);
+      if (!QFile::copy(source, target)) {
+        userPluginSuccess = false;
+        continue;
+      }
+      QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                        QFileDevice::ExeOwner | QFileDevice::ReadGroup |
+                                        QFileDevice::ExeGroup | QFileDevice::ReadOther |
+                                        QFileDevice::ExeOther);
+    } else {
+      adminCommands << QString("mkdir -p '%1'").arg(targetDir);
+      adminCommands << QString("rm -rf '%1'").arg(target);
+      adminCommands << QString("ditto '%1' '%2'").arg(source).arg(target);
+    }
   }
 
   char qtResourceCmd[cmdBufSize] = {0};
   CopyQtResource(qtResourceCmd, sizeof(qtResourceCmd));
   if (strlen(qtResourceCmd) > 0) {
-    commands << QString::fromUtf8(qtResourceCmd).trimmed();
+    adminCommands << QString::fromUtf8(qtResourceCmd).trimmed();
   }
 
-  if (commands.isEmpty()) {
-    return true;
+  if (adminCommands.isEmpty()) {
+    return userPluginSuccess;
   }
 
-  QString fullCommand = commands.join(" && ");
-  bool result = executeWithPrivileges(fullCommand);
-  return result;
+  QString fullCommand = adminCommands.join(" && ");
+  return executeWithPrivileges(fullCommand) && userPluginSuccess;
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
-  QStringList commands;
+  QStringList adminCommands;
 
   for (const QString& plugin : plugins) {
     QString target = getPluginInstallPath(plugin);
-    commands << QString("rm -rf '%1'").arg(target);
+    auto permission = getPluginPermission(plugin);
+
+    if (permission == PluginPermission::User) {
+      QFile::remove(target);
+    } else {
+      adminCommands << QString("rm -rf '%1'").arg(target);
+    }
   }
 
   char deleteQtResourceCmd[cmdBufSize] = {0};
   DeleteQtResource(deleteQtResourceCmd, sizeof(deleteQtResourceCmd));
   if (strlen(deleteQtResourceCmd) > 0) {
-    commands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
+    adminCommands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
   }
 
-  if (commands.isEmpty()) {
+  if (adminCommands.isEmpty()) {
     return true;
   }
 
-  QString fullCommand = commands.join(" && ");
+  QString fullCommand = adminCommands.join(" && ");
   return executeWithPrivileges(fullCommand);
 }
 
