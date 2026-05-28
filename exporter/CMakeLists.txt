@@ -108,6 +108,13 @@ configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
         @ONLY
 )
 
+if (WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/templates/PAGExporter.rc.in
+            ${CMAKE_BINARY_DIR}/PAGExporter.rc
+            @ONLY
+    )
+endif ()
+
 list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
@@ -269,6 +276,7 @@ elseif (WIN32)
             COMMENT "Compiling the PiPL"
     )
     target_sources(${PROJECT_NAME} PRIVATE PAGExporterPiPL.rc)
+    target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/PAGExporter.rc)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(deploy_build_type "debug")
