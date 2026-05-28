@@ -842,10 +842,24 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
 // wrapper's (0,0) and inherits the wrapper's size; under flex mode the
 // wrapper is no longer absolutely positioned, so the image fills the wrapper
 // via flow sizing instead.
-function imageInnerStyle(rect, flexItem) {
-  if (flexItem) return `width: 100%; height: 100%`;
-  return `position: absolute; left: 0px; top: 0px; ` +
-    `width: ${px(rect.width)}; height: ${px(rect.height)}`;
+//
+// `objectFit` is the computed CSS `object-fit` keyword from the source
+// element (`'fill' | 'contain' | 'cover' | 'none' | 'scale-down'`). It is
+// forwarded verbatim so the PAGX subset importer can map it onto the
+// ImagePattern's ScaleMode. Default (`fill` / empty) is omitted; without this
+// pass-through the importer would always default to ScaleMode::Stretch and
+// thumbnails authored with `object-fit: cover` (CMS hero images, avatar
+// crops, …) would render with the wrong aspect ratio against the live
+// browser baseline.
+function imageInnerStyle(rect, flexItem, objectFit) {
+  const base = flexItem
+    ? `width: 100%; height: 100%`
+    : `position: absolute; left: 0px; top: 0px; ` +
+      `width: ${px(rect.width)}; height: ${px(rect.height)}`;
+  if (objectFit && objectFit !== 'fill') {
+    return `${base}; object-fit: ${objectFit}`;
+  }
+  return base;
 }
 
 // Walk an SVG subtree and rewrite `currentColor` / `context-fill` /
@@ -1420,7 +1434,8 @@ function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxSty
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(el.getAttribute('alt') || '');
-  const imgStyle = imageInnerStyle(rect, opts.flexItem);
+  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
+  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
   const inner = `<img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
@@ -1435,7 +1450,8 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
 // touching PAGX's renderer.
 function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
   const src = el.getAttribute('data-snapshot-canvas-src') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem);
+  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
+  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
   const inner = `<img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
