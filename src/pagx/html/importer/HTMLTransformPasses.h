@@ -117,6 +117,38 @@ class AbsoluteToFlexInferencePass : public HTMLTransformPass {
 };
 
 /**
+ * Pass — MarginToGapPromotion.
+ *
+ * HTML written in Tailwind / utility-class style frequently expresses inter-item spacing as
+ * a uniform per-item margin (`mb-[12px]` on every flex child, sometimes omitted on the last
+ * one) rather than a container `gap`. CSS computes those margins into the flex line's main
+ * size, so the page renders with the expected gutter. PAGX's vertical/horizontal layout has
+ * no per-child margin concept — items render edge-to-edge unless the container itself
+ * carries a `gap`.
+ *
+ * This pass walks every `display: flex` container, resolves each in-flow child's main-axis
+ * margins (`margin-top` / `margin-bottom` for column flex, the row counterparts otherwise),
+ * and lifts a uniform per-edge margin onto the container's `gap`. Two patterns are
+ * recognised: trailing margins (every child carries the same `mb`, last one optionally `0`)
+ * and leading margins (the second child onwards carries the same `mt`).
+ *
+ * Bails out without modification when the container already has a positive `gap`, declares
+ * `flex-wrap`, has fewer than two in-flow children, or whenever any margin is not a plain
+ * px length. Successful promotions emit `subset:margin-promoted-to-gap`.
+ *
+ * Must run before SpaceJustifyOverflowCollapsePass so the latter sees a clean container with
+ * no leftover per-child margin to ignore, and after PropertyFilter so that values are
+ * already normalised to plain px.
+ */
+class MarginToGapPromotionPass : public HTMLTransformPass {
+ public:
+  const char* name() const override {
+    return "MarginToGapPromotion";
+  }
+  void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
+};
+
+/**
  * Pass — SpaceJustifyOverflowCollapse.
  *
  * CSS Flexbox falls back to `flex-start` packing whenever the leftover free space along the

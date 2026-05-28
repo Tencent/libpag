@@ -1233,4 +1233,180 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthShorthandResolvesEachToken) {
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "padding: 16px"));
 }
 
+//==================================================================================================
+// MarginToGapPromotion
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapTrailingWithBlankLastChild) {
+  // The Tailwind-style pattern: every flex child has the same `mb`, except the last one.
+  // The pass should lift the shared margin onto the container's `gap` and clear all per-child
+  // margins, so PAGX's vertical layout reproduces the CSS gutters.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 12px"));
+  for (auto c = wrapper->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_FALSE(StyleContains(c, "margin-bottom"));
+    EXPECT_FALSE(StyleContains(c, "margin-top"));
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapTrailingUniformAllChildren) {
+  // The same uniform `mb` on every child (including the last). The pass still lifts onto
+  // `gap` and zero out the trailing margins; the trailing `mb` on the last child becomes
+  // empty bottom padding which CSS accepts.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:400px">
+               <div style="display:flex;flex-direction:column;width:200px;height:400px">
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 8px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapLeadingPattern) {
+  // The leading pattern: first child has no margin-top, every subsequent child has the same
+  // margin-top. Pass should still promote.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px"></div>
+                 <div style="width:100px;height:50px;margin-top:16px"></div>
+                 <div style="width:100px;height:50px;margin-top:16px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 16px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapWorksOnRowFlex) {
+  // Same logic on the row axis: uniform margin-right across siblings becomes the container's
+  // `gap`. Ensures the pass is axis-symmetric, not column-only.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:60px">
+               <div style="display:flex;flex-direction:row;width:300px;height:60px">
+                 <div style="width:50px;height:50px;margin-right:10px"></div>
+                 <div style="width:50px;height:50px;margin-right:10px"></div>
+                 <div style="width:50px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 10px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsInconsistentMargins) {
+  // Inconsistent trailing margins (8px vs 12px) and no leading margins: neither pattern
+  // matches, so the pass leaves the tree untouched and emits no promotion diagnostic.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(wrapper, "gap:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsWhenContainerHasGap) {
+  // Container already declares its own positive `gap`: leave the per-child margins alone.
+  // We deliberately set the gap to a value distinct from the per-child margin so a buggy
+  // implementation that overwrites the gap is easy to spot.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;gap:4px;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 4px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsWhenShorthandHasBothEdgeMargins) {
+  // `margin: 4px 12px` makes EVERY child carry a non-zero leading AND trailing main-axis
+  // margin (top=bottom=4 for a column flex). The actual CSS gutter between siblings is
+  // mb + mt = 8, not 4, so a naive lift to `gap: 4px` would change the rendering. The pass
+  // must conservatively decline both the trailing and leading patterns and leave the
+  // shorthand untouched.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(wrapper, "gap:"));
+  // Children keep their original shorthand verbatim.
+  for (auto c = wrapper->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_TRUE(StyleContains(c, "margin: 4px 12px"));
+  }
+}
+
+//==================================================================================================
+// SpaceJustifyOverflowCollapse
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyCollapseAccountsForChildMargin) {
+  // Children fit the container by `width` alone (3 × 50 = 150 ≤ 200) but overflow once
+  // their `margin-right` is included (3 × 50 + 2 × 30 = 210 > 200). The pass must count
+  // the margins; otherwise it would leave `space-between` in place and PAGX would render
+  // the leftover space as a positive gap that doesn't exist in the browser.
+  //
+  // We disable MarginToGap (by using a leading + trailing mix that doesn't match either
+  // pattern) so the SpaceJustify pass is the one observed.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:80px">
+               <div style="display:flex;flex-direction:row;justify-content:space-between;width:200px;height:80px">
+                 <div style="width:50px;height:50px;margin-right:30px"></div>
+                 <div style="width:50px;height:50px;margin-left:30px;margin-right:30px"></div>
+                 <div style="width:50px;height:50px;margin-left:30px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "justify-content: flex-start"));
+  // MarginToGap should have stayed away from this mixed-leading/trailing layout.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+}
+
 }  // namespace pag

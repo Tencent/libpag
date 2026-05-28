@@ -126,6 +126,11 @@ HTMLSubsetTransformer::Builder& HTMLSubsetTransformer::Builder::addDefaultPasses
   // AbsoluteToFlexInference is always wired in; it self-disables when
   // `Options::inferFlexFromAbsolute` is false so the default pipeline behaviour is unchanged.
   _impl->passes.push_back(std::make_unique<html::AbsoluteToFlexInferencePass>());
+  // Lifts uniform per-child main-axis margin onto the container's `gap` so PAGX's layout
+  // engine — which has no per-child margin concept — preserves the visual gutters declared in
+  // utility-class CSS. Must run after PropertyFilter (px normalisation) and before
+  // SpaceJustifyOverflowCollapse (which counts the resulting `gap` into its overflow check).
+  _impl->passes.push_back(std::make_unique<html::MarginToGapPromotionPass>());
   // Must run after both PropertyFilter (so that values are normalised to plain px) and
   // AbsoluteToFlexInference (so newly-inferred flex containers are also covered), and before
   // InlineStyleEmitter (which reads the resolved map back out into the `style="…"` attribute).

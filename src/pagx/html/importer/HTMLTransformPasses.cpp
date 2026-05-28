@@ -613,6 +613,84 @@ bool ParsePaddingFromResolved(const PropertyMap& props, float& top, float& right
   return any || sh.empty();  // empty padding is fine (zeros)
 }
 
+// Resolves a child's main-axis edge margins (top + bottom for column flex, left + right for
+// row flex). Reads the `margin` shorthand first, then per-side longhands which override the
+// shorthand. Returns false if any encountered value is not a plain px length (e.g. `auto`,
+// percentages) so callers can bail out conservatively. Missing values are treated as 0.
+bool ResolveChildMainMargin(const PropertyMap& props, bool row, float& outLeading,
+                            float& outTrailing) {
+  outLeading = 0.0f;
+  outTrailing = 0.0f;
+  auto sh = LookupResolved(props, "margin");
+  if (!sh.empty()) {
+    float t = 0.0f;
+    float r = 0.0f;
+    float b = 0.0f;
+    float l = 0.0f;
+    if (!ApplyPaddingShorthand(sh, t, r, b, l)) return false;
+    outLeading = row ? l : t;
+    outTrailing = row ? r : b;
+  }
+  const std::string leadKey = row ? "margin-left" : "margin-top";
+  const std::string trailKey = row ? "margin-right" : "margin-bottom";
+  if (auto v = LookupResolved(props, leadKey); !v.empty()) {
+    float px = 0.0f;
+    if (!ParseNormalisedPx(v, px)) return false;
+    outLeading = px;
+  }
+  if (auto v = LookupResolved(props, trailKey); !v.empty()) {
+    float px = 0.0f;
+    if (!ParseNormalisedPx(v, px)) return false;
+    outTrailing = px;
+  }
+  return true;
+}
+
+// Removes the main-axis margin declarations (both shorthand and per-side longhands) that
+// `ResolveChildMainMargin` would have read. Cross-axis margins on the same shorthand are
+// preserved by re-emitting them as longhands before the shorthand is stripped.
+void ClearChildMainMargin(PropertyMap& props, bool row) {
+  auto sh = LookupResolved(props, "margin");
+  if (!sh.empty()) {
+    float t = 0.0f;
+    float r = 0.0f;
+    float b = 0.0f;
+    float l = 0.0f;
+    if (ApplyPaddingShorthand(sh, t, r, b, l)) {
+      // Re-emit the cross-axis longhands so we don't accidentally drop them when the
+      // shorthand is removed below.
+      if (row) {
+        if (t != 0.0f) props["margin-top"] = EmitPx(t);
+        if (b != 0.0f) props["margin-bottom"] = EmitPx(b);
+      } else {
+        if (l != 0.0f) props["margin-left"] = EmitPx(l);
+        if (r != 0.0f) props["margin-right"] = EmitPx(r);
+      }
+    }
+    props.erase("margin");
+  }
+  props.erase(row ? "margin-left" : "margin-top");
+  props.erase(row ? "margin-right" : "margin-bottom");
+}
+
+// Returns true when the property `flex` shorthand resolves to a positive grow factor. The
+// subset pipeline only emits `flex: <grow>` (see SubsetPropertyTable), so a single numeric
+// token is the only shape we need to recognise here. Shared between MarginToGapPromotion
+// and SpaceJustifyOverflowCollapse: both passes must skip containers whose children declare
+// `flex-grow`, since the spec routes free space into the grown child rather than into the
+// packing gaps these passes reason about.
+bool ChildHasFlexGrow(const PropertyMap& props) {
+  const std::string& flex = LookupResolved(props, "flex");
+  if (flex.empty()) return false;
+  std::string trimmed = Trim(flex);
+  if (trimmed.empty()) return false;
+  char* end = nullptr;
+  float v = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str()) return false;
+  if (!std::isfinite(v)) return false;
+  return v > 0.0f;
+}
+
 // Padding shorthand emission and per-axis px formatting are shared with the property table /
 // importer via HTMLDetail (`EmitPaddingShorthand`, `EmitPx`).
 
@@ -1092,25 +1170,200 @@ void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
 }
 
 //==================================================================================================
-// SpaceJustifyOverflowCollapsePass
+// MarginToGapPromotionPass
 //==================================================================================================
 
 namespace {
 
-// Returns true when the property `flex` shorthand resolves to a positive grow factor. The subset
-// pipeline only emits `flex: <grow>` (see SubsetPropertyTable), so a single numeric token is the
-// only shape we need to recognise here.
-bool ChildHasFlexGrow(const PropertyMap& props) {
-  const std::string& flex = LookupResolved(props, "flex");
-  if (flex.empty()) return false;
-  std::string trimmed = Trim(flex);
-  if (trimmed.empty()) return false;
-  char* end = nullptr;
-  float v = std::strtof(trimmed.c_str(), &end);
-  if (end == trimmed.c_str()) return false;
-  if (!std::isfinite(v)) return false;
-  return v > 0.0f;
+// Tightly bounded `flex-wrap` test: PAGX layout only models single-line flex, so any wrap
+// keyword forces this pass to bail. `nowrap` (the spec default) and an empty string are the
+// only safe values.
+bool FlexContainerWraps(const PropertyMap& props) {
+  std::string fw = LookupResolvedLower(props, "flex-wrap");
+  return !fw.empty() && fw != "nowrap";
 }
+
+// Conservative parser for the `gap` shorthand on a flex container: returns true when the
+// property is absent OR when it parses cleanly as a single px value (we then expose that
+// value via `outGap`). Any other shape (`auto`, percentage, two-token row/column gap) is
+// treated as "already set, do not touch". Single-token `0`/`0px` is treated as unset.
+bool ContainerHasExplicitGap(const PropertyMap& props, float& outGap) {
+  outGap = 0.0f;
+  const std::string& g = LookupResolved(props, "gap");
+  if (g.empty()) return false;
+  float px = 0.0f;
+  if (!ParseNormalisedPx(g, px)) return true;  // unrecognised → treat as set
+  if (px <= 0.0f) return false;
+  outGap = px;
+  return true;
+}
+
+// Inspects a single flex container and, when its in-flow children expose a uniform
+// per-edge main-axis margin, lifts that margin onto the container's `gap` and clears the
+// per-child margin declarations. Two patterns are recognised:
+//
+//   - Trailing pattern (the Tailwind-style `mb-[N]` on every item):
+//     all in-flow children carry the same `margin-bottom` (or `margin-right` for row flex),
+//     except optionally the last one which may be `0`. No child carries a leading margin.
+//
+//   - Leading pattern (the `mt-[N]` from the second item onwards):
+//     the first child carries no `margin-top`, every subsequent child carries the same
+//     non-zero `margin-top` (or `margin-left`). No child carries a trailing margin.
+//
+// In both cases the lifted gap equals the per-child margin, which preserves CSS visuals
+// once the children render under PAGX's `gap`-aware vertical/horizontal layout.
+//
+// Bails out (without modification) when:
+//   - the container is not `display: flex`, declares `flex-wrap`, or already has a
+//     positive `gap`;
+//   - fewer than two in-flow children participate;
+//   - any participating child carries `flex` grow (the spec routes free space into the
+//     child, so the gap value can no longer be inferred from margins alone);
+//   - any margin is non-px (e.g. `auto`, percentages);
+//   - margins do not match either pattern.
+void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
+  if (!parent || parent->type != DOMNodeType::Element) return;
+  auto* parentResolved = ctx.findResolved(parent.get());
+  if (!parentResolved) return;
+  if (LookupResolvedLower(*parentResolved, "display") != "flex") return;
+  if (FlexContainerWraps(*parentResolved)) return;
+  float existingGap = 0.0f;
+  if (ContainerHasExplicitGap(*parentResolved, existingGap)) return;
+
+  bool row = LookupResolvedLower(*parentResolved, "flex-direction") != "column";
+
+  std::vector<PropertyMap*> childProps;
+  std::vector<float> leadMargins;
+  std::vector<float> trailMargins;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    if (c->type != DOMNodeType::Element) continue;
+    auto* cr = ctx.findResolved(c.get());
+    if (!cr) return;
+    std::string pos = LookupResolvedLower(*cr, "position");
+    if (pos == "absolute" || pos == "fixed") continue;
+    if (ChildHasFlexGrow(*cr)) return;
+    float lead = 0.0f;
+    float trail = 0.0f;
+    if (!ResolveChildMainMargin(*cr, row, lead, trail)) return;
+    childProps.push_back(cr);
+    leadMargins.push_back(lead);
+    trailMargins.push_back(trail);
+  }
+  if (childProps.size() < 2) return;
+
+  const size_t n = childProps.size();
+  // `kEps` absorbs the same sub-pixel rounding that `ResolveLength` introduces when
+  // converting Tailwind arbitrary values; tighter equality misfires on legitimate uniformity.
+  constexpr float kEps = 0.05f;
+  auto eq = [&](float a, float b) { return std::fabs(a - b) <= kEps; };
+
+  // Trailing pattern: all leadMargins must be ~0; trailMargins[0..n-2] uniform > 0; the
+  // last trailMargin is 0 or matches the others.
+  bool trailingOK = true;
+  for (float l : leadMargins) {
+    if (!eq(l, 0.0f)) {
+      trailingOK = false;
+      break;
+    }
+  }
+  if (trailingOK) {
+    float g = trailMargins[0];
+    if (g <= kEps) {
+      trailingOK = false;
+    } else {
+      for (size_t i = 1; i + 1 < n; ++i) {
+        if (!eq(trailMargins[i], g)) {
+          trailingOK = false;
+          break;
+        }
+      }
+      if (trailingOK) {
+        float last = trailMargins[n - 1];
+        if (!eq(last, 0.0f) && !eq(last, g)) trailingOK = false;
+      }
+    }
+    if (trailingOK) {
+      for (auto* cr : childProps) ClearChildMainMargin(*cr, row);
+      (*parentResolved)["gap"] = EmitPx(g);
+      ctx.warn("subset:margin-promoted-to-gap",
+               "html: <" + parent->name + "> per-child main-axis margin lifted to gap=" +
+                   EmitPx(g) + " (" + std::string(row ? "row" : "column") + " flex)",
+               parent);
+      return;
+    }
+  }
+
+  // Leading pattern: all trailMargins must be ~0; leadMargins[1..n-1] uniform > 0; first
+  // leadMargin is 0 or matches the others.
+  bool leadingOK = true;
+  for (float t : trailMargins) {
+    if (!eq(t, 0.0f)) {
+      leadingOK = false;
+      break;
+    }
+  }
+  if (leadingOK) {
+    float g = leadMargins[1];
+    if (g <= kEps) {
+      leadingOK = false;
+    } else {
+      for (size_t i = 2; i < n; ++i) {
+        if (!eq(leadMargins[i], g)) {
+          leadingOK = false;
+          break;
+        }
+      }
+      if (leadingOK) {
+        float first = leadMargins[0];
+        if (!eq(first, 0.0f) && !eq(first, g)) leadingOK = false;
+      }
+    }
+    if (leadingOK) {
+      for (auto* cr : childProps) ClearChildMainMargin(*cr, row);
+      (*parentResolved)["gap"] = EmitPx(g);
+      ctx.warn("subset:margin-promoted-to-gap",
+               "html: <" + parent->name + "> per-child main-axis margin lifted to gap=" +
+                   EmitPx(g) + " (" + std::string(row ? "row" : "column") + " flex)",
+               parent);
+      return;
+    }
+  }
+}
+
+void WalkPromoteMarginToGap(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx,
+                            int depth) {
+  if (!node || node->type != DOMNodeType::Element) return;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    ctx.warn(
+        "subset:max-depth",
+        "html: maximum recursion depth reached during margin-to-gap promotion; subtree skipped",
+        node);
+    return;
+  }
+  if (node->name == "svg") return;
+  TryPromoteMarginToGap(node, ctx);
+  auto child = node->firstChild;
+  while (child) {
+    WalkPromoteMarginToGap(child, ctx, depth + 1);
+    child = child->nextSibling;
+  }
+}
+
+}  // namespace
+
+void MarginToGapPromotionPass::apply(const std::shared_ptr<DOMNode>& root,
+                                     HTMLTransformContext& ctx) {
+  if (!root || ctx.hasFatal()) return;
+  auto body = root->getFirstChild("body");
+  if (!body) return;
+  WalkPromoteMarginToGap(body, ctx, 0);
+}
+
+//==================================================================================================
+// SpaceJustifyOverflowCollapsePass
+//==================================================================================================
+
+namespace {
 
 // Resolves a child's main-axis size against `props`. Tries plain px first; falls back to a
 // percentage of `containerMain` (when finite). Returns false when the value is missing or in a
@@ -1196,7 +1449,14 @@ void TryCollapseSpaceJustify(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     float childMain = 0.0f;
     if (!ResolveChildMainSize(*childResolved, row, availableMain, childMain)) return;
     if (!std::isfinite(childMain)) return;
-    total += childMain;
+    // CSS flexbox sizes the line by `outer hypothetical main-size`, which includes the child's
+    // main-axis margins. Without this term, a child carrying `margin-bottom: 12px` (or its row
+    // counterpart) is treated as smaller than it really is, so an overflowing line slips
+    // through the `total <= availableMain` check and the original `justify-content` is kept.
+    float leadMargin = 0.0f;
+    float trailMargin = 0.0f;
+    if (!ResolveChildMainMargin(*childResolved, row, leadMargin, trailMargin)) return;
+    total += childMain + leadMargin + trailMargin;
     inFlowCount++;
   }
   if (inFlowCount < 2) return;
