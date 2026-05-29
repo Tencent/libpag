@@ -5,6 +5,7 @@
 // needs a real platform font to shape against; that path is verified in
 // Phase 12 RenderEquivalenceTest against the standard sample corpus, not
 // here, to keep unit tests font-independent.
+#include <cstring>
 #include <memory>
 #include <optional>
 #include "gtest/gtest.h"
@@ -12,6 +13,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Text.h"
@@ -20,6 +22,7 @@
 #include "pagx/pag/Baker.h"
 #include "pagx/pag/Codec.h"
 #include "pagx/pag/PAGDocument.h"
+#include "pagx/types/Data.h"
 
 namespace pagx::pag {
 
@@ -365,6 +368,73 @@ TEST(TextBaker, TextModifierRangeSelectorMaxEnumValuesRoundTrip) {
   const auto& s = *d->rangeSelectors[0];
   EXPECT_EQ(s.shape, tgfx::SelectorShape::Smooth);
   EXPECT_EQ(s.unit, tgfx::SelectorUnit::Percentage);
+}
+
+// Phase 19+ — bitmap EmbeddedFont kind. PAGX <Glyph image="..."> roundtrip
+// must preserve per-glyph image bytes, offset, advance, and EmbeddedFont
+// kind. Without this gate, shape_glyph_run.pagx's ⑦ row of bitmap stars /
+// hearts silently disappears in the PAGX→PAG render report (the visible
+// regression that drove this work).
+TEST(TextBaker, CaseAAuthorGlyphRunInternsBitmapFont) {
+  // Two distinct 4-byte payloads stand in for encoded image bytes; the
+  // baker hashes raw bytes for intern dedup, so the test does not need
+  // real PNG content here.
+  const uint8_t payload1[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+  const uint8_t payload2[4] = {0xCA, 0xFE, 0xBA, 0xBE};
+  auto r = BakeAndRoundTrip([&](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
+    auto* font = b.RawDocument()->makeNode<pagx::Font>();
+    font->id = "bitmapFont";
+    font->unitsPerEm = 100;
+
+    auto* glyph1 = b.RawDocument()->makeNode<pagx::Glyph>();
+    glyph1->image = b.RawDocument()->makeNode<pagx::Image>();
+    glyph1->image->data = pagx::Data::MakeWithCopy(payload1, sizeof(payload1));
+    glyph1->offset = pagx::Point{0.0f, -5.0f};
+    glyph1->advance = 60.0f;
+    font->glyphs.push_back(glyph1);
+
+    auto* glyph2 = b.RawDocument()->makeNode<pagx::Glyph>();
+    glyph2->image = b.RawDocument()->makeNode<pagx::Image>();
+    glyph2->image->data = pagx::Data::MakeWithCopy(payload2, sizeof(payload2));
+    glyph2->advance = 60.0f;
+    font->glyphs.push_back(glyph2);
+
+    auto* text = b.RawDocument()->makeNode<pagx::Text>();
+    text->fontSize = 68.0f;
+    auto* run = b.RawDocument()->makeNode<pagx::GlyphRun>();
+    run->font = font;
+    run->fontSize = 68.0f;
+    run->glyphs = {1, 2};
+    run->x = 14.0f;
+    run->y = 10.0f;
+    run->xOffsets = {0.0f, 56.0f};
+    text->glyphRuns.push_back(run);
+    host.contents.push_back(text);
+  });
+  ASSERT_NE(r.decoded, nullptr);
+  ASSERT_EQ(r.decoded->embeddedFonts.size(), 1u);
+  const auto& font = r.decoded->embeddedFonts[0];
+  EXPECT_EQ(font->kind, EmbeddedFont::Kind::Image);
+  EXPECT_EQ(font->unitsPerEm, 100u);
+  ASSERT_EQ(font->glyphs.size(), 2u);
+
+  // Glyph 1: payload + offset + advance survive byte-for-byte.
+  const auto& g1 = font->glyphs[0];
+  EXPECT_FLOAT_EQ(g1.advance, 60.0f);
+  EXPECT_FLOAT_EQ(g1.offset.x, 0.0f);
+  EXPECT_FLOAT_EQ(g1.offset.y, -5.0f);
+  ASSERT_NE(g1.imageBytes, nullptr);
+  ASSERT_EQ(g1.imageBytes->size(), sizeof(payload1));
+  EXPECT_EQ(std::memcmp(g1.imageBytes->data(), payload1, sizeof(payload1)), 0);
+
+  // Glyph 2: zero offset (default).
+  const auto& g2 = font->glyphs[1];
+  EXPECT_FLOAT_EQ(g2.advance, 60.0f);
+  EXPECT_FLOAT_EQ(g2.offset.x, 0.0f);
+  EXPECT_FLOAT_EQ(g2.offset.y, 0.0f);
+  ASSERT_NE(g2.imageBytes, nullptr);
+  ASSERT_EQ(g2.imageBytes->size(), sizeof(payload2));
+  EXPECT_EQ(std::memcmp(g2.imageBytes->data(), payload2, sizeof(payload2)), 0);
 }
 
 }  // namespace pagx::pag

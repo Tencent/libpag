@@ -589,17 +589,47 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
     if (typefaces[index] != nullptr) {
       return typefaces[index];
     }
-    const auto& font = doc.embeddedFonts[index];
+    auto& font = doc.embeddedFonts[index];
     if (font == nullptr) {
       return nullptr;
     }
-    tgfx::PathTypefaceBuilder builder;
-    for (const auto& glyph : font->glyphs) {
-      // Reserve the GlyphID slot even for empty paths — incoming IDs from
-      // GlyphRunData.glyphs still need to index correctly.
-      builder.addGlyph(glyph.path, glyph.advance);
+    if (font->kind == EmbeddedFont::Kind::Image) {
+      // Use the default unitsPerEm = 1 here so the outer
+      // tgfx::Font(typeface, fontSize / EmbeddedFont::unitsPerEm) applies
+      // the design-space scale once. Mirrors GlyphRunRenderer line 133
+      // which also uses the default builder unitsPerEm. Constructing the
+      // builder with EmbeddedFont::unitsPerEm would double-scale and
+      // shrink bitmap glyphs to sub-pixel sizes.
+      tgfx::ImageTypefaceBuilder builder;
+      for (auto& glyph : font->glyphs) {
+        // Decode-and-cache so multiple GlyphRuns sharing the same font hit
+        // a single ImageCodec instance, matching the ImageAsset cache
+        // policy (ImageAsset::decodedImage). The codec is held by the
+        // EmbeddedGlyph to outlive the typeface returned to renderer.
+        if (glyph.decodedCodec == nullptr && glyph.imageBytes != nullptr) {
+          glyph.decodedCodec =
+              tgfx::ImageCodec::MakeFrom(std::const_pointer_cast<tgfx::Data>(glyph.imageBytes));
+        }
+        if (glyph.decodedCodec != nullptr) {
+          builder.addGlyph(glyph.decodedCodec, glyph.offset, glyph.advance);
+        }
+      }
+      typefaces[index] = builder.detach();
+    } else {
+      tgfx::PathTypefaceBuilder builder;
+      for (const auto& glyph : font->glyphs) {
+        // Reserve the GlyphID slot even for empty paths — incoming IDs from
+        // GlyphRunData.glyphs still need to index correctly.
+        if (glyph.offset.x != 0 || glyph.offset.y != 0) {
+          tgfx::Path translated = glyph.path;
+          translated.transform(tgfx::Matrix::MakeTrans(glyph.offset.x, glyph.offset.y));
+          builder.addGlyph(translated, glyph.advance);
+        } else {
+          builder.addGlyph(glyph.path, glyph.advance);
+        }
+      }
+      typefaces[index] = builder.detach();
     }
-    typefaces[index] = builder.detach();
     return typefaces[index];
   };
 

@@ -26,7 +26,8 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Image.h"  // ImageAsset::decodedImage cache
+#include "tgfx/core/Image.h"       // ImageAsset::decodedImage cache
+#include "tgfx/core/ImageCodec.h"  // EmbeddedGlyph::decodedCodec cache
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Path.h"
@@ -182,10 +183,17 @@ struct ImageAsset {
 };
 
 // ============================================================================
-// C.4b — EmbeddedFont (Phase 17 v2.23: path-based font resource)
+// C.4b — EmbeddedFont (Phase 17 v2.23: path-based font resource;
+//                      Phase 19+ v2.30: bitmap glyph kind for emoji-style fonts)
 // ============================================================================
 //
-// Mirrors PAGX <Font id="fontN"><Glyph advance="..." path="..."/></Font>.
+// Mirrors PAGX <Font id="fontN"><Glyph .../></Font>. PAGX glyphs are either
+// vector paths or bitmap images (mutually exclusive at the glyph level).
+// tgfx CustomTypeface builders are kind-singular (PathTypefaceBuilder vs
+// ImageTypefaceBuilder), so the EmbeddedFont also commits to a single kind
+// per font and the per-glyph fields imageBytes / path are populated based on
+// EmbeddedFont::kind.
+//
 // Only consumed by case A (author-authored <GlyphRun>) via
 // ElementTextData::glyphRuns[i].embeddedFontIndex. NOT a ttf subset:
 // ttf / otf font files are never embedded in PAG.
@@ -193,15 +201,36 @@ struct ImageAsset {
 // Coordinate convention: glyph paths retain the PAGX y-up source (e.g.
 // "M100 0 L193 -299" where negative y is above); the Inflater flips to
 // tgfx's y-down convention via Matrix::Scale(scale, -scale) at render time.
+// Bitmap glyphs are decoded by tgfx::ImageTypefaceBuilder which already
+// handles its own y orientation, so no flip is applied to imageBytes.
 
 struct EmbeddedGlyph {
-  float advance = 0.0f;  // PAGX <Glyph advance="..."> — em-units, pre-unitsPerEm
-  tgfx::Path path;       // PAGX <Glyph path="..."> — y-up source coordinates
+  float advance = 0.0f;
+  // Glyph offset in design space, in unitsPerEm coordinates. Both kinds
+  // honour this: path glyphs translate the path before adding it to the
+  // typeface (matches GlyphRunRenderer), bitmap glyphs forward it to
+  // ImageTypefaceBuilder::addGlyph(codec, offset, advance).
+  Point offset = {};
+  // Populated when the owning EmbeddedFont::kind == Path. y-up source
+  // coordinates; the Inflater applies the y-flip at render time.
+  tgfx::Path path;
+  // Populated when the owning EmbeddedFont::kind == Image. Raw encoded
+  // bytes (PNG / JPEG / WebP). Mirrors ImageAsset::data — Inflater decodes
+  // once via tgfx::ImageCodec::MakeFrom and caches in decodedCodec so the
+  // same glyph rendered from multiple GlyphRuns hits the codec cache.
+  std::shared_ptr<const tgfx::Data> imageBytes;
+  std::shared_ptr<tgfx::ImageCodec> decodedCodec;
 };
 
 struct EmbeddedFont {
-  uint32_t unitsPerEm = 1000;         // PAGX default
-  std::vector<EmbeddedGlyph> glyphs;  // index = value stored in GlyphRunData.glyphs
+  enum class Kind : uint8_t {
+    Path = 0,   // glyphs[i].path populated (Phase 17 default)
+    Image = 1,  // glyphs[i].imageBytes populated (Phase 19+ bitmap font)
+  };
+
+  uint32_t unitsPerEm = 1000;
+  Kind kind = Kind::Path;
+  std::vector<EmbeddedGlyph> glyphs;
 };
 
 // ============================================================================

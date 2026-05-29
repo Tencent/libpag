@@ -34,6 +34,7 @@
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextModifier.h"
@@ -44,6 +45,7 @@
 #include "pagx/pag/TypefaceKey.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/ToTGFX.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Path.h"
 
 namespace pagx::pag {
@@ -73,17 +75,50 @@ ParagraphJustification MapTextAnchor(pagx::TextAnchor anchor) {
 // ---- Phase 17 case A EmbeddedFont interning ----
 //
 // Content-hash-based intern: two PAGX <Font> nodes that carry the same
-// unitsPerEm and the same glyph table collapse to one entry in
-// `doc.embeddedFonts`. Hash key = unitsPerEm + per-glyph (advance,
-// path verbs, path points) serialized into a byte buffer, then
-// std::hash<std::string>. Collisions are tolerated because the map's
-// value (uint32_t index) is never the discriminator — we resolve by
-// direct content equality would be overkill for single-Bake maps.
+// unitsPerEm, kind, and glyph table collapse to one entry in
+// `doc.embeddedFonts`. Hash key includes per-glyph (advance, offset) and
+// either the path geometry (Path kind) or the encoded image bytes (Image
+// kind). Collisions are tolerated because the map's value (uint32_t index)
+// is never the discriminator — direct content equality would be overkill
+// for single-Bake maps.
 //
 // Why content hash (not pagx::Font* pointer): design decision confirmed
 // Phase 17 — structurally identical fonts emitted by different authoring
 // passes should dedup, and the hash cost (O(glyphCount * verbCount)) is
 // paid once per font during Bake, not per GlyphRun.
+
+// Determines the EmbeddedFont kind to encode for a PAGX <Font>. tgfx's
+// CustomTypeface builders are kind-singular, so the font commits to one
+// kind. Mirrors GlyphRunRenderer::BuildTypefaceFromFont's hasPath /
+// hasImage detection. Falls back to Path when both are absent so the
+// downstream encoder still produces a consistent (empty) font entry.
+static EmbeddedFont::Kind DetermineFontKind(const pagx::Font& font) {
+  bool hasImage = false;
+  for (const auto* g : font.glyphs) {
+    if (g != nullptr && g->image != nullptr) {
+      hasImage = true;
+      break;
+    }
+  }
+  return hasImage ? EmbeddedFont::Kind::Image : EmbeddedFont::Kind::Path;
+}
+
+// Resolve a PAGX Image node to raw encoded bytes. PAGXImporter has already
+// decoded base64 data URIs into image->data, so we only need to handle
+// inline bytes vs filePath here. Returns null for image == nullptr or
+// missing payloads — caller writes a sentinel empty EmbeddedGlyph.
+static std::shared_ptr<tgfx::Data> ResolveImageBytes(const pagx::Image* image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  if (image->data != nullptr && !image->data->empty()) {
+    return tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+  }
+  if (!image->filePath.empty()) {
+    return tgfx::Data::MakeFromFile(image->filePath);
+  }
+  return nullptr;
+}
 
 std::string ComputeEmbeddedFontHash(const pagx::Font& font) {
   std::string buf;
@@ -91,26 +126,50 @@ std::string ComputeEmbeddedFontHash(const pagx::Font& font) {
   auto appendRaw = [&](const void* p, size_t n) { buf.append(static_cast<const char*>(p), n); };
   uint32_t unitsPerEm = static_cast<uint32_t>(font.unitsPerEm);
   appendRaw(&unitsPerEm, sizeof(unitsPerEm));
+  uint8_t kindByte = static_cast<uint8_t>(DetermineFontKind(font));
+  appendRaw(&kindByte, sizeof(kindByte));
   uint32_t glyphCount = static_cast<uint32_t>(font.glyphs.size());
   appendRaw(&glyphCount, sizeof(glyphCount));
   for (const auto* g : font.glyphs) {
-    if (g == nullptr || g->path == nullptr) {
+    if (g == nullptr) {
       uint32_t sentinel = 0;
       appendRaw(&sentinel, sizeof(sentinel));
       continue;
     }
     appendRaw(&g->advance, sizeof(g->advance));
-    const auto& verbs = g->path->verbs();
-    const auto& points = g->path->points();
-    uint32_t vCount = static_cast<uint32_t>(verbs.size());
-    uint32_t pCount = static_cast<uint32_t>(points.size());
-    appendRaw(&vCount, sizeof(vCount));
-    appendRaw(&pCount, sizeof(pCount));
-    if (!verbs.empty()) {
-      appendRaw(verbs.data(), verbs.size() * sizeof(pagx::PathVerb));
-    }
-    if (!points.empty()) {
-      appendRaw(points.data(), points.size() * sizeof(pagx::Point));
+    appendRaw(&g->offset, sizeof(g->offset));
+    if (g->image != nullptr) {
+      // Image kind: hash the raw encoded bytes (data URI already decoded
+      // into image->data by PAGXImporter). filePath fonts can still alias
+      // through MakeFromFile at intern time but we hash by data bytes when
+      // available, falling back to the path string otherwise.
+      if (g->image->data != nullptr && !g->image->data->empty()) {
+        uint32_t n = static_cast<uint32_t>(g->image->data->size());
+        appendRaw(&n, sizeof(n));
+        appendRaw(g->image->data->bytes(), n);
+      } else {
+        uint32_t n = static_cast<uint32_t>(g->image->filePath.size());
+        appendRaw(&n, sizeof(n));
+        if (n > 0) {
+          appendRaw(g->image->filePath.data(), n);
+        }
+      }
+    } else if (g->path != nullptr) {
+      const auto& verbs = g->path->verbs();
+      const auto& points = g->path->points();
+      uint32_t vCount = static_cast<uint32_t>(verbs.size());
+      uint32_t pCount = static_cast<uint32_t>(points.size());
+      appendRaw(&vCount, sizeof(vCount));
+      appendRaw(&pCount, sizeof(pCount));
+      if (!verbs.empty()) {
+        appendRaw(verbs.data(), verbs.size() * sizeof(pagx::PathVerb));
+      }
+      if (!points.empty()) {
+        appendRaw(points.data(), points.size() * sizeof(pagx::Point));
+      }
+    } else {
+      uint32_t sentinel = 0;
+      appendRaw(&sentinel, sizeof(sentinel));
     }
   }
   return buf;
@@ -128,12 +187,16 @@ uint32_t InternEmbeddedFont(BakeContext& ctx, PAGDocument& doc, const pagx::Font
   }
   auto font = std::make_unique<EmbeddedFont>();
   font->unitsPerEm = static_cast<uint32_t>(src.unitsPerEm);
+  font->kind = DetermineFontKind(src);
   font->glyphs.reserve(src.glyphs.size());
   for (const auto* g : src.glyphs) {
     EmbeddedGlyph out;
     if (g != nullptr) {
       out.advance = g->advance;
-      if (g->path != nullptr) {
+      out.offset = tgfx::Point{g->offset.x, g->offset.y};
+      if (font->kind == EmbeddedFont::Kind::Image) {
+        out.imageBytes = ResolveImageBytes(g->image);
+      } else if (g->path != nullptr) {
         out.path = pagx::ToTGFX(*g->path);
       }
     }

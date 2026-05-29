@@ -178,22 +178,40 @@ void ReadImageAssetTable(::pag::DecodeStream* stream, DecodeContext* ctx, uint64
 
 namespace {
 
-// EmbeddedFont sub-Tag body: varU32 unitsPerEm, varU32 glyphCount,
-// repeat[ float advance, Path path ].
+// EmbeddedFont sub-Tag body:
+//   varU32 unitsPerEm
+//   u8     kind             // 0 = Path, 1 = Image
+//   varU32 glyphCount
+//   if kind == Path:
+//     repeat[ float advance, Point offset, Path path ]
+//   if kind == Image:
+//     repeat[ float advance, Point offset, varU32 imageBytesLen, bytes imageBytes ]
 //
 // Path encoding reuses the §D.2 quantised path codec (PathCodec.h::WritePath
 // / ReadPath) — same encoding ElementShapePath uses, so glyph outlines pay
 // the same per-verb cost (verbCount + xs[] + ys[]). The PAGX y-up source
 // orientation is preserved in the bytes; the Inflater applies the y-flip
 // matrix at render time (case A inflateTextAsPath).
+//
+// Bitmap glyphs reuse the same length-prefixed-bytes encoding as ImageAsset
+// so the loader can route either through ZeroCopyScope. tgfx
+// ImageTypefaceBuilder consumes the codec directly and applies the
+// fontSize / unitsPerEm scale itself, so no extra orientation hint travels
+// in the byte stream.
 void WriteEmbeddedFont(::pag::EncodeStream* stream, const EmbeddedFont& font,
                        EncodeSession* session) {
   ::pag::EncodeStream body(session->sc);
   body.writeEncodedUint32(font.unitsPerEm);
+  body.writeUint8(static_cast<uint8_t>(font.kind));
   body.writeEncodedUint32(static_cast<uint32_t>(font.glyphs.size()));
   for (const auto& glyph : font.glyphs) {
     body.writeFloat(glyph.advance);
-    WritePath(&body, glyph.path);
+    WritePoint(&body, glyph.offset);
+    if (font.kind == EmbeddedFont::Kind::Path) {
+      WritePath(&body, glyph.path);
+    } else {
+      WriteLengthPrefixedBytes(&body, glyph.imageBytes);
+    }
   }
   WriteTag(stream, TagCode::EmbeddedFontItem, &body);
 }
@@ -204,6 +222,14 @@ std::unique_ptr<EmbeddedFont> ReadEmbeddedFont(::pag::DecodeStream* stream, Deco
   auto guard = MakeGuard(ctx);
 
   font->unitsPerEm = ReadEncodedUint32Safe(stream, &guard);
+  uint8_t kindByte = stream->readUint8();
+  if (kindByte > static_cast<uint8_t>(EmbeddedFont::Kind::Image)) {
+    ctx->warn(ErrorCode::InvalidEnumValue, "EmbeddedFont kind out of range; using Path");
+    font->kind = EmbeddedFont::Kind::Path;
+  } else {
+    font->kind = static_cast<EmbeddedFont::Kind>(kindByte);
+  }
+
   uint32_t glyphCount = ReadEncodedUint32Safe(stream, &guard);
   // Each EmbeddedFont can hold the glyph table for an entire script (e.g.
   // a Chinese subset of several thousand glyphs). MAX_GLYPHS_PER_RUN is the
@@ -218,9 +244,18 @@ std::unique_ptr<EmbeddedFont> ReadEmbeddedFont(::pag::DecodeStream* stream, Deco
   font->glyphs.resize(glyphCount);
   for (uint32_t i = 0; i < glyphCount; ++i) {
     font->glyphs[i].advance = stream->readFloat();
-    font->glyphs[i].path = ReadPath(stream, ctx);
-    if (ctx->hasError()) {
-      return nullptr;
+    font->glyphs[i].offset = ReadPoint(stream);
+    if (font->kind == EmbeddedFont::Kind::Path) {
+      font->glyphs[i].path = ReadPath(stream, ctx);
+      if (ctx->hasError()) {
+        return nullptr;
+      }
+    } else {
+      font->glyphs[i].imageBytes = ReadLengthPrefixedBytes(stream, &guard, limits::MAX_IMAGE_BYTES,
+                                                           ErrorCode::ImageResourceSizeExceeded);
+      if (ctx->hasError()) {
+        return nullptr;
+      }
     }
   }
 
