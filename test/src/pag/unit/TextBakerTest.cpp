@@ -340,4 +340,31 @@ TEST(TextBaker, TextModifierRangeSelectorRoundTrip) {
   EXPECT_EQ(s.randomSeed, 4242);
 }
 
+// Regression: ElementTags decoder once gated SelectorShape on Round and
+// SelectorUnit on Index, so any RangeSelector authored with the highest
+// enum values (shape=Smooth, unit=Percentage) was silently downgraded to
+// Square / Percentage on the inflate side. This locks the upper bounds
+// down and would have caught the visible drift on text_modifier's SCALE
+// row in the PAGX-vs-PAG comparison report.
+TEST(TextBaker, TextModifierRangeSelectorMaxEnumValuesRoundTrip) {
+  auto r = BakeAndRoundTrip([](pagx::test::PAGXBuilder& b, pagx::Layer& host) {
+    auto* mod = b.RawDocument()->makeNode<pagx::TextModifier>();
+    auto* sel = b.RawDocument()->makeNode<pagx::RangeSelector>();
+    sel->shape = pagx::SelectorShape::Smooth;
+    sel->unit = pagx::SelectorUnit::Percentage;
+    mod->selectors.push_back(sel);
+    host.contents.push_back(mod);
+  });
+  ASSERT_NE(r.decoded, nullptr);
+  const auto* layer = FirstLayer(*r.decoded);
+  ASSERT_NE(layer, nullptr);
+  ASSERT_EQ(layer->vector->contents.size(), 1u);
+  const auto& d =
+      std::get<std::unique_ptr<ElementTextModifierData>>(layer->vector->contents[0]->payload);
+  ASSERT_EQ(d->rangeSelectors.size(), 1u);
+  const auto& s = *d->rangeSelectors[0];
+  EXPECT_EQ(s.shape, tgfx::SelectorShape::Smooth);
+  EXPECT_EQ(s.unit, tgfx::SelectorUnit::Percentage);
+}
+
 }  // namespace pagx::pag

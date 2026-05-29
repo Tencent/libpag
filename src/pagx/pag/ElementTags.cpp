@@ -1110,7 +1110,7 @@ std::unique_ptr<RangeSelectorData> ReadRangeSelectorDataInline(::pag::DecodeStre
   r->offset = ReadProperty<float>(s, /*default=*/0.0f, te);
   if (s->position() < te) {
     uint8_t unitByte = s->readUint8();
-    if (unitByte > static_cast<uint8_t>(SelectorUnit::Index)) {
+    if (unitByte > static_cast<uint8_t>(SelectorUnit::Percentage)) {
       ctx->warn(ErrorCode::InvalidEnumValue,
                 "RangeSelectorData.unit out of range; using Percentage");
       r->unit = SelectorUnit::Percentage;
@@ -1120,7 +1120,7 @@ std::unique_ptr<RangeSelectorData> ReadRangeSelectorDataInline(::pag::DecodeStre
   }
   if (s->position() < te) {
     uint8_t shapeByte = s->readUint8();
-    if (shapeByte > static_cast<uint8_t>(SelectorShape::Round)) {
+    if (shapeByte > static_cast<uint8_t>(SelectorShape::Smooth)) {
       ctx->warn(ErrorCode::InvalidEnumValue, "RangeSelectorData.shape out of range; using Square");
       r->shape = SelectorShape::Square;
     } else {
