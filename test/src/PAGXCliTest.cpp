@@ -113,6 +113,30 @@ static std::string ReadFile(const std::string& path) {
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
+// RAII helper that redirects an ostream (e.g. std::cout, std::cerr) into an internal
+// stringstream for the lifetime of the instance and restores the original buffer on
+// destruction. Use str() to read what was captured.
+class StreamCapture {
+ public:
+  explicit StreamCapture(std::ostream& stream) : stream_(stream), oldBuf_(stream.rdbuf()) {
+    stream_.rdbuf(captured_.rdbuf());
+  }
+  ~StreamCapture() {
+    stream_.rdbuf(oldBuf_);
+  }
+  StreamCapture(const StreamCapture&) = delete;
+  StreamCapture& operator=(const StreamCapture&) = delete;
+
+  std::string str() const {
+    return captured_.str();
+  }
+
+ private:
+  std::ostream& stream_;
+  std::streambuf* oldBuf_;
+  std::stringstream captured_;
+};
+
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
   auto pagxPath = TestResourcePath(pagxResourceName);
