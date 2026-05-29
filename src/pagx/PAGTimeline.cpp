@@ -35,11 +35,11 @@ static int64_t DurationMicros(const Animation* animation) {
                               static_cast<double>(animation->frameRate));
 }
 
-PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim, PAGLayerTree* layerTree,
+PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim, RuntimeBinding* binding,
                          PAGXDocument* contextDoc)
     : ownerFile(std::move(file)),
       animation(anim),
-      layerTree(layerTree),
+      binding(binding),
       contextDoc(contextDoc) {
 }
 
@@ -134,7 +134,7 @@ void PAGTimeline::apply(float mix) {
   if (clamped <= 0.0f) {
     return;
   }
-  file->applyAnimation(animation, layerTree, contextDoc, currentTimeUs, clamped);
+  file->applyAnimation(animation, binding, contextDoc, currentTimeUs, clamped);
 }
 
 bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {

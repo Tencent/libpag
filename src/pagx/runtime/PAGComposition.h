@@ -46,8 +46,8 @@ class PAGComposition {
    * Builds a runtime slot for ownerLayer.composition. Returns nullptr if ownerLayer is null,
    * has no composition, or the document is not laid out.
    * @param ownerLayer the slot Layer in the source document.
-   * @param parentFile the owning PAGFile; used to dispatch ChannelRegistry writes and to register
-   *                   spawned PAGTimeline instances. Must not be null.
+   * @param parentFile the owning PAGFile, used to register spawned PAGTimeline instances. Must not
+   *                   be null.
    */
   static std::unique_ptr<PAGComposition> Make(const Layer* ownerLayer, PAGFile* parentFile);
 
@@ -58,14 +58,14 @@ class PAGComposition {
    * as a child of the slot Layer's tgfx container.
    */
   std::shared_ptr<tgfx::Layer> rootLayer() const {
-    return layerTree.root;
+    return root;
   }
 
   /**
-   * Per-slot layer map used by ChannelRegistry writers when targeting nodes inside this slot.
+   * Per-slot binding used by runtime writers when targeting nodes inside this slot.
    */
-  PAGLayerTree& mutableLayerTree() {
-    return layerTree;
+  RuntimeBinding& mutableBinding() {
+    return binding;
   }
 
   /**
@@ -84,11 +84,9 @@ class PAGComposition {
 
   const Layer* ownerLayer = nullptr;
   PAGFile* parentFile = nullptr;
-  // The document whose nodeMap drives animation lookup and channel target resolution for this
-  // slot. Equal to parentFile->document for in-document Compositions; equal to
-  // ownerLayer->composition->externalDoc for sealed cross-document wrappers.
-  PAGXDocument* effectiveDoc = nullptr;
-  PAGLayerTree layerTree = {};
+  PAGXDocument* document = nullptr;
+  std::shared_ptr<tgfx::Layer> root = nullptr;
+  RuntimeBinding binding = {};
   std::vector<std::shared_ptr<PAGTimeline>> slotTimelines = {};
   // Recursive child slots: one entry per Layer inside this slot whose composition field is set.
   std::vector<std::unique_ptr<PAGComposition>> childSlots = {};

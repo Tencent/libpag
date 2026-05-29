@@ -21,15 +21,20 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/runtime/AnimContext.h"
-#include "pagx/runtime/ChannelRegistry.h"
 #include "pagx/runtime/PAGComposition.h"
-#include "pagx/runtime/PAGFileInternal.h"
 #include "pagx/runtime/PAGSurfaceImpl.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "renderer/LayerBuilder.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
+
+struct PAGFile::LayerTreeStorage {
+  std::shared_ptr<tgfx::Layer> root = nullptr;
+  RuntimeBinding binding = {};
+  tgfx::DisplayList displayList;
+  bool rootAttached = false;
+};
 
 std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   if (document == nullptr) {
@@ -42,7 +47,9 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   file->document = document;
   file->layerTree = std::make_unique<LayerTreeStorage>();
   file->displayOptions = PAGDisplayOptions::Make(&file->layerTree->displayList);
-  file->layerTree->tree = LayerBuilder::BuildWithSlotsHandedOff(document.get());
+  auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
+  file->layerTree->root = std::move(buildResult.root);
+  file->layerTree->binding = std::move(buildResult.binding);
   // Build runtime composition slots: each top-level Layer with composition!=null gets its own
   // PAGComposition instance, which constructs a per-slot subtree and spawns timeline drivers.
   for (auto* layer : document->layers) {
@@ -55,9 +62,9 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
     }
     auto slotRoot = slot->rootLayer();
     if (slotRoot != nullptr) {
-      auto it = file->layerTree->tree.layerMap.find(layer);
-      if (it != file->layerTree->tree.layerMap.end()) {
-        it->second->addChild(slotRoot);
+      auto container = file->layerTree->binding.get<tgfx::Layer>(layer);
+      if (container != nullptr) {
+        container->addChild(slotRoot);
       }
     }
     file->compositionSlots.push_back(std::move(slot));
@@ -106,10 +113,10 @@ std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& id) {
   if (it != timelinesByAnimation.end()) {
     return it->second;
   }
-  // Top-level timelines target the file's top-level layerTree directly. Channel target IDs are
-  // resolved against the primary document.
+  // Top-level timelines target the file's top-level runtime binding directly. Channel target IDs
+  // are resolved against the primary document.
   auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), matched, &layerTree->tree, document.get()));
+      std::weak_ptr<PAGFile>(shared_from_this()), matched, &layerTree->binding, document.get()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -129,12 +136,12 @@ bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
   if (surface == nullptr || surface->impl == nullptr || surface->impl->drawable == nullptr) {
     return false;
   }
-  if (layerTree == nullptr || layerTree->tree.root == nullptr) {
+  if (layerTree == nullptr || layerTree->root == nullptr) {
     return false;
   }
   auto& drawable = surface->impl->drawable;
   if (!layerTree->rootAttached) {
-    layerTree->displayList.root()->addChild(layerTree->tree.root);
+    layerTree->displayList.root()->addChild(layerTree->root);
     layerTree->rootAttached = true;
   }
   auto device = drawable->getDevice();
@@ -217,18 +224,16 @@ void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
   // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
 }
 
-void PAGFile::applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree,
+void PAGFile::applyAnimation(Animation* animation, RuntimeBinding* binding,
                              PAGXDocument* contextDoc, int64_t microseconds, float mix) {
-  if (animation == nullptr || document == nullptr || layerTree == nullptr) {
+  if (animation == nullptr || document == nullptr || binding == nullptr) {
     return;
   }
   if (mix <= 0.0f) {
     return;
   }
-  auto* targetTree = slotLayerTree != nullptr ? slotLayerTree : &layerTree->tree;
   auto* lookupDoc = contextDoc != nullptr ? contextDoc : document.get();
   auto clampedMix = std::min(1.0f, mix);
-  const auto& registry = ChannelRegistry::Get();
   for (auto* object : animation->objects) {
     if (object == nullptr) {
       continue;
@@ -237,29 +242,29 @@ void PAGFile::applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree,
     if (targetNode == nullptr) {
       continue;
     }
-    AnimContext ctx{targetTree, targetNode, clampedMix};
     for (auto* property : object->properties) {
       if (property == nullptr) {
         continue;
       }
-      auto* desc = registry.find(targetNode->nodeType(), property->channel);
-      if (desc == nullptr || !desc->writer) {
-        continue;
-      }
-      desc->writer(ctx, property->evaluateAt(microseconds, animation->frameRate));
+      binding->apply(targetNode, property->channel,
+                     property->evaluateAt(microseconds, animation->frameRate), clampedMix);
     }
   }
 }
 
 std::shared_ptr<PAGTimeline> PAGFile::createSlotTimeline(Animation* animation,
-                                                         PAGLayerTree* layerTreeForSlot,
+                                                         RuntimeBinding* binding,
                                                          PAGXDocument* contextDoc) {
-  if (animation == nullptr || layerTreeForSlot == nullptr) {
+  if (animation == nullptr || binding == nullptr) {
     return nullptr;
   }
   auto* effectiveDoc = contextDoc != nullptr ? contextDoc : document.get();
   return std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), animation, layerTreeForSlot, effectiveDoc));
+      std::weak_ptr<PAGFile>(shared_from_this()), animation, binding, effectiveDoc));
+}
+
+RuntimeBinding* PAGFile::mutableBinding() {
+  return layerTree != nullptr ? &layerTree->binding : nullptr;
 }
 
 }  // namespace pagx

@@ -68,6 +68,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/runtime/MixUtils.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -146,14 +147,14 @@ class LayerBuilderContext {
       }
       resolvePendingMasks();
     }
-    _layerTree.root = root;
-    return std::move(_layerTree);
+    _result.root = root;
+    return std::move(_result);
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
-    _layerTree.root = root;
-    return std::move(_layerTree);
+    _result.root = root;
+    return std::move(_result);
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
@@ -173,9 +174,8 @@ class LayerBuilderContext {
 
   void resolvePendingMasks() {
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
-      auto it = _layerTree.layerMap.find(maskPagx);
-      if (it != _layerTree.layerMap.end()) {
-        auto maskLayer = it->second;
+      auto maskLayer = _result.getLayer(maskPagx);
+      if (maskLayer != nullptr) {
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
         maskLayer->setVisible(true);
@@ -205,7 +205,8 @@ class LayerBuilderContext {
 
     if (layer) {
       // Register layer for mask lookups and animation writers.
-      _layerTree.layerMap[node] = layer;
+      _result.binding.set(node, layer);
+      bindLayerChannels(node, layer);
 
       applyLayerAttributes(node, layer.get());
 
@@ -223,6 +224,44 @@ class LayerBuilderContext {
     }
 
     return layer;
+  }
+
+  static void WriteLayerAlpha(void* object, const KeyValue& value, float mix) {
+    auto* layer = static_cast<tgfx::Layer*>(object);
+    layer->setAlpha(MixFloat(layer->alpha(), std::get<float>(value), mix));
+  }
+
+  static void WriteLayerVisible(void* object, const KeyValue& value, float) {
+    static_cast<tgfx::Layer*>(object)->setVisible(std::get<bool>(value));
+  }
+
+  static void WriteLayerBlendMode(void* object, const KeyValue& value, float) {
+    auto mode = static_cast<BlendMode>(std::get<int>(value));
+    static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
+  }
+
+  static void WriteLayerX(void* object, const KeyValue& value, float mix) {
+    auto* layer = static_cast<tgfx::Layer*>(object);
+    auto matrix = layer->matrix();
+    auto mixed = MixFloat(matrix.getTranslateX(), std::get<float>(value), mix);
+    matrix.setTranslateX(mixed);
+    layer->setMatrix(matrix);
+  }
+
+  static void WriteLayerY(void* object, const KeyValue& value, float mix) {
+    auto* layer = static_cast<tgfx::Layer*>(object);
+    auto matrix = layer->matrix();
+    auto mixed = MixFloat(matrix.getTranslateY(), std::get<float>(value), mix);
+    matrix.setTranslateY(mixed);
+    layer->setMatrix(matrix);
+  }
+
+  void bindLayerChannels(const Layer* node, const std::shared_ptr<tgfx::Layer>&) {
+    _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
+    _result.binding.setWriter(node, "visible", WriteLayerVisible);
+    _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
+    _result.binding.setWriter(node, "x", WriteLayerX);
+    _result.binding.setWriter(node, "y", WriteLayerY);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
@@ -429,7 +468,7 @@ class LayerBuilderContext {
     if (tgfxText) {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
-      _layerTree.textMap[node] = tgfxText;
+      _result.binding.set(node, tgfxText);
     }
     return tgfxText;
   }
@@ -445,7 +484,7 @@ class LayerBuilderContext {
 
     auto fill = tgfx::FillStyle::Make(colorSource);
     if (fill) {
-      _layerTree.fillMap[node] = fill;
+      _result.binding.set(node, fill);
       fill->setAlpha(node->alpha);
       if (node->blendMode != BlendMode::Normal) {
         fill->setBlendMode(ToTGFX(node->blendMode));
@@ -473,7 +512,7 @@ class LayerBuilderContext {
     if (stroke == nullptr) {
       return nullptr;
     }
-    _layerTree.strokeMap[node] = stroke;
+    _result.binding.set(node, stroke);
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
@@ -497,6 +536,12 @@ class LayerBuilderContext {
     return stroke;
   }
 
+  static void WriteSolidColor(void* object, const KeyValue& value, float mix) {
+    auto* solid = static_cast<tgfx::SolidColor*>(object);
+    auto target = ToTGFX(std::get<Color>(value));
+    solid->setColor(MixTGFXColor(solid->color(), target, mix));
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
@@ -507,7 +552,8 @@ class LayerBuilderContext {
         auto solid = static_cast<const SolidColor*>(node);
         auto tgfxSolid = tgfx::SolidColor::Make(ToTGFX(solid->color));
         if (tgfxSolid) {
-          _layerTree.solidMap[solid] = tgfxSolid;
+          _result.binding.set(solid, tgfxSolid);
+          _result.binding.setWriter(solid, "color", WriteSolidColor);
         }
         return tgfxSolid;
       }
@@ -536,12 +582,43 @@ class LayerBuilderContext {
     }
   }
 
-  void extractGradientStops(const Gradient* parent, const std::vector<ColorStop*>& colorStops,
+  static RuntimeColorStop* GetColorStopBinding(void* object) {
+    return static_cast<RuntimeColorStop*>(object);
+  }
+
+  static void WriteColorStopColor(void* object, const KeyValue& value, float mix) {
+    auto* stop = GetColorStopBinding(object);
+    if (stop == nullptr || stop->gradient == nullptr) {
+      return;
+    }
+    auto colors = stop->gradient->colors();
+    if (stop->index >= colors.size()) {
+      return;
+    }
+    auto target = ToTGFX(std::get<Color>(value));
+    colors[stop->index] = MixTGFXColor(colors[stop->index], target, mix);
+    stop->gradient->setColors(std::move(colors));
+  }
+
+  static void WriteColorStopOffset(void* object, const KeyValue& value, float mix) {
+    auto* stop = GetColorStopBinding(object);
+    if (stop == nullptr || stop->gradient == nullptr) {
+      return;
+    }
+    auto positions = stop->gradient->positions();
+    if (stop->index >= positions.size()) {
+      return;
+    }
+    auto target = std::get<float>(value);
+    positions[stop->index] = MixFloat(positions[stop->index], target, mix);
+    stop->gradient->setPositions(std::move(positions));
+  }
+
+  void extractGradientStops(const std::vector<ColorStop*>& colorStops,
                             std::vector<tgfx::Color>* colors, std::vector<float>* positions) {
     colors->reserve(colorStops.size());
     positions->reserve(colorStops.size());
     for (const auto* stop : colorStops) {
-      _layerTree.stopMap[stop] = std::make_pair(parent, colors->size());
       colors->push_back(ToTGFX(stop->color));
       positions->push_back(stop->offset);
     }
@@ -552,9 +629,18 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::ColorSource> applyGradientProperties(
-      std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node) {
+      std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node,
+      const std::vector<ColorStop*>& colorStops) {
     if (gradient) {
-      _layerTree.gradientMap[node] = gradient;
+      _result.binding.set(node, gradient);
+      for (size_t index = 0; index < colorStops.size(); index++) {
+        auto stopBinding = std::make_shared<RuntimeColorStop>();
+        stopBinding->gradient = gradient;
+        stopBinding->index = index;
+        _result.binding.set(colorStops[index], stopBinding);
+        _result.binding.setWriter(colorStops[index], "color", WriteColorStopColor);
+        _result.binding.setWriter(colorStops[index], "offset", WriteColorStopOffset);
+      }
       gradient->setFitsToGeometry(node->fitsToGeometry);
       if (!node->matrix.isIdentity()) {
         gradient->setMatrix(ToTGFX(node->matrix));
@@ -566,36 +652,38 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node, node->colorStops, &colors, &positions);
+    extractGradientStops(node->colorStops, &colors, &positions);
     return applyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
-        node);
+        node, node->colorStops);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node, node->colorStops, &colors, &positions);
+    extractGradientStops(node->colorStops, &colors, &positions);
     return applyGradientProperties(
-        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node);
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node,
+        node->colorStops);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node, node->colorStops, &colors, &positions);
+    extractGradientStops(node->colorStops, &colors, &positions);
     return applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
                                                              node->endAngle, colors, positions),
-                                   node);
+                                   node, node->colorStops);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
-    extractGradientStops(node, node->colorStops, &colors, &positions);
+    extractGradientStops(node->colorStops, &colors, &positions);
     return applyGradientProperties(
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node);
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node,
+        node->colorStops);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -615,7 +703,7 @@ class LayerBuilderContext {
     }
 
     if (image) {
-      _layerTree.imageMap[imageNode] = image;
+      _result.binding.set(imageNode, image);
     }
 
     if (!image) {
@@ -626,7 +714,7 @@ class LayerBuilderContext {
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
-      _layerTree.patternMap[node] = pattern;
+      _result.binding.set(node, pattern);
       pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
@@ -875,7 +963,8 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
-        _layerTree.dropShadowStyleMap[style] = tgfxStyle;
+        _result.binding.set(style, tgfxStyle);
+        bindDropShadowStyleChannels(style, tgfxStyle);
         return tgfxStyle;
       }
       case NodeType::InnerShadowStyle: {
@@ -901,6 +990,102 @@ class LayerBuilderContext {
     }
   }
 
+  static void WriteDropShadowStyleOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* style = static_cast<tgfx::DropShadowStyle*>(object);
+    style->setOffsetX(MixFloat(style->offsetX(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowStyleOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* style = static_cast<tgfx::DropShadowStyle*>(object);
+    style->setOffsetY(MixFloat(style->offsetY(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowStyleBlurX(void* object, const KeyValue& value, float mix) {
+    auto* style = static_cast<tgfx::DropShadowStyle*>(object);
+    style->setBlurrinessX(MixFloat(style->blurrinessX(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowStyleBlurY(void* object, const KeyValue& value, float mix) {
+    auto* style = static_cast<tgfx::DropShadowStyle*>(object);
+    style->setBlurrinessY(MixFloat(style->blurrinessY(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* style = static_cast<tgfx::DropShadowStyle*>(object);
+    auto target = ToTGFX(std::get<Color>(value));
+    style->setColor(MixTGFXColor(style->color(), target, mix));
+  }
+
+  static void WriteDropShadowStyleShowBehindLayer(void* object, const KeyValue& value, float) {
+    static_cast<tgfx::DropShadowStyle*>(object)->setShowBehindLayer(std::get<bool>(value));
+  }
+
+  void bindDropShadowStyleChannels(const DropShadowStyle* node,
+                                   const std::shared_ptr<tgfx::DropShadowStyle>&) {
+    _result.binding.setWriter(node, "offsetX", WriteDropShadowStyleOffsetX);
+    _result.binding.setWriter(node, "offsetY", WriteDropShadowStyleOffsetY);
+    _result.binding.setWriter(node, "blurX", WriteDropShadowStyleBlurX);
+    _result.binding.setWriter(node, "blurY", WriteDropShadowStyleBlurY);
+    _result.binding.setWriter(node, "color", WriteDropShadowStyleColor);
+    _result.binding.setWriter(node, "showBehindLayer", WriteDropShadowStyleShowBehindLayer);
+  }
+
+  static void WriteBlurFilterX(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::BlurFilter*>(object);
+    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), std::get<float>(value), mix));
+  }
+
+  static void WriteBlurFilterY(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::BlurFilter*>(object);
+    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), std::get<float>(value), mix));
+  }
+
+  void bindBlurFilterChannels(const BlurFilter* node,
+                              const std::shared_ptr<tgfx::BlurFilter>&) {
+    _result.binding.setWriter(node, "blurX", WriteBlurFilterX);
+    _result.binding.setWriter(node, "blurY", WriteBlurFilterY);
+  }
+
+  static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
+    filter->setOffsetX(MixFloat(filter->offsetX(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowFilterOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
+    filter->setOffsetY(MixFloat(filter->offsetY(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowFilterBlurX(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
+    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowFilterBlurY(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
+    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), std::get<float>(value), mix));
+  }
+
+  static void WriteDropShadowFilterColor(void* object, const KeyValue& value, float mix) {
+    auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
+    auto target = ToTGFX(std::get<Color>(value));
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteDropShadowFilterShadowOnly(void* object, const KeyValue& value, float) {
+    static_cast<tgfx::DropShadowFilter*>(object)->setDropsShadowOnly(std::get<bool>(value));
+  }
+
+  void bindDropShadowFilterChannels(const DropShadowFilter* node,
+                                    const std::shared_ptr<tgfx::DropShadowFilter>&) {
+    _result.binding.setWriter(node, "offsetX", WriteDropShadowFilterOffsetX);
+    _result.binding.setWriter(node, "offsetY", WriteDropShadowFilterOffsetY);
+    _result.binding.setWriter(node, "blurX", WriteDropShadowFilterBlurX);
+    _result.binding.setWriter(node, "blurY", WriteDropShadowFilterBlurY);
+    _result.binding.setWriter(node, "color", WriteDropShadowFilterColor);
+    _result.binding.setWriter(node, "shadowOnly", WriteDropShadowFilterShadowOnly);
+  }
+
   std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
@@ -911,7 +1096,8 @@ class LayerBuilderContext {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
         auto tgfxFilter =
             tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
-        _layerTree.blurFilterMap[filter] = tgfxFilter;
+        _result.binding.set(filter, tgfxFilter);
+        bindBlurFilterChannels(filter, tgfxFilter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {
@@ -919,7 +1105,8 @@ class LayerBuilderContext {
         auto tgfxFilter = tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY,
                                                        filter->blurX, filter->blurY,
                                                        ToTGFX(filter->color), filter->shadowOnly);
-        _layerTree.dropShadowFilterMap[filter] = tgfxFilter;
+        _result.binding.set(filter, tgfxFilter);
+        bindDropShadowFilterChannels(filter, tgfxFilter);
         return tgfxFilter;
       }
       case NodeType::InnerShadowFilter: {
@@ -956,7 +1143,7 @@ class LayerBuilderContext {
     }
   };
   std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
-  PAGLayerTree _layerTree = {};
+  LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
   bool _slotsHandedOff = false;

@@ -33,10 +33,8 @@ std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer,
     return nullptr;
   }
   auto slot = std::unique_ptr<PAGComposition>(new PAGComposition(ownerLayer, parentFile));
-  // Sealed cross-document wrapper Compositions surface their externalDoc as the effective ID
-  // namespace; in-document Compositions fall back to the parent file's document.
   auto* externalDoc = ownerLayer->composition->externalDoc.get();
-  slot->effectiveDoc = externalDoc != nullptr ? externalDoc : parentFile->document.get();
+  slot->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
   slot->buildSubtree();
   slot->spawnTimelines(ownerLayer->timelines);
   slot->buildChildSlots();
@@ -50,11 +48,13 @@ PAGComposition::PAGComposition(const Layer* ownerLayer, PAGFile* parentFile)
 PAGComposition::~PAGComposition() = default;
 
 void PAGComposition::buildSubtree() {
-  layerTree = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
+  auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
+  root = std::move(buildResult.root);
+  binding = std::move(buildResult.binding);
 }
 
 void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
-  if (parentFile == nullptr || effectiveDoc == nullptr) {
+  if (parentFile == nullptr || document == nullptr) {
     return;
   }
   for (const auto& driver : drivers) {
@@ -62,11 +62,11 @@ void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>
       continue;
     }
     auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation = effectiveDoc->findNode<Animation>(animationDriver->animationId);
+    auto* animation = document->findNode<Animation>(animationDriver->animationId);
     if (animation == nullptr) {
       continue;
     }
-    auto timeline = parentFile->createSlotTimeline(animation, &layerTree, effectiveDoc);
+    auto timeline = parentFile->createSlotTimeline(animation, &binding, document);
     if (timeline == nullptr) {
       continue;
     }
@@ -91,9 +91,9 @@ void PAGComposition::buildChildSlots() {
     }
     auto childRoot = childSlot->rootLayer();
     if (childRoot != nullptr) {
-      auto it = layerTree.layerMap.find(compLayer);
-      if (it != layerTree.layerMap.end()) {
-        it->second->addChild(childRoot);
+      auto container = binding.get<tgfx::Layer>(compLayer);
+      if (container != nullptr) {
+        container->addChild(childRoot);
       }
     }
     childSlots.push_back(std::move(childSlot));

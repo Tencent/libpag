@@ -32,6 +32,7 @@ namespace pagx {
 class Animation;
 class Node;
 class PAGComposition;
+struct RuntimeBinding;
 
 /**
  * PAGFile is the runtime instance of a PAGXDocument. It owns the runtime layer tree, the timeline
@@ -135,19 +136,20 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
   // Evaluates the given animation at the given microsecond time and writes results into the
-  // supplied per-slot layerTree (or the top-level layerTree when slotLayerTree is null).
-  // contextDoc is the document whose nodeMap channel target IDs are looked up against; it
-  // differs from `document` when the timeline was spawned by a sealed cross-document wrapper.
-  // Called by PAGTimeline::apply().
-  void applyAnimation(Animation* animation, PAGLayerTree* slotLayerTree, PAGXDocument* contextDoc,
+  // supplied runtime binding. contextDoc is the document whose nodeMap channel target IDs are
+  // looked up against; it differs from `document` when the timeline was spawned by a sealed
+  // cross-document wrapper. Called by PAGTimeline::apply().
+  void applyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
                       int64_t microseconds, float mix);
 
   // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
-  // per-slot layerTree and resolving channel targets against contextDoc. Used by
-  // PAGComposition::Make for slot-spawned timelines. Caller owns the returned shared_ptr; the
-  // file does not register slot timelines into timelinesByAnimation.
-  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, PAGLayerTree* layerTree,
+  // runtime binding and resolving channel targets against contextDoc. Used by PAGComposition::Make
+  // for slot-spawned timelines. Caller owns the returned shared_ptr; the file does not register
+  // slot timelines into timelinesByAnimation.
+  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, RuntimeBinding* binding,
                                                   PAGXDocument* contextDoc);
+
+  RuntimeBinding* mutableBinding();
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};

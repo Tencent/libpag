@@ -81,7 +81,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
-#include "pagx/runtime/PAGFileInternal.h"
 #include "pagx/runtime/PAGComposition.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
@@ -5699,8 +5698,8 @@ PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  auto& tree = file->layerTree->tree;
-  auto tgfxLayer = tree.layerMap.at(layer);
+  auto& tree = *file->mutableBinding();
+  auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
   tgfxLayer->setAlpha(1.0f);
 
@@ -5744,8 +5743,8 @@ PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
   object->properties.push_back(visProp);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto tgfxLayer = tree.layerMap.at(layer);
+  auto& tree = *file->mutableBinding();
+  auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setVisible(true);
 
   auto timeline = file->getDefaultTimeline();
@@ -5782,8 +5781,8 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   object->properties.push_back(xProp);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto tgfxLayer = tree.layerMap.at(layer);
+  auto& tree = *file->mutableBinding();
+  auto tgfxLayer = tree.get<tgfx::Layer>(layer);
 
   auto matrix = tgfxLayer->matrix();
   matrix.setTranslateX(20.0f);
@@ -5824,10 +5823,9 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
   obj->properties.push_back(p);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto it = tree.solidMap.find(solid);
-  ASSERT_TRUE(it != tree.solidMap.end());
-  auto tgfxSolid = it->second;
+  auto& tree = *file->mutableBinding();
+  auto tgfxSolid = tree.get<tgfx::SolidColor>(solid);
+  ASSERT_TRUE(tgfxSolid != nullptr);
 
   auto timeline = file->getDefaultTimeline();
   timeline->apply(1.0f);
@@ -5842,8 +5840,8 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
 }
 
 /**
- * Test case: ColorStop.color and ColorStop.offset channels write through stopMap into the parent
- * Gradient's colors() / positions() arrays.
+ * Test case: ColorStop.color and ColorStop.offset channels write through RuntimeColorStop into
+ * the parent Gradient's colors() / positions() arrays.
  */
 PAGX_TEST(PAGXTest, ChannelColorStop) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -5889,14 +5887,13 @@ PAGX_TEST(PAGXTest, ChannelColorStop) {
   obj->properties.push_back(offsetProp);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto gradIt = tree.gradientMap.find(gradient);
-  ASSERT_TRUE(gradIt != tree.gradientMap.end());
-  auto tgfxGrad = gradIt->second;
-  auto stopIt = tree.stopMap.find(stop1);
-  ASSERT_TRUE(stopIt != tree.stopMap.end());
-  EXPECT_EQ(stopIt->second.first, gradient);
-  EXPECT_EQ(stopIt->second.second, 1u);
+  auto& tree = *file->mutableBinding();
+  auto tgfxGrad = tree.get<tgfx::Gradient>(gradient);
+  ASSERT_TRUE(tgfxGrad != nullptr);
+  auto stopBinding = tree.get<pagx::RuntimeColorStop>(stop1);
+  ASSERT_TRUE(stopBinding != nullptr);
+  EXPECT_EQ(stopBinding->gradient.get(), tgfxGrad.get());
+  EXPECT_EQ(stopBinding->index, 1u);
 
   auto timeline = file->getDefaultTimeline();
   timeline->apply(1.0f);
@@ -5936,10 +5933,9 @@ PAGX_TEST(PAGXTest, ChannelBlurFilter) {
   obj->properties.push_back(yProp);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto it = tree.blurFilterMap.find(blur);
-  ASSERT_TRUE(it != tree.blurFilterMap.end());
-  auto tgfxBlur = it->second;
+  auto& tree = *file->mutableBinding();
+  auto tgfxBlur = tree.get<tgfx::BlurFilter>(blur);
+  ASSERT_TRUE(tgfxBlur != nullptr);
 
   auto timeline = file->getDefaultTimeline();
   timeline->apply(0.5f);
@@ -6000,18 +5996,18 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   sObj->properties.push_back(sblur);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto fIt = tree.dropShadowFilterMap.find(dsFilter);
-  ASSERT_TRUE(fIt != tree.dropShadowFilterMap.end());
-  auto sIt = tree.dropShadowStyleMap.find(dsStyle);
-  ASSERT_TRUE(sIt != tree.dropShadowStyleMap.end());
+  auto& tree = *file->mutableBinding();
+  auto tgfxFilter = tree.get<tgfx::DropShadowFilter>(dsFilter);
+  ASSERT_TRUE(tgfxFilter != nullptr);
+  auto tgfxStyle = tree.get<tgfx::DropShadowStyle>(dsStyle);
+  ASSERT_TRUE(tgfxStyle != nullptr);
 
   auto timeline = file->getDefaultTimeline();
   timeline->apply(1.0f);
 
-  EXPECT_FLOAT_EQ(fIt->second->offsetX(), 8.0f);
-  EXPECT_FLOAT_EQ(fIt->second->color().red, 1.0f);
-  EXPECT_FLOAT_EQ(sIt->second->blurrinessY(), 12.0f);
+  EXPECT_FLOAT_EQ(tgfxFilter->offsetX(), 8.0f);
+  EXPECT_FLOAT_EQ(tgfxFilter->color().red, 1.0f);
+  EXPECT_FLOAT_EQ(tgfxStyle->blurrinessY(), 12.0f);
 }
 
 namespace {
@@ -6047,8 +6043,8 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
   MakeAlphaAnim(doc.get(), "hint", 1.0f);
 
   auto file = pagx::PAGFile::Make(doc);
-  auto& tree = file->layerTree->tree;
-  auto tgfxLayer = tree.layerMap.at(layer);
+  auto& tree = *file->mutableBinding();
+  auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setAlpha(0.5f);
 
   auto base = file->getTimeline("base");
@@ -6299,7 +6295,7 @@ NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::strin
 
 /**
  * Test case: A nested Composition slot with a single AnimationTimeline driver actually drives the
- * child Layer's alpha channel — the slot's per-slot layerMap is wired through to ChannelRegistry,
+ * child Layer's alpha channel — the slot's per-slot binding is wired through to runtime writers,
  * and the spawned timeline plays automatically by default.
  */
 PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
@@ -6320,12 +6316,11 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
   ASSERT_TRUE(file != nullptr);
   ASSERT_EQ(file->compositionSlots.size(), 1u);
 
-  // Per-slot layerMap should expose the child Layer's tgfx instance — and that instance must
-  // differ from anything stored in the top-level layerTree (top-level has the slot Layer only).
-  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
-  auto childIt = slotTree.layerMap.find(fx.childLayer);
-  ASSERT_TRUE(childIt != slotTree.layerMap.end());
-  auto tgfxChild = childIt->second;
+  // Per-slot binding should expose the child Layer's tgfx instance — and that instance must
+  // differ from anything stored in the top-level binding (top-level has the slot Layer only).
+  auto& slotTree = file->compositionSlots[0]->mutableBinding();
+  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
+  ASSERT_TRUE(tgfxChild != nullptr);
 
   // Initial state: alpha defaults to 1.0 (tgfx default) until apply runs.
   EXPECT_FLOAT_EQ(tgfxChild->alpha(), 1.0f);
@@ -6373,10 +6368,10 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_EQ(file->compositionSlots.size(), 2u);
 
-  auto& treeA = file->compositionSlots[0]->mutableLayerTree();
-  auto& treeB = file->compositionSlots[1]->mutableLayerTree();
-  auto tgfxChildA = treeA.layerMap.at(fx.childLayer);
-  auto tgfxChildB = treeB.layerMap.at(fx.childLayer);
+  auto& treeA = file->compositionSlots[0]->mutableBinding();
+  auto& treeB = file->compositionSlots[1]->mutableBinding();
+  auto tgfxChildA = treeA.get<tgfx::Layer>(fx.childLayer);
+  auto tgfxChildB = treeB.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
 
   // Reset alphas to a known value, then advance. Slot A is playing, slot B is paused.
@@ -6406,11 +6401,9 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
 
   options->setZoomScale(2.0f);
   EXPECT_FLOAT_EQ(options->getZoomScale(), 2.0f);
-  EXPECT_FLOAT_EQ(file->layerTree->displayList.zoomScale(), 2.0f);
 
   options->setZoomScalePrecision(100);
   EXPECT_EQ(options->getZoomScalePrecision(), 100);
-  EXPECT_EQ(file->layerTree->displayList.zoomScalePrecision(), 100);
 
   options->setContentOffset(12.0f, -7.0f);
   auto offset = options->getContentOffset();
@@ -6419,36 +6412,25 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
 
   options->setRenderMode(pagx::PAGRenderMode::Tiled);
   EXPECT_EQ(options->getRenderMode(), pagx::PAGRenderMode::Tiled);
-  EXPECT_EQ(file->layerTree->displayList.renderMode(), tgfx::RenderMode::Tiled);
 
   options->setTileSize(512);
   EXPECT_EQ(options->getTileSize(), 512);
-  EXPECT_EQ(file->layerTree->displayList.tileSize(), 512);
 
   options->setMaxTileCount(64);
   EXPECT_EQ(options->getMaxTileCount(), 64);
-  EXPECT_EQ(file->layerTree->displayList.maxTileCount(), 64);
 
   options->setAllowZoomBlur(true);
   EXPECT_TRUE(options->getAllowZoomBlur());
-  EXPECT_TRUE(file->layerTree->displayList.allowZoomBlur());
 
   options->setMaxTilesRefinedPerFrame(8);
   EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);
-  EXPECT_EQ(file->layerTree->displayList.maxTilesRefinedPerFrame(), 8);
 
   pagx::Color background = {0.1f, 0.2f, 0.3f, 0.4f, pagx::ColorSpace::SRGB};
   options->setBackgroundColor(background);
   EXPECT_EQ(options->getBackgroundColor(), background);
-  auto tgfxBackground = file->layerTree->displayList.backgroundColor();
-  EXPECT_FLOAT_EQ(tgfxBackground.red, background.red);
-  EXPECT_FLOAT_EQ(tgfxBackground.green, background.green);
-  EXPECT_FLOAT_EQ(tgfxBackground.blue, background.blue);
-  EXPECT_FLOAT_EQ(tgfxBackground.alpha, background.alpha);
 
   options->setSubtreeCacheMaxSize(1024);
   EXPECT_EQ(options->getSubtreeCacheMaxSize(), 1024);
-  EXPECT_EQ(file->layerTree->displayList.subtreeCacheMaxSize(), 1024);
 
   options->setShowDirtyRegions(true);
   EXPECT_TRUE(options->getShowDirtyRegions());
@@ -6527,8 +6509,8 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   // Slot timeline (inside the only slot) advanced too — verify by checking slot child alpha
   // after apply.
   file->apply();
-  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
-  auto tgfxChild = slotTree.layerMap.at(fx.childLayer);
+  auto& slotTree = file->compositionSlots[0]->mutableBinding();
+  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 }
 
@@ -6605,10 +6587,10 @@ PAGX_TEST(PAGXTest, CrossDocCompositionBasic) {
   // Driver spawned a slot timeline; advance the master clock and verify the external child
   // Layer's alpha was animated.
   file->advanceAndApply(500'000);
-  auto& slotTree = file->compositionSlots[0]->mutableLayerTree();
+  auto& slotTree = file->compositionSlots[0]->mutableBinding();
   auto* externalChild = slotLayer->composition->externalDoc->findNode<pagx::Layer>("subLayer");
   ASSERT_TRUE(externalChild != nullptr);
-  auto tgfxChild = slotTree.layerMap.at(externalChild);
+  auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 }
 

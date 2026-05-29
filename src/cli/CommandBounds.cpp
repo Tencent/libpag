@@ -186,13 +186,13 @@ int RunBounds(int argc, char* argv[]) {
       std::cerr << "pagx bounds: --relative target not found\n";
       return 1;
     }
-    auto it = buildResult.layerMap.find(relativePagx);
-    if (it == buildResult.layerMap.end()) {
+    auto layer = buildResult.getLayer(relativePagx);
+    if (layer == nullptr) {
       xmlFreeDoc(xmlDoc);
       std::cerr << "pagx bounds: --relative target has no rendered layer\n";
       return 1;
     }
-    relativeLayer = it->second.get();
+    relativeLayer = layer.get();
   }
 
   if (!options.id.empty()) {
@@ -207,12 +207,12 @@ int RunBounds(int argc, char* argv[]) {
       return 1;
     }
     auto* pagxLayer = static_cast<const Layer*>(node);
-    auto it = buildResult.layerMap.find(pagxLayer);
-    if (it == buildResult.layerMap.end()) {
+    auto layer = buildResult.getLayer(pagxLayer);
+    if (layer == nullptr) {
       std::cerr << "pagx bounds: Layer '" << options.id << "' has no rendered layer\n";
       return 1;
     }
-    PrintLayerBounds(pagxLayer, it->second.get(), relativeLayer, options.jsonOutput);
+    PrintLayerBounds(pagxLayer, layer.get(), relativeLayer, options.jsonOutput);
   } else if (!options.xpath.empty()) {
     // XPath mode: query specific nodes.
     auto matchedLayers = EvaluateXPath(xmlDoc, options.xpath, document.get());
@@ -222,13 +222,13 @@ int RunBounds(int argc, char* argv[]) {
       return 1;
     }
     for (const Layer* pagxLayer : matchedLayers) {
-      auto it = buildResult.layerMap.find(pagxLayer);
-      if (it == buildResult.layerMap.end()) {
+      auto layer = buildResult.getLayer(pagxLayer);
+      if (layer == nullptr) {
         std::cerr << "pagx bounds: Layer '" << GetLayerLabel(pagxLayer)
                   << "' has no rendered layer\n";
         continue;
       }
-      PrintLayerBounds(pagxLayer, it->second.get(), relativeLayer, options.jsonOutput);
+      PrintLayerBounds(pagxLayer, layer.get(), relativeLayer, options.jsonOutput);
     }
   } else {
     // No XPath: print bounds for the whole document and all layers.
