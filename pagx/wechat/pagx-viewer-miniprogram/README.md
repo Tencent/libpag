@@ -2,7 +2,7 @@
 
 微信小程序 PAGX 查看器 SDK，提供在微信小程序中渲染 PAGX 动画文件的能力。基于 TGFX 和 WebAssembly 实现高性能 WebGL 渲染。
 
-> 当前版本：**v1.8.2**
+> 当前版本：**v1.9.1**
 
 ## 目录结构
 
@@ -11,9 +11,10 @@ pagx-viewer-miniprogram/
 ├── package.json
 ├── lib/
 │   ├── pagx-viewer.js        # PAGX 核心库（含 WASM 绑定）
-│   └── pagx-viewer.wasm.br   # 压缩后的 WASM 模块（~954KB）
+│   ├── pagx-viewer.wasm      # 未压缩 WASM 模块（~3.4MB）
+│   └── pagx-viewer.wasm.br   # Brotli 压缩 WASM 模块（~980KB）
 ├── types/                    # TypeScript 类型定义
-│   ├── pagx/wechat/ts/       # PAGX 核心类型
+│   ├── pagx/wechat/ts/       # PAGX 核心类型（pagx / pagx-view / pagx-check / types ...）
 │   └── third_party/tgfx/     # TGFX 图形库类型
 ├── CHANGELOG.md
 └── README.md
@@ -36,7 +37,7 @@ pagx-viewer-miniprogram/
 ```json
 {
   "dependencies": {
-    "@tencent/pagx-viewer-miniprogram": "1.8.2"
+    "@tencent/pagx-viewer-miniprogram": "1.9.1"
   }
 }
 ```
@@ -194,7 +195,14 @@ const module = await PAGXInit({
 | `View.loadPAGX(data: Uint8Array)` | 一步加载 PAGX 文件（解析+构建层树） |
 | `View.parsePAGX(data: Uint8Array)` | 仅解析 PAGX 文件，不构建层树（三步加载第 1 步） |
 | `View.getExternalFilePaths()` | 获取外部图片资源路径列表（三步加载第 2 步） |
-| `View.loadFileData(filePath, fileData)` | 加载外部文件数据到对应 Image 节点（三步加载第 2 步） |
+| `View.loadFileData(filePath, fileData)` | 加载外部文件字节流到对应 Image 节点（wasm 内解码） |
+| `View.loadFileDataAsNativeImage(filePath, nativeImage)` | 把宿主解码好的图片注入 Image 节点；可在 `buildLayers()` 之后调用，用于渐进式首次填图（v1.9+） |
+| `View.upgradeImageFromNative(filePath, nativeImage)` | 替换某 `filePath` 已挂载图片为新版本（缩略图 → 高清升级），并就地重建引用层（v1.9+） |
+| `View.attachNativeImage(filePath, nativeImage, quality)` | 按质量等级（`Thumbnail` / `Full`）上传宿主解码图片为 GPU 常驻 backend texture，并接入 SDK 的 LRU 驱逐（v1.9+） |
+| `View.setTextureEventHandler(handler)` | 注册纹理生命周期回调（`onTextureRequest` / `onTextureEvict`）（v1.9+） |
+| `View.isFullBudgetSaturated()` | 查询 Full 桶是否已越过硬上限（渐进升级循环 gating 用）（v1.9+） |
+| `View.getImageBounds(filePaths)` | 查询图片在 root-space 下的 `unionBounds` / `largestBounds`，需在 `buildLayers()` 之后（v1.9+） |
+| `View.getImageMetadata()` | 列出每个外部图片的原始尺寸 + 每处 `ImagePattern` 用法，需在 `parsePAGX()` 之后（v1.9+） |
 | `View.buildLayers()` | 构建层树，完成渲染内容准备（三步加载第 3 步） |
 | `View.contentWidth()` | 获取 PAGX 内容宽度（物理像素） |
 | `View.contentHeight()` | 获取 PAGX 内容高度（物理像素） |
@@ -209,6 +217,9 @@ const module = await PAGXInit({
 | `View.getContentTransform()` | 获取坐标转换参数，用于评论浮层定位 |
 | `View.getNodePosition(nodeId)` | 通过节点 ID 查询节点相对于画布的位置 |
 | `View.setBoundsOrigin(x, y)` | 手动设置 boundsOrigin，覆盖 PAGX 文件中的值 |
+| `View.setGestureActive(active)` | pan/zoom 开始/结束时切换手势冻结快路径，native 侧 readback surface 作为 cachedSnapshot（v1.9+） |
+| `View.setSnapshotEnabled(enabled)` | fitSnapshot 快路径开关，默认 `true`；关闭可让渐进式加载实时反映新图（v1.9+） |
+| `View.resetForFreshCapture()` | 丢弃 init 之前的 cached / fit 快照、复位首帧标志（v1.9+） |
 | `View.setRenderCallbacks(onBefore?, onAfter?)` | 设置帧渲染回调 |
 | `View.startRendering()` | 开始持续渲染 |
 | `View.stopRendering()` | 停止渲染 |
@@ -216,6 +227,8 @@ const module = await PAGXInit({
 | `View.isCurrentlyRendering()` | 是否正在渲染 |
 | `View.updateSize(width?, height?)` | 更新视图尺寸 |
 | `View.destroy()` | 销毁实例并释放资源 |
+| `View.decodeImageFromPath(filePath)` *(static)* | 把临时文件 / URL 解码到 `OffscreenCanvas`（小程序原生解码线程，可并发）（v1.9+） |
+| `View.decodeImageFromBytes(bytes, hint?)` *(static)* | 把字节流落临时文件后调 `decodeImageFromPath`，自动清理（v1.9+） |
 
 #### View.init 的 options 参数
 
@@ -788,6 +801,193 @@ onUnload() {
 ### Canvas 尺寸变化后评论位置不对
 
 Canvas 尺寸变化会影响 `fitScale` 和 `centerOffset`。调用 `View.updateSize()` 后需要重新调用 `getContentTransform()` 并重新计算所有评论的 `baseX`/`baseY`。
+
+## 渐进式图片加载（v1.9+）
+
+`v1.9` 引入一套渐进式图片加载工具链，把 webp/png/jpeg 解码从 wasm 主线程下放到小程序原生
+解码器，并在 SDK 内部维护**缩略图 + 高清图**双桶 LRU 缓存。业务层只需关心"下载哪张图"，
+其余（GPU 上传、内存预算、淘汰、缩略图兜底）由 SDK 接管。
+
+### 加载流程
+
+```
+parsePAGX()                        ← 解析 PAGX 文件
+  → getImageMetadata()             ← 拿到所有图片的原始尺寸 + ImagePattern 用法
+  → buildLayers()                  ← 立刻完成布局（图片节点暂为空）
+
+setTextureEventHandler({...})      ← 注册纹理生命周期回调（解决驱逐后的回填）
+
+// 第一阶段：填充缩略图，让所有画面非空
+for (const path of view.getExternalFilePaths()) {
+  attachNativeImage(path, decodedThumbCanvas, ImageQuality.Thumbnail);
+}
+
+// 第二阶段：渐进升级到高清（首屏 / 视口附近优先）
+const bounds = view.getImageBounds(viewportPaths);
+// 按 bounds 与视口距离排序，逐一上传 Full：
+for (const path of sortedPaths) {
+  if (view.isFullBudgetSaturated()) break;
+  attachNativeImage(path, decodedFullCanvas, ImageQuality.Full);
+}
+```
+
+### 双桶模型
+
+| 桶 | 来源 | 是否参与 LRU | 兜底语义 |
+|----|------|-------------|---------|
+| `Thumbnail` | `attachNativeImage(path, canvas, ImageQuality.Thumbnail)` | 不参与（只在桶满时静默淘汰最旧条目）| `Full` 缺失或被驱逐时自动回退绘制 |
+| `Full` | `attachNativeImage(path, canvas, ImageQuality.Full)` | 每帧 LRU 扫描，超预算驱逐时触发 `onTextureEvict` | 主显示纹理 |
+
+被 LRU 扫到的 Full 路径会通过 `onTextureRequest(filePath)` 在下一帧渲染时再次请求；业务层
+拉到原图后再次 `attachNativeImage(..., Full)` 即可。**对 `onTextureRequest` 的响应始终是
+1:1 替换**，不会让总字节数超出预算。
+
+### 解码工具
+
+```javascript
+// 1. 已有 URL / 临时文件路径
+const canvas = await View.decodeImageFromPath(tempFilePath);
+
+// 2. 已有字节流（自动落临时文件 → 解码 → 删除）
+const canvas = await View.decodeImageFromBytes(bytes, 'thumb.webp');
+
+// 3. 注入到对应 Image 节点
+view.attachNativeImage(filePath, canvas, ImageQuality.Full);
+// canvas 可在调用返回后立即丢弃，SDK 已把像素拷到 GPU
+```
+
+`decodeImageFromPath` 走小程序原生 webp/png/jpeg 解码线程，多张图可并发；多次解码不会
+阻塞 wasm 渲染主线程。
+
+### 完整示例
+
+```javascript
+import { PAGXInit, ImageQuality } from './utils/pagx-viewer';
+
+async function progressiveLoad(view, pagxBytes) {
+  view.parsePAGX(pagxBytes);
+
+  // 注册回调：被 LRU 驱逐的路径要在下一帧重新填充
+  view.setTextureEventHandler({
+    onTextureRequest(filePath) {
+      // 异步取原图 → 解码 → 上传 Full（替换性 1:1，安全）
+      fetchAndAttach(filePath, ImageQuality.Full);
+    },
+    onTextureEvict(paths) {
+      paths.forEach((p) => myLocalCache.drop(p));
+    },
+  });
+
+  view.buildLayers();
+
+  // 第一阶段：所有图都先挂缩略图，画面立刻非空
+  const metadata = view.getImageMetadata();
+  await Promise.all(metadata.map(async (m) => {
+    const thumbBytes = await downloadThumb(m.filePath, pickThumbSize(m));
+    const canvas = await View.decodeImageFromBytes(thumbBytes);
+    view.attachNativeImage(m.filePath, canvas, ImageQuality.Thumbnail);
+  }));
+
+  // 第二阶段：按视口距离 / 显示面积排序，渐进升级 Full
+  const bounds = view.getImageBounds(metadata.map((m) => m.filePath));
+  const sortedPaths = sortByViewportDistance(bounds);
+  for (const filePath of sortedPaths) {
+    if (view.isFullBudgetSaturated()) break;
+    await fetchAndAttach(filePath, ImageQuality.Full);
+  }
+
+  async function fetchAndAttach(filePath, quality) {
+    const bytes = await myDownloader(filePath);
+    const canvas = await View.decodeImageFromBytes(bytes);
+    view.attachNativeImage(filePath, canvas, quality);
+  }
+}
+```
+
+### 注意事项
+
+- `getImageBounds()` 必须在 `buildLayers()` 之后调用；首次调用因 tgfx 内部 lazy 计算
+  localBounds 较重，建议放到首帧渲染完成后的 idle 时机（如 `setTimeout(0)` 或 `wx.nextTick`）
+- `getImageMetadata()` 需在 `parsePAGX()` 之后调用，可作为决定缩略图档位的依据
+- 渐进式加载场景下，建议关闭 `setSnapshotEnabled(false)`，避免缩略图被永久 cache 而看不到高清升级
+- `loadFileDataAsNativeImage()`（v1.9 之前已存在的旧入口）仍保留，作为不区分质量等级的简单注入；
+  推荐新代码统一走 `attachNativeImage(..., quality)`，享受 LRU + 缩略图兜底
+
+## PAGX 渲染卡顿预检（v1.9+）
+
+针对低端机加载复杂 PAGX 文件可能卡顿的场景，SDK 提供 `CheckPagx(pagxData)` 异步预检接口，
+业务层可在加载前快速判断当前设备 + 当前文件是否可顺畅渲染。
+
+> **调用方式**：`CheckPagx` 不是从包顶层 import 的独立函数，而是挂在 `PAGXInit` 返回的
+> `module` 上。必须先 `await PAGXInit({...})`，才能通过 `module.CheckPagx(data)` 调用。
+>
+> v1.9.1 起 `PAGX` interface 已显式声明 `CheckPagx` 字段，TypeScript 用户在 `module.CheckPagx(data)`
+> 上可获得完整的入参类型与返回值（`PagxCheckResult`）字段补全。
+
+```javascript
+import { PAGXInit } from './utils/pagx-viewer';
+
+Page({
+  module: null,
+
+  async onLoad() {
+    // 先初始化 wasm 模块
+    this.module = await PAGXInit({
+      locateFile: (file) => '/utils/' + file,
+    });
+
+    // 之后才能调用 CheckPagx
+    await this.safeLoad('/assets/your-animation.pagx');
+  },
+
+  async safeLoad(filePath) {
+    const fs = wx.getFileSystemManager();
+    const data = new Uint8Array(fs.readFileSync(filePath));
+
+    const result = await this.module.CheckPagx(data);
+    // result = { score, benchmarkLevel, deviceTier, platform }
+
+    const minScore = result.platform === 'android' ? 65 : 75;
+    if (result.score < minScore) {
+      wx.showToast({ title: '该文件可能导致卡顿', icon: 'none' });
+      return;
+    }
+
+    // 通过预检 → 正常加载
+    this.View.loadPAGX(data);
+  },
+});
+```
+
+### 评分模型
+
+SDK 沿"五条独立失效路径"中最高风险路径打分（0-100，越高越流畅）：
+
+| 路径 | 计算 |
+|------|------|
+| A. BgBlur × 下方不可缓存元素 | `bg_count × (inner + blur + grad/10)` |
+| B. Path 几何量 | `path_data_bytes (MB)` |
+| C. 大画布 × 元素密度 | `(pix_M/100) × (imgPat + layer/30 + grad/20)` |
+| D. BgBlur 数量 | `bg_count` |
+| E. Layer XML 数量 | 源 XML 中 `<Layer>` 数量 |
+
+### 设备档位（按 `wx.getDeviceBenchmarkInfo`）
+
+| 平台 | 高端机 | 中端机 | 低端机 |
+|------|-------|-------|-------|
+| Android | `benchmarkLevel ≥ 30` | `23–29` | `≤ 22` |
+| iOS | `benchmarkLevel ≥ 36` | `30–35` | `≤ 29` |
+
+中低端机阈值会自动收紧。`benchmarkLevel = -1` 时 `deviceTier = 'unknown'`，使用最保守阈值。
+
+### 返回值
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `score` | `number` | 0-100，越高越流畅 |
+| `benchmarkLevel` | `number` | 微信 API 原始性能等级（-1 = 未知）|
+| `deviceTier` | `'high' \| 'mid' \| 'low' \| 'unknown'` | 档位 |
+| `platform` | `'ios' \| 'android' \| 'other'` | 平台 |
 
 ## 技术限制
 

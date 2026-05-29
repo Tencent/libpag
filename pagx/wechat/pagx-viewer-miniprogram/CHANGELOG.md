@@ -1,5 +1,90 @@
 # Changelog
 
+## v1.9.1
+
+### 变更
+
+- TypeScript 类型完善：`PAGX` interface 显式声明了 `View`（`typeof View`）与
+  `CheckPagx` 字段。先前两者依赖 `TGFX` 的索引签名（`[key: string]: any`）兜底，IDE
+  无法补全；现在 `await PAGXInit({...})` 拿到的 `module` 上调用 `module.View.init(...)`
+  / `module.CheckPagx(data)` 可获得完整的参数与返回值类型补全
+- 仅类型层面补充，对外运行时 API 与 v1.9 保持一致
+
+---
+
+## v1.9
+
+### 新增
+
+#### 渐进式图片加载（宿主端解码 + 分级缓存）
+
+新增一整套 API，把 webp/png/jpeg 解码从 wasm 主线程下放到小程序原生解码器，并在 SDK 内提供
+缩略图 + 高清图双桶 LRU 缓存，业务层只需关心"下载哪张图"。
+
+- `View.attachNativeImage(filePath, nativeImage, quality)`：把宿主解码好的图片
+  （`OffscreenCanvas` 等）按质量等级（`ImageQuality.Thumbnail` / `ImageQuality.Full`）
+  挂到对应 Image 节点。下一次 `draw()` 时上传成 GPU 常驻 backend texture，宿主侧的
+  `OffscreenCanvas` 调用返回后即可释放。`Full` 桶超过预算时按 LRU 驱逐并触发
+  `onTextureEvict`；`Thumbnail` 桶满时静默驱逐最旧条目，作为 `Full` 被驱逐时的兜底，
+  保证图层不变白
+- `ImageQuality` 枚举：`Thumbnail = 0` / `Full = 1`，与 C++ 端 `pagx::ImageQuality` 对齐
+- `View.setTextureEventHandler(handler)`：注册纹理生命周期回调
+  - `onTextureRequest(filePath)`：渲染时若引用某 `filePath` 但既无 Full 纹理也无在飞请求，
+    SDK 主动通知业务层去拉，业务层走 `attachNativeImage(path, canvas, Full)` 完成投递
+  - `onTextureEvict(filePaths[])`：本帧被 LRU 扫掉的 Full 纹理列表，业务可顺带释放自己缓存
+  - 传 `null` 清除已注册 handler；handler 跨 `parsePAGX()` 持久存在
+- `View.isFullBudgetSaturated()`：查询 Full 桶是否已越过硬上限。渐进升级循环每轮顶部
+  检查它，为 `true` 则跳过新一批投递（响应 `onTextureRequest` 的 1:1 替换始终安全）
+- `View.getImageBounds(filePaths)`：查询每个 `filePath` 在 root-space（canvas 像素）下的
+  bounds，含 `unionBounds`（视口相交判断）+ `largestBounds`（焦距评分）。需在
+  `buildLayers()` 之后调用，首次调用因 tgfx lazy 计算 localBounds 较重，建议放到首帧之后
+  的 idle 时机
+- `View.getImageMetadata()`：列出每个外部图片的原始尺寸 + 每处 `ImagePattern` 用法
+  （`nodeWidth/Height`、`scaleMode`、`scaleFactor`），业务可据此挑合适的缩略图档位与
+  显示比例，无需重新解析 PAGX XML。需在 `parsePAGX()` 之后调用
+
+#### 宿主端图片解码工具
+
+- `View.decodeImageFromPath(filePath)`：把本地临时文件 / URL（小程序可解析）解码到
+  `OffscreenCanvas`。解码运行在小程序原生 webp/png/jpeg 解码线程，多张图可并发
+- `View.decodeImageFromBytes(bytes, hint?)`：把已下载的字节流落到 `wx.env.USER_DATA_PATH`
+  下的临时文件后调用 `decodeImageFromPath`，返回 `OffscreenCanvas`，调用结束后自动清理临时文件
+
+#### 其它新增 API
+
+- `View.loadFileDataAsNativeImage(filePath, nativeImage)`：把宿主解码好的图片直接挂
+  到 Image 节点。与 `loadFileData()` 不同，此方法可在 `buildLayers()` **之后**调用，
+  SDK 会自动重建引用该图的 VectorLayer，下一帧即生效。适用于渐进式首次填图
+- `View.upgradeImageFromNative(filePath, nativeImage)`：替换某 `filePath` 已挂载的图片
+  为新版本（典型场景：缩略图 → 高清图升级），并就地重建所有引用层。仅在
+  `buildLayers()` 之后有效；首次填图请用 `loadFileDataAsNativeImage()`
+- `View.setSnapshotEnabled(enabled)`：fitSnapshot 快路径开关。默认 `true`，会在 zoom
+  ≤ 1.02 时直接 blit 缓存的 fit-to-canvas 快照，跳过完整 displayList 渲染。关闭后每帧
+  强制完整渲染，牺牲性能换取首帧清晰度与渐进式加载的实时反馈
+- `View.setGestureActive(active)`：手势冻结快路径。pan/zoom 开始时传 `true`、结束时传
+  `false`。`active=true` 时 native 侧会 readback 当前 surface 作为 cachedSnapshot
+- `View.resetForFreshCapture()`：丢弃 `parsePAGX` 与手势 state 初始化之间产生的
+  cached / fit 快照，并复位首帧标志，让 `isFirstFrameRendered()` 反映 init 后的渲染状态。
+  在新文档加载并完成 `applyGestureState()` 后调用
+
+#### 渲染卡顿预检
+
+- `module.CheckPagx(pagxData)`：异步评估 PAGX 文件在当前设备上的渲染卡顿风险。
+  **挂在 `PAGXInit` 返回的 module 上**，必须先 `await PAGXInit({...})` 拿到 module 后调用，
+  不是从包顶层 import 的独立函数
+  - SDK 内部根据五条独立失效路径（BgBlur 嵌套、Path 几何量、大画布 × 元素密度、BgBlur 数量、
+    Layer 数量）对文件评分，并按设备性能等级（`wx.getDeviceBenchmarkInfo`）动态收紧阈值
+  - 返回 `Promise<{ score, benchmarkLevel, deviceTier, platform }>`
+  - 渲染建议：Android 平台 `score ≥ 65`、其他平台（iOS 等）`score ≥ 75` 可正常渲染
+  - 设备档位（`'high' | 'mid' | 'low' | 'unknown'`）由 `benchmarkLevel` 与 `platform` 联合判定
+
+### 变更
+
+- `package.json` `typings` 仍指向 `types/pagx/wechat/ts/pagx.d.ts`，新导出
+  `ImageQuality`、`TextureEventHandler` 类型可直接 `import` 使用
+
+---
+
 ## v1.8.2
 
 ### 变更
