@@ -27,6 +27,11 @@
 #                              them as render fallbacks so text in uninstalled
 #                              web fonts renders correctly. The fonts are not
 #                              embedded into the .pagx. Default: disabled.
+#   --embed-fonts              On top of --download-fonts, embed the downloaded
+#                              faces into the .pagx (pagx font embed) so the
+#                              document is self-contained and its glyph metrics
+#                              match the snapshot on any host. Implies
+#                              --download-fonts. Default: disabled.
 #   --font-dir <dir>           Where downloaded fonts are written
 #                              (default: <output>.fonts/)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
@@ -79,6 +84,7 @@ DO_RENDER=1
 INFER_FLEX=1
 KEEP_SUBSET_HTML=1
 DOWNLOAD_FONTS=0
+EMBED_FONTS=0
 FONT_DIR=""
 SNAPSHOT_EXTRA_ARGS=()
 # Browser engine: defaults to puppeteer; --browser-engine wins over the env
@@ -138,6 +144,13 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --download-fonts)
+      DOWNLOAD_FONTS=1
+      shift
+      ;;
+    --embed-fonts)
+      # Embedding the faces requires them to be downloaded first, so opting into
+      # --embed-fonts implies --download-fonts.
+      EMBED_FONTS=1
       DOWNLOAD_FONTS=1
       shift
       ;;
@@ -354,6 +367,18 @@ fi
 echo "[3/$TOTAL_STEPS] resolve   $PAGX_FILE"
 run_step "pagx resolve" "$PAGX_BIN" resolve "$PAGX_FILE"
 
+# Optional: embed the downloaded web fonts into the resolved document so the
+# .pagx is self-contained (glyph outlines travel with the file) and renders
+# with the correct typeface — and matching glyph metrics — on any host.
+# Requires a resolved document, hence after `pagx resolve`; runs even when
+# --no-render is set so the saved .pagx still carries the fonts. Gated on
+# --embed-fonts (which implies --download-fonts), so the default pipeline is
+# unchanged and the faces are still passed to `pagx render` as fallbacks below.
+if [[ "$EMBED_FONTS" -eq 1 && ${#FONT_FALLBACK_ARGS[@]} -gt 0 ]]; then
+  echo "[font-embed] $PAGX_FILE ($((${#FONT_FALLBACK_ARGS[@]} / 2)) font file(s))"
+  run_step "pagx font embed" "$PAGX_BIN" font embed "$PAGX_FILE" "${FONT_FALLBACK_ARGS[@]}"
+fi
+
 if [[ "$DO_RENDER" -ne 1 ]]; then
   echo "[done] wrote $PAGX_FILE (skipped render)"
   exit 0
@@ -365,8 +390,8 @@ fi
 echo "[4/$TOTAL_STEPS] render    $PAGX_FILE  ->  $PNG_FILE (scale=$SCALE)"
 # Pass the downloaded fonts as render fallbacks so text in uninstalled web
 # fonts resolves against the real typeface instead of a host system fallback.
-# The fonts are not embedded into the .pagx; they are only supplied at render
-# time.
+# Faces already embedded above (when --embed-fonts is set) are read from the
+# document; any un-embedded face still resolves against these files.
 run_step "pagx render" "$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE" \
   "${FONT_FALLBACK_ARGS[@]:+${FONT_FALLBACK_ARGS[@]}}"
 

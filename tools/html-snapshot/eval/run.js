@@ -46,6 +46,11 @@ function parseArgs(argv) {
     // html2pagx does. Mostly relevant for CJK corpora whose text would
     // otherwise fall back to a host typeface.
     downloadFonts: false,
+    // When true, additionally embed each case's downloaded faces into its .pagx
+    // (`pagx font embed`) so the document is self-contained and its glyph
+    // metrics match the snapshot regardless of host fonts. Implies
+    // downloadFonts. Mirrors html2pagx's --embed-fonts.
+    embedFonts: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
     // Honours HTML_SNAPSHOT_BROWSER when no flag is passed.
@@ -62,6 +67,7 @@ function parseArgs(argv) {
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--download-fonts') opts.downloadFonts = true;
+    else if (a === '--embed-fonts') { opts.embedFonts = true; opts.downloadFonts = true; }
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -97,6 +103,9 @@ const USAGE = `Usage: node run.js [options]
                       content-addressed cache at out/<label>/fonts/ (identical
                       faces stored once); each case records the subset it uses
                       in out/<label>/<case>/fonts.txt. Mirrors html2pagx.
+  --embed-fonts       On top of --download-fonts, embed each case's downloaded
+                      faces into its .pagx (pagx font embed) so glyph metrics
+                      match the snapshot. Implies --download-fonts.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -321,18 +330,27 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexSkipped = w.flexSkipped;
 
   // The fonts this case uses (from its manifest) become `--fallback` args for
-  // `pagx render`, so text in an uninstalled web font resolves against the real
-  // typeface instead of a host system fallback. Only this case's fonts are
-  // passed — the shared cache also holds other cases' fonts, which this render
-  // must not see. Mirrors html2pagx's font handling.
+  // `pagx render` (and `pagx font embed` when --embed-fonts is set), so text in
+  // an uninstalled web font resolves against the real typeface instead of a
+  // host system fallback. Only this case's fonts are passed — the shared cache
+  // also holds other cases' fonts, which this render must not see. Mirrors
+  // html2pagx's font handling.
   const fontFallbackArgs = [];
   if (opts.downloadFonts) {
     for (const f of readFontManifest(fontManifest)) fontFallbackArgs.push('--fallback', f);
   }
 
-  // 4. resolve + render
+  // 4. resolve + (font embed) + render
   if (!opts.skipExisting || !fs.existsSync(subsetPng)) {
     await runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
+    // Optionally embed the downloaded faces into the resolved .pagx so the
+    // document is self-contained and its glyph metrics match the snapshot.
+    // Gated on --embed-fonts; the faces are still passed to `pagx render` as
+    // fallbacks below regardless.
+    if (opts.embedFonts && fontFallbackArgs.length > 0) {
+      await runProc(opts.pagxBin, ['font', 'embed', subsetPagx, ...fontFallbackArgs],
+        path.join(caseDir, 'font-embed.stderr.txt'));
+    }
     // Only pass fonts to render when the case actually has some; an empty
     // --fallback list keeps the command identical to a no-font render.
     const r = await runProc(opts.pagxBin,
