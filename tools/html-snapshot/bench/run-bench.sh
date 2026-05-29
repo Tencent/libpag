@@ -27,6 +27,8 @@
 #   BASELINE_RUNS         "browser opens about:blank" floor runs prepended
 #                         to the case loop (default 1, set 0 to skip)
 #   BASELINE_HOLD_MS      ms each baseline run holds the page open (default 200)
+#   DOWNLOAD_FONTS        1 to pass --download-fonts to snapshot.js (measures
+#                         web-font capture cost). Default 0. Also `--download-fonts`.
 #   REBUILD=1             force `docker build` even if image exists
 #
 # Examples:
@@ -48,6 +50,7 @@ BUILD_CTX=$(cd "$SCRIPT_DIR/.." && pwd)
 # convention still works.
 LABEL=${LABEL:-current}
 BROWSER_ENGINE=${BROWSER_ENGINE:-puppeteer}
+DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -67,6 +70,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --engine=*|--browser-engine=*)
       BROWSER_ENGINE=${1#*=}
+      shift
+      ;;
+    --download-fonts)
+      DOWNLOAD_FONTS=1
       shift
       ;;
     -h|--help)
@@ -109,6 +116,7 @@ echo "INPUT_DIR        = $INPUT_DIR"
 echo "OUTPUT_DIR       = $OUTPUT_DIR"
 echo "LABEL            = $LABEL"
 echo "BROWSER_ENGINE   = $BROWSER_ENGINE"
+echo "DOWNLOAD_FONTS   = $DOWNLOAD_FONTS"
 echo "IMAGE_NAME       = $IMAGE_NAME"
 echo "BUILD_CTX        = $BUILD_CTX"
 echo "CONTAINER_CPUS   = $CONTAINER_CPUS"
@@ -163,6 +171,7 @@ docker run --rm \
   -e BASELINE_RUNS="$BASELINE_RUNS" \
   -e BASELINE_HOLD_MS="$BASELINE_HOLD_MS" \
   -e BROWSER_ENGINE="$BROWSER_ENGINE" \
+  -e DOWNLOAD_FONTS="$DOWNLOAD_FONTS" \
   -v "$INPUT_DIR":/inputs:ro \
   -v "$OUTPUT_DIR":/out \
   "$IMAGE_NAME" \

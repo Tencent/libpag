@@ -39,6 +39,11 @@ function parseArgs(argv) {
     label: 'current',
     recursive: false,
     concurrency: 1,
+    // When true, snapshot.js downloads the page's web fonts; run.js then
+    // embeds them into the .pagx (`pagx font embed`) and registers them as
+    // render fallbacks, mirroring what html2pagx does. Mostly relevant for
+    // CJK corpora whose text would otherwise fall back to a host typeface.
+    downloadFonts: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
     // Honours HTML_SNAPSHOT_BROWSER when no flag is passed.
@@ -54,6 +59,7 @@ function parseArgs(argv) {
     else if (a === '--only') opts.only = argv[++i];
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
+    else if (a === '--download-fonts') opts.downloadFonts = true;
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -84,6 +90,10 @@ const USAGE = `Usage: node run.js [options]
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus; case names are
                       derived from the relative path (e.g. tech-hy3/page-001)
+  --download-fonts    Download the page's web fonts (snapshot.js), embed them
+                      into the .pagx (pagx font embed) and pass them to
+                      pagx render as fallbacks. Per case, fonts land in
+                      out/<label>/<case>/fonts/. Mirrors html2pagx.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -144,6 +154,22 @@ function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
 
+// Collect the SFNT files snapshot.js wrote into `dir` so they can be embedded
+// into the .pagx and registered as render fallbacks. Returns a sorted absolute
+// path list; missing directory → empty (the case simply had no web fonts).
+function collectFontFiles(dir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch (_err) {
+    return [];
+  }
+  return entries
+    .filter((n) => /\.(ttf|otf|ttc)$/i.test(n))
+    .sort()
+    .map((n) => path.join(dir, n));
+}
+
 function timeNow() {
   return Date.now();
 }
@@ -202,6 +228,7 @@ async function processCase(entry, outDir, opts, browser) {
   const subsetPagx = path.join(caseDir, 'subset.pagx');
   const subsetPng = path.join(caseDir, 'subset.png');
   const diffPng = path.join(caseDir, 'diff.png');
+  const fontDir = path.join(caseDir, 'fonts');
   const importStderr = path.join(caseDir, 'import.stderr.txt');
   const snapshotStderr = path.join(caseDir, 'snapshot.stderr.txt');
   const baselineStderr = path.join(caseDir, 'baseline.stderr.txt');
@@ -253,11 +280,9 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
-    const r = await runProc(
-      'node',
-      [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml, ...engineArgs],
-      snapshotStderr,
-    );
+    const snapshotArgs = [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml, ...engineArgs];
+    if (opts.downloadFonts) snapshotArgs.push('--download-fonts', '--font-dir', fontDir);
+    const r = await runProc('node', snapshotArgs, snapshotStderr);
     row.snapshotMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'snapshot-failed';
@@ -281,10 +306,24 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexInferred = w.flexInferred;
   row.flexSkipped = w.flexSkipped;
 
-  // 4. resolve + render
+  // Downloaded fonts (if any) become `--fallback` args for both `pagx font
+  // embed` (so the .pagx is self-contained) and `pagx render` (so any
+  // un-embedded face still resolves against the real typeface instead of a
+  // host system fallback). Mirrors html2pagx's font handling.
+  const fontFallbackArgs = [];
+  if (opts.downloadFonts) {
+    for (const f of collectFontFiles(fontDir)) fontFallbackArgs.push('--fallback', f);
+  }
+
+  // 4. resolve + (font embed) + render
   if (!opts.skipExisting || !fs.existsSync(subsetPng)) {
     await runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
-    const r = await runProc(opts.pagxBin, ['render', subsetPagx, '--output', subsetPng, '--scale', '1'],
+    if (fontFallbackArgs.length > 0) {
+      await runProc(opts.pagxBin, ['font', 'embed', subsetPagx, ...fontFallbackArgs],
+        path.join(caseDir, 'font-embed.stderr.txt'));
+    }
+    const r = await runProc(opts.pagxBin,
+      ['render', subsetPagx, '--output', subsetPng, '--scale', '1', ...fontFallbackArgs],
       path.join(caseDir, 'render.stderr.txt'));
     row.renderMs = r.durationMs;
     if (r.code !== 0 || !fs.existsSync(subsetPng)) {
@@ -563,7 +602,7 @@ async function main() {
     fail(`no html cases found in ${opts.corpus}${hint}`, 1);
   }
   const concurrency = Math.max(1, Math.min(opts.concurrency, cases.length));
-  console.log(`run: ${cases.length} cases → ${opts.outDir}  (concurrency=${concurrency})`);
+  console.log(`run: ${cases.length} cases → ${opts.outDir}  (concurrency=${concurrency}${opts.downloadFonts ? ', download-fonts=on' : ''})`);
 
   // A single browser instance is reused for both the live and subset flex
   // counts across every case. Launching once shaves ~1s per case. Opening

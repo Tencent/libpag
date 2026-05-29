@@ -19,11 +19,14 @@ INTERVAL_MS=${3:-50}
 
 # CGROUP=1 enables cgroup memory.peak / cpu.stat collection (the
 # container is the only environment where these numbers aren't
-# contaminated by other host processes). BROWSER_ENGINE is forwarded
-# from run-bench.sh via `docker run -e`; we don't default it here so a
-# misconfigured caller fails fast in run-cases.sh's whitelist check
-# rather than silently falling back to puppeteer.
+# contaminated by other host processes). BROWSER_ENGINE and
+# DOWNLOAD_FONTS are forwarded from run-bench.sh via `docker run -e`;
+# we don't default BROWSER_ENGINE here so a misconfigured caller fails
+# fast in run-cases.sh's whitelist check rather than silently falling
+# back to puppeteer. Font downloads land under /out (writable);
+# /inputs is read-only.
 exec env \
   CGROUP=1 \
   BROWSER_ENGINE="${BROWSER_ENGINE:-puppeteer}" \
+  DOWNLOAD_FONTS="${DOWNLOAD_FONTS:-0}" \
   /bench/run-cases.sh "$INPUT_DIR" "$OUT_DIR" /app /bench "$INTERVAL_MS"

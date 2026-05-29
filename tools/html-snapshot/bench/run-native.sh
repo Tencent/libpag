@@ -39,6 +39,8 @@
 #   BASELINE_RUNS      "browser opens about:blank" floor runs prepended
 #                      to the case loop (default 1, set 0 to skip)
 #   BASELINE_HOLD_MS   ms each baseline run holds the page open (default 200)
+#   DOWNLOAD_FONTS     1 to pass --download-fonts to snapshot.js (measures
+#                      web-font capture cost). Default 0. Also `--download-fonts`.
 #
 # Examples:
 #   tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
@@ -78,6 +80,7 @@ SNAPSHOT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 
 LABEL=${LABEL:-current}
 BROWSER_ENGINE=${BROWSER_ENGINE:-puppeteer}
+DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -97,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --engine=*|--browser-engine=*)
       BROWSER_ENGINE=${1#*=}
+      shift
+      ;;
+    --download-fonts)
+      DOWNLOAD_FONTS=1
       shift
       ;;
     -h|--help)
@@ -119,7 +126,7 @@ case "$BROWSER_ENGINE" in
 esac
 
 if [[ ${#POSITIONAL[@]} -lt 1 ]]; then
-  echo "usage: $0 [--label NAME] [--engine puppeteer|playwright] <input_dir> [output_dir]" >&2
+  echo "usage: $0 [--label NAME] [--engine puppeteer|playwright] [--download-fonts] <input_dir> [output_dir]" >&2
   exit 2
 fi
 
@@ -155,6 +162,7 @@ echo "INPUT_DIR      = $INPUT_DIR"
 echo "OUTPUT_DIR     = $OUTPUT_DIR"
 echo "LABEL          = $LABEL"
 echo "BROWSER_ENGINE = $BROWSER_ENGINE"
+echo "DOWNLOAD_FONTS = $DOWNLOAD_FONTS"
 echo "SNAPSHOT_DIR   = $SNAPSHOT_DIR"
 echo "BENCH_DIR      = $SCRIPT_DIR"
 echo "INTERVAL_MS    = $INTERVAL_MS"
@@ -164,6 +172,7 @@ echo
 # for why we suppress cgroup reads outside the bench container.
 env CGROUP=0 \
     BROWSER_ENGINE="$BROWSER_ENGINE" \
+    DOWNLOAD_FONTS="$DOWNLOAD_FONTS" \
   "$SCRIPT_DIR/run-cases.sh" \
     "$INPUT_DIR" "$OUTPUT_DIR" "$SNAPSHOT_DIR" "$SCRIPT_DIR" "$INTERVAL_MS"
 

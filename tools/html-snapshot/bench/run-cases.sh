@@ -44,6 +44,11 @@
 #                  ms baseline-blank.js holds the page open after
 #                  navigation (default 200) so sampler.js gets at
 #                  least one steady-state tick on fast machines.
+#   DOWNLOAD_FONTS=1|0
+#                  when 1, pass --download-fonts to each snapshot.js
+#                  invocation so the page's web fonts are saved to a
+#                  sibling `<name>.fonts/` directory under <output_dir>
+#                  (measures the cost of font capture). Default 0.
 #
 # Notes:
 #   - Bash 3.2 compatible (no `mapfile`, no `sort -z`). The case-list
@@ -237,6 +242,13 @@ esac
 # without round-tripping through sampler.js argv parsing.
 COLLECT_CGROUP=${CGROUP:-0}
 
+# Web-font download: off by default. When on, each snapshot.js call gets
+# --download-fonts plus a per-case --font-dir under $OUT_DIR (never under the
+# read-only /inputs mount), so the bench measures the cost of capturing the
+# page's web fonts. The fallback embed/render steps html2pagx performs are
+# out of scope here — the bench only measures snapshot.js itself.
+DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
+
 {
   echo "{"
   printf '  "kernel": "%s",\n'           "$(uname -r)"
@@ -245,6 +257,7 @@ COLLECT_CGROUP=${CGROUP:-0}
   printf '  "cpu_count": "%s",\n'        "$CPU_COUNT"
   printf '  "node_version": "%s",\n'     "$(node --version)"
   printf '  "browser_engine": "%s",\n'   "$BROWSER_ENGINE"
+  printf '  "download_fonts": "%s",\n'   "$DOWNLOAD_FONTS"
   printf '  "puppeteer_version": "%s",\n' "$PUPPETEER_VERSION"
   printf '  "playwright_version": "%s",\n' "$PLAYWRIGHT_VERSION"
   printf '  "chromium_version": "%s",\n' "$CHROMIUM_VERSION"
@@ -276,7 +289,7 @@ set -f
 IFS=$'\n' CASES=($(printf '%s\n' "${CASES[@]}" | LC_ALL=C sort)); unset IFS
 set +f
 
-echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE)"
+echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE, download-fonts=$DOWNLOAD_FONTS)"
 
 # ---- run loop -------------------------------------------------------------
 
@@ -352,7 +365,16 @@ for src in "${CASES[@]}"; do
   rel=${src#"$INPUT_DIR/"}
   out_sub="$OUT_DIR/$(dirname "$rel")"
   mkdir -p "$out_sub"
-  out_file="$out_sub/$(basename "$rel" .html).subset.html"
+  case_base=$(basename "$rel" .html)
+  out_file="$out_sub/$case_base.subset.html"
+
+  # Per-case snapshot.js flags. --download-fonts is appended only when the
+  # bench is configured for it; the font-dir lives under $OUT_DIR so it stays
+  # writable even when /inputs is mounted read-only.
+  SNAPSHOT_CASE_ARGS=(--browser-engine "$BROWSER_ENGINE")
+  if [[ "$DOWNLOAD_FONTS" == "1" ]]; then
+    SNAPSHOT_CASE_ARGS+=(--download-fonts --font-dir "$out_sub/$case_base.fonts")
+  fi
 
   echo "-> $rel"
 
@@ -362,7 +384,7 @@ for src in "${CASES[@]}"; do
   # docker logs while the JSONL stays clean.
   run_sampled "$rel" \
     node "$SNAPSHOT_DIR/snapshot.js" "$src" -o "$out_file" \
-      --browser-engine "$BROWSER_ENGINE"
+      "${SNAPSHOT_CASE_ARGS[@]}"
 
   if [[ $LAST_SAMPLER_STATUS -ne 0 ]]; then
     echo "   (snapshot exited $LAST_SAMPLER_STATUS; row still recorded for diagnostics)"

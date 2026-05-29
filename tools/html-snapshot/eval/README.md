@@ -27,7 +27,17 @@ snapshot's layout-preserving rewrites.
 
 # Reuse already-generated PNGs (only re-runs metrics).
 ./run.sh --skip-existing --label current
+
+# Download the page's web fonts, embed them into the .pagx and pass them to
+# the renderer as fallbacks (mirrors html2pagx; useful for CJK corpora).
+./run.sh --download-fonts --label fonts-on
 ```
+
+With `--download-fonts`, `snapshot.js` saves each web font the page uses into
+`out/<label>/<case>/fonts/`; `run.js` then runs `pagx font embed --fallback …`
+on the resolved document and passes the same files to `pagx render --fallback`,
+so text in an uninstalled web font renders with the correct face instead of a
+host system fallback. Cases with no web fonts are unaffected.
 
 Outputs land in `eval/out/<label>/`:
 
