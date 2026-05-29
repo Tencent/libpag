@@ -73,6 +73,8 @@ async function main() {
       cookies: opts.cookies,
       headers: opts.headers,
       inlineIconFonts: opts.inlineIconFonts,
+      downloadFonts: opts.downloadFonts,
+      fontDir: opts.fontDir,
       log: (msg) => console.error(`${LOG_PREFIX}${msg}`),
     });
 

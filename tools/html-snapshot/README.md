@@ -127,6 +127,8 @@ Options:
 | `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
+| `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
+| `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
 
 ### Inline icon fonts
@@ -168,6 +170,59 @@ pre-flag behaviour. Use this when:
 - network egress is undesirable (the pass fetches each unique font URL
   once via Node's `fetch`).
 
+### Download web fonts
+
+The snapshot bakes each text node's computed `font-family` **name** into its
+inline style, but it cannot embed the font itself: the HTML subset disallows
+`@font-face`, so the importer drops it. At render time PAGX resolves a family
+by name via `tgfx::Typeface::MakeFromName`, which only finds fonts **installed
+on the rendering host**. A page styled with a Google-Fonts / self-hosted web
+font that isn't installed locally therefore renders with a wrong fallback face
+(e.g. the `font-[900] italic` `Noto Sans SC` heading falls back to a default
+sans-serif).
+
+Pass `--download-fonts` to capture the actual font files. Rather than
+re-deriving the `@font-face` set from CSS, the pass saves the font files
+**Chromium already fetched** while rendering — which for CJK families means
+only the unicode-range subset files the page's text actually falls into, not
+the hundreds of subsets a `Noto Sans SC` stylesheet declares. Each WOFF2/WOFF
+payload is decompressed to a plain SFNT (TTF/OTF) — the only container
+`tgfx::Typeface::MakeFromPath` reads — named by its real family/sub-family,
+de-duplicated by content, and written to `--font-dir` (default
+`<output>.fonts/`):
+
+```bash
+node snapshot.js page.html --download-fonts
+# → page.subset.html
+# → page.fonts/Noto-Sans-SC-Black.ttf, page.fonts/Noto-Sans-SC-Regular.ttf, …
+```
+
+Hand the files to `pagx` so the document renders (or embeds) with the correct
+typeface — `--fallback` both registers the face (matching the document's
+`font-family`) and adds it to the per-glyph fallback chain, so multiple CJK
+subset files jointly cover the text:
+
+```bash
+pagx font embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
+pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
+```
+
+`html2pagx --download-fonts` wires all of this up automatically (see below).
+
+**Caveats:**
+
+- The pass saves what the browser actually fetched. For **Latin / single-file
+  web fonts** (Inter, Roboto, …) each weight is a distinct, correctly-named
+  file, so weights round-trip faithfully.
+- For **CJK families served as unicode-range subsets** (Google's Noto Sans
+  SC/TC/JP, …) the per-subset files carry unreliable, templated `name`-table
+  metadata — they frequently all report the same family/weight (e.g.
+  `Noto Sans SC Thin`, `usWeightClass: 100`) regardless of the weight the page
+  requested, and Chromium may fetch only a subset of the declared weights and
+  synthesize the rest. The captured glyphs render correctly (no tofu / system
+  fallback) but the *weight* may not match the design. When weight fidelity
+  matters for CJK, install the real font on the render host instead.
+
 ### One-shot pipeline
 
 `html2pagx` wraps snapshot + `pagx import` + `pagx resolve` + `pagx render` in
@@ -198,6 +253,8 @@ Options:
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
+| `--download-fonts` | Download the page's web fonts, embed them into the `.pagx` (`pagx font embed`) and register them as render fallbacks |
+| `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--browser-engine <name>` | Headless driver to use (`puppeteer` or `playwright`); forwarded to `snapshot.js`. Honours `$HTML_SNAPSHOT_BROWSER`. |
 | `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |

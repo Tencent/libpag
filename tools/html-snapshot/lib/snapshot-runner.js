@@ -16,6 +16,7 @@ const {
   inlineCanvases,
 } = require('./browser-snapshot');
 const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./icon-font');
+const { makeFontCaptureListener, saveDownloadedFonts } = require('./font-download');
 const { openAndSettlePage } = require('./page-loader');
 const { responseBytes } = require('./browser-engine');
 const { errMessage } = require('./cli');
@@ -60,6 +61,11 @@ function makeImageCaptureListener(engine, cache, log) {
 //                          — forwarded to openAndSettlePage
 //   inlineIconFonts        — when true (default), webfont icon glyphs are
 //                            replaced with inline <svg>
+//   downloadFonts          — when true, every web font the browser fetched
+//                            while rendering is written to `fontDir` as a
+//                            plain SFNT (TTF/OTF). Off by default.
+//   fontDir                — destination directory for downloaded fonts;
+//                            required when `downloadFonts` is true.
 //   log                    — optional `(string) => void` for progress / error
 //                            diagnostics. When omitted, the pipeline runs
 //                            silently. Image-capture skip diagnostics are
@@ -76,11 +82,28 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     cookies = [],
     headers = [],
     inlineIconFonts = true,
+    downloadFonts = false,
+    fontDir = '',
     log = null,
   } = opts || {};
 
   const { engine } = engineHandle;
   const imageBytesByUrl = new Map();
+  const fontBytesByUrl = new Map();
+  // Image capture is always on; font capture only when the caller asked for
+  // it. Both read disjoint resource types off the same `response` event, so a
+  // single composed listener avoids racing two `page.on('response')`
+  // handlers (page-loader accepts exactly one).
+  const captureImage = makeImageCaptureListener(engine, imageBytesByUrl, null);
+  const captureFont = downloadFonts
+    ? makeFontCaptureListener(engine, fontBytesByUrl, null)
+    : null;
+  const onResponse = captureFont
+    ? (resp) => {
+        captureImage(resp);
+        captureFont(resp);
+      }
+    : captureImage;
   const page = await openAndSettlePage(engineHandle, targetUrl, {
     viewportWidth,
     viewportHeight,
@@ -94,7 +117,7 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
         }
       : null,
     onPageError: log ? (err) => log(`page exception: ${errMessage(err)}`) : null,
-    onResponse: makeImageCaptureListener(engine, imageBytesByUrl, null),
+    onResponse,
     // Ship both helper bundles to the page exactly once at navigation
     // time. Subsequent `page.evaluate(...)` calls only have to send the
     // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
@@ -138,7 +161,23 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
-    return await page.evaluate(TAKE_SNAPSHOT_EXPR);
+    const snapshot = await page.evaluate(TAKE_SNAPSHOT_EXPR);
+
+    // Write the web fonts the browser fetched to disk. The font bytes were
+    // captured off the `response` event during load + settle, so they are
+    // already in `fontBytesByUrl` by now (no page interaction needed). This
+    // is best-effort: a decode/write failure degrades to "no fonts on disk"
+    // and the rest of the snapshot still returns.
+    let fonts = [];
+    if (downloadFonts && fontDir) {
+      try {
+        fonts = await saveDownloadedFonts(fontBytesByUrl, fontDir, log || (() => {}));
+        if (log) log(`downloaded ${fonts.length} font file(s) to ${fontDir}`);
+      } catch (err) {
+        if (log) log(`font download failed: ${errMessage(err)}`);
+      }
+    }
+    return { ...snapshot, fonts };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the

@@ -127,6 +127,15 @@ const FLAGS = [
   // legacy font-named span path (faster, no font fetch, but the PAGX file
   // becomes non-portable).
   { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
+  // Download every web font the page actually uses (each unicode-range
+  // subset the browser fetched) and write it to disk as a plain SFNT
+  // (TTF/OTF). Off by default. The files can then be handed to
+  // `pagx render --fallback` / `pagx font embed --fallback` so text styled
+  // with an uninstalled web font renders with the correct typeface instead
+  // of a system fallback. The destination defaults to a sibling
+  // `<output>.fonts/` directory; override with `--font-dir`.
+  { names: ['--download-fonts'], takesArg: false, set: (o) => { o.downloadFonts = true; } },
+  { names: ['--font-dir'], set: (o, v) => { o.fontDir = v; } },
   // Pick the headless browser driver. Defaults to puppeteer; pass
   // `playwright` to drive Chromium through Playwright instead (requires
   // `playwright` to be installed — declared as an optionalDependency).
@@ -171,6 +180,13 @@ function parseArgs(argv) {
     // See lib/icon-font.js for the pipeline; toggle via
     // `--no-inline-icon-fonts`.
     inlineIconFonts: true,
+    // Web-font download: when true, every font file the browser fetched
+    // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
+    // downstream `pagx render`/`pagx font embed` can use the real typeface
+    // instead of a host system fallback. See lib/font-download.js; toggle
+    // via `--download-fonts`, redirect via `--font-dir`.
+    downloadFonts: false,
+    fontDir: '',
     // Headless browser driver: 'puppeteer' (default) or 'playwright'.
     // `resolveEngine(undefined)` reads HTML_SNAPSHOT_BROWSER if set, else
     // returns the default. The `--browser-engine` flag below overrides both.
@@ -236,6 +252,23 @@ function parseArgs(argv) {
       opts.output = path.resolve(opts.output);
     }
   }
+  // Resolve the font-download destination once the output path is known. An
+  // explicit --font-dir always wins; otherwise default to a sibling
+  // `<output-without-ext>.fonts/` directory (with a trailing `.subset`
+  // stripped so `page.subset.html` yields `page.fonts/`, not
+  // `page.subset.fonts/`). Stdout mode has no output path to derive from, so
+  // --font-dir is required there.
+  if (opts.fontDir) {
+    opts.fontDir = path.resolve(opts.fontDir);
+  } else if (opts.downloadFonts) {
+    if (opts.outputToStdout || !opts.output) {
+      fail(`--download-fonts requires --font-dir when output is written to stdout`);
+    }
+    const dir = path.dirname(opts.output);
+    let base = path.basename(opts.output, path.extname(opts.output));
+    if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
+    opts.fontDir = path.join(dir, `${base}.fonts`);
+  }
   return opts;
 }
 
@@ -264,6 +297,14 @@ Options:
                              self-contained and renders identically on any
                              machine, regardless of which icon fonts are
                              installed).
+  --download-fonts           Save every web font the page uses (each
+                             unicode-range subset the browser fetched) to disk
+                             as a plain SFNT (TTF/OTF). Default: disabled. Hand
+                             the files to 'pagx render --fallback' or
+                             'pagx font embed --fallback' so text in an
+                             uninstalled web font renders with the right face.
+  --font-dir <dir>           Destination for --download-fonts (default:
+                             <output-without-ext>.fonts/).
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

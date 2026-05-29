@@ -23,6 +23,12 @@
 #                              that is removed after import); default keeps it
 #   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
 #                              → inline SVG conversion (default: enabled)
+#   --download-fonts           Download the web fonts the page uses, embed them
+#                              into the .pagx (pagx font embed) and register them
+#                              as render fallbacks so text in uninstalled web
+#                              fonts renders correctly. Default: disabled.
+#   --font-dir <dir>           Where downloaded fonts are written
+#                              (default: <output>.fonts/)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
@@ -72,6 +78,8 @@ DO_RESOLVE=1
 DO_RENDER=1
 INFER_FLEX=1
 KEEP_SUBSET_HTML=1
+DOWNLOAD_FONTS=0
+FONT_DIR=""
 SNAPSHOT_EXTRA_ARGS=()
 # Browser engine: defaults to puppeteer; --browser-engine wins over the env
 # var which wins over this default. Captured separately from
@@ -128,6 +136,14 @@ while [[ $# -gt 0 ]]; do
     --no-inline-icon-fonts)
       SNAPSHOT_EXTRA_ARGS+=("$1")
       shift
+      ;;
+    --download-fonts)
+      DOWNLOAD_FONTS=1
+      shift
+      ;;
+    --font-dir)
+      FONT_DIR="$2"
+      shift 2
       ;;
     --)
       shift
@@ -258,6 +274,17 @@ fi
 # own default (which would silently override what the user selected here).
 SNAPSHOT_EXTRA_ARGS+=("--browser-engine" "$BROWSER_ENGINE")
 
+# Web-font download: default the destination to a sibling `<base>.fonts/`
+# directory and forward the flags to snapshot.js. The captured font files are
+# collected after the snapshot step and fed to `pagx font embed` / `pagx
+# render` further down.
+if [[ "$DOWNLOAD_FONTS" -eq 1 ]]; then
+  if [[ -z "$FONT_DIR" ]]; then
+    FONT_DIR="$OUT_DIR/${INPUT_BASE}.fonts"
+  fi
+  SNAPSHOT_EXTRA_ARGS+=("--download-fonts" "--font-dir" "$FONT_DIR")
+fi
+
 if [[ "$DO_RESOLVE" -eq 1 || "$DO_RENDER" -eq 1 ]]; then
   if [[ ! -x "$PAGX_BIN" ]]; then
     echo "html2pagx: pagx binary not found or not executable: $PAGX_BIN" >&2
@@ -279,6 +306,23 @@ echo "[1/$TOTAL_STEPS] snapshot  $INPUT_ABS"
 run_step snapshot \
   node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" \
   "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}"
+
+# Collect the SFNT files snapshot.js wrote so they can be embedded into the
+# .pagx and registered as render fallbacks. `--fallback` both registers the
+# typeface (so the document's font-family matches it) and adds it to the
+# per-glyph fallback chain — the latter is what lets the handful of CJK
+# unicode-range subset files jointly cover the page's text.
+FONT_FALLBACK_ARGS=()
+if [[ "$DOWNLOAD_FONTS" -eq 1 ]]; then
+  shopt -s nullglob
+  for font_file in "$FONT_DIR"/*.ttf "$FONT_DIR"/*.otf "$FONT_DIR"/*.ttc; do
+    FONT_FALLBACK_ARGS+=("--fallback" "$font_file")
+  done
+  shopt -u nullglob
+  if [[ ${#FONT_FALLBACK_ARGS[@]} -eq 0 ]]; then
+    echo "html2pagx: --download-fonts: no web fonts were captured in $FONT_DIR" >&2
+  fi
+fi
 
 #--------------------------------------------------------------------------------------------------
 # Step 2: pagx import
@@ -310,6 +354,16 @@ fi
 echo "[3/$TOTAL_STEPS] resolve   $PAGX_FILE"
 run_step "pagx resolve" "$PAGX_BIN" resolve "$PAGX_FILE"
 
+# Embed the downloaded web fonts into the resolved document so the .pagx is
+# self-contained (glyph outlines travel with the file) and renders with the
+# correct typeface on any host. Requires a resolved document, hence after
+# `pagx resolve`; runs even when --no-render is set so the saved .pagx still
+# carries the fonts.
+if [[ "$DOWNLOAD_FONTS" -eq 1 && ${#FONT_FALLBACK_ARGS[@]} -gt 0 ]]; then
+  echo "[font-embed] $PAGX_FILE ($((${#FONT_FALLBACK_ARGS[@]} / 2)) font file(s))"
+  run_step "pagx font embed" "$PAGX_BIN" font embed "$PAGX_FILE" "${FONT_FALLBACK_ARGS[@]}"
+fi
+
 if [[ "$DO_RENDER" -ne 1 ]]; then
   echo "[done] wrote $PAGX_FILE (skipped render)"
   exit 0
@@ -319,6 +373,10 @@ fi
 # Step 4: pagx render
 #--------------------------------------------------------------------------------------------------
 echo "[4/$TOTAL_STEPS] render    $PAGX_FILE  ->  $PNG_FILE (scale=$SCALE)"
-run_step "pagx render" "$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE"
+# Pass the downloaded fonts as render fallbacks too: glyphs already embedded
+# above are read from the document, but any text whose face wasn't embedded
+# still resolves against these files instead of a host system fallback.
+run_step "pagx render" "$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE" \
+  "${FONT_FALLBACK_ARGS[@]:+${FONT_FALLBACK_ARGS[@]}}"
 
 echo "[done] $PNG_FILE"
