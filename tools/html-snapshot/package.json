@@ -11,7 +11,32 @@
   "scripts": {
     "snapshot": "node snapshot.js",
     "server": "node server.js",
-    "build:browser": "node build-browser-bundle.js"
+    "build:browser": "node build-browser-bundle.js",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/test/**/*.test.js"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(pixelmatch)/)"
+    ],
+    "collectCoverageFrom": [
+      "lib/**/*.js",
+      "bench/report-utils.js",
+      "eval/compare.js",
+      "!lib/browser-snapshot.js",
+      "!lib/page-loader.js",
+      "!lib/snapshot-runner.js"
+    ],
+    "coverageDirectory": "<rootDir>/coverage",
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "lcov"
+    ]
   },
   "dependencies": {
     "opentype.js": "^2.0.0",
@@ -22,5 +47,11 @@
   },
   "optionalDependencies": {
     "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "babel-jest": "^30.4.1",
+    "jest": "^30.4.2"
   }
 }

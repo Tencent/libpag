@@ -615,4 +615,13 @@ module.exports = {
   glyphToSvg,
   resolveIconFontSvgs,
   inlineIconFontsOnPage,
+  // Exported for unit testing. These are pure, browser-independent helpers
+  // used by the (DOM-bound) collection passes above; surfacing them lets the
+  // test suite cover the parsing / classification logic without a headless
+  // browser.
+  formatRank,
+  parseSrcList,
+  parseFontFaceFromText,
+  isPuaCodepoint,
+  roundTo,
 };

@@ -485,6 +485,31 @@ pagx resolve xiaohongshu_react.pagx
 pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
 ```
 
+## Testing
+
+Unit tests live in `test/` and run with [Jest](https://jestjs.io/). They cover
+the Node-side modules — CLI parsing, the HTTP query/header helpers, the
+browser-engine adapter, font download/SFNT conversion, the `pagx import`
+runner, icon-font parsing, and the bench/eval report + image-diff utilities —
+without launching a real headless browser (the engine, page, and `pagx` binary
+are stubbed).
+
+```bash
+cd tools/html-snapshot
+npm install          # installs Jest + dev deps (one-time)
+
+npm test             # run the suite
+npm run test:coverage # run with a coverage report (written to coverage/)
+```
+
+The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
+only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
+are excluded from the coverage target — they are exercised end-to-end by the
+`eval/` and `bench/` harnesses against a headless Chromium instead. A few
+ESM-only dependencies (e.g. `pixelmatch`) are transformed for Jest via
+`babel.config.js`; the source tree itself stays plain CommonJS and is never
+Babel-compiled at runtime.
+
 ## Limitations
 
 - Animations, hover states, and other dynamic effects are captured in whatever

@@ -7,3 +7,6 @@ bench/out
 .git
 .gitignore
 README.md
+test
+coverage
+babel.config.js
