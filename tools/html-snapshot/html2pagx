@@ -23,10 +23,10 @@
 #                              that is removed after import); default keeps it
 #   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
 #                              → inline SVG conversion (default: enabled)
-#   --download-fonts           Download the web fonts the page uses, embed them
-#                              into the .pagx (pagx font embed) and register them
-#                              as render fallbacks so text in uninstalled web
-#                              fonts renders correctly. Default: disabled.
+#   --download-fonts           Download the web fonts the page uses and register
+#                              them as render fallbacks so text in uninstalled
+#                              web fonts renders correctly. The fonts are not
+#                              embedded into the .pagx. Default: disabled.
 #   --font-dir <dir>           Where downloaded fonts are written
 #                              (default: <output>.fonts/)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
@@ -276,8 +276,8 @@ SNAPSHOT_EXTRA_ARGS+=("--browser-engine" "$BROWSER_ENGINE")
 
 # Web-font download: default the destination to a sibling `<base>.fonts/`
 # directory and forward the flags to snapshot.js. The captured font files are
-# collected after the snapshot step and fed to `pagx font embed` / `pagx
-# render` further down.
+# collected after the snapshot step and passed to `pagx render` as fallbacks
+# further down.
 if [[ "$DOWNLOAD_FONTS" -eq 1 ]]; then
   if [[ -z "$FONT_DIR" ]]; then
     FONT_DIR="$OUT_DIR/${INPUT_BASE}.fonts"
@@ -307,11 +307,11 @@ run_step snapshot \
   node "$SCRIPT_DIR/snapshot.js" "$INPUT_ABS" -o "$SUBSET_HTML" \
   "${SNAPSHOT_EXTRA_ARGS[@]:+${SNAPSHOT_EXTRA_ARGS[@]}}"
 
-# Collect the SFNT files snapshot.js wrote so they can be embedded into the
-# .pagx and registered as render fallbacks. `--fallback` both registers the
-# typeface (so the document's font-family matches it) and adds it to the
-# per-glyph fallback chain — the latter is what lets the handful of CJK
-# unicode-range subset files jointly cover the page's text.
+# Collect the SFNT files snapshot.js wrote so they can be registered as render
+# fallbacks. `--fallback` both registers the typeface (so the document's
+# font-family matches it) and adds it to the per-glyph fallback chain — the
+# latter is what lets the handful of CJK unicode-range subset files jointly
+# cover the page's text.
 FONT_FALLBACK_ARGS=()
 if [[ "$DOWNLOAD_FONTS" -eq 1 ]]; then
   shopt -s nullglob
@@ -354,16 +354,6 @@ fi
 echo "[3/$TOTAL_STEPS] resolve   $PAGX_FILE"
 run_step "pagx resolve" "$PAGX_BIN" resolve "$PAGX_FILE"
 
-# Embed the downloaded web fonts into the resolved document so the .pagx is
-# self-contained (glyph outlines travel with the file) and renders with the
-# correct typeface on any host. Requires a resolved document, hence after
-# `pagx resolve`; runs even when --no-render is set so the saved .pagx still
-# carries the fonts.
-if [[ "$DOWNLOAD_FONTS" -eq 1 && ${#FONT_FALLBACK_ARGS[@]} -gt 0 ]]; then
-  echo "[font-embed] $PAGX_FILE ($((${#FONT_FALLBACK_ARGS[@]} / 2)) font file(s))"
-  run_step "pagx font embed" "$PAGX_BIN" font embed "$PAGX_FILE" "${FONT_FALLBACK_ARGS[@]}"
-fi
-
 if [[ "$DO_RENDER" -ne 1 ]]; then
   echo "[done] wrote $PAGX_FILE (skipped render)"
   exit 0
@@ -373,9 +363,10 @@ fi
 # Step 4: pagx render
 #--------------------------------------------------------------------------------------------------
 echo "[4/$TOTAL_STEPS] render    $PAGX_FILE  ->  $PNG_FILE (scale=$SCALE)"
-# Pass the downloaded fonts as render fallbacks too: glyphs already embedded
-# above are read from the document, but any text whose face wasn't embedded
-# still resolves against these files instead of a host system fallback.
+# Pass the downloaded fonts as render fallbacks so text in uninstalled web
+# fonts resolves against the real typeface instead of a host system fallback.
+# The fonts are not embedded into the .pagx; they are only supplied at render
+# time.
 run_step "pagx render" "$PAGX_BIN" render "$PAGX_FILE" --output "$PNG_FILE" --scale "$SCALE" \
   "${FONT_FALLBACK_ARGS[@]:+${FONT_FALLBACK_ARGS[@]}}"
 

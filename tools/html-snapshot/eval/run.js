@@ -42,10 +42,9 @@ function parseArgs(argv) {
     // When true, snapshot.js downloads the page's web fonts into a shared,
     // content-addressed cache (out/<label>/fonts/), so a face common to the
     // corpus is stored once rather than re-downloaded per case; run.js then
-    // embeds each case's subset into its .pagx (`pagx font embed`) and
-    // registers it as render fallbacks, mirroring what html2pagx does. Mostly
-    // relevant for CJK corpora whose text would otherwise fall back to a host
-    // typeface.
+    // registers each case's subset as render fallbacks, mirroring what
+    // html2pagx does. Mostly relevant for CJK corpora whose text would
+    // otherwise fall back to a host typeface.
     downloadFonts: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
@@ -93,9 +92,8 @@ const USAGE = `Usage: node run.js [options]
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus; case names are
                       derived from the relative path (e.g. tech-hy3/page-001)
-  --download-fonts    Download the page's web fonts (snapshot.js), embed them
-                      into the .pagx (pagx font embed) and pass them to
-                      pagx render as fallbacks. Fonts land in a single shared,
+  --download-fonts    Download the page's web fonts (snapshot.js) and pass them
+                      to pagx render as fallbacks. Fonts land in a single shared,
                       content-addressed cache at out/<label>/fonts/ (identical
                       faces stored once); each case records the subset it uses
                       in out/<label>/<case>/fonts.txt. Mirrors html2pagx.
@@ -160,10 +158,10 @@ function ensureDir(p) {
 }
 
 // Read the per-case font manifest snapshot.js wrote (one absolute path per
-// line) so only the fonts this case actually uses are embedded into the .pagx
-// and registered as render fallbacks. The fonts themselves live in the shared,
-// content-addressed cache directory, but each case must reference just its own
-// set. Missing/empty manifest → empty (the case simply had no web fonts).
+// line) so only the fonts this case actually uses are registered as render
+// fallbacks. The fonts themselves live in the shared, content-addressed cache
+// directory, but each case must reference just its own set. Missing/empty
+// manifest → empty (the case simply had no web fonts).
 function readFontManifest(manifestPath) {
   let text;
   try {
@@ -323,23 +321,18 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexSkipped = w.flexSkipped;
 
   // The fonts this case uses (from its manifest) become `--fallback` args for
-  // both `pagx font embed` (so the .pagx is self-contained) and `pagx render`
-  // (so any un-embedded face still resolves against the real typeface instead
-  // of a host system fallback). Only this case's fonts are passed — the shared
-  // cache also holds other cases' fonts, which this render must not see.
-  // Mirrors html2pagx's font handling.
+  // `pagx render`, so text in an uninstalled web font resolves against the real
+  // typeface instead of a host system fallback. Only this case's fonts are
+  // passed — the shared cache also holds other cases' fonts, which this render
+  // must not see. Mirrors html2pagx's font handling.
   const fontFallbackArgs = [];
   if (opts.downloadFonts) {
     for (const f of readFontManifest(fontManifest)) fontFallbackArgs.push('--fallback', f);
   }
 
-  // 4. resolve + (font embed) + render
+  // 4. resolve + render
   if (!opts.skipExisting || !fs.existsSync(subsetPng)) {
     await runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
-    if (fontFallbackArgs.length > 0) {
-      await runProc(opts.pagxBin, ['font', 'embed', subsetPagx, ...fontFallbackArgs],
-        path.join(caseDir, 'font-embed.stderr.txt'));
-    }
     // Only pass fonts to render when the case actually has some; an empty
     // --fallback list keeps the command identical to a no-font render.
     const r = await runProc(opts.pagxBin,
