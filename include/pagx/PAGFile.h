@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
@@ -94,6 +95,18 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   float getHeight() const;
 
   /**
+   * Returns the display options used when drawing this PAGFile. The returned object is owned by
+   * this PAGFile and remains valid until the PAGFile is destroyed.
+   */
+  PAGDisplayOptions* getDisplayOptions();
+
+  /**
+   * Returns the display options used when drawing this PAGFile. The returned object is owned by
+   * this PAGFile and remains valid until the PAGFile is destroyed.
+   */
+  const PAGDisplayOptions* getDisplayOptions() const;
+
+  /**
    * Advances the master clock by deltaMicroseconds and applies the result to the runtime tree.
    * The master clock drives the default top-level timeline (animations[0]) and every spawned slot
    * timeline inside Composition slots; non-default top-level timelines are independent and must
@@ -146,6 +159,8 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   // tgfx layer types into the public header.
   struct LayerTreeStorage;
   std::unique_ptr<LayerTreeStorage> layerTree = {};
+
+  std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 
   friend class PAGXDocument;
   friend class PAGTimeline;

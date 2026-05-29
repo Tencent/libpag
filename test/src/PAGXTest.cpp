@@ -27,6 +27,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGFile.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
@@ -37,10 +38,10 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
-#include "pagx/animation/Animation.h"
-#include "pagx/animation/AnimationObject.h"
-#include "pagx/animation/Property.h"
-#include "pagx/timeline/AnimationTimeline.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Property.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -6395,6 +6396,67 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
  * timeline and every slot timeline by the same delta, while non-default top-level timelines are
  * not touched.
  */
+PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto* options = file->getDisplayOptions();
+  ASSERT_TRUE(options != nullptr);
+
+  options->setZoomScale(2.0f);
+  EXPECT_FLOAT_EQ(options->getZoomScale(), 2.0f);
+  EXPECT_FLOAT_EQ(file->layerTree->displayList.zoomScale(), 2.0f);
+
+  options->setZoomScalePrecision(100);
+  EXPECT_EQ(options->getZoomScalePrecision(), 100);
+  EXPECT_EQ(file->layerTree->displayList.zoomScalePrecision(), 100);
+
+  options->setContentOffset(12.0f, -7.0f);
+  auto offset = options->getContentOffset();
+  EXPECT_FLOAT_EQ(offset.x, 12.0f);
+  EXPECT_FLOAT_EQ(offset.y, -7.0f);
+
+  options->setRenderMode(pagx::PAGRenderMode::Tiled);
+  EXPECT_EQ(options->getRenderMode(), pagx::PAGRenderMode::Tiled);
+  EXPECT_EQ(file->layerTree->displayList.renderMode(), tgfx::RenderMode::Tiled);
+
+  options->setTileSize(512);
+  EXPECT_EQ(options->getTileSize(), 512);
+  EXPECT_EQ(file->layerTree->displayList.tileSize(), 512);
+
+  options->setMaxTileCount(64);
+  EXPECT_EQ(options->getMaxTileCount(), 64);
+  EXPECT_EQ(file->layerTree->displayList.maxTileCount(), 64);
+
+  options->setAllowZoomBlur(true);
+  EXPECT_TRUE(options->getAllowZoomBlur());
+  EXPECT_TRUE(file->layerTree->displayList.allowZoomBlur());
+
+  options->setMaxTilesRefinedPerFrame(8);
+  EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);
+  EXPECT_EQ(file->layerTree->displayList.maxTilesRefinedPerFrame(), 8);
+
+  pagx::Color background = {0.1f, 0.2f, 0.3f, 0.4f, pagx::ColorSpace::SRGB};
+  options->setBackgroundColor(background);
+  EXPECT_EQ(options->getBackgroundColor(), background);
+  auto tgfxBackground = file->layerTree->displayList.backgroundColor();
+  EXPECT_FLOAT_EQ(tgfxBackground.red, background.red);
+  EXPECT_FLOAT_EQ(tgfxBackground.green, background.green);
+  EXPECT_FLOAT_EQ(tgfxBackground.blue, background.blue);
+  EXPECT_FLOAT_EQ(tgfxBackground.alpha, background.alpha);
+
+  options->setSubtreeCacheMaxSize(1024);
+  EXPECT_EQ(options->getSubtreeCacheMaxSize(), 1024);
+  EXPECT_EQ(file->layerTree->displayList.subtreeCacheMaxSize(), 1024);
+
+  options->setShowDirtyRegions(true);
+  EXPECT_TRUE(options->getShowDirtyRegions());
+
+  const auto constFile = std::const_pointer_cast<const pagx::PAGFile>(file);
+  EXPECT_EQ(constFile->getDisplayOptions(), options);
+}
+
 PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");

@@ -18,36 +18,36 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/animation/Keyframe.h"
-#include "pagx/nodes/Node.h"
+#include <string>
+#include "pagx/nodes/Timeline.h"
 
 namespace pagx {
 
-class AnimationObject;
-
-enum class LoopMode { Once, Loop, PingPong };
-
 /**
- * Animation defines a named timeline composed of Object/Property/Keyframe entries. The animation
- * is identified by Node::id, which must be unique within the owning PAGXDocument. References from
- * Layer.timelines drivers look up animations via this id.
+ * AnimationTimeline attaches a referenced Animation to the owning Layer's runtime composition.
+ * The Animation is resolved via PAGXDocument::findNode<Animation>(animationId) at build time;
+ * the id must match an Animation defined anywhere in the same document (animation ids are unique
+ * across the entire document, not scoped to a single Composition).
  */
-class Animation : public Node {
+class AnimationTimeline : public Timeline {
  public:
-  Frame duration = 0;
-  float frameRate = 60.0f;
-  LoopMode loop = LoopMode::Once;
-  std::vector<AnimationObject*> objects = {};
+  AnimationTimeline() = default;
 
-  NodeType nodeType() const override {
-    return NodeType::Animation;
+  /**
+   * The id of the referenced Animation. Resolved against the owning document's id table.
+   */
+  std::string animationId = {};
+
+  /**
+   * Initial playing state when the embedding PAGFile first builds the runtime tree. Setting this
+   * to false constructs the timeline in the paused state; callers can call play() later. Default
+   * is true.
+   */
+  bool playing = true;
+
+  TimelineType timelineType() const override {
+    return TimelineType::Animation;
   }
-
- private:
-  Animation() = default;
-
-  friend class PAGXDocument;
 };
 
 }  // namespace pagx

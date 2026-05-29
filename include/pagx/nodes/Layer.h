@@ -27,7 +27,7 @@
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/timeline/Timeline.h"
+#include "pagx/nodes/Timeline.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"

@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <string>
-#include "pagx/animation/Animation.h"
+#include "pagx/nodes/Animation.h"
 
 namespace pagx {
 

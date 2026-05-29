@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/animation/Property.h"
+#include "pagx/nodes/Property.h"
 #include <string>
 #include "pagx/runtime/KeyframeEvaluator.h"
 

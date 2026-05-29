@@ -22,7 +22,7 @@
 #include <string>
 #include <variant>
 #include <vector>
-#include "pagx/animation/Keyframe.h"
+#include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

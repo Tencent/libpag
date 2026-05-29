@@ -21,7 +21,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include "pagx/timeline/Timeline.h"
+#include "pagx/nodes/Timeline.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 

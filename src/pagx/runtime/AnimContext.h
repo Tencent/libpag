@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/animation/Property.h"
+#include "pagx/nodes/Property.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

@@ -20,7 +20,7 @@
 
 #include <algorithm>
 #include <string>
-#include "pagx/animation/Keyframe.h"
+#include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/types/Color.h"
 

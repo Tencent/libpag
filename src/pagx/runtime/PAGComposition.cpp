@@ -20,10 +20,10 @@
 #include "pagx/PAGFile.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/animation/Animation.h"
+#include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/timeline/AnimationTimeline.h"
+#include "pagx/nodes/AnimationTimeline.h"
 
 namespace pagx {
 

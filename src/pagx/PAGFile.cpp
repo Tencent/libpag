@@ -18,15 +18,15 @@
 
 #include "pagx/PAGFile.h"
 #include <algorithm>
-#include "pagx/animation/Animation.h"
-#include "pagx/animation/AnimationObject.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/AnimContext.h"
 #include "pagx/runtime/ChannelRegistry.h"
 #include "pagx/runtime/PAGComposition.h"
 #include "pagx/runtime/PAGFileInternal.h"
 #include "pagx/runtime/PAGSurfaceImpl.h"
-#include "pagx/timeline/AnimationTimeline.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
@@ -41,6 +41,7 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   auto file = std::shared_ptr<PAGFile>(new PAGFile());
   file->document = document;
   file->layerTree = std::make_unique<LayerTreeStorage>();
+  file->displayOptions = PAGDisplayOptions::Make(&file->layerTree->displayList);
   file->layerTree->tree = LayerBuilder::BuildWithSlotsHandedOff(document.get());
   // Build runtime composition slots: each top-level Layer with composition!=null gets its own
   // PAGComposition instance, which constructs a per-slot subtree and spawns timeline drivers.
@@ -161,6 +162,14 @@ float PAGFile::getWidth() const {
 
 float PAGFile::getHeight() const {
   return document != nullptr ? document->height : 0.0f;
+}
+
+PAGDisplayOptions* PAGFile::getDisplayOptions() {
+  return displayOptions.get();
+}
+
+const PAGDisplayOptions* PAGFile::getDisplayOptions() const {
+  return displayOptions.get();
 }
 
 void PAGFile::advance(int64_t deltaMicroseconds) {

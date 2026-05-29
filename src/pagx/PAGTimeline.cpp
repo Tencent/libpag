@@ -19,7 +19,7 @@
 #include "pagx/PAGTimeline.h"
 #include <algorithm>
 #include "pagx/PAGFile.h"
-#include "pagx/animation/Animation.h"
+#include "pagx/nodes/Animation.h"
 
 namespace pagx {
 
