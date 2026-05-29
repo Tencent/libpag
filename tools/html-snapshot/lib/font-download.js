@@ -200,12 +200,20 @@ function makeFontCaptureListener(engine, cache, log) {
       if (!url || url.startsWith('data:')) return;
       if (!resp.ok()) return;
       if (cache.has(url)) return;
+      // Clear the timeout once the race settles (either branch) so a
+      // successfully-read body never leaves the 10s timer pending — an
+      // uncleared timer keeps the Node event loop alive past the work it
+      // was guarding.
+      let timer;
       const buf = await Promise.race([
         responseBytes(resp, engine),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timed out reading font body')), FONT_BODY_READ_TIMEOUT_MS),
-        ),
-      ]);
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('timed out reading font body')),
+            FONT_BODY_READ_TIMEOUT_MS,
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
       if (buf && buf.length) cache.set(url, buf);
     } catch (err) {
       if (log) log(`font capture skipped: ${errMessage(err)}`);
