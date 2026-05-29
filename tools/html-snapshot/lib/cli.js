@@ -136,6 +136,11 @@ const FLAGS = [
   // `<output>.fonts/` directory; override with `--font-dir`.
   { names: ['--download-fonts'], takesArg: false, set: (o) => { o.downloadFonts = true; } },
   { names: ['--font-dir'], set: (o, v) => { o.fontDir = v; } },
+  // Write the list of font files this snapshot actually uses (one absolute
+  // path per line) to <path>. With a shared --font-dir, the directory may hold
+  // fonts from many pages; the manifest lets a caller (eval/run.js) hand only
+  // the fonts this page needs to `pagx render` / `pagx font embed`.
+  { names: ['--font-manifest'], set: (o, v) => { o.fontManifest = v; } },
   // Pick the headless browser driver. Defaults to puppeteer; pass
   // `playwright` to drive Chromium through Playwright instead (requires
   // `playwright` to be installed — declared as an optionalDependency).
@@ -187,6 +192,8 @@ function parseArgs(argv) {
     // via `--download-fonts`, redirect via `--font-dir`.
     downloadFonts: false,
     fontDir: '',
+    // Optional path to write the per-page font manifest (see --font-manifest).
+    fontManifest: '',
     // Headless browser driver: 'puppeteer' (default) or 'playwright'.
     // `resolveEngine(undefined)` reads HTML_SNAPSHOT_BROWSER if set, else
     // returns the default. The `--browser-engine` flag below overrides both.
@@ -269,6 +276,15 @@ function parseArgs(argv) {
     if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
     opts.fontDir = path.join(dir, `${base}.fonts`);
   }
+  // A manifest only makes sense alongside --download-fonts (it lists the
+  // captured font files). Resolve it to an absolute path so the paths it
+  // records are usable from any working directory.
+  if (opts.fontManifest) {
+    if (!opts.downloadFonts) {
+      fail(`--font-manifest requires --download-fonts`);
+    }
+    opts.fontManifest = path.resolve(opts.fontManifest);
+  }
   return opts;
 }
 
@@ -304,7 +320,14 @@ Options:
                              'pagx font embed --fallback' so text in an
                              uninstalled web font renders with the right face.
   --font-dir <dir>           Destination for --download-fonts (default:
-                             <output-without-ext>.fonts/).
+                             <output-without-ext>.fonts/). May be shared across
+                             runs; identical faces are stored once (content-
+                             addressed filenames).
+  --font-manifest <file>     Write the font files this page uses (one absolute
+                             path per line) to <file>. Requires
+                             --download-fonts. Lets callers pass only the fonts
+                             this page needs to 'pagx render' / 'pagx font
+                             embed' when --font-dir is shared.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

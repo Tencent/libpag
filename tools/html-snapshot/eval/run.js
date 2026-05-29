@@ -39,10 +39,13 @@ function parseArgs(argv) {
     label: 'current',
     recursive: false,
     concurrency: 1,
-    // When true, snapshot.js downloads the page's web fonts; run.js then
-    // embeds them into the .pagx (`pagx font embed`) and registers them as
-    // render fallbacks, mirroring what html2pagx does. Mostly relevant for
-    // CJK corpora whose text would otherwise fall back to a host typeface.
+    // When true, snapshot.js downloads the page's web fonts into a shared,
+    // content-addressed cache (out/<label>/fonts/), so a face common to the
+    // corpus is stored once rather than re-downloaded per case; run.js then
+    // embeds each case's subset into its .pagx (`pagx font embed`) and
+    // registers it as render fallbacks, mirroring what html2pagx does. Mostly
+    // relevant for CJK corpora whose text would otherwise fall back to a host
+    // typeface.
     downloadFonts: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
@@ -92,8 +95,10 @@ const USAGE = `Usage: node run.js [options]
                       derived from the relative path (e.g. tech-hy3/page-001)
   --download-fonts    Download the page's web fonts (snapshot.js), embed them
                       into the .pagx (pagx font embed) and pass them to
-                      pagx render as fallbacks. Per case, fonts land in
-                      out/<label>/<case>/fonts/. Mirrors html2pagx.
+                      pagx render as fallbacks. Fonts land in a single shared,
+                      content-addressed cache at out/<label>/fonts/ (identical
+                      faces stored once); each case records the subset it uses
+                      in out/<label>/<case>/fonts.txt. Mirrors html2pagx.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -154,20 +159,22 @@ function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
 
-// Collect the SFNT files snapshot.js wrote into `dir` so they can be embedded
-// into the .pagx and registered as render fallbacks. Returns a sorted absolute
-// path list; missing directory → empty (the case simply had no web fonts).
-function collectFontFiles(dir) {
-  let entries;
+// Read the per-case font manifest snapshot.js wrote (one absolute path per
+// line) so only the fonts this case actually uses are embedded into the .pagx
+// and registered as render fallbacks. The fonts themselves live in the shared,
+// content-addressed cache directory, but each case must reference just its own
+// set. Missing/empty manifest → empty (the case simply had no web fonts).
+function readFontManifest(manifestPath) {
+  let text;
   try {
-    entries = fs.readdirSync(dir);
+    text = fs.readFileSync(manifestPath, 'utf8');
   } catch (_err) {
     return [];
   }
-  return entries
-    .filter((n) => /\.(ttf|otf|ttc)$/i.test(n))
-    .sort()
-    .map((n) => path.join(dir, n));
+  return text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && fs.existsSync(l));
 }
 
 function timeNow() {
@@ -228,7 +235,10 @@ async function processCase(entry, outDir, opts, browser) {
   const subsetPagx = path.join(caseDir, 'subset.pagx');
   const subsetPng = path.join(caseDir, 'subset.png');
   const diffPng = path.join(caseDir, 'diff.png');
-  const fontDir = path.join(caseDir, 'fonts');
+  // Per-case manifest listing which shared-cache fonts this case uses. The
+  // font *files* live in opts.fontCacheDir (shared across all cases, deduped by
+  // content) — only the manifest is per-case.
+  const fontManifest = path.join(caseDir, 'fonts.txt');
   const importStderr = path.join(caseDir, 'import.stderr.txt');
   const snapshotStderr = path.join(caseDir, 'snapshot.stderr.txt');
   const baselineStderr = path.join(caseDir, 'baseline.stderr.txt');
@@ -281,7 +291,13 @@ async function processCase(entry, outDir, opts, browser) {
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
     const snapshotArgs = [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml, ...engineArgs];
-    if (opts.downloadFonts) snapshotArgs.push('--download-fonts', '--font-dir', fontDir);
+    if (opts.downloadFonts) {
+      snapshotArgs.push(
+        '--download-fonts',
+        '--font-dir', opts.fontCacheDir,
+        '--font-manifest', fontManifest,
+      );
+    }
     const r = await runProc('node', snapshotArgs, snapshotStderr);
     row.snapshotMs = r.durationMs;
     if (r.code !== 0) {
@@ -306,13 +322,15 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexInferred = w.flexInferred;
   row.flexSkipped = w.flexSkipped;
 
-  // Downloaded fonts (if any) become `--fallback` args for both `pagx font
-  // embed` (so the .pagx is self-contained) and `pagx render` (so any
-  // un-embedded face still resolves against the real typeface instead of a
-  // host system fallback). Mirrors html2pagx's font handling.
+  // The fonts this case uses (from its manifest) become `--fallback` args for
+  // both `pagx font embed` (so the .pagx is self-contained) and `pagx render`
+  // (so any un-embedded face still resolves against the real typeface instead
+  // of a host system fallback). Only this case's fonts are passed — the shared
+  // cache also holds other cases' fonts, which this render must not see.
+  // Mirrors html2pagx's font handling.
   const fontFallbackArgs = [];
   if (opts.downloadFonts) {
-    for (const f of collectFontFiles(fontDir)) fontFallbackArgs.push('--fallback', f);
+    for (const f of readFontManifest(fontManifest)) fontFallbackArgs.push('--fallback', f);
   }
 
   // 4. resolve + (font embed) + render
@@ -322,6 +340,8 @@ async function processCase(entry, outDir, opts, browser) {
       await runProc(opts.pagxBin, ['font', 'embed', subsetPagx, ...fontFallbackArgs],
         path.join(caseDir, 'font-embed.stderr.txt'));
     }
+    // Only pass fonts to render when the case actually has some; an empty
+    // --fallback list keeps the command identical to a no-font render.
     const r = await runProc(opts.pagxBin,
       ['render', subsetPagx, '--output', subsetPng, '--scale', '1', ...fontFallbackArgs],
       path.join(caseDir, 'render.stderr.txt'));
@@ -592,6 +612,13 @@ async function main() {
   if (!opts.pagxBin) opts.pagxBin = defaultPagxBin();
   if (!opts.outDir) opts.outDir = path.join(SCRIPT_DIR, 'out', opts.label);
   ensureDir(opts.outDir);
+
+  // Single shared, content-addressed font cache for the whole run. Every case
+  // downloads into it; identical faces (the common case across a corpus that
+  // shares one web font) are stored once instead of being re-saved per case.
+  // Each case records the subset it uses in its own fonts.txt manifest.
+  opts.fontCacheDir = path.join(opts.outDir, 'fonts');
+  if (opts.downloadFonts) ensureDir(opts.fontCacheDir);
 
   if (!fs.existsSync(opts.pagxBin)) {
     fail(`pagx binary not found: ${opts.pagxBin}`, 1);

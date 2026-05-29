@@ -89,6 +89,15 @@ async function main() {
       fs.writeFileSync(opts.output, result.html, 'utf8');
       console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
     }
+
+    // Emit the per-page font manifest so a caller with a shared --font-dir can
+    // feed only this page's fonts to pagx. Written unconditionally when
+    // requested (even with zero fonts) so the caller can distinguish "no fonts"
+    // from "snapshot never ran".
+    if (opts.fontManifest) {
+      const lines = (result.fonts || []).map((f) => f.path).filter(Boolean);
+      fs.writeFileSync(opts.fontManifest, lines.length ? lines.join('\n') + '\n' : '', 'utf8');
+    }
   } finally {
     await engineHandle.browser.close();
   }

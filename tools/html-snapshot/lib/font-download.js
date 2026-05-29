@@ -37,6 +37,7 @@
 
 'use strict';
 
+const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
@@ -153,19 +154,36 @@ function sanitize(value) {
   return slug || 'font';
 }
 
-// Build a unique `<Family>-<Style>.<ext>` filename, suffixing `-1`, `-2`, … on
-// collision. CJK web fonts arrive as many unicode-range subsets sharing one
-// family+style, so the numeric suffix keeps each subset as its own file.
-function uniqueFileName(used, meta) {
+// Build a content-addressed `<Family>-<Style>-<hash>.<ext>` filename. The
+// hash suffix (first 16 hex chars of the SFNT's SHA-1) makes the name a pure
+// function of the bytes, which gives us two properties for free:
+//   - De-duplication: the same face downloaded by multiple pages/cases — even
+//     across separate snapshot runs sharing one font directory — always maps
+//     to the same filename, so it is stored once instead of accumulating
+//     `-1`, `-2`, … copies of identical bytes.
+//   - Coverage: CJK/latin web fonts arrive as many unicode-range subsets that
+//     share one family+style but differ in content; their distinct hashes keep
+//     each subset as its own file, so the glyph coverage is preserved.
+function contentFileName(meta, hash) {
   const base = sanitize(`${meta.family}-${meta.style}`);
-  let name = `${base}.${meta.ext}`;
-  let i = 1;
-  while (used.has(name)) {
-    name = `${base}-${i}.${meta.ext}`;
-    i += 1;
+  return `${base}-${hash.slice(0, 16)}.${meta.ext}`;
+}
+
+// Write `data` to `filePath` without ever exposing a half-written file to a
+// concurrent reader (eval/run.js processes many cases in parallel into one
+// shared font directory). We stage the bytes in a per-call temp file and
+// atomically rename it into place; if another worker won the race and created
+// the (byte-identical, content-addressed) target first, we discard our temp
+// and treat it as success.
+async function writeFileAtomic(filePath, data) {
+  const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  await fsp.writeFile(tmp, data);
+  try {
+    await fsp.rename(tmp, filePath);
+  } catch (err) {
+    await fsp.unlink(tmp).catch(() => {});
+    if (!fs.existsSync(filePath)) throw err;
   }
-  used.add(name);
-  return name;
 }
 
 // Build a `page.on('response')` listener that caches every successful font
@@ -196,11 +214,13 @@ function makeFontCaptureListener(engine, cache, log) {
 }
 
 // Convert the captured `url -> Buffer` map into on-disk SFNT files under
-// `outDir`. Returns `[{ url, path, family, style }]` for the files actually
-// written. De-dupes by the decompressed SFNT's content hash so the same face
-// served from multiple URLs (or already-cached re-requests) is written once.
-// Per-font failures are logged and skipped — a single undecodable payload
-// must not lose the rest.
+// `outDir`. Returns `[{ url, path, family, style }]` for the unique faces
+// captured. De-dupes by the decompressed SFNT's content hash so the same face
+// served from multiple URLs (or already-cached re-requests) is recorded once,
+// and uses a content-addressed filename so an identical face already on disk —
+// e.g. written by an earlier case sharing this directory — is reused rather
+// than re-written. Per-font failures are logged and skipped — a single
+// undecodable payload must not lose the rest.
 async function saveDownloadedFonts(fontBytesByUrl, outDir, logger) {
   const log = typeof logger === 'function' ? logger : () => {};
   const entries = fontBytesByUrl ? Array.from(fontBytesByUrl.entries()) : [];
@@ -209,7 +229,6 @@ async function saveDownloadedFonts(fontBytesByUrl, outDir, logger) {
   await fsp.mkdir(outDir, { recursive: true });
 
   const seenHashes = new Set();
-  const usedNames = new Set();
   const saved = [];
   for (const [url, raw] of entries) {
     try {
@@ -219,9 +238,15 @@ async function saveDownloadedFonts(fontBytesByUrl, outDir, logger) {
       if (seenHashes.has(hash)) continue;
       seenHashes.add(hash);
       const meta = readFontMeta(sfnt);
-      const fileName = uniqueFileName(usedNames, meta);
+      const fileName = contentFileName(meta, hash);
       const filePath = path.join(outDir, fileName);
-      await fsp.writeFile(filePath, sfnt);
+      // Content-addressed name ⇒ an existing file with this name already holds
+      // the same bytes, so skip the rewrite (and the duplicate download cost
+      // on disk). Otherwise stage + atomically rename so parallel cases never
+      // observe a partial file.
+      if (!fs.existsSync(filePath)) {
+        await writeFileAtomic(filePath, sfnt);
+      }
       saved.push({ url, path: filePath, family: meta.family, style: meta.style });
     } catch (err) {
       log(`failed to save font ${url}: ${errMessage(err)}`);

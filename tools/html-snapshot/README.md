@@ -128,7 +128,8 @@ Options:
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
-| `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` |
+| `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
+| `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
 
 ### Inline icon fonts
@@ -187,15 +188,24 @@ re-deriving the `@font-face` set from CSS, the pass saves the font files
 only the unicode-range subset files the page's text actually falls into, not
 the hundreds of subsets a `Noto Sans SC` stylesheet declares. Each WOFF2/WOFF
 payload is decompressed to a plain SFNT (TTF/OTF) — the only container
-`tgfx::Typeface::MakeFromPath` reads — named by its real family/sub-family,
-de-duplicated by content, and written to `--font-dir` (default
-`<output>.fonts/`):
+`tgfx::Typeface::MakeFromPath` reads — and written to `--font-dir` (default
+`<output>.fonts/`) under a content-addressed name
+(`<Family>-<Style>-<hash>.<ext>`). The hash suffix de-duplicates by content:
+an identical face — even one captured by an earlier run sharing the same
+`--font-dir` — is stored once rather than re-saved, while distinct
+unicode-range subsets (different bytes) keep their own files so glyph coverage
+is preserved:
 
 ```bash
 node snapshot.js page.html --download-fonts
 # → page.subset.html
-# → page.fonts/Noto-Sans-SC-Black.ttf, page.fonts/Noto-Sans-SC-Regular.ttf, …
+# → page.fonts/Noto-Sans-SC-Black-1a2b3c4d5e6f7081.ttf, …
 ```
+
+When a single `--font-dir` is shared across many pages, pass `--font-manifest
+<file>` so the snapshot also records just *this* page's font files (one
+absolute path per line); feed that list — not the whole shared directory — to
+`pagx`.
 
 Hand the files to `pagx` so the document renders (or embeds) with the correct
 typeface — `--fallback` both registers the face (matching the document's
