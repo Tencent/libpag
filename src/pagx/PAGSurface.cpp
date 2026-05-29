@@ -19,7 +19,6 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/OffscreenDrawable.h"
-#include "pagx/runtime/PAGSurfaceImpl.h"
 #include "tgfx/core/ImageInfo.h"
 
 namespace pagx {
@@ -33,29 +32,27 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
   if (drawable == nullptr) {
     return nullptr;
   }
-  auto impl = std::make_unique<Impl>();
-  impl->drawable = std::move(drawable);
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(impl)));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
 }
 
-PAGSurface::PAGSurface(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {
+PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
 }
 
 PAGSurface::~PAGSurface() = default;
 
 int PAGSurface::width() const {
-  return impl != nullptr && impl->drawable != nullptr ? impl->drawable->width() : 0;
+  return drawable != nullptr ? drawable->width() : 0;
 }
 
 int PAGSurface::height() const {
-  return impl != nullptr && impl->drawable != nullptr ? impl->drawable->height() : 0;
+  return drawable != nullptr ? drawable->height() : 0;
 }
 
 bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
-  if (impl == nullptr || impl->drawable == nullptr || dstPixels == nullptr) {
+  if (drawable == nullptr || dstPixels == nullptr) {
     return false;
   }
-  auto device = impl->drawable->getDevice();
+  auto device = drawable->getDevice();
   if (device == nullptr) {
     return false;
   }
@@ -63,12 +60,12 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (context == nullptr) {
     return false;
   }
-  auto surface = impl->drawable->getSurface(context);
+  auto surface = drawable->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
     return false;
   }
-  auto info = tgfx::ImageInfo::Make(impl->drawable->width(), impl->drawable->height(),
+  auto info = tgfx::ImageInfo::Make(drawable->width(), drawable->height(),
                                     tgfx::ColorType::RGBA_8888,
                                     tgfx::AlphaType::Premultiplied, dstRowBytes);
   bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);

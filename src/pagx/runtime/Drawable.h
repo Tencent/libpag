@@ -33,7 +33,7 @@ namespace pagx {
  * This header lives inside the pagx implementation tree: public API only sees Drawable through
  * an opaque forward declaration in PAGSurface.h. Subclass authors must include this header to
  * implement the protocol; callers must obtain Drawable instances from each subclass's factory
- * (e.g. CanvasDrawable::FromCanvasID on web).
+ * (e.g. GPUDrawable::FromCanvasID on web).
  */
 class Drawable {
  public:

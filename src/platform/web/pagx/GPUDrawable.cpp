@@ -16,23 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PagxCanvasDrawable.h"
+#include "GPUDrawable.h"
 #include <emscripten/html5.h>
 
 namespace pagx {
 
-std::shared_ptr<CanvasDrawable> CanvasDrawable::FromCanvasID(const std::string& canvasID) {
+std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
   if (canvasID.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<CanvasDrawable>(new CanvasDrawable(canvasID));
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(canvasID));
 }
 
-CanvasDrawable::CanvasDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
-  CanvasDrawable::updateSize();
+GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
+  GPUDrawable::updateSize();
 }
 
-void CanvasDrawable::updateSize() {
+void GPUDrawable::updateSize() {
   if (canvasID.empty()) {
     return;
   }
@@ -42,7 +42,7 @@ void CanvasDrawable::updateSize() {
   freeSurface();
 }
 
-std::shared_ptr<tgfx::Device> CanvasDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -52,7 +52,7 @@ std::shared_ptr<tgfx::Device> CanvasDrawable::getDevice() {
   return window != nullptr ? window->getDevice() : nullptr;
 }
 
-std::shared_ptr<tgfx::Surface> CanvasDrawable::getSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> GPUDrawable::getSurface(tgfx::Context* context) {
   if (surface != nullptr) {
     return surface;
   }
@@ -63,7 +63,7 @@ std::shared_ptr<tgfx::Surface> CanvasDrawable::getSurface(tgfx::Context* context
   return surface;
 }
 
-void CanvasDrawable::present(tgfx::Context* context) {
+void GPUDrawable::present(tgfx::Context* context) {
   if (context != nullptr) {
     context->flushAndSubmit();
   }

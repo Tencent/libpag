@@ -25,17 +25,17 @@
 namespace pagx {
 
 /**
- * CanvasDrawable adapts a browser canvas (selected by its element id) into the pagx Drawable
+ * GPUDrawable adapts a browser canvas (selected by its element id) into the pagx Drawable
  * protocol. The underlying WebGL device and surface are created lazily on first access and
  * tracked for canvas resize via updateSize().
  */
-class CanvasDrawable : public Drawable {
+class GPUDrawable : public Drawable {
  public:
   /**
-   * Creates a CanvasDrawable bound to the given canvas element id. Returns nullptr if canvasID
+   * Creates a GPUDrawable bound to the given canvas element id. Returns nullptr if canvasID
    * is empty.
    */
-  static std::shared_ptr<CanvasDrawable> FromCanvasID(const std::string& canvasID);
+  static std::shared_ptr<GPUDrawable> FromCanvasID(const std::string& canvasID);
 
   int width() const override {
     return _width;
@@ -51,7 +51,7 @@ class CanvasDrawable : public Drawable {
   void present(tgfx::Context* context) override;
 
  private:
-  explicit CanvasDrawable(std::string canvasID);
+  explicit GPUDrawable(std::string canvasID);
 
   std::string canvasID;
   int _width = 0;

@@ -22,7 +22,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/PAGComposition.h"
-#include "pagx/runtime/PAGSurfaceImpl.h"
+#include "pagx/runtime/Drawable.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
@@ -133,13 +133,13 @@ std::shared_ptr<PAGTimeline> PAGFile::getDefaultTimeline() {
 }
 
 bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
-  if (surface == nullptr || surface->impl == nullptr || surface->impl->drawable == nullptr) {
+  if (surface == nullptr || surface->drawable == nullptr) {
     return false;
   }
   if (layerTree == nullptr || layerTree->root == nullptr) {
     return false;
   }
-  auto& drawable = surface->impl->drawable;
+  auto& drawable = surface->drawable;
   if (!layerTree->rootAttached) {
     layerTree->displayList.root()->addChild(layerTree->root);
     layerTree->rootAttached = true;

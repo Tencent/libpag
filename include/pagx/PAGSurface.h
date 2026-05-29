@@ -79,11 +79,9 @@ class PAGSurface {
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
  private:
-  struct Impl;
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable);
 
-  explicit PAGSurface(std::unique_ptr<Impl> impl);
-
-  std::unique_ptr<Impl> impl;
+  std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGFile;
 };

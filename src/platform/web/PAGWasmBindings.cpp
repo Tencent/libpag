@@ -24,7 +24,7 @@
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
-#include "platform/web/PagxCanvasDrawable.h"
+#include "platform/web/pagx/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
@@ -717,7 +717,7 @@ bool PAGBindInit() {
       .class_function("_FromCanvas",
                       optional_override([](const std::string& canvasID) {
                         return pagx::PAGSurface::MakeFrom(
-                            pagx::CanvasDrawable::FromCanvasID(canvasID));
+                            pagx::GPUDrawable::FromCanvasID(canvasID));
                       }))
       .class_function("_MakeOffscreen", &pagx::PAGSurface::MakeOffscreen)
       .function("_width", &pagx::PAGSurface::width)
