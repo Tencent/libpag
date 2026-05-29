@@ -146,23 +146,17 @@ static bool IsUrlPath(const std::string& path) {
   }
   auto scheme = path.substr(0, schemeEnd);
   if (scheme.size() == 4) {
-    if ((scheme[0] == 'h' || scheme[0] == 'H') &&
-        (scheme[1] == 't' || scheme[1] == 'T') &&
-        (scheme[2] == 't' || scheme[2] == 'T') &&
-        (scheme[3] == 'p' || scheme[3] == 'P')) {
+    if ((scheme[0] == 'h' || scheme[0] == 'H') && (scheme[1] == 't' || scheme[1] == 'T') &&
+        (scheme[2] == 't' || scheme[2] == 'T') && (scheme[3] == 'p' || scheme[3] == 'P')) {
       return true;
     }
-    if ((scheme[0] == 'f' || scheme[0] == 'F') &&
-        (scheme[1] == 'i' || scheme[1] == 'I') &&
-        (scheme[2] == 'l' || scheme[2] == 'L') &&
-        (scheme[3] == 'e' || scheme[3] == 'E')) {
+    if ((scheme[0] == 'f' || scheme[0] == 'F') && (scheme[1] == 'i' || scheme[1] == 'I') &&
+        (scheme[2] == 'l' || scheme[2] == 'L') && (scheme[3] == 'e' || scheme[3] == 'E')) {
       return true;
     }
   } else if (scheme.size() == 5) {
-    if ((scheme[0] == 'h' || scheme[0] == 'H') &&
-        (scheme[1] == 't' || scheme[1] == 'T') &&
-        (scheme[2] == 't' || scheme[2] == 'T') &&
-        (scheme[3] == 'p' || scheme[3] == 'P') &&
+    if ((scheme[0] == 'h' || scheme[0] == 'H') && (scheme[1] == 't' || scheme[1] == 'T') &&
+        (scheme[2] == 't' || scheme[2] == 'T') && (scheme[3] == 'p' || scheme[3] == 'P') &&
         (scheme[4] == 's' || scheme[4] == 'S')) {
       return true;
     }
