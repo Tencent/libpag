@@ -20,8 +20,11 @@
 
 #include <memory>
 #include <vector>
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -65,6 +68,38 @@ class GlyphRunRenderer {
    * PAGXDocument::applyLayout()) or when it is in pre-shaped mode.
    */
   static const std::vector<TextLayoutGlyphRun>& GetLayoutRuns(const Text* text);
+
+  /**
+   * Composes per-glyph transform matrices for a single GlyphRun using the
+   * anchor + scale + skew + rotate + position composition shared between
+   * PAGX-native rendering and the PAG v2 inflater. Each input array follows
+   * the PAGX <GlyphRun> semantics: a count of 0 means "field absent"; index
+   * out of range falls back to the per-glyph identity (scale=1, rotation=0,
+   * skew=0). `font` provides per-glyph advance for fallback positioning when
+   * neither positions nor xOffsets cover a glyph index. `postMatrix` is
+   * applied after the per-glyph composition (the PAGX-native path passes the
+   * Text's inverse layout matrix here; the PAG inflater passes Identity since
+   * runs already carry Text-local absolute coordinates). Output is written
+   * verbatim into `glyphMatrices`, sized to glyphCount.
+   */
+  static void ComposeGlyphMatrices(const tgfx::Font& font, const tgfx::GlyphID* glyphs,
+                                   size_t glyphCount, float runX, float runY, const float* xOffsets,
+                                   size_t xOffsetCount, const tgfx::Point* positions,
+                                   size_t positionCount, const tgfx::Point* anchors,
+                                   size_t anchorCount, const tgfx::Point* scales, size_t scaleCount,
+                                   const float* rotations, size_t rotationCount, const float* skews,
+                                   size_t skewCount, const tgfx::Matrix& postMatrix,
+                                   std::vector<tgfx::Matrix>* glyphMatrices);
+
+  /**
+   * Writes a glyph run into a TextBlobBuilder, classifying the per-glyph
+   * matrix set into the most compact mode (Point → RSXform → Matrix). Pairs
+   * with ComposeGlyphMatrices and is shared by the PAGX-native renderer and
+   * the PAG v2 inflater so the two paths stay pixel-aligned.
+   */
+  static void AppendGlyphsToBlobBuilder(tgfx::TextBlobBuilder& builder, const tgfx::Font& font,
+                                        const tgfx::GlyphID* glyphs, size_t glyphCount,
+                                        const std::vector<tgfx::Matrix>& glyphMatrices);
 
  private:
   static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(const Font* fontNode);

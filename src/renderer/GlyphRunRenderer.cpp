@@ -191,81 +191,104 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
       }
     }
 
-    // Step 1: Compute the final matrix for each glyph (source transform × inverseMatrix).
-    bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty();
-    std::vector<tgfx::Matrix> glyphMatrices(count);
-    float currentX = run->x;
-    for (size_t i = 0; i < count; i++) {
-      float posX = 0;
-      float posY = 0;
-      if (i < run->positions.size()) {
-        posX = run->x + run->positions[i].x;
-        posY = run->y + run->positions[i].y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-      } else if (i < run->xOffsets.size()) {
-        posX = run->x + run->xOffsets[i];
-        posY = run->y;
-      } else {
-        posX = currentX;
-        posY = run->y;
-        currentX += font.getAdvance(run->glyphs[i]);
-      }
-
-      if (hasTransforms) {
-        float sx = (i < run->scales.size()) ? run->scales[i].x : 1.0f;
-        float sy = (i < run->scales.size()) ? run->scales[i].y : 1.0f;
-        float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
-        float skew = (i < run->skews.size()) ? run->skews[i] : 0.0f;
-
-        float anchorX = font.getAdvance(run->glyphs[i]) * 0.5f;
-        float anchorY = 0.0f;
-        if (i < run->anchors.size()) {
-          anchorX += run->anchors[i].x;
-          anchorY += run->anchors[i].y;
-        }
-
-        auto matrix = tgfx::Matrix::I();
-        matrix.preTranslate(-anchorX, -anchorY);
-        if (sx != 1.0f || sy != 1.0f) {
-          matrix.preScale(sx, sy);
-        }
-        if (skew != 0.0f) {
-          float skewRadians = skew * static_cast<float>(M_PI) / 180.0f;
-          auto skewMatrix = tgfx::Matrix::I();
-          skewMatrix.setSkewX(-std::tan(skewRadians));
-          matrix.preConcat(skewMatrix);
-        }
-        if (rotation != 0.0f) {
-          matrix.preRotate(rotation);
-        }
-        matrix.preTranslate(anchorX, anchorY);
-        matrix.preTranslate(posX, posY);
-        matrix.postConcat(inverseMatrix);
-        glyphMatrices[i] = matrix;
-      } else {
-        auto matrix = tgfx::Matrix::MakeTrans(posX, posY);
-        matrix.postConcat(inverseMatrix);
-        glyphMatrices[i] = matrix;
-      }
-    }
-
-    // Step 2: Classify all glyph matrices to find the most compact positioning mode.
-    auto mode = GlyphPositionMode::Point;
-    for (size_t i = 0; i < count; i++) {
-      mode = PromoteMode(mode, ClassifyMatrix(glyphMatrices[i]));
-      if (mode == GlyphPositionMode::Matrix) {
-        break;
-      }
-    }
-
-    // Step 3: Write glyphs into the TextBlob with the determined mode.
-    WriteGlyphsWithMode(builder, font, run->glyphs.data(), count, glyphMatrices, mode);
+    // pagx::Point and tgfx::Point share an identical {float x; float y;}
+    // memory layout, so the array adapter below stays zero-cost on the
+    // PAGX-native side. The PAG inflater calls ComposeGlyphMatrices with
+    // tgfx::Point arrays directly.
+    auto* positionsPtr = reinterpret_cast<const tgfx::Point*>(run->positions.data());
+    auto* anchorsPtr = reinterpret_cast<const tgfx::Point*>(run->anchors.data());
+    auto* scalesPtr = reinterpret_cast<const tgfx::Point*>(run->scales.data());
+    std::vector<tgfx::Matrix> glyphMatrices;
+    ComposeGlyphMatrices(font, run->glyphs.data(), count, run->x, run->y, run->xOffsets.data(),
+                         run->xOffsets.size(), positionsPtr, run->positions.size(), anchorsPtr,
+                         run->anchors.size(), scalesPtr, run->scales.size(), run->rotations.data(),
+                         run->rotations.size(), run->skews.data(), run->skews.size(), inverseMatrix,
+                         &glyphMatrices);
+    AppendGlyphsToBlobBuilder(builder, font, run->glyphs.data(), count, glyphMatrices);
   }
 
   text->glyphData->textBlob = builder.build();
   text->glyphData->anchors = std::move(anchors);
+}
+
+void GlyphRunRenderer::ComposeGlyphMatrices(
+    const tgfx::Font& font, const tgfx::GlyphID* glyphs, size_t glyphCount, float runX, float runY,
+    const float* xOffsets, size_t xOffsetCount, const tgfx::Point* positions, size_t positionCount,
+    const tgfx::Point* anchors, size_t anchorCount, const tgfx::Point* scales, size_t scaleCount,
+    const float* rotations, size_t rotationCount, const float* skews, size_t skewCount,
+    const tgfx::Matrix& postMatrix, std::vector<tgfx::Matrix>* glyphMatrices) {
+  glyphMatrices->resize(glyphCount);
+  bool hasTransforms = scaleCount > 0 || rotationCount > 0 || skewCount > 0;
+  float currentX = runX;
+  for (size_t i = 0; i < glyphCount; i++) {
+    float posX = 0;
+    float posY = 0;
+    if (i < positionCount) {
+      posX = runX + positions[i].x;
+      posY = runY + positions[i].y;
+      if (i < xOffsetCount) {
+        posX += xOffsets[i];
+      }
+    } else if (i < xOffsetCount) {
+      posX = runX + xOffsets[i];
+      posY = runY;
+    } else {
+      posX = currentX;
+      posY = runY;
+      currentX += font.getAdvance(glyphs[i]);
+    }
+
+    if (hasTransforms) {
+      float sx = (i < scaleCount) ? scales[i].x : 1.0f;
+      float sy = (i < scaleCount) ? scales[i].y : 1.0f;
+      float rotation = (i < rotationCount) ? rotations[i] : 0.0f;
+      float skew = (i < skewCount) ? skews[i] : 0.0f;
+
+      float anchorX = font.getAdvance(glyphs[i]) * 0.5f;
+      float anchorY = 0.0f;
+      if (i < anchorCount) {
+        anchorX += anchors[i].x;
+        anchorY += anchors[i].y;
+      }
+
+      auto matrix = tgfx::Matrix::I();
+      matrix.preTranslate(-anchorX, -anchorY);
+      if (sx != 1.0f || sy != 1.0f) {
+        matrix.preScale(sx, sy);
+      }
+      if (skew != 0.0f) {
+        float skewRadians = skew * static_cast<float>(M_PI) / 180.0f;
+        auto skewMatrix = tgfx::Matrix::I();
+        skewMatrix.setSkewX(-std::tan(skewRadians));
+        matrix.preConcat(skewMatrix);
+      }
+      if (rotation != 0.0f) {
+        matrix.preRotate(rotation);
+      }
+      matrix.preTranslate(anchorX, anchorY);
+      matrix.preTranslate(posX, posY);
+      matrix.postConcat(postMatrix);
+      (*glyphMatrices)[i] = matrix;
+    } else {
+      auto matrix = tgfx::Matrix::MakeTrans(posX, posY);
+      matrix.postConcat(postMatrix);
+      (*glyphMatrices)[i] = matrix;
+    }
+  }
+}
+
+void GlyphRunRenderer::AppendGlyphsToBlobBuilder(tgfx::TextBlobBuilder& builder,
+                                                 const tgfx::Font& font,
+                                                 const tgfx::GlyphID* glyphs, size_t glyphCount,
+                                                 const std::vector<tgfx::Matrix>& glyphMatrices) {
+  auto mode = GlyphPositionMode::Point;
+  for (size_t i = 0; i < glyphCount; i++) {
+    mode = PromoteMode(mode, ClassifyMatrix(glyphMatrices[i]));
+    if (mode == GlyphPositionMode::Matrix) {
+      break;
+    }
+  }
+  WriteGlyphsWithMode(builder, font, glyphs, glyphCount, glyphMatrices, mode);
 }
 
 std::shared_ptr<tgfx::TextBlob> GlyphRunRenderer::BuildTextBlobFromLayoutRuns(

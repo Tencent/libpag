@@ -633,16 +633,17 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
     return typefaces[index];
   };
 
-  // Concatenate all runs into a single TextBlob when they share a
-  // typeface (the common case: one <Font> → many <GlyphRun>). Mixed-
-  // typeface runs within one Text are a future concern (no spec sample
-  // triggers it) and fall back to the first run only with a warning.
-  std::shared_ptr<tgfx::TextBlob> textBlob;
+  // Each run is appended to the shared TextBlobBuilder with its own
+  // tgfx::Font, so multiple GlyphRuns share one TextBlob without
+  // round-tripping through a flat positions array. ComposeGlyphMatrices
+  // mirrors GlyphRunRenderer::ComposeGlyphMatrices so anchors / scales /
+  // rotations / skews land identically on the PAG inflater path. Multi-
+  // typeface within one Text is still a Phase 17 limitation; later runs
+  // referencing a different EmbeddedFont are dropped with a warning.
+  tgfx::TextBlobBuilder builder = {};
   bool multiTypefaceSeen = false;
   std::shared_ptr<tgfx::Typeface> firstTypeface;
-  std::vector<tgfx::GlyphID> glyphIDs;
-  std::vector<tgfx::Point> positions;
-  tgfx::Font lastFont;  // carries fauxBold/fauxItalic + size from first run
+  bool hasAnyGlyphs = false;
 
   for (const auto& run : pay.glyphRuns) {
     auto typeface = getTypeface(run.embeddedFontIndex);
@@ -670,38 +671,24 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
     }
     if (firstTypeface == nullptr) {
       firstTypeface = typeface;
-      lastFont = font;
     } else if (typeface != firstTypeface) {
       multiTypefaceSeen = true;
       continue;
     }
 
     const size_t count = run.glyphs.size();
-    float currentX = run.x;
-    for (size_t i = 0; i < count; ++i) {
-      float posX = 0.0f;
-      float posY = 0.0f;
-      // Per-glyph positioning priority (GlyphRunRenderer §197-213):
-      //   1. positions[i] present → posX = run.x + positions[i].x (+ xOffsets[i])
-      //   2. xOffsets[i] present  → posX = run.x + xOffsets[i]
-      //   3. neither               → posX accumulates advance
-      if (i < run.positions.size()) {
-        posX = run.x + run.positions[i].x;
-        posY = run.y + run.positions[i].y;
-        if (i < run.xOffsets.size()) {
-          posX += run.xOffsets[i];
-        }
-      } else if (i < run.xOffsets.size()) {
-        posX = run.x + run.xOffsets[i];
-        posY = run.y;
-      } else {
-        posX = currentX;
-        posY = run.y;
-        currentX += font.getAdvance(run.glyphs[i]);
-      }
-      glyphIDs.push_back(run.glyphs[i]);
-      positions.push_back(tgfx::Point{posX, posY});
+    if (count == 0) {
+      continue;
     }
+    std::vector<tgfx::Matrix> glyphMatrices;
+    GlyphRunRenderer::ComposeGlyphMatrices(
+        font, run.glyphs.data(), count, run.x, run.y, run.xOffsets.data(), run.xOffsets.size(),
+        run.positions.data(), run.positions.size(), run.anchors.data(), run.anchors.size(),
+        run.scales.data(), run.scales.size(), run.rotations.data(), run.rotations.size(),
+        run.skews.data(), run.skews.size(), tgfx::Matrix::I(), &glyphMatrices);
+    GlyphRunRenderer::AppendGlyphsToBlobBuilder(builder, font, run.glyphs.data(), count,
+                                                glyphMatrices);
+    hasAnyGlyphs = true;
   }
 
   if (multiTypefaceSeen) {
@@ -709,11 +696,11 @@ std::shared_ptr<tgfx::VectorElement> inflateTextAsPath(PAGDocument& doc, const E
               "case A Text with mixed EmbeddedFonts: later runs dropped (Phase 17 limit)");
   }
 
-  if (glyphIDs.empty() || firstTypeface == nullptr) {
+  if (!hasAnyGlyphs) {
     return nullptr;
   }
 
-  textBlob = tgfx::TextBlob::MakeFrom(glyphIDs.data(), positions.data(), glyphIDs.size(), lastFont);
+  auto textBlob = builder.build();
   if (textBlob == nullptr) {
     return nullptr;
   }
