@@ -62,6 +62,18 @@ tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root
                                         const std::shared_ptr<tgfx::Layer>& targetLayer);
 
 /**
+ * Generalised version of ComputeRasterizedLayerBounds that resolves the bounds in an arbitrary
+ * coordinate space (e.g. the target layer's parent for the SVG `<image>` placement path) instead
+ * of the document root. Pass nullptr for `coordinateSpace` to use the layer's own world space.
+ * Like the root-based variant, the bounds are intersected with the layer's own scrollRect window
+ * (mapped to the same coordinate space) when present, so the rasterized PNG and the `<image>`
+ * placement agree on a single scrollRect-clipped extent. Returns an empty rect when the
+ * intersection is empty.
+ */
+tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                               const tgfx::Layer* coordinateSpace);
+
+/**
  * Rasterizes a tgfx layer (including any masks) to a PNG-encoded Data object. `pixelScale` is the
  * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
  * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
@@ -82,9 +94,10 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
  * the orientation of the rendered pixels. Pass the target layer's parent as
  * `targetCoordinateSpace` when the PNG is nested inside a group whose transform already matches
  * the parent's coordinate space (e.g. SVG `<image>` emitted inside a parent `<g transform=...>`).
- * Passing nullptr falls back to using `root` as the coordinate space. Unlike the 4-arg overload,
- * this variant does not auto-clip the layer's own scrollRect — the SVG path applies that clipping
- * separately via the enclosing `<g>` element.
+ * Passing nullptr falls back to using `root` as the coordinate space. Like the 4-arg overload,
+ * the layer's own scrollRect is auto-applied to both the bounds (so the PNG is sized to the
+ * visible window) and the canvas (so pixels outside the window are clipped) — the SVG path can
+ * therefore place the resulting `<image>` without an extra `clip-path` wrapper.
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,

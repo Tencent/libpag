@@ -407,7 +407,12 @@ class SVGWriter {
   // Writes the non-content attributes of a layer's <g> (id, data-*, transform,
   // opacity, style, filter, mask/clipPath, scrollRect clip). Geometry and child
   // layers are emitted separately after closeElementStart() in writeLayer.
-  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer);
+  // `emitScrollClipHere` is false when the caller will emit the scrollRect
+  // clip-path on a deferred middle <g> wrapper to avoid colliding with a
+  // contour-mask clip-path on the same element (both share the SVG `clip-path`
+  // attribute, so writing both onto the outer <g> drops the first).
+  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
+                                 bool emitScrollClipHere = true);
   // Emits contents + composition layers + child layers. Used both for the
   // needs-group path (inside the <g>) and for the bare-through path.
   void writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha = 1.0f);
@@ -2116,19 +2121,24 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
   // so the behavior matches).
   auto coordinateSpace =
       tgfxLayer->parent() != nullptr ? tgfxLayer->parent() : buildResult.root.get();
+  // Compute the on-canvas placement bounds in the same coordinate space and with the same
+  // scrollRect intersection that RenderMaskedLayer applies internally, so the <image>'s x/y/w/h
+  // exactly cover the rasterized PNG's pixel region. Without intersecting scrollRect here the
+  // <image> would be placed at the unclipped layer bounds while the PNG carries scrollRect-clipped
+  // pixels, leaking transparent borders outside the visible window.
+  auto bounds = ComputeRasterizedLayerBoundsInSpace(tgfxLayer, coordinateSpace);
+  if (bounds.isEmpty()) {
+    addWarning("rasterize skipped: layer '" +
+               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' reported empty bounds; falling back to vector emission.");
+    return false;
+  }
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
   auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
     addWarning("rasterize failed: PNG bake for layer '" +
                (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
                "' produced no pixel data; falling back to vector emission.");
-    return false;
-  }
-  auto bounds = tgfxLayer->getBounds(coordinateSpace, true);
-  if (bounds.isEmpty()) {
-    addWarning("rasterize skipped: layer '" +
-               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-               "' reported empty bounds; falling back to vector emission.");
     return false;
   }
   std::string href = "data:image/png;base64," + Base64Encode(pngData->bytes(), pngData->size());
@@ -2350,7 +2360,14 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   out.openElement("g");
-  writeLayerGroupAttributes(out, layer);
+  bool needsContourClip = layer->mask != nullptr && layer->maskType == MaskType::Contour;
+  // The outer <g> already gets the contour-mask clip-path from
+  // writeLayerGroupAttributes. SVG only allows one `clip-path` value per
+  // element, so when both contour mask and scrollRect are present we defer the
+  // scrollRect clip to a middle <g> wrapper below; otherwise the second
+  // attribute would silently overwrite the first.
+  bool needsScrollMiddleWrapper = layer->hasScrollRect && needsContourClip;
+  writeLayerGroupAttributes(out, layer, /*emitScrollClipHere=*/!needsScrollMiddleWrapper);
 
   bool hasContent =
       !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
@@ -2360,6 +2377,18 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   out.closeElementStart();
+
+  // Middle <g> for scrollRect when a contour-mask clip-path occupies the outer
+  // <g>'s clip-path slot. The middle <g> carries no transform — its local
+  // coordinate space equals the outer's (post layer-matrix), so the scroll
+  // clipPath rect (anchored at 0,0 with sr.width × sr.height) is interpreted
+  // identically to the un-collided case where it sat on the outer <g>.
+  if (needsScrollMiddleWrapper) {
+    auto scrollClipId = writeScrollRectClipDef(layer);
+    out.openElement("g");
+    out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
+    out.closeElementStart();
+  }
 
   // When scrollRect is active, wrap all content in an inner <g> that shifts
   // the content by (-scrollRect.x, -scrollRect.y) so that the scroll origin
@@ -2376,6 +2405,10 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   writeLayerBody(out, layer, perChildAlpha);
 
   if (hasScrollOffset) {
+    out.closeElement();
+  }
+
+  if (needsScrollMiddleWrapper) {
     out.closeElement();
   }
 
@@ -2410,7 +2443,8 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
   }
 }
 
-void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
+void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
+                                          bool emitScrollClipHere) {
   if (!layer->id.empty()) {
     out.addAttribute("id", layer->id);
   }
@@ -2456,8 +2490,11 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
 
   // scrollRect clips the layer's content to a viewport rectangle and offsets
   // the content by the scroll origin. Unlike PPT (which must bake to PNG),
-  // SVG natively supports <clipPath> so we emit a vector clip.
-  if (layer->hasScrollRect) {
+  // SVG natively supports <clipPath> so we emit a vector clip. When the layer
+  // also carries a contour mask, the contour mask owns this <g>'s `clip-path`
+  // and `emitScrollClipHere` is false — the caller emits the scroll clip on a
+  // deferred middle <g> wrapper instead so both clips can coexist.
+  if (emitScrollClipHere && layer->hasScrollRect) {
     auto scrollClipId = writeScrollRectClipDef(layer);
     out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
   }

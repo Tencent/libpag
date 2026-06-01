@@ -230,24 +230,29 @@ void GPUContext::unlock() {
   }
 }
 
-tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root,
-                                        const std::shared_ptr<tgfx::Layer>& targetLayer) {
-  auto bounds = targetLayer->getBounds(root.get(), true);
+tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer>& targetLayer,
+                                               const tgfx::Layer* coordinateSpace) {
+  auto bounds = targetLayer->getBounds(coordinateSpace, true);
   auto scrollRect = targetLayer->scrollRect();
   if (!scrollRect.isEmpty()) {
-    // getRelativeMatrix(root) already folds in scrollRect's preTranslate (see
-    // tgfx Layer::getMatrixWithScrollRect), so mapping the scrollRect rect
-    // through it yields the visible window in `root` coordinates regardless of
+    // getRelativeMatrix already folds in scrollRect's preTranslate (see tgfx
+    // Layer::getMatrixWithScrollRect), so mapping the scrollRect through it
+    // yields the visible window in the target coordinate space regardless of
     // the layer's matrix or scroll offsets. getBounds however does not
     // intersect the layer's own scrollRect with its own bounds (only child
     // scrollRects are intersected during traversal), so we apply the clip here
     // to keep the rasterized extent in sync with what will actually be drawn.
-    auto windowInRoot = targetLayer->getRelativeMatrix(root.get()).mapRect(scrollRect);
-    if (!bounds.intersect(windowInRoot)) {
+    auto windowInSpace = targetLayer->getRelativeMatrix(coordinateSpace).mapRect(scrollRect);
+    if (!bounds.intersect(windowInSpace)) {
       return tgfx::Rect::MakeEmpty();
     }
   }
   return bounds;
+}
+
+tgfx::Rect ComputeRasterizedLayerBounds(const std::shared_ptr<tgfx::Layer>& root,
+                                        const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  return ComputeRasterizedLayerBoundsInSpace(targetLayer, root.get());
 }
 
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
@@ -277,6 +282,17 @@ namespace {
 // PNG is tightly cropped and can be placed at `bounds.left/top` inside any container whose
 // transform chain matches `coordinateSpace`. Used by the SVG path where the enclosing `<g>`
 // already carries the parent transform.
+//
+// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own scrollRect (see
+// Layer.h doc on draw()) — only children's scrollRects are honoured during the recursive walk.
+// This drawer applies the clip itself so the baked PNG honours the scrollRect window even when
+// the visual content overflows it (e.g. a layer with both a scrollRect and SVG-unsupported
+// features such as TextPath / TextModifier / Conic / Diamond gradient that triggers the SVG
+// rasterize fallback). Without this clip the PNG would contain out-of-window pixels and the
+// SVG `<image>` placement at `bounds` would still leak them since `writeLayer` returns early
+// after a successful rasterize and skips the enclosing scrollRect `<g>` wrapper. The scrollRect
+// lives in layer-local coordinates, so we clip after concatenating the layer's relative matrix
+// while the canvas is still in layer-local space.
 struct MaskedLayerDrawerInSpace {
   const std::shared_ptr<tgfx::Layer>& targetLayer;
   const tgfx::Layer* coordinateSpace;
@@ -284,6 +300,10 @@ struct MaskedLayerDrawerInSpace {
   void operator()(tgfx::Canvas* canvas) const {
     canvas->translate(-bounds.left, -bounds.top);
     canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
+    auto scrollRect = targetLayer->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
+    }
     targetLayer->draw(canvas);
   }
 };
@@ -296,7 +316,7 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const tgfx::Layer* targetCoordinateSpace,
                                               float pixelScale) {
   auto coordinateSpace = targetCoordinateSpace != nullptr ? targetCoordinateSpace : root.get();
-  auto bounds = targetLayer->getBounds(coordinateSpace, true);
+  auto bounds = ComputeRasterizedLayerBoundsInSpace(targetLayer, coordinateSpace);
   if (bounds.isEmpty() || bounds.width() <= 0 || bounds.height() <= 0) {
     return nullptr;
   }

@@ -2085,6 +2085,54 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersDiamondGradient) {
   EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
 }
 
+// Regression: when a rasterize-path layer (an unsupported feature triggers PNG bake) also has a
+// scrollRect, the baked PNG and the placed <image> must both honour the scrollRect window. The
+// previous code used `getBounds(coordinateSpace, true)` for the <image> placement and skipped the
+// scrollRect clip in MaskedLayerDrawerInSpace, so the <image> covered the full unclipped bounds
+// while leaking out-of-window pixels into the export. After the fix the <image>'s width/height
+// match the scrollRect dimensions exactly.
+PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedHonoursScrollRect) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->id = "scrolledRaster";
+  layer->hasScrollRect = true;
+  layer->scrollRect = {0, 0, 100, 80};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {300, 300};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {150, 150};
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 0.0f;
+  s1->color = {1, 0, 0, 1};
+  auto* s2 = doc->makeNode<pagx::ColorStop>();
+  s2->offset = 1.0f;
+  s2->color = {0, 0, 1, 1};
+  grad->colorStops = {s1, s2};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The bake produced an <image>, not a vector fall-through.
+  auto imageStart = svg.find("<image");
+  ASSERT_NE(imageStart, std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  // Inspect the <image> element specifically (root <svg> also has width="300", so we cannot
+  // assert on the global string). The <image>'s width / height must equal the scrollRect window
+  // (100 × 80), proving the rasterize bounds were intersected with the scrollRect.
+  auto imageEnd = svg.find("/>", imageStart);
+  ASSERT_NE(imageEnd, std::string::npos);
+  std::string imageTag = svg.substr(imageStart, imageEnd - imageStart);
+  EXPECT_NE(imageTag.find("width=\"100\""), std::string::npos);
+  EXPECT_NE(imageTag.find("height=\"80\""), std::string::npos);
+  // The unclipped layer bounds (300 × 300) must NOT leak into the <image> placement.
+  EXPECT_EQ(imageTag.find("width=\"300\""), std::string::npos);
+  EXPECT_EQ(imageTag.find("height=\"300\""), std::string::npos);
+}
+
 // Coverage for the rasterDPI clamp: 0 / negative / huge values must be clamped to a usable
 // range so bakeUnsupported=true still produces a non-empty <image>. The placed <image> always
 // keeps logical coordinates regardless of the chosen DPI, but the PNG payload size scales.
@@ -2300,6 +2348,44 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MaskContour) {
   EXPECT_NE(svg.find("<clipPath"), std::string::npos);
   EXPECT_NE(svg.find("clip-path=\"url(#clip"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_mask_contour.svg");
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskContourWithScrollRectCoexist) {
+  // Regression: when a layer carries both a contour mask and a scrollRect, both must remain
+  // effective. Prior code wrote `clip-path="url(#contour)"` and then `clip-path="url(#scroll)"`
+  // onto the same outer <g>, where the second overwrites the first and silently disables the
+  // contour mask. Check that the emitted SVG references both clipPath ids.
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskEllipse = doc->makeNode<pagx::Ellipse>();
+  maskEllipse->position = {100, 100};
+  maskEllipse->size = {120, 120};
+  maskLayer->contents.push_back(maskEllipse);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* user = doc->makeNode<pagx::Layer>();
+  user->mask = maskLayer;
+  user->maskType = pagx::MaskType::Contour;
+  user->hasScrollRect = true;
+  user->scrollRect = {10, 20, 200, 150};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {150, 150};
+  rect->size = {180, 100};
+  user->contents.push_back(rect);
+  user->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  doc->layers.push_back(user);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Both clipPath defs must be present — the contour clip and the scrollRect clip.
+  EXPECT_NE(svg.find("id=\"clip"), std::string::npos);
+  EXPECT_NE(svg.find("id=\"scrollClip"), std::string::npos);
+  // Both clip-path attributes must reference their respective ids in the output. With the
+  // collision-fix the contour clip is on the outer <g> and the scrollRect clip moves to a
+  // middle <g> wrapper, so both references survive end-to-end.
+  EXPECT_NE(svg.find("clip-path=\"url(#clip"), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#scrollClip"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_contour_with_scrollrect.svg");
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_MaskAlpha) {
