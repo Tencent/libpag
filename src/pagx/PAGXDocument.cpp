@@ -47,8 +47,8 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
-      } else if (layer->composition != nullptr && layer->composition->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->composition->externalDoc.get(), paths);
+      } else if (layer->externalDoc != nullptr) {
+        AppendExternalFilePaths(layer->externalDoc.get(), paths);
       }
     }
   }
@@ -72,8 +72,8 @@ static bool LoadExternalComposition(PAGXDocument* document, Layer* layer,
   wrapper->height = externalDoc->height;
   wrapper->layers = externalDoc->layers;
   wrapper->animations = externalDoc->animations;
-  wrapper->externalDoc = externalDoc;
   layer->composition = wrapper;
+  layer->externalDoc = externalDoc;
   layer->compositionFilePath = {};
   return true;
 }
@@ -177,9 +177,8 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
       auto* layer = static_cast<Layer*>(node.get());
       bool loadedComposition = LoadExternalComposition(this, layer, filePath, data);
       found = loadedComposition || found;
-      if (!loadedComposition && layer->composition != nullptr &&
-          layer->composition->externalDoc != nullptr) {
-        found = layer->composition->externalDoc->loadFileData(filePath, data) || found;
+      if (!loadedComposition && layer->externalDoc != nullptr) {
+        found = layer->externalDoc->loadFileData(filePath, data) || found;
       }
     }
   }

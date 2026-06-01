@@ -42,6 +42,7 @@
 namespace pagx {
 
 class Composition;
+class PAGXDocument;
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
@@ -148,6 +149,13 @@ class Layer : public Node, public LayoutNode {
    * PAGXDocument::loadFileData().
    */
   std::string compositionFilePath = {};
+
+  /**
+   * Externally loaded PAGX document used as this layer's composition content. When set, the
+   * composition's layers and animations point into this document, and runtime timeline target lookup
+   * is resolved against this document instead of the owner document.
+   */
+  std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
   /**
    * Timeline entries to activate when this layer references a Composition. Each entry is a

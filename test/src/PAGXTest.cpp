@@ -6566,14 +6566,14 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
   auto* slotLayer = doc->findNode<pagx::Layer>("slot");
   ASSERT_TRUE(slotLayer != nullptr);
   ASSERT_TRUE(slotLayer->composition != nullptr);
-  ASSERT_TRUE(slotLayer->composition->externalDoc != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
   ASSERT_EQ(file->compositionSlots.size(), 1u);
   file->advanceAndApply(500'000);
 
-  auto* externalChild = slotLayer->composition->externalDoc->findNode<pagx::Layer>("childLayer");
+  auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(externalChild != nullptr);
   auto& slotTree = file->compositionSlots[0]->mutableBinding();
   auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);

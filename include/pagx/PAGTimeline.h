@@ -131,8 +131,8 @@ class PAGTimeline {
   // PAGFile's binding; slot timelines use the binding built for that slot.
   RuntimeBinding* binding = nullptr;
   // Document used to resolve channel target IDs at apply time. Top-level timelines use the file's
-  // primary document; slot timelines spawned by sealed cross-document Composition wrappers use
-  // the wrapper's externalDoc so internal IDs of the external file stay self-contained.
+  // primary document; slot timelines spawned by external composition layers use the layer's
+  // externalDoc so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
   int64_t currentTimeUs = 0;
   bool playing = false;

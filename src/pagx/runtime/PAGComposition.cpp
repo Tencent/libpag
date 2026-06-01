@@ -32,7 +32,7 @@ std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer, PA
     return nullptr;
   }
   auto slot = std::unique_ptr<PAGComposition>(new PAGComposition(ownerLayer, parentFile));
-  auto* externalDoc = ownerLayer->composition->externalDoc.get();
+  auto* externalDoc = ownerLayer->externalDoc.get();
   slot->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
   slot->buildSubtree();
   slot->spawnTimelines(ownerLayer->timelines);
