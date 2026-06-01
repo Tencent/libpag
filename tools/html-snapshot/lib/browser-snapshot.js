@@ -2636,11 +2636,17 @@ const TAKE_SNAPSHOT_EXPR = '(() => window.__pagxSnapshot.takeSnapshot())()';
 
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
-// Walk every <img> in the document and, for any whose `src` is an absolute
-// `http(s)://` URL, stash a `data:` URI on `data-snapshot-src`. The
-// downstream snapshot reader (`imgSrc`) prefers that attribute, so the
-// emitted HTML becomes self-contained — required because `pagx render`
-// cannot fetch URLs at render time.
+// Walk every <img> in the document and normalise its `src` for `pagx render`,
+// which can read `data:` URIs and local files but cannot fetch URLs at render
+// time. The result is stashed on `data-snapshot-src`, which the downstream
+// snapshot reader (`imgSrc`) prefers over the original attribute:
+//
+//   - `http(s)://` src  → a `data:` URI of the bytes (self-contained snapshot).
+//   - `file://` src      → the absolute filesystem path. A relative <img src>
+//     on a local page resolves to a `file://` URL the browser computed against
+//     the source document; emitting it as an absolute path keeps the subset
+//     valid regardless of where it is written, since PAGX otherwise resolves a
+//     bare relative `src` against the subset HTML's own directory.
 //
 // Two byte sources, in priority order:
 //
@@ -2679,6 +2685,26 @@ async function inlineExternalImages(cachedMap) {
     return `data:${mime};base64,${btoa(binary)}`;
   }
 
+  // Convert a `file://` URL (the absolute form the browser resolves a local /
+  // relative <img src> into) back to a plain filesystem path. PAGX's importer
+  // treats a leading `/` (POSIX) or `C:/` (Windows) as absolute and reads the
+  // file directly, but does not understand the `file://` scheme, so we strip
+  // it and percent-decode the path. Returns '' for anything that isn't a
+  // file URL so the caller can fall through to its other branches.
+  function fileUrlToPath(fileUrl) {
+    try {
+      const u = new URL(fileUrl);
+      if (u.protocol !== 'file:') return '';
+      let p = decodeURIComponent(u.pathname);
+      // Windows: `file:///C:/dir/x.png` → pathname `/C:/dir/x.png`; drop the
+      // leading slash so the drive letter starts the path.
+      if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+      return p;
+    } catch (_) {
+      return '';
+    }
+  }
+
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
   const pending = [];
@@ -2686,6 +2712,19 @@ async function inlineExternalImages(cachedMap) {
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
     if (src.startsWith('data:')) continue;
+    // Local image referenced by a relative (or absolute-but-relative-to-the-
+    // source) path: the browser has already resolved it to an absolute
+    // `file://` URL. Emit that as a plain absolute filesystem path so the
+    // subset HTML keeps working no matter which directory it is written to —
+    // PAGX otherwise resolves a bare relative `src` against the subset's own
+    // location, which breaks the moment the subset and the image files no
+    // longer share a directory (e.g. the eval pipeline writes the subset under
+    // out/<label>/<case>/ while the images live elsewhere).
+    if (/^file:/i.test(src)) {
+      const fsPath = fileUrlToPath(src);
+      if (fsPath) img.setAttribute('data-snapshot-src', fsPath);
+      continue;
+    }
     if (!/^https?:/i.test(src)) continue;
     const cached = cache[src];
     if (cached) {
