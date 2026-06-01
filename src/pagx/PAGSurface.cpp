@@ -65,9 +65,9 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
     device->unlock();
     return false;
   }
-  auto info = tgfx::ImageInfo::Make(drawable->width(), drawable->height(),
-                                    tgfx::ColorType::RGBA_8888,
-                                    tgfx::AlphaType::Premultiplied, dstRowBytes);
+  auto info =
+      tgfx::ImageInfo::Make(drawable->width(), drawable->height(), tgfx::ColorType::RGBA_8888,
+                            tgfx::AlphaType::Premultiplied, dstRowBytes);
   bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);
   device->unlock();
   return ok;

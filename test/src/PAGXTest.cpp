@@ -40,13 +40,12 @@
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/Property.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -59,6 +58,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/Property.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -67,6 +67,7 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/runtime/PAGComposition.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -81,7 +82,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
-#include "pagx/runtime/PAGComposition.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
@@ -5303,8 +5303,9 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
- * Test case: Top-level Animations / Object / Property / Keyframe round-trip
- * across all six TypedProperty<T> instantiations (float, bool, int, string, image, color).
+/**
+ * Test case: Top-level Animations / Object / Property / Keyframe round-trip across all six
+ * TypedProperty<T> instantiations (float, bool, int, string, image, color).
  */
 PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -6011,8 +6012,7 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
 }
 
 namespace {
-static pagx::Animation* MakeAlphaAnim(pagx::PAGXDocument* doc, const std::string& id,
-                                      float value) {
+static pagx::Animation* MakeAlphaAnim(pagx::PAGXDocument* doc, const std::string& id, float value) {
   auto anim = doc->makeNode<pagx::Animation>(id);
   anim->duration = 60;
   anim->frameRate = 60;
@@ -6128,8 +6128,8 @@ PAGX_TEST(PAGXTest, KeyframeLinearFloat) {
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0, 60.0f)), 0.0f);
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(500'000, 60.0f)), 0.5f);
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(1'000'000, 60.0f)), 1.0f);
-  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(2'000'000, 60.0f)), 1.0f);   // clamp end
-  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(-100'000, 60.0f)), 0.0f);    // clamp start
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(2'000'000, 60.0f)), 1.0f);  // clamp end
+  EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(-100'000, 60.0f)), 0.0f);   // clamp start
 }
 
 /**
@@ -6154,10 +6154,10 @@ PAGX_TEST(PAGXTest, KeyframeHoldFloat) {
 PAGX_TEST(PAGXTest, KeyframeBezierFloatStandardEase) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
-  prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Bezier,
-                             pagx::Point{0.42f, 0.0f}, {}});
-  prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::None, {},
-                             pagx::Point{0.58f, 1.0f}});
+  prop->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, pagx::Point{0.42f, 0.0f}, {}});
+  prop->keyframes.push_back(
+      {60, 1.0f, pagx::KeyframeInterpolationType::None, {}, pagx::Point{0.58f, 1.0f}});
 
   // Endpoints anchor exactly.
   EXPECT_FLOAT_EQ(std::get<float>(prop->evaluateAt(0, 60.0f)), 0.0f);
@@ -6250,8 +6250,7 @@ struct NestedCompFixture {
 };
 
 NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::string& compId,
-                                       const std::string& animId,
-                                       const std::string& childLayerId) {
+                                       const std::string& animId, const std::string& childLayerId) {
   NestedCompFixture fx;
   fx.comp = doc->makeNode<pagx::Composition>(compId);
   fx.comp->width = 50;
@@ -6643,4 +6642,5 @@ PAGX_TEST(PAGXTest, CrossDocFromXMLWithoutBaseDirReports) {
     }
   }
   EXPECT_TRUE(foundBaseDirError);
-}}  // namespace pag
+}
+}  // namespace pag

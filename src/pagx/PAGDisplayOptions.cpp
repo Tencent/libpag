@@ -84,7 +84,7 @@ void PAGDisplayOptions::setZoomScale(float zoomScale) {
 
 int PAGDisplayOptions::getZoomScalePrecision() const {
   return impl != nullptr && impl->displayList != nullptr ? impl->displayList->zoomScalePrecision()
-                                                        : 1000;
+                                                         : 1000;
 }
 
 void PAGDisplayOptions::setZoomScalePrecision(int precision) {
@@ -109,7 +109,7 @@ void PAGDisplayOptions::setContentOffset(float offsetX, float offsetY) {
 
 PAGRenderMode PAGDisplayOptions::getRenderMode() const {
   return impl != nullptr && impl->displayList != nullptr ? ToPAGX(impl->displayList->renderMode())
-                                                        : PAGRenderMode::Partial;
+                                                         : PAGRenderMode::Partial;
 }
 
 void PAGDisplayOptions::setRenderMode(PAGRenderMode renderMode) {
@@ -140,7 +140,7 @@ void PAGDisplayOptions::setMaxTileCount(int count) {
 
 bool PAGDisplayOptions::getAllowZoomBlur() const {
   return impl != nullptr && impl->displayList != nullptr ? impl->displayList->allowZoomBlur()
-                                                        : false;
+                                                         : false;
 }
 
 void PAGDisplayOptions::setAllowZoomBlur(bool allow) {
@@ -175,7 +175,7 @@ void PAGDisplayOptions::setBackgroundColor(const Color& color) {
 
 int PAGDisplayOptions::getSubtreeCacheMaxSize() const {
   return impl != nullptr && impl->displayList != nullptr ? impl->displayList->subtreeCacheMaxSize()
-                                                        : 0;
+                                                         : 0;
 }
 
 void PAGDisplayOptions::setSubtreeCacheMaxSize(int maxSize) {

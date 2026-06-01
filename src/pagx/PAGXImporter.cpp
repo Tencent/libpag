@@ -28,7 +28,6 @@
 #include "pagx/PAGXDefaults.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/Property.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -54,6 +53,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/Property.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -558,8 +558,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
         auto subDoc = PAGXImporter::FromFile(absolutePath);
         g_loadingPathStack.pop_back();
         if (subDoc == nullptr) {
-          ReportError(doc, node,
-                      "Failed to load external composition '" + compositionAttr + "'.");
+          ReportError(doc, node, "Failed to load external composition '" + compositionAttr + "'.");
         } else {
           // Propagate errors from the external document to the host so callers see one unified
           // error list.
@@ -747,8 +746,9 @@ static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument*
       layer->timelines.push_back(std::move(driver));
     } else {
       ReportError(doc, current.get(),
-                  "Element '" + current->name + "' is not allowed in 'Timelines'."
-                  " Expected: Animation.");
+                  "Element '" + current->name +
+                      "' is not allowed in 'Timelines'."
+                      " Expected: Animation.");
     }
   }
 }

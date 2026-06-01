@@ -21,14 +21,13 @@
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
-#include "pagx/nodes/AnimationTimeline.h"
 
 namespace pagx {
 
-std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer,
-                                                     PAGFile* parentFile) {
+std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer, PAGFile* parentFile) {
   if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
     return nullptr;
   }

@@ -20,10 +20,10 @@
 #include <algorithm>
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/Layer.h"
-#include "pagx/runtime/PAGComposition.h"
-#include "pagx/runtime/Drawable.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/runtime/Drawable.h"
+#include "pagx/runtime/PAGComposition.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -259,8 +259,8 @@ std::shared_ptr<PAGTimeline> PAGFile::createSlotTimeline(Animation* animation,
     return nullptr;
   }
   auto* effectiveDoc = contextDoc != nullptr ? contextDoc : document.get();
-  return std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), animation, binding, effectiveDoc));
+  return std::shared_ptr<PAGTimeline>(new PAGTimeline(std::weak_ptr<PAGFile>(shared_from_this()),
+                                                      animation, binding, effectiveDoc));
 }
 
 RuntimeBinding* PAGFile::mutableBinding() {

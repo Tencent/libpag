@@ -37,10 +37,7 @@ static int64_t DurationMicros(const Animation* animation) {
 
 PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim, RuntimeBinding* binding,
                          PAGXDocument* contextDoc)
-    : ownerFile(std::move(file)),
-      animation(anim),
-      binding(binding),
-      contextDoc(contextDoc) {
+    : ownerFile(std::move(file)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
 const std::string& PAGTimeline::getId() const {

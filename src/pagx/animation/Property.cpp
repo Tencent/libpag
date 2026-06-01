@@ -35,9 +35,9 @@ KeyValue TypedProperty<T>::onEvaluateAtMicros(int64_t microseconds, float frameR
   if (keyframes.empty()) {
     return T{};
   }
-  double framePosition = frameRate > 0.0f ? static_cast<double>(microseconds) *
-                                                static_cast<double>(frameRate) / 1.0e6
-                                          : 0.0;
+  double framePosition =
+      frameRate > 0.0f ? static_cast<double>(microseconds) * static_cast<double>(frameRate) / 1.0e6
+                       : 0.0;
   return EvaluateKeyframeSequence<T>(keyframes, framePosition);
 }
 

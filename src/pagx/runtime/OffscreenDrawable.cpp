@@ -29,7 +29,8 @@ std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<OffscreenDrawable>(new OffscreenDrawable(width, height, std::move(device)));
+  return std::shared_ptr<OffscreenDrawable>(
+      new OffscreenDrawable(width, height, std::move(device)));
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)

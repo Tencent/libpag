@@ -40,9 +40,7 @@ inline float LerpKeyframeValue<float>(const float& a, const float& b, double t) 
 template <>
 inline Color LerpKeyframeValue<Color>(const Color& a, const Color& b, double t) {
   Color result = a;
-  auto lerpComponent = [t](float ax, float bx) {
-    return static_cast<float>(ax + (bx - ax) * t);
-  };
+  auto lerpComponent = [t](float ax, float bx) { return static_cast<float>(ax + (bx - ax) * t); };
   result.red = lerpComponent(a.red, b.red);
   result.green = lerpComponent(a.green, b.green);
   result.blue = lerpComponent(a.blue, b.blue);
@@ -92,10 +90,9 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     return keyframes.back().value;
   }
   // Locate the segment whose right endpoint exceeds framePosition.
-  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
-                                [](double value, const Keyframe<T>& kf) {
-                                  return value < static_cast<double>(kf.time);
-                                });
+  auto upper = std::upper_bound(
+      keyframes.begin(), keyframes.end(), framePosition,
+      [](double value, const Keyframe<T>& kf) { return value < static_cast<double>(kf.time); });
   auto right = upper;
   auto left = upper - 1;
   double leftTime = static_cast<double>(left->time);
@@ -109,10 +106,9 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     case KeyframeInterpolationType::Hold:
       return left->value;
     case KeyframeInterpolationType::Bezier: {
-      double eased = SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                                       static_cast<double>(left->bezierOut.y),
-                                       static_cast<double>(right->bezierIn.x),
-                                       static_cast<double>(right->bezierIn.y), rawT);
+      double eased = SolveBezierEasing(
+          static_cast<double>(left->bezierOut.x), static_cast<double>(left->bezierOut.y),
+          static_cast<double>(right->bezierIn.x), static_cast<double>(right->bezierIn.y), rawT);
       return LerpKeyframeValue<T>(left->value, right->value, eased);
     }
     case KeyframeInterpolationType::None:

@@ -59,6 +59,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/MixUtils.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/FillRule.h"
@@ -68,7 +69,6 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/runtime/MixUtils.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -1040,8 +1040,7 @@ class LayerBuilderContext {
     filter->setBlurrinessY(MixFloat(filter->blurrinessY(), std::get<float>(value), mix));
   }
 
-  void bindBlurFilterChannels(const BlurFilter* node,
-                              const std::shared_ptr<tgfx::BlurFilter>&) {
+  void bindBlurFilterChannels(const BlurFilter* node, const std::shared_ptr<tgfx::BlurFilter>&) {
     _result.binding.setWriter(node, "blurX", WriteBlurFilterX);
     _result.binding.setWriter(node, "blurY", WriteBlurFilterY);
   }
@@ -1102,9 +1101,9 @@ class LayerBuilderContext {
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
-        auto tgfxFilter = tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY,
-                                                       filter->blurX, filter->blurY,
-                                                       ToTGFX(filter->color), filter->shadowOnly);
+        auto tgfxFilter =
+            tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                         filter->blurY, ToTGFX(filter->color), filter->shadowOnly);
         _result.binding.set(filter, tgfxFilter);
         bindDropShadowFilterChannels(filter, tgfxFilter);
         return tgfxFilter;
