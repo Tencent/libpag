@@ -6431,9 +6431,6 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setSubtreeCacheMaxSize(1024);
   EXPECT_EQ(options->getSubtreeCacheMaxSize(), 1024);
 
-  options->setShowDirtyRegions(true);
-  EXPECT_TRUE(options->getShowDirtyRegions());
-
   const auto constFile = std::const_pointer_cast<const pagx::PAGFile>(file);
   EXPECT_EQ(constFile->getDisplayOptions(), options);
 }

@@ -46,7 +46,7 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   auto file = std::shared_ptr<PAGFile>(new PAGFile());
   file->document = document;
   file->layerTree = std::make_unique<LayerTreeStorage>();
-  file->displayOptions = PAGDisplayOptions::Make(&file->layerTree->displayList);
+  file->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(file));
   auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
   file->layerTree->root = std::move(buildResult.root);
   file->layerTree->binding = std::move(buildResult.binding);
@@ -265,6 +265,10 @@ std::shared_ptr<PAGTimeline> PAGFile::createSlotTimeline(Animation* animation,
 
 RuntimeBinding* PAGFile::mutableBinding() {
   return layerTree != nullptr ? &layerTree->binding : nullptr;
+}
+
+void* PAGFile::getDisplayListForOptions() const {
+  return layerTree != nullptr ? &layerTree->displayList : nullptr;
 }
 
 }  // namespace pagx

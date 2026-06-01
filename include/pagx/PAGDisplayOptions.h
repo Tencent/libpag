@@ -24,6 +24,8 @@
 
 namespace pagx {
 
+class PAGFile;
+
 /**
  * PAGRenderMode defines how a PAGFile display list is rendered to a PAGSurface.
  */
@@ -173,25 +175,12 @@ class PAGDisplayOptions {
    */
   void setSubtreeCacheMaxSize(int maxSize);
 
-  /**
-   * Returns whether dirty regions are highlighted during drawing for debugging.
-   */
-  bool getShowDirtyRegions() const;
-
-  /**
-   * Sets whether dirty regions are highlighted during drawing for debugging.
-   * @param show true to draw dirty-region debug overlays.
-   */
-  void setShowDirtyRegions(bool show);
-
  private:
-  struct Impl;
+  explicit PAGDisplayOptions(std::shared_ptr<PAGFile> file);
 
-  explicit PAGDisplayOptions(std::unique_ptr<Impl> impl);
+  void* getDisplayList() const;
 
-  static std::unique_ptr<PAGDisplayOptions> Make(void* displayList);
-
-  std::unique_ptr<Impl> impl = nullptr;
+  std::weak_ptr<PAGFile> file = {};
 
   friend class PAGFile;
 };

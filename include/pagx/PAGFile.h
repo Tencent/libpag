@@ -151,6 +151,8 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
 
   RuntimeBinding* mutableBinding();
 
+  void* getDisplayListForOptions() const;
+
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
@@ -167,6 +169,7 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   friend class PAGXDocument;
   friend class PAGTimeline;
   friend class PAGComposition;
+  friend class PAGDisplayOptions;
 };
 
 }  // namespace pagx

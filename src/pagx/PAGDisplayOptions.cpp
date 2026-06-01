@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGDisplayOptions.h"
-#include <utility>
+#include "pagx/PAGFile.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -54,144 +54,138 @@ Color ToPAGX(const tgfx::Color& color) {
 
 }  // namespace
 
-struct PAGDisplayOptions::Impl {
-  explicit Impl(void* displayList) : displayList(static_cast<tgfx::DisplayList*>(displayList)) {
-  }
-
-  tgfx::DisplayList* displayList = nullptr;
-  bool showDirtyRegions = false;
-};
-
-std::unique_ptr<PAGDisplayOptions> PAGDisplayOptions::Make(void* displayList) {
-  return std::unique_ptr<PAGDisplayOptions>(
-      new PAGDisplayOptions(std::make_unique<Impl>(displayList)));
-}
-
-PAGDisplayOptions::PAGDisplayOptions(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {
+PAGDisplayOptions::PAGDisplayOptions(std::shared_ptr<PAGFile> file) : file(file) {
 }
 
 PAGDisplayOptions::~PAGDisplayOptions() = default;
 
+void* PAGDisplayOptions::getDisplayList() const {
+  auto owner = file.lock();
+  return owner != nullptr ? owner->getDisplayListForOptions() : nullptr;
+}
+
 float PAGDisplayOptions::getZoomScale() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->zoomScale() : 1.0f;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->zoomScale() : 1.0f;
 }
 
 void PAGDisplayOptions::setZoomScale(float zoomScale) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setZoomScale(zoomScale);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setZoomScale(zoomScale);
   }
 }
 
 int PAGDisplayOptions::getZoomScalePrecision() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->zoomScalePrecision()
-                                                         : 1000;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->zoomScalePrecision() : 1000;
 }
 
 void PAGDisplayOptions::setZoomScalePrecision(int precision) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setZoomScalePrecision(precision);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setZoomScalePrecision(precision);
   }
 }
 
 Point PAGDisplayOptions::getContentOffset() const {
-  if (impl == nullptr || impl->displayList == nullptr) {
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList == nullptr) {
     return {};
   }
-  auto offset = impl->displayList->contentOffset();
+  auto offset = displayList->contentOffset();
   return {offset.x, offset.y};
 }
 
 void PAGDisplayOptions::setContentOffset(float offsetX, float offsetY) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setContentOffset(offsetX, offsetY);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setContentOffset(offsetX, offsetY);
   }
 }
 
 PAGRenderMode PAGDisplayOptions::getRenderMode() const {
-  return impl != nullptr && impl->displayList != nullptr ? ToPAGX(impl->displayList->renderMode())
-                                                         : PAGRenderMode::Partial;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? ToPAGX(displayList->renderMode()) : PAGRenderMode::Partial;
 }
 
 void PAGDisplayOptions::setRenderMode(PAGRenderMode renderMode) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setRenderMode(ToTGFX(renderMode));
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setRenderMode(ToTGFX(renderMode));
   }
 }
 
 int PAGDisplayOptions::getTileSize() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->tileSize() : 256;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->tileSize() : 256;
 }
 
 void PAGDisplayOptions::setTileSize(int tileSize) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setTileSize(tileSize);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setTileSize(tileSize);
   }
 }
 
 int PAGDisplayOptions::getMaxTileCount() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->maxTileCount() : 0;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->maxTileCount() : 0;
 }
 
 void PAGDisplayOptions::setMaxTileCount(int count) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setMaxTileCount(count);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setMaxTileCount(count);
   }
 }
 
 bool PAGDisplayOptions::getAllowZoomBlur() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->allowZoomBlur()
-                                                         : false;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->allowZoomBlur() : false;
 }
 
 void PAGDisplayOptions::setAllowZoomBlur(bool allow) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setAllowZoomBlur(allow);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setAllowZoomBlur(allow);
   }
 }
 
 int PAGDisplayOptions::getMaxTilesRefinedPerFrame() const {
-  return impl != nullptr && impl->displayList != nullptr
-             ? impl->displayList->maxTilesRefinedPerFrame()
-             : 5;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->maxTilesRefinedPerFrame() : 5;
 }
 
 void PAGDisplayOptions::setMaxTilesRefinedPerFrame(int count) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setMaxTilesRefinedPerFrame(count);
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setMaxTilesRefinedPerFrame(count);
   }
 }
 
 Color PAGDisplayOptions::getBackgroundColor() const {
-  return impl != nullptr && impl->displayList != nullptr
-             ? ToPAGX(impl->displayList->backgroundColor())
-             : Color{0, 0, 0, 0, ColorSpace::SRGB};
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? ToPAGX(displayList->backgroundColor())
+                                : Color{0, 0, 0, 0, ColorSpace::SRGB};
 }
 
 void PAGDisplayOptions::setBackgroundColor(const Color& color) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setBackgroundColor(ToTGFX(color));
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setBackgroundColor(ToTGFX(color));
   }
 }
 
 int PAGDisplayOptions::getSubtreeCacheMaxSize() const {
-  return impl != nullptr && impl->displayList != nullptr ? impl->displayList->subtreeCacheMaxSize()
-                                                         : 0;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  return displayList != nullptr ? displayList->subtreeCacheMaxSize() : 0;
 }
 
 void PAGDisplayOptions::setSubtreeCacheMaxSize(int maxSize) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->setSubtreeCacheMaxSize(maxSize);
-  }
-}
-
-bool PAGDisplayOptions::getShowDirtyRegions() const {
-  return impl != nullptr ? impl->showDirtyRegions : false;
-}
-
-void PAGDisplayOptions::setShowDirtyRegions(bool show) {
-  if (impl != nullptr && impl->displayList != nullptr) {
-    impl->displayList->showDirtyRegions(show);
-    impl->showDirtyRegions = show;
+  auto displayList = static_cast<tgfx::DisplayList*>(getDisplayList());
+  if (displayList != nullptr) {
+    displayList->setSubtreeCacheMaxSize(maxSize);
   }
 }
 
