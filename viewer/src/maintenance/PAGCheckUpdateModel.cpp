@@ -37,17 +37,19 @@ PAGCheckUpdateModel::~PAGCheckUpdateModel() {
   }
 }
 
-void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
-  if (!availableUpdateUrls.empty()) {
+void PAGCheckUpdateModel::checkForUpdates(bool keepSilent, bool isUseBeta) {
+  if (fetchingAppcast) {
     qDebug() << "Checking for updates is already in progress, please try again later";
     return;
   }
 
+  fetchingAppcast = true;
   this->isUseBeta = isUseBeta;
-  this->keepSilent = keepSlient;
-  PAGNetworkFetcher fetcher(ServerUrl);
-  connect(&fetcher, &PAGNetworkFetcher::fetched, this, &PAGCheckUpdateModel::getAppcast);
-  fetcher.fetch();
+  this->keepSilent = keepSilent;
+  auto* fetcher = new PAGNetworkFetcher(ServerUrl, this);
+  connect(fetcher, &PAGNetworkFetcher::fetched, this, &PAGCheckUpdateModel::getAppcast);
+  connect(fetcher, &PAGNetworkFetcher::finished, fetcher, &QObject::deleteLater);
+  fetcher->fetchAsync();
 }
 
 void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
@@ -59,6 +61,7 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
 
   if (baseUrl.isEmpty()) {
     qDebug() << "No update url found";
+    fetchingAppcast = false;
     return;
   }
 
@@ -71,12 +74,16 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
     availableUpdateUrls.push_back(updateUrl);
   }
 
+  // Each PAGUpdateVersionFetcherTask::parseAppcast always emits versionFound (with fallback
+  // version "0" on parse failure), ensuring getUpdateVersion collects all responses and resets
+  // fetchingAppcast. If parseAppcast is modified, this invariant must be preserved.
   for (const auto& url : availableUpdateUrls) {
     auto* task = new PAGUpdateVersionFetcherTask(url);
     task->setAutoDelete(false);
     connect(task, &PAGUpdateVersionFetcherTask::versionFound, this,
-            &PAGCheckUpdateModel::getUpdateVersion);
-    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater);
+            &PAGCheckUpdateModel::getUpdateVersion, Qt::QueuedConnection);
+    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater,
+            Qt::QueuedConnection);
     threadPool->start(task);
   }
 }
@@ -102,11 +109,14 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
     }
   }
 
-  QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
-    availableUpdates.clear();
-    availableUpdateUrls.clear();
-    CheckForUpdates(keepSilent, selectedUrl.toStdString());
-  });
+  finalizeUpdateCheck(selectedUrl);
+}
+
+void PAGCheckUpdateModel::finalizeUpdateCheck(const QString& selectedUrl) {
+  availableUpdates.clear();
+  availableUpdateUrls.clear();
+  fetchingAppcast = false;
+  CheckForUpdates(keepSilent, selectedUrl.toStdString());
 }
 
 int PAGCheckUpdateModel::CompareAppVersion(const QString& version1, const QString& version2) {

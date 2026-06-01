@@ -4,7 +4,7 @@
      `text` or `fontFamily` so they route to writeEmbeddedShapeGlyphs (SVG path/image output),
      not the CSS span text path. Covers: xOffsets, positions, anchors, scales, skews,
      combined transforms, and bitmap glyphs (with / without glyph offset). -->
-<pagx version="1.0" width="480" height="520">
+<pagx width="480" height="520">
   <Resources>
     <!-- Vector font: four visually distinct geometric shapes.
          All paths use unitsPerEm=1000 coordinates (y upward, body in y=0..-800).

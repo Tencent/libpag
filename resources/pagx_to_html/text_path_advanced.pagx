@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextPath advanced attributes: forceAlignment, perpendicular=false, margins -->
-<pagx version="1.0" width="420" height="440">
+<pagx width="420" height="440">
   <Resources>
     <PathData id="bannerArc" data="M 10,80 Q 130,0 260,80"/>
     <PathData id="uprightArc" data="M 20,25 Q 130,0 240,25"/>

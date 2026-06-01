@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGNetworkFetcher.h"
+#include <QDebug>
 #include <QEventLoop>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -30,6 +31,7 @@ PAGNetworkFetcher::PAGNetworkFetcher(const QString& url, QObject* parent)
 
 void PAGNetworkFetcher::fetch() {
   QNetworkAccessManager manager;
+  manager.setTransferTimeout(15000);
   QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
 
   QEventLoop eventLoop;
@@ -39,10 +41,35 @@ void PAGNetworkFetcher::fetch() {
   if (reply->error() == QNetworkReply::NoError) {
     Q_EMIT fetched(reply->readAll());
   } else {
+    qWarning() << "Network fetch failed for" << url << ":" << reply->errorString();
     Q_EMIT fetched({});
   }
 
   reply->deleteLater();
+  Q_EMIT finished();
+}
+
+void PAGNetworkFetcher::fetchAsync() {
+  if (asyncManager != nullptr) {
+    return;
+  }
+  asyncManager = new QNetworkAccessManager(this);
+  asyncManager->setTransferTimeout(15000);
+  connect(asyncManager, &QNetworkAccessManager::finished, this,
+          &PAGNetworkFetcher::onReplyFinished);
+  asyncManager->get(QNetworkRequest(QUrl(url)));
+}
+
+void PAGNetworkFetcher::onReplyFinished(QNetworkReply* reply) {
+  if (reply->error() == QNetworkReply::NoError) {
+    Q_EMIT fetched(reply->readAll());
+  } else {
+    qWarning() << "Async network fetch failed for" << url << ":" << reply->errorString();
+    Q_EMIT fetched({});
+  }
+  reply->deleteLater();
+  asyncManager->deleteLater();
+  asyncManager = nullptr;
   Q_EMIT finished();
 }
 

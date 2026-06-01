@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: fillRule comparison — winding vs evenOdd on identical overlapping paths -->
-<pagx version="1.0" width="320" height="305">
+<pagx width="320" height="305">
   <Resources>
     <!-- Star path with self-intersections (pentagram), positive coordinates -->
     <PathData id="starPath" data="M 40,0 L 50,27 L 80,27 L 56,44 L 65,75 L 40,56 L 15,75 L 24,44 L 0,27 L 30,27 Z"/>

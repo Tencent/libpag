@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Forward resource reference (resource used before defined); two-pass parsing required.
      Resources are referenced by layers that appear before the Resources block in document order. -->
-<pagx version="1.0" width="320" height="260">
+<pagx width="320" height="260">
   <!-- Background using a forward-referenced gradient (defined below in Resources) -->
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
