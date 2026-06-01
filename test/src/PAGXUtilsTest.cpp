@@ -38,6 +38,9 @@
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ImageFormatUtils.h"
+#include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

@@ -52,6 +52,8 @@
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ModifierResolver.h"
+#include "pagx/utils/RasterUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
