@@ -41,8 +41,9 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const { responseBytes } = require('./browser-engine');
 const { errMessage } = require('./cli');
+const { writeFileAtomic } = require('./atomic-write');
+const { makeCaptureListener } = require('./capture-listener');
 
 let opentype = null;
 let wawoff2 = null;
@@ -169,56 +170,22 @@ function contentFileName(meta, hash) {
   return `${base}-${hash.slice(0, 16)}.${meta.ext}`;
 }
 
-// Write `data` to `filePath` without ever exposing a half-written file to a
-// concurrent reader (eval/run.js processes many cases in parallel into one
-// shared font directory). We stage the bytes in a per-call temp file and
-// atomically rename it into place; if another worker won the race and created
-// the (byte-identical, content-addressed) target first, we discard our temp
-// and treat it as success.
-async function writeFileAtomic(filePath, data) {
-  const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-  await fsp.writeFile(tmp, data);
-  try {
-    await fsp.rename(tmp, filePath);
-  } catch (err) {
-    await fsp.unlink(tmp).catch(() => {});
-    if (!fs.existsSync(filePath)) throw err;
-  }
-}
-
 // Build a `page.on('response')` listener that caches every successful font
 // response body into `cache` as a `url -> Buffer` mapping. Mirrors
 // snapshot-runner's image-capture listener: it never throws (a detached
 // response just leaves the URL absent), and it reads the body eagerly because
 // the response object may not survive past page teardown.
 function makeFontCaptureListener(engine, cache, log) {
-  return async function captureFontResponse(resp) {
-    try {
-      const req = resp.request();
-      if (req.resourceType() !== 'font') return;
-      const url = req.url();
-      if (!url || url.startsWith('data:')) return;
-      if (!resp.ok()) return;
-      if (cache.has(url)) return;
-      // Clear the timeout once the race settles (either branch) so a
-      // successfully-read body never leaves the 10s timer pending — an
-      // uncleared timer keeps the Node event loop alive past the work it
-      // was guarding.
-      let timer;
-      const buf = await Promise.race([
-        responseBytes(resp, engine),
-        new Promise((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error('timed out reading font body')),
-            FONT_BODY_READ_TIMEOUT_MS,
-          );
-        }),
-      ]).finally(() => clearTimeout(timer));
-      if (buf && buf.length) cache.set(url, buf);
-    } catch (err) {
-      if (log) log(`font capture skipped: ${errMessage(err)}`);
-    }
-  };
+  return makeCaptureListener({
+    resourceType: 'font',
+    engine,
+    cache,
+    log,
+    label: 'font',
+    timeoutMs: FONT_BODY_READ_TIMEOUT_MS,
+    timeoutMessage: 'timed out reading font body',
+    skipEmptyBody: true,
+  });
 }
 
 // Convert the captured `url -> Buffer` map into on-disk SFNT files under

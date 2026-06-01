@@ -75,7 +75,7 @@ const path = require('path');
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./lib/pagx-runner');
-const { errMessage, isHttpUrl } = require('./lib/cli');
+const { errMessage, isHttpUrl, makeFail, parseNumber, validateCookies, validateHeaders, SNAPSHOT_DEFAULTS } = require('./lib/cli');
 const {
   HttpError,
   safeQueryParam,
@@ -94,6 +94,7 @@ const SUPPORTED_FORMATS = ['html', 'pagx', 'both'];
 const DEFAULT_FORMAT = 'html';
 
 const LOG_PREFIX = 'html-snapshot-server: ';
+const fail = makeFail('html-snapshot-server');
 
 function log(msg) {
   // Stderr keeps server diagnostics out of stdout, so wrappers that pipe
@@ -149,38 +150,28 @@ function parseServerArgs(argv) {
       printUsage();
       process.exit(0);
     } else if (a === '--port') {
-      opts.port = Number(argv[++i]);
-      if (!Number.isFinite(opts.port) || opts.port <= 0 || opts.port > 65535) {
-        console.error(`${LOG_PREFIX}invalid --port value`);
-        process.exit(2);
-      }
+      opts.port = parseNumber('--port', argv[++i], { min: 1, max: 65535, fail });
     } else if (a === '--host') {
       opts.host = argv[++i];
     } else if (a === '--browser-engine') {
       try {
         opts.browserEngine = resolveEngine(argv[++i]);
       } catch (err) {
-        console.error(`${LOG_PREFIX}${errMessage(err)}`);
-        process.exit(2);
+        fail(errMessage(err));
       }
     } else if (a === '--pagx-bin') {
       const value = argv[++i];
-      if (!value) {
-        console.error(`${LOG_PREFIX}--pagx-bin requires a path argument`);
-        process.exit(2);
-      }
+      if (!value) fail('--pagx-bin requires a path argument');
       opts.pagxBin = path.resolve(value);
     } else if (a === '--max-body-mb') {
-      const mb = Number(argv[++i]);
-      if (!Number.isFinite(mb) || mb <= 0) {
-        console.error(`${LOG_PREFIX}--max-body-mb must be a positive number`);
-        process.exit(2);
-      }
+      const mb = parseNumber('--max-body-mb', argv[++i], { min: 1, fail });
       opts.maxBodyBytes = mb * 1024 * 1024;
     } else {
-      console.error(`${LOG_PREFIX}unknown option: ${a}`);
+      // server's UX has long printed the usage block on unknown options to
+      // help operators correct typos. Keep that behaviour — fail() alone
+      // would only emit the one-line error.
       printUsage();
-      process.exit(2);
+      fail(`unknown option: ${a}`);
     }
   }
   return opts;
@@ -438,30 +429,15 @@ function resolveOptions(reqOptions, forUrl) {
   if (typeof r.selector === 'string') out.selector = r.selector;
   if (typeof r.inlineIconFonts === 'boolean') out.inlineIconFonts = r.inlineIconFonts;
   if (forUrl) {
-    if (Array.isArray(r.cookies)) {
-      // Expected shape: [{ name, value }]. Drop anything that doesn't
-      // fit the contract rather than letting puppeteer throw a
-      // less-helpful error mid-pipeline.
-      const valid = r.cookies.filter(
-        (c) => c && typeof c.name === 'string' && typeof c.value === 'string',
-      );
-      if (valid.length > 0) out.cookies = valid;
-    }
-    if (Array.isArray(r.headers)) {
-      // Array shape: [[key, value], …] matches the CLI parser output.
-      const valid = r.headers.filter(
-        (h) => Array.isArray(h) && h.length === 2
-          && typeof h[0] === 'string' && typeof h[1] === 'string',
-      );
-      if (valid.length > 0) out.headers = valid;
-    } else if (r.headers && typeof r.headers === 'object') {
-      // Object shape: { "X-User": "alice" } — convenient for JSON
-      // callers; converted to the same `[[k, v]]` form internally.
-      const entries = Object.entries(r.headers).filter(
-        ([k, v]) => typeof k === 'string' && typeof v === 'string',
-      );
-      if (entries.length > 0) out.headers = entries;
-    }
+    // cookies: [{ name, value }] only — anything else is dropped (validators
+    // shared with the CLI live in lib/cli.js).
+    const cookies = validateCookies(r.cookies);
+    if (cookies.length > 0) out.cookies = cookies;
+    // headers: accept [[key, value], …] (matches CLI output) or { Key: Value }
+    // (convenient for JSON callers); both normalise to [[k, v], …] inside
+    // validateHeaders.
+    const headers = validateHeaders(r.headers);
+    if (headers.length > 0) out.headers = headers;
   }
   return out;
 }

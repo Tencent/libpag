@@ -178,22 +178,27 @@ function isVisible(computed) {
   return true;
 }
 
-function readPadding(computed) {
+// Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
+// a `{ top, right, bottom, left }` object. Tolerates missing / non-numeric
+// values by coercing to 0 — `getComputedStyle` always returns a string but
+// `parseFloat('')` is NaN, so the `|| 0` is load-bearing for the callers'
+// arithmetic.
+function readBox(computed, prefix, suffix) {
+  const sfx = suffix ? `-${suffix}` : '';
   return {
-    top:    parseFloat(computed.getPropertyValue('padding-top'))    || 0,
-    right:  parseFloat(computed.getPropertyValue('padding-right'))  || 0,
-    bottom: parseFloat(computed.getPropertyValue('padding-bottom')) || 0,
-    left:   parseFloat(computed.getPropertyValue('padding-left'))   || 0,
+    top:    parseFloat(computed.getPropertyValue(`${prefix}-top${sfx}`))    || 0,
+    right:  parseFloat(computed.getPropertyValue(`${prefix}-right${sfx}`))  || 0,
+    bottom: parseFloat(computed.getPropertyValue(`${prefix}-bottom${sfx}`)) || 0,
+    left:   parseFloat(computed.getPropertyValue(`${prefix}-left${sfx}`))   || 0,
   };
 }
 
+function readPadding(computed) {
+  return readBox(computed, 'padding');
+}
+
 function readMargin(computed) {
-  return {
-    top:    parseFloat(computed.getPropertyValue('margin-top'))    || 0,
-    right:  parseFloat(computed.getPropertyValue('margin-right'))  || 0,
-    bottom: parseFloat(computed.getPropertyValue('margin-bottom')) || 0,
-    left:   parseFloat(computed.getPropertyValue('margin-left'))   || 0,
-  };
+  return readBox(computed, 'margin');
 }
 
 function borderWidthOf(computed, side) {
@@ -2533,6 +2538,7 @@ const HELPER_FNS = [
   paddingShorthand,
   nonZero,
   isVisible,
+  readBox,
   readPadding,
   readMargin,
   borderWidthOf,

@@ -19,8 +19,14 @@ const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./icon-font');
 const { makeFontCaptureListener, saveDownloadedFonts } = require('./font-download');
 const { saveDownloadedImages } = require('./image-download');
 const { openAndSettlePage } = require('./page-loader');
-const { responseBytes } = require('./browser-engine');
-const { errMessage } = require('./cli');
+const { makeCaptureListener } = require('./capture-listener');
+const { errMessage, SNAPSHOT_DEFAULTS } = require('./cli');
+
+// Default values for the user-facing snapshot options. Defined in lib/cli.js
+// so the CLI parser, the HTTP service, and this runner share a single source.
+//
+// Re-exported here for backwards compatibility with callers that imported
+// `SNAPSHOT_DEFAULTS` from `./snapshot-runner`.
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -32,28 +38,19 @@ const { errMessage } = require('./cli');
 // failed for, since most image CDNs do not return CORS headers).
 //
 // We capture by URL key (not by element ref) so the same image used by
-// multiple <img> tags is stored once. The listener never throws — a detached
-// response or scheme we don't support just leaves the URL absent from the
-// cache, and the in-page fetch fallback will retry.
+// multiple <img> tags is stored once.
 function makeImageCaptureListener(engine, cache, log) {
-  return async function captureImageResponse(resp) {
-    try {
-      const req = resp.request();
-      if (req.resourceType() !== 'image') return;
-      const url = req.url();
-      if (!url || url.startsWith('data:')) return;
-      if (!resp.ok()) return;
-      if (cache.has(url)) return;
-      const buf = await responseBytes(resp, engine);
-      const ct = resp.headers()['content-type'] || 'application/octet-stream';
-      cache.set(url, { buffer: buf, contentType: ct });
-    } catch (err) {
-      // Common case: response detached after a navigation, or the request
-      // was served from cache and the body is no longer accessible. Drop
-      // it — the in-page fetch fallback handles cache misses.
-      if (log) log(`image capture skipped: ${errMessage(err)}`);
-    }
-  };
+  return makeCaptureListener({
+    resourceType: 'image',
+    engine,
+    cache,
+    log,
+    label: 'image',
+    project: (buf, resp) => ({
+      buffer: buf,
+      contentType: resp.headers()['content-type'] || 'application/octet-stream',
+    }),
+  });
 }
 
 // Turn a captured `{ buffer, contentType }` entry into a base64 `data:` URI —
@@ -92,11 +89,45 @@ function entryToDataUri(entry) {
 //                            snapshot.js's pre-extraction behaviour (one
 //                            "skipped" line per cross-origin image was too
 //                            noisy).
+// Default values for the user-facing snapshot options. Defined in lib/cli.js
+// so the CLI parser, the HTTP service, and this runner share a single source.
+// Run a best-effort save step (fonts or images): on success, log the count;
+// on failure, log the error and return an empty array so the rest of the
+// pipeline still proceeds. Centralised so the font and image branches stop
+// re-implementing the same try/catch/log scaffolding around their respective
+// `save*` calls.
+async function bestEffortSave(saveFn, cache, dir, log, label) {
+  try {
+    const arr = await saveFn(cache, dir, log || (() => {}));
+    if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
+    return arr;
+  } catch (err) {
+    if (log) log(`${label} download failed: ${errMessage(err)}`);
+    return [];
+  }
+}
+
+// Run a best-effort save step (fonts or images): on success, log the count;
+// on failure, log the error and return an empty array so the rest of the
+// pipeline still proceeds. Centralised so the font and image branches stop
+// re-implementing the same try/catch/log scaffolding around their respective
+// `save*` calls.
+async function bestEffortSave(saveFn, cache, dir, log, label) {
+  try {
+    const arr = await saveFn(cache, dir, log || (() => {}));
+    if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
+    return arr;
+  } catch (err) {
+    if (log) log(`${label} download failed: ${errMessage(err)}`);
+    return [];
+  }
+}
+
 async function runSnapshot(engineHandle, targetUrl, opts) {
   const {
-    viewportWidth = 1400,
-    viewportHeight = 900,
-    waitMs = 800,
+    viewportWidth = SNAPSHOT_DEFAULTS.viewportWidth,
+    viewportHeight = SNAPSHOT_DEFAULTS.viewportHeight,
+    waitMs = SNAPSHOT_DEFAULTS.waitMs,
     selector = '',
     cookies = [],
     headers = [],
@@ -166,12 +197,9 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     let images = [];
     const srcByUrl = {};
     if (downloadImages && imageDir) {
-      try {
-        images = await saveDownloadedImages(imageBytesByUrl, imageDir, log || (() => {}));
-        if (log) log(`downloaded ${images.length} image file(s) to ${imageDir}`);
-      } catch (err) {
-        if (log) log(`image download failed: ${errMessage(err)}`);
-      }
+      images = await bestEffortSave(
+        saveDownloadedImages, imageBytesByUrl, imageDir, log, 'image',
+      );
       for (const { url, path: filePath } of images) {
         srcByUrl[url] = filePath;
       }
@@ -214,15 +242,9 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     // already in `fontBytesByUrl` by now (no page interaction needed). This
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
-    let fonts = [];
-    if (downloadFonts && fontDir) {
-      try {
-        fonts = await saveDownloadedFonts(fontBytesByUrl, fontDir, log || (() => {}));
-        if (log) log(`downloaded ${fonts.length} font file(s) to ${fontDir}`);
-      } catch (err) {
-        if (log) log(`font download failed: ${errMessage(err)}`);
-      }
-    }
+    const fonts = (downloadFonts && fontDir)
+      ? await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font')
+      : [];
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
@@ -237,4 +259,4 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
   }
 }
 
-module.exports = { runSnapshot, makeImageCaptureListener };
+module.exports = { runSnapshot, makeImageCaptureListener, SNAPSHOT_DEFAULTS };

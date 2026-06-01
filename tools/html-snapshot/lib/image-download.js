@@ -37,6 +37,8 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const { writeFileAtomic } = require('./atomic-write');
+const { errMessage } = require('./cli');
 
 // Map a response content-type (or a magic-byte sniff) to a file extension.
 // PAGX matches images by decoding the file bytes, not the extension, so a
@@ -115,23 +117,6 @@ function contentFileName(url, hash, ext) {
   return `${baseNameFromUrl(url)}-${hash.slice(0, 16)}.${ext}`;
 }
 
-// Write `data` to `filePath` without ever exposing a half-written file to a
-// concurrent reader (eval/run.js processes many cases in parallel into one
-// shared directory). Stage the bytes in a per-call temp file and atomically
-// rename it into place; if another worker won the race and created the
-// (byte-identical, content-addressed) target first, discard our temp and treat
-// it as success.
-async function writeFileAtomic(filePath, data) {
-  const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-  await fsp.writeFile(tmp, data);
-  try {
-    await fsp.rename(tmp, filePath);
-  } catch (err) {
-    await fsp.unlink(tmp).catch(() => {});
-    if (!fs.existsSync(filePath)) throw err;
-  }
-}
-
 // Convert the captured `url -> { buffer, contentType }` map into on-disk image
 // files under `outDir`. Returns `[{ url, path }]` for the unique images
 // captured. De-dupes by content hash so the same image served from multiple
@@ -169,8 +154,7 @@ async function saveDownloadedImages(imageBytesByUrl, outDir, logger) {
       }
       saved.push({ url, path: filePath });
     } catch (err) {
-      const msg = err && err.message ? err.message : String(err);
-      log(`failed to save image ${url}: ${msg}`);
+      log(`failed to save image ${url}: ${errMessage(err)}`);
     }
   }
   return saved;

@@ -10,6 +10,17 @@ const { SUPPORTED_ENGINES, resolveEngine } = require('./browser-engine');
 
 const LOG_PREFIX = 'html-snapshot: ';
 
+// Default values for the user-facing snapshot options. Defined here so the
+// CLI parser, the HTTP service (server.js), and the pipeline runner
+// (snapshot-runner.js) read the numbers from a single source — drift between
+// them used to mean "the same request produced different output depending on
+// which entry point you used".
+const SNAPSHOT_DEFAULTS = Object.freeze({
+  viewportWidth: 1400,
+  viewportHeight: 900,
+  waitMs: 800,
+});
+
 // Print an error message with the standard CLI prefix and abort with the
 // "argument error" exit code (2). Centralised so every fail point shares the
 // same prefix and exit semantics — the prior inline `console.error` + `exit`
@@ -51,13 +62,17 @@ function errMessage(err) {
 // sibling tools can keep their own log prefix.
 function parseNumber(flagName, value, opts) {
   const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? opts.min : 0;
+  const max = (opts && Object.prototype.hasOwnProperty.call(opts, 'max')) ? opts.max : Infinity;
   const failFn = (opts && opts.fail) || fail;
   if (value === undefined) {
     failFn(`'${flagName}' requires a numeric argument`);
   }
   const n = Number(value);
-  if (!Number.isFinite(n) || n < min) {
-    const bound = min > 0 ? `>= ${min}` : 'non-negative';
+  if (!Number.isFinite(n) || n < min || n > max) {
+    let bound;
+    if (max !== Infinity) bound = `between ${min} and ${max}`;
+    else if (min > 0) bound = `>= ${min}`;
+    else bound = 'non-negative';
     failFn(`'${flagName}' expects a ${bound} number, got '${value}'`);
   }
   return n;
@@ -101,6 +116,42 @@ function parseHeader(flagName, value) {
     fail(`'${flagName}' has empty header name in '${value}'`);
   }
   return [key, val];
+}
+
+// Filter an already-parsed cookie list to entries that match puppeteer's
+// `{ name, value }` contract. Used by both:
+//   - the CLI parser (cli.js parseCookie produces well-formed entries; the
+//     filter is a no-op safety net there);
+//   - the HTTP service (server.js receives JSON-decoded objects from
+//     untrusted clients and must drop anything that doesn't fit the contract
+//     before handing it to the snapshot pipeline).
+// Returns the filtered array (possibly empty); never throws on a malformed
+// input.
+function validateCookies(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (c) => c && typeof c.name === 'string' && typeof c.value === 'string',
+  );
+}
+
+// Normalise an incoming `headers` value into the `[[key, value], …]` form the
+// snapshot pipeline expects. Accepts both the array shape (matches the CLI
+// parser output) and the object shape `{ Key: Value }` (convenient for JSON
+// callers). Drops entries whose key or value isn't a string. Returns `[]` for
+// unrecognised inputs; never throws on a malformed input.
+function validateHeaders(value) {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (h) => Array.isArray(h) && h.length === 2
+        && typeof h[0] === 'string' && typeof h[1] === 'string',
+    );
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).filter(
+      ([k, v]) => typeof k === 'string' && typeof v === 'string',
+    );
+  }
+  return [];
 }
 
 // Long-option flag table. Each entry lists the names the user can type and a
@@ -181,9 +232,9 @@ function parseArgs(argv) {
     // instead of a temp file on disk.
     outputToStdout: false,
     isUrl: false,
-    viewportWidth: 1400,
-    viewportHeight: 900,
-    waitMs: 800,
+    viewportWidth: SNAPSHOT_DEFAULTS.viewportWidth,
+    viewportHeight: SNAPSHOT_DEFAULTS.viewportHeight,
+    waitMs: SNAPSHOT_DEFAULTS.waitMs,
     selector: '',
     cookies: [],
     headers: [],
@@ -275,40 +326,29 @@ function parseArgs(argv) {
       opts.output = path.resolve(opts.output);
     }
   }
-  // Resolve the font-download destination once the output path is known. An
-  // explicit --font-dir always wins; otherwise default to a sibling
-  // `<output-without-ext>.fonts/` directory (with a trailing `.subset`
-  // stripped so `page.subset.html` yields `page.fonts/`, not
-  // `page.subset.fonts/`). Stdout mode has no output path to derive from, so
-  // --font-dir is required there.
-  if (opts.fontDir) {
-    opts.fontDir = path.resolve(opts.fontDir);
-  } else if (opts.downloadFonts) {
+  // Resolve a `--<resource>-dir` flag to an absolute path: an explicit value
+  // wins (already in `opts[dirKey]`); otherwise, when the corresponding
+  // `--download-<resource>` flag is on, default to a sibling
+  // `<output-without-ext>.<suffix>/` directory. The trailing `.subset` is
+  // stripped from the base name so `page.subset.html` yields `page.fonts/`,
+  // not `page.subset.fonts/`. Stdout mode has no output path to derive from,
+  // so an explicit `--<resource>-dir` is required.
+  function resolveSiblingDir(dirKey, downloadKey, suffix, downloadFlag, dirFlag) {
+    if (opts[dirKey]) {
+      opts[dirKey] = path.resolve(opts[dirKey]);
+      return;
+    }
+    if (!opts[downloadKey]) return;
     if (opts.outputToStdout || !opts.output) {
-      fail(`--download-fonts requires --font-dir when output is written to stdout`);
+      fail(`${downloadFlag} requires ${dirFlag} when output is written to stdout`);
     }
     const dir = path.dirname(opts.output);
     let base = path.basename(opts.output, path.extname(opts.output));
     if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
-    opts.fontDir = path.join(dir, `${base}.fonts`);
+    opts[dirKey] = path.join(dir, `${base}.${suffix}`);
   }
-  // Resolve the image-download destination once the output path is known,
-  // mirroring --font-dir: an explicit --image-dir always wins; otherwise
-  // default to a sibling `<output-without-ext>.images/` directory (with a
-  // trailing `.subset` stripped so `page.subset.html` yields `page.images/`,
-  // not `page.subset.images/`). The snapshot references images by absolute
-  // file path, so stdout mode still works as long as --image-dir is given.
-  if (opts.imageDir) {
-    opts.imageDir = path.resolve(opts.imageDir);
-  } else if (opts.downloadImages) {
-    if (opts.outputToStdout || !opts.output) {
-      fail(`--download-images requires --image-dir when output is written to stdout`);
-    }
-    const dir = path.dirname(opts.output);
-    let base = path.basename(opts.output, path.extname(opts.output));
-    if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
-    opts.imageDir = path.join(dir, `${base}.images`);
-  }
+  resolveSiblingDir('fontDir',  'downloadFonts',  'fonts',  '--download-fonts',  '--font-dir');
+  resolveSiblingDir('imageDir', 'downloadImages', 'images', '--download-images', '--image-dir');
   // A manifest only makes sense alongside --download-fonts (it lists the
   // captured font files). Resolve it to an absolute path so the paths it
   // records are usable from any working directory.
@@ -375,4 +415,4 @@ Options:
                              override via HTML_SNAPSHOT_BROWSER env var).`);
 }
 
-module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, errMessage, LOG_PREFIX };
+module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, errMessage, validateCookies, validateHeaders, LOG_PREFIX, SNAPSHOT_DEFAULTS };

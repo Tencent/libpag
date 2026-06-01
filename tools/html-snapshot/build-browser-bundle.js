@@ -36,6 +36,23 @@ const {
   ICON_FONT_HELPERS_SRC,
 } = require('./lib/icon-font');
 
+// Public API exposed by the browser bundle, in the order their source code
+// appears in factoryBody and their entries appear in the returned object.
+// Driving the body & return-object & ESM `export const` list off this single
+// list means adding a new browser entry only edits one place — the previous
+// shape repeated each name across three string blocks.
+//
+// `takeSnapshot` is special-cased below: it maps to `snapshotMain` (which
+// comes from HELPERS_SRC, not from a Node-side require), so it is not in
+// this list.
+const BROWSER_EXPORTS = [
+  { name: 'inlineExternalImages',   fn: inlineExternalImages },
+  { name: 'inlineCanvases',         fn: inlineCanvases },
+  { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
+  { name: 'collectIconFontTargets', fn: browserCollectIconFontTargets },
+  { name: 'applyIconFontSvgs',      fn: browserApplyIconFontSvgs },
+];
+
 const distDir = path.join(__dirname, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
 
@@ -79,15 +96,7 @@ ${PAYLOAD_CONSTANTS_SRC}
 
 ${ICON_FONT_HELPERS_SRC}
 
-${inlineExternalImages.toString()}
-
-${inlineCanvases.toString()}
-
-${browserCollectFontFaceMap.toString()}
-
-${browserCollectIconFontTargets.toString()}
-
-${browserApplyIconFontSvgs.toString()}
+${BROWSER_EXPORTS.map((e) => e.fn.toString()).join('\n\n')}
 
 return {
   takeSnapshot: snapshotMain,
@@ -121,6 +130,10 @@ ${factoryBody}
 }));
 `;
 
+const esmExports = ['takeSnapshot', ...BROWSER_EXPORTS.map((e) => e.name)]
+  .map((n) => `export const ${n} = _module.${n};`)
+  .join('\n');
+
 const esm = `${banner}
 
 const _module = (function () {
@@ -128,12 +141,7 @@ const _module = (function () {
 ${factoryBody}
 }());
 
-export const takeSnapshot = _module.takeSnapshot;
-export const inlineExternalImages = _module.inlineExternalImages;
-export const inlineCanvases = _module.inlineCanvases;
-export const collectFontFaceMap = _module.collectFontFaceMap;
-export const collectIconFontTargets = _module.collectIconFontTargets;
-export const applyIconFontSvgs = _module.applyIconFontSvgs;
+${esmExports}
 export default _module;
 `;
 
