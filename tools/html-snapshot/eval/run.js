@@ -4,9 +4,15 @@
  * directory:
  *
  *   for each case:
- *     1. baseline.js  → out/<case>.baseline.png
- *     2. html2pagx    → out/<case>.subset.html / .pagx / .png + stderr
- *     3. compare.js   → metrics row
+ *     1. baseline.js               → out/<case>.baseline.png
+ *     2. lib/pipeline.js (snapshot → pagx import → resolve → [font embed]
+ *                         → render) → out/<case>.subset.html / .pagx / .png
+ *     3. compare.js                → metrics row
+ *
+ * Step 2 shares its implementation with the html2pagx CLI through
+ * tools/html-snapshot/lib/pipeline.js. Anything this script does on top of
+ * that pipeline (baseline rendering, pixel/flex metrics, shared font/image
+ * caches across cases, concurrency) lives in this file.
  *
  * Outputs:
  *   out/report.csv         — one row per case
@@ -21,10 +27,18 @@
 
 const fs = require('fs');
 const path = require('path');
-const child_process = require('child_process');
 const compare = require('./compare');
 const { makeFail } = require('../lib/cli');
 const { launchBrowser, resolveEngine } = require('../lib/browser-engine');
+const {
+  spawnCapture,
+  runSnapshot,
+  runPagxImportToFile,
+  runPagxResolve,
+  runPagxFontEmbed,
+  runPagxRender,
+  readFontManifest,
+} = require('../lib/pipeline');
 
 const fail = makeFail('run');
 
@@ -42,14 +56,13 @@ function parseArgs(argv) {
     // When true, snapshot.js downloads the page's web fonts into a shared,
     // content-addressed cache (out/<label>/fonts/), so a face common to the
     // corpus is stored once rather than re-downloaded per case; run.js then
-    // registers each case's subset as render fallbacks, mirroring what
-    // html2pagx does. Mostly relevant for CJK corpora whose text would
-    // otherwise fall back to a host typeface.
+    // registers each case's subset as render fallbacks. Mostly relevant for
+    // CJK corpora whose text would otherwise fall back to a host typeface.
     downloadFonts: false,
     // When true, additionally embed each case's downloaded faces into its .pagx
     // (`pagx font embed`) so the document is self-contained and its glyph
     // metrics match the snapshot regardless of host fonts. Implies
-    // downloadFonts. Mirrors html2pagx's --embed-fonts.
+    // downloadFonts.
     embedFonts: false,
     // When true, snapshot.js downloads the page's external images into a shared,
     // content-addressed cache (out/<label>/images/) and rewrites each subset
@@ -57,7 +70,7 @@ function parseArgs(argv) {
     // them as base64 data URIs. This keeps the subset HTML — and the .pagx
     // produced from it — small for image-heavy corpora; `pagx render` reads the
     // files directly, so (unlike fonts) no per-case manifest or `--fallback`
-    // wiring is needed. Mirrors html2pagx's --download-images.
+    // wiring is needed.
     downloadImages: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
@@ -111,7 +124,7 @@ const USAGE = `Usage: node run.js [options]
                       to pagx render as fallbacks. Fonts land in a single shared,
                       content-addressed cache at out/<label>/fonts/ (identical
                       faces stored once); each case records the subset it uses
-                      in out/<label>/<case>/fonts.txt. Mirrors html2pagx.
+                      in out/<label>/<case>/fonts.txt.
   --embed-fonts       On top of --download-fonts, embed each case's downloaded
                       faces into its .pagx (pagx font embed) so glyph metrics
                       match the snapshot. Implies --download-fonts.
@@ -120,7 +133,7 @@ const USAGE = `Usage: node run.js [options]
                       as base64. Images land in a single shared, content-
                       addressed cache at out/<label>/images/ (identical images
                       stored once); pagx render reads the files directly, so no
-                      per-case manifest is needed. Mirrors html2pagx.
+                      per-case manifest is needed.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -181,24 +194,6 @@ function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
 
-// Read the per-case font manifest snapshot.js wrote (one absolute path per
-// line) so only the fonts this case actually uses are registered as render
-// fallbacks. The fonts themselves live in the shared, content-addressed cache
-// directory, but each case must reference just its own set. Missing/empty
-// manifest → empty (the case simply had no web fonts).
-function readFontManifest(manifestPath) {
-  let text;
-  try {
-    text = fs.readFileSync(manifestPath, 'utf8');
-  } catch (_err) {
-    return [];
-  }
-  return text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && fs.existsSync(l));
-}
-
 function timeNow() {
   return Date.now();
 }
@@ -206,44 +201,6 @@ function timeNow() {
 function fmt(n, digits = 4) {
   if (typeof n !== 'number' || !isFinite(n)) return '-';
   return n.toFixed(digits);
-}
-
-// Async spawn wrapper. Returns a Promise so processCase calls can run in
-// parallel under --concurrency without serializing on the Node event loop
-// (spawnSync would have blocked it).
-function runProc(cmd, args, stderrPath) {
-  return new Promise((resolve) => {
-    const startedAt = timeNow();
-    let child;
-    try {
-      child = child_process.spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    } catch (err) {
-      const stderr = `\n${err.message}`;
-      if (stderrPath) {
-        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
-      }
-      resolve({ code: null, durationMs: timeNow() - startedAt, stdout: '', stderr });
-      return;
-    }
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d) => { stdout += d.toString(); });
-    child.stderr.on('data', (d) => { stderr += d.toString(); });
-    let killedByTimeout = false;
-    const timer = setTimeout(() => {
-      killedByTimeout = true;
-      try { child.kill('SIGKILL'); } catch (_e) { /* ignore */ }
-    }, 180000);
-    child.on('error', (err) => { stderr += `\n${err.message}`; });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (killedByTimeout) stderr += '\n[runProc] killed by timeout (180s)';
-      if (stderrPath) {
-        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
-      }
-      resolve({ code, durationMs: timeNow() - startedAt, stdout, stderr });
-    });
-  });
 }
 
 async function processCase(entry, outDir, opts, browser) {
@@ -298,10 +255,10 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 1. baseline
   if (!opts.skipExisting || !fs.existsSync(baselinePng)) {
-    const r = await runProc(
-      'node',
+    const r = await spawnCapture(
+      process.execPath,
       [path.join(SCRIPT_DIR, 'baseline.js'), htmlPath, '-o', baselinePng, ...engineArgs],
-      baselineStderr,
+      { stderrPath: baselineStderr },
     );
     row.baselineMs = r.durationMs;
     if (r.code !== 0) {
@@ -312,22 +269,23 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
-    const snapshotArgs = [path.join(TOOL_DIR, 'snapshot.js'), htmlPath, '-o', subsetHtml, ...engineArgs];
-    if (opts.downloadFonts) {
-      snapshotArgs.push(
-        '--download-fonts',
-        '--font-dir', opts.fontCacheDir,
-        '--font-manifest', fontManifest,
-      );
-    }
-    // Image download writes the page's images into the shared cache and
-    // rewrites the subset HTML to reference them by absolute path. Unlike
-    // fonts, the path is baked into the .pagx by `pagx import`, so render reads
-    // the files directly — no per-case manifest / `--fallback` wiring needed.
-    if (opts.downloadImages) {
-      snapshotArgs.push('--download-images', '--image-dir', opts.imageCacheDir);
-    }
-    const r = await runProc('node', snapshotArgs, snapshotStderr);
+    const r = await runSnapshot({
+      input: htmlPath,
+      output: subsetHtml,
+      scriptDir: TOOL_DIR,
+      browserEngine: opts.browserEngine,
+      downloadFonts: opts.downloadFonts,
+      fontDir: opts.downloadFonts ? opts.fontCacheDir : '',
+      fontManifest: opts.downloadFonts ? fontManifest : '',
+      // Image download writes the page's images into the shared cache and
+      // rewrites the subset HTML to reference them by absolute path. Unlike
+      // fonts, the path is baked into the .pagx by `pagx import`, so render
+      // reads the files directly — no per-case manifest / `--fallback`
+      // wiring needed.
+      downloadImages: opts.downloadImages,
+      imageDir: opts.downloadImages ? opts.imageCacheDir : '',
+      stderrPath: snapshotStderr,
+    });
     row.snapshotMs = r.durationMs;
     if (r.code !== 0) {
       row.error = 'snapshot-failed';
@@ -337,9 +295,13 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 3. import
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
-    const args = ['import', '--input', subsetHtml, '--output', subsetPagx, '--format', 'html'];
-    if (opts.inferFlex) args.push('--html-infer-flex');
-    const r = await runProc(opts.pagxBin, args, importStderr);
+    const r = await runPagxImportToFile({
+      pagxBin: opts.pagxBin,
+      subsetHtml,
+      pagxFile: subsetPagx,
+      inferFlex: opts.inferFlex,
+      stderrPath: importStderr,
+    });
     row.importMs = r.durationMs;
     if (r.code !== 0 || !fs.existsSync(subsetPagx)) {
       row.error = 'import-failed';
@@ -352,32 +314,44 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexSkipped = w.flexSkipped;
 
   // The fonts this case uses (from its manifest) become `--fallback` args for
-  // `pagx render` (and `pagx font embed` when --embed-fonts is set), so text in
-  // an uninstalled web font resolves against the real typeface instead of a
-  // host system fallback. Only this case's fonts are passed — the shared cache
-  // also holds other cases' fonts, which this render must not see. Mirrors
-  // html2pagx's font handling.
-  const fontFallbackArgs = [];
+  // `pagx render` (and `pagx font embed` when --embed-fonts is set), so text
+  // in an uninstalled web font resolves against the real typeface instead of
+  // a host system fallback. Only this case's fonts are passed — the shared
+  // cache also holds other cases' fonts, which this render must not see.
+  let fontFallbacks = [];
   if (opts.downloadFonts) {
-    for (const f of readFontManifest(fontManifest)) fontFallbackArgs.push('--fallback', f);
+    fontFallbacks = readFontManifest({ manifestPath: fontManifest });
   }
 
   // 4. resolve + (font embed) + render
   if (!opts.skipExisting || !fs.existsSync(subsetPng)) {
-    await runProc(opts.pagxBin, ['resolve', subsetPagx], path.join(caseDir, 'resolve.stderr.txt'));
+    await runPagxResolve({
+      pagxBin: opts.pagxBin,
+      pagxFile: subsetPagx,
+      stderrPath: path.join(caseDir, 'resolve.stderr.txt'),
+    });
     // Optionally embed the downloaded faces into the resolved .pagx so the
     // document is self-contained and its glyph metrics match the snapshot.
     // Gated on --embed-fonts; the faces are still passed to `pagx render` as
     // fallbacks below regardless.
-    if (opts.embedFonts && fontFallbackArgs.length > 0) {
-      await runProc(opts.pagxBin, ['font', 'embed', subsetPagx, ...fontFallbackArgs],
-        path.join(caseDir, 'font-embed.stderr.txt'));
+    if (opts.embedFonts && fontFallbacks.length > 0) {
+      await runPagxFontEmbed({
+        pagxBin: opts.pagxBin,
+        pagxFile: subsetPagx,
+        fontFiles: fontFallbacks,
+        stderrPath: path.join(caseDir, 'font-embed.stderr.txt'),
+      });
     }
     // Only pass fonts to render when the case actually has some; an empty
     // --fallback list keeps the command identical to a no-font render.
-    const r = await runProc(opts.pagxBin,
-      ['render', subsetPagx, '--output', subsetPng, '--scale', '1', ...fontFallbackArgs],
-      path.join(caseDir, 'render.stderr.txt'));
+    const r = await runPagxRender({
+      pagxBin: opts.pagxBin,
+      pagxFile: subsetPagx,
+      output: subsetPng,
+      scale: 1,
+      fontFallbacks,
+      stderrPath: path.join(caseDir, 'render.stderr.txt'),
+    });
     row.renderMs = r.durationMs;
     if (r.code !== 0 || !fs.existsSync(subsetPng)) {
       row.error = 'render-failed';

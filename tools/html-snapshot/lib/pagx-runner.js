@@ -1,15 +1,19 @@
 // Run `pagx import --format html` against a snapshot HTML payload and return
-// the resulting PAGX (a UTF-8 XML document) as a string. This module is the
-// Node-side counterpart to step 2 of the `html2pagx` bash wrapper:
+// the resulting PAGX (a UTF-8 XML document) as a string. This module is a
+// thin in-memory adapter for `pagx import`: callers hand it an HTML string
+// and get the PAGX string back, with temp-file plumbing hidden. It powers
+// `server.js` so the HTTP service can return PAGX directly instead of the
+// intermediate flat HTML.
 //
-//   html2pagx → snapshot.js → pagx import → pagx resolve → pagx render
+// The on-disk pipeline (snapshot.js → pagx import → resolve → render) used by
+// the html2pagx CLI and eval/run.js lives in `lib/pipeline.js`; that module
+// also exposes a `filterKnownWarnings` helper that mirrors what we do here
+// for stderr cleanup, so the two stay aligned.
 //
-// It is consumed by `server.js` so the HTTP service can return PAGX directly
-// instead of just the intermediate flat HTML. The CLI binary is spawned per
-// request — one tiny native invocation against a per-request temp file —
-// which keeps the warm-browser model intact (no need to rebuild the C++
-// importer in-process) while still being fast enough that PAGX generation
-// fits in the same request as the snapshot itself.
+// The CLI binary is spawned per request — one tiny native invocation against
+// a per-request temp file — which keeps the warm-browser model intact (no
+// need to rebuild the C++ importer in-process) while still being fast enough
+// that PAGX generation fits in the same request as the snapshot itself.
 //
 // Why temp files: pagx import takes paths only — it does not accept stdin
 // for input nor stdout for output (CommandImport.cpp parses --input and
@@ -62,7 +66,7 @@ function spawnPagxImport({ pagxBin, htmlPath, outPath, inferFlex }) {
       '--output', outPath,
     ];
     // `--html-infer-flex` recovers display:flex containers from the
-    // absolute-positioned snapshot. The html2pagx wrapper enables it by
+    // absolute-positioned snapshot. The html2pagx CLI enables it by
     // default; we mirror that here unless the caller passes false.
     if (inferFlex) args.push('--html-infer-flex');
 
@@ -105,9 +109,10 @@ function spawnPagxImport({ pagxBin, htmlPath, outPath, inferFlex }) {
 // `pagx import --format html` emits one warning per absolute-positioned
 // text leaf — the importer's normaliser handles them silently in the
 // resulting PAGX, but the warnings still spam stderr at one line per
-// element. The bash wrapper (`html2pagx`) filters them out before
-// surfacing pagx's stderr; we do the same here so a 200-element page
-// doesn't produce 200 lines of noise on every request.
+// element. We strip them here so a 200-element page doesn't produce 200
+// lines of noise on every HTTP request. lib/pipeline.js exports an
+// equivalent `filterKnownWarnings` for the on-disk pipeline; the two stay
+// aligned so the CLI and the HTTP service surface the same diagnostics.
 function filterKnownWarnings(stderr) {
   if (!stderr) return '';
   return stderr
