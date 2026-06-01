@@ -41,6 +41,8 @@
 #   BASELINE_HOLD_MS   ms each baseline run holds the page open (default 200)
 #   DOWNLOAD_FONTS     1 to pass --download-fonts to snapshot.js (measures
 #                      web-font capture cost). Default 0. Also `--download-fonts`.
+#   DOWNLOAD_IMAGES    1 to pass --download-images to snapshot.js (measures
+#                      image capture cost). Default 0. Also `--download-images`.
 #
 # Examples:
 #   tools/html-snapshot/bench/run-native.sh ~/Desktop/tmp_case
@@ -81,6 +83,7 @@ SNAPSHOT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 LABEL=${LABEL:-current}
 BROWSER_ENGINE=${BROWSER_ENGINE:-puppeteer}
 DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
+DOWNLOAD_IMAGES=${DOWNLOAD_IMAGES:-0}
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -106,6 +109,10 @@ while [[ $# -gt 0 ]]; do
       DOWNLOAD_FONTS=1
       shift
       ;;
+    --download-images)
+      DOWNLOAD_IMAGES=1
+      shift
+      ;;
     -h|--help)
       sed -n '2,30p' "$0"
       exit 0
@@ -126,7 +133,7 @@ case "$BROWSER_ENGINE" in
 esac
 
 if [[ ${#POSITIONAL[@]} -lt 1 ]]; then
-  echo "usage: $0 [--label NAME] [--engine puppeteer|playwright] [--download-fonts] <input_dir> [output_dir]" >&2
+  echo "usage: $0 [--label NAME] [--engine puppeteer|playwright] [--download-fonts] [--download-images] <input_dir> [output_dir]" >&2
   exit 2
 fi
 
@@ -163,6 +170,7 @@ echo "OUTPUT_DIR     = $OUTPUT_DIR"
 echo "LABEL          = $LABEL"
 echo "BROWSER_ENGINE = $BROWSER_ENGINE"
 echo "DOWNLOAD_FONTS = $DOWNLOAD_FONTS"
+echo "DOWNLOAD_IMAGES = $DOWNLOAD_IMAGES"
 echo "SNAPSHOT_DIR   = $SNAPSHOT_DIR"
 echo "BENCH_DIR      = $SCRIPT_DIR"
 echo "INTERVAL_MS    = $INTERVAL_MS"
@@ -173,6 +181,7 @@ echo
 env CGROUP=0 \
     BROWSER_ENGINE="$BROWSER_ENGINE" \
     DOWNLOAD_FONTS="$DOWNLOAD_FONTS" \
+    DOWNLOAD_IMAGES="$DOWNLOAD_IMAGES" \
   "$SCRIPT_DIR/run-cases.sh" \
     "$INPUT_DIR" "$OUTPUT_DIR" "$SNAPSHOT_DIR" "$SCRIPT_DIR" "$INTERVAL_MS"
 

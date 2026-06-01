@@ -31,6 +31,10 @@ snapshot's layout-preserving rewrites.
 # Download the page's web fonts, embed them into the .pagx and pass them to
 # the renderer as fallbacks (mirrors html2pagx; useful for CJK corpora).
 ./run.sh --download-fonts --label fonts-on
+
+# Download the page's external images and reference them by file path instead
+# of inlining base64 (mirrors html2pagx; keeps subset HTML / .pagx small).
+./run.sh --download-images --label images-on
 ```
 
 With `--download-fonts`, `snapshot.js` saves each web font the page uses into a
@@ -41,6 +45,15 @@ runs `pagx font embed --fallback …` on the resolved document and passes the sa
 per-case files to `pagx render --fallback`, so text in an uninstalled web font
 renders with the correct face instead of a host system fallback. Cases with no
 web fonts are unaffected.
+
+With `--download-images`, `snapshot.js` saves each external image the page uses
+into a single shared, content-addressed cache at `out/<label>/images/` (an image
+common to the corpus is stored once) and rewrites the subset HTML to reference
+it by its absolute file path instead of inlining it as a base64 `data:` URI.
+This keeps the subset HTML — and the `.pagx` produced from it — small for
+image-heavy corpora. Unlike fonts, the path is baked into the `.pagx` by
+`pagx import`, so `pagx render` reads the files directly with no per-case
+manifest or `--fallback` wiring. Cases with no external images are unaffected.
 
 Outputs land in `eval/out/<label>/`:
 

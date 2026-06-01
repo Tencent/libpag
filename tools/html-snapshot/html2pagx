@@ -34,6 +34,13 @@
 #                              --download-fonts. Default: disabled.
 #   --font-dir <dir>           Where downloaded fonts are written
 #                              (default: <output>.fonts/)
+#   --download-images          Download the external images the page uses and
+#                              reference them by local file path instead of
+#                              inlining them as base64 data URIs. Keeps the
+#                              .pagx small for image-heavy pages; the images are
+#                              read from disk at render time. Default: disabled.
+#   --image-dir <dir>          Where downloaded images are written
+#                              (default: <output>.images/)
 #   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
 #   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
@@ -86,6 +93,8 @@ KEEP_SUBSET_HTML=1
 DOWNLOAD_FONTS=0
 EMBED_FONTS=0
 FONT_DIR=""
+DOWNLOAD_IMAGES=0
+IMAGE_DIR=""
 SNAPSHOT_EXTRA_ARGS=()
 # Browser engine: defaults to puppeteer; --browser-engine wins over the env
 # var which wins over this default. Captured separately from
@@ -156,6 +165,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --font-dir)
       FONT_DIR="$2"
+      shift 2
+      ;;
+    --download-images)
+      DOWNLOAD_IMAGES=1
+      shift
+      ;;
+    --image-dir)
+      IMAGE_DIR="$2"
       shift 2
       ;;
     --)
@@ -296,6 +313,18 @@ if [[ "$DOWNLOAD_FONTS" -eq 1 ]]; then
     FONT_DIR="$OUT_DIR/${INPUT_BASE}.fonts"
   fi
   SNAPSHOT_EXTRA_ARGS+=("--download-fonts" "--font-dir" "$FONT_DIR")
+fi
+
+# Image download: default the destination to a sibling `<base>.images/`
+# directory and forward the flags to snapshot.js. snapshot.js writes the
+# captured images there and rewrites the subset HTML to reference them by
+# local file path, so no extra wiring is needed on the import/render side —
+# `pagx render` reads the files directly.
+if [[ "$DOWNLOAD_IMAGES" -eq 1 ]]; then
+  if [[ -z "$IMAGE_DIR" ]]; then
+    IMAGE_DIR="$OUT_DIR/${INPUT_BASE}.images"
+  fi
+  SNAPSHOT_EXTRA_ARGS+=("--download-images" "--image-dir" "$IMAGE_DIR")
 fi
 
 if [[ "$DO_RESOLVE" -eq 1 || "$DO_RENDER" -eq 1 ]]; then

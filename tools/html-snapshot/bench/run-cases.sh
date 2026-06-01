@@ -49,6 +49,12 @@
 #                  invocation so the page's web fonts are saved to a
 #                  sibling `<name>.fonts/` directory under <output_dir>
 #                  (measures the cost of font capture). Default 0.
+#   DOWNLOAD_IMAGES=1|0
+#                  when 1, pass --download-images to each snapshot.js
+#                  invocation so the page's external images are saved to a
+#                  sibling `<name>.images/` directory under <output_dir> and
+#                  referenced by file path instead of inlined (measures the
+#                  cost of image capture). Default 0.
 #
 # Notes:
 #   - Bash 3.2 compatible (no `mapfile`, no `sort -z`). The case-list
@@ -249,6 +255,12 @@ COLLECT_CGROUP=${CGROUP:-0}
 # out of scope here — the bench only measures snapshot.js itself.
 DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
 
+# Image download: off by default. When on, each snapshot.js call gets
+# --download-images plus a per-case --image-dir under $OUT_DIR (never under the
+# read-only /inputs mount), so the bench measures the cost of capturing and
+# writing the page's external images instead of inlining them as base64.
+DOWNLOAD_IMAGES=${DOWNLOAD_IMAGES:-0}
+
 {
   echo "{"
   printf '  "kernel": "%s",\n'           "$(uname -r)"
@@ -258,6 +270,7 @@ DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
   printf '  "node_version": "%s",\n'     "$(node --version)"
   printf '  "browser_engine": "%s",\n'   "$BROWSER_ENGINE"
   printf '  "download_fonts": "%s",\n'   "$DOWNLOAD_FONTS"
+  printf '  "download_images": "%s",\n'  "$DOWNLOAD_IMAGES"
   printf '  "puppeteer_version": "%s",\n' "$PUPPETEER_VERSION"
   printf '  "playwright_version": "%s",\n' "$PLAYWRIGHT_VERSION"
   printf '  "chromium_version": "%s",\n' "$CHROMIUM_VERSION"
@@ -289,7 +302,7 @@ set -f
 IFS=$'\n' CASES=($(printf '%s\n' "${CASES[@]}" | LC_ALL=C sort)); unset IFS
 set +f
 
-echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE, download-fonts=$DOWNLOAD_FONTS)"
+echo "Found ${#CASES[@]} input case(s) under $INPUT_DIR (engine=$BROWSER_ENGINE, download-fonts=$DOWNLOAD_FONTS, download-images=$DOWNLOAD_IMAGES)"
 
 # ---- run loop -------------------------------------------------------------
 
@@ -368,12 +381,16 @@ for src in "${CASES[@]}"; do
   case_base=$(basename "$rel" .html)
   out_file="$out_sub/$case_base.subset.html"
 
-  # Per-case snapshot.js flags. --download-fonts is appended only when the
-  # bench is configured for it; the font-dir lives under $OUT_DIR so it stays
-  # writable even when /inputs is mounted read-only.
+  # Per-case snapshot.js flags. --download-fonts / --download-images are
+  # appended only when the bench is configured for them; the font-dir /
+  # image-dir live under $OUT_DIR so they stay writable even when /inputs is
+  # mounted read-only.
   SNAPSHOT_CASE_ARGS=(--browser-engine "$BROWSER_ENGINE")
   if [[ "$DOWNLOAD_FONTS" == "1" ]]; then
     SNAPSHOT_CASE_ARGS+=(--download-fonts --font-dir "$out_sub/$case_base.fonts")
+  fi
+  if [[ "$DOWNLOAD_IMAGES" == "1" ]]; then
+    SNAPSHOT_CASE_ARGS+=(--download-images --image-dir "$out_sub/$case_base.images")
   fi
 
   echo "-> $rel"

@@ -180,6 +180,17 @@ describe('parseArgs — file inputs', () => {
     expect(opts.fontManifest).toBe(path.resolve('manifest.txt'));
   });
 
+  test('--download-images defaults --image-dir to a sibling .images dir', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/out.subset.html', '--download-images'));
+    expect(opts.downloadImages).toBe(true);
+    expect(opts.imageDir).toBe(path.resolve('/tmp/out.images'));
+  });
+
+  test('--image-dir overrides the default destination', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '--download-images', '--image-dir', '/tmp/imgs'));
+    expect(opts.imageDir).toBe(path.resolve('/tmp/imgs'));
+  });
+
   test('rejects --cookie / --header for file inputs', () => {
     const { exited, messages } = captureExit(() =>
       parseArgs(argv('/tmp/page.html', '--cookie', 'a=b')));
@@ -220,6 +231,13 @@ describe('parseArgs — URL inputs', () => {
       parseArgs(argv('https://example.com', '-o', '-', '--download-fonts')));
     expect(exited).toBe(true);
     expect(messages[0]).toMatch(/requires --font-dir/);
+  });
+
+  test('--download-images to stdout requires an explicit --image-dir', () => {
+    const { exited, messages } = captureExit(() =>
+      parseArgs(argv('https://example.com', '-o', '-', '--download-images')));
+    expect(exited).toBe(true);
+    expect(messages[0]).toMatch(/requires --image-dir/);
   });
 });
 

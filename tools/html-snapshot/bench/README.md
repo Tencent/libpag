@@ -46,6 +46,13 @@ capture** inside the snapshot step; the downstream `pagx font embed` /
 `pagx render --fallback` work that `html2pagx` (and `eval/`) perform is
 out of scope here — the bench only samples `snapshot.js` itself.
 
+Likewise, both modes accept `--download-images` (or
+`DOWNLOAD_IMAGES=1`), which forwards `--download-images` to each
+`snapshot.js` invocation so the page's external images are written to a
+per-case `<name>.images/` directory under the output dir and referenced
+by file path instead of inlined as base64. This measures the **cost of
+image capture** inside the snapshot step.
+
 ## Why this exists
 
 `html-snapshot` is JS-driven so its cost on Linux is dominated by

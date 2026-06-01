@@ -17,21 +17,24 @@ const {
 } = require('./browser-snapshot');
 const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./icon-font');
 const { makeFontCaptureListener, saveDownloadedFonts } = require('./font-download');
+const { saveDownloadedImages } = require('./image-download');
 const { openAndSettlePage } = require('./page-loader');
 const { responseBytes } = require('./browser-engine');
 const { errMessage } = require('./cli');
 
 // Build a `page.on('response')` listener that captures every successful
-// image response into `cache` as a `url -> data:URI` mapping. The map is
-// later handed to `inlineExternalImages` so the in-page pass reuses the
-// browser's already-loaded bytes instead of re-fetching cross-origin
+// image response into `cache` as a `url -> { buffer, contentType }` mapping.
+// The bytes are later turned into either a `data:` URI (default, self-
+// contained snapshot) or an on-disk file path (`--download-images`, small
+// snapshot) and handed to `inlineExternalImages`, so the in-page pass reuses
+// the browser's already-loaded bytes instead of re-fetching cross-origin
 // images (which the legacy `fetch(url, { mode: 'cors' })` path silently
 // failed for, since most image CDNs do not return CORS headers).
 //
 // We capture by URL key (not by element ref) so the same image used by
-// multiple <img> tags pays a single base64 conversion. The listener never
-// throws — a detached response or scheme we don't support just leaves the
-// URL absent from the cache, and the in-page fetch fallback will retry.
+// multiple <img> tags is stored once. The listener never throws — a detached
+// response or scheme we don't support just leaves the URL absent from the
+// cache, and the in-page fetch fallback will retry.
 function makeImageCaptureListener(engine, cache, log) {
   return async function captureImageResponse(resp) {
     try {
@@ -40,9 +43,10 @@ function makeImageCaptureListener(engine, cache, log) {
       const url = req.url();
       if (!url || url.startsWith('data:')) return;
       if (!resp.ok()) return;
+      if (cache.has(url)) return;
       const buf = await responseBytes(resp, engine);
       const ct = resp.headers()['content-type'] || 'application/octet-stream';
-      cache.set(url, `data:${ct};base64,${buf.toString('base64')}`);
+      cache.set(url, { buffer: buf, contentType: ct });
     } catch (err) {
       // Common case: response detached after a navigation, or the request
       // was served from cache and the body is no longer accessible. Drop
@@ -50,6 +54,14 @@ function makeImageCaptureListener(engine, cache, log) {
       if (log) log(`image capture skipped: ${errMessage(err)}`);
     }
   };
+}
+
+// Turn a captured `{ buffer, contentType }` entry into a base64 `data:` URI —
+// the default, self-contained representation handed to `inlineExternalImages`
+// when images are not being written to disk.
+function entryToDataUri(entry) {
+  const ct = (entry && entry.contentType) || 'application/octet-stream';
+  return `data:${ct};base64,${entry.buffer.toString('base64')}`;
 }
 
 // Run the full snapshot pipeline against `targetUrl` using the already-
@@ -66,6 +78,13 @@ function makeImageCaptureListener(engine, cache, log) {
 //                            plain SFNT (TTF/OTF). Off by default.
 //   fontDir                — destination directory for downloaded fonts;
 //                            required when `downloadFonts` is true.
+//   downloadImages         — when true, every external image the browser
+//                            fetched is written to `imageDir` and referenced
+//                            by its local file path instead of inlined as a
+//                            base64 `data:` URI, keeping the snapshot small.
+//                            Off by default (images are inlined).
+//   imageDir               — destination directory for downloaded images;
+//                            required when `downloadImages` is true.
 //   log                    — optional `(string) => void` for progress / error
 //                            diagnostics. When omitted, the pipeline runs
 //                            silently. Image-capture skip diagnostics are
@@ -84,6 +103,8 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     inlineIconFonts = true,
     downloadFonts = false,
     fontDir = '',
+    downloadImages = false,
+    imageDir = '',
     log = null,
   } = opts || {};
 
@@ -128,13 +149,38 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
 
   try {
     // PAGX's renderer can read `data:` URIs and local files but not
-    // `http(s)://` URLs. Inline every external image into a base64 data
-    // URI here so the downstream `pagx render` step can decode them
-    // directly. The Map captured above is handed in as a plain object so
-    // `page.evaluate` can serialise it across the CDP boundary; misses
-    // fall back to in-page fetch (limited to 8 concurrent requests
-    // inside the helper).
-    await page.evaluate(inlineExternalImages, Object.fromEntries(imageBytesByUrl));
+    // `http(s)://` URLs, so every external image must be turned into one of
+    // those before the snapshot is walked. Two strategies, both driven by the
+    // bytes the response listener already captured:
+    //   - default: inline each image as a base64 `data:` URI so the snapshot
+    //     is fully self-contained.
+    //   - `--download-images`: write the bytes to `imageDir` and reference the
+    //     local file path instead, keeping the snapshot (and the PAGX produced
+    //     from it) small. Best-effort — a write failure for a given image
+    //     leaves it absent from the map, so it falls back to the in-page fetch
+    //     + inline path below.
+    // The resulting `url -> data:URI | path` map is handed to
+    // `inlineExternalImages` as a plain object so `page.evaluate` can
+    // serialise it across the CDP boundary; misses fall back to in-page fetch
+    // (limited to 8 concurrent requests inside the helper).
+    let images = [];
+    const srcByUrl = {};
+    if (downloadImages && imageDir) {
+      try {
+        images = await saveDownloadedImages(imageBytesByUrl, imageDir, log || (() => {}));
+        if (log) log(`downloaded ${images.length} image file(s) to ${imageDir}`);
+      } catch (err) {
+        if (log) log(`image download failed: ${errMessage(err)}`);
+      }
+      for (const { url, path: filePath } of images) {
+        srcByUrl[url] = filePath;
+      }
+    } else {
+      for (const [url, entry] of imageBytesByUrl) {
+        srcByUrl[url] = entryToDataUri(entry);
+      }
+    }
+    await page.evaluate(inlineExternalImages, srcByUrl);
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
@@ -177,7 +223,7 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
         if (log) log(`font download failed: ${errMessage(err)}`);
       }
     }
-    return { ...snapshot, fonts };
+    return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the

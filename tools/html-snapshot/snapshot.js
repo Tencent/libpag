@@ -75,6 +75,8 @@ async function main() {
       inlineIconFonts: opts.inlineIconFonts,
       downloadFonts: opts.downloadFonts,
       fontDir: opts.fontDir,
+      downloadImages: opts.downloadImages,
+      imageDir: opts.imageDir,
       log: (msg) => console.error(`${LOG_PREFIX}${msg}`),
     });
 

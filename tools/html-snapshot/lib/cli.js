@@ -136,6 +136,15 @@ const FLAGS = [
   // `<output>.fonts/` directory; override with `--font-dir`.
   { names: ['--download-fonts'], takesArg: false, set: (o) => { o.downloadFonts = true; } },
   { names: ['--font-dir'], set: (o, v) => { o.fontDir = v; } },
+  // Download every external image the browser fetched while rendering and
+  // reference it by its on-disk file path instead of inlining the bytes as a
+  // base64 `data:` URI. Off by default (images are inlined, so the snapshot is
+  // self-contained). Useful to keep the subset HTML — and the PAGX produced
+  // from it — small when a page carries large/full-resolution images. The
+  // destination defaults to a sibling `<output>.images/` directory; override
+  // with `--image-dir`.
+  { names: ['--download-images'], takesArg: false, set: (o) => { o.downloadImages = true; } },
+  { names: ['--image-dir'], set: (o, v) => { o.imageDir = v; } },
   // Write the list of font files this snapshot actually uses (one absolute
   // path per line) to <path>. With a shared --font-dir, the directory may hold
   // fonts from many pages; the manifest lets a caller (eval/run.js) hand only
@@ -194,6 +203,13 @@ function parseArgs(argv) {
     fontDir: '',
     // Optional path to write the per-page font manifest (see --font-manifest).
     fontManifest: '',
+    // Image download: when true, every external image the browser fetched is
+    // written to `imageDir` and referenced by its local file path instead of
+    // inlined as a base64 `data:` URI, keeping the snapshot small. See
+    // lib/image-download.js; toggle via `--download-images`, redirect via
+    // `--image-dir`.
+    downloadImages: false,
+    imageDir: '',
     // Headless browser driver: 'puppeteer' (default) or 'playwright'.
     // `resolveEngine(undefined)` reads HTML_SNAPSHOT_BROWSER if set, else
     // returns the default. The `--browser-engine` flag below overrides both.
@@ -276,6 +292,23 @@ function parseArgs(argv) {
     if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
     opts.fontDir = path.join(dir, `${base}.fonts`);
   }
+  // Resolve the image-download destination once the output path is known,
+  // mirroring --font-dir: an explicit --image-dir always wins; otherwise
+  // default to a sibling `<output-without-ext>.images/` directory (with a
+  // trailing `.subset` stripped so `page.subset.html` yields `page.images/`,
+  // not `page.subset.images/`). The snapshot references images by absolute
+  // file path, so stdout mode still works as long as --image-dir is given.
+  if (opts.imageDir) {
+    opts.imageDir = path.resolve(opts.imageDir);
+  } else if (opts.downloadImages) {
+    if (opts.outputToStdout || !opts.output) {
+      fail(`--download-images requires --image-dir when output is written to stdout`);
+    }
+    const dir = path.dirname(opts.output);
+    let base = path.basename(opts.output, path.extname(opts.output));
+    if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
+    opts.imageDir = path.join(dir, `${base}.images`);
+  }
   // A manifest only makes sense alongside --download-fonts (it lists the
   // captured font files). Resolve it to an absolute path so the paths it
   // records are usable from any working directory.
@@ -322,6 +355,15 @@ Options:
   --font-dir <dir>           Destination for --download-fonts (default:
                              <output-without-ext>.fonts/). May be shared across
                              runs; identical faces are stored once (content-
+                             addressed filenames).
+  --download-images          Save every external image the page uses to disk and
+                             reference it by local file path instead of inlining
+                             it as a base64 data: URI. Default: disabled (images
+                             are inlined). Keeps the subset HTML — and the PAGX
+                             produced from it — small for image-heavy pages.
+  --image-dir <dir>          Destination for --download-images (default:
+                             <output-without-ext>.images/). May be shared across
+                             runs; identical images are stored once (content-
                              addressed filenames).
   --font-manifest <file>     Write the font files this page uses (one absolute
                              path per line) to <file>. Requires

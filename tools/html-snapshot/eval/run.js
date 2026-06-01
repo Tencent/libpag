@@ -51,6 +51,14 @@ function parseArgs(argv) {
     // metrics match the snapshot regardless of host fonts. Implies
     // downloadFonts. Mirrors html2pagx's --embed-fonts.
     embedFonts: false,
+    // When true, snapshot.js downloads the page's external images into a shared,
+    // content-addressed cache (out/<label>/images/) and rewrites each subset
+    // HTML to reference them by their absolute file path instead of inlining
+    // them as base64 data URIs. This keeps the subset HTML — and the .pagx
+    // produced from it — small for image-heavy corpora; `pagx render` reads the
+    // files directly, so (unlike fonts) no per-case manifest or `--fallback`
+    // wiring is needed. Mirrors html2pagx's --download-images.
+    downloadImages: false,
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
     // Honours HTML_SNAPSHOT_BROWSER when no flag is passed.
@@ -68,6 +76,7 @@ function parseArgs(argv) {
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--download-fonts') opts.downloadFonts = true;
     else if (a === '--embed-fonts') { opts.embedFonts = true; opts.downloadFonts = true; }
+    else if (a === '--download-images') opts.downloadImages = true;
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -106,6 +115,12 @@ const USAGE = `Usage: node run.js [options]
   --embed-fonts       On top of --download-fonts, embed each case's downloaded
                       faces into its .pagx (pagx font embed) so glyph metrics
                       match the snapshot. Implies --download-fonts.
+  --download-images   Download the page's external images (snapshot.js) and
+                      reference them by local file path instead of inlining them
+                      as base64. Images land in a single shared, content-
+                      addressed cache at out/<label>/images/ (identical images
+                      stored once); pagx render reads the files directly, so no
+                      per-case manifest is needed. Mirrors html2pagx.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -304,6 +319,13 @@ async function processCase(entry, outDir, opts, browser) {
         '--font-dir', opts.fontCacheDir,
         '--font-manifest', fontManifest,
       );
+    }
+    // Image download writes the page's images into the shared cache and
+    // rewrites the subset HTML to reference them by absolute path. Unlike
+    // fonts, the path is baked into the .pagx by `pagx import`, so render reads
+    // the files directly — no per-case manifest / `--fallback` wiring needed.
+    if (opts.downloadImages) {
+      snapshotArgs.push('--download-images', '--image-dir', opts.imageCacheDir);
     }
     const r = await runProc('node', snapshotArgs, snapshotStderr);
     row.snapshotMs = r.durationMs;
@@ -631,6 +653,13 @@ async function main() {
   opts.fontCacheDir = path.join(opts.outDir, 'fonts');
   if (opts.downloadFonts) ensureDir(opts.fontCacheDir);
 
+  // Single shared, content-addressed image cache for the whole run, mirroring
+  // the font cache. Every case downloads into it; identical images (e.g. a
+  // shared logo/hero across a corpus) are stored once. The subset HTML
+  // references images by absolute path, so no per-case manifest is needed.
+  opts.imageCacheDir = path.join(opts.outDir, 'images');
+  if (opts.downloadImages) ensureDir(opts.imageCacheDir);
+
   if (!fs.existsSync(opts.pagxBin)) {
     fail(`pagx binary not found: ${opts.pagxBin}`, 1);
   }
@@ -640,7 +669,7 @@ async function main() {
     fail(`no html cases found in ${opts.corpus}${hint}`, 1);
   }
   const concurrency = Math.max(1, Math.min(opts.concurrency, cases.length));
-  console.log(`run: ${cases.length} cases → ${opts.outDir}  (concurrency=${concurrency}${opts.downloadFonts ? ', download-fonts=on' : ''})`);
+  console.log(`run: ${cases.length} cases → ${opts.outDir}  (concurrency=${concurrency}${opts.downloadFonts ? ', download-fonts=on' : ''}${opts.downloadImages ? ', download-images=on' : ''})`);
 
   // A single browser instance is reused for both the live and subset flex
   // counts across every case. Launching once shaves ~1s per case. Opening
