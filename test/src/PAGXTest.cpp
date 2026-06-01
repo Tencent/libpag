@@ -6513,4 +6513,103 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 }
 
+namespace {
+std::shared_ptr<pagx::Data> MakePAGXData(const std::string& xml) {
+  return pagx::Data::MakeWithCopy(xml.data(), xml.size());
+}
+
+std::string MakeExternalCompositionXML(const std::string& layerId, const std::string& animationId) {
+  std::string xml;
+  xml += "<pagx width=\"50\" height=\"50\">\n";
+  xml += "  <Layer id=\"" + layerId + "\" width=\"50\" height=\"50\">\n";
+  xml += "    <Rectangle width=\"50\" height=\"50\"/>\n";
+  xml += "    <Fill>\n";
+  xml += "      <SolidColor color=\"#FF0000\"/>\n";
+  xml += "    </Fill>\n";
+  xml += "  </Layer>\n";
+  xml += "  <Animations>\n";
+  xml += "    <Animation id=\"" + animationId + "\" duration=\"60\" frameRate=\"60\">\n";
+  xml += "      <Object target=\"" + layerId + "\">\n";
+  xml += "        <Property channel=\"alpha\" type=\"float\">\n";
+  xml += "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n";
+  xml += "          <Key time=\"60\" value=\"1\"/>\n";
+  xml += "        </Property>\n";
+  xml += "      </Object>\n";
+  xml += "    </Animation>\n";
+  xml += "  </Animations>\n";
+  xml += "</pagx>\n";
+  return xml;
+}
+}  // namespace
+
+/**
+ * Test case: external PAGX composition data is loaded through the same getExternalFilePaths() /
+ * loadFileData() flow used by external image files.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\">\n"
+      "    <Timelines>\n"
+      "      <Animation ref=\"@fade\" playing=\"true\"/>\n"
+      "    </Timelines>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto paths = doc->getExternalFilePaths();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths[0], "child.pagx");
+
+  auto childXML = MakeExternalCompositionXML("childLayer", "fade");
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->composition != nullptr);
+  ASSERT_TRUE(slotLayer->composition->externalDoc != nullptr);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->compositionSlots.size(), 1u);
+  file->advanceAndApply(500'000);
+
+  auto* externalChild = slotLayer->composition->externalDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(externalChild != nullptr);
+  auto& slotTree = file->compositionSlots[0]->mutableBinding();
+  auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
+  ASSERT_TRUE(tgfxChild != nullptr);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+}
+
+/**
+ * Test case: external file enumeration continues through loaded external PAGX documents.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXCompositionNestedFiles) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  std::string childXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Resources>\n"
+      "    <Image id=\"img\" source=\"nested.png\"/>\n"
+      "  </Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+
+  auto paths = doc->getExternalFilePaths();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths[0], "nested.png");
+
+  uint8_t bytes[] = {1, 2, 3, 4};
+  auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
+  EXPECT_TRUE(doc->loadFileData("nested.png", imageData));
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+}
+
 }  // namespace pag

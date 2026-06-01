@@ -143,6 +143,13 @@ class Layer : public Node, public LayoutNode {
   Composition* composition = nullptr;
 
   /**
+   * External PAGX file path for the composition content. This is populated when the `composition`
+   * attribute points to a file path instead of an in-document resource reference, and is resolved by
+   * PAGXDocument::loadFileData().
+   */
+  std::string compositionFilePath = {};
+
+  /**
    * Timeline entries to activate when this layer references a Composition. Each entry is a
    * polymorphic Timeline subclass (AnimationTimeline in v1) describing a time-driven behavior to
    * attach to the runtime sub-tree. An empty list means the composition is rendered statically

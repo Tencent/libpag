@@ -21,12 +21,62 @@
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGFile.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
 
 namespace pagx {
+
+static bool IsExternalFilePath(const std::string& filePath) {
+  return !filePath.empty() && filePath.find("data:") != 0;
+}
+
+static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
+  if (document == nullptr || paths == nullptr) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->data == nullptr && IsExternalFilePath(image->filePath)) {
+        paths->push_back(image->filePath);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
+        paths->push_back(layer->compositionFilePath);
+      } else if (layer->composition != nullptr && layer->composition->externalDoc != nullptr) {
+        AppendExternalFilePaths(layer->composition->externalDoc.get(), paths);
+      }
+    }
+  }
+}
+
+static bool LoadExternalComposition(PAGXDocument* document, Layer* layer,
+                                    const std::string& filePath, std::shared_ptr<Data> data) {
+  if (document == nullptr || layer == nullptr || data == nullptr ||
+      layer->compositionFilePath != filePath || layer->composition != nullptr) {
+    return false;
+  }
+  auto externalDoc = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (externalDoc == nullptr) {
+    return false;
+  }
+  for (const auto& error : externalDoc->errors) {
+    document->errors.push_back("[" + filePath + "] " + error);
+  }
+  auto* wrapper = document->makeNode<Composition>();
+  wrapper->width = externalDoc->width;
+  wrapper->height = externalDoc->height;
+  wrapper->layers = externalDoc->layers;
+  wrapper->animations = externalDoc->animations;
+  wrapper->externalDoc = externalDoc;
+  layer->composition = wrapper;
+  layer->compositionFilePath = {};
+  return true;
+}
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
   if (config != nullptr) {
@@ -106,19 +156,7 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->data != nullptr || image->filePath.empty()) {
-      continue;
-    }
-    if (image->filePath.find("data:") == 0) {
-      continue;
-    }
-    paths.push_back(image->filePath);
-  }
+  AppendExternalFilePaths(this, &paths);
   return paths;
 }
 
@@ -128,16 +166,22 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   }
   bool found = false;
   for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->filePath == filePath) {
+        image->data = data;
+        image->filePath = {};
+        found = true;
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      bool loadedComposition = LoadExternalComposition(this, layer, filePath, data);
+      found = loadedComposition || found;
+      if (!loadedComposition && layer->composition != nullptr &&
+          layer->composition->externalDoc != nullptr) {
+        found = layer->composition->externalDoc->loadFileData(filePath, data) || found;
+      }
     }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->data = data;
-    image->filePath = {};
-    found = true;
   }
   return found;
 }

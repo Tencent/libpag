@@ -497,6 +497,8 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       ReportError(doc, node,
                   "Resource '" + compositionAttr + "' not found for 'composition' attribute.");
     }
+  } else if (!compositionAttr.empty()) {
+    layer->compositionFilePath = compositionAttr;
   }
   layer->timelines.clear();
 

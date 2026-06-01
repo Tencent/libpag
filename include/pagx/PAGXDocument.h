@@ -120,18 +120,17 @@ class PAGXDocument : public Node {
   bool hasUnresolvedImports() const;
 
   /**
-   * Returns a list of external file paths referenced by Image nodes that have no embedded data.
-   * Data URIs (paths starting with "data:") are excluded.
+   * Returns a list of external file paths referenced by Image nodes or external composition layers
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
   /**
-   * Loads external file data for an Image node matching the given file path. Once loaded, the
-   * Image's data field is populated and its filePath is cleared, so the renderer uses embedded data
-   * instead of file I/O.
-   * @param filePath the external file path to match against Image nodes
-   * @param data the file content to embed into the matching Image node
-   * @return true if a matching Image node was found and its data was loaded successfully
+   * Loads external file data matching the given file path. Image data is embedded into matching
+   * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
+   * @param filePath the external file path to match against Image nodes or composition layers
+   * @param data the file content to embed or parse
+   * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
