@@ -380,6 +380,49 @@ static std::string GetFaceName(IDWriteFont* font) {
   return result;
 }
 
+static std::string GetFilePath(IDWriteFontFile* fontFile) {
+  if (fontFile == nullptr) {
+    return {};
+  }
+
+  IDWriteFontFileLoader* loader = nullptr;
+  HRESULT hr = fontFile->GetLoader(&loader);
+  if (FAILED(hr) || loader == nullptr) {
+    return {};
+  }
+
+  IDWriteLocalFontFileLoader* localLoader = nullptr;
+  hr = loader->QueryInterface(__uuidof(IDWriteLocalFontFileLoader),
+                              reinterpret_cast<void**>(&localLoader));
+  SafeRelease(&loader);
+  if (FAILED(hr) || localLoader == nullptr) {
+    return {};
+  }
+
+  const void* refKey = nullptr;
+  UINT32 refKeySize = 0;
+  hr = fontFile->GetReferenceKey(&refKey, &refKeySize);
+  if (FAILED(hr) || refKey == nullptr) {
+    SafeRelease(&localLoader);
+    return {};
+  }
+
+  UINT32 length = 0;
+  hr = localLoader->GetFilePathLengthFromKey(refKey, refKeySize, &length);
+  if (FAILED(hr) || length == 0) {
+    SafeRelease(&localLoader);
+    return {};
+  }
+
+  std::wstring wide(static_cast<size_t>(length) + 1, L'\0');
+  hr = localLoader->GetFilePathFromKey(refKey, refKeySize, wide.data(), length + 1);
+  SafeRelease(&localLoader);
+  if (FAILED(hr)) {
+    return {};
+  }
+  return WideToUTF8(wide.c_str(), static_cast<int>(length));
+}
+
 std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
   IDWriteFactory* factory = nullptr;
   HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -602,17 +645,16 @@ FontLocation SystemFonts::FindFont(const std::string& family, const std::string&
     return {};
   }
 
-  const void* refKey = nullptr;
-  UINT32 refKeySize = 0;
-  hr = fontFile->GetReferenceKey(&refKey, &refKeySize);
-
   FontLocation location = {};
-  // GetReferenceKey includes the null terminator in the byte count.
-  int keyLen = static_cast<int>(refKeySize / sizeof(wchar_t));
-  if (SUCCEEDED(hr) && refKey != nullptr && keyLen > 1) {
-    location.path = WideToUTF8(static_cast<const wchar_t*>(refKey), keyLen - 1);
-  }
+  location.path = GetFilePath(fontFile);
   SafeRelease(&fontFile);
+  if (location.path.empty()) {
+    SafeRelease(&fontFace);
+    SafeRelease(&fontFamily);
+    SafeRelease(&fontCollection);
+    SafeRelease(&factory);
+    return {};
+  }
 
   location.ttcIndex = static_cast<int>(fontFace->GetIndex());
   location.fontFamily = GetFamilyName(fontFamily);

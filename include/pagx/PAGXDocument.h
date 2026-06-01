@@ -115,7 +115,7 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes that have no embedded data.
-   * Data URIs (paths starting with "data:") are excluded.
+   * URL-form paths (http://, https://, and file://) are excluded.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
