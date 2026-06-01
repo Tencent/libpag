@@ -48,10 +48,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/ppt/PPTContourUtils.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
-#include "pagx/ppt/PPTModifierResolver.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -700,7 +700,7 @@ class PPTWriter {
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
-  PPTModifierResolver _resolver;
+  ModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 

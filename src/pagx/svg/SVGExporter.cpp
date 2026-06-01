@@ -204,7 +204,9 @@ static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size) {
 
 // SVG cross-environment usage (e.g. embedded in HTML, opened in a browser) cannot
 // rely on absolute filesystem paths resolving, so prefer to inline the encoded image
-// bytes as a data URI. Reads from disk on demand when only filePath is populated.
+// bytes as a data URI. Reads from disk on demand when only filePath is populated. When
+// reading fails, return empty so the caller skips the asset rather than embedding a
+// host-local path that would leak filesystem layout and never resolve elsewhere.
 static std::string GetImageHref(const Image* image) {
   if (image->data) {
     return EncodeImageDataURI(image->data->bytes(), image->data->size());
@@ -214,7 +216,6 @@ static std::string GetImageHref(const Image* image) {
     if (data && data->size() > 0) {
       return EncodeImageDataURI(data->bytes(), data->size());
     }
-    return image->filePath;
   }
   return {};
 }
@@ -246,11 +247,11 @@ class SVGWriter {
  public:
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
-            PAGXDocument* doc = nullptr, bool rasterizeUnsupportedFeatures = true,
-            int rasterDPI = 192)
+            PAGXDocument* doc = nullptr, bool bakeUnsupported = true, int rasterDPI = 192,
+            bool resolveModifiers = true, std::vector<std::string>* warnings = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath),
-        _rasterizeUnsupportedFeatures(rasterizeUnsupportedFeatures), _rasterDPI(rasterDPI),
+        _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
+        _rasterDPI(rasterDPI), _resolveModifiers(resolveModifiers), _warnings(warnings),
         _layoutContext(layoutContext), _resolver(doc), _doc(doc) {
   }
 
@@ -261,8 +262,10 @@ class SVGWriter {
   SVGWriterContext* _context = nullptr;
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
-  bool _rasterizeUnsupportedFeatures = true;
+  bool _bakeUnsupported = true;
   int _rasterDPI = 192;
+  bool _resolveModifiers = true;
+  std::vector<std::string>* _warnings = nullptr;
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
   PAGXDocument* _doc = nullptr;
@@ -272,6 +275,24 @@ class SVGWriter {
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
+  }
+
+  // Append a human-readable warning for downstream pipelines that need to surface silent
+  // degradation. No-op when no warnings sink was supplied.
+  void addWarning(std::string message) {
+    if (_warnings != nullptr) {
+      _warnings->push_back(std::move(message));
+    }
+  }
+
+  // Returns the resolver-baked element list when resolveModifiers is enabled, otherwise the
+  // original list verbatim. Modifier nodes left in the verbatim list are dropped silently by
+  // processVectorScope's switch (matching V1 / PPTExporter::resolveModifiers=false behaviour).
+  std::vector<Element*> resolveIfEnabled(const std::vector<Element*>& elements) {
+    if (_resolveModifiers) {
+      return _resolver.resolve(elements);
+    }
+    return elements;
   }
 
   const LayerBuildResult& ensureBuildResult();
@@ -570,6 +591,10 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   }
   std::string href = GetImageHref(pattern->image);
   if (href.empty()) {
+    addWarning(
+        "ImagePattern dropped: image bytes unavailable (no inline data and on-disk read "
+        "from filePath '" +
+        pattern->image->filePath + "' failed); the affected fill will be empty.");
     return {};
   }
 
@@ -2059,10 +2084,16 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
   auto& buildResult = ensureBuildResult();
   auto it = buildResult.layerMap.find(layer);
   if (it == buildResult.layerMap.end() || !buildResult.root) {
+    addWarning("rasterize skipped: layer '" +
+               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' has no entry in the LayerBuilder map; falling back to vector emission.");
     return false;
   }
   auto tgfxLayer = it->second;
   if (!tgfxLayer) {
+    addWarning("rasterize skipped: layer '" +
+               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' resolved to a null tgfx::Layer; falling back to vector emission.");
     return false;
   }
   // The <image> is emitted into `out`, which is the parent <g>'s body — that <g>'s transform
@@ -2076,10 +2107,16 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
   auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
   auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
+    addWarning("rasterize failed: PNG bake for layer '" +
+               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' produced no pixel data; falling back to vector emission.");
     return false;
   }
   auto bounds = tgfxLayer->getBounds(coordinateSpace, true);
   if (bounds.isEmpty()) {
+    addWarning("rasterize skipped: layer '" +
+               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' reported empty bounds; falling back to vector emission.");
     return false;
   }
   std::string href = "data:image/png;base64," + Base64Encode(pngData->bytes(), pngData->size());
@@ -2203,7 +2240,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // child Text is added to the accumulator with the box's transform /
           // alpha, and box-level params surface as their textBox. Resolve
           // path modifiers nested inside the box before walking.
-          const std::vector<Element*> innerWalked = _resolver.resolve(tb->elements);
+          const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
           processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
                              accumulator.size());
         } else {
@@ -2218,7 +2255,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         auto* group = static_cast<const Group*>(element);
         Matrix groupMatrix = transform * BuildGroupMatrix(group);
         float groupAlpha = alpha * group->alpha;
-        const std::vector<Element*> innerWalked = _resolver.resolve(group->elements);
+        const std::vector<Element*> innerWalked = resolveIfEnabled(group->elements);
         processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
                            accumulator.size());
         break;
@@ -2242,7 +2279,7 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
   // TrimPath / RoundCorner / MergePath -> editable Path). Painters, Group,
   // Text, and TextBox pass through unchanged so the accumulator walk below
   // operates on normalized geometry.
-  const std::vector<Element*> walked = _resolver.resolve(elements);
+  const std::vector<Element*> walked = resolveIfEnabled(elements);
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
@@ -2265,12 +2302,20 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // elements / degrading gradients to radial) is what the vector path below does.
   // BackgroundBlurStyle is intentionally excluded: SVG has no portable backdrop-blur primitive,
   // so the layer is kept as vector with the blur effect silently dropped.
-  if (_rasterizeUnsupportedFeatures) {
+  if (_bakeUnsupported) {
     auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {
       if (rasterizeLayerAsImage(out, layer)) {
         return;
       }
+    }
+  } else {
+    auto features = ProbeLayerFeaturesForSVG(layer);
+    if (features.needsRasterization()) {
+      addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+                 "' uses SVG-unsupported features (TextPath / TextModifier / diamond or conic "
+                 "gradient) and bakeUnsupported is false; emitting as best-effort vector with "
+                 "those features dropped or downgraded to radial.");
     }
   }
 
@@ -2424,18 +2469,30 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 // Main Export function
 //==============================================================================
 
-std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options) {
+std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
+                               std::vector<std::string>* warnings) {
   // Mirror PPTExporter: resolve renderPosition() for every layer/group so authored x/y/position
   // attributes flow into the matrix helpers (BuildLayerMatrix / BuildGroupMatrix).
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
+  }
+  // Clamp rasterDPI to a sane range. 0 / negative would silently produce a zero-pixel surface
+  // (the bake then fails and the exporter falls through to the vector path, contradicting
+  // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * pixelScale))`
+  // away from float→int implementation-defined behaviour on huge canvases.
+  int safeRasterDPI = options.rasterDPI;
+  if (safeRasterDPI < 1) {
+    safeRasterDPI = 1;
+  } else if (safeRasterDPI > 4096) {
+    safeRasterDPI = 4096;
   }
   SVGBuilder svg(true, options.indent);
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
-                   &doc, options.rasterizeUnsupportedFeatures, options.rasterDPI);
+                   &doc, options.bakeUnsupported, safeRasterDPI, options.resolveModifiers,
+                   warnings);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
@@ -2470,8 +2527,8 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options) {
 }
 
 bool SVGExporter::ToFile(PAGXDocument& document, const std::string& filePath,
-                         const Options& options) {
-  auto svgContent = ToSVG(document, options);
+                         const Options& options, std::vector<std::string>* warnings) {
+  auto svgContent = ToSVG(document, options, warnings);
   if (svgContent.empty()) {
     return false;
   }

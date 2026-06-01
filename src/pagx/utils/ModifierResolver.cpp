@@ -323,6 +323,8 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // Modifier appliers. Each returns the new pagx::Path replacement(s).
 //==============================================================================
 
+// Apply a TrimPath modifier to `shape`, returning a freshly allocated Path
+// (or `shape` unchanged when the trim collapses or the shape is degenerate).
 Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
   auto tp = PrimitiveToTGFXPath(shape);
   if (tp.isEmpty()) {
@@ -336,6 +338,8 @@ Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* tr
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
+// Apply a RoundCorner modifier to `shape`, returning a freshly allocated Path (or `shape`
+// unchanged when the radius is non-positive or the shape is degenerate).
 Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
                                                      const RoundCorner* corner) const {
   if (corner->radius <= 0.0f) {
@@ -534,8 +538,8 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // values near INT_MAX would invoke UB in the cast, and values around
         // 1e6 would still allocate gigabytes via `generated.reserve(maxCount)`
         // below. 10000 is comfortably above any visually meaningful copy count.
-        constexpr float kMaxRepeaterCopies = 10000.0f;
-        copiesF = std::min(copiesF, kMaxRepeaterCopies);
+        constexpr float MAX_REPEATER_COPIES = 10000.0f;
+        copiesF = std::min(copiesF, MAX_REPEATER_COPIES);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This

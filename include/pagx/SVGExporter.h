@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
@@ -59,21 +60,36 @@ struct SVGExportOptions {
   FontConfig* fontConfig = nullptr;
 
   /**
-   * Whether to rasterize layers that carry features SVG cannot losslessly represent (TextPath,
-   * TextModifier, diamond/conic gradient). When true, such a layer is baked to an embedded PNG
-   * and emitted as an &lt;image&gt; so the visual result is preserved. When false, the exporter
-   * falls through to the vector path and those features degrade silently (text path / modifier
-   * drop, diamond/conic gradient fall back to radial). BackgroundBlurStyle is always kept as
-   * vector output with the blur effect silently dropped, since SVG has no portable backdrop-blur
-   * primitive. The default value is true.
+   * Whether to resolve path-modifier elements (TrimPath, RoundCorner, MergePath, Polystar) into
+   * editable geometry by applying the modifier through tgfx::Path operations and emitting the
+   * resulting path as a regular <path>. When disabled, modifiers are dropped on the floor. When
+   * enabled, the modifier itself is no longer live but the resulting shape remains a fully editable
+   * SVG path. Naming is aligned with PPTExportOptions::resolveModifiers. The default value is true.
    */
-  bool rasterizeUnsupportedFeatures = true;
+  bool resolveModifiers = true;
 
   /**
-   * Ratio of raster DPI to the 96 DPI logical coordinate space, driving the off-screen surface
-   * size of every PNG bake. The placed &lt;image&gt; keeps using logical dimensions so consumers
-   * stretch the denser bitmap over the same visible extent, yielding a crisper result.
-   * The default value is 192.
+   * Whether to bake layers that carry features SVG cannot losslessly represent (TextPath,
+   * TextModifier, diamond/conic gradient) into embedded PNG patches. When true, such a layer is
+   * baked to an embedded PNG and emitted as an &lt;image&gt; so the visual result is preserved.
+   * When false, the exporter falls through to the vector path and those features degrade silently
+   * (TextPath / TextModifier drop, diamond/conic gradient fall back to radial). BackgroundBlurStyle
+   * is always kept as vector output with the blur effect silently dropped, since SVG has no
+   * portable backdrop-blur primitive. Naming is aligned with PPTExportOptions::bakeUnsupported.
+   * The default value is true.
+   */
+  bool bakeUnsupported = true;
+
+  /**
+   * Pixel DPI used when a layer or tiled pattern has to be baked to PNG. The Surface behind every
+   * bake is sized by `rasterDPI / 96` relative to the layer's logical extent, while the placed
+   * &lt;image&gt; keeps using logical dimensions so consumers stretch the denser bitmap over the
+   * same visible extent, yielding a crisper result.
+   *
+   * Valid range: [1, 4096]. Values outside this range are clamped at the entry point — passing 0
+   * or a negative value would otherwise silently disable rasterization (the bake would produce a
+   * zero-pixel surface and the exporter would fall through to the vector path), contradicting the
+   * intent of `bakeUnsupported = true`. The default value is 192 (2x of the default 96 DPI).
    */
   int rasterDPI = 192;
 };
@@ -90,17 +106,27 @@ class SVGExporter {
    * Exports a PAGXDocument to an SVG string.
    * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
    *        on first use to resolve renderPosition() for layers and groups.
+   * @param options export options controlling text rendering, modifier resolution, and rasterizer
+   *        behaviour.
+   * @param warnings optional pointer to receive human-readable warnings whenever a layer or asset
+   *        had to be degraded — image data could not be loaded, a tiled pattern bake failed, a
+   *        layer rasterization failed, or an SVG-unsupported feature was emitted as vector
+   *        because `bakeUnsupported` is false. Useful for CI / batch pipelines to detect silent
+   *        degradation. May be nullptr to suppress collection.
    */
-  static std::string ToSVG(PAGXDocument& document, const Options& options = {});
+  static std::string ToSVG(PAGXDocument& document, const Options& options = {},
+                           std::vector<std::string>* warnings = nullptr);
 
   /**
    * Exports a PAGXDocument to an SVG file.
    * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
    *        on first use to resolve renderPosition() for layers and groups.
+   * @param warnings same semantics as ToSVG(); see that method for details.
    * @return true on success.
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
-                     const Options& options = {});
+                     const Options& options = {},
+                     std::vector<std::string>* warnings = nullptr);
 };
 
 }  // namespace pagx

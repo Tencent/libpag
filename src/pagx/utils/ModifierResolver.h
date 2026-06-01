@@ -62,19 +62,10 @@ class ModifierResolver {
  private:
   PAGXDocument* _doc;
 
-  // Allocates a new pagx::Path whose data is a fresh PathData owned by _doc.
-  // Primes the wrapper Path's preferred layout from `data` bounds so a chained
-  // modifier that re-enters PrimitiveToTGFXPath sees renderScale()==1 and
-  // renderPosition()==(0,0) instead of an empty layoutBounds().
   Element* makePathFromData(PathData* data) const;
 
-  // Apply a TrimPath modifier to `shape`, returning a freshly allocated Path
-  // (or `shape` unchanged when the trim collapses or the shape is degenerate).
   Element* applyTrimToElement(Element* shape, const TrimPath* trim) const;
 
-  // Apply a RoundCorner modifier to `shape`, returning a freshly allocated
-  // Path (or `shape` unchanged when the radius is non-positive or the shape
-  // is degenerate).
   Element* applyRoundCornerToElement(Element* shape, const RoundCorner* corner) const;
 };
 

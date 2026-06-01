@@ -1003,6 +1003,46 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
   SaveFile(svg, "PAGXSVGTest/svg_export_writing_mode_vertical.svg");
 }
 
+// Coverage for the vertical justify stretch path: when a column is shorter than the box's inner
+// height the exporter writes textLength + lengthAdjust="spacing" so SVG distributes the surplus
+// spacing across the glyphs instead of leaving them at the start of the column. The last column
+// degrades to Start (no textLength) to match the renderer.
+PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVerticalJustifyEmitsTextLength) {
+  auto doc = pagx::PAGXDocument::Make(200, 400);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {20, 20};
+  textBox->width = 120;
+  textBox->height = 320;
+  textBox->writingMode = pagx::WritingMode::Vertical;
+  textBox->textAlign = pagx::TextAlign::Justify;
+  textBox->overflow = pagx::Overflow::Hidden;
+
+  // Text long enough that vertical layout creates several columns shorter than 320.
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text =
+      "AAAAAAAAAA BBBBBBBBBB CCCCCCCCCC DDDDDDDDDD EEEEEEEEEE FFFFFFFFFF GGGGGGGGGG HHHHHHHHHH";
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options;
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
+  EXPECT_NE(svg.find("textLength="), std::string::npos);
+  EXPECT_NE(svg.find("lengthAdjust=\"spacing\""), std::string::npos);
+}
+
 /**
  * Composition recursion: a Layer referencing a Composition emits the
  * composition's inner layers into the same <g>, so the nested Rectangle
@@ -1074,7 +1114,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RenderPositionFromConstraint) {
 // Helper function to create a minimal PNG image
 static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
   // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
-  static const uint8_t kMinimalPNG[] = {
+  static const uint8_t MINIMAL_PNG[] = {
       0x89,
       0x50,
       0x4E,
@@ -1154,7 +1194,7 @@ static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
       0x82,
   };
   auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
+  image->data = pagx::Data::MakeWithCopy(MINIMAL_PNG, sizeof(MINIMAL_PNG));
   return image;
 }
 
@@ -1949,7 +1989,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConicGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.rasterizeUnsupportedFeatures = false;
+  opts.bakeUnsupported = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("conic gradient degraded"), std::string::npos);
@@ -1979,10 +2019,154 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DiamondGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.rasterizeUnsupportedFeatures = false;
+  opts.bakeUnsupported = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("diamond gradient degraded"), std::string::npos);
+}
+
+// Coverage for bakeUnsupported=true (the default): conic / diamond gradient trips the SVG
+// feature probe and is baked to an embedded PNG patch via <image> instead of degrading to a
+// radial gradient.
+PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->id = "conicLayer";
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {100, 100};
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 0.0f;
+  s1->color = {1, 0, 0, 1};
+  auto* s2 = doc->makeNode<pagx::ColorStop>();
+  s2->offset = 1.0f;
+  s2->color = {0, 0, 1, 1};
+  grad->colorStops = {s1, s2};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  // Default options: bakeUnsupported=true. Expect an <image> with a PNG data URI to replace the
+  // vector emission, and no <radialGradient> degrade fallback to slip through.
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  EXPECT_EQ(svg.find("<radialGradient"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersDiamondGradient) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* grad = doc->makeNode<pagx::DiamondGradient>();
+  grad->center = {100, 100};
+  grad->radius = 90.0f;
+  auto* s1 = doc->makeNode<pagx::ColorStop>();
+  s1->offset = 0.0f;
+  s1->color = {1, 0, 0, 1};
+  auto* s2 = doc->makeNode<pagx::ColorStop>();
+  s2->offset = 1.0f;
+  s2->color = {0, 1, 0, 1};
+  grad->colorStops = {s1, s2};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+}
+
+// Coverage for the rasterDPI clamp: 0 / negative / huge values must be clamped to a usable
+// range so bakeUnsupported=true still produces a non-empty <image>. The placed <image> always
+// keeps logical coordinates regardless of the chosen DPI, but the PNG payload size scales.
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIDefaultProducesImage) {
+  auto doc = pagx::PAGXDocument::Make(120, 120);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {60, 60};
+  rect->size = {100, 100};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {60, 60};
+  auto* s = doc->makeNode<pagx::ColorStop>();
+  s->offset = 0.0f;
+  s->color = {1, 0, 0, 1};
+  grad->colorStops = {s};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options opts;
+  opts.rasterDPI = 192;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsZeroAndNegative) {
+  auto doc = pagx::PAGXDocument::Make(120, 120);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {60, 60};
+  rect->size = {100, 100};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {60, 60};
+  auto* s = doc->makeNode<pagx::ColorStop>();
+  s->offset = 0.0f;
+  s->color = {1, 0, 0, 1};
+  grad->colorStops = {s};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  // rasterDPI=0 / negative would silently produce a zero-pixel surface and the bake would
+  // fall through to the vector path, contradicting bakeUnsupported=true. The clamp at the
+  // entry point keeps the bake alive.
+  pagx::SVGExporter::Options opts;
+  opts.rasterDPI = 0;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+
+  opts.rasterDPI = -100;
+  auto svg2 = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg2.find("data:image/png;base64,"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsHugeValue) {
+  auto doc = pagx::PAGXDocument::Make(60, 60);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {30, 30};
+  rect->size = {40, 40};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {30, 30};
+  auto* s = doc->makeNode<pagx::ColorStop>();
+  s->offset = 0.0f;
+  s->color = {1, 0, 0, 1};
+  grad->colorStops = {s};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  // Huge rasterDPI is clamped at the entry point so float→int cast in the bake stays well
+  // within int range. The exported SVG keeps logical pixel dimensions.
+  pagx::SVGExporter::Options opts;
+  opts.rasterDPI = 100000;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_DisplayP3FillEmitsColorStyle) {
@@ -2442,8 +2626,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternRotatedMatrix) {
 }
 
 /**
- * Exercises Image filePath fallback (no inline data). The exporter falls back
- * to emitting the path itself when the file cannot be read.
+ * Exercises Image filePath fallback (no inline data). When the on-disk read fails the exporter
+ * drops the asset and surfaces a warning rather than embedding the host-local filesystem path,
+ * which would never resolve in a different environment and would leak directory layout.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternFilePathFallback) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -2464,15 +2649,25 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternFilePathFallback) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  auto svg = pagx::SVGExporter::ToSVG(*doc);
-  EXPECT_NE(svg.find("nonexistent/test_image.png"), std::string::npos);
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("nonexistent/test_image.png"), std::string::npos);
+  EXPECT_FALSE(warnings.empty());
+  bool sawWarning = false;
+  for (const auto& w : warnings) {
+    if (w.find("nonexistent/test_image.png") != std::string::npos) {
+      sawWarning = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(sawWarning);
 }
 
 /**
  * JPEG magic bytes should be detected and produce a data:image/jpeg URI.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_JpegMimeDetection) {
-  static constexpr uint8_t kFakeJpeg[] = {0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J',  'F',
+  static constexpr uint8_t FAKE_JPEG[] = {0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J',  'F',
                                           'I',  'F',  0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
                                           0x00, 0x01, 0x00, 0x00, 0xFF, 0xD9};
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -2481,7 +2676,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_JpegMimeDetection) {
   rect->position = {10, 10};
   rect->size = {80, 80};
   auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kFakeJpeg, sizeof(kFakeJpeg));
+  image->data = pagx::Data::MakeWithCopy(FAKE_JPEG, sizeof(FAKE_JPEG));
   auto* pattern = doc->makeNode<pagx::ImagePattern>();
   pattern->image = image;
   pattern->tileModeX = pagx::TileMode::Decal;
@@ -2500,7 +2695,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_JpegMimeDetection) {
  * WebP magic bytes should be detected and produce a data:image/webp URI.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_WebpMimeDetection) {
-  static constexpr uint8_t kFakeWebp[] = {'R', 'I', 'F', 'F', 0x10, 0x00, 0x00, 0x00,
+  static constexpr uint8_t FAKE_WEBP[] = {'R', 'I', 'F', 'F', 0x10, 0x00, 0x00, 0x00,
                                           'W', 'E', 'B', 'P', 'V',  'P',  '8',  ' '};
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -2508,7 +2703,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WebpMimeDetection) {
   rect->position = {10, 10};
   rect->size = {80, 80};
   auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kFakeWebp, sizeof(kFakeWebp));
+  image->data = pagx::Data::MakeWithCopy(FAKE_WEBP, sizeof(FAKE_WEBP));
   auto* pattern = doc->makeNode<pagx::ImagePattern>();
   pattern->image = image;
   pattern->tileModeX = pagx::TileMode::Decal;
