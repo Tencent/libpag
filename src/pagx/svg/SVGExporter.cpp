@@ -645,7 +645,15 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
       _defs->closeElement();
       return "url(#" + defId + ")";
     }
-    // If baking failed, fall through to try native tiling for Repeat modes
+    // Baking failed for Mirror/Clamp. SVG has no native equivalent for those wrap
+    // modes, so the fall-through below either degrades them to Repeat (when the
+    // other axis is Repeat) or paints a single tile across the shape. Surface the
+    // semantic loss explicitly instead of silently picking the Repeat path.
+    addWarning(needsNativeTiling
+                   ? "ImagePattern: Mirror/Clamp tile bake failed; the Mirror/Clamp axis "
+                     "falls back to Repeat tiling and loses its wrap mode."
+                   : "ImagePattern: Mirror/Clamp tile bake failed; falling back to a single "
+                     "image fill, the Mirror/Clamp wrap mode will be lost.");
   }
 
   // Fall back to native SVG pattern handling for Repeat mode and non-bakeable cases.
