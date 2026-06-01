@@ -15,10 +15,18 @@ const EMOJI_FONT_URL = 'https://pag.qq.com/wx_pagx_demo/fonts/NotoColorEmoji.ttf
 
 // PAGX sample files configuration
 const SAMPLE_FILES = [
-  // { 
-  //   name: 'ios2666', 
-  //   url: 'https://pag.qq.com/wx_pagx_demo/ios2666.pagx'
-  // },
+  { 
+    name: 'page_0-1', 
+    url: 'https://pag.qq.com/wx_pagx_demo/page_0-1.pagx'
+  },
+  { 
+    name: 'page_0-0', 
+    url: 'https://pag.qq.com/wx_pagx_demo/page_0-0.pagx'
+  },
+  { 
+    name: 'jianbian_0', 
+    url: 'https://pag.qq.com/wx_pagx_demo/jianbian_0.pagx'
+  },
   { 
     name: 'ColorPicker', 
     url: 'https://pag.qq.com/wx_pagx_demo/ColorPicker.pagx'
