@@ -19,6 +19,7 @@
 #include "HardwareDecoder.h"
 #import <UIKit/UIKit.h>
 #include <algorithm>
+#include <atomic>
 #include <mutex>
 #include <vector>
 #include "base/utils/Log.h"
@@ -37,26 +38,40 @@ std::vector<HardwareDecoder*>& GetActiveDecoders() {
   return list;
 }
 
-// Registers a global willResignActive observer once. The observer block runs on a dedicated
-// NSOperationQueue (not the main thread), so it bypasses the synchronous-observer ordering
-// that lets EAGLDevice::finish() acquire device.locker first and stall the main thread before
-// HardwareDecoder gets a chance to abort its in-progress VT decode.
-void RegisterWillResignObserverOnce() {
+// Reflects whether the application is currently inactive (between willResignActive and
+// didBecomeActive). Read by onDecodeFrame() to fast-fail any decode attempt while in this
+// window, since calling VTDecompressionSessionDecodeFrame may block indefinitely once the
+// app moves to the background, defeating the invalidateSession() unblock done at willResign.
+std::atomic<bool> g_appInactive{false};
+
+// Registers global willResignActive / didBecomeActive observers once. The blocks run on a
+// dedicated NSOperationQueue (not the main thread), so they bypass the synchronous-observer
+// ordering that lets EAGLDevice::finish() acquire device.locker first and stall the main
+// thread before HardwareDecoder gets a chance to abort its in-progress VT decode.
+void RegisterAppLifecycleObserversOnce() {
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     NSOperationQueue* queue = [[NSOperationQueue alloc] init];
     queue.maxConcurrentOperationCount = 1;
-    queue.name = @"libpag.HardwareDecoder.willResign";
+    queue.name = @"libpag.HardwareDecoder.lifecycle";
     [[NSNotificationCenter defaultCenter]
         addObserverForName:UIApplicationWillResignActiveNotification
                     object:nil
                      queue:queue
                 usingBlock:^(NSNotification*) {
-          std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
-          for (auto* decoder : GetActiveDecoders()) {
-            decoder->invalidateSession();
-          }
-        }];
+                  g_appInactive.store(true, std::memory_order_release);
+                  std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+                  for (auto* decoder : GetActiveDecoders()) {
+                    decoder->invalidateSession();
+                  }
+                }];
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationDidBecomeActiveNotification
+                    object:nil
+                     queue:queue
+                usingBlock:^(NSNotification*) {
+                  g_appInactive.store(false, std::memory_order_release);
+                }];
   });
 }
 }  // namespace
@@ -69,7 +84,8 @@ void HardwareDecoder::invalidateSession() {
   {
     std::lock_guard<std::mutex> lock(sessionLocker);
     if (session) {
-      sessionToInvalidate = static_cast<VTDecompressionSessionRef>(CFRetain(session));
+      CFRetain(session);
+      sessionToInvalidate = session;
     }
   }
   if (sessionToInvalidate) {
@@ -83,7 +99,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format)
       destinationColorSpace(format.colorSpace),
       maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
-  RegisterWillResignObserverOnce();
+  RegisterAppLifecycleObserversOnce();
   std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
   GetActiveDecoders().push_back(this);
 }
@@ -238,9 +254,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {
-    if (newSession != nullptr &&
-        (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
-         sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL)) {
+    if (newSession != nullptr && (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
+                                  sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL)) {
       CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
           kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
       CFStringRef destinationTransferFunction = CFStringCreateWithCString(
@@ -326,6 +341,15 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
     outputFrame = nullptr;
+  }
+
+  // Fast-fail while the app is inactive (between willResignActive and didBecomeActive).
+  // Calling VTDecompressionSessionDecodeFrame in this window may block indefinitely because
+  // iOS suspends the hardware decoder pipeline as the app heads to the background; returning
+  // Error here lets the caller release device.locker so the main thread can complete
+  // EAGLDevice::finish() within the watchdog window.
+  if (g_appInactive.load(std::memory_order_acquire)) {
+    return DecodingResult::Error;
   }
 
   CVPixelBufferRef outputPixelBuffer = nullptr;
