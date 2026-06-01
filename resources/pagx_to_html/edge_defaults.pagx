@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Default values and edge cases — default Rectangle/Ellipse/Fill/Stroke/Polystar,
+     zero-size shapes, ConicGradient defaults, minimal Text, RadialGradient, evenOdd, TrimPath -->
+<pagx width="480" height="420">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,24,20,24" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Edge Cases and Defaults" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Default values, zero sizes, minimal attributes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="10" padding="12" alignment="stretch" arrangement="center">
+
+      <!-- Row 1: Rectangle defaults, Ellipse defaults, Stroke defaults, Polystar defaults -->
+      <Layer layout="horizontal" gap="10" alignment="center" arrangement="spaceEvenly">
+        <!-- Rectangle with default Fill (black) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="56,56"/>
+            <Fill/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Rect+Fill" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- Ellipse with color Fill -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Ellipse position="30,30" size="56,56"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Ellipse" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- Rectangle with default Stroke (black 1px) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="56,56"/>
+            <Stroke/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Stroke" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- Polystar with defaults -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Polystar position="30,30" outerRadius="28" innerRadius="14"/>
+            <Fill color="#F59E0B40"/>
+            <Stroke color="#F59E0B" width="1"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="Polystar" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 2: Zero-size, ConicGradient defaults, Minimal text, RadialGradient -->
+      <Layer layout="horizontal" gap="10" alignment="center" arrangement="spaceEvenly">
+        <!-- Zero-size shapes (background only, shapes invisible by design) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="60,60" roundness="6"/>
+            <Fill color="#FEF2F2"/>
+            <Stroke color="#FECACA" width="1"/>
+            <Group>
+              <Text text="0x0" fontSize="14" position="30,30" textAnchor="center"/>
+              <Fill color="#EF4444"/>
+            </Group>
+          </Layer>
+          <Layer height="10">
+            <Text text="Zero-size" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- ConicGradient with defaults (no center/angle) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Ellipse position="30,30" size="56,56"/>
+            <Fill>
+              <ConicGradient>
+                <ColorStop offset="0" color="#3B82F6"/>
+                <ColorStop offset="0.5" color="#EC4899"/>
+                <ColorStop offset="1" color="#3B82F6"/>
+              </ConicGradient>
+            </Fill>
+          </Layer>
+          <Layer height="10">
+            <Text text="Conic" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- Minimal text (no fontFamily) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="60,60" roundness="6"/>
+            <Fill color="#F8FAFC"/>
+            <Stroke color="#E2E8F0" width="1"/>
+            <Group>
+              <Text text="Hi" fontSize="18" position="30,30" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Group>
+          </Layer>
+          <Layer height="10">
+            <Text text="Minimal" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- RadialGradient -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="56,56" roundness="8"/>
+            <Fill>
+              <RadialGradient center="0.5,0.5" radius="1.43">
+                <ColorStop offset="0" color="#FFFFFF"/>
+                <ColorStop offset="1" color="#8B5CF6"/>
+              </RadialGradient>
+            </Fill>
+          </Layer>
+          <Layer height="10">
+            <Text text="Radial" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 3: evenOdd, TrimPath defaults, Empty layer -->
+      <Layer layout="horizontal" gap="10" alignment="center" arrangement="spaceEvenly">
+        <!-- evenOdd fill rule -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="22,22" size="36,36"/>
+            <Rectangle position="38,38" size="36,36"/>
+            <MergePath mode="append"/>
+            <Fill color="#8B5CF680" fillRule="evenOdd"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="evenOdd" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- TrimPath with defaults -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Ellipse position="30,30" size="50,30"/>
+            <TrimPath start="0" end="0.7"/>
+            <Stroke color="#06B6D4" width="2"/>
+          </Layer>
+          <Layer height="10">
+            <Text text="TrimPath" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+        <!-- Empty layer (1x1 invisible rect) -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="60" height="60">
+            <Rectangle position="30,30" size="60,60" roundness="6"/>
+            <Fill color="#F8FAFC"/>
+            <Stroke color="#E2E8F0" width="1" dashes="4,4"/>
+            <Group>
+              <Text text="empty" fontSize="10" position="30,30" textAnchor="center"/>
+              <Fill color="#CBD5E1"/>
+            </Group>
+          </Layer>
+          <Layer height="10">
+            <Text text="Empty" fontFamily="Arial" fontSize="7" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+      </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

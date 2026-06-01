@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: SolidColor in all formats: #RGB, #RRGGBB, #RRGGBBAA, srgb(), p3(), @id reference -->
+<pagx width="420" height="300">
+  <Resources>
+    <SolidColor id="resBrandColor" color="#8B5CF6"/>
+  </Resources>
+
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Color Formats" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="All supported color syntax variations" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="12" padding="20" alignment="center" arrangement="center">
+
+      <!-- Row 1: Hex formats + srgb -->
+      <Layer layout="horizontal" gap="20" arrangement="center">
+        <!-- #RGB -->
+        <Layer width="60" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#F00"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="#RGB" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- #RRGGBB -->
+        <Layer width="60" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#3B82F6"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="#RRGGBB" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- #RRGGBBAA -->
+        <Layer width="68" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill color="#EF444480"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="#RRGGBBAA" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- srgb() -->
+        <Layer width="60" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill>
+              <SolidColor color="srgb(0.06,0.72,0.51,0.9)"/>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="srgb()" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Row 2: P3 and resource reference -->
+      <Layer layout="horizontal" gap="20" arrangement="center">
+        <!-- p3() -->
+        <Layer width="60" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+            <Fill>
+              <SolidColor color="p3(1,0.2,0.1)"/>
+            </Fill>
+          </Layer>
+          <Layer height="12">
+            <Text text="p3()" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- @id ref -->
+        <Layer width="60" layout="vertical" gap="4" alignment="center">
+          <Layer width="50" height="50">
+            <Ellipse left="0" right="0" top="0" bottom="0"/>
+            <Fill color="@resBrandColor"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="@id ref" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

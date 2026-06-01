@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: GlyphRun as a shape-batching mechanism — NOT text rendering.
+     Font resources contain geometric shapes with no Unicode mapping. Text nodes have no
+     `text` or `fontFamily` so they route to writeEmbeddedShapeGlyphs (SVG path/image output),
+     not the CSS span text path. Covers: xOffsets, positions, anchors, scales, skews,
+     combined transforms, and bitmap glyphs (with / without glyph offset). -->
+<pagx width="480" height="520">
+  <Resources>
+    <!-- Vector font: four visually distinct geometric shapes.
+         All paths use unitsPerEm=1000 coordinates (y upward, body in y=0..-800).
+         advance=700 ensures consistent spacing. -->
+    <Font id="shapes" unitsPerEm="1000">
+      <!-- Hexagon (flat-top) -->
+      <Glyph advance="700"
+             path="M 175,0 L 0,-400 L 175,-800 L 525,-800 L 700,-400 L 525,0 Z"/>
+      <!-- 5-pointed star -->
+      <Glyph advance="700"
+             path="M 350,0 L 449,-270 L 663,-270 L 497,-436 L 563,-700 L 350,-560 L 137,-700 L 203,-436 L 37,-270 L 251,-270 Z"/>
+      <!-- Rounded square -->
+      <Glyph advance="700"
+             path="M 150,0 C 67,0 0,-67 0,-150 L 0,-650 C 0,-733 67,-800 150,-800 L 550,-800 C 633,-800 700,-733 700,-650 L 700,-150 C 700,-67 633,0 550,0 Z"/>
+      <!-- Right arrow -->
+      <Glyph advance="700"
+             path="M 0,-150 L 380,-150 L 380,-50 L 700,-400 L 380,-750 L 380,-650 L 0,-650 Z"/>
+    </Font>
+
+    <!-- Bitmap font: star (with glyph offset) and heart (without offset) -->
+    <Font id="bitmaps" unitsPerEm="100">
+      <Glyph advance="60" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACZ0lEQVR4nO1bUZHDIBCtg0qohEqohEqIhEqIhEjI1+mohEqIhEjYwmWZo7kUAgHeJsObeTP3VfZtFngs3OlUUQED/Zxumug4YFDie010HBAo4RdFYl7Q8RSHEt1ZCejQ8RSFEnxWHK0E6L/P6LiKQYltLPGGDTquYlBih4UEDOi4ikAJvS+IN7yj48sOJfLpSMATHV9WKIFXh3jDKzrObGDj40vAMY0Rb30+8YbH2xKVqDYgAS063uSYGR8fR3S8SfHF+Ph4HGP0xfj4eAxjRNOZP1S84f57BR7j4+M+jRFvefrLu2zvWt75t2RsjRzMjRc2vbV1/JWfgSt9LEdrvI5jaChFe42/nBHWWgPFLGJoDlb8Rk/jrSRaZ1f3ynU2+6BJCDtjUJx5kco4U3WQJGxzlDSd4Uus7qmpY07TW9hhEtKJt5Kgt8iXAHE+6hjzmKYdJCGf+FkSegFi5+yzi58lQlISMH1ENfBDgPgHRLyVhAYoXkbXiKYja8ltUo8l6xap8HTAlv0S6PO+PzflvSegba2vUMprlRUU/0u03g/Qts5vLOV0jAnjB+QshIRxhXJukQnTNJVxc0Rh196pib8roDSXH7HEu0EKu/f/KGH6u2SJnUL4dwQUboDGpcA5kaHnCbwhCgy6d81bCm+2YB9S0LpXX8RVstq48LRYW1m4V2Xk7wXo6og+s/Pv+yoM1xPwlGvrKveAMc7kXmhxhoiWO8S6dJO//6fp/wuWpsUr9VghQdmBDCHzfMOY/7bN3GO6AjHzvPjBhKYDmFkfyp8MeV46t7UCMZhtE2+IKioqKioqKnaHN731UHSLB5IuAAAAAElFTkSuQmCC" offset="0,-5"/>
+      <Glyph advance="60" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACN0lEQVR4nO1by43DIBBNBynBJaSEXPeWElJCSnAJOe+JElICJbgENzCSS8jCGkusFzv8ZzCM9KQcYvPe4z/g08ky4Ou7E3gKjAJvS3CBu8DZthytvLN6ljuUNyqOnWt5n4S7kDBhEmA2xFR5TD0TUiYPNkK84BFIwmREv1NeH0H4Gg9f8SwyER2DXjuq1oeE5TFK4vXW0CnErnV/EzKJ11tCypp3M0H84ZaRDBZuW+LltJOjKWJDavw/LcM8f2KTy4VnrbVvbgUQf74vAQ/dgJwjMRUMi/iOABksdLVMfVu4LetvbCJY6KUBnAARLPBmANQ5AywYTgRIoEIaUNMKcI2pjQHNgLwJEGpgbSEEbSn8mwvAJoKF87IjHAmQyY2x1nTYgqduQI3jwN/sMNS1IpxaVthgQEeAWC6YT42hjmUxN4pXBlwJEEyN66YBFbSC7dqvpBXs175mAiNANjbsL0nA8c4KzSfCH0w40nmh9z0hToB8KD4PfDsGlN4V3Ju+wYSSN0rm6zAeJvQExLhi8z6irwmMgChbuN0LtDRAjgclHKNJjmH9vmAT0okvwIT04gmbkE88QRPyi1+Z8EIU/0ITvzKCIYiPP9WFBMyft+QSf8fWawxB7AJpT5nkuy/YOncj4bhAo7/bBsz5hBg7SfkOv/08dkD4F2fy2XifwGEF+GWXyqz1rVADpM3CaSA/0IUE7OcW4u7hqQbMZw/6ACl/2+XsjxKqS0wKx23ye6FMqFN8CyLxA4AW7KoCBy56AAAAAElFTkSuQmCC"/>
+    </Font>
+  </Resources>
+
+  <!-- Background gradient -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill>
+      <LinearGradient>
+        <ColorStop color="#EEF2FF" offset="0"/>
+        <ColorStop color="#F0FDF4" offset="1"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="18,22,18,22" gap="6" alignment="stretch">
+
+    <!-- Title -->
+    <Layer height="20">
+      <Text text="Shape Glyph Run" fontFamily="Arial" fontStyle="Bold" fontSize="15" centerX="0" textAnchor="center"/>
+      <Fill color="#1E293B"/>
+    </Layer>
+
+    <!-- Subtitle -->
+    <Layer height="12">
+      <Text text="GlyphRun as shape-batch renderer (not text)" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+      <Fill color="#64748B"/>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="20" blurY="20" color="#1E293B18"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="14" gap="0" alignment="stretch">
+
+        <!-- ① xOffsets: four shapes, equally spaced, no transform (baseline row) -->
+        <Layer height="11">
+          <Text text="① xOffsets — four shapes, uniform spacing (no transform)" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="38">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="26" glyphs="1,2,3,4" x="10" y="30"
+                       xOffsets="0,90,180,270"/>
+          </Text>
+          <Fill color="#6366F1"/>
+        </Layer>
+
+        <!-- ② positions: same spacing, each shape nudged in xy -->
+        <Layer height="11">
+          <Text text="② positions — per-shape xy nudge (±8px)" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="50">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="26" glyphs="1,2,3,4" x="10" y="34"
+                       xOffsets="0,90,180,270"
+                       positions="0,0;8,-12;-6,10;5,-8"/>
+          </Text>
+          <Fill color="#0EA5E9"/>
+          <Stroke color="#0369A1" width="1"/>
+        </Layer>
+
+        <!-- ③ scales: anchor at shape centre (anchorY = -fontSize*0.4 ≈ -11) -->
+        <Layer height="11">
+          <Text text="③ scales — 0.6× / 0.8× / 1.0× / 1.2× (anchor at centre)" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="46">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="28" glyphs="1,2,3,4" x="10" y="34"
+                       xOffsets="0,90,180,270"
+                       anchors="0,-11;0,-11;0,-11;0,-11"
+                       scales="0.6,0.6;0.8,0.8;1,1;1.2,1.2"/>
+          </Text>
+          <Fill color="#F59E0B"/>
+        </Layer>
+
+        <!-- ④ skews: alternating -20°/+20° -->
+        <Layer height="11">
+          <Text text="④ skews — -20° / +20° / -20° / +20°" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="46">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="24" glyphs="1,2,3,4" x="16" y="38"
+                       xOffsets="0,90,180,270"
+                       skews="-20,20,-20,20"/>
+          </Text>
+          <Fill color="#EC4899"/>
+        </Layer>
+
+        <!-- ⑤ anchors: different pivot points produce different scale origins -->
+        <Layer height="11">
+          <Text text="⑤ anchors — different pivot points, all scaled 1.4×" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="44">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="24" glyphs="1,2,3,4" x="10" y="34"
+                       xOffsets="0,90,180,270"
+                       anchors="0,0;8,-10;-8,0;0,-16"
+                       scales="1.4,1.4;1.4,1.4;1.4,1.4;1.4,1.4"/>
+          </Text>
+          <Fill color="#10B981"/>
+        </Layer>
+
+        <!-- ⑥ combined: all transforms with moderate values -->
+        <Layer height="11">
+          <Text text="⑥ combined — pos + anchor + skew + scale" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="52">
+          <Text>
+            <GlyphRun font="@shapes" fontSize="26" glyphs="1,2,3,4" x="10" y="34"
+                       xOffsets="0,90,180,270"
+                       positions="0,0;4,-6;-3,5;3,-4"
+                       anchors="0,-10;0,-10;0,-10;0,-10"
+                       skews="-8,6,-10,8"
+                       scales="1.1,0.9;0.85,1.1;1.05,0.95;0.9,1.05"/>
+          </Text>
+          <Fill>
+            <LinearGradient>
+              <ColorStop color="#8B5CF6" offset="0"/>
+              <ColorStop color="#EC4899" offset="1"/>
+            </LinearGradient>
+          </Fill>
+        </Layer>
+
+        <!-- ⑦ bitmap: star (with glyph offset) + heart (without), alternating -->
+        <Layer height="11">
+          <Text text="⑦ bitmap — star (glyph offset) + heart (no offset), alternating" fontFamily="Arial" fontSize="9"/>
+          <Fill color="#94A3B8"/>
+        </Layer>
+        <Layer height="50">
+          <Text>
+            <GlyphRun font="@bitmaps" fontSize="68" glyphs="1,2,1,2,1,2" x="14" y="10"
+                       xOffsets="0,56,112,168,224,280"/>
+          </Text>
+          <Fill color="#000000" alpha="0.01"/>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

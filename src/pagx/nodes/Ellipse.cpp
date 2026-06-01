@@ -22,32 +22,31 @@
 namespace pagx {
 
 void Ellipse::onMeasure(LayoutContext*) {
-  preferredX = position.x - size.width * 0.5f;
-  preferredY = position.y - size.height * 0.5f;
-  preferredWidth = size.width;
-  preferredHeight = size.height;
+  // Preferred size: authored width/height overrides the intrinsic 'size'. percentWidth/Height are
+  // not consulted here; they are resolved by the parent via PerformConstraintLayout.
+  float w = std::isnan(width) ? size.width : width;
+  float h = std::isnan(height) ? size.height : height;
+  // position specifies the ellipse center. When position.x/y is NaN, the bounding box's top-left
+  // is placed at the origin (0, 0).
+  preferredX = std::isnan(position.x) ? 0 : (position.x - w * 0.5f);
+  preferredY = std::isnan(position.y) ? 0 : (position.y - h * 0.5f);
+  preferredWidth = w;
+  preferredHeight = h;
 }
 
-void Ellipse::setLayoutSize(LayoutContext*, float width, float height) {
-  if (!std::isnan(width)) {
-    size.width = width;
-  }
-  if (!std::isnan(height)) {
-    size.height = height;
-  }
-  layoutWidth = size.width;
-  layoutHeight = size.height;
+void Ellipse::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
+  layoutWidth = !std::isnan(targetWidth) ? targetWidth : preferredWidth;
+  layoutHeight = !std::isnan(targetHeight) ? targetHeight : preferredHeight;
 }
 
-void Ellipse::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x + size.width * 0.5f;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y + size.height * 0.5f;
-    layoutY = y;
-  }
+Point Ellipse::renderPosition() const {
+  auto bounds = layoutBounds();
+  return {bounds.x + bounds.width * 0.5f, bounds.y + bounds.height * 0.5f};
+}
+
+Size Ellipse::renderSize() const {
+  auto bounds = layoutBounds();
+  return {bounds.width, bounds.height};
 }
 
 }  // namespace pagx

@@ -34,6 +34,7 @@ bool PAGXRenderer::isReady() const {
 
 void PAGXRenderer::updateSize() {
   if (drawable != nullptr) {
+    drawable->freeSurface();
     drawable->updateSize();
   }
 }
@@ -66,7 +67,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  if (state.contentLayer != nullptr && state.contentWidth > 0 && state.contentHeight > 0) {
+  if (state.rootLayer != nullptr && state.contentWidth > 0 && state.contentHeight > 0) {
     int surfaceWidth = surface->width();
     int surfaceHeight = surface->height();
     float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(state.contentWidth);
@@ -79,7 +80,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
         0.5f;
     auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
     matrix.preScale(scale, scale);
-    state.contentLayer->setMatrix(matrix);
+    state.rootLayer->setMatrix(matrix);
   }
 
   auto renderStart = tgfx::Clock::Now();

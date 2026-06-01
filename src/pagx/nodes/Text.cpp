@@ -48,38 +48,56 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 }
 
 void Text::onMeasure(LayoutContext* context) {
+  textScale = 1.0f;
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
-  preferredX = textBounds.x;
-  preferredY = textBounds.y;
-  preferredWidth = textBounds.width;
-  preferredHeight = textBounds.height;
+  // position is the text origin (x, baseline); textBounds is relative to position.
+  preferredX = position.x + textBounds.x;
+  preferredY = position.y + textBounds.y;
+  // Preferred size: authored width/height overrides the intrinsic text bounds when present.
+  preferredWidth = std::isnan(width) ? textBounds.width : width;
+  preferredHeight = std::isnan(height) ? textBounds.height : height;
 }
 
-void Text::setLayoutSize(LayoutContext* context, float width, float height) {
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
+void Text::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // Compute scale based on intrinsic text bounds (pre-scaling) and the requested target. NaN on
+  // an axis means the parent did not constrain that axis, so ComputeUniformScale skips it. When
+  // both axes are NaN, fall back to the preferred size so an authored width/height still drives
+  // scaling without parent constraints.
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(textBounds.width, textBounds.height, tW, tH);
+  float origW = textBounds.width;
+  float origH = textBounds.height;
   if (scale != 1.0f) {
-    fontSize = fontSize * scale;
+    textScale = scale;
     auto params = MakeStandaloneParams(this);
+    params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     textBounds = result.bounds;
   }
-  layoutWidth = textBounds.width;
-  layoutHeight = textBounds.height;
+  // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font
+  // hinting may cause slight differences. renderPosition() compensates via centering.
+  layoutWidth = origW * scale;
+  layoutHeight = origH * scale;
 }
 
-void Text::setLayoutPosition(LayoutContext*, float x, float y) {
-  if (!std::isnan(x)) {
-    position.x = x - textBounds.x;
-    layoutX = x;
-  }
-  if (!std::isnan(y)) {
-    position.y = y - textBounds.y;
-    layoutY = y;
-  }
+Point Text::renderPosition() const {
+  auto bounds = layoutBounds();
+  float offsetX = (bounds.width - textBounds.width) * 0.5f;
+  float offsetY = (bounds.height - textBounds.height) * 0.5f;
+  return {bounds.x + offsetX - textBounds.x, bounds.y + offsetY - textBounds.y};
+}
+
+float Text::renderFontSize() const {
+  return fontSize * textScale;
 }
 
 }  // namespace pagx

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="460" height="400">
+<pagx width="460" height="400">
   <!-- Test TextBox with Group transforms: inverse matrix cancels Group transform
        so text renders at TextBox layout position regardless of Group transform. -->
 

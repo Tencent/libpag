@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: scrollRect dedicated test — viewport clipping with content extending beyond -->
+<pagx width="380" height="300">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Scroll Rect" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Viewport clipping with content extending beyond" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="10" alignment="center" arrangement="center">
+        <!-- Row 1: Two viewport demos side by side -->
+        <Layer layout="horizontal" gap="20" alignment="center" arrangement="center">
+          <!-- Viewport 1 -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="120" height="80" clipToBounds="true">
+              <!-- Dashed border showing viewport boundary -->
+              <Rectangle position="60,40" size="120,80"/>
+              <Stroke color="#94A3B8" width="1" dashes="4,3"/>
+              <!-- scrollRect clips the gradient rectangle -->
+              <Layer scrollRect="20,20,120,80" x="0" y="0">
+                <Rectangle position="80,50" size="200,120" roundness="12"/>
+                <Fill>
+                  <LinearGradient startPoint="0,0" endPoint="1,1">
+                    <ColorStop offset="0" color="#3B82F6"/>
+                    <ColorStop offset="0.5" color="#8B5CF6"/>
+                    <ColorStop offset="1" color="#EC4899"/>
+                  </LinearGradient>
+                </Fill>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="Viewport 1" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+
+          <!-- Viewport 2 (scrolled) -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="120" height="80" clipToBounds="true">
+              <Rectangle position="60,40" size="120,80"/>
+              <Stroke color="#94A3B8" width="1" dashes="4,3"/>
+              <Layer scrollRect="40,20,120,80" x="0" y="0">
+                <Rectangle position="80,50" size="200,120" roundness="12"/>
+                <Fill>
+                  <LinearGradient startPoint="0,0" endPoint="1,1">
+                    <ColorStop offset="0" color="#10B981"/>
+                    <ColorStop offset="0.5" color="#F59E0B"/>
+                    <ColorStop offset="1" color="#EF4444"/>
+                  </LinearGradient>
+                </Fill>
+              </Layer>
+            </Layer>
+            <Layer height="12">
+              <Text text="Viewport 2" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Row 2: Text clipping demo -->
+        <Layer layout="vertical" gap="4" alignment="center">
+          <Layer width="280" height="50" clipToBounds="true">
+            <Rectangle position="140,25" size="280,50"/>
+            <Stroke color="#94A3B8" width="1" dashes="4,3"/>
+            <Layer scrollRect="0,0,280,50" x="0" y="0">
+              <TextBox width="500" height="50" wordWrap="false" paragraphAlign="middle">
+                <Text text="This is a long text that extends well beyond the scroll rect boundary and should be clipped." fontFamily="Arial" fontSize="14"/>
+                <Fill color="#1F2937"/>
+              </TextBox>
+            </Layer>
+          </Layer>
+          <Layer height="12">
+            <Text text="Text Clipping" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+            <Fill color="#94A3B8"/>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

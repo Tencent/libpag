@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nested Layer containing TextBox with left+right constraints in vertical layout.
+     The red bar should appear below all wrapped text, not overlap. -->
+<pagx width="300" height="200">
+  <Layer width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer width="100%" height="100%" layout="vertical" gap="12" padding="20">
+    <!-- Intermediate Layer (content-measured) containing TextBox -->
+    <Layer>
+      <Rectangle width="100%" height="100%" roundness="8"/>
+      <Fill color="#FFFFFF"/>
+      <Layer width="100%" height="100%" padding="12">
+        <TextBox width="100%">
+          <Text text="AAAA BBBB CCCC DDDD EEEE FFFF GGGG" fontFamily="Noto Sans SC" fontSize="16"/>
+          <Fill color="#1E293B"/>
+        </TextBox>
+      </Layer>
+    </Layer>
+    <!-- Red bar sibling -->
+    <Layer height="32">
+      <Rectangle width="100%" height="100%" roundness="8"/>
+      <Fill color="#F43F5E"/>
+    </Layer>
+  </Layer>
+</pagx>

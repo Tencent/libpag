@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group → div.pagx-group with anchor/position/rotation/scale/skew/alpha; scope isolation; geometry propagation -->
+<pagx width="420" height="380">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Group Transform" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Anchor, rotation, scale, skew, scope isolation" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card: internal content uses absolute positioning for Group transforms -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" gap="10" padding="15" alignment="stretch" arrangement="center">
+        <!-- Column 1: Rotate+Scale and Skew -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+        <!-- Rotate+Scale -->
+        <Layer width="140" layout="vertical" gap="4" alignment="center">
+          <Layer width="140" height="100">
+            <Group anchor="50,50" position="70,50" rotation="30" scale="0.8,0.8" alpha="0.7">
+              <Rectangle position="60,60" size="80,80" roundness="8"/>
+              <Fill color="#3B82F6"/>
+            </Group>
+          </Layer>
+          <Layer height="12">
+            <Text text="Rotate+Scale" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Skew -->
+        <Layer width="140" layout="vertical" gap="4" alignment="center">
+          <Layer width="140" height="100">
+            <Group anchor="40,40" position="60,40" skew="20" skewAxis="45" scale="1.2,1">
+              <Rectangle position="50,50" size="60,60"/>
+              <Fill color="#8B5CF6"/>
+            </Group>
+          </Layer>
+          <Layer height="12">
+            <Text text="Skew" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+
+      <!-- Column 2: Scope Isolation and Propagation -->
+      <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+        <!-- Scope Isolation -->
+        <Layer width="140" layout="vertical" gap="4" alignment="center">
+          <Layer width="140" height="100">
+            <Group position="20,10">
+              <Ellipse position="40,40" size="50,50"/>
+              <Fill color="#EF4444"/>
+            </Group>
+            <Rectangle position="100,60" size="60,60"/>
+            <Fill color="#10B981"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Scope Isolation" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+        <!-- Propagation -->
+        <Layer width="140" layout="vertical" gap="4" alignment="center">
+          <Layer width="140" height="100">
+            <Group position="30,15">
+              <Rectangle position="40,40" size="50,50"/>
+            </Group>
+            <Fill color="#F59E0B"/>
+          </Layer>
+          <Layer height="12">
+            <Text text="Propagation" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+        </Layer>
+      </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

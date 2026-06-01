@@ -25,7 +25,6 @@
 #include "cli/LayoutUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/PAGXImporter.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 
@@ -149,13 +148,9 @@ int RunBounds(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto document = PAGXImporter::FromFile(options.inputFile);
+  auto document = LoadDocument(options.inputFile, "pagx bounds");
   if (document == nullptr) {
-    std::cerr << "pagx bounds: failed to load '" << options.inputFile << "'\n";
     return 1;
-  }
-  for (auto& error : document->errors) {
-    std::cerr << "pagx bounds: warning: " << error << "\n";
   }
   if (document->hasUnresolvedImports()) {
     std::cerr << "pagx bounds: error: unresolved import directive, run 'pagx resolve' first\n";

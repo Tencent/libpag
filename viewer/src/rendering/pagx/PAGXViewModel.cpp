@@ -152,7 +152,7 @@ void PAGXViewModel::markNeedsRender() {
 
 PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
-  return {displayList, pagxContentLayer, pagxWidth, pagxHeight};
+  return {displayList, pagxRootLayer, pagxWidth, pagxHeight};
 }
 
 bool PAGXViewModel::hasContent() {
@@ -194,13 +194,16 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
+  document->applyLayout();
 
   auto newContentLayer = pagx::LayerBuilder::Build(document.get());
   if (newContentLayer == nullptr) {
@@ -208,12 +211,16 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       std::lock_guard<std::mutex> lock(renderMutex);
       clearContent();
     }
+    Q_EMIT filePathChanged("");
     Q_EMIT pagxDocumentChanged(nullptr);
     return false;
   }
 
+  auto newContainer = tgfx::Layer::Make();
+  newContainer->addChild(newContentLayer);
+
   auto newDisplayList = std::make_shared<tgfx::DisplayList>();
-  newDisplayList->root()->addChild(newContentLayer);
+  newDisplayList->root()->addChild(newContainer);
 
   // Store XML content for later update to XmlLinesModel
   auto xmlString = QString::fromUtf8(reinterpret_cast<const char*>(byteData->data()),
@@ -226,7 +233,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     pagxDocument = document;
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxContentLayer = newContentLayer;
+    pagxRootLayer = newContainer;
     updateAnimationState();
     displayList = std::move(newDisplayList);
     needsRender = true;
@@ -283,7 +290,7 @@ void PAGXViewModel::previousFrame() {
 
 void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
-  pagxContentLayer = nullptr;
+  pagxRootLayer = nullptr;
   displayList = nullptr;
 }
 
@@ -307,21 +314,25 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   if (document == nullptr) {
     return tr("Failed to parse XML: invalid syntax or structure");
   }
+  document->applyLayout();
 
   auto newContentLayer = pagx::LayerBuilder::Build(document.get());
   if (newContentLayer == nullptr) {
     return tr("Failed to build layer from XML document");
   }
 
+  auto newContainer = tgfx::Layer::Make();
+  newContainer->addChild(newContentLayer);
+
   auto newDisplayList = std::make_shared<tgfx::DisplayList>();
-  newDisplayList->root()->addChild(newContentLayer);
+  newDisplayList->root()->addChild(newContainer);
 
   {
     std::lock_guard<std::mutex> lock(renderMutex);
     pagxDocument = document;
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxContentLayer = newContentLayer;
+    pagxRootLayer = newContainer;
     updateAnimationState();
     displayList = std::move(newDisplayList);
     needsRender = true;

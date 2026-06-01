@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test file for C13: Simple rectangular mask (can use scrollRect instead) -->
+<pagx width="200" height="100">
+  <Layer id="maskLayer" name="RectMask" visible="false">
+    <Rectangle width="100" height="50"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="MaskedContent" left="10" top="10" mask="@maskLayer" maskType="alpha">
+    <Rectangle left="-50" top="-25" width="200" height="100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>

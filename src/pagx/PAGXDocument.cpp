@@ -19,6 +19,7 @@
 #include "pagx/PAGXDocument.h"
 #include <unordered_set>
 #include "LayoutContext.h"
+#include "base/utils/Log.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
@@ -27,6 +28,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Stroke.h"
 #include "tgfx/core/Image.h"
+#include "renderer/FontEmbedder.h"
 
 namespace pagx {
 
@@ -155,6 +157,19 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     found = true;
   }
   return found;
+}
+
+bool PAGXDocument::embed() {
+  if (!isLayoutApplied()) {
+    LOGE("PAGXDocument::embed() called before applyLayout(). Call applyLayout() first.");
+    return false;
+  }
+  FontEmbedder embedder;
+  return embedder.embed(this);
+}
+
+void PAGXDocument::clearEmbed() {
+  FontEmbedder::ClearEmbeddedGlyphRuns(this);
 }
 
 Image* PAGXDocument::loadDecodedImage(const std::string& filePath,

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXView.h"
-#include <QDateTime>
 #include "rendering/RenderThread.h"
 #include "rendering/pagx/PAGXRenderer.h"
 
@@ -37,6 +36,8 @@ PAGXView::PAGXView(QQuickItem* parent) : ContentView(parent) {
   // Connect rendered signal to viewModel for deferred XmlLinesModel updates
   connect(renderThread.get(), &RenderThread::rendered, viewModel.get(),
           &PAGXViewModel::onRenderCompleted, Qt::QueuedConnection);
+  connect(renderThread.get(), &QThread::started, this, &PAGXView::onRenderThreadStarted,
+          Qt::QueuedConnection);
   renderThread->moveToThread(renderThread.get());
 }
 
@@ -66,14 +67,7 @@ void PAGXView::initDrawable() {
 }
 
 void PAGXView::onRequestSizeChanged() {
-  // Stop any pending resize timer and set a time window to skip new ones.
-  // This prevents the 400ms delay handler from calling updateSize() again
-  // after we've already handled the size change here.
-  // We use a 500ms window to cover multiple geometryChange() calls that may occur
-  // due to Qt's layout system, and handle the race condition where
-  // geometryChange() is called after takeSizeChanged() clears sizeChanged.
   resizeTimer->stop();
-  skipResizeTimerUntil = QDateTime::currentMSecsSinceEpoch() + 500;
   sizeChanged = true;
   viewModel->markNeedsRender();
   triggerFlush();
@@ -89,6 +83,13 @@ void PAGXView::onSizeChangedDelayHandled() {
 
 void PAGXView::flush() const {
   if (viewModel->hasContent()) {
+    triggerFlush();
+  }
+}
+
+void PAGXView::onRenderThreadStarted() {
+  if (viewModel->hasContent()) {
+    viewModel->markNeedsRender();
     triggerFlush();
   }
 }

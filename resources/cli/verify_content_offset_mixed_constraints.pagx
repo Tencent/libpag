@@ -1,0 +1,10 @@
+<pagx width="200" height="60">
+  <Layer centerX="0" centerY="0">
+    <Rectangle width="100%" height="100%" roundness="22"/>
+    <Fill color="#3B82F6"/>
+    <Group centerX="0" centerY="0">
+      <Text left="40" right="40" top="12" bottom="12" text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#FFF"/>
+    </Group>
+  </Layer>
+</pagx>

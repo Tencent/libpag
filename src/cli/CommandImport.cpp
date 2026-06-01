@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
-#include <fstream>
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
 
 namespace pagx::cli {
@@ -215,15 +215,17 @@ int RunImport(int argc, char* argv[]) {
     std::cerr << "pagx import: warning: " << warning << "\n";
   }
 
+  auto optimizeResult = PAGXOptimizer::Optimize(result.document.get());
+  if (!optimizeResult.converged) {
+    std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
+              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
+
   auto xml = PAGXExporter::ToXML(*result.document);
-  std::ofstream out(options.outputFile);
-  if (!out.is_open()) {
-    std::cerr << "pagx import: error: failed to write '" << options.outputFile << "'\n";
+  if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {
     return 1;
   }
-  out << xml;
 
-  std::cout << "pagx import: wrote " << options.outputFile << "\n";
   return 0;
 }
 

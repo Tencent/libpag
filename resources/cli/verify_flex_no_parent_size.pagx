@@ -1,0 +1,12 @@
+<pagx width="400" height="300">
+  <Layer layout="vertical">
+    <Layer height="50">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#EEE"/>
+    </Layer>
+    <Layer flex="1">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#DDD"/>
+    </Layer>
+  </Layer>
+</pagx>

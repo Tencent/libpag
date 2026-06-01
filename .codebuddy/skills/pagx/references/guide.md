@@ -16,13 +16,16 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ## Root Node
 
 ```xml
-<pagx version="1.0" width="800" height="600">
-  <Layer>...</Layer>
-  <Resources>...</Resources>   <!-- optional, recommended at end -->
+<pagx width="800" height="600">
+  <Layer>
+  </Layer>
+  <Resources>
+  </Resources>
+  <!-- optional, recommended at end -->
 </pagx>
 ```
 
-- `version`, `width`, `height` are **required**.
+- `width`, `height` are **required**.
 - **`<pagx>` direct children: ONLY `<Layer>` and `<Resources>`** — no other elements.
   VectorElements must be inside a `<Layer>`. `<Group>` as a direct child causes a parse error.
 - `<Composition>` has the same rule — top-level children must be `<Layer>` only.
@@ -33,6 +36,9 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 
 - **Origin**: top-left. **X**: right. **Y**: down. **Angles**: clockwise (0° = 3 o'clock).
 - **Units**: pixels (lengths), degrees (angles).
+- **Canvas clipping**: the `<pagx>` `width`/`height` define the rendering boundary — any
+  content extending beyond it is clipped. Allow margin for drop shadows, blurs, and
+  stroke half-widths that fall outside their geometry.
 
 ## Color Formats
 
@@ -58,7 +64,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ### Containment Hierarchy
 
 ```
-pagx (required: version, width, height)
+pagx (required: width, height)
 ├── Layer*
 │   ├── VectorElements* (geometry, modifiers, painters, Groups, TextBox)
 │   ├── <svg>* (import directive)
@@ -126,16 +132,16 @@ Layer or Group — use Layer when it needs `layout` or child Layers, use Group o
 ```xml
 <!-- Outer: background (no padding). Inner: padded layout content. -->
 <Layer>
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+  <Rectangle width="100%" height="100%" roundness="12"/>
   <Fill color="#FFF"/>
-  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="16">
+  <Layer width="100%" height="100%" layout="vertical" gap="8" padding="16">
     <!-- content here -->
   </Layer>
 </Layer>
 
 <!-- Button: outer background, inner Group for padded text -->
 <Layer centerX="0" centerY="0">
-  <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+  <Rectangle width="100%" height="100%" roundness="8"/>
   <Fill color="#3B82F6"/>
   <Group centerX="0" centerY="0" padding="10,15">
     <Text text="Click" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
@@ -221,49 +227,42 @@ Prefer `arrangement` over empty spacer Layers.
 
 ## Constraint Positioning
 
-Constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`) position
-elements relative to their parent container. Supported by: Rectangle, Ellipse, Polystar,
-Path, Text, Group, TextBox, TextPath, and Layer. Always available for VectorElements; for
-child Layers only when parent has no `layout` or child has `includeInLayout="false"`.
-Top-level Layers (direct children of `<pagx>` or `<Composition>`) can also use
-constraints — the document/composition `width`×`height` serves as their container size.
+Constraint attributes (`left`, `right`, `top`, `bottom`, `centerX`, `centerY`, `width`,
+`height`) place and size elements relative to their container. Distances are measured from
+the named edge to the container edge (minus `padding`). Supported by Rectangle, Ellipse,
+Polystar, Path, Text, Group, TextBox, TextPath, and Layer — always on VectorElements;
+on child Layers only when the parent has no `layout` or the child has
+`includeInLayout="false"`.
 
-| Attribute | Effect |
-|-----------|--------|
-| `left` | Distance from element left edge to container left edge |
-| `right` | Distance from element right edge to container right edge |
-| `top` | Distance from element top edge to container top edge |
-| `bottom` | Distance from element bottom edge to container bottom edge |
-| `centerX` | Horizontal offset from container center (0 = centered) |
-| `centerY` | Vertical offset from container center (0 = centered) |
+**Pick by design intent**:
 
-**Per-axis rules** — use only one combination per axis:
-- Single edge alone → position only
-- Opposite pair (`left`+`right`) → derives size AND positions
-- `centerX` overrides `left`/`right` silently (avoid mixing)
+| Intent | Attributes |
+|--------|-----------|
+| Fixed size at fixed position | `left`+`top`+`width`+`height` |
+| Fill the container | `width="100%" height="100%"` |
+| Stretch with margin | `left="M" right="M" top="M" bottom="M"` |
+| Pin to a corner | `right`+`top` (top-right), `right`+`bottom` (bottom-right), etc. |
+| Centered | `centerX="0" centerY="0"` |
+| Fixed-size element anchored to one edge | `left="M" width="W"` or `right="M" width="W"` |
 
-**Priority**: `centerX` > `left`+`right` > `left` > `right` (same for vertical).
+Positional rules per axis (pick one combination):
+`left` alone / `right` alone / `centerX` alone — position only;
+`left`+`right` — positions AND stretches to fill, **overriding any `width`**.
+`width` accepts pixels (`100`) or percentage (`50%`); percentages resolve against the
+container's layout size inside `padding`.
 
-**Opposite-pair behavior** by element type:
+**Size behavior by element type** (applies to both pixels and percentages):
 
-| Element Type | Behavior |
-|--------------|----------|
-| Rectangle, Ellipse | **Stretch** to fill |
-| TextBox | **Stretch** as text layout region |
-| Path, Polystar, Text, TextPath | **Scale to fit** proportionally |
-| Group | **Derive size** for child constraint reference |
-| Child Layer | **Override** width/height |
-
-**Size priority** (highest first): opposite-pair → explicit size → content measurement.
-
-**Choose by design intent**: `right`+`top` for top-right corner, `centerX`+`bottom` for
-bottom-center, `left="0" right="0" top="0" bottom="0"` to fill parent.
-
-**Examples**:
+| Element | Effect of explicit size |
+|---------|------------------------|
+| Rectangle, Ellipse | Stretch shape to fill target size |
+| TextBox | Stretch text layout region |
+| Path, Polystar, Text, TextPath | Scale drawing to fit (proportional) |
+| Group, Layer | Adopt the size as layout bounds for children |
 
 ```xml
 <!-- Background: stretch to fill -->
-<Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+<Rectangle width="100%" height="100%" roundness="12"/>
 
 <!-- Centered text -->
 <TextBox centerX="0" centerY="0">
@@ -280,21 +279,22 @@ bottom-center, `left="0" right="0" top="0" bottom="0"` to fill parent.
 
 ## Container Sizing
 
-When VectorElements use opposite-pair constraints to stretch-fill, the container **must**
-have a determinate size. Three ways: explicit `width`/`height`, parent layout (flex/stretch),
-or opposite-pair constraints from parent.
+When VectorElements use percentage dimensions (`width="50%"`) or opposite-pair constraints
+to stretch-fill, the container **must** have a determinate size. Three ways: explicit
+`width`/`height`, parent layout (flex/stretch), or constraints from parent (opposite-pair
+or percentage).
 
 ```xml
 <!-- 1. Explicit -->
 <Layer width="300" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
 </Layer>
 
 <!-- 2. Flex from parent -->
 <Layer width="600" height="400" layout="horizontal">
   <Layer flex="1">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F00"/>
   </Layer>
 </Layer>
@@ -302,7 +302,7 @@ or opposite-pair constraints from parent.
 <!-- 3. Constraints from parent -->
 <Layer width="600" height="400">
   <Layer left="20" right="20" top="20" bottom="20">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="12"/>
+    <Rectangle width="100%" height="100%" roundness="12"/>
     <Fill color="#F00"/>
   </Layer>
 </Layer>
@@ -392,19 +392,19 @@ constraints on the **Group itself**, not on inner elements. Group also supports 
 ```xml
 <!-- ✅ Correct: first content directly, Group isolates AND positions subsequent content -->
 <Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
   <Group centerX="0" centerY="0">
-    <Ellipse size="30,30"/>
+    <Ellipse width="30" height="30"/>
     <Stroke color="#000" width="1"/>
   </Group>
 </Layer>
 
 <!-- ❌ Wrong: missing Group — Stroke leaks onto Rectangle -->
 <Layer width="200" height="200">
-  <Rectangle left="0" right="0" top="0" bottom="0"/>
+  <Rectangle width="100%" height="100%"/>
   <Fill color="#F00"/>
-  <Ellipse left="35" top="35" size="30,30"/>
+  <Ellipse left="35" top="35" width="30" height="30"/>
   <Stroke color="#000" width="1"/>  <!-- applies to BOTH Rectangle and Ellipse -->
 </Layer>
 ```
@@ -436,16 +436,24 @@ over `position`.
   `dashes` (comma-separated lengths, e.g., `"5,3"` = 5px solid + 3px gap),
   `align` (center/inside/outside)
 
-All gradient/pattern coordinates are **relative to the geometry element's local origin**
-(not canvas). `ConicGradient` angles follow PAGX convention (0° = right), which differs
-from CSS `conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient`
-radiates from center toward four corners (`center`, `radius`). `ImagePattern` fills
-geometry with an image (see `patterns.md` §Avatar).
+By default all gradient/pattern coordinates are **relative to each geometry's own bounding
+box**, in a normalized 0-1 space (`fitsToGeometry="true"` for gradients; any `scaleMode!="none"`
+for ImagePattern). The fill auto-fits per geometry. Set `fitsToGeometry="false"` on a gradient or
+`scaleMode="none"` on an ImagePattern to switch to **absolute coordinates** in the parent
+container's (Layer or Group) coordinate space (origin at (0, 0)); multiple geometries inside that
+container then share one continuous fill. This default contrasts with CSS/SVG, where gradient
+positions are pixel values; in PAGX, prefer the normalized form so a single gradient definition
+stays reusable across geometries of different sizes.
+`ConicGradient` angles follow PAGX convention (0° = right), which differs from CSS
+`conic-gradient` (0° = top) — subtract 90° to convert. `DiamondGradient` radiates from center
+toward four corners (`center`, `radius`). `ImagePattern` fills geometry with an image; see
+`patterns.md` §Avatar.
 
 ```xml
-<!-- Inline gradient in Fill -->
+<!-- Inline gradient in Fill (default: 0-1 space, auto-fit to geometry,
+     startPoint=0,0 → endPoint=1,0 horizontal left-to-right across the shape). -->
 <Fill>
-  <LinearGradient startPoint="0,0" endPoint="200,0">
+  <LinearGradient>
     <ColorStop offset="0" color="#6366F1"/>
     <ColorStop offset="1" color="#EC4899"/>
   </LinearGradient>
@@ -456,11 +464,6 @@ geometry with an image (see `patterns.md` §Avatar).
 ```
 
 See `patterns.md` §Gradient Text for LinearGradient on text, §Star Badge for RadialGradient.
-
-| CSS | PAGX |
-|-----|------|
-| `linear-gradient(angle, stops)` | `<LinearGradient startPoint endPoint>` — convert angle to coordinates |
-| `radial-gradient(circle R at cx cy)` | `<RadialGradient center="cx,cy" radius="R">` |
 
 ## Modifiers
 
@@ -494,7 +497,10 @@ if glyph lists are present (emoji silently discarded). Text modifiers silently s
 Fill/Stroke** in the scope. Isolate with Groups.
 
 **Repeater**: copies all accumulated geometry and styles. `copies=0` clears all.
-Nested Repeaters multiply: A × B total. See `patterns.md` §Circular Gauge.
+Nested Repeaters multiply: A × B total. Per-copy transforms are applied around `anchor`:
+`position` and `rotation` accumulate linearly (step N = N × value), `scale` accumulates
+exponentially (step N = value^N) — set `anchor` to the desired rotation/scale center
+(e.g., layer center for radial fan-out). See `patterns.md` §Circular Gauge.
 
 **TextModifier + RangeSelector**: applies per-glyph transforms (position, rotation, scale,
 alpha) to accumulated text. `RangeSelector` controls which glyphs are affected (`start`,
@@ -526,7 +532,7 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 **Rich text**: multiple Text + Fill in one TextBox, using Groups for different styles:
 
 ```xml
-<TextBox left="0" right="0" top="0" bottom="0" textAlign="start">
+<TextBox width="100%" height="100%" textAlign="start">
   <Text text="Bold part " fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
   <Fill color="#000"/>
   <Group>
@@ -540,8 +546,8 @@ discards **entire lines**, not pixels). TextBox overrides child Text's `position
 `bottom="0"` for underline. See `patterns.md` §Text Decoration.
 
 **TextPath**: maps glyphs onto a curved path. Supports constraint positioning (opposite-pair
-uses scale-to-fit). Text-to-shape conversion is triggered by shape modifiers in the same
-scope — use separate Groups if you need both.
+constraints and percentage dimensions use scale-to-fit). Text-to-shape conversion is
+triggered by shape modifiers in the same scope — use separate Groups if you need both.
 
 ---
 
@@ -588,6 +594,10 @@ multi-stroke decorations, illustrated indicators. This includes any shape that w
 otherwise require `Path` / `PathData`, since those typically represent complex outlines
 better expressed as SVG. Place the `<svg>` inside a Layer and use constraint positioning
 on the Layer.
+
+**Import restrictions**: `<svg>` and `import` can only be direct children of `<Layer>`
+— not `<Group>` or `<TextBox>`. The Layer must not contain VectorElements or child
+Layers, because resolve replaces them.
 
 ---
 
@@ -646,7 +656,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <Layer width="100" height="50"/>
 
   <!-- ✅ Or pair with opposite edge to stretch -->
-  <Layer left="0" right="0" top="0" bottom="0"/>
+  <Layer width="100%" height="100%"/>
   ```
 
 - **NEVER** assume `visible="false"` removes a Layer from layout — a hidden Layer still
@@ -659,13 +669,13 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ❌ Wrong: content starts at (50,50), container measures from (0,0) to (150,150)
        but actual content is only 100x100 -->
   <Layer>
-    <Rectangle left="50" top="50" size="100,100"/>
+    <Rectangle left="50" top="50" width="100" height="100"/>
     <Fill color="#F00"/>
   </Layer>
 
   <!-- ✅ Correct: content starts at (0,0) -->
   <Layer>
-    <Rectangle size="100,100"/>
+    <Rectangle width="100" height="100"/>
     <Fill color="#F00"/>
   </Layer>
   ```
@@ -707,21 +717,21 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   <!-- ❌ First Group is redundant — no earlier content to isolate from -->
   <Layer width="200" height="200">
     <Group>
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Rectangle width="100%" height="100%"/>
       <Fill color="#F00"/>
     </Group>
     <Group centerX="0" centerY="0">
-      <Ellipse size="30,30"/>
+      <Ellipse width="30" height="30"/>
       <Stroke color="#000" width="1"/>
     </Group>
   </Layer>
 
   <!-- ✅ First content placed directly, only second needs Group -->
   <Layer width="200" height="200">
-    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Rectangle width="100%" height="100%"/>
     <Fill color="#F00"/>
     <Group centerX="0" centerY="0">
-      <Ellipse size="30,30"/>
+      <Ellipse width="30" height="30"/>
       <Stroke color="#000" width="1"/>
     </Group>
   </Layer>
@@ -733,18 +743,18 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```xml
   <!-- ❌ Two Groups with the same Fill -->
   <Group>
-    <Rectangle size="100,40"/>
+    <Rectangle width="100" height="40"/>
     <Fill color="#F00"/>
   </Group>
   <Group>
-    <Ellipse left="120" size="40,40"/>
+    <Ellipse left="120" width="40" height="40"/>
     <Fill color="#F00"/>
   </Group>
 
   <!-- ✅ Merged into one Group -->
   <Group>
-    <Rectangle size="100,40"/>
-    <Ellipse left="120" size="40,40"/>
+    <Rectangle width="100" height="40"/>
+    <Ellipse left="120" width="40" height="40"/>
     <Fill color="#F00"/>
   </Group>
   ```
@@ -778,7 +788,7 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```
 
 - **NEVER** put `padding` on a Layer that also has stretch-fill background VectorElements
-  (`left="0" right="0" top="0" bottom="0"`) — `padding` insets the constraint reference
+  (`width="100%" height="100%"`) — `padding` insets the constraint reference
   frame for **all contents** including VectorElements, so the background shrinks away from
   the Layer edges instead of filling them. MUST use nested container structure: outer Layer
   for edge-to-edge background (no padding), inner Layer for padded content layout.
@@ -786,17 +796,59 @@ finalizing any PAGX output, verify that none of these anti-patterns appear in yo
   ```xml
   <!-- ❌ padding shrinks the Rectangle — background has 12px gap around all edges -->
   <Layer layout="vertical" gap="8" padding="12">
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#F8F9FA"/>
     <!-- content starts at same offset as background — no visual padding -->
   </Layer>
 
   <!-- ✅ Outer holds background, inner carries padding -->
   <Layer>
-    <Rectangle left="0" right="0" top="0" bottom="0" roundness="8"/>
+    <Rectangle width="100%" height="100%" roundness="8"/>
     <Fill color="#F8F9FA"/>
-    <Layer left="0" right="0" top="0" bottom="0" layout="vertical" gap="8" padding="12">
+    <Layer width="100%" height="100%" layout="vertical" gap="8" padding="12">
       <!-- content has 12px visual padding inside the background -->
     </Layer>
   </Layer>
   ```
+
+- **NEVER** place `<svg>` or `import` inside a `<Group>` or `<TextBox>` — they can only be
+  direct children of `<Layer>`. Also **NEVER** add VectorElements or child Layers to a
+  Layer that contains `<svg>` or `import`, because resolve replaces them.
+
+  ```xml
+  <!-- ❌ svg inside Group — not allowed -->
+  <Layer width="44" height="44">
+    <Rectangle width="100%" height="100%" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <Group centerX="0" centerY="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 4L20 20H4Z"/>
+      </svg>
+    </Group>
+  </Layer>
+
+  <!-- ❌ svg mixed with other children in the same Layer -->
+  <Layer width="44" height="44">
+    <Rectangle width="100%" height="100%" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 4L20 20H4Z"/>
+    </svg>
+  </Layer>
+
+  <!-- ✅ Separate Layer for background, dedicated child Layer for svg -->
+  <Layer width="44" height="44">
+    <Rectangle width="100%" height="100%" roundness="10"/>
+    <Fill color="#DBEAFE"/>
+    <Layer centerX="0" centerY="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 4L20 20H4Z"/>
+      </svg>
+    </Layer>
+  </Layer>
+  ```
+
+- **NEVER** use Text characters as icon substitutes — characters like `+`, `−`, `×`, `<`,
+  `>`, `↑`, `↓`, `⋯` render with inconsistent metrics across fonts and cannot be styled
+  precisely. Always draw icons with inline `<svg>` paths, even for simple shapes like a
+  plus sign or an arrow.

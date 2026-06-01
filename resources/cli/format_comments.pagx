@@ -1,0 +1,14 @@
+<!-- Top-level comment describing the file -->
+<pagx width="200" height="200">
+  <!-- Section A -->
+  <Layer>
+    <Rectangle width="100%" height="100%"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+
+  <!-- Section B -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello & <World>]]></Text>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

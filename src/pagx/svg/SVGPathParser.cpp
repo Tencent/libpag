@@ -201,6 +201,12 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
   } else if (sweep && dtheta < 0) {
     dtheta += 2.0f * PI;
   }
+  // For near-full-circle arcs where start and end nearly coincide, VectorAngle
+  // can return ~0 instead of ~±2π. When largeArc is set and dtheta is tiny,
+  // force it to a full sweep.
+  if (largeArc && std::abs(dtheta) < 1e-3f) {
+    dtheta = sweep ? 2.0f * PI : -2.0f * PI;
+  }
 
   int segments = static_cast<int>(std::ceil(std::abs(dtheta) / (PI / 2.0f)));
   if (segments == 0) {

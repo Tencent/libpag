@@ -34,14 +34,15 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 void PAGWindow::openFile(QString path) {
-  if (contentView == nullptr) {
+  if (window == nullptr) {
     return;
   }
-  bool result = contentView->getViewModel()->loadFile(path);
-  if (!result) {
-    return;
-  }
+  // Set filePath immediately so PAGViewer::openFile() can detect this window already
+  // owns the file, preventing duplicate windows when the same file is opened rapidly.
+  // On successful load the ViewModel emits filePathChanged which calls updateFilePath()
+  // to keep filePath in sync; on failure it emits filePathChanged("") to clear it.
   filePath = path;
+  Q_EMIT requestOpenFile(path);
   window->raise();
   window->requestActivate();
 }
@@ -70,6 +71,7 @@ void PAGWindow::disconnectContentViewSignals() {
     disconnect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
                &PAGTaskFactory::setFilePath);
   }
+  disconnect(viewModel, &ContentViewModel::filePathChanged, this, &PAGWindow::updateFilePath);
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
     disconnect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
     disconnect(pagVM, &PAGViewModel::pagFileChanged, editAttributeModel.get(),
@@ -112,6 +114,7 @@ void PAGWindow::connectContentViewSignals() {
     connect(viewModel, &ContentViewModel::filePathChanged, taskFactory,
             &PAGTaskFactory::setFilePath);
   }
+  connect(viewModel, &ContentViewModel::filePathChanged, this, &PAGWindow::updateFilePath);
   if (auto* pagVM = qobject_cast<PAGViewModel*>(viewModel)) {
     connect(pagVM, &PAGViewModel::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile,
             Qt::QueuedConnection);
@@ -144,7 +147,7 @@ void PAGWindow::connectContentViewSignals() {
   }
 }
 
-void PAGWindow::open() {
+void PAGWindow::open(const QString& initialViewType) {
   translator = std::make_unique<QTranslator>();
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
@@ -163,6 +166,10 @@ void PAGWindow::open() {
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("pagWindow", this);
+  context->setContextProperty("initialViewType", initialViewType);
+  static bool startupTasksDone = false;
+  context->setContextProperty("shouldRunStartupTasks", !startupTasksDone);
+  startupTasksDone = true;
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
@@ -205,6 +212,10 @@ bool PAGWindow::isUseEnglish() {
 
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+void PAGWindow::updateFilePath(const QString& path) {
+  filePath = path;
 }
 
 QQmlApplicationEngine* PAGWindow::getEngine() {

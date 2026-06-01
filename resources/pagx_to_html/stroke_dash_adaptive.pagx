@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke dashAdaptive → pre-compute scaled dasharray; CSS/SVG have no direct equivalent -->
+<pagx width="400" height="280">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Dash Adaptive Stroke" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Normal dashes vs evenly distributed dashes" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <!-- Card inner layout: two columns side by side -->
+      <Layer left="0" right="0" top="0" bottom="0" layout="horizontal" padding="16" alignment="stretch" arrangement="center">
+
+        <!-- Left column: normal dashes -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="120" height="120">
+            <Ellipse position="60,60" size="110,110"/>
+            <Stroke color="#3B82F6" width="4" dashes="10,5" cap="round"/>
+          </Layer>
+        </Layer>
+
+        <!-- Vertical divider -->
+        <Layer width="1">
+          <Rectangle left="0" right="0" top="8" bottom="8"/>
+          <Fill color="#CBD5E1"/>
+        </Layer>
+
+        <!-- Right column: adaptive dashes -->
+        <Layer flex="1" layout="vertical" gap="10" alignment="center" arrangement="center">
+          <Layer height="14">
+            <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+            <Fill color="#64748B"/>
+          </Layer>
+          <Layer width="120" height="120">
+            <Ellipse position="60,60" size="110,110"/>
+            <Stroke color="#EF4444" width="4" dashes="10,5" dashAdaptive="true" cap="round"/>
+          </Layer>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

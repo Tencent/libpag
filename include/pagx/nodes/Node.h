@@ -25,7 +25,7 @@ namespace pagx {
 
 /**
  * NodeType enumerates all types of nodes that can be stored in a PAGX document. This includes
- * resources (Image, Composition, ColorSources) and elements (shapes, painters, modifiers, etc.).
+ * resources (Image, Composition, ColorSources) and elements (geometry, painters, modifiers, etc.).
  */
 enum class NodeType {
   // Document
@@ -126,7 +126,7 @@ enum class NodeType {
    */
   ColorMatrixFilter,
 
-  // Elements (shapes, painters, modifiers, containers)
+  // Elements (geometry, painters, modifiers, containers)
   /**
    * A rectangle shape with optional rounded corners.
    */
@@ -148,11 +148,11 @@ enum class NodeType {
    */
   Text,
   /**
-   * A fill painter that fills shapes with a color or gradient.
+   * A fill painter that fills geometry with a color or gradient.
    */
   Fill,
   /**
-   * A stroke painter that outlines shapes with a color or gradient.
+   * A stroke painter that outlines geometry with a color or gradient.
    */
   Stroke,
   /**
@@ -226,23 +226,6 @@ class Node {
    * PAGXImporter during parsing.
    */
   int sourceLine = -1;
-
-  /**
-   * Returns true if the given key is a valid custom data key. A valid key contains only lowercase
-   * letters ('a'-'z'), digits ('0'-'9'), and hyphens ('-'), must not be empty, and must not end
-   * with a hyphen. The key should not include the "data-" prefix.
-   */
-  static bool IsValidCustomDataKey(const std::string& key) {
-    if (key.empty() || key.front() == '-' || key.back() == '-') {
-      return false;
-    }
-    for (auto c : key) {
-      if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
-        return false;
-      }
-    }
-    return true;
-  }
 
   virtual ~Node() = default;
 

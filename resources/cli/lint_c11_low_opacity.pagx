@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Test file for C11: Low opacity with high-cost elements -->
-<pagx version="1.0" width="200" height="100">
-  <Layer name="LowOpacity" left="10" top="10" alpha="0.03">
-    <Rectangle left="10" size="80,50"/>
-    <Fill color="#FF0000"/>
-    <Repeater copies="15" position="20,0"/>
-  </Layer>
-</pagx>

@@ -25,7 +25,7 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
 #include "pagx/PAGXExporter.h"
-#include "pagx/PAGXImporter.h"
+#include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -143,11 +143,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
   auto& svgDoc = result.document;
 
-  // Update Layer dimensions from source.
-  if (std::isnan(layer->width) && svgDoc->width > 0) {
+  // Update Layer dimensions from source. Keep existing absolute or percentage values untouched.
+  if (std::isnan(layer->width) && std::isnan(layer->percentWidth) && svgDoc->width > 0) {
     layer->width = svgDoc->width;
   }
-  if (std::isnan(layer->height) && svgDoc->height > 0) {
+  if (std::isnan(layer->height) && std::isnan(layer->percentHeight) && svgDoc->height > 0) {
     layer->height = svgDoc->height;
   }
 
@@ -157,10 +157,8 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   // element layers. Otherwise, keep the wrapper itself.
   std::vector<Layer*> elementLayers;
   for (auto* svgLayer : svgDoc->layers) {
-    bool isPlainWrapper = svgLayer->contents.empty() && !svgLayer->children.empty() &&
-                          svgLayer->matrix.isIdentity() && svgLayer->alpha == 1.0f &&
-                          svgLayer->blendMode == BlendMode::Normal && svgLayer->mask == nullptr &&
-                          svgLayer->styles.empty() && svgLayer->filters.empty();
+    bool isPlainWrapper =
+        IsLayerShell(svgLayer) && svgLayer->contents.empty() && !svgLayer->children.empty();
     if (isPlainWrapper) {
       for (auto* child : svgLayer->children) {
         elementLayers.push_back(child);
@@ -179,14 +177,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   bool canDowngradeAll = false;
   if (elementLayers.size() == 1) {
     auto* single = elementLayers[0];
-    canUnpack = single->matrix.isIdentity() && single->alpha == 1.0f &&
-                single->blendMode == BlendMode::Normal && single->mask == nullptr &&
-                single->styles.empty() && single->filters.empty() && single->children.empty();
+    canUnpack = IsLayerShell(single) && single->children.empty();
   } else if (elementLayers.size() > 1) {
     canDowngradeAll = true;
     for (auto* el : elementLayers) {
-      if (!el->children.empty() || !el->styles.empty() || !el->filters.empty() ||
-          el->mask != nullptr || el->composition != nullptr) {
+      if (!el->children.empty() || HasLayerOnlyFeatures(el)) {
         canDowngradeAll = false;
         break;
       }
@@ -201,7 +196,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     for (size_t i = 0; i < elementLayers.size(); i++) {
       auto* elemLayer = elementLayers[i];
       bool unpackFirst = false;
-      if (i == 0 && elemLayer->matrix.isIdentity() && elemLayer->alpha == 1.0f) {
+      if (i == 0 && elemLayer->matrix.isIdentity()) {
         unpackFirst = true;
         for (auto* child : elemLayer->contents) {
           auto* layoutNode = LayoutNode::AsLayoutNode(child);
@@ -242,7 +237,6 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
             group->rotation = rot;
           }
         }
-        group->alpha = elemLayer->alpha;
         layer->contents.push_back(group);
       }
     }
@@ -300,15 +294,9 @@ int RunResolve(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto doc = PAGXImporter::FromFile(options.inputFile);
+  auto doc = LoadDocument(options.inputFile, "pagx resolve");
   if (doc == nullptr) {
-    std::cerr << "pagx resolve: error: failed to load '" << options.inputFile << "'\n";
     return 1;
-  }
-  if (!doc->errors.empty()) {
-    for (auto& error : doc->errors) {
-      std::cerr << "pagx resolve: warning: " << error << "\n";
-    }
   }
 
   auto baseDir = GetDirectory(options.inputFile);
@@ -328,6 +316,16 @@ int RunResolve(int argc, char* argv[]) {
 
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
+  }
+
+  // Always run the optimizer so the resolve output is stable regardless of whether the input
+  // contained imports or already-authored structure. The optimizer is conservative: any Layer
+  // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
+  // so this only cleans up the newly inlined import payload.
+  auto optimizeResult = PAGXOptimizer::Optimize(doc.get());
+  if (!optimizeResult.converged) {
+    std::cerr << "pagx resolve: warning: PAGXOptimizer did not converge within "
+              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
 
   auto xml = PAGXExporter::ToXML(*doc);

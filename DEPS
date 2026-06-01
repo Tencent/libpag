@@ -27,7 +27,7 @@
       },
       {
         "url": "https://github.com/harfbuzz/harfbuzz.git",
-        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
+        "commit": "9ef44a2d67ac870c1f7f671f6dc98d08a2579865",
         "dir": "third_party/harfbuzz"
       },
       {
@@ -49,6 +49,11 @@
         "url": "https://github.com/GNOME/libxml2.git",
         "commit": "3d840e17858de03a09fba8b202e3a89267d5795a",
         "dir": "third_party/libxml2"
+      },
+      {
+        "url": "https://github.com/google/woff2.git",
+        "commit": "1c69169e9e1811dccd6c54c532fedda300233968",
+        "dir": "third_party/woff2"
       }
     ]
   },

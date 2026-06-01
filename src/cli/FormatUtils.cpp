@@ -17,87 +17,120 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/FormatUtils.h"
+#include <libxml/parser.h>
 #include <algorithm>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx_xsd.h"
 
 namespace pagx::cli {
 
-// Attribute ordering tables extracted from PAGXExporter.cpp.
-// Each entry maps an element name to the canonical attribute order.
-// Attributes not in the table retain their original relative order and are appended at the end.
-// "data-*" attributes on Layer are always placed last.
+// ============================================================================
+// Attribute order map parsed from the embedded XSD schema
+// ============================================================================
 
-// clang-format off
-static const std::unordered_map<std::string, std::vector<const char*>> ATTRIBUTE_ORDER = {
-    {"pagx", {"version", "width", "height"}},
-    {"Layer", {"id", "name", "visible", "alpha", "blendMode", "x", "y", "width", "height",
-               "layout", "gap", "flex", "padding", "alignment", "arrangement", "includeInLayout",
-               "left", "right", "top", "bottom", "centerX", "centerY",
-               "matrix", "matrix3D", "preserve3D", "antiAlias", "groupOpacity",
-               "passThroughBackground", "scrollRect", "clipToBounds", "mask", "maskType", "composition"}},
-    {"Rectangle", {"left", "top", "right", "bottom", "centerX", "centerY",
-                    "position", "size", "roundness", "reversed"}},
-    {"Ellipse", {"left", "top", "right", "bottom", "centerX", "centerY",
-                  "position", "size", "reversed"}},
-    {"Polystar", {"left", "top", "right", "bottom", "centerX", "centerY",
-                  "position", "type", "pointCount", "outerRadius", "innerRadius", "rotation",
-                  "outerRoundness", "innerRoundness", "reversed"}},
-    {"Path", {"left", "top", "right", "bottom", "centerX", "centerY",
-               "data", "reversed"}},
-    {"Text", {"text", "left", "top", "right", "bottom", "centerX", "centerY",
-              "position", "fontFamily", "fontStyle", "fontSize", "letterSpacing",
-              "fauxBold", "fauxItalic", "textAnchor"}},
-    {"GlyphRun", {"font", "fontSize", "glyphs", "x", "y", "xOffsets", "positions", "anchors",
-                  "scales", "rotations", "skews"}},
-    {"Fill", {"color", "alpha", "blendMode", "fillRule", "placement"}},
-    {"Stroke", {"color", "width", "alpha", "blendMode", "cap", "join", "miterLimit", "dashes",
-                "dashOffset", "dashAdaptive", "align", "placement"}},
-    {"TrimPath", {"start", "end", "offset", "type"}},
-    {"RoundCorner", {"radius"}},
-    {"MergePath", {"mode"}},
-    {"TextModifier", {"anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
-                      "fillColor", "strokeColor", "strokeWidth"}},
-    {"RangeSelector", {"start", "end", "offset", "unit", "shape", "easeIn", "easeOut", "mode",
-                       "weight", "randomOrder", "randomSeed"}},
-    {"TextPath", {"path", "baselineOrigin", "baselineAngle", "firstMargin", "lastMargin",
-                  "perpendicular", "reversed", "forceAlignment", "left", "top", "right", "bottom",
-                  "centerX", "centerY"}},
-    {"TextBox", {"anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
-                 "width", "height", "padding", "textAlign", "paragraphAlign", "writingMode",
-                 "lineHeight", "wordWrap", "overflow", "left", "right", "top", "bottom",
-                 "centerX", "centerY"}},
-    {"Repeater", {"copies", "offset", "order", "anchor", "position", "rotation", "scale",
-                  "startAlpha", "endAlpha"}},
-    {"Group", {"anchor", "position", "rotation", "scale", "skew", "skewAxis", "alpha",
-               "width", "height", "padding", "left", "right", "top", "bottom", "centerX",
-               "centerY"}},
-    {"SolidColor", {"id", "color"}},
-    {"LinearGradient", {"id", "startPoint", "endPoint", "matrix"}},
-    {"RadialGradient", {"id", "center", "radius", "matrix"}},
-    {"ConicGradient", {"id", "center", "startAngle", "endAngle", "matrix"}},
-    {"DiamondGradient", {"id", "center", "radius", "matrix"}},
-    {"ImagePattern", {"id", "image", "tileModeX", "tileModeY", "filterMode", "mipmapMode",
-                      "matrix"}},
-    {"ColorStop", {"offset", "color"}},
-    {"Image", {"id", "source"}},
-    {"PathData", {"id", "data"}},
-    {"Composition", {"id", "width", "height"}},
-    {"Font", {"id", "unitsPerEm"}},
-    {"Glyph", {"id", "path", "image", "offset", "advance"}},
-    {"Resources", {}},
-    {"DropShadowStyle", {"blendMode", "excludeChildEffects", "offsetX", "offsetY", "blurX", "blurY", "color",
-                         "showBehindLayer"}},
-    {"InnerShadowStyle", {"blendMode", "excludeChildEffects", "offsetX", "offsetY", "blurX", "blurY", "color"}},
-    {"BackgroundBlurStyle", {"blendMode", "excludeChildEffects", "blurX", "blurY", "tileMode"}},
-    {"BlurFilter", {"blurX", "blurY", "tileMode"}},
-    {"DropShadowFilter", {"offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"}},
-    {"InnerShadowFilter", {"offsetX", "offsetY", "blurX", "blurY", "color", "shadowOnly"}},
-    {"BlendFilter", {"color", "blendMode"}},
-    {"ColorMatrixFilter", {"matrix"}},
-};
-// clang-format on
+static std::string XsdAttrStr(xmlNodePtr node, const char* name) {
+  auto* val = xmlGetProp(node, reinterpret_cast<const xmlChar*>(name));
+  if (val == nullptr) {
+    return {};
+  }
+  std::string result(reinterpret_cast<const char*>(val));
+  xmlFree(val);
+  return result;
+}
+
+static bool XsdNodeIs(xmlNodePtr node, const char* localName) {
+  return node->type == XML_ELEMENT_NODE &&
+         xmlStrcmp(node->name, reinterpret_cast<const xmlChar*>(localName)) == 0;
+}
+
+static void CollectAttributes(xmlNodePtr parent,
+                              std::unordered_map<std::string, std::vector<std::string>>& groupMap,
+                              std::vector<std::string>& attrs) {
+  for (auto cur = parent->children; cur != nullptr; cur = cur->next) {
+    if (XsdNodeIs(cur, "attribute")) {
+      auto name = XsdAttrStr(cur, "name");
+      if (!name.empty()) {
+        attrs.push_back(std::move(name));
+      }
+    } else if (XsdNodeIs(cur, "attributeGroup")) {
+      auto ref = XsdAttrStr(cur, "ref");
+      auto it = groupMap.find(ref);
+      if (it != groupMap.end()) {
+        attrs.insert(attrs.end(), it->second.begin(), it->second.end());
+      }
+    }
+  }
+}
+
+static std::unordered_map<std::string, std::vector<std::string>> ParseXsdAttributeOrder() {
+  auto& xsdContent = PagxXsdContent();
+  auto* doc =
+      xmlReadMemory(xsdContent.data(), static_cast<int>(xsdContent.size()), nullptr, nullptr, 0);
+  if (doc == nullptr) {
+    return {};
+  }
+  auto* root = xmlDocGetRootElement(doc);
+  if (root == nullptr) {
+    xmlFreeDoc(doc);
+    return {};
+  }
+
+  // First pass: collect attributeGroup definitions.
+  std::unordered_map<std::string, std::vector<std::string>> groupMap;
+  for (auto cur = root->children; cur != nullptr; cur = cur->next) {
+    if (XsdNodeIs(cur, "attributeGroup")) {
+      auto name = XsdAttrStr(cur, "name");
+      if (name.empty()) {
+        continue;
+      }
+      std::vector<std::string> attrs;
+      for (auto child = cur->children; child != nullptr; child = child->next) {
+        if (XsdNodeIs(child, "attribute")) {
+          auto attrName = XsdAttrStr(child, "name");
+          if (!attrName.empty()) {
+            attrs.push_back(std::move(attrName));
+          }
+        }
+      }
+      groupMap[std::move(name)] = std::move(attrs);
+    }
+  }
+
+  // Second pass: collect complexType attribute orders.
+  std::unordered_map<std::string, std::vector<std::string>> result;
+  for (auto cur = root->children; cur != nullptr; cur = cur->next) {
+    if (!XsdNodeIs(cur, "complexType")) {
+      continue;
+    }
+    auto typeName = XsdAttrStr(cur, "name");
+    if (typeName.empty()) {
+      continue;
+    }
+    // Derive element name: remove "Type" suffix, special-case "PagxType" -> "pagx".
+    std::string elementName;
+    if (typeName == "PagxType") {
+      elementName = "pagx";
+    } else if (typeName.size() > 4 && typeName.compare(typeName.size() - 4, 4, "Type") == 0) {
+      elementName = typeName.substr(0, typeName.size() - 4);
+    } else {
+      elementName = typeName;
+    }
+
+    std::vector<std::string> attrs;
+    CollectAttributes(cur, groupMap, attrs);
+    result[std::move(elementName)] = std::move(attrs);
+  }
+
+  xmlFreeDoc(doc);
+  return result;
+}
+
+const std::unordered_map<std::string, std::vector<std::string>>& GetAttributeOrderMap() {
+  static const auto order = ParseXsdAttributeOrder();
+  return order;
+}
 
 struct SortKeyComparator {
   const std::vector<int>* keys = nullptr;
@@ -111,8 +144,9 @@ void ReorderAttributes(xmlNodePtr node) {
     return;
   }
   auto elementName = std::string(reinterpret_cast<const char*>(node->name));
-  auto it = ATTRIBUTE_ORDER.find(elementName);
-  if (it == ATTRIBUTE_ORDER.end()) {
+  auto& attrOrder = GetAttributeOrderMap();
+  auto it = attrOrder.find(elementName);
+  if (it == attrOrder.end()) {
     return;
   }
   const auto& order = it->second;
@@ -250,14 +284,52 @@ void SerializeNode(std::string& output, xmlNodePtr node, int indentLevel, int in
       }
 
       if (cur->children != nullptr) {
-        output += ">\n";
-        SerializeNode(output, cur->children, indentLevel + 1, indentSpaces);
-        output += indent;
-        output += "</";
-        output += reinterpret_cast<const char*>(cur->name);
-        output += ">\n";
+        auto* only = cur->children;
+        if (only->next == nullptr && only->type == XML_CDATA_SECTION_NODE) {
+          output += "><![CDATA[";
+          auto* content = reinterpret_cast<const char*>(only->content);
+          if (content != nullptr) {
+            output += content;
+          }
+          output += "]]></";
+          output += reinterpret_cast<const char*>(cur->name);
+          output += ">\n";
+        } else {
+          output += ">\n";
+          SerializeNode(output, cur->children, indentLevel + 1, indentSpaces);
+          output += indent;
+          output += "</";
+          output += reinterpret_cast<const char*>(cur->name);
+          output += ">\n";
+        }
       } else {
         output += "/>\n";
+      }
+    } else if (cur->type == XML_COMMENT_NODE) {
+      auto indent = std::string(static_cast<size_t>(indentLevel * indentSpaces), ' ');
+      auto* content = reinterpret_cast<const char*>(cur->content);
+      if (content != nullptr) {
+        output += indent;
+        output += "<!--";
+        output += content;
+        output += "-->\n";
+      }
+    } else if (cur->type == XML_TEXT_NODE) {
+      auto* text = reinterpret_cast<const char*>(cur->content);
+      if (text != nullptr) {
+        int newlines = 0;
+        bool blankOnly = true;
+        for (auto* p = text; *p != '\0'; p++) {
+          if (*p == '\n') {
+            newlines++;
+          } else if (*p != ' ' && *p != '\t' && *p != '\r') {
+            blankOnly = false;
+            break;
+          }
+        }
+        if (blankOnly && newlines >= 2) {
+          output += "\n";
+        }
       }
     }
   }

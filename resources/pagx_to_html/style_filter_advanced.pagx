@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Advanced style/filter attributes — LayerStyle.blendMode (non-normal), excludeChildEffects=true,
+     BackgroundBlurStyle.tileMode (non-default), BlurFilter.tileMode (non-default),
+     DropShadowStyle with blendMode, Stroke.alpha, Stroke.placement=foreground, Path.reversed=true -->
+<pagx width="420" height="480">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16,20,16,20" gap="6" alignment="stretch" arrangement="center">
+
+    <!-- Row 1: DropShadow blendMode + InnerShadow blendMode -->
+    <Layer layout="horizontal" gap="10" alignment="stretch" arrangement="center">
+      <!-- DropShadowStyle with blendMode="multiply" -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="120" height="120">
+          <Layer name="dropShadowDemo" centerX="0" centerY="0">
+            <Rectangle position="50,50" size="100,100" roundness="12"/>
+            <Fill color="#3B82F6"/>
+            <DropShadowStyle offsetX="6" offsetY="6" blurX="16" blurY="16" color="#3B82F680" blendMode="multiply"/>
+          </Layer>
+        </Layer>
+        <Layer height="12">
+          <Text text="DropShadow blendMode" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- InnerShadowStyle with blendMode="screen" -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="120" height="120">
+          <Layer name="innerShadowDemo" centerX="0" centerY="0">
+            <Rectangle position="50,50" size="100,100" roundness="12"/>
+            <Fill color="#10B981"/>
+            <InnerShadowStyle offsetX="4" offsetY="4" blurX="10" blurY="10" color="#FFFFFF80" blendMode="screen"/>
+          </Layer>
+        </Layer>
+        <Layer height="12">
+          <Text text="InnerShadow blendMode" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
+
+    <!-- Row 2: excludeChildEffects + BgBlur tileMode -->
+    <Layer layout="horizontal" gap="10" alignment="stretch" arrangement="center">
+      <!-- excludeChildEffects=true -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="120" height="120">
+          <Layer name="excludeDemo" centerX="0" centerY="0">
+            <Rectangle position="50,50" size="100,100" roundness="12"/>
+            <Fill color="#F59E0B"/>
+            <DropShadowStyle offsetX="4" offsetY="8" blurX="20" blurY="20" color="#00000060" excludeChildEffects="true"/>
+            <Layer name="childCircle" centerX="0" centerY="0">
+              <Ellipse position="20,20" size="40,40"/>
+              <Fill color="#FFFFFF"/>
+              <BlurFilter blurX="2" blurY="2"/>
+            </Layer>
+          </Layer>
+        </Layer>
+        <Layer height="12">
+          <Text text="excludeChildEffects" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- BgBlur tileMode=clamp -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="120" height="80">
+          <Layer name="bgBlurRect" centerX="0">
+            <Rectangle position="50,25" size="100,50" roundness="8"/>
+            <Fill color="#8B5CF620"/>
+            <BackgroundBlurStyle blurX="10" blurY="10" tileMode="clamp"/>
+          </Layer>
+          <Layer name="pinkEllipse" centerX="0" bottom="0">
+            <Ellipse position="40,18" size="80,35"/>
+            <Fill color="#EC4899"/>
+          </Layer>
+        </Layer>
+        <Layer height="12">
+          <Text text="BgBlur tileMode=clamp" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
+
+    <!-- Row 3: Stroke alpha+foreground + BlurFilter tileMode + Path reversed -->
+    <Layer layout="horizontal" gap="10" alignment="stretch" arrangement="center">
+      <!-- Stroke with alpha and placement="foreground" -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer width="120" height="80">
+          <Layer name="strokeFgDemo" centerX="0" centerY="0">
+            <Rectangle position="50,30" size="100,60" roundness="12"/>
+            <Fill color="#EC4899"/>
+            <Stroke color="#FFFFFF" width="4" alpha="0.5" placement="foreground"/>
+            <Layer name="innerDot" centerX="0" centerY="0">
+              <Ellipse position="20,20" size="40,40"/>
+              <Fill color="#1E293B"/>
+            </Layer>
+          </Layer>
+        </Layer>
+        <Layer height="12">
+          <Text text="Stroke alpha+foreground" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+
+      <!-- BlurFilter tileMode + Path reversed -->
+      <Layer flex="1" layout="vertical" gap="6" alignment="center" arrangement="center">
+        <Layer layout="horizontal" gap="12" alignment="center" arrangement="center">
+          <!-- Blur tileMode=mirror -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="112" height="76">
+              <Layer name="blurMirror" width="88" height="52" centerX="0" centerY="0">
+                <Rectangle position="44,26" size="88,52"/>
+                <Fill>
+                  <LinearGradient startPoint="0,0" endPoint="1,0">
+                    <ColorStop offset="0" color="#06B6D4"/>
+                    <ColorStop offset="0.33" color="#06B6D4"/>
+                    <ColorStop offset="0.34" color="#EC4899"/>
+                    <ColorStop offset="0.66" color="#EC4899"/>
+                    <ColorStop offset="0.67" color="#F59E0B"/>
+                    <ColorStop offset="1" color="#F59E0B"/>
+                  </LinearGradient>
+                </Fill>
+                <BlurFilter blurX="6" blurY="6" tileMode="mirror"/>
+              </Layer>
+            </Layer>
+            <Layer height="10">
+              <Text text="Blur mirror" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+          <!-- Path reversed -->
+          <Layer layout="vertical" gap="4" alignment="center">
+            <Layer width="60" height="60">
+              <Layer name="reversedPath" centerX="0" centerY="0">
+                <Rectangle position="25,25" size="50,50" reversed="true"/>
+                <Fill color="#8B5CF6"/>
+                <Stroke color="#6D28D9" width="2"/>
+              </Layer>
+            </Layer>
+            <Layer height="10">
+              <Text text="Reversed" fontFamily="Arial" fontSize="8" centerX="0" textAnchor="center"/>
+              <Fill color="#64748B"/>
+            </Layer>
+          </Layer>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>
