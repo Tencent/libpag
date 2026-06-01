@@ -18,6 +18,7 @@
 
 #include "ToTGFX.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
@@ -312,6 +313,18 @@ tgfx::ScaleMode ToTGFX(ScaleMode mode) {
       return tgfx::ScaleMode::Zoom;
   }
   return tgfx::ScaleMode::LetterBox;
+}
+
+tgfx::RenderMode ToTGFX(PAGRenderMode renderMode) {
+  switch (renderMode) {
+    case PAGRenderMode::Direct:
+      return tgfx::RenderMode::Direct;
+    case PAGRenderMode::Partial:
+      return tgfx::RenderMode::Partial;
+    case PAGRenderMode::Tiled:
+      return tgfx::RenderMode::Tiled;
+  }
+  return tgfx::RenderMode::Partial;
 }
 
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {

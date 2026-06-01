@@ -24,18 +24,6 @@
 namespace pagx {
 namespace {
 
-tgfx::RenderMode ToTGFX(PAGRenderMode renderMode) {
-  switch (renderMode) {
-    case PAGRenderMode::Direct:
-      return tgfx::RenderMode::Direct;
-    case PAGRenderMode::Partial:
-      return tgfx::RenderMode::Partial;
-    case PAGRenderMode::Tiled:
-      return tgfx::RenderMode::Tiled;
-  }
-  return tgfx::RenderMode::Partial;
-}
-
 PAGRenderMode ToPAGX(tgfx::RenderMode renderMode) {
   switch (renderMode) {
     case tgfx::RenderMode::Direct:
