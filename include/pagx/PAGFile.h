@@ -99,13 +99,7 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    * Returns the display options used when drawing this PAGFile. The returned object is owned by
    * this PAGFile and remains valid until the PAGFile is destroyed.
    */
-  PAGDisplayOptions* getDisplayOptions();
-
-  /**
-   * Returns the display options used when drawing this PAGFile. The returned object is owned by
-   * this PAGFile and remains valid until the PAGFile is destroyed.
-   */
-  const PAGDisplayOptions* getDisplayOptions() const;
+  PAGDisplayOptions* getDisplayOptions() const;
 
   /**
    * Advances every runtime composition (recursing into nested child compositions) by

@@ -171,11 +171,7 @@ float PAGFile::getHeight() const {
   return document != nullptr ? document->height : 0.0f;
 }
 
-PAGDisplayOptions* PAGFile::getDisplayOptions() {
-  return displayOptions.get();
-}
-
-const PAGDisplayOptions* PAGFile::getDisplayOptions() const {
+PAGDisplayOptions* PAGFile::getDisplayOptions() const {
   return displayOptions.get();
 }
 
