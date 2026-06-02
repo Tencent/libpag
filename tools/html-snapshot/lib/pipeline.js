@@ -17,7 +17,7 @@
 // html2pagx-specific argument parsing + preflight + progress prints).
 //
 // Function shape:
-//   - Per-step helpers (`runSnapshot`, `runPagxImportToFile`, `runPagxResolve`,
+//   - Per-step helpers (`forkSnapshotCli`, `runPagxImportToFile`, `runPagxResolve`,
 //     `runPagxFontEmbed`, `runPagxRender`) spawn their child process, capture
 //     stderr (optionally writing it to a file the eval needs for later
 //     analysis), and resolve to `{ code, durationMs, stderr }`. They never
@@ -40,7 +40,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const { defaultPagxBin, filterKnownWarnings } = require('./pagx-runner');
-const { isHttpUrl } = require('./cli');
+const { isHttpUrl } = require('./common');
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -104,9 +104,9 @@ function spawnCapture(cmd, args, opts = {}) {
 }
 
 // Build the `node snapshot.js <input> -o <output> [...]` argv. Centralised so
-// runSnapshot and any future consumer agree on flag names. `extraArgs` is an
-// escape hatch for callers that need to pass through a flag this helper has
-// not learned about yet.
+// forkSnapshotCli and any future consumer agree on flag names. `extraArgs` is
+// an escape hatch for callers that need to pass through a flag this helper
+// has not learned about yet.
 function buildSnapshotArgs(opts) {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
@@ -134,7 +134,13 @@ function buildSnapshotArgs(opts) {
   return args;
 }
 
-// Step 1 — render <input> into a flat absolute-positioned subset HTML.
+// Step 1 — fork `node snapshot.js` to render <input> into a flat absolute-
+// positioned subset HTML. Named `forkSnapshotCli` (rather than `runSnapshot`)
+// so it never collides with `lib/snapshot-runner.js`'s `runSnapshot`, which
+// drives the snapshot pipeline in-process against an already-launched browser
+// — both names previously coexisted and `lib/batch.js` had to import them
+// side-by-side, which made the difference between "fork a child" and "drive
+// in-process" invisible at the call site.
 //
 // Required: `input` (file path or http(s) URL), `output` (subset HTML path),
 // `scriptDir` (directory containing snapshot.js).
@@ -144,10 +150,10 @@ function buildSnapshotArgs(opts) {
 // `nodeBin` overrides the Node interpreter (defaults to `process.execPath` so
 // child Node matches the parent — matters when the parent is run via `npx`,
 // `nvm`, or a non-default install).
-async function runSnapshot(opts = {}) {
-  if (!opts.input) throw new Error('runSnapshot: input is required');
-  if (!opts.output) throw new Error('runSnapshot: output is required');
-  if (!opts.scriptDir) throw new Error('runSnapshot: scriptDir is required');
+async function forkSnapshotCli(opts = {}) {
+  if (!opts.input) throw new Error('forkSnapshotCli: input is required');
+  if (!opts.output) throw new Error('forkSnapshotCli: output is required');
+  if (!opts.scriptDir) throw new Error('forkSnapshotCli: scriptDir is required');
   const nodeBin = opts.nodeBin || process.execPath;
   const args = buildSnapshotArgs(opts);
   return spawnCapture(nodeBin, args, {
@@ -371,7 +377,7 @@ async function runHtmlToPagx(opts = {}) {
   // file (the historical CLI behaviour). Batch mode (`lib/batch.js`) injects an
   // in-process variant that calls `lib/snapshot-runner.js` against a single
   // long-lived browser, saving ~1.5s of Chromium startup per file.
-  const snapshotImpl = typeof opts.snapshotImpl === 'function' ? opts.snapshotImpl : runSnapshot;
+  const snapshotImpl = typeof opts.snapshotImpl === 'function' ? opts.snapshotImpl : forkSnapshotCli;
 
   try {
     log(`[1/${totalSteps}] snapshot  ${opts.input}`);
@@ -467,7 +473,7 @@ module.exports = {
   filterKnownWarnings,
   PipelineStepError,
   spawnCapture,
-  runSnapshot,
+  forkSnapshotCli,
   runPagxImportToFile,
   runPagxResolve,
   runPagxFontEmbed,

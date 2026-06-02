@@ -36,7 +36,7 @@
 
 const fsp = require('fs').promises;
 const { DROP_TAG_NAMES } = require('./dom-tags');
-const { errMessage } = require('./cli');
+const { errMessage } = require('./common');
 
 let opentype = null;
 let wawoff2 = null;

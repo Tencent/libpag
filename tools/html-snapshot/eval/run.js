@@ -28,11 +28,11 @@
 const fs = require('fs');
 const path = require('path');
 const compare = require('./compare');
-const { makeFail } = require('../lib/cli');
+const { makeFail } = require('../lib/common');
 const { launchBrowser, resolveEngine } = require('../lib/browser-engine');
 const {
   spawnCapture,
-  runSnapshot,
+  forkSnapshotCli,
   runPagxImportToFile,
   runPagxResolve,
   runPagxFontEmbed,
@@ -269,7 +269,7 @@ async function processCase(entry, outDir, opts, browser) {
 
   // 2. snapshot
   if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
-    const r = await runSnapshot({
+    const r = await forkSnapshotCli({
       input: htmlPath,
       output: subsetHtml,
       scriptDir: TOOL_DIR,

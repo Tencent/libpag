@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { openAndSettlePage } = require('../lib/page-loader');
-const { makeFail, parseNumber } = require('../lib/cli');
+const { makeFail, parseNumber } = require('../lib/common');
 const { launchBrowser, resolveEngine, setViewport } = require('../lib/browser-engine');
 
 const fail = makeFail('baseline');

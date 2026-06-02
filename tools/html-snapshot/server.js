@@ -75,7 +75,7 @@ const path = require('path');
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./lib/pagx-runner');
-const { errMessage, isHttpUrl, makeFail, parseNumber, validateCookies, validateHeaders, SNAPSHOT_DEFAULTS } = require('./lib/cli');
+const { errMessage, isHttpUrl, makeFail, parseNumber, SNAPSHOT_DEFAULTS } = require('./lib/common');
 const {
   HttpError,
   safeQueryParam,
@@ -83,6 +83,8 @@ const {
   setStringParam,
   setBoolParam,
   wantsJsonResponse,
+  validateCookies,
+  validateHeaders,
 } = require('./lib/http-utils');
 
 // Output formats the server understands. `html` is the original (and default)

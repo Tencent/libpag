@@ -38,7 +38,7 @@ const fsp = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const { writeFileAtomic } = require('./atomic-write');
-const { errMessage } = require('./cli');
+const { errMessage } = require('./common');
 
 // Map a response content-type (or a magic-byte sniff) to a file extension.
 // PAGX matches images by decoding the file bytes, not the extension, so a

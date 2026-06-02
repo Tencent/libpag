@@ -20,13 +20,7 @@ const { makeFontCaptureListener, saveDownloadedFonts } = require('./font-downloa
 const { saveDownloadedImages } = require('./image-download');
 const { openAndSettlePage } = require('./page-loader');
 const { makeCaptureListener } = require('./capture-listener');
-const { errMessage, SNAPSHOT_DEFAULTS } = require('./cli');
-
-// Default values for the user-facing snapshot options. Defined in lib/cli.js
-// so the CLI parser, the HTTP service, and this runner share a single source.
-//
-// Re-exported here for backwards compatibility with callers that imported
-// `SNAPSHOT_DEFAULTS` from `./snapshot-runner`.
+const { errMessage, SNAPSHOT_DEFAULTS } = require('./common');
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -241,4 +235,4 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
   }
 }
 
-module.exports = { runSnapshot, makeImageCaptureListener, SNAPSHOT_DEFAULTS };
+module.exports = { runSnapshot, makeImageCaptureListener };

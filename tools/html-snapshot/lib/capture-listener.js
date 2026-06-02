@@ -18,7 +18,7 @@
 'use strict';
 
 const { responseBytes } = require('./browser-engine');
-const { errMessage } = require('./cli');
+const { errMessage } = require('./common');
 
 function makeCaptureListener({
   resourceType,

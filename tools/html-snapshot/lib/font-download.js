@@ -41,7 +41,7 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const { errMessage } = require('./cli');
+const { errMessage } = require('./common');
 const { writeFileAtomic } = require('./atomic-write');
 const { makeCaptureListener } = require('./capture-listener');
 

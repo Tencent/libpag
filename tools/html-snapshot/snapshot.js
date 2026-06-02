@@ -27,7 +27,8 @@
 'use strict';
 
 const fs = require('fs');
-const { parseArgs, LOG_PREFIX, errMessage } = require('./lib/cli');
+const { parseArgs } = require('./lib/cli');
+const { LOG_PREFIX, errMessage } = require('./lib/common');
 const { launchBrowser } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
 

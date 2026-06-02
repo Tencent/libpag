@@ -71,6 +71,42 @@ function wantsJsonResponse(req) {
   return true;
 }
 
+// Filter an already-parsed cookie list to entries that match puppeteer's
+// `{ name, value }` contract. Used by both:
+//   - the CLI parser (lib/cli.js's parseCookie produces well-formed entries;
+//     the filter is a no-op safety net there);
+//   - the HTTP service (server.js receives JSON-decoded objects from
+//     untrusted clients and must drop anything that doesn't fit the contract
+//     before handing it to the snapshot pipeline).
+// Returns the filtered array (possibly empty); never throws on a malformed
+// input.
+function validateCookies(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (c) => c && typeof c.name === 'string' && typeof c.value === 'string',
+  );
+}
+
+// Normalise an incoming `headers` value into the `[[key, value], …]` form the
+// snapshot pipeline expects. Accepts both the array shape (matches the CLI
+// parser output) and the object shape `{ Key: Value }` (convenient for JSON
+// callers). Drops entries whose key or value isn't a string. Returns `[]` for
+// unrecognised inputs; never throws on a malformed input.
+function validateHeaders(value) {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (h) => Array.isArray(h) && h.length === 2
+        && typeof h[0] === 'string' && typeof h[1] === 'string',
+    );
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).filter(
+      ([k, v]) => typeof k === 'string' && typeof v === 'string',
+    );
+  }
+  return [];
+}
+
 module.exports = {
   HttpError,
   safeQueryParam,
@@ -78,4 +114,6 @@ module.exports = {
   setStringParam,
   setBoolParam,
   wantsJsonResponse,
+  validateCookies,
+  validateHeaders,
 };

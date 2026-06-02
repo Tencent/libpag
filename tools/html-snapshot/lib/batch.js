@@ -26,7 +26,7 @@ const path = require('path');
 
 const { launchBrowser } = require('./browser-engine');
 const { runSnapshot } = require('./snapshot-runner');
-const { errMessage } = require('./cli');
+const { errMessage } = require('./common');
 const {
   PipelineStepError,
   runHtmlToPagx,
@@ -93,7 +93,7 @@ function basenameStem(file) {
 
 // Build the in-process snapshot adapter. The returned function has the
 // same `(snapshotArgs) => { code, durationMs, stderr }` shape as
-// `pipeline.runSnapshot`, but instead of forking `snapshot.js` it calls
+// `pipeline.forkSnapshotCli`, but instead of forking `snapshot.js` it calls
 // `lib/snapshot-runner.js` against the long-lived `engineHandle`.
 //
 // Why pass `engineHandle` in via closure rather than re-launching: every

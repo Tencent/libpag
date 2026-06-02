@@ -2,88 +2,19 @@
 // mirrors `process.argv`-shaped input (so callers can pass `process.argv`
 // directly and we slice past the `node` + script entries internally) and a
 // `printUsage()` that writes the help text to stdout.
+//
+// Generic helpers that used to live here (errMessage, isHttpUrl, fail,
+// makeFail, parseNumber, LOG_PREFIX, SNAPSHOT_DEFAULTS) were moved to
+// `lib/common.js` so non-CLI modules (capture-listener, font-download,
+// snapshot-runner, …) no longer have to depend on the CLI parser to reach
+// for them. HTTP-only validators (validateCookies, validateHeaders) live in
+// `lib/http-utils.js`.
 
 'use strict';
 
 const path = require('path');
 const { SUPPORTED_ENGINES, resolveEngine } = require('./browser-engine');
-
-const LOG_PREFIX = 'html-snapshot: ';
-
-// Default values for the user-facing snapshot options. Defined here so the
-// CLI parser, the HTTP service (server.js), and the pipeline runner
-// (snapshot-runner.js) read the numbers from a single source — drift between
-// them used to mean "the same request produced different output depending on
-// which entry point you used".
-const SNAPSHOT_DEFAULTS = Object.freeze({
-  viewportWidth: 1400,
-  viewportHeight: 900,
-  waitMs: 800,
-});
-
-// Print an error message with the standard CLI prefix and abort with the
-// "argument error" exit code (2). Centralised so every fail point shares the
-// same prefix and exit semantics — the prior inline `console.error` + `exit`
-// pairs were close to identical and easy to drift.
-function fail(msg) {
-  console.error(`${LOG_PREFIX}${msg}`);
-  process.exit(2);
-}
-
-// Build a `fail`-style helper that prefixes log messages with `prefix:` and
-// exits with the given code (default 2). Used by sibling tools (eval/run.js,
-// eval/baseline.js) that share the same arg-error UX but want their own log
-// prefix so users can tell which tool reported the failure. The returned
-// function never returns, so callers can use it in expression position
-// without `return fail(...)` boilerplate.
-function makeFail(prefix) {
-  return function failWithPrefix(msg, code) {
-    console.error(`${prefix}: ${msg}`);
-    process.exit(code === undefined ? 2 : code);
-  };
-}
-
-// Extract a one-line message from any thrown value. Centralised because the
-// `err && err.message ? err.message : err` pattern was repeated at every
-// catch site that wanted to log a reason without a stack trace. Treats
-// non-Error throws (strings, plain objects, undefined) gracefully — falls
-// back to `String(err)` so `undefined` becomes `'undefined'` rather than
-// an empty trailing colon in the log.
-function errMessage(err) {
-  if (err && typeof err.message === 'string' && err.message) return err.message;
-  return String(err);
-}
-
-// Convert a flag's argument to a number, validating it survives parsing and
-// is at or above `min`. Without this, `--viewport-width foo` would silently
-// send NaN to puppeteer's setViewport. Used for both strictly-positive
-// (viewport dimensions) and non-negative (wait-ms) numeric flags. `opts.fail`
-// optionally overrides the default `html-snapshot:`-prefixed reporter so
-// sibling tools can keep their own log prefix.
-function parseNumber(flagName, value, opts) {
-  const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? opts.min : 0;
-  const max = (opts && Object.prototype.hasOwnProperty.call(opts, 'max')) ? opts.max : Infinity;
-  const failFn = (opts && opts.fail) || fail;
-  if (value === undefined) {
-    failFn(`'${flagName}' requires a numeric argument`);
-  }
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < min || n > max) {
-    let bound;
-    if (max !== Infinity) bound = `between ${min} and ${max}`;
-    else if (min > 0) bound = `>= ${min}`;
-    else bound = 'non-negative';
-    failFn(`'${flagName}' expects a ${bound} number, got '${value}'`);
-  }
-  return n;
-}
-
-// Match `http://` and `https://` only. We deliberately reject other schemes
-// (file:, data:, ftp:, ...) so that a typo like `htttp://...` or a stray local
-// path with a colon never silently hits the network.
-function isHttpUrl(s) {
-  return /^https?:\/\//i.test(s);
-}
+const { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl } = require('./common');
 
 // Parse `name=value` into a puppeteer-compatible cookie descriptor. The URL
 // must be filled in by the caller (we do that once we know the page URL) so
@@ -116,42 +47,6 @@ function parseHeader(flagName, value) {
     fail(`'${flagName}' has empty header name in '${value}'`);
   }
   return [key, val];
-}
-
-// Filter an already-parsed cookie list to entries that match puppeteer's
-// `{ name, value }` contract. Used by both:
-//   - the CLI parser (cli.js parseCookie produces well-formed entries; the
-//     filter is a no-op safety net there);
-//   - the HTTP service (server.js receives JSON-decoded objects from
-//     untrusted clients and must drop anything that doesn't fit the contract
-//     before handing it to the snapshot pipeline).
-// Returns the filtered array (possibly empty); never throws on a malformed
-// input.
-function validateCookies(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (c) => c && typeof c.name === 'string' && typeof c.value === 'string',
-  );
-}
-
-// Normalise an incoming `headers` value into the `[[key, value], …]` form the
-// snapshot pipeline expects. Accepts both the array shape (matches the CLI
-// parser output) and the object shape `{ Key: Value }` (convenient for JSON
-// callers). Drops entries whose key or value isn't a string. Returns `[]` for
-// unrecognised inputs; never throws on a malformed input.
-function validateHeaders(value) {
-  if (Array.isArray(value)) {
-    return value.filter(
-      (h) => Array.isArray(h) && h.length === 2
-        && typeof h[0] === 'string' && typeof h[1] === 'string',
-    );
-  }
-  if (value && typeof value === 'object') {
-    return Object.entries(value).filter(
-      ([k, v]) => typeof k === 'string' && typeof v === 'string',
-    );
-  }
-  return [];
 }
 
 // Long-option flag table. Each entry lists the names the user can type and a
@@ -415,4 +310,4 @@ Options:
                              override via HTML_SNAPSHOT_BROWSER env var).`);
 }
 
-module.exports = { parseArgs, printUsage, isHttpUrl, fail, makeFail, parseNumber, errMessage, validateCookies, validateHeaders, LOG_PREFIX, SNAPSHOT_DEFAULTS };
+module.exports = { parseArgs, printUsage };
