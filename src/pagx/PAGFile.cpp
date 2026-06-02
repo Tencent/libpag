@@ -164,11 +164,11 @@ bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
   return true;
 }
 
-float PAGFile::getWidth() const {
+float PAGFile::width() const {
   return document != nullptr ? document->width : 0.0f;
 }
 
-float PAGFile::getHeight() const {
+float PAGFile::height() const {
   return document != nullptr ? document->height : 0.0f;
 }
 

@@ -89,12 +89,12 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   /**
    * Returns the document canvas width.
    */
-  float getWidth() const;
+  float width() const;
 
   /**
    * Returns the document canvas height.
    */
-  float getHeight() const;
+  float height() const;
 
   /**
    * Returns the display options used when drawing this PAGFile. The returned object is owned by

@@ -48,7 +48,7 @@ std::shared_ptr<PAGLayer> PAGLayer::Wrap(const Layer* node, const void* runtimeL
   return layer;
 }
 
-std::string PAGLayer::getName() const {
+std::string PAGLayer::name() const {
   return impl->node != nullptr ? impl->node->name : std::string();
 }
 
@@ -71,7 +71,7 @@ Matrix PAGLayer::getGlobalMatrix() const {
           localToSurface.getTranslateX(), localToSurface.getTranslateY()};
 }
 
-bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool shapeHitTest) {
+bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
   if (impl->runtimeLayer == nullptr || impl->rootFile == nullptr) {
     return false;
   }
@@ -80,7 +80,7 @@ bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool shapeHitTest) {
   if (!impl->rootFile->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return false;
   }
-  return impl->runtimeLayer->hitTestPoint(rootX, rootY, shapeHitTest);
+  return impl->runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);
 }
 
 }  // namespace pagx

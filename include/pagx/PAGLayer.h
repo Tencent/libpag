@@ -39,7 +39,7 @@ class PAGLayer {
   /**
    * Returns the display name of the layer. Returns an empty string if the layer has no name.
    */
-  std::string getName() const;
+  std::string name() const;
 
   /**
    * Returns the matrix that maps this layer's local coordinate space to the surface coordinate
@@ -50,13 +50,13 @@ class PAGLayer {
   Matrix getGlobalMatrix() const;
 
   /**
-   * Returns whether this layer overlaps the given surface point. shapeHitTest selects the actual
+   * Returns whether this layer overlaps the given surface point. pixelHitTest selects the actual
    * shape (true) or the bounding box (false).
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
-   * @param shapeHitTest whether to test against the actual shape (true) or the bounding box (false).
+   * @param pixelHitTest whether to test against the actual shape (true) or the bounding box (false).
    */
-  bool hitTestPoint(float surfaceX, float surfaceY, bool shapeHitTest = false);
+  bool hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest = false);
 
  private:
   PAGLayer();

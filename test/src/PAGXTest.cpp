@@ -5561,8 +5561,8 @@ PAGX_TEST(PAGXTest, PAGFileLiveFileRegistration) {
 
   auto file2 = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file2 != nullptr);
-  EXPECT_EQ(file2->getWidth(), 100.0f);
-  EXPECT_EQ(file2->getHeight(), 100.0f);
+  EXPECT_EQ(file2->width(), 100.0f);
+  EXPECT_EQ(file2->height(), 100.0f);
 }
 
 /**
@@ -5594,7 +5594,7 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
   ASSERT_TRUE(t1 != nullptr);
   EXPECT_EQ(t1.get(), t1Again.get());
   EXPECT_EQ(t1->getId(), "main");
-  EXPECT_EQ(t1->getDuration(), 1'000'000);
+  EXPECT_EQ(t1->duration(), 1'000'000);
 
   auto t2 = file->getTimeline("hint");
   ASSERT_TRUE(t2 != nullptr);
@@ -5624,7 +5624,7 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   ASSERT_TRUE(timeline != nullptr);
 
   // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
-  EXPECT_EQ(timeline->getDuration(), 1'000'000);
+  EXPECT_EQ(timeline->duration(), 1'000'000);
 
   EXPECT_FALSE(timeline->isPlaying());
   EXPECT_EQ(timeline->currentTime(), 0);
@@ -6744,7 +6744,7 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
 
   auto hits = file->getLayersUnderPoint(50, 40);
   ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->getName(), "HitLayer");
+  EXPECT_EQ(hits[0]->name(), "HitLayer");
 
   auto miss = file->getLayersUnderPoint(180, 180);
   EXPECT_TRUE(miss.empty());
@@ -6816,7 +6816,7 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
 
   auto hits = file->getLayersUnderPoint(50, 50);
   ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->getName(), "NestedChild");
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
 }
 
 /**
@@ -6913,7 +6913,7 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
 
   auto hits = file->getLayersUnderPoint(2.0f * 30 + 10, 2.0f * 20 + 5);
   ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->getName(), "PosLayer");
+  EXPECT_EQ(hits[0]->name(), "PosLayer");
 
   // local (0,0) maps to surface = zoomScale * (layerPos) + contentOffset.
   // layer translate is (30, 20); surface tx = 2*30 + 10 = 70, ty = 2*20 + 5 = 45; scale = 2.

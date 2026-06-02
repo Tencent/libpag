@@ -78,11 +78,11 @@ const std::string& PAGTimeline::getId() const {
   return animation != nullptr ? animation->id : kEmpty;
 }
 
-int64_t PAGTimeline::getDuration() const {
+int64_t PAGTimeline::duration() const {
   return DurationMicros(animation);
 }
 
-float PAGTimeline::getFrameRate() const {
+float PAGTimeline::frameRate() const {
   return animation != nullptr ? animation->frameRate : 60.0f;
 }
 

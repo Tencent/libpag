@@ -49,12 +49,12 @@ class PAGTimeline {
    * Returns the animation duration in microseconds, derived from Animation::duration (in frames)
    * and Animation::frameRate.
    */
-  int64_t getDuration() const;
+  int64_t duration() const;
 
   /**
    * Returns the animation frame rate. Equal to Animation::frameRate.
    */
-  float getFrameRate() const;
+  float frameRate() const;
 
   /**
    * Starts or resumes playback. Subsequent advance() calls will advance the current time.
