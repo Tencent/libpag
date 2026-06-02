@@ -113,10 +113,9 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    * spawned by Layer.timelines drivers that declare auto-play; top-level animations are not
    * touched and must be driven explicitly via getTimeline(...)->advanceAndApply(...).
    *
-   * Mirrors Rive's artboard.advance(dt): business code calls this once per frame to advance the
-   * composition subtree. When mixing multiple top-level animations, drive each timeline via
-   * getTimeline(id)->advance(dt) / apply(mix) yourself, then call advance(dt) once for the
-   * compositions.
+   * Business code calls this once per frame to advance the composition subtree. When mixing
+   * multiple top-level animations, drive each timeline via getTimeline(id)->advance(dt) /
+   * apply(mix) yourself, then call advance(dt) once for the compositions.
    */
   void advance(int64_t deltaMicroseconds);
 
