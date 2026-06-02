@@ -227,31 +227,51 @@ class LayerBuilderContext {
   }
 
   static void WriteLayerAlpha(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* layer = static_cast<tgfx::Layer*>(object);
-    layer->setAlpha(MixFloat(layer->alpha(), std::get<float>(value), mix));
+    layer->setAlpha(MixFloat(layer->alpha(), *v, mix));
   }
 
   static void WriteLayerVisible(void* object, const KeyValue& value, float) {
-    static_cast<tgfx::Layer*>(object)->setVisible(std::get<bool>(value));
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::Layer*>(object)->setVisible(*v);
   }
 
   static void WriteLayerBlendMode(void* object, const KeyValue& value, float) {
-    auto mode = static_cast<BlendMode>(std::get<int>(value));
+    auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto mode = static_cast<BlendMode>(*v);
     static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
   }
 
   static void WriteLayerX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* layer = static_cast<tgfx::Layer*>(object);
     auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateX(), std::get<float>(value), mix);
+    auto mixed = MixFloat(matrix.getTranslateX(), *v, mix);
     matrix.setTranslateX(mixed);
     layer->setMatrix(matrix);
   }
 
   static void WriteLayerY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* layer = static_cast<tgfx::Layer*>(object);
     auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateY(), std::get<float>(value), mix);
+    auto mixed = MixFloat(matrix.getTranslateY(), *v, mix);
     matrix.setTranslateY(mixed);
     layer->setMatrix(matrix);
   }
@@ -537,8 +557,12 @@ class LayerBuilderContext {
   }
 
   static void WriteSolidColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* solid = static_cast<tgfx::SolidColor*>(object);
-    auto target = ToTGFX(std::get<Color>(value));
+    auto target = ToTGFX(*v);
     solid->setColor(MixTGFXColor(solid->color(), target, mix));
   }
 
@@ -587,6 +611,10 @@ class LayerBuilderContext {
   }
 
   static void WriteColorStopColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* stop = GetColorStopBinding(object);
     if (stop == nullptr || stop->gradient == nullptr) {
       return;
@@ -595,12 +623,16 @@ class LayerBuilderContext {
     if (stop->index >= colors.size()) {
       return;
     }
-    auto target = ToTGFX(std::get<Color>(value));
+    auto target = ToTGFX(*v);
     colors[stop->index] = MixTGFXColor(colors[stop->index], target, mix);
     stop->gradient->setColors(std::move(colors));
   }
 
   static void WriteColorStopOffset(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* stop = GetColorStopBinding(object);
     if (stop == nullptr || stop->gradient == nullptr) {
       return;
@@ -609,8 +641,7 @@ class LayerBuilderContext {
     if (stop->index >= positions.size()) {
       return;
     }
-    auto target = std::get<float>(value);
-    positions[stop->index] = MixFloat(positions[stop->index], target, mix);
+    positions[stop->index] = MixFloat(positions[stop->index], *v, mix);
     stop->gradient->setPositions(std::move(positions));
   }
 
@@ -991,33 +1022,57 @@ class LayerBuilderContext {
   }
 
   static void WriteDropShadowStyleOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* style = static_cast<tgfx::DropShadowStyle*>(object);
-    style->setOffsetX(MixFloat(style->offsetX(), std::get<float>(value), mix));
+    style->setOffsetX(MixFloat(style->offsetX(), *v, mix));
   }
 
   static void WriteDropShadowStyleOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* style = static_cast<tgfx::DropShadowStyle*>(object);
-    style->setOffsetY(MixFloat(style->offsetY(), std::get<float>(value), mix));
+    style->setOffsetY(MixFloat(style->offsetY(), *v, mix));
   }
 
   static void WriteDropShadowStyleBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* style = static_cast<tgfx::DropShadowStyle*>(object);
-    style->setBlurrinessX(MixFloat(style->blurrinessX(), std::get<float>(value), mix));
+    style->setBlurrinessX(MixFloat(style->blurrinessX(), *v, mix));
   }
 
   static void WriteDropShadowStyleBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* style = static_cast<tgfx::DropShadowStyle*>(object);
-    style->setBlurrinessY(MixFloat(style->blurrinessY(), std::get<float>(value), mix));
+    style->setBlurrinessY(MixFloat(style->blurrinessY(), *v, mix));
   }
 
   static void WriteDropShadowStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* style = static_cast<tgfx::DropShadowStyle*>(object);
-    auto target = ToTGFX(std::get<Color>(value));
+    auto target = ToTGFX(*v);
     style->setColor(MixTGFXColor(style->color(), target, mix));
   }
 
   static void WriteDropShadowStyleShowBehindLayer(void* object, const KeyValue& value, float) {
-    static_cast<tgfx::DropShadowStyle*>(object)->setShowBehindLayer(std::get<bool>(value));
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::DropShadowStyle*>(object)->setShowBehindLayer(*v);
   }
 
   void bindDropShadowStyleChannels(const DropShadowStyle* node,
@@ -1031,13 +1086,21 @@ class LayerBuilderContext {
   }
 
   static void WriteBlurFilterX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::BlurFilter*>(object);
-    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), std::get<float>(value), mix));
+    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), *v, mix));
   }
 
   static void WriteBlurFilterY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::BlurFilter*>(object);
-    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), std::get<float>(value), mix));
+    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), *v, mix));
   }
 
   void bindBlurFilterChannels(const BlurFilter* node, const std::shared_ptr<tgfx::BlurFilter>&) {
@@ -1046,33 +1109,57 @@ class LayerBuilderContext {
   }
 
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
-    filter->setOffsetX(MixFloat(filter->offsetX(), std::get<float>(value), mix));
+    filter->setOffsetX(MixFloat(filter->offsetX(), *v, mix));
   }
 
   static void WriteDropShadowFilterOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
-    filter->setOffsetY(MixFloat(filter->offsetY(), std::get<float>(value), mix));
+    filter->setOffsetY(MixFloat(filter->offsetY(), *v, mix));
   }
 
   static void WriteDropShadowFilterBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
-    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), std::get<float>(value), mix));
+    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), *v, mix));
   }
 
   static void WriteDropShadowFilterBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
-    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), std::get<float>(value), mix));
+    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), *v, mix));
   }
 
   static void WriteDropShadowFilterColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
     auto* filter = static_cast<tgfx::DropShadowFilter*>(object);
-    auto target = ToTGFX(std::get<Color>(value));
+    auto target = ToTGFX(*v);
     filter->setColor(MixTGFXColor(filter->color(), target, mix));
   }
 
   static void WriteDropShadowFilterShadowOnly(void* object, const KeyValue& value, float) {
-    static_cast<tgfx::DropShadowFilter*>(object)->setDropsShadowOnly(std::get<bool>(value));
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::DropShadowFilter*>(object)->setDropsShadowOnly(*v);
   }
 
   void bindDropShadowFilterChannels(const DropShadowFilter* node,
