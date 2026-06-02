@@ -14,12 +14,6 @@ import * as path from 'path';
 import { SUPPORTED_ENGINES, resolveEngine, type EngineName } from './browser-engine';
 import { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl } from './common';
 
-// Re-export `parseNumber` for callers that historically reached for the CLI
-// module (e.g. html2pagx). The helper itself moved to `lib/common.ts`; the
-// re-export keeps the existing import shape working without a one-line change
-// at every consumer.
-export { parseNumber };
-
 export interface ParsedCookie {
   name: string;
   value: string;

@@ -29,7 +29,7 @@ const {
 } = require('./dist/lib/pipeline');
 const { runBatch } = require('./dist/lib/batch');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
-const { parseNumber } = require('./dist/lib/cli');
+const { parseNumber } = require('./dist/lib/common');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';
