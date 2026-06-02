@@ -1,43 +1,49 @@
 // Shared, dependency-free utilities used across the html-snapshot codebase.
 //
-// Why this file exists: before the split, `lib/cli.js` doubled as the home
+// Why this file exists: before the split, `lib/cli.ts` doubled as the home
 // for these helpers, which forced every low-level module that needed
 // `errMessage`, `isHttpUrl`, or `SNAPSHOT_DEFAULTS` (capture-listener,
 // font-download, image-download, icon-font, pipeline, snapshot-runner, …) to
 // `require('./cli')`. That coupled non-CLI code to the CLI argument parser
-// and pulled `lib/browser-engine.js` along as a transitive load. Moving the
-// generic helpers out makes `cli.js` purely a CLI front-end and lets every
+// and pulled `lib/browser-engine.ts` along as a transitive load. Moving the
+// generic helpers out makes `cli.ts` purely a CLI front-end and lets every
 // other module depend on a leaf utility module that has no project-internal
 // imports of its own.
 //
 // What lives here: only helpers that are truly generic and have zero
 // project-internal dependencies. CLI-only helpers (FLAGS, parseCookie,
-// parseHeader, parseArgs, printUsage) stay in `lib/cli.js`; HTTP-only
-// validators (validateCookies, validateHeaders) live in `lib/http-utils.js`.
-
-'use strict';
+// parseHeader, parseArgs, printUsage) stay in `lib/cli.ts`; HTTP-only
+// validators (validateCookies, validateHeaders) live in `lib/http-utils.ts`.
 
 // Standard prefix used when html-snapshot logs to stderr. Lives here so the
 // CLI driver, the in-process snapshot runner, and any sibling tool that
 // wants to mimic the same UX print under the same banner.
-const LOG_PREFIX = 'html-snapshot: ';
+export const LOG_PREFIX = 'html-snapshot: ';
+
+export interface SnapshotDefaults {
+  readonly viewportWidth: number;
+  readonly viewportHeight: number;
+  readonly waitMs: number;
+}
 
 // Default values for the user-facing snapshot options. Defined here so the
 // CLI parser, the HTTP service (server.js), and the in-process runner
-// (snapshot-runner.js) read the numbers from a single source — drift between
+// (snapshot-runner.ts) read the numbers from a single source — drift between
 // them used to mean "the same request produced different output depending on
 // which entry point you used".
-const SNAPSHOT_DEFAULTS = Object.freeze({
+export const SNAPSHOT_DEFAULTS: SnapshotDefaults = Object.freeze({
   viewportWidth: 1400,
   viewportHeight: 900,
   waitMs: 800,
 });
 
+export type FailFn = (msg: string, code?: number) => never;
+
 // Print an error message with the standard CLI prefix and abort with the
 // "argument error" exit code (2). Centralised so every fail point shares the
 // same prefix and exit semantics — the prior inline `console.error` + `exit`
 // pairs were close to identical and easy to drift.
-function fail(msg) {
+export function fail(msg: string): never {
   console.error(`${LOG_PREFIX}${msg}`);
   process.exit(2);
 }
@@ -48,8 +54,8 @@ function fail(msg) {
 // prefix so users can tell which tool reported the failure. The returned
 // function never returns, so callers can use it in expression position
 // without `return fail(...)` boilerplate.
-function makeFail(prefix) {
-  return function failWithPrefix(msg, code) {
+export function makeFail(prefix: string): FailFn {
+  return function failWithPrefix(msg: string, code?: number): never {
     console.error(`${prefix}: ${msg}`);
     process.exit(code === undefined ? 2 : code);
   };
@@ -61,9 +67,18 @@ function makeFail(prefix) {
 // non-Error throws (strings, plain objects, undefined) gracefully — falls
 // back to `String(err)` so `undefined` becomes `'undefined'` rather than
 // an empty trailing colon in the log.
-function errMessage(err) {
-  if (err && typeof err.message === 'string' && err.message) return err.message;
+export function errMessage(err: unknown): string {
+  if (err && typeof (err as { message?: unknown }).message === 'string'
+      && (err as { message: string }).message) {
+    return (err as { message: string }).message;
+  }
   return String(err);
+}
+
+export interface ParseNumberOptions {
+  min?: number;
+  max?: number;
+  fail?: FailFn;
 }
 
 // Convert a flag's argument to a number, validating it survives parsing and
@@ -72,16 +87,20 @@ function errMessage(err) {
 // (viewport dimensions) and non-negative (wait-ms) numeric flags. `opts.fail`
 // optionally overrides the default `html-snapshot:`-prefixed reporter so
 // sibling tools can keep their own log prefix.
-function parseNumber(flagName, value, opts) {
-  const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? opts.min : 0;
-  const max = (opts && Object.prototype.hasOwnProperty.call(opts, 'max')) ? opts.max : Infinity;
-  const failFn = (opts && opts.fail) || fail;
+export function parseNumber(
+  flagName: string,
+  value: string | undefined,
+  opts?: ParseNumberOptions,
+): number {
+  const min = (opts && Object.prototype.hasOwnProperty.call(opts, 'min')) ? (opts.min as number) : 0;
+  const max = (opts && Object.prototype.hasOwnProperty.call(opts, 'max')) ? (opts.max as number) : Infinity;
+  const failFn: FailFn = (opts && opts.fail) || fail;
   if (value === undefined) {
     failFn(`'${flagName}' requires a numeric argument`);
   }
   const n = Number(value);
   if (!Number.isFinite(n) || n < min || n > max) {
-    let bound;
+    let bound: string;
     if (max !== Infinity) bound = `between ${min} and ${max}`;
     else if (min > 0) bound = `>= ${min}`;
     else bound = 'non-negative';
@@ -93,16 +112,6 @@ function parseNumber(flagName, value, opts) {
 // Match `http://` and `https://` only. We deliberately reject other schemes
 // (file:, data:, ftp:, ...) so that a typo like `htttp://...` or a stray local
 // path with a colon never silently hits the network.
-function isHttpUrl(s) {
+export function isHttpUrl(s: string): boolean {
   return /^https?:\/\//i.test(s);
 }
-
-module.exports = {
-  LOG_PREFIX,
-  SNAPSHOT_DEFAULTS,
-  fail,
-  makeFail,
-  errMessage,
-  parseNumber,
-  isHttpUrl,
-};

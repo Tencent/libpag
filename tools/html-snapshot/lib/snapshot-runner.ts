@@ -7,20 +7,36 @@
 //
 // Returns: { html, width, height }
 
-'use strict';
-
-const {
+import {
   TAKE_SNAPSHOT_EXPR,
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
   inlineCanvases,
-} = require('./browser-snapshot');
-const { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } = require('./icon-font');
-const { makeFontCaptureListener, saveDownloadedFonts } = require('./font-download');
-const { saveDownloadedImages } = require('./image-download');
-const { openAndSettlePage } = require('./page-loader');
-const { makeCaptureListener } = require('./capture-listener');
-const { errMessage, SNAPSHOT_DEFAULTS } = require('./common');
+} from './browser-snapshot';
+import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
+import {
+  makeFontCaptureListener,
+  saveDownloadedFonts,
+  type SavedFont,
+} from './font-download';
+import {
+  saveDownloadedImages,
+  type ImageCaptureValue,
+  type SavedImage,
+} from './image-download';
+import { openAndSettlePage } from './page-loader';
+import {
+  makeCaptureListener,
+  type CaptureLogger,
+  type CaptureResponseListener,
+} from './capture-listener';
+import { errMessage, SNAPSHOT_DEFAULTS } from './common';
+import type {
+  BrowserResponse,
+  CookieParam,
+  EngineName,
+  EngineWrapper,
+} from './browser-engine';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -33,14 +49,18 @@ const { errMessage, SNAPSHOT_DEFAULTS } = require('./common');
 //
 // We capture by URL key (not by element ref) so the same image used by
 // multiple <img> tags is stored once.
-function makeImageCaptureListener(engine, cache, log) {
-  return makeCaptureListener({
+export function makeImageCaptureListener(
+  engine: EngineName,
+  cache: Map<string, ImageCaptureValue>,
+  log: CaptureLogger | null,
+): CaptureResponseListener {
+  return makeCaptureListener<ImageCaptureValue>({
     resourceType: 'image',
     engine,
     cache,
     log,
     label: 'image',
-    project: (buf, resp) => ({
+    project: (buf: Buffer, resp: BrowserResponse): ImageCaptureValue => ({
       buffer: buf,
       contentType: resp.headers()['content-type'] || 'application/octet-stream',
     }),
@@ -50,45 +70,46 @@ function makeImageCaptureListener(engine, cache, log) {
 // Turn a captured `{ buffer, contentType }` entry into a base64 `data:` URI —
 // the default, self-contained representation handed to `inlineExternalImages`
 // when images are not being written to disk.
-function entryToDataUri(entry) {
+function entryToDataUri(entry: ImageCaptureValue): string {
   const ct = (entry && entry.contentType) || 'application/octet-stream';
   return `data:${ct};base64,${entry.buffer.toString('base64')}`;
 }
 
-// Run the full snapshot pipeline against `targetUrl` using the already-
-// launched browser in `engineHandle`. The page is always closed before this
-// function returns (success or failure); the browser stays open.
-//
-// `opts`:
-//   viewportWidth, viewportHeight, waitMs, selector, cookies, headers
-//                          — forwarded to openAndSettlePage
-//   inlineIconFonts        — when true (default), webfont icon glyphs are
-//                            replaced with inline <svg>
-//   downloadFonts          — when true, every web font the browser fetched
-//                            while rendering is written to `fontDir` as a
-//                            plain SFNT (TTF/OTF). Off by default.
-//   fontDir                — destination directory for downloaded fonts;
-//                            required when `downloadFonts` is true.
-//   downloadImages         — when true, every external image the browser
-//                            fetched is written to `imageDir` and referenced
-//                            by its local file path instead of inlined as a
-//                            base64 `data:` URI, keeping the snapshot small.
-//                            Off by default (images are inlined).
-//   imageDir               — destination directory for downloaded images;
-//                            required when `downloadImages` is true.
-//   log                    — optional `(string) => void` for progress / error
-//                            diagnostics. When omitted, the pipeline runs
-//                            silently. Image-capture skip diagnostics are
-//                            intentionally suppressed regardless to match
-//                            snapshot.js's pre-extraction behaviour (one
-//                            "skipped" line per cross-origin image was too
-//                            noisy).
+export interface RunSnapshotOptions {
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitMs?: number;
+  selector?: string;
+  cookies?: CookieParam[];
+  headers?: Array<[string, string]>;
+  inlineIconFonts?: boolean;
+  downloadFonts?: boolean;
+  fontDir?: string;
+  downloadImages?: boolean;
+  imageDir?: string;
+  log?: CaptureLogger | null;
+}
+
+export interface RunSnapshotResult {
+  html: string;
+  width: number;
+  height: number;
+  fonts: SavedFont[];
+  images: SavedImage[];
+}
+
 // Run a best-effort save step (fonts or images): on success, log the count;
 // on failure, log the error and return an empty array so the rest of the
 // pipeline still proceeds. Centralised so the font and image branches stop
 // re-implementing the same try/catch/log scaffolding around their respective
 // `save*` calls.
-async function bestEffortSave(saveFn, cache, dir, log, label) {
+async function bestEffortSave<TItem, TCache>(
+  saveFn: (cache: TCache, dir: string, log: CaptureLogger) => Promise<TItem[]>,
+  cache: TCache,
+  dir: string,
+  log: CaptureLogger | null,
+  label: string,
+): Promise<TItem[]> {
   try {
     const arr = await saveFn(cache, dir, log || (() => {}));
     if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
@@ -99,7 +120,14 @@ async function bestEffortSave(saveFn, cache, dir, log, label) {
   }
 }
 
-async function runSnapshot(engineHandle, targetUrl, opts) {
+// Run the full snapshot pipeline against `targetUrl` using the already-
+// launched browser in `engineHandle`. The page is always closed before this
+// function returns (success or failure); the browser stays open.
+export async function runSnapshot(
+  engineHandle: EngineWrapper,
+  targetUrl: string,
+  opts?: RunSnapshotOptions,
+): Promise<RunSnapshotResult> {
   const {
     viewportWidth = SNAPSHOT_DEFAULTS.viewportWidth,
     viewportHeight = SNAPSHOT_DEFAULTS.viewportHeight,
@@ -116,22 +144,22 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
   } = opts || {};
 
   const { engine } = engineHandle;
-  const imageBytesByUrl = new Map();
-  const fontBytesByUrl = new Map();
+  const imageBytesByUrl = new Map<string, ImageCaptureValue>();
+  const fontBytesByUrl = new Map<string, Buffer>();
   // Image capture is always on; font capture only when the caller asked for
   // it. Both read disjoint resource types off the same `response` event, so a
   // single composed listener avoids racing two `page.on('response')`
   // handlers (page-loader accepts exactly one).
   const captureImage = makeImageCaptureListener(engine, imageBytesByUrl, null);
-  const captureFont = downloadFonts
-    ? makeFontCaptureListener(engine, fontBytesByUrl, null)
+  const captureFont: CaptureResponseListener | null = downloadFonts
+    ? makeFontCaptureListener(engine, fontBytesByUrl, () => {})
     : null;
-  const onResponse = captureFont
-    ? (resp) => {
-        captureImage(resp);
-        captureFont(resp);
+  const onResponse: (resp: BrowserResponse) => void = captureFont
+    ? (resp: BrowserResponse) => {
+        void captureImage(resp);
+        void captureFont(resp);
       }
-    : captureImage;
+    : (resp: BrowserResponse) => { void captureImage(resp); };
   const page = await openAndSettlePage(engineHandle, targetUrl, {
     viewportWidth,
     viewportHeight,
@@ -140,16 +168,17 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     cookies,
     headers,
     onConsole: log
-      ? (msg) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (msg: any) => {
           if (msg.type() === 'error') log(`page error: ${msg.text()}`);
         }
       : null,
-    onPageError: log ? (err) => log(`page exception: ${errMessage(err)}`) : null,
+    onPageError: log ? (err: Error) => log(`page exception: ${errMessage(err)}`) : null,
     onResponse,
     // Ship both helper bundles to the page exactly once at navigation
     // time. Subsequent `page.evaluate(...)` calls only have to send the
     // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
-    // dispatch wrappers in lib/icon-font.js), instead of re-encoding the
+    // dispatch wrappers in lib/icon-font.ts), instead of re-encoding the
     // ~80 KB helper source for every snapshot.
     initScripts: [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
   });
@@ -157,24 +186,16 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
   try {
     // PAGX's renderer can read `data:` URIs and local files but not
     // `http(s)://` URLs, so every external image must be turned into one of
-    // those before the snapshot is walked. Two strategies, both driven by the
-    // bytes the response listener already captured:
-    //   - default: inline each image as a base64 `data:` URI so the snapshot
-    //     is fully self-contained.
-    //   - `--download-images`: write the bytes to `imageDir` and reference the
-    //     local file path instead, keeping the snapshot (and the PAGX produced
-    //     from it) small. Best-effort — a write failure for a given image
-    //     leaves it absent from the map, so it falls back to the in-page fetch
-    //     + inline path below.
-    // The resulting `url -> data:URI | path` map is handed to
-    // `inlineExternalImages` as a plain object so `page.evaluate` can
-    // serialise it across the CDP boundary; misses fall back to in-page fetch
-    // (limited to 8 concurrent requests inside the helper).
-    let images = [];
-    const srcByUrl = {};
+    // those before the snapshot is walked.
+    let images: SavedImage[] = [];
+    const srcByUrl: Record<string, string> = {};
     if (downloadImages && imageDir) {
       images = await bestEffortSave(
-        saveDownloadedImages, imageBytesByUrl, imageDir, log, 'image',
+        saveDownloadedImages,
+        imageBytesByUrl,
+        imageDir,
+        log,
+        'image',
       );
       for (const { url, path: filePath } of images) {
         srcByUrl[url] = filePath;
@@ -211,14 +232,16 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
-    const snapshot = await page.evaluate(TAKE_SNAPSHOT_EXPR);
+    const snapshot = await page.evaluate(TAKE_SNAPSHOT_EXPR) as {
+      html: string; width: number; height: number;
+    };
 
     // Write the web fonts the browser fetched to disk. The font bytes were
     // captured off the `response` event during load + settle, so they are
     // already in `fontBytesByUrl` by now (no page interaction needed). This
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
-    const fonts = (downloadFonts && fontDir)
+    const fonts: SavedFont[] = (downloadFonts && fontDir)
       ? await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font')
       : [];
     return { ...snapshot, fonts, images };
@@ -234,5 +257,3 @@ async function runSnapshot(engineHandle, targetUrl, opts) {
     }
   }
 }
-
-module.exports = { runSnapshot, makeImageCaptureListener };

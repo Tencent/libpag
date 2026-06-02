@@ -7,7 +7,7 @@ const {
   defaultPagxBin,
   runPagxImport,
   PagxImportError,
-} = require('../lib/pagx-runner');
+} = require('../dist/lib/pagx-runner');
 
 describe('defaultPagxBin', () => {
   const saved = process.env.PAGX_BIN;

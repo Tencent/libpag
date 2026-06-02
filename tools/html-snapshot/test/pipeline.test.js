@@ -15,8 +15,8 @@ const {
   readFontManifest,
   runHtmlToPagx,
   isHttpUrl,
-} = require('../lib/pipeline');
-const { ChildProcessError } = require('../lib/errors');
+} = require('../dist/lib/pipeline');
+const { ChildProcessError } = require('../dist/lib/errors');
 
 let dir;
 beforeEach(() => {

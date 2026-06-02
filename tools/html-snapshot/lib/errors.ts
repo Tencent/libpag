@@ -1,6 +1,6 @@
 // Shared base class for "a child process we spawned exited non-zero or
-// failed to start". Both `PipelineStepError` (lib/pipeline.js) and
-// `PagxImportError` (lib/pagx-runner.js) carry the same `{ code, stderr }`
+// failed to start". Both `PipelineStepError` (lib/pipeline.ts) and
+// `PagxImportError` (lib/pagx-runner.ts) carry the same `{ code, stderr }`
 // pair on top of an Error message; this base captures the pattern so
 // future child-process wrappers do not have to retype the same constructor.
 //
@@ -15,15 +15,19 @@
 // line at the call site and the base does not have to know which subclass
 // instantiated it.
 
-'use strict';
+export interface ChildProcessErrorInit {
+  code?: number | null;
+  stderr?: string;
+}
 
-class ChildProcessError extends Error {
-  constructor(message, { code, stderr } = {}) {
+export class ChildProcessError extends Error {
+  code: number | null;
+  stderr: string;
+
+  constructor(message: string, { code, stderr }: ChildProcessErrorInit = {}) {
     super(message);
     this.name = 'ChildProcessError';
     this.code = code === undefined ? null : code;
     this.stderr = stderr || '';
   }
 }
-
-module.exports = { ChildProcessError };

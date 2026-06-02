@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { runBatch, collectHtmlInputs } = require('../lib/batch');
+const { runBatch, collectHtmlInputs } = require('../dist/lib/batch');
 
 let dir;
 beforeEach(() => {

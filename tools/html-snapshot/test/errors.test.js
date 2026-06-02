@@ -1,6 +1,6 @@
 'use strict';
 
-const { ChildProcessError } = require('../lib/errors');
+const { ChildProcessError } = require('../dist/lib/errors');
 
 describe('ChildProcessError', () => {
   test('extends Error and carries the message', () => {

@@ -72,10 +72,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./lib/browser-engine');
-const { runSnapshot } = require('./lib/snapshot-runner');
-const { runPagxImport, defaultPagxBin, PagxImportError } = require('./lib/pagx-runner');
-const { errMessage, isHttpUrl, makeFail, parseNumber, SNAPSHOT_DEFAULTS } = require('./lib/common');
+const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./dist/lib/browser-engine');
+const { runSnapshot } = require('./dist/lib/snapshot-runner');
+const { runPagxImport, defaultPagxBin, PagxImportError } = require('./dist/lib/pagx-runner');
+const { errMessage, isHttpUrl, makeFail, parseNumber, SNAPSHOT_DEFAULTS } = require('./dist/lib/common');
 const {
   HttpError,
   safeQueryParam,
@@ -85,7 +85,7 @@ const {
   wantsJsonResponse,
   validateCookies,
   validateHeaders,
-} = require('./lib/http-utils');
+} = require('./dist/lib/http-utils');
 
 // Output formats the server understands. `html` is the original (and default)
 // behaviour: return the flat snapshot HTML straight from the browser.

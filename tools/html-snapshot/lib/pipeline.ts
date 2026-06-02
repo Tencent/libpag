@@ -15,33 +15,15 @@
 // has exactly one implementation, and each entry point is left only with the
 // code that is genuinely its own (eval-specific reports + caches + pool;
 // html2pagx-specific argument parsing + preflight + progress prints).
-//
-// Function shape:
-//   - Per-step helpers (`forkSnapshotCli`, `runPagxImportToFile`, `runPagxResolve`,
-//     `runPagxFontEmbed`, `runPagxRender`) spawn their child process, capture
-//     stderr (optionally writing it to a file the eval needs for later
-//     analysis), and resolve to `{ code, durationMs, stderr }`. They never
-//     throw on a non-zero exit — eval/run.js wants soft failure (record
-//     `row.error = 'X-failed'`), html2pagx wants hard failure (exit 1 with a
-//     prefixed message). Returning a structured result lets each caller pick
-//     its own contract.
-//   - `runHtmlToPagx` is the html2pagx-side end-to-end orchestrator: it
-//     applies the per-step helpers in order, derives default output paths,
-//     handles the optional resolve/render/embed gates, and throws
-//     `PipelineStepError` when a step exits non-zero. eval/run.js does its
-//     own gating (skipExisting, per-case concurrency cursor) and therefore
-//     calls the per-step helpers directly rather than the orchestrator.
 
-'use strict';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { spawn } from 'child_process';
 
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { spawn } = require('child_process');
-
-const { defaultPagxBin, filterKnownWarnings } = require('./pagx-runner');
-const { isHttpUrl } = require('./common');
-const { ChildProcessError } = require('./errors');
+import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
+import { isHttpUrl } from './common';
+import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -49,8 +31,14 @@ const { ChildProcessError } = require('./errors');
 // surface the underlying tool's diagnostics. Inherits `{ code, stderr }`
 // field initialisation from `ChildProcessError`; only the `step` label and
 // `name` are specific to this subclass.
-class PipelineStepError extends ChildProcessError {
-  constructor(message, opts = {}) {
+export interface PipelineStepErrorInit extends ChildProcessErrorInit {
+  step?: string;
+}
+
+export class PipelineStepError extends ChildProcessError {
+  step: string;
+
+  constructor(message: string, opts: PipelineStepErrorInit = {}) {
     super(message, opts);
     this.name = 'PipelineStepError';
     this.step = opts.step || '';
@@ -63,20 +51,36 @@ class PipelineStepError extends ChildProcessError {
 // every step; callers that want a different ceiling pass `timeoutMs`.
 const DEFAULT_STEP_TIMEOUT_MS = 180000;
 
+export interface SpawnCaptureOptions {
+  stderrPath?: string;
+  timeoutMs?: number;
+}
+
+export interface SpawnCaptureResult {
+  code: number | null;
+  durationMs: number;
+  stdout: string;
+  stderr: string;
+}
+
 // Internal: spawn a child, capture stdout/stderr, optionally tee stderr to a
 // file (eval needs it on disk for compare.countImporterWarnings), enforce a
 // timeout, and resolve with `{ code, durationMs, stdout, stderr }`. Never
 // rejects on a child failure — the resolve shape is the per-step contract.
-function spawnCapture(cmd, args, opts = {}) {
+export function spawnCapture(
+  cmd: string,
+  args: string[],
+  opts: SpawnCaptureOptions = {},
+): Promise<SpawnCaptureResult> {
   const stderrPath = opts.stderrPath || '';
   const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : DEFAULT_STEP_TIMEOUT_MS;
-  return new Promise((resolve) => {
+  return new Promise<SpawnCaptureResult>((resolve) => {
     const startedAt = Date.now();
     let child;
     try {
       child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (err) {
-      const stderr = `\n${err.message || String(err)}`;
+      const stderr = `\n${(err as Error).message || String(err)}`;
       if (stderrPath) {
         try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
       }
@@ -85,15 +89,15 @@ function spawnCapture(cmd, args, opts = {}) {
     }
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (d) => { stdout += d.toString(); });
-    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
     let killedByTimeout = false;
     const timer = setTimeout(() => {
       killedByTimeout = true;
       try { child.kill('SIGKILL'); } catch (_e) { /* ignore */ }
     }, timeoutMs);
-    child.on('error', (err) => { stderr += `\n${err.message || String(err)}`; });
-    child.on('close', (code) => {
+    child.on('error', (err: Error) => { stderr += `\n${err.message || String(err)}`; });
+    child.on('close', (code: number | null) => {
       clearTimeout(timer);
       if (killedByTimeout) stderr += `\n[pipeline] killed by timeout (${timeoutMs}ms)`;
       if (stderrPath) {
@@ -104,11 +108,31 @@ function spawnCapture(cmd, args, opts = {}) {
   });
 }
 
+export interface BuildSnapshotArgsOptions {
+  scriptDir: string;
+  input: string;
+  output: string;
+  browserEngine?: string;
+  inlineIconFonts?: boolean;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitMs?: number;
+  selector?: string;
+  cookies?: string[];
+  headers?: string[];
+  downloadFonts?: boolean;
+  fontDir?: string;
+  fontManifest?: string;
+  downloadImages?: boolean;
+  imageDir?: string;
+  extraArgs?: string[];
+}
+
 // Build the `node snapshot.js <input> -o <output> [...]` argv. Centralised so
 // forkSnapshotCli and any future consumer agree on flag names. `extraArgs` is
 // an escape hatch for callers that need to pass through a flag this helper
 // has not learned about yet.
-function buildSnapshotArgs(opts) {
+function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
@@ -135,42 +159,41 @@ function buildSnapshotArgs(opts) {
   return args;
 }
 
+export interface ForkSnapshotCliOptions extends BuildSnapshotArgsOptions, SpawnCaptureOptions {
+  nodeBin?: string;
+}
+
 // Step 1 — fork `node snapshot.js` to render <input> into a flat absolute-
 // positioned subset HTML. Named `forkSnapshotCli` (rather than `runSnapshot`)
-// so it never collides with `lib/snapshot-runner.js`'s `runSnapshot`, which
+// so it never collides with `lib/snapshot-runner.ts`'s `runSnapshot`, which
 // drives the snapshot pipeline in-process against an already-launched browser
-// — both names previously coexisted and `lib/batch.js` had to import them
+// — both names previously coexisted and `lib/batch.ts` had to import them
 // side-by-side, which made the difference between "fork a child" and "drive
 // in-process" invisible at the call site.
-//
-// Required: `input` (file path or http(s) URL), `output` (subset HTML path),
-// `scriptDir` (directory containing snapshot.js).
-// Optional: every snapshot-side flag (browserEngine, inlineIconFonts,
-// viewport*, waitMs, selector, cookies, headers, downloadFonts/fontDir/
-// fontManifest, downloadImages/imageDir). `stderrPath` tees stderr to disk;
-// `nodeBin` overrides the Node interpreter (defaults to `process.execPath` so
-// child Node matches the parent — matters when the parent is run via `npx`,
-// `nvm`, or a non-default install).
-async function forkSnapshotCli(opts = {}) {
+export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}): Promise<SpawnCaptureResult> {
   if (!opts.input) throw new Error('forkSnapshotCli: input is required');
   if (!opts.output) throw new Error('forkSnapshotCli: output is required');
   if (!opts.scriptDir) throw new Error('forkSnapshotCli: scriptDir is required');
   const nodeBin = opts.nodeBin || process.execPath;
-  const args = buildSnapshotArgs(opts);
+  const args = buildSnapshotArgs(opts as BuildSnapshotArgsOptions);
   return spawnCapture(nodeBin, args, {
     stderrPath: opts.stderrPath,
     timeoutMs: opts.timeoutMs,
   });
 }
 
+export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
+  pagxBin?: string;
+  subsetHtml?: string;
+  pagxFile?: string;
+  inferFlex?: boolean;
+  log?: (line: string) => void;
+}
+
 // Step 2 — run `pagx import --format html --input <subset> --output <pagx>`.
-//
-// `inferFlex` defaults to true (matches html2pagx's old behaviour: pass
-// --html-infer-flex unless explicitly disabled). The result includes raw
-// stderr; if `log` is provided, the filtered stderr (warnings stripped) is
-// emitted via that callback so the caller can surface diagnostics without
-// the per-leaf warning noise.
-async function runPagxImportToFile(opts = {}) {
+export async function runPagxImportToFile(
+  opts: RunPagxImportToFileOptions = {},
+): Promise<SpawnCaptureResult> {
   const { pagxBin, subsetHtml, pagxFile, inferFlex = true, stderrPath, log, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
@@ -185,19 +208,27 @@ async function runPagxImportToFile(opts = {}) {
   return result;
 }
 
-// Step 3 — `pagx resolve <pagx>`. Resolves external image/font references the
-// document carries by URL into self-contained payloads where possible.
-async function runPagxResolve(opts = {}) {
+export interface RunPagxResolveOptions extends SpawnCaptureOptions {
+  pagxBin?: string;
+  pagxFile?: string;
+}
+
+// Step 3 — `pagx resolve <pagx>`.
+export async function runPagxResolve(opts: RunPagxResolveOptions = {}): Promise<SpawnCaptureResult> {
   const { pagxBin, pagxFile, stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxResolve: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxResolve: pagxFile is required');
   return spawnCapture(pagxBin, ['resolve', pagxFile], { stderrPath, timeoutMs });
 }
 
+export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
+  pagxBin?: string;
+  pagxFile?: string;
+  fontFiles?: string[];
+}
+
 // Optional Step 3.5 — `pagx font embed <pagx> --fallback <font>...`.
-// Only meaningful when `fontFiles` is non-empty. Caller decides whether to
-// invoke at all (gated on --embed-fonts in html2pagx and eval).
-async function runPagxFontEmbed(opts = {}) {
+export async function runPagxFontEmbed(opts: RunPagxFontEmbedOptions = {}): Promise<SpawnCaptureResult> {
   const { pagxBin, pagxFile, fontFiles = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxFontEmbed: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxFontEmbed: pagxFile is required');
@@ -206,8 +237,16 @@ async function runPagxFontEmbed(opts = {}) {
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
+export interface RunPagxRenderOptions extends SpawnCaptureOptions {
+  pagxBin?: string;
+  pagxFile?: string;
+  output?: string;
+  scale?: number;
+  fontFallbacks?: string[];
+}
+
 // Step 4 — `pagx render <pagx> --output <png> --scale <s> [--fallback <font>...]`.
-async function runPagxRender(opts = {}) {
+export async function runPagxRender(opts: RunPagxRenderOptions = {}): Promise<SpawnCaptureResult> {
   const { pagxBin, pagxFile, output, scale = 1, fontFallbacks = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxRender: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxRender: pagxFile is required');
@@ -217,16 +256,11 @@ async function runPagxRender(opts = {}) {
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
-// Glob a directory for SFNT files (TTF / OTF / TTC). Used by html2pagx after
-// snapshot.js writes its captured fonts into `fontDir` — the resulting list
-// is registered with `pagx render --fallback` and (optionally)
-// `pagx font embed --fallback` so text styled with an uninstalled web font
-// resolves against the real face. Returns absolute paths sorted by name for
-// deterministic ordering.
-function collectFontFallbacks(opts = {}) {
+// Glob a directory for SFNT files (TTF / OTF / TTC).
+export function collectFontFallbacks(opts: { fontDir?: string } = {}): string[] {
   const fontDir = opts.fontDir;
   if (!fontDir) return [];
-  let entries;
+  let entries: string[];
   try {
     entries = fs.readdirSync(fontDir);
   } catch (_err) {
@@ -239,15 +273,11 @@ function collectFontFallbacks(opts = {}) {
   return out;
 }
 
-// Read a per-case font manifest produced by `snapshot.js --font-manifest`
-// (one absolute path per line). Used by eval/run.js to register only the
-// fonts a particular case actually uses, when fonts share a single content-
-// addressed cache directory across the whole corpus. Skips missing entries
-// silently — a stale manifest line should not abort the run.
-function readFontManifest(opts = {}) {
+// Read a per-case font manifest produced by `snapshot.js --font-manifest`.
+export function readFontManifest(opts: { manifestPath?: string } = {}): string[] {
   const manifestPath = opts.manifestPath;
   if (!manifestPath) return [];
-  let text;
+  let text: string;
   try {
     text = fs.readFileSync(manifestPath, 'utf8');
   } catch (_err) {
@@ -259,22 +289,11 @@ function readFontManifest(opts = {}) {
     .filter((l) => l && fs.existsSync(l));
 }
 
-// Detect an http(s) URL via the same rule the snapshot CLI uses (re-exported
-// from cli.js). Centralised so runHtmlToPagx and html2pagx agree on the rule.
-// Default callers' `log` to a no-op when omitted; runHtmlToPagx prints
-// `[N/M] step ...` progress lines through this hook so html2pagx can stream
-// them to stdout while embedded callers stay quiet.
-function noopLog() {}
+function noopLog(_msg: string): void {}
 
 // Standard "did the step succeed?" check used by every fork-based step in
-// runHtmlToPagx. The contract is: on a non-zero exit, surface stderr and
-// throw a `PipelineStepError` so the html2pagx CLI can emit a uniform
-// `html2pagx: <step> failed` message; on a zero exit, still forward any
-// captured stderr (warnings, deprecation notices) so the operator sees
-// diagnostics. The `pagx import` step does its own check because it also
-// needs to verify the output file materialised on disk and routes its
-// stderr through the importer's filtered `log` callback instead.
-function assertStepOk(stepName, result) {
+// runHtmlToPagx.
+function assertStepOk(stepName: string, result: SpawnCaptureResult): void {
   if (result.code !== 0) {
     process.stderr.write(result.stderr);
     throw new PipelineStepError(`${stepName} failed`, {
@@ -286,33 +305,54 @@ function assertStepOk(stepName, result) {
   if (result.stderr) process.stderr.write(result.stderr);
 }
 
+export type SnapshotImpl = (args: BuildSnapshotArgsOptions) => Promise<SpawnCaptureResult>;
+
+export interface RunHtmlToPagxOptions {
+  log?: (line: string) => void;
+  pagxBin?: string;
+  scriptDir?: string;
+  input?: string;
+  outputDir?: string;
+  outputName?: string;
+  scale?: number;
+  doResolve?: boolean;
+  doRender?: boolean;
+  inferFlex?: boolean;
+  keepSubsetHtml?: boolean;
+  embedFonts?: boolean;
+  downloadFonts?: boolean;
+  fontDir?: string;
+  downloadImages?: boolean;
+  imageDir?: string;
+  browserEngine?: string;
+  inlineIconFonts?: boolean;
+  cookies?: string[];
+  headers?: string[];
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitMs?: number;
+  selector?: string;
+  snapshotImpl?: SnapshotImpl;
+  snapshotExtraArgs?: string[];
+}
+
+export interface RunHtmlToPagxResult {
+  subsetHtml: string;
+  pagx: string;
+  png: string | null;
+  fonts: string[];
+}
+
 // End-to-end orchestrator. Runs snapshot → import → optional resolve →
 // optional font embed → optional render. Throws `PipelineStepError` on the
 // first non-zero step so the html2pagx CLI can print a uniform
 // `html2pagx: <step> failed` message and exit 1.
-//
-// Output paths follow html2pagx's old convention:
-//   subset HTML → <outputDir>/<base>.subset.html
-//   pagx        → <outputDir>/<base>.pagx
-//   png         → <outputDir>/<base>.png
-//   fonts dir   → <outputDir>/<base>.fonts/  (when --download-fonts and
-//                 fontDir is unset)
-//   images dir  → <outputDir>/<base>.images/ (when --download-images and
-//                 imageDir is unset)
-//
-// `keepSubsetHtml` controls whether the subset HTML survives on disk after
-// import; when false the file is written to a self-cleaning temp dir.
-//
-// `snapshotImpl` (optional) replaces the default fork-`node snapshot.js` step
-// with a caller-provided async function of the same `(snapshotArgs) => { code,
-// durationMs, stderr }` shape. Batch mode injects an in-process variant that
-// reuses one long-lived browser across many files; everyone else relies on the
-// default fork-per-file path.
-async function runHtmlToPagx(opts = {}) {
+export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
   const pagxBin = opts.pagxBin || defaultPagxBin();
   const scriptDir = opts.scriptDir;
   if (!scriptDir) throw new Error('runHtmlToPagx: scriptDir is required');
+  if (!opts.input) throw new Error('runHtmlToPagx: input is required');
 
   const inputIsUrl = isHttpUrl(opts.input);
   let outputDir = opts.outputDir || '';
@@ -324,7 +364,6 @@ async function runHtmlToPagx(opts = {}) {
     }
     if (!outputDir) outputDir = process.cwd();
   } else {
-    if (!opts.input) throw new Error('runHtmlToPagx: input is required');
     if (!fs.existsSync(opts.input)) {
       throw new Error(`runHtmlToPagx: input not found: ${opts.input}`);
     }
@@ -341,7 +380,7 @@ async function runHtmlToPagx(opts = {}) {
 
   // When the user opts out of keeping the subset HTML on disk, redirect it to
   // a self-cleaning temp dir; pagx import still needs a file to read.
-  let subsetHtml;
+  let subsetHtml: string;
   let tempDir = '';
   if (opts.keepSubsetHtml === false) {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'html2pagx-'));
@@ -367,18 +406,13 @@ async function runHtmlToPagx(opts = {}) {
     imageDir = path.join(outputDir, `${baseName}.images`);
   }
 
-  // Step counter for human-readable progress prints. Matches the old bash
-  // wrapper's `[N/M] step ...` format that lib/batch.js and CI logs depend
-  // on for line-wise grepping.
   let totalSteps = 2;
   if (doResolve) totalSteps = 3;
   if (doRender) totalSteps = 4;
 
-  // Step 1 implementation is injectable. Default = fork `node snapshot.js` per
-  // file (the historical CLI behaviour). Batch mode (`lib/batch.js`) injects an
-  // in-process variant that calls `lib/snapshot-runner.js` against a single
-  // long-lived browser, saving ~1.5s of Chromium startup per file.
-  const snapshotImpl = typeof opts.snapshotImpl === 'function' ? opts.snapshotImpl : forkSnapshotCli;
+  const snapshotImpl: SnapshotImpl = typeof opts.snapshotImpl === 'function'
+    ? opts.snapshotImpl
+    : (forkSnapshotCli as SnapshotImpl);
 
   try {
     log(`[1/${totalSteps}] snapshot  ${opts.input}`);
@@ -402,7 +436,7 @@ async function runHtmlToPagx(opts = {}) {
     });
     assertStepOk('snapshot', snapshotResult);
 
-    let fonts = [];
+    let fonts: string[] = [];
     if (downloadFonts) {
       fonts = collectFontFallbacks({ fontDir });
       if (fonts.length === 0) {
@@ -416,12 +450,8 @@ async function runHtmlToPagx(opts = {}) {
       subsetHtml,
       pagxFile,
       inferFlex: opts.inferFlex !== false,
-      log: (line) => process.stderr.write(line + '\n'),
+      log: (line: string) => process.stderr.write(line + '\n'),
     });
-    // Import has its own check: stderr was already routed through the
-    // filtered `log` callback above, and we additionally require the output
-    // file to exist (zero exit + missing pagxFile means "tool ran but
-    // produced nothing", which assertStepOk wouldn't catch).
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
       throw new PipelineStepError('pagx import failed', {
         step: 'pagx import',
@@ -469,18 +499,4 @@ async function runHtmlToPagx(opts = {}) {
   }
 }
 
-module.exports = {
-  defaultPagxBin,
-  filterKnownWarnings,
-  PipelineStepError,
-  spawnCapture,
-  forkSnapshotCli,
-  runPagxImportToFile,
-  runPagxResolve,
-  runPagxFontEmbed,
-  runPagxRender,
-  collectFontFallbacks,
-  readFontManifest,
-  runHtmlToPagx,
-  isHttpUrl,
-};
+export { defaultPagxBin, filterKnownWarnings, isHttpUrl };

@@ -5,13 +5,22 @@
 //
 // The flow is engine-agnostic — it accepts either a raw puppeteer/playwright
 // Browser handle (legacy callers) or the `{ browser, engine }` wrapper that
-// `lib/browser-engine.js`'s `launchBrowser` returns. The engine name is
+// `lib/browser-engine.ts`'s `launchBrowser` returns. The engine name is
 // threaded through to the adapter's per-engine helpers so cookies, viewport,
 // and waitUntil semantics match whichever browser was launched.
 
-'use strict';
-
-const { unwrap, newPage, mapWaitUntil, addCookies, addInitScript } = require('./browser-engine');
+import {
+  unwrap,
+  newPage,
+  mapWaitUntil,
+  addCookies,
+  addInitScript,
+  type Browser,
+  type BrowserResponse,
+  type CookieParam,
+  type EngineWrapper,
+  type Page,
+} from './browser-engine';
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
@@ -22,6 +31,25 @@ const { unwrap, newPage, mapWaitUntil, addCookies, addInitScript } = require('./
 const ROOT_HAS_CHILDREN_SCRIPT =
   'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ConsoleListener = (msg: any) => void;
+export type PageErrorListener = (err: Error) => void;
+export type ResponseListener = (resp: BrowserResponse) => void | Promise<void>;
+
+export interface OpenAndSettlePageOptions {
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitMs?: number;
+  selector?: string;
+  cookies?: CookieParam[];
+  // [key, value] pairs.
+  headers?: Array<[string, string]>;
+  onConsole?: ConsoleListener | null;
+  onPageError?: PageErrorListener | null;
+  onResponse?: ResponseListener | null;
+  initScripts?: string[];
+}
+
 // Open a fresh page on `browserOrWrapper`, navigate to `url`, and apply the
 // standard wait strategy. `url` must already be a fully-qualified URL —
 // callers are responsible for prepending `file://` when the input is a local
@@ -30,7 +58,11 @@ const ROOT_HAS_CHILDREN_SCRIPT =
 // `browserOrWrapper` may be either:
 //   - the `{ browser, engine }` wrapper returned by `launchBrowser`, or
 //   - a raw puppeteer Browser (legacy callers — engine defaults to puppeteer).
-async function openAndSettlePage(browserOrWrapper, url, opts) {
+export async function openAndSettlePage(
+  browserOrWrapper: EngineWrapper | Browser,
+  url: string,
+  opts?: OpenAndSettlePageOptions,
+): Promise<Page> {
   const {
     viewportWidth = 1400,
     viewportHeight = 900,
@@ -58,13 +90,13 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
   // Init scripts must be registered before `page.goto` so the page's own
   // inline scripts see the helper bundles already on `window`. Each entry
   // is a self-contained source string (callers prepare it with
-  // `windowAttachScript` from lib/browser-snapshot.js / lib/icon-font.js).
+  // `windowAttachScript` from lib/browser-snapshot.ts / lib/icon-font.ts).
   for (const script of initScripts) {
     if (script) await addInitScript(page, engine, script);
   }
 
   if (headers.length > 0) {
-    const headerMap = {};
+    const headerMap: Record<string, string> = {};
     for (const [key, value] of headers) headerMap[key] = value;
     await page.setExtraHTTPHeaders(headerMap);
   }
@@ -90,5 +122,3 @@ async function openAndSettlePage(browserOrWrapper, url, opts) {
   }
   return page;
 }
-
-module.exports = { openAndSettlePage };

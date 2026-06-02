@@ -7,7 +7,7 @@ const {
   setStringParam,
   setBoolParam,
   wantsJsonResponse,
-} = require('../lib/http-utils');
+} = require('../dist/lib/http-utils');
 
 describe('HttpError', () => {
   test('carries a status code and message', () => {

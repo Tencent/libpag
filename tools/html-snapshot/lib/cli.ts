@@ -5,21 +5,52 @@
 //
 // Generic helpers that used to live here (errMessage, isHttpUrl, fail,
 // makeFail, parseNumber, LOG_PREFIX, SNAPSHOT_DEFAULTS) were moved to
-// `lib/common.js` so non-CLI modules (capture-listener, font-download,
+// `lib/common.ts` so non-CLI modules (capture-listener, font-download,
 // snapshot-runner, …) no longer have to depend on the CLI parser to reach
 // for them. HTTP-only validators (validateCookies, validateHeaders) live in
-// `lib/http-utils.js`.
+// `lib/http-utils.ts`.
 
-'use strict';
+import * as path from 'path';
+import { SUPPORTED_ENGINES, resolveEngine, type EngineName } from './browser-engine';
+import { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl } from './common';
 
-const path = require('path');
-const { SUPPORTED_ENGINES, resolveEngine } = require('./browser-engine');
-const { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl } = require('./common');
+// Re-export `parseNumber` for callers that historically reached for the CLI
+// module (e.g. html2pagx). The helper itself moved to `lib/common.ts`; the
+// re-export keeps the existing import shape working without a one-line change
+// at every consumer.
+export { parseNumber };
+
+export interface ParsedCookie {
+  name: string;
+  value: string;
+}
+
+export type ParsedHeader = [string, string];
+
+export interface SnapshotCliOptions {
+  input: string;
+  output: string;
+  outputToStdout: boolean;
+  isUrl: boolean;
+  viewportWidth: number;
+  viewportHeight: number;
+  waitMs: number;
+  selector: string;
+  cookies: ParsedCookie[];
+  headers: ParsedHeader[];
+  inlineIconFonts: boolean;
+  downloadFonts: boolean;
+  fontDir: string;
+  fontManifest: string;
+  downloadImages: boolean;
+  imageDir: string;
+  browserEngine: EngineName;
+}
 
 // Parse `name=value` into a puppeteer-compatible cookie descriptor. The URL
 // must be filled in by the caller (we do that once we know the page URL) so
 // the cookie is scoped to the right origin.
-function parseCookie(flagName, value) {
+function parseCookie(flagName: string, value: string | undefined): ParsedCookie {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'name=value' argument`);
   }
@@ -33,7 +64,7 @@ function parseCookie(flagName, value) {
 // Parse `Key: Value` (or `Key:Value`) into a [key, value] pair. The colon
 // after the key is the separator; any further colons are part of the value
 // (so `Authorization: Bearer xyz:abc` works as expected).
-function parseHeader(flagName, value) {
+function parseHeader(flagName: string, value: string | undefined): ParsedHeader {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'Key: Value' argument`);
   }
@@ -49,6 +80,12 @@ function parseHeader(flagName, value) {
   return [key, val];
 }
 
+interface FlagSpec {
+  names: string[];
+  takesArg?: boolean;
+  set: (opts: SnapshotCliOptions, value?: string) => void;
+}
+
 // Long-option flag table. Each entry lists the names the user can type and a
 // setter that mutates `opts` with the next argv token. `-h` / `--help` and
 // positional handling stay inline in `parseArgs` since they affect control
@@ -57,12 +94,12 @@ function parseHeader(flagName, value) {
 // distinguishes them from the value-bearing flags above so `parseArgs` knows
 // not to shift the index after the flag is matched. The helper here keeps
 // the table declarative.
-const FLAGS = [
-  { names: ['-o', '--output'],     set: (o, v) => { o.output = v; } },
+const FLAGS: FlagSpec[] = [
+  { names: ['-o', '--output'],     set: (o, v) => { o.output = v as string; } },
   { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parseNumber('--viewport-width', v, { min: 1 }); } },
   { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parseNumber('--viewport-height', v, { min: 1 }); } },
   { names: ['--wait-ms'],          set: (o, v) => { o.waitMs = parseNumber('--wait-ms', v, { min: 0 }); } },
-  { names: ['--selector'],         set: (o, v) => { o.selector = v; } },
+  { names: ['--selector'],         set: (o, v) => { o.selector = v as string; } },
   { names: ['--cookie'],           set: (o, v) => { o.cookies.push(parseCookie('--cookie', v)); } },
   { names: ['--header'],           set: (o, v) => { o.headers.push(parseHeader('--header', v)); } },
   // Disable the inline-icon-font pre-pass (default: enabled). When the pass
@@ -81,7 +118,7 @@ const FLAGS = [
   // of a system fallback. The destination defaults to a sibling
   // `<output>.fonts/` directory; override with `--font-dir`.
   { names: ['--download-fonts'], takesArg: false, set: (o) => { o.downloadFonts = true; } },
-  { names: ['--font-dir'], set: (o, v) => { o.fontDir = v; } },
+  { names: ['--font-dir'], set: (o, v) => { o.fontDir = v as string; } },
   // Download every external image the browser fetched while rendering and
   // reference it by its on-disk file path instead of inlining the bytes as a
   // base64 `data:` URI. Off by default (images are inlined, so the snapshot is
@@ -90,12 +127,12 @@ const FLAGS = [
   // destination defaults to a sibling `<output>.images/` directory; override
   // with `--image-dir`.
   { names: ['--download-images'], takesArg: false, set: (o) => { o.downloadImages = true; } },
-  { names: ['--image-dir'], set: (o, v) => { o.imageDir = v; } },
+  { names: ['--image-dir'], set: (o, v) => { o.imageDir = v as string; } },
   // Write the list of font files this snapshot actually uses (one absolute
   // path per line) to <path>. With a shared --font-dir, the directory may hold
   // fonts from many pages; the manifest lets a caller (eval/run.js) hand only
   // the fonts this page needs to `pagx render` / `pagx font embed`.
-  { names: ['--font-manifest'], set: (o, v) => { o.fontManifest = v; } },
+  { names: ['--font-manifest'], set: (o, v) => { o.fontManifest = v as string; } },
   // Pick the headless browser driver. Defaults to puppeteer; pass
   // `playwright` to drive Chromium through Playwright instead (requires
   // `playwright` to be installed — declared as an optionalDependency).
@@ -105,18 +142,18 @@ const FLAGS = [
     try {
       o.browserEngine = resolveEngine(v);
     } catch (err) {
-      fail(err && err.message ? err.message : String(err));
+      fail(err && (err as Error).message ? (err as Error).message : String(err));
     }
   } },
 ];
 
-const FLAG_BY_NAME = new Map();
+const FLAG_BY_NAME = new Map<string, FlagSpec>();
 for (const flag of FLAGS) {
   for (const name of flag.names) FLAG_BY_NAME.set(name, flag);
 }
 
-function parseArgs(argv) {
-  const opts = {
+export function parseArgs(argv: string[]): SnapshotCliOptions {
+  const opts: SnapshotCliOptions = {
     input: '',
     output: '',
     // When true, the HTML is written to process.stdout and the
@@ -137,13 +174,13 @@ function parseArgs(argv) {
     // by a webfont (Phosphor, Material Icons, Font Awesome, Lucide, …) to
     // an inline `<svg>` so the snapshot — and the PAGX downstream — no
     // longer depends on the icon font being available at render time.
-    // See lib/icon-font.js for the pipeline; toggle via
+    // See lib/icon-font.ts for the pipeline; toggle via
     // `--no-inline-icon-fonts`.
     inlineIconFonts: true,
     // Web-font download: when true, every font file the browser fetched
     // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
     // downstream `pagx render`/`pagx font embed` can use the real typeface
-    // instead of a host system fallback. See lib/font-download.js; toggle
+    // instead of a host system fallback. See lib/font-download.ts; toggle
     // via `--download-fonts`, redirect via `--font-dir`.
     downloadFonts: false,
     fontDir: '',
@@ -152,7 +189,7 @@ function parseArgs(argv) {
     // Image download: when true, every external image the browser fetched is
     // written to `imageDir` and referenced by its local file path instead of
     // inlined as a base64 `data:` URI, keeping the snapshot small. See
-    // lib/image-download.js; toggle via `--download-images`, redirect via
+    // lib/image-download.ts; toggle via `--download-images`, redirect via
     // `--image-dir`.
     downloadImages: false,
     imageDir: '',
@@ -161,7 +198,7 @@ function parseArgs(argv) {
     // returns the default. The `--browser-engine` flag below overrides both.
     browserEngine: resolveEngine(undefined),
   };
-  const positional = [];
+  const positional: string[] = [];
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') {
@@ -228,7 +265,13 @@ function parseArgs(argv) {
   // stripped from the base name so `page.subset.html` yields `page.fonts/`,
   // not `page.subset.fonts/`. Stdout mode has no output path to derive from,
   // so an explicit `--<resource>-dir` is required.
-  function resolveSiblingDir(dirKey, downloadKey, suffix, downloadFlag, dirFlag) {
+  const resolveSiblingDir = (
+    dirKey: 'fontDir' | 'imageDir',
+    downloadKey: 'downloadFonts' | 'downloadImages',
+    suffix: string,
+    downloadFlag: string,
+    dirFlag: string,
+  ): void => {
     if (opts[dirKey]) {
       opts[dirKey] = path.resolve(opts[dirKey]);
       return;
@@ -241,7 +284,7 @@ function parseArgs(argv) {
     let base = path.basename(opts.output, path.extname(opts.output));
     if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
     opts[dirKey] = path.join(dir, `${base}.${suffix}`);
-  }
+  };
   resolveSiblingDir('fontDir',  'downloadFonts',  'fonts',  '--download-fonts',  '--font-dir');
   resolveSiblingDir('imageDir', 'downloadImages', 'images', '--download-images', '--image-dir');
   // A manifest only makes sense alongside --download-fonts (it lists the
@@ -256,7 +299,7 @@ function parseArgs(argv) {
   return opts;
 }
 
-function printUsage() {
+export function printUsage(): void {
   console.log(`Usage: html-snapshot <input.html | http(s)://url> -o <out.html> [options]
 
 Render <input> in a headless browser and emit a flat, absolute-positioned
@@ -309,5 +352,3 @@ Options:
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);
 }
-
-module.exports = { parseArgs, printUsage };

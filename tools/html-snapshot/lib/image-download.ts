@@ -1,13 +1,13 @@
 // External <img> download → on-disk image export.
 //
 // By default the snapshot pipeline inlines every external image into a base64
-// `data:` URI (see lib/snapshot-runner.js + browser-snapshot.js's
+// `data:` URI (see lib/snapshot-runner.ts + browser-snapshot.ts's
 // `inlineExternalImages`), which makes the subset HTML — and the PAGX produced
 // from it — self-contained but potentially huge: a page with a handful of
 // full-resolution photos can balloon the document by several megabytes of
 // base64.
 //
-// This module is the opt-in alternative, mirroring lib/font-download.js: it
+// This module is the opt-in alternative, mirroring lib/font-download.ts: it
 // saves the actual image *files* the browser already downloaded while rendering
 // the page to a directory on disk, and the caller (snapshot-runner) then
 // references each image by its local file path instead of inlining the bytes.
@@ -31,19 +31,30 @@
 //      content-addressed filename, and returns the `url -> path` mapping the
 //      caller hands to `inlineExternalImages`.
 
-'use strict';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import { writeFileAtomic } from './atomic-write';
+import { errMessage } from './common';
 
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-const crypto = require('crypto');
-const { writeFileAtomic } = require('./atomic-write');
-const { errMessage } = require('./common');
+const fsp = fs.promises;
+
+export interface ImageCaptureValue {
+  buffer: Buffer;
+  contentType?: string;
+}
+
+export type ImageLogger = (msg: string) => void;
+
+export interface SavedImage {
+  url: string;
+  path: string;
+}
 
 // Map a response content-type (or a magic-byte sniff) to a file extension.
 // PAGX matches images by decoding the file bytes, not the extension, so a
 // wrong extension here only affects on-disk legibility, never rendering.
-const CONTENT_TYPE_EXT = {
+const CONTENT_TYPE_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
@@ -60,7 +71,7 @@ const CONTENT_TYPE_EXT = {
 // Sniff the container from the leading bytes when the content-type is missing
 // or generic (`application/octet-stream`). Covers the formats browsers
 // actually emit for <img>; anything unrecognised falls back to `img`.
-function sniffExt(buf) {
+export function sniffExt(buf: Buffer | null | undefined): string {
   if (!buf || buf.length < 4) return 'img';
   const b = buf;
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
@@ -84,7 +95,7 @@ function sniffExt(buf) {
 // Resolve the on-disk extension for a captured image, preferring the server's
 // content-type (stripped of any `; charset=...` parameters) and falling back
 // to a magic-byte sniff.
-function pickExt(contentType, buffer) {
+export function pickExt(contentType: string | undefined | null, buffer: Buffer): string {
   const ct = String(contentType || '').split(';')[0].trim().toLowerCase();
   if (CONTENT_TYPE_EXT[ct]) return CONTENT_TYPE_EXT[ct];
   return sniffExt(buffer);
@@ -94,7 +105,7 @@ function pickExt(contentType, buffer) {
 // file is recognisable on disk. Collapses any run of disallowed characters to
 // a single dash and trims dashes; URLs that slug to empty (query-only, CJK)
 // fall back to a stable default.
-function baseNameFromUrl(url) {
+export function baseNameFromUrl(url: string): string {
   let name = '';
   try {
     const u = new URL(url);
@@ -113,7 +124,7 @@ function baseNameFromUrl(url) {
 // function of the content, so the same image referenced by multiple <img>
 // tags — or across separate snapshot runs sharing one image directory — always
 // maps to the same filename and is stored once instead of accumulating copies.
-function contentFileName(url, hash, ext) {
+function contentFileName(url: string, hash: string, ext: string): string {
   return `${baseNameFromUrl(url)}-${hash.slice(0, 16)}.${ext}`;
 }
 
@@ -125,27 +136,35 @@ function contentFileName(url, hash, ext) {
 // written by an earlier case sharing this directory — is reused rather than
 // re-written. Per-image failures are logged and skipped — a single bad payload
 // must not lose the rest.
-async function saveDownloadedImages(imageBytesByUrl, outDir, logger) {
-  const log = typeof logger === 'function' ? logger : () => {};
+export async function saveDownloadedImages(
+  imageBytesByUrl: Map<string, ImageCaptureValue | Buffer> | null | undefined,
+  outDir: string,
+  logger?: ImageLogger,
+): Promise<SavedImage[]> {
+  const log: ImageLogger = typeof logger === 'function' ? logger : () => {};
   const entries = imageBytesByUrl ? Array.from(imageBytesByUrl.entries()) : [];
   if (entries.length === 0) return [];
 
   await fsp.mkdir(outDir, { recursive: true });
 
-  const seenHashes = new Set();
-  const saved = [];
+  const seenHashes = new Set<string>();
+  const saved: SavedImage[] = [];
   for (const [url, value] of entries) {
     try {
       // Accept either the `{ buffer, contentType }` shape the capture listener
       // produces or a bare Buffer (used by tests / callers that don't track a
       // content-type). A Buffer exposes its own `.buffer` (the backing
       // ArrayBuffer), so check `Buffer.isBuffer` first to avoid unwrapping it.
-      const buffer = Buffer.isBuffer(value) ? value : value && value.buffer;
+      const buffer = Buffer.isBuffer(value)
+        ? value
+        : (value && (value as ImageCaptureValue).buffer);
       if (!Buffer.isBuffer(buffer) || !buffer.length) continue;
       const hash = crypto.createHash('sha1').update(buffer).digest('hex');
       if (seenHashes.has(hash)) continue;
       seenHashes.add(hash);
-      const contentType = Buffer.isBuffer(value) ? '' : value && value.contentType;
+      const contentType = Buffer.isBuffer(value)
+        ? ''
+        : (value && (value as ImageCaptureValue).contentType);
       const ext = pickExt(contentType, buffer);
       const fileName = contentFileName(url, hash, ext);
       const filePath = path.join(outDir, fileName);
@@ -159,11 +178,3 @@ async function saveDownloadedImages(imageBytesByUrl, outDir, logger) {
   }
   return saved;
 }
-
-module.exports = {
-  saveDownloadedImages,
-  // Exported for unit-level reuse / testing.
-  pickExt,
-  sniffExt,
-  baseNameFromUrl,
-};

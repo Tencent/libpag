@@ -7,7 +7,7 @@ const {
   parseNumber,
   errMessage,
   LOG_PREFIX,
-} = require('../lib/common');
+} = require('../dist/lib/common');
 const { captureExit } = require('./helpers');
 
 describe('isHttpUrl', () => {

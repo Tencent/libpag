@@ -4,7 +4,7 @@
 // Font Awesome, Lucide, Remix, …). Their visual glyphs live in a TTF/WOFF2
 // resource hosted via `@font-face` and are inserted into the DOM through
 // `::before { content: "\eXXX" }` pseudo-elements. The snapshot's default
-// pseudo-text path (renderPseudoTextLeaf in browser-snapshot.js) preserves
+// pseudo-text path (renderPseudoTextLeaf in browser-snapshot.ts) preserves
 // the codepoint + `font-family: "Phosphor"`, but PAGX's renderer can only
 // resolve the font through `tgfx::Typeface::MakeFromName` — i.e. it has to
 // find the face on the host system. The PAGX file itself does not embed the
@@ -28,27 +28,34 @@
 //   3. browser-side: re-find each tagged host and attach the SVG markup as
 //      `data-snapshot-icon-svg`; remove the temp `data-icon-target-id`.
 //
-// The snapshot walker (browser-snapshot.js) checks for
+// The snapshot walker (browser-snapshot.ts) checks for
 // `data-snapshot-icon-svg` and routes via `renderInlineIconSvg` instead of
 // the pseudo-text leaf, sizing the SVG to the host's measured rect.
 
-'use strict';
+import * as fs from 'fs';
+import { DROP_TAG_NAMES } from './dom-tags';
+import { errMessage } from './common';
+import { loadFontCodec } from './font-codec';
+import type { Page } from './browser-engine';
 
-const fsp = require('fs').promises;
-const { DROP_TAG_NAMES } = require('./dom-tags');
-const { errMessage } = require('./common');
-const { loadFontCodec } = require('./font-codec');
+const fsp = fs.promises;
 
 // ===== Browser-side helpers =====
 //
-// Each helper below is a top-level function declaration — never nested inside
-// another function — so its `Function.prototype.toString()` source can be
-// concatenated into a single IIFE string and shipped to the page via
+// Each helper below is a top-level `function` declaration — never nested
+// inside another function — so its `Function.prototype.toString()` source
+// can be concatenated into a single IIFE string and shipped to the page via
 // `page.evaluate`. The same source is also injected into the standalone
 // browser bundle (build-browser-bundle.js) so callers running outside of
 // node have access to the same helpers under one shared closure.
 //
-// Layout mirrors lib/browser-snapshot.js:
+// IMPORTANT: do not rewrite these helpers as arrow functions or class
+// methods; the `.toString()` output must remain a stand-alone `function …`
+// expression that re-parses correctly inside the IIFE wrapper. The TS
+// compile target is ES2022, so async/await are preserved verbatim — no
+// helper insertion pollutes the serialised source.
+//
+// Layout mirrors lib/browser-snapshot.ts:
 //   ICON_FONT_HELPER_FNS  — node-side array of helper references.
 //   ICON_FONT_HELPERS_SRC — concatenated source string. Empty until the
 //                           array is finalised at module-load time.
@@ -59,7 +66,7 @@ const { loadFontCodec } = require('./font-codec');
 // Format-rank lookup for picking the most-decode-friendly source. WOFF2 is
 // preferred (smallest, modern), then WOFF (zlib-only), then raw SFNT
 // containers. `truetype`/`opentype` are aliases for ttf/otf.
-function formatRank(f) {
+export function formatRank(f: string): number {
   if (f === 'woff2') return 1;
   if (f === 'woff') return 2;
   if (f === 'ttf' || f === 'truetype') return 3;
@@ -67,12 +74,17 @@ function formatRank(f) {
   return 5;
 }
 
+interface ParsedSrc {
+  url: string;
+  format: string;
+}
+
 // Parse a `src:` declaration into the best-ranked `{url, format}` pair.
 // `font-family` values are unquoted by the caller; `src` URLs are resolved
 // against the stylesheet's own `href` so relative paths in CDN-hosted
 // stylesheets produce absolute, fetchable URLs.
-function parseSrcList(srcRaw, sheetBase) {
-  const urls = [];
+export function parseSrcList(srcRaw: string, sheetBase: string): ParsedSrc | null {
+  const urls: ParsedSrc[] = [];
   const re = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^)]+?))\s*\)(?:\s*format\(\s*["']?([^"')]+)["']?\s*\))?/g;
   let m;
   while ((m = re.exec(srcRaw)) !== null) {
@@ -88,6 +100,12 @@ function parseSrcList(srcRaw, sheetBase) {
   return { url: absUrl, format: best.format };
 }
 
+interface FontFaceEntry {
+  family: string;
+  url: string;
+  format: string;
+}
+
 // Parse `@font-face { ... }` blocks out of a raw CSS string. Used as a
 // fallback when `cssRules` is denied by CORS — Chromium still loaded and
 // applied the stylesheet (so the page renders), but JS can't introspect it.
@@ -95,10 +113,10 @@ function parseSrcList(srcRaw, sheetBase) {
 // are `font-family` and `src`, both of which use the same syntax that
 // `cssRules` would yield. Comments are stripped first so a `/* src: url(...)
 // */` decoy doesn't mislead the matcher.
-function parseFontFaceFromText(cssText, sheetBase) {
+export function parseFontFaceFromText(cssText: string, sheetBase: string): FontFaceEntry[] {
   if (!cssText) return [];
   const stripped = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
-  const out = [];
+  const out: FontFaceEntry[] = [];
   const ffRe = /@font-face\s*\{([^}]*)\}/gi;
   let m;
   while ((m = ffRe.exec(stripped)) !== null) {
@@ -112,6 +130,14 @@ function parseFontFaceFromText(cssText, sheetBase) {
   }
   return out;
 }
+
+// `DROP_TAGS_UPPER` is declared as a string-prepended `const` at IIFE
+// construction time (see ICON_FONT_DROP_TAGS_SRC below); the browser-side
+// `isIconScanSkippedTag` references it from the surrounding closure. The
+// declaration here is only for the TypeScript checker — it's never actually
+// emitted into the browser payload (the function source is captured via
+// `.toString()`, not the surrounding module scope).
+declare const DROP_TAGS_UPPER: Set<string>;
 
 // Walk `document.styleSheets` for `@font-face` rules and return a
 // JSON-safe `{ family: { url, format } }` map.
@@ -130,9 +156,9 @@ function parseFontFaceFromText(cssText, sheetBase) {
 // the same family) keeps the first source — good enough for icon fonts
 // (single regular weight) and avoids round-tripping a heavier italic/bold
 // variant.
-async function collectFontFaceMap() {
-  const map = {};
-  const inaccessible = [];
+async function collectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
+  const map: Record<string, ParsedSrc> = {};
+  const inaccessible: string[] = [];
   const sheets = document.styleSheets ? Array.from(document.styleSheets) : [];
   for (const sheet of sheets) {
     let rules;
@@ -145,9 +171,11 @@ async function collectFontFaceMap() {
     for (const rule of Array.from(rules)) {
       // CSSFontFaceRule: rule.type === 5. Newer browsers expose
       // CSSFontFaceRule as a class; the type-number check works on both.
-      if (rule.type !== 5) continue;
-      const familyRaw = (rule.style.getPropertyValue('font-family') || '').trim();
-      const srcRaw = rule.style.getPropertyValue('src') || '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = rule as any;
+      if (r.type !== 5) continue;
+      const familyRaw = (r.style.getPropertyValue('font-family') || '').trim();
+      const srcRaw = r.style.getPropertyValue('src') || '';
       if (!familyRaw || !srcRaw) continue;
       const family = familyRaw.replace(/^["']|["']$/g, '');
       const parsed = parseSrcList(srcRaw, sheetBase);
@@ -174,7 +202,7 @@ async function collectFontFaceMap() {
 // accidentally capture multi-glyph ligature names ("home", "menu") that
 // some icon fonts use; ligature handling would require renderText
 // measurements we don't have here.
-function isPuaCodepoint(cp) {
+export function isPuaCodepoint(cp: number): boolean {
   return cp >= 0xE000 && cp <= 0xF8FF;
 }
 
@@ -182,11 +210,11 @@ function isPuaCodepoint(cp) {
 // so a page with hundreds of inline `<style>` / `<script>` blocks doesn't
 // pay for a per-element `getComputedStyle(el, '::before')` round-trip.
 //
-// Backed by the shared `DROP_TAG_NAMES` list in lib/dom-tags.js so this
+// Backed by the shared `DROP_TAG_NAMES` list in lib/dom-tags.ts so this
 // pass and the main snapshot walker stay in lockstep — the function body
 // is constructed at module load and serialised into the browser payload
 // through `ICON_FONT_DROP_TAGS_SRC` below.
-function isIconScanSkippedTag(tag) {
+function isIconScanSkippedTag(tag: string): boolean {
   return tag ? DROP_TAGS_UPPER.has(tag) : false;
 }
 
@@ -200,8 +228,17 @@ function isIconScanSkippedTag(tag) {
 
 // Walk styleSheets and return the JSON-safe `@font-face` family→{url,format}
 // map. Async because the cross-origin CSS fallback uses `fetch`.
-async function browserCollectFontFaceMap() {
+async function browserCollectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
   return await collectFontFaceMap();
+}
+
+interface IconFontTarget {
+  id: string;
+  fontFamily: string;
+  codepoint: number;
+  fontUrl: string;
+  format: string;
+  pseudo: string;
 }
 
 // Walk every leaf element in the document and report icon-font candidates.
@@ -215,9 +252,9 @@ async function browserCollectFontFaceMap() {
 // webfonts (Phosphor, Material Icons, Font Awesome, …) and avoids
 // converting genuine pseudo-text content (e.g. `content: "—"`) into
 // rendering glyph paths.
-async function browserCollectIconFontTargets() {
+async function browserCollectIconFontTargets(): Promise<IconFontTarget[]> {
   const fontFaceMap = await collectFontFaceMap();
-  const targets = [];
+  const targets: IconFontTarget[] = [];
   let counter = 0;
   const all = document.body ? document.body.querySelectorAll('*') : [];
   // Hoist the quoted-segment regex once and inline the `content` decode
@@ -250,13 +287,13 @@ async function browserCollectIconFontTargets() {
       // is the right gate. Reject longer strings (ligature names like
       // "home", multi-char prefixes, …) so we never mis-route real text.
       if (ch.length !== 1) continue;
-      const cp = ch.codePointAt(0);
+      const cp = ch.codePointAt(0)!;
       if (!isPuaCodepoint(cp)) continue;
       const fontFamilyRaw = (cs.getPropertyValue('font-family') || '').trim();
       const families = fontFamilyRaw
         .split(',')
         .map(function (s) { return s.trim().replace(/^["']|["']$/g, ''); });
-      let entry = null;
+      let entry: ParsedSrc | null = null;
       let matchedFamily = '';
       for (const fam of families) {
         if (fontFaceMap[fam]) { entry = fontFaceMap[fam]; matchedFamily = fam; break; }
@@ -281,6 +318,11 @@ async function browserCollectIconFontTargets() {
   return targets;
 }
 
+interface IconFontResult {
+  id: string;
+  svg: string;
+}
+
 // Re-find each tagged host, store the resolved SVG markup in a window-level
 // dictionary keyed by the host's stable `data-icon-target-id`, then leave
 // only the id reference on the host as `data-snapshot-icon-svg-id`. The
@@ -295,9 +337,11 @@ async function browserCollectIconFontTargets() {
 //
 // Self-contained (no helper dependencies), so it can be passed straight to
 // `page.evaluate(fn, args)` without an IIFE wrapper.
-function browserApplyIconFontSvgs(results) {
+function browserApplyIconFontSvgs(results: IconFontResult[] | null | undefined): void {
   const arr = results || [];
-  const dict = (window.__pagxIconSvgs = window.__pagxIconSvgs || Object.create(null));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+  const dict = (w.__pagxIconSvgs = w.__pagxIconSvgs || Object.create(null));
   for (let i = 0; i < arr.length; i++) {
     const r = arr[i];
     if (!r || !r.id || !r.svg) continue;
@@ -317,12 +361,12 @@ function browserApplyIconFontSvgs(results) {
 
 // ===== Browser-side payload assembly =====
 //
-// Mirrors the layout in lib/browser-snapshot.js: a single array of helper
+// Mirrors the layout in lib/browser-snapshot.ts: a single array of helper
 // references → concatenated source string → IIFE wrappers around the two
 // async entry points. The standalone browser bundle re-uses
 // `ICON_FONT_HELPERS_SRC` to expose the helpers under its factory closure.
 
-const ICON_FONT_HELPER_FNS = [
+const ICON_FONT_HELPER_FNS: Function[] = [
   formatRank,
   parseSrcList,
   parseFontFaceFromText,
@@ -339,7 +383,7 @@ const ICON_FONT_DROP_TAGS_SRC =
   'const DROP_TAGS_UPPER = new Set(' +
   JSON.stringify(DROP_TAG_NAMES.map(function (s) { return s.toUpperCase(); })) +
   ');';
-const ICON_FONT_HELPERS_SRC =
+export const ICON_FONT_HELPERS_SRC =
   ICON_FONT_DROP_TAGS_SRC + '\n\n' +
   ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
@@ -347,9 +391,6 @@ const ICON_FONT_HELPERS_SRC =
 // async-IIFE is the right shape for both entry points: the helpers are
 // declared first (function declarations hoist), then the entry function is
 // declared and immediately invoked.
-const COLLECT_FONT_FACE_MAP_PAYLOAD =
-  '(async () => {\n' + ICON_FONT_HELPERS_SRC + '\n' + browserCollectFontFaceMap.toString() +
-  '\nreturn await browserCollectFontFaceMap();\n})()';
 const COLLECT_ICON_FONT_TARGETS_PAYLOAD =
   '(async () => {\n' + ICON_FONT_HELPERS_SRC + '\n' + browserCollectIconFontTargets.toString() +
   '\nreturn await browserCollectIconFontTargets();\n})()';
@@ -359,7 +400,7 @@ const COLLECT_ICON_FONT_TARGETS_PAYLOAD =
 // trigger them with a sub-100-byte expression instead of re-shipping
 // `ICON_FONT_HELPERS_SRC` on every evaluate. Registered via
 // `page.evaluateOnNewDocument` from snapshot.js before navigation.
-const ICON_FONT_INIT_SCRIPT =
+export const ICON_FONT_INIT_SCRIPT =
   '(function() {\n' + ICON_FONT_HELPERS_SRC + '\n' +
   browserCollectFontFaceMap.toString() + '\n' +
   browserCollectIconFontTargets.toString() + '\n' +
@@ -371,6 +412,12 @@ const ICON_FONT_INIT_SCRIPT =
   '};\n' +
   '})();';
 const COLLECT_ICON_FONT_TARGETS_EXPR = '(async () => await window.__pagxIconFont.collectTargets())()';
+
+// Re-export for module consumers that need to embed the browser-side
+// helpers into their own page contexts (the standalone browser bundle).
+export { browserCollectFontFaceMap, browserCollectIconFontTargets, browserApplyIconFontSvgs };
+// Suppress unused-payload lint until the build-browser-bundle.js consumes it.
+void COLLECT_ICON_FONT_TARGETS_PAYLOAD;
 
 // ===== Node-side helpers =====
 
@@ -384,7 +431,7 @@ const ICON_FONT_FETCH_TIMEOUT_MS = 10_000;
 // Fetch `url` into a Buffer. Supports `http(s)://`, `data:`, and `file://`
 // schemes; everything else is rejected so a relative-path src that slipped
 // through URL resolution doesn't silently become a no-op.
-async function fetchFontBytes(url) {
+export async function fetchFontBytes(url: string): Promise<Buffer> {
   if (url.startsWith('data:')) {
     const comma = url.indexOf(',');
     if (comma < 0) throw new Error('malformed data: URL');
@@ -411,20 +458,23 @@ async function fetchFontBytes(url) {
 // and decompressed via the `wawoff2` WASM port of Google's reference
 // decoder; everything else is fed straight to `opentype.parse`, which
 // already handles WOFF natively.
-async function parseFontBuffer(buffer) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function parseFontBuffer(buffer: Buffer): Promise<any> {
   const { opentype, wawoff2 } = loadFontCodec();
   let bytes = buffer;
   if (bytes.length >= 4 && bytes[0] === 0x77 && bytes[1] === 0x4F && bytes[2] === 0x46 && bytes[3] === 0x32) {
     const decoded = await wawoff2.decompress(bytes);
     bytes = Buffer.isBuffer(decoded) ? decoded : Buffer.from(decoded);
   }
-  return opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  return opentype.parse(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+  );
 }
 
 // Round a float to `digits` decimal places, matching the precision used
-// throughout browser-snapshot.js for path-data emission. `0` round-trips
+// throughout browser-snapshot.ts for path-data emission. `0` round-trips
 // to `0` (avoids `-0`), and non-finite values fall back to `0`.
-function roundTo(n, digits) {
+export function roundTo(n: number, digits: number): number {
   if (!Number.isFinite(n)) return 0;
   const m = Math.pow(10, digits);
   const r = Math.round(n * m) / m;
@@ -437,7 +487,7 @@ function roundTo(n, digits) {
 // path is positioned via opentype.js's `glyph.getPath(0, ascender,
 // unitsPerEm)` so its baseline sits at `y = ascender` within that box,
 // matching SVG's Y-down convention. The wrapper that hosts this SVG
-// (renderInlineIconSvg in browser-snapshot.js) injects explicit width /
+// (renderInlineIconSvg in browser-snapshot.ts) injects explicit width /
 // height attributes derived from the host's measured pixel rect, so the
 // em-square is uniformly scaled to the icon's on-screen size.
 //
@@ -447,7 +497,8 @@ function roundTo(n, digits) {
 //
 // Returns null when the codepoint is unmapped (.notdef, glyph index 0).
 // The caller falls back to the legacy font-named span in that case.
-function glyphToSvg(font, codepoint) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function glyphToSvg(font: any, codepoint: number): string | null {
   const ch = String.fromCodePoint(codepoint);
   const glyph = font.charToGlyph(ch);
   if (!glyph) return null;
@@ -481,17 +532,23 @@ function glyphToSvg(font, codepoint) {
     + '<path d="' + data + '" fill="currentColor"/></svg>';
 }
 
+export type IconFontLogger = (msg: string) => void;
+
 // Take the `targets` array reported by `browserCollectIconFontTargets` and
 // produce a parallel `[{ id, svg }]` list for the apply phase. Each unique
 // font URL is fetched + parsed once; per-glyph extraction reuses the cached
 // font. Failures (bad URL, unsupported format, missing glyph) are logged
 // via `logger` and degrade gracefully — the host stays untagged and the
 // snapshot falls back to the font-named span.
-async function resolveIconFontSvgs(targets, logger) {
+export async function resolveIconFontSvgs(
+  targets: IconFontTarget[] | null | undefined,
+  logger: IconFontLogger,
+): Promise<IconFontResult[]> {
   if (!targets || targets.length === 0) return [];
   const log = logger;
-  const fontByUrl = new Map();
-  const failedUrls = new Set();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fontByUrl = new Map<string, any>();
+  const failedUrls = new Set<string>();
 
   // Pre-fetch each unique font URL in parallel. The previous implementation
   // walked targets sequentially and downloaded on-demand, which serialised
@@ -500,8 +557,8 @@ async function resolveIconFontSvgs(targets, logger) {
   // Promise.all collapses those into a single overlapping window. Per-glyph
   // SVG extraction stays sequential (CPU-bound, not benefitted by parallel
   // dispatch) and runs against the now-warm cache.
-  const uniqueUrls = [];
-  const seen = new Set();
+  const uniqueUrls: string[] = [];
+  const seen = new Set<string>();
   for (const t of targets) {
     if (!t || !t.fontUrl || seen.has(t.fontUrl)) continue;
     seen.add(t.fontUrl);
@@ -518,13 +575,13 @@ async function resolveIconFontSvgs(targets, logger) {
     }
   }));
 
-  const results = [];
+  const results: IconFontResult[] = [];
   for (const t of targets) {
     if (!t || !t.fontUrl) continue;
     if (failedUrls.has(t.fontUrl)) continue;
     const font = fontByUrl.get(t.fontUrl);
     if (!font) continue;
-    let svg = null;
+    let svg: string | null = null;
     try {
       svg = glyphToSvg(font, t.codepoint);
     } catch (err) {
@@ -538,10 +595,19 @@ async function resolveIconFontSvgs(targets, logger) {
   return results;
 }
 
+export interface InlineIconFontsOptions {
+  logger?: IconFontLogger;
+}
+
+export interface InlineIconFontsResult {
+  inlined: number;
+  total: number;
+}
+
 // Top-level pipeline: discover icon-font targets in the page, fetch their
 // font URLs, render each target glyph to an inline `<svg>` payload and
 // stash that payload on the host element via `data-snapshot-icon-svg`.
-// The downstream snapshot walker (`render` in browser-snapshot.js) routes
+// The downstream snapshot walker (`render` in browser-snapshot.ts) routes
 // any element carrying that attribute to `renderInlineIconSvg`, which
 // emits the SVG instead of a font-named span.
 //
@@ -558,11 +624,14 @@ async function resolveIconFontSvgs(targets, logger) {
 // the `data-icon-target-id` markers the collector left behind), and
 // applicator failures only lose the visual replacement — the page is
 // still snapshotted, just with the original font-named spans.
-async function inlineIconFontsOnPage(page, opts) {
+export async function inlineIconFontsOnPage(
+  page: Page,
+  opts?: InlineIconFontsOptions,
+): Promise<InlineIconFontsResult> {
   const options = opts || {};
-  const logger = typeof options.logger === 'function' ? options.logger : function () {};
+  const logger: IconFontLogger = typeof options.logger === 'function' ? options.logger : function () {};
 
-  let targets = null;
+  let targets: IconFontTarget[] | null = null;
   try {
     targets = await page.evaluate(COLLECT_ICON_FONT_TARGETS_EXPR);
   } catch (err) {
@@ -571,7 +640,7 @@ async function inlineIconFontsOnPage(page, opts) {
   }
   if (!targets || targets.length === 0) return { inlined: 0, total: 0 };
 
-  let results = [];
+  let results: IconFontResult[] = [];
   try {
     results = await resolveIconFontSvgs(targets, logger);
   } catch (err) {
@@ -584,37 +653,10 @@ async function inlineIconFontsOnPage(page, opts) {
   // collector left on every candidate. Skipping it would leak those
   // attributes into the final snapshot HTML.
   try {
-    await page.evaluate((r) => window.__pagxIconFont.applySvgs(r), results);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await page.evaluate((r: IconFontResult[]) => (window as any).__pagxIconFont.applySvgs(r), results);
   } catch (err) {
     logger('inline-icon-fonts: SVG application failed: ' + errMessage(err));
   }
   return { inlined: results.length, total: targets.length };
 }
-
-module.exports = {
-  // Browser-side hooks (also re-exported in the standalone bundle so
-  // callers running outside of node can plug in their own resolver). Each
-  // entry function references the helpers below by name; consumers that
-  // run them in isolation must inject `ICON_FONT_HELPERS_SRC` into the
-  // surrounding closure first.
-  browserCollectFontFaceMap,
-  browserCollectIconFontTargets,
-  browserApplyIconFontSvgs,
-  ICON_FONT_HELPERS_SRC,
-  ICON_FONT_INIT_SCRIPT,
-  // Node-side helpers.
-  fetchFontBytes,
-  parseFontBuffer,
-  glyphToSvg,
-  resolveIconFontSvgs,
-  inlineIconFontsOnPage,
-  // Exported for unit testing. These are pure, browser-independent helpers
-  // used by the (DOM-bound) collection passes above; surfacing them lets the
-  // test suite cover the parsing / classification logic without a headless
-  // browser.
-  formatRank,
-  parseSrcList,
-  parseFontFaceFromText,
-  isPuaCodepoint,
-  roundTo,
-};

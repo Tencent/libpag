@@ -27,10 +27,10 @@
 'use strict';
 
 const fs = require('fs');
-const { parseArgs } = require('./lib/cli');
-const { LOG_PREFIX } = require('./lib/common');
-const { launchBrowser, formatLaunchHint } = require('./lib/browser-engine');
-const { runSnapshot } = require('./lib/snapshot-runner');
+const { parseArgs } = require('./dist/lib/cli');
+const { LOG_PREFIX } = require('./dist/lib/common');
+const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
+const { runSnapshot } = require('./dist/lib/snapshot-runner');
 
 async function main() {
   const opts = parseArgs(process.argv);

@@ -1,6 +1,6 @@
 // Web-font download → on-disk SFNT (TTF/OTF) export.
 //
-// Unlike the icon-font pass (lib/icon-font.js), which converts individual PUA
+// Unlike the icon-font pass (lib/icon-font.ts), which converts individual PUA
 // glyphs to inline <svg> so the snapshot is self-contained, body/text web
 // fonts (Google Fonts "Noto Sans SC", "Inter", self-hosted @font-face, …)
 // cannot be inlined into the subset HTML: the HTML subset spec disallows
@@ -35,35 +35,51 @@
 //      table for a human-readable filename, de-dupes by content hash, and
 //      writes the files into the requested directory.
 
-'use strict';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import { errMessage } from './common';
+import { writeFileAtomic } from './atomic-write';
+import { makeCaptureListener, type CaptureLogger, type CaptureResponseListener } from './capture-listener';
+import { loadFontCodec } from './font-codec';
+import type { EngineName } from './browser-engine';
 
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-const crypto = require('crypto');
-const { errMessage } = require('./common');
-const { writeFileAtomic } = require('./atomic-write');
-const { makeCaptureListener } = require('./capture-listener');
-const { loadFontCodec } = require('./font-codec');
+const fsp = fs.promises;
 
 // Hard cap on reading a single font response body. Mirrors the icon-font
 // fetch timeout — a hung CDN must not stall the whole snapshot.
 const FONT_BODY_READ_TIMEOUT_MS = 10_000;
 
+export interface FontMeta {
+  family: string;
+  style: string;
+  ext: 'ttf' | 'otf';
+}
+
+export interface SavedFont {
+  url: string;
+  path: string;
+  family: string;
+  style: string;
+}
+
 // View a Node Buffer as a standalone ArrayBuffer slice for opentype.js
 // (which only accepts ArrayBuffer, not Buffer). Slicing by byteOffset/length
 // guards against Buffers that share an underlying pool with other data.
-function toArrayBuffer(buffer) {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
 }
 
 // Match the 4-byte container signatures we care about. WOFF2 = `wOF2`,
 // WOFF = `wOFF`; everything else is assumed to already be a raw SFNT
 // (`\0\1\0\0` TrueType, `OTTO` CFF, `true`/`ttcf`, …).
-function isWoff2(buf) {
+function isWoff2(buf: Buffer): boolean {
   return buf.length >= 4 && buf[0] === 0x77 && buf[1] === 0x4f && buf[2] === 0x46 && buf[3] === 0x32;
 }
-function isWoff(buf) {
+function isWoff(buf: Buffer): boolean {
   return buf.length >= 4 && buf[0] === 0x77 && buf[1] === 0x4f && buf[2] === 0x46 && buf[3] === 0x46;
 }
 
@@ -73,7 +89,7 @@ function isWoff(buf) {
 //   - WOFF:  opentype.js parses the zlib-compressed tables; we re-serialise
 //     to SFNT with `font.toArrayBuffer()` so tgfx can load it.
 //   - SFNT:  returned unchanged.
-async function toSfnt(buffer) {
+export async function toSfnt(buffer: Buffer): Promise<Buffer> {
   const { opentype: ot, wawoff2: w2 } = loadFontCodec();
   if (isWoff2(buffer)) {
     const decoded = await w2.decompress(buffer);
@@ -88,11 +104,13 @@ async function toSfnt(buffer) {
 
 // opentype.js name records are `{ en: '…', … }` locale maps. Prefer English,
 // then any available locale, then empty.
-function pickName(record) {
+function pickName(record: unknown): string {
   if (!record || typeof record !== 'object') return '';
-  if (typeof record.en === 'string' && record.en) return record.en;
-  for (const key of Object.keys(record)) {
-    if (typeof record[key] === 'string' && record[key]) return record[key];
+  const rec = record as Record<string, unknown>;
+  if (typeof rec.en === 'string' && rec.en) return rec.en;
+  for (const key of Object.keys(rec)) {
+    const v = rec[key];
+    if (typeof v === 'string' && v) return v;
   }
   return '';
 }
@@ -101,17 +119,17 @@ function pickName(record) {
 // tables (`names.windows.fontFamily`, `names.macintosh.fontFamily`, …); v1
 // exposed them flat (`names.fontFamily`). Try the platform tables first, then
 // the flat layout, so the lookup works across both major versions.
-function nameFrom(names, key) {
+function nameFrom(names: Record<string, unknown> | null | undefined, key: string): string {
   if (!names || typeof names !== 'object') return '';
   for (const platform of ['windows', 'macintosh', 'unicode']) {
-    const table = names[platform];
-    if (table && table[key]) {
-      const value = pickName(table[key]);
+    const table = (names as Record<string, Record<string, unknown> | undefined>)[platform];
+    if (table && (table as Record<string, unknown>)[key]) {
+      const value = pickName((table as Record<string, unknown>)[key]);
       if (value) return value;
     }
   }
-  if (names[key]) {
-    const value = pickName(names[key]);
+  if ((names as Record<string, unknown>)[key]) {
+    const value = pickName((names as Record<string, unknown>)[key]);
     if (value) return value;
   }
   return '';
@@ -121,29 +139,31 @@ function nameFrom(names, key) {
 // Used purely to build a readable, collision-free filename — PAGX matches the
 // font by the family name *inside* the file at load time, so a wrong filename
 // here never affects rendering, only legibility on disk.
-function readFontMeta(sfnt) {
+export function readFontMeta(sfnt: Buffer): FontMeta {
   const { opentype: ot } = loadFontCodec();
   let family = '';
   let style = '';
   let isCFF = false;
   try {
     const font = ot.parse(toArrayBuffer(sfnt));
-    const names = font.names || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const names = ((font as any).names || {}) as Record<string, unknown>;
     family = nameFrom(names, 'fontFamily') || nameFrom(names, 'preferredFamily');
     style = nameFrom(names, 'fontSubfamily') || nameFrom(names, 'preferredSubfamily');
-    isCFF = !!(font.tables && font.tables.cff);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    isCFF = !!((font as any).tables && (font as any).tables.cff);
   } catch (_) {
     /* fall back to the signature sniff below */
   }
   const sig = sfnt.length >= 4 ? sfnt.slice(0, 4).toString('binary') : '';
-  const ext = isCFF || sig === 'OTTO' ? 'otf' : 'ttf';
+  const ext: 'ttf' | 'otf' = isCFF || sig === 'OTTO' ? 'otf' : 'ttf';
   return { family: family || 'font', style: style || 'Regular', ext };
 }
 
 // Filesystem-safe slug. Collapses any run of disallowed characters to a
 // single dash and trims leading/trailing dashes so CJK family names (which
 // slug to empty) fall back to a stable default.
-function sanitize(value) {
+function sanitize(value: string): string {
   const slug = String(value).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
   return slug || 'font';
 }
@@ -158,7 +178,7 @@ function sanitize(value) {
 //   - Coverage: CJK/latin web fonts arrive as many unicode-range subsets that
 //     share one family+style but differ in content; their distinct hashes keep
 //     each subset as its own file, so the glyph coverage is preserved.
-function contentFileName(meta, hash) {
+function contentFileName(meta: FontMeta, hash: string): string {
   const base = sanitize(`${meta.family}-${meta.style}`);
   return `${base}-${hash.slice(0, 16)}.${meta.ext}`;
 }
@@ -168,8 +188,12 @@ function contentFileName(meta, hash) {
 // snapshot-runner's image-capture listener: it never throws (a detached
 // response just leaves the URL absent), and it reads the body eagerly because
 // the response object may not survive past page teardown.
-function makeFontCaptureListener(engine, cache, log) {
-  return makeCaptureListener({
+export function makeFontCaptureListener(
+  engine: EngineName,
+  cache: Map<string, Buffer>,
+  log: CaptureLogger,
+): CaptureResponseListener {
+  return makeCaptureListener<Buffer>({
     resourceType: 'font',
     engine,
     cache,
@@ -189,15 +213,19 @@ function makeFontCaptureListener(engine, cache, log) {
 // e.g. written by an earlier case sharing this directory — is reused rather
 // than re-written. Per-font failures are logged and skipped — a single
 // undecodable payload must not lose the rest.
-async function saveDownloadedFonts(fontBytesByUrl, outDir, logger) {
-  const log = typeof logger === 'function' ? logger : () => {};
+export async function saveDownloadedFonts(
+  fontBytesByUrl: Map<string, Buffer> | null | undefined,
+  outDir: string,
+  logger?: CaptureLogger,
+): Promise<SavedFont[]> {
+  const log: CaptureLogger = typeof logger === 'function' ? logger : () => {};
   const entries = fontBytesByUrl ? Array.from(fontBytesByUrl.entries()) : [];
   if (entries.length === 0) return [];
 
   await fsp.mkdir(outDir, { recursive: true });
 
-  const seenHashes = new Set();
-  const saved = [];
+  const seenHashes = new Set<string>();
+  const saved: SavedFont[] = [];
   for (const [url, raw] of entries) {
     try {
       const sfnt = await toSfnt(raw);
@@ -222,11 +250,3 @@ async function saveDownloadedFonts(fontBytesByUrl, outDir, logger) {
   }
   return saved;
 }
-
-module.exports = {
-  makeFontCaptureListener,
-  saveDownloadedFonts,
-  // Exported for unit-level reuse / testing.
-  toSfnt,
-  readFontMeta,
-};

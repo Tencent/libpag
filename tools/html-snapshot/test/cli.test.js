@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { parseArgs, printUsage } = require('../lib/cli');
+const { parseArgs, printUsage } = require('../dist/lib/cli');
 const { captureExit, argv } = require('./helpers');
 
 describe('printUsage', () => {

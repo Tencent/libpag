@@ -11,7 +11,7 @@
 // fork. The adapter keeps engine knowledge in one file.
 //
 // Selecting the engine (precedence: highest first):
-//   1. `--browser-engine <puppeteer|playwright>` CLI flag (parsed in cli.js)
+//   1. `--browser-engine <puppeteer|playwright>` CLI flag (parsed in cli.ts)
 //   2. `HTML_SNAPSHOT_BROWSER=puppeteer|playwright` environment variable
 //   3. `'puppeteer'` (default, keeps backward compatibility)
 //
@@ -19,38 +19,59 @@
 // (declared in `optionalDependencies`), so the default install footprint and
 // the existing puppeteer-only workflow are unchanged.
 
-'use strict';
-
-const SUPPORTED_ENGINES = ['puppeteer', 'playwright'];
-const DEFAULT_ENGINE = 'puppeteer';
+export const SUPPORTED_ENGINES = ['puppeteer', 'playwright'] as const;
+export type EngineName = (typeof SUPPORTED_ENGINES)[number];
+export const DEFAULT_ENGINE: EngineName = 'puppeteer';
 
 // Map of canonical engine name → npm package name. The package is required
 // lazily so users who never set --browser-engine playwright don't have to
 // install playwright.
-const ENGINE_PACKAGE = {
+const ENGINE_PACKAGE: Record<EngineName, string> = {
   puppeteer: 'puppeteer',
   playwright: 'playwright',
 };
 
+// Browser/Page/Response handles — typed as `any` because puppeteer and
+// playwright expose different concrete classes and we only call the shared
+// methods on them. Using a structural alias keeps call sites typed without
+// pulling either package's full type tree into every caller.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Browser = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Page = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type BrowserResponse = any;
+
+export interface EngineWrapper {
+  browser: Browser;
+  engine: EngineName;
+}
+
 // Normalise `name` to one of SUPPORTED_ENGINES, falling back to the env var
 // then to DEFAULT_ENGINE. Throws on an unknown explicit value so the user
 // notices typos at startup rather than after the first browser call fails.
-function resolveEngine(name) {
+export function resolveEngine(name?: string | null): EngineName {
   const raw = (name || process.env.HTML_SNAPSHOT_BROWSER || DEFAULT_ENGINE).toLowerCase();
-  if (!SUPPORTED_ENGINES.includes(raw)) {
+  if (!(SUPPORTED_ENGINES as readonly string[]).includes(raw)) {
     throw new Error(
       `unsupported browser engine '${name}' (expected one of: ${SUPPORTED_ENGINES.join(', ')})`,
     );
   }
-  return raw;
+  return raw as EngineName;
+}
+
+interface EngineLauncher {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  launch(opts: Record<string, any>): Promise<Browser>;
 }
 
 // Lazy-require the engine package and return its launcher. We unify the two
 // shapes here (puppeteer is its own launcher; playwright exposes
 // `chromium.launch`) so the rest of the code only calls `launcher.launch(...)`.
-function loadEngine(engine) {
+function loadEngine(engine: EngineName): EngineLauncher {
   const pkg = ENGINE_PACKAGE[engine];
-  let mod;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mod: any;
   try {
     mod = require(pkg);
   } catch (err) {
@@ -59,28 +80,37 @@ function loadEngine(engine) {
         + `\`npx --prefix tools/html-snapshot playwright install chromium\` to fetch the browser binary.`
       : `Run \`npm install --prefix tools/html-snapshot\` to install puppeteer.`;
     const e = new Error(
-      `failed to load '${pkg}' for browser engine '${engine}': ${err && err.message ? err.message : err}\n${hint}`,
+      `failed to load '${pkg}' for browser engine '${engine}': `
+      + `${err && (err as Error).message ? (err as Error).message : err}\n${hint}`,
     );
-    e.cause = err;
+    (e as Error & { cause?: unknown }).cause = err;
     throw e;
   }
   if (engine === 'playwright') {
     if (!mod.chromium) {
       throw new Error(`'playwright' module does not expose chromium — got ${typeof mod}`);
     }
-    return mod.chromium;
+    return mod.chromium as EngineLauncher;
   }
-  return mod;
+  return mod as EngineLauncher;
+}
+
+export interface LaunchOptions {
+  engine?: string | null;
+  headless?: boolean;
+  args?: string[];
+  executablePath?: string;
 }
 
 // Launch a headless browser using the requested engine. Returns the wrapper
 // `{ browser, engine }`; downstream helpers in this file accept that wrapper
 // directly so callers don't have to remember to thread the engine name
 // alongside the browser handle.
-async function launchBrowser(opts) {
+export async function launchBrowser(opts?: LaunchOptions): Promise<EngineWrapper> {
   const engine = resolveEngine(opts && opts.engine);
   const launcher = loadEngine(engine);
-  const launchOpts = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const launchOpts: Record<string, any> = {
     headless: opts && opts.headless !== undefined ? opts.headless : true,
     // `--no-sandbox` is needed inside most CI/Docker environments where
     // Chromium's sandbox can't be set up. `--font-render-hinting=none` keeps
@@ -111,18 +141,30 @@ async function launchBrowser(opts) {
 // True if the caller passed our `{ browser, engine }` wrapper rather than a
 // bare puppeteer/playwright Browser instance. Used by helpers that want to
 // stay backward compatible with code paths still passing a raw browser.
-function isWrapper(x) {
-  return !!(x && typeof x === 'object' && x.browser && typeof x.engine === 'string');
+export function isWrapper(x: unknown): x is EngineWrapper {
+  return !!(x && typeof x === 'object'
+    && (x as EngineWrapper).browser
+    && typeof (x as EngineWrapper).engine === 'string');
 }
 
 // Unwrap a `{ browser, engine }` wrapper into its two components, defaulting
 // the engine to puppeteer when a bare browser handle is passed. Centralised
 // because every helper below needs the same coercion.
-function unwrap(wrapperOrBrowser) {
+export function unwrap(wrapperOrBrowser: EngineWrapper | Browser): EngineWrapper {
   if (isWrapper(wrapperOrBrowser)) {
     return { browser: wrapperOrBrowser.browser, engine: wrapperOrBrowser.engine };
   }
   return { browser: wrapperOrBrowser, engine: DEFAULT_ENGINE };
+}
+
+export interface ViewportSpec {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+}
+
+export interface NewPageOptions {
+  viewport?: ViewportSpec | null;
 }
 
 // Map our generic options to the engine-specific page constructor calls.
@@ -141,7 +183,10 @@ function unwrap(wrapperOrBrowser) {
 //     skip the context dance and just call `setViewportSize()` after
 //     `newPage()`. If a non-default DSF is ever requested for Playwright,
 //     we error out clearly rather than silently dropping it.
-async function newPage(wrapperOrBrowser, opts) {
+export async function newPage(
+  wrapperOrBrowser: EngineWrapper | Browser,
+  opts?: NewPageOptions,
+): Promise<Page> {
   const { browser, engine } = unwrap(wrapperOrBrowser);
   const viewport = (opts && opts.viewport) || null;
   if (engine === 'playwright') {
@@ -174,7 +219,11 @@ async function newPage(wrapperOrBrowser, opts) {
 // renamed it to `setViewportSize` and split the DSF out to the context (which
 // can't be changed once set). Callers that need a different DSF must request
 // it via newPage's viewport opt at open time.
-async function setViewport(page, engine, viewport) {
+export async function setViewport(
+  page: Page,
+  engine: EngineName,
+  viewport: ViewportSpec | null | undefined,
+): Promise<void> {
   if (!viewport) return;
   if (engine === 'playwright') {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -188,11 +237,13 @@ async function setViewport(page, engine, viewport) {
   });
 }
 
+export type WaitUntilToken = 'load' | 'domcontentloaded' | 'networkidle' | 'networkidle0' | string;
+
 // Translate our generic "fully settled" waitUntil token into the engine's
 // flavour. Puppeteer's `'networkidle0'` (no in-flight requests for 500ms) and
 // Playwright's `'networkidle'` are semantically the same; both engines
 // accept `'load'` / `'domcontentloaded'` verbatim.
-function mapWaitUntil(engine, token) {
+export function mapWaitUntil(engine: EngineName, token?: WaitUntilToken): string {
   if (!token || token === 'networkidle') {
     return engine === 'playwright' ? 'networkidle' : 'networkidle0';
   }
@@ -202,12 +253,28 @@ function mapWaitUntil(engine, token) {
   return token;
 }
 
+export interface CookieParam {
+  name: string;
+  value: string;
+  url?: string;
+  domain?: string;
+  path?: string;
+  expires?: number;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: string;
+}
+
 // Engine-agnostic cookie injection. Both APIs accept the same shape
 // (`{ name, value, url|domain }`); the difference is just where the call
 // lives — on the page for puppeteer, on the context for playwright.
 // Cookies must include either `url` or `domain` so the browser knows which
 // origin they belong to.
-async function addCookies(page, engine, cookies) {
+export async function addCookies(
+  page: Page,
+  engine: EngineName,
+  cookies: CookieParam[] | null | undefined,
+): Promise<void> {
   if (!cookies || cookies.length === 0) return;
   if (engine === 'playwright') {
     await page.context().addCookies(cookies);
@@ -221,7 +288,10 @@ async function addCookies(page, engine, cookies) {
 // with the raw bytes (no charset coercion). May throw if the response
 // detached (page navigated away before the body was consumed) — callers
 // should wrap in try/catch and treat the failure as "skip this resource".
-async function responseBytes(resp, engine) {
+export async function responseBytes(
+  resp: BrowserResponse,
+  engine: EngineName,
+): Promise<Buffer> {
   if (engine === 'playwright') {
     return resp.body();
   }
@@ -236,7 +306,11 @@ async function responseBytes(resp, engine) {
 //
 // Puppeteer: `page.evaluateOnNewDocument(string|fn)`.
 // Playwright: `page.addInitScript({ content: string })`.
-async function addInitScript(page, engine, script) {
+export async function addInitScript(
+  page: Page,
+  engine: EngineName,
+  script: string,
+): Promise<void> {
   if (engine === 'playwright') {
     await page.addInitScript({ content: script });
     return;
@@ -260,8 +334,10 @@ const LAUNCH_MISSING_BROWSER_RE = /Could not find Chrome|Failed to launch the br
 // printing) lets each caller route them through its own logger / log
 // prefix; snapshot.js prepends `LOG_PREFIX` to each line, the HTTP server
 // would prepend its own banner, etc.
-function formatLaunchHint(err, engine) {
-  const msg = (err && typeof err.message === 'string') ? err.message : String(err);
+export function formatLaunchHint(err: unknown, engine: EngineName): string[] | null {
+  const msg = (err && typeof (err as Error).message === 'string')
+    ? (err as Error).message
+    : String(err);
   if (!LAUNCH_MISSING_BROWSER_RE.test(msg)) return null;
   const lines = [`failed to launch headless Chromium for engine '${engine}'. Try:`];
   if (engine === 'playwright') {
@@ -272,19 +348,3 @@ function formatLaunchHint(err, engine) {
   }
   return lines;
 }
-
-module.exports = {
-  SUPPORTED_ENGINES,
-  DEFAULT_ENGINE,
-  resolveEngine,
-  launchBrowser,
-  unwrap,
-  isWrapper,
-  newPage,
-  setViewport,
-  mapWaitUntil,
-  addCookies,
-  responseBytes,
-  addInitScript,
-  formatLaunchHint,
-};

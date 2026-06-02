@@ -6,43 +6,31 @@
 // This implementation launches one browser, then loops over the matched
 // files calling `runHtmlToPagx({ snapshotImpl: in-process })`. The
 // in-process snapshot reuses that single browser via the same
-// `lib/snapshot-runner.js` path that `server.js` uses for its long-lived
-// HTTP service. The pagx binary is still forked per step (it's a C++
-// executable; <50 ms of startup, not a bottleneck), but Chromium
-// startup is amortised across the whole batch.
-//
-// Output conventions match the bash wrapper exactly so existing CI
-// log-grepping survives:
-//   - `Found N non-subset HTML files under: <dir>`
-//   - per-file `[idx/total] process <rel>` / `[idx/total] skip <rel>` /
-//     `[idx/total] would process <rel>` lines
-//   - terminating `Summary: processed=X skipped=Y failed=Z total=W`
-//   - exit code 1 when at least one file failed.
+// `lib/snapshot-runner.ts` path that `server.js` uses for its long-lived
+// HTTP service.
 
-'use strict';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const fs = require('fs');
-const path = require('path');
-
-const { launchBrowser } = require('./browser-engine');
-const { runSnapshot } = require('./snapshot-runner');
-const { errMessage } = require('./common');
-const {
+import { launchBrowser, type EngineWrapper } from './browser-engine';
+import { runSnapshot } from './snapshot-runner';
+import { errMessage } from './common';
+import {
   PipelineStepError,
   runHtmlToPagx,
   isHttpUrl,
-} = require('./pipeline');
+  type BuildSnapshotArgsOptions,
+  type SpawnCaptureResult,
+  type SnapshotImpl,
+} from './pipeline';
 
 // Walk `root` recursively and collect every regular file whose name ends
-// with `.html` or `.htm`, dropping `.subset.html` / `.subset.htm` outputs
-// (those are the by-products of a previous run, not new inputs). Returns
-// absolute paths sorted lexicographically so progress lines and Summary
-// totals are deterministic across runs and across machines.
-function collectHtmlInputs(root) {
-  const out = [];
-  const stack = [root];
+// with `.html` or `.htm`, dropping `.subset.html` / `.subset.htm` outputs.
+export function collectHtmlInputs(root: string): string[] {
+  const out: string[] = [];
+  const stack: string[] = [root];
   while (stack.length > 0) {
-    const dir = stack.pop();
+    const dir = stack.pop()!;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -68,10 +56,8 @@ function collectHtmlInputs(root) {
 }
 
 // Translate an absolute input path under `inputRoot` into the directory
-// where its outputs should be written. With `outputRoot` set the input
-// tree is mirrored under it; without, outputs sit next to the input
-// (the bash wrapper's default).
-function resolveOutputDir(file, inputRoot, outputRoot) {
+// where its outputs should be written.
+function resolveOutputDir(file: string, inputRoot: string, outputRoot: string): string {
   const rel = path.relative(inputRoot, file);
   const relDir = path.dirname(rel);
   if (!outputRoot) {
@@ -82,41 +68,47 @@ function resolveOutputDir(file, inputRoot, outputRoot) {
 }
 
 // Strip both the extension and a trailing `.htm` from a basename so
-// `foo.html` and `foo.htm` both yield `foo`. Matches `runHtmlToPagx`'s
-// own derivation, which the bash wrapper implicitly relied on for its
-// `--skip-existing` check.
-function basenameStem(file) {
+// `foo.html` and `foo.htm` both yield `foo`.
+function basenameStem(file: string): string {
   let stem = path.basename(file, path.extname(file));
   if (stem.endsWith('.htm')) stem = stem.slice(0, -'.htm'.length);
   return stem;
 }
 
 // Build the in-process snapshot adapter. The returned function has the
-// same `(snapshotArgs) => { code, durationMs, stderr }` shape as
+// same `(snapshotArgs) => SpawnCaptureResult` shape as
 // `pipeline.forkSnapshotCli`, but instead of forking `snapshot.js` it calls
-// `lib/snapshot-runner.js` against the long-lived `engineHandle`.
-//
-// Why pass `engineHandle` in via closure rather than re-launching: every
-// call shares the one Chromium process, which is the whole point of the
-// batch path. The adapter writes the resulting subset HTML to the same
-// `output` path the fork variant would have written to, so the rest of
-// `runHtmlToPagx` (pagx import → resolve → render) is unaffected.
-function makeInProcessSnapshot(engineHandle) {
-  return async function inProcessSnapshot(snapshotArgs) {
+// `lib/snapshot-runner.ts` against the long-lived `engineHandle`.
+function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
+  return async function inProcessSnapshot(
+    snapshotArgs: BuildSnapshotArgsOptions,
+  ): Promise<SpawnCaptureResult> {
     const startedAt = Date.now();
     const targetUrl = isHttpUrl(snapshotArgs.input)
       ? snapshotArgs.input
       : `file://${path.resolve(snapshotArgs.input)}`;
-    const stderrChunks = [];
-    const log = (msg) => { stderrChunks.push(`html-snapshot: ${msg}`); };
+    const stderrChunks: string[] = [];
+    const log = (msg: string) => { stderrChunks.push(`html-snapshot: ${msg}`); };
     try {
+      const cookieParams = (snapshotArgs.cookies || []).map((c) => {
+        const eq = c.indexOf('=');
+        return eq > 0
+          ? { name: c.slice(0, eq), value: c.slice(eq + 1) }
+          : { name: c, value: '' };
+      });
+      const headerPairs: Array<[string, string]> = (snapshotArgs.headers || []).map((h) => {
+        const colon = h.indexOf(':');
+        return colon > 0
+          ? [h.slice(0, colon).trim(), h.slice(colon + 1).trim()] as [string, string]
+          : [h, ''] as [string, string];
+      });
       const result = await runSnapshot(engineHandle, targetUrl, {
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
         waitMs: snapshotArgs.waitMs,
         selector: snapshotArgs.selector,
-        cookies: snapshotArgs.cookies,
-        headers: snapshotArgs.headers,
+        cookies: cookieParams,
+        headers: headerPairs,
         inlineIconFonts: snapshotArgs.inlineIconFonts,
         downloadFonts: snapshotArgs.downloadFonts,
         fontDir: snapshotArgs.fontDir,
@@ -135,17 +127,42 @@ function makeInProcessSnapshot(engineHandle) {
   };
 }
 
+export interface RunBatchOptions {
+  inputDir: string;
+  scriptDir: string;
+  pagxBin?: string;
+  outputRoot?: string;
+  skipExisting?: boolean;
+  dryRun?: boolean;
+  browserEngine?: string;
+  scale?: number;
+  doResolve?: boolean;
+  doRender?: boolean;
+  inferFlex?: boolean;
+  keepSubsetHtml?: boolean;
+  embedFonts?: boolean;
+  downloadFonts?: boolean;
+  fontDir?: string;
+  downloadImages?: boolean;
+  imageDir?: string;
+  inlineIconFonts?: boolean;
+  cookies?: string[];
+  headers?: string[];
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitMs?: number;
+  selector?: string;
+}
+
+export interface RunBatchResult {
+  processed: number;
+  skipped: number;
+  failed: number;
+  total: number;
+}
+
 // Run the batch.
-//
-// Required: `inputDir`, `scriptDir`, `pagxBin`, plus the snapshot/render
-// flags `runHtmlToPagx` understands. Optional batch-only flags:
-//   `outputRoot`     mirror input tree under this directory; default = next to inputs
-//   `skipExisting`   skip files whose `.pagx` target already exists
-//   `dryRun`         list matched files without launching a browser or running pagx
-//   `browserEngine`  forwarded to `launchBrowser`
-//
-// Returns `{ processed, skipped, failed, total }`. Caller decides exit code.
-async function runBatch(opts) {
+export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   const inputDir = opts.inputDir ? path.resolve(opts.inputDir) : '';
   if (!inputDir) throw new Error('runBatch: inputDir is required');
   if (!fs.existsSync(inputDir) || !fs.statSync(inputDir).isDirectory()) {
@@ -165,10 +182,7 @@ async function runBatch(opts) {
   }
   process.stdout.write(`Found ${total} non-subset HTML files under: ${inputDir}\n`);
 
-  // Dry run never opens the browser. Mirrors the bash wrapper's dry-run
-  // contract (no side effects), with the user-confirmed simplification:
-  // we list the would-process files instead of pretending to print
-  // a fork-style command line that no longer exists.
+  // Dry run never opens the browser.
   if (opts.dryRun) {
     let processed = 0;
     let skipped = 0;
@@ -190,10 +204,7 @@ async function runBatch(opts) {
     return { processed, skipped, failed: 0, total };
   }
 
-  // Launch Chromium once. The handle is shared across every per-file
-  // `runHtmlToPagx` call via the in-process snapshot adapter; closing
-  // it in the `finally` block guarantees we don't leak the browser
-  // process if the batch aborts midway.
+  // Launch Chromium once.
   const engineHandle = await launchBrowser({ engine: opts.browserEngine });
   const snapshotImpl = makeInProcessSnapshot(engineHandle);
 
@@ -244,7 +255,7 @@ async function runBatch(opts) {
           viewportHeight: opts.viewportHeight,
           waitMs: opts.waitMs,
           selector: opts.selector,
-          log: (line) => process.stdout.write(line + '\n'),
+          log: (line: string) => process.stdout.write(line + '\n'),
           snapshotImpl,
         });
         processed++;
@@ -267,5 +278,3 @@ async function runBatch(opts) {
   process.stdout.write(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}\n`);
   return { processed, skipped, failed, total };
 }
-
-module.exports = { runBatch, collectHtmlInputs };

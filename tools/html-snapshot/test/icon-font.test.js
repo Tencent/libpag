@@ -7,7 +7,7 @@ const {
   parseFontFaceFromText,
   isPuaCodepoint,
   roundTo,
-} = require('../lib/icon-font');
+} = require('../dist/lib/icon-font');
 
 // Minimal opentype.js-shaped font stub. `glyphToSvg` only touches
 // charToGlyph(), unitsPerEm, ascender, and the returned glyph's

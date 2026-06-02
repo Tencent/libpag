@@ -1,6 +1,6 @@
 'use strict';
 
-const { DROP_TAG_NAMES } = require('../lib/dom-tags');
+const { DROP_TAG_NAMES } = require('../dist/lib/dom-tags');
 
 describe('DROP_TAG_NAMES', () => {
   test('is a non-empty array', () => {

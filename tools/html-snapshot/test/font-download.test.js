@@ -8,7 +8,7 @@ const {
   readFontMeta,
   makeFontCaptureListener,
   saveDownloadedFonts,
-} = require('../lib/font-download');
+} = require('../dist/lib/font-download');
 
 // A throwaway buffer that is neither WOFF nor WOFF2 (so toSfnt returns it
 // unchanged) and is not a parseable SFNT (so readFontMeta falls back to its

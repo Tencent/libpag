@@ -10,9 +10,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { openAndSettlePage } = require('../lib/page-loader');
-const { makeFail, parseNumber } = require('../lib/common');
-const { launchBrowser, resolveEngine, setViewport } = require('../lib/browser-engine');
+const { openAndSettlePage } = require('../dist/lib/page-loader');
+const { makeFail, parseNumber } = require('../dist/lib/common');
+const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/browser-engine');
 
 const fail = makeFail('baseline');
 

@@ -12,7 +12,7 @@ const {
   addCookies,
   responseBytes,
   addInitScript,
-} = require('../lib/browser-engine');
+} = require('../dist/lib/browser-engine');
 
 describe('resolveEngine', () => {
   const savedEnv = process.env.HTML_SNAPSHOT_BROWSER;

@@ -4,7 +4,7 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const os = require('os');
 const path = require('path');
-const { writeFileAtomic } = require('../lib/atomic-write');
+const { writeFileAtomic } = require('../dist/lib/atomic-write');
 
 let dir;
 beforeEach(() => {

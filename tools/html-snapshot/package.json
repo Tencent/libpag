@@ -11,6 +11,8 @@
   "scripts": {
     "snapshot": "node snapshot.js",
     "server": "node server.js",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
     "build:browser": "node build-browser-bundle.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
@@ -24,12 +26,12 @@
       "/node_modules/(?!(pixelmatch)/)"
     ],
     "collectCoverageFrom": [
-      "lib/**/*.js",
+      "dist/lib/**/*.js",
       "bench/report-utils.js",
       "eval/compare.js",
-      "!lib/browser-snapshot.js",
-      "!lib/page-loader.js",
-      "!lib/snapshot-runner.js"
+      "!dist/lib/browser-snapshot.js",
+      "!dist/lib/page-loader.js",
+      "!dist/lib/snapshot-runner.js"
     ],
     "coverageDirectory": "<rootDir>/coverage",
     "coverageReporters": [
@@ -51,7 +53,11 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
+    "@types/node": "^22.19.19",
+    "@types/opentype.js": "^1.3.10",
+    "@types/pngjs": "^6.0.5",
     "babel-jest": "^30.4.1",
-    "jest": "^30.4.2"
+    "jest": "^30.4.2",
+    "typescript": "^5.9.3"
   }
 }

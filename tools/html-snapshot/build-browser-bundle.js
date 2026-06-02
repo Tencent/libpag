@@ -28,13 +28,13 @@ const {
   inlineCanvases,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
-} = require('./lib/browser-snapshot');
+} = require('./dist/lib/browser-snapshot');
 const {
   browserCollectFontFaceMap,
   browserCollectIconFontTargets,
   browserApplyIconFontSvgs,
   ICON_FONT_HELPERS_SRC,
-} = require('./lib/icon-font');
+} = require('./dist/lib/icon-font');
 
 // Public API exposed by the browser bundle, in the order their source code
 // appears in factoryBody and their entries appear in the returned object.

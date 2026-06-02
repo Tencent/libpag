@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
-const { unwrap, newPage, mapWaitUntil } = require('../lib/browser-engine');
+const { unwrap, newPage, mapWaitUntil } = require('../dist/lib/browser-engine');
 // pixelmatch v7+ is ESM-only (`export default`). Under Node's ESM-from-CJS
 // `require()` interop the module resolves to a namespace object whose default
 // export is the function, so `require('pixelmatch')` itself is not callable.

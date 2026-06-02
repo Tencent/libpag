@@ -15,7 +15,7 @@ describe('loadFontCodec', () => {
     // again). The underlying packages stay cached by Node, so we are not
     // paying the wasm cost more than once.
     jest.resetModules();
-    ({ loadFontCodec } = require('../lib/font-codec'));
+    ({ loadFontCodec } = require('../dist/lib/font-codec'));
   });
 
   test('returns both libraries with the expected shape', () => {

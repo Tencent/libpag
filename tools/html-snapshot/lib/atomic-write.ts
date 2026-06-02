@@ -1,5 +1,5 @@
-// Atomic single-file writer shared by lib/font-download.js and
-// lib/image-download.js. Both modules write content-addressed files into a
+// Atomic single-file writer shared by lib/font-download.ts and
+// lib/image-download.ts. Both modules write content-addressed files into a
 // directory that may be shared across parallel workers (eval/run.js processes
 // many cases in parallel into one shared font/image directory), so a writer
 // must never expose a half-written file to a concurrent reader.
@@ -9,13 +9,15 @@
 // created the (byte-identical, content-addressed) target first, discard our
 // temp and treat the conflict as success.
 
-'use strict';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 
-const fs = require('fs');
-const fsp = require('fs').promises;
-const crypto = require('crypto');
+const fsp = fs.promises;
 
-async function writeFileAtomic(filePath, data) {
+export async function writeFileAtomic(
+  filePath: string,
+  data: Buffer | Uint8Array | string,
+): Promise<void> {
   const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   await fsp.writeFile(tmp, data);
   try {
@@ -25,5 +27,3 @@ async function writeFileAtomic(filePath, data) {
     if (!fs.existsSync(filePath)) throw err;
   }
 }
-
-module.exports = { writeFileAtomic };

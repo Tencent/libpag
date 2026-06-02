@@ -26,10 +26,10 @@ const {
   PipelineStepError,
   runHtmlToPagx,
   isHttpUrl,
-} = require('./lib/pipeline');
-const { runBatch } = require('./lib/batch');
-const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./lib/browser-engine');
-const { parseNumber } = require('./lib/cli');
+} = require('./dist/lib/pipeline');
+const { runBatch } = require('./dist/lib/batch');
+const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
+const { parseNumber } = require('./dist/lib/cli');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';

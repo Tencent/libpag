@@ -28,8 +28,8 @@
 const fs = require('fs');
 const path = require('path');
 const compare = require('./compare');
-const { makeFail } = require('../lib/common');
-const { launchBrowser, resolveEngine } = require('../lib/browser-engine');
+const { makeFail } = require('../dist/lib/common');
+const { launchBrowser, resolveEngine } = require('../dist/lib/browser-engine');
 const {
   spawnCapture,
   forkSnapshotCli,
@@ -38,7 +38,7 @@ const {
   runPagxFontEmbed,
   runPagxRender,
   readFontManifest,
-} = require('../lib/pipeline');
+} = require('../dist/lib/pipeline');
 
 const fail = makeFail('run');
 

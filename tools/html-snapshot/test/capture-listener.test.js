@@ -1,6 +1,6 @@
 'use strict';
 
-const { makeCaptureListener } = require('../lib/capture-listener');
+const { makeCaptureListener } = require('../dist/lib/capture-listener');
 
 // Build a puppeteer-style response stub. `responseBytes(resp, 'puppeteer')`
 // inside the listener resolves via `resp.buffer()`, so we expose that here
