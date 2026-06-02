@@ -306,15 +306,17 @@ class SVGWriter {
   bool rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer);
 
   // One geometry instance captured during the scope walk in writeElements.
-  // Transform/alpha are baked at collection time so that later painters can
-  // emit the geometry without knowing about the surrounding Group/TextBox
-  // stack. `textBox` carries the in-scope <TextBox> modifier so Text geometry
-  // still picks up box-level layout when rendered by a downstream painter
-  // (matches the legacy CollectFillStroke().textBox rule).
+  // Only `transform` is baked at collection time; the painter's effective
+  // alpha is supplied at emit time from the painter's own scope so that a
+  // Group's alpha does NOT leak onto outer painters that render the Group's
+  // geometry (Group is an isolation boundary for painters, while geometry
+  // itself still propagates upward). `textBox` carries the in-scope
+  // <TextBox> modifier so Text geometry still picks up box-level layout when
+  // rendered by a downstream painter (matches the legacy
+  // CollectFillStroke().textBox rule).
   struct AccumulatedGeometry {
     const Element* element = nullptr;
     Matrix transform = {};
-    float alpha = 1.0f;
     const TextBox* textBox = nullptr;
   };
 
@@ -327,7 +329,7 @@ class SVGWriter {
                           const Matrix& transform, float alpha, const TextBox* parentTextBox,
                           std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
   void emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
-                          const FillStrokeInfo& fs);
+                          const FillStrokeInfo& fs, float alpha);
 
   // Shape writing
   void writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
@@ -2162,7 +2164,7 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
 // SVG element per painter (overlapping in document order). Mirrors
 // PPTWriter::emitGeometryWithFs.
 void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
-                                   const FillStrokeInfo& fs) {
+                                   const FillStrokeInfo& fs, float alpha) {
   FillStrokeInfo localFs = fs;
   if (localFs.textBox == nullptr) {
     localFs.textBox = entry.textBox;
@@ -2170,15 +2172,14 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
   switch (entry.element->nodeType()) {
     case NodeType::Rectangle:
       writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
-                     entry.alpha);
+                     alpha);
       break;
     case NodeType::Ellipse:
       writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform,
-                   entry.alpha);
+                   alpha);
       break;
     case NodeType::Path:
-      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform,
-                entry.alpha);
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, alpha);
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
@@ -2193,9 +2194,9 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
       if (!text->glyphRuns.empty()) {
-        writeTextAsPath(out, text, localFs, entry.transform, entry.alpha);
+        writeTextAsPath(out, text, localFs, entry.transform, alpha);
       } else {
-        writeText(out, text, localFs, entry.transform, entry.alpha);
+        writeText(out, text, localFs, entry.transform, alpha);
       }
       break;
     }
@@ -2232,8 +2233,14 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         } else {
           painterFs.stroke = static_cast<const Stroke*>(element);
         }
+        // The painter's effective alpha is the alpha of THIS scope, not the
+        // alpha that was in effect when each geometry was collected. A Group
+        // that contains geometry but whose Painter lives outside the Group
+        // must NOT multiply its own alpha into the outer painter's output —
+        // Group is an isolation boundary for painters even though geometry
+        // propagates upward.
         for (size_t i = scopeStart; i < accumulator.size(); ++i) {
-          emitGeometryWithFs(out, accumulator[i], painterFs);
+          emitGeometryWithFs(out, accumulator[i], painterFs, alpha);
         }
         break;
       }
@@ -2244,7 +2251,6 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         AccumulatedGeometry entry;
         entry.element = element;
         entry.transform = transform;
-        entry.alpha = alpha;
         entry.textBox = localTextBox;
         accumulator.push_back(entry);
         break;
