@@ -31,40 +31,38 @@ class PAGLayer;
 class PAGTimeline;
 
 /**
- * PAGComposition is the runtime instance backing a single Layer.composition reference. Each
- * instance owns its own layer subtree and timeline list, so multiple Layers referencing the same
- * Composition keep independent state. Child compositions are constructed recursively.
+ * PAGComposition is the runtime instance of a composition. It can drive the animations declared
+ * inside the composition and answer hit-test queries against its content. When the same composition
+ * is referenced from multiple places, each reference produces an independent PAGComposition with
+ * its own playback state, so animating or hit-testing one does not affect the others.
  *
- * PAGFile is itself a PAGComposition: the file's top-level runtime subtree is the base
- * composition's data, and the file's nested compositions are this base's child compositions.
+ * PAGFile is a PAGComposition, so a whole file is driven and queried through the same interface.
  */
 class PAGComposition {
  public:
   virtual ~PAGComposition();
 
   /**
-   * Advances this composition's own spawned timelines, then recursively advances every child
-   * composition, so the advance delta propagates to all timelines in the composition subtree.
+   * Advances the animations that play automatically inside this composition, including those in
+   * nested child compositions, by the given amount of time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
    */
   void advance(int64_t deltaMicroseconds);
 
   /**
-   * Applies this composition's own spawned timelines, then recursively applies every child
-   * composition.
+   * Applies the current state of the animations that play automatically inside this composition,
+   * including those in nested child compositions, to the displayed content.
    * @param mix blend weight, defaults to 1.0 (full overwrite).
    */
   void apply(float mix = 1.0f);
 
   /**
-   * Returns an array of PAGLayers under the given point. The first layer in the array is the
-   * top-most under the point, the last is the bottom-most. Returns an empty array if nothing is
-   * hit. Coordinates are in this composition's root coordinate space (for PAGFile this is the
-   * surface/display space before zoom and contentOffset are applied — see
-   * PAGFile::getLayersUnderPoint, which performs that conversion). Hit testing uses layer bounding
-   * boxes; it does not require a prior GPU render.
-   * @param x the x coordinate in the composition root coordinate space.
-   * @param y the y coordinate in the composition root coordinate space.
+   * Returns the layers under the given point. The first layer in the array is the top-most under
+   * the point, the last is the bottom-most. Returns an empty array if nothing is hit. The point is
+   * in this composition's coordinate space; PAGFile::getLayersUnderPoint takes surface coordinates
+   * instead. Hit testing does not require the content to have been drawn first.
+   * @param x the x coordinate in the composition coordinate space.
+   * @param y the y coordinate in the composition coordinate space.
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
 

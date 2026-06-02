@@ -29,9 +29,8 @@ class PAGFile;
 class PAGXDocument;
 
 /**
- * PAGTimeline drives a single Animation inside a PAGFile. It owns the playback state (current
- * frame, playing flag) and writes the evaluated property values back to the runtime layer tree of
- * its owning PAGFile via apply().
+ * PAGTimeline controls the playback of a single animation in a PAGFile. It holds the playback state
+ * (current time and playing flag) and applies the animation to the file's content via apply().
  *
  * PAGTimeline must not be constructed directly; obtain instances through PAGFile::getTimeline().
  * Multiple lookups for the same animation name return the same PAGTimeline instance, so playback
@@ -79,8 +78,8 @@ class PAGTimeline {
   bool isPlaying() const;
 
   /**
-   * Sets the current playback time in microseconds. Only updates the internal time; callers must
-   * invoke apply() to write the resulting values into the runtime layer tree.
+   * Sets the current playback time in microseconds. Only updates the time; call apply() to reflect
+   * it in the content.
    */
   void setCurrentTime(int64_t microseconds);
 
@@ -90,8 +89,8 @@ class PAGTimeline {
   int64_t currentTime() const;
 
   /**
-   * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not write any
-   * values to the runtime layer tree.
+   * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
+   * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
    * @return true if the current time changed, false if the timeline is paused or
    *         deltaMicroseconds is zero.
@@ -99,8 +98,8 @@ class PAGTimeline {
   bool advance(int64_t deltaMicroseconds);
 
   /**
-   * Evaluates all properties at the current time and writes the results into the runtime layer
-   * tree, blended with the existing values by mix.
+   * Evaluates the animation at the current time and applies the results to the content, blended
+   * with the existing values by mix.
    *
    * Mixing rules:
    *   - Continuous channels (float / Color): result = lerp(current, evaluated, mix). Color channels

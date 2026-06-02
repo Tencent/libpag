@@ -28,35 +28,30 @@ class Layer;
 class PAGFile;
 
 /**
- * PAGLayer is a runtime handle to a single Layer node within a PAGComposition instance. It is
- * returned by hit testing to identify a layer under a point. A handle is tied to one runtime
- * instance: the same source Layer referenced by multiple compositions yields a distinct PAGLayer
- * per instance.
+ * PAGLayer is a handle to one layer of a running composition, returned by hit testing to identify
+ * the layer under a point. When the same source layer appears in multiple composition instances,
+ * each instance yields its own PAGLayer handle with its own on-screen position.
  */
 class PAGLayer {
  public:
   ~PAGLayer();
 
   /**
-   * Returns the display name of the source Layer this handle refers to. Returns an empty string if
-   * the source layer is unavailable.
+   * Returns the display name of the layer. Returns an empty string if the layer has no name.
    */
   std::string getName() const;
 
   /**
    * Returns the matrix that maps this layer's local coordinate space to the surface coordinate
-   * space. It combines the layer's accumulated transform within the runtime tree (including any
-   * animation applied so far) with the display list's zoomScale and contentOffset. Use it to map
-   * points or bounds from the layer's local space onto the surface. Returns the identity matrix if
-   * the handle has no runtime layer or the surface mapping is unavailable.
+   * space, reflecting the layer's current on-screen position (including any animation applied so
+   * far). Use it to map points or bounds from the layer onto the surface. Returns the identity
+   * matrix if the mapping is unavailable.
    */
   Matrix getGlobalMatrix() const;
 
   /**
-   * Checks whether this layer overlaps the given surface point. Surface coordinates are converted
-   * to the runtime tree's root space before testing. shapeHitTest selects the actual shape (true)
-   * or the bounding box (false). Returns false if the handle has no runtime layer or the surface
-   * point cannot be mapped.
+   * Returns whether this layer overlaps the given surface point. shapeHitTest selects the actual
+   * shape (true) or the bounding box (false).
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    * @param shapeHitTest whether to test against the actual shape (true) or the bounding box (false).

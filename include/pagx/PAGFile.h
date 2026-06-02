@@ -36,16 +36,13 @@ struct Matrix;
 struct RuntimeBinding;
 
 /**
- * PAGFile is the runtime instance of a PAGXDocument. It owns the runtime layer tree, the timeline
- * registry, and the draw surface binding. Multiple PAGFile instances can be created from the same
- * PAGXDocument; each one has independent runtime state but shares the underlying template data.
+ * PAGFile is the runtime instance of a PAGXDocument, used to drive its animations and draw its
+ * content to a surface. Multiple PAGFile instances can be created from the same PAGXDocument; each
+ * one has independent runtime state but shares the underlying template data.
  *
- * PAGFile is the top-level PAGComposition: its base holds the file's top-level runtime subtree,
- * binding, and the nested child compositions. PAGFile adds the file-level state (source document,
- * timeline registry, display options, and the draw surface binding).
- *
- * PAGFile keeps the source PAGXDocument alive through a shared_ptr held internally, so callers
- * may release their own document handle once the PAGFile is created.
+ * PAGFile is a PAGComposition, so the whole file is advanced, applied, and hit-tested through that
+ * interface. PAGFile keeps the source PAGXDocument alive internally, so callers may release their
+ * own document handle once the PAGFile is created.
  */
 class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFile> {
  public:
@@ -82,11 +79,10 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
   /**
-   * Renders the current state of the runtime tree into the given surface. Does not advance
-   * timelines; callers must invoke advance() / apply() on the appropriate timelines beforehand.
+   * Renders the current content of this file into the given surface. Does not advance animations;
+   * callers must advance the file (or its timelines) beforehand.
    * @param surface the destination surface.
-   * @return true if the surface was redrawn, false if surface is null or the runtime tree is
-   *         empty.
+   * @return true if the surface was redrawn, false if surface is null or there is no content.
    */
   bool draw(const std::shared_ptr<PAGSurface>& surface);
 
@@ -108,18 +104,16 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
 
   /**
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
-   * apply() are inherited from PAGComposition: they drive only the timelines spawned by
-   * Layer.timelines drivers (recursing into child compositions). Top-level animations are not
-   * driven here and must be driven explicitly via getTimeline(id)->advanceAndApply(...).
+   * apply() drive the animations that play automatically in this file (including nested
+   * compositions). Top-level animations are not driven here; play them explicitly via
+   * getTimeline(id)->advanceAndApply(...).
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
   /**
-   * Returns an array of PAGLayers under the given surface point. The first layer in the array is
-   * the top-most under the point, the last is the bottom-most. Returns an empty array if nothing
-   * is hit. Surface coordinates are converted to the layer tree's root coordinate space using the
-   * display list's zoomScale and contentOffset. Hit testing uses layer bounding boxes and does not
-   * require a prior draw().
+   * Returns the layers under the given surface point. The first layer in the array is the top-most
+   * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
+   * testing does not require a prior draw().
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
