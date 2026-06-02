@@ -26,9 +26,23 @@ namespace pagx {
 
 class Property;
 
+/**
+ * AnimationObject groups the animated properties that target a single node within an Animation.
+ * Each AnimationObject binds to one node (identified by target) and carries the set of properties
+ * whose keyframes drive that node over time.
+ */
 class AnimationObject : public Node {
  public:
+  /**
+   * The id of the target node this AnimationObject drives. Resolved against the owning document's
+   * id table when the runtime timeline is built.
+   */
   std::string target = {};
+
+  /**
+   * The animated properties applied to the target node. Each Property carries its own channel and
+   * keyframes.
+   */
   std::vector<Property*> properties = {};
 
   NodeType nodeType() const override {

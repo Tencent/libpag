@@ -71,8 +71,8 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   std::shared_ptr<PAGTimeline> getTimeline(const std::string& id);
 
   /**
-   * Returns the PAGTimeline for the first top-level animation, or nullptr if the document has no
-   * top-level animations. Equivalent to getTimeline(getTimelineIds().front()).
+   * Returns the PAGTimeline for the first top-level animation in the document, or nullptr if the
+   * document has no top-level animations.
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 

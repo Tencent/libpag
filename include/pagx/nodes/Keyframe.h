@@ -25,17 +25,47 @@
 
 namespace pagx {
 
+/**
+ * Frame is a frame-discrete time index used by keyframes and animation durations.
+ */
 using Frame = int64_t;
+
+/**
+ * ZeroFrame is the first frame index (time origin) of an animation.
+ */
 constexpr Frame ZeroFrame = 0;
 
+/**
+ * KeyframeInterpolationType selects how a keyframe's value is interpolated toward the next
+ * keyframe.
+ */
 enum class KeyframeInterpolationType : uint8_t {
+  /**
+   * No interpolation; reserved for keyframes that carry no easing information.
+   */
   None = 0,
+  /**
+   * Linear interpolation between this keyframe and the next.
+   */
   Linear = 1,
+  /**
+   * Cubic bezier easing using this keyframe's bezierOut and the next keyframe's bezierIn handles.
+   */
   Bezier = 2,
+  /**
+   * Holds this keyframe's value until the next keyframe time, then jumps.
+   */
   Hold = 3,
 };
 
+/**
+ * ImageRef references an image resource by id. Used as a KeyValue alternative for image-valued
+ * properties so keyframes can switch between image resources over time.
+ */
 struct ImageRef {
+  /**
+   * The id of the referenced image resource, resolved against the owning document's id table.
+   */
   std::string id = {};
 
   bool operator==(const ImageRef& other) const {
@@ -47,12 +77,35 @@ struct ImageRef {
   }
 };
 
+/**
+ * Keyframe holds a single animated value at a specific time, together with the interpolation mode
+ * and bezier handles used to reach the next keyframe.
+ */
 template <typename T>
 struct Keyframe {
+  /**
+   * The time of this keyframe, in frames.
+   */
   Frame time = ZeroFrame;
+
+  /**
+   * The value at this keyframe.
+   */
   T value = {};
+
+  /**
+   * The interpolation mode used between this keyframe and the next.
+   */
   KeyframeInterpolationType interpolation = KeyframeInterpolationType::Linear;
+
+  /**
+   * The outgoing bezier control handle of this keyframe, used when interpolation is Bezier.
+   */
   Point bezierOut = {};
+
+  /**
+   * The incoming bezier control handle of this keyframe, used when interpolation is Bezier.
+   */
   Point bezierIn = {};
 };
 

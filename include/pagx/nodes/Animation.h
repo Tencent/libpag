@@ -26,7 +26,23 @@ namespace pagx {
 
 class AnimationObject;
 
-enum class LoopMode { Once, Loop, PingPong };
+/**
+ * LoopMode selects how an Animation repeats once it reaches the end of its duration.
+ */
+enum class LoopMode {
+  /**
+   * Plays once and stops at the final frame.
+   */
+  Once,
+  /**
+   * Restarts from the beginning each time it reaches the end.
+   */
+  Loop,
+  /**
+   * Plays forward to the end, then backward to the start, repeating indefinitely.
+   */
+  PingPong,
+};
 
 /**
  * Animation defines a named timeline composed of Object/Property/Keyframe entries. The animation
@@ -35,9 +51,24 @@ enum class LoopMode { Once, Loop, PingPong };
  */
 class Animation : public Node {
  public:
+  /**
+   * The total length of the animation, in frames.
+   */
   Frame duration = 0;
+
+  /**
+   * The frame rate used to convert between time and frames when sampling keyframes.
+   */
   float frameRate = 60.0f;
+
+  /**
+   * The loop behavior applied once the animation reaches its duration.
+   */
   LoopMode loop = LoopMode::Once;
+
+  /**
+   * The animated objects that make up this animation, each driving a single target node.
+   */
   std::vector<AnimationObject*> objects = {};
 
   NodeType nodeType() const override {

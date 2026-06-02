@@ -27,6 +27,11 @@
 
 namespace pagx {
 
+/**
+ * KeyValue is the value carried by a Property's keyframes. Its std::variant alternatives are
+ * ordered to match PropertyValueType, so the active alternative index equals the corresponding
+ * PropertyValueType value.
+ */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
 
 /**
@@ -42,8 +47,18 @@ enum class PropertyValueType : uint8_t {
   Color = 5,
 };
 
+/**
+ * Property is the abstract base for a single animated channel within an AnimationObject. Concrete
+ * subclasses are TypedProperty<T> specializations, each binding a KeyValue alternative to a set of
+ * keyframes. The base exposes type-erased evaluation so callers can sample a Property without
+ * knowing its concrete value type.
+ */
 class Property : public Node {
  public:
+  /**
+   * The channel this Property drives on the target node (for example a transform or color
+   * channel). Interpreted by the runtime when applying evaluated values to the layer tree.
+   */
   std::string channel = {};
 
   /**
@@ -53,16 +68,25 @@ class Property : public Node {
    */
   virtual PropertyValueType valueType() const = 0;
 
-  // Evaluates the property value at the given Frame index. Useful for unit tests and any caller
-  // operating in frame-discrete time.
+  /**
+   * Evaluates the property value at the given Frame index. Useful for unit tests and any caller
+   * operating in frame-discrete time.
+   * @param frame the frame index to sample.
+   * @return the interpolated value at the given frame.
+   */
   KeyValue evaluateAt(Frame frame) const {
     return onEvaluateAtFrame(frame);
   }
 
-  // Evaluates the property value at the given time in microseconds, using the supplied frameRate
-  // to convert microseconds to a continuous frame position. Implementations should perform
-  // interpolation in double precision to avoid losing precision when the timeline is being driven
-  // by microsecond deltas.
+  /**
+   * Evaluates the property value at the given time in microseconds, using the supplied frameRate
+   * to convert microseconds to a continuous frame position. Implementations perform interpolation
+   * in double precision to avoid losing precision when the timeline is driven by microsecond
+   * deltas.
+   * @param microseconds the time to sample, in microseconds.
+   * @param frameRate the frame rate used to map microseconds to a frame position.
+   * @return the interpolated value at the given time.
+   */
   KeyValue evaluateAt(int64_t microseconds, float frameRate) const {
     return onEvaluateAtMicros(microseconds, frameRate);
   }
@@ -81,9 +105,18 @@ class Property : public Node {
   friend class PAGXDocument;
 };
 
+/**
+ * TypedProperty binds a concrete KeyValue alternative T to an ordered list of keyframes. Each
+ * specialization reports a distinct PropertyValueType and provides interpolation for its value
+ * type through the runtime KeyframeEvaluator.
+ */
 template <typename T>
 class TypedProperty : public Property {
  public:
+  /**
+   * The keyframes driving this property, ordered by time. Interpolation between keyframes follows
+   * each keyframe's KeyframeInterpolationType.
+   */
   std::vector<Keyframe<T>> keyframes = {};
 
   PropertyValueType valueType() const override;
