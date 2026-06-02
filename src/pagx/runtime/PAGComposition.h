@@ -70,7 +70,7 @@ class PAGComposition {
 
   /**
    * Advances this composition's own spawned timelines, then recursively advances every child
-   * composition, so the master clock reaches all timelines in the composition subtree.
+   * composition, so the advance delta propagates to all timelines in the composition subtree.
    */
   void advance(int64_t deltaMicroseconds);
 
