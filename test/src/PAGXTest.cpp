@@ -6815,4 +6815,65 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
   EXPECT_EQ(hit->getName(), "NestedChild");
 }
 
+/**
+ * Test case: when two layers reference the same Composition, each builds an independent runtime
+ * composition instance with its own reverse map. Both instances are present and a hit resolves the
+ * shared child through the composition subtree, confirming per-instance reverse maps are built and
+ * probed rather than a single shared map.
+ */
+PAGX_TEST(PAGXTest, HitTestSharedCompositionPerInstance) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("shared");
+  comp->width = 100;
+  comp->height = 100;
+  auto childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->name = "SharedChild";
+  auto childRect = doc->makeNode<pagx::Rectangle>();
+  childRect->position = {0, 0};
+  childRect->size = {100, 100};
+  auto childFill = doc->makeNode<pagx::Fill>();
+  auto childSolid = doc->makeNode<pagx::SolidColor>();
+  childSolid->color = {0, 0, 1, 1};
+  childFill->color = childSolid;
+  childLayer->contents.push_back(childRect);
+  childLayer->contents.push_back(childFill);
+  comp->layers.push_back(childLayer);
+
+  // Two layers reference the same Composition; each gets its own runtime composition instance.
+  auto compLayerA = doc->makeNode<pagx::Layer>();
+  compLayerA->name = "InstanceA";
+  compLayerA->composition = comp;
+  doc->layers.push_back(compLayerA);
+
+  auto compLayerB = doc->makeNode<pagx::Layer>();
+  compLayerB->name = "InstanceB";
+  compLayerB->composition = comp;
+  doc->layers.push_back(compLayerB);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  // Two independent runtime composition instances were built from the one shared Composition.
+  ASSERT_EQ(file->composition->childCompositions.size(), 2u);
+
+  // Each instance has its own reverse map keyed by its own tgfx layers, but resolves to the same
+  // shared source child node.
+  auto& bindingA = file->composition->childCompositions[0]->composition->binding;
+  auto& bindingB = file->composition->childCompositions[1]->composition->binding;
+  auto tgfxChildA = bindingA.get<tgfx::Layer>(childLayer);
+  auto tgfxChildB = bindingB.get<tgfx::Layer>(childLayer);
+  ASSERT_TRUE(tgfxChildA != nullptr);
+  ASSERT_TRUE(tgfxChildB != nullptr);
+  // Per-instance isolation: the shared source layer maps to distinct tgfx layers per instance.
+  EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
+  // Each instance's reverse map resolves its own tgfx layer back to the shared source node, proving
+  // hit resolution is per-instance: a hit on either instance's tgfx layer resolves the right node.
+  EXPECT_EQ(bindingA.nodeForLayer(tgfxChildA.get()), static_cast<const pagx::Node*>(childLayer));
+  EXPECT_EQ(bindingB.nodeForLayer(tgfxChildB.get()), static_cast<const pagx::Node*>(childLayer));
+  // Cross-instance lookup misses: instance A's map does not know instance B's tgfx layer.
+  EXPECT_EQ(bindingA.nodeForLayer(tgfxChildB.get()), nullptr);
+  EXPECT_EQ(bindingB.nodeForLayer(tgfxChildA.get()), nullptr);
+}
+
 }  // namespace pag
