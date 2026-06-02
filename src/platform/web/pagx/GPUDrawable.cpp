@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef PAG_BUILD_PAGX
+
 #include "GPUDrawable.h"
 #include <emscripten/html5.h>
 
@@ -70,3 +72,5 @@ void GPUDrawable::present(tgfx::Context* context) {
 }
 
 }  // namespace pagx
+
+#endif  // PAG_BUILD_PAGX
