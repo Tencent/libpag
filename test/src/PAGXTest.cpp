@@ -6742,12 +6742,16 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  auto hit = file->hitTest(50, 40);
-  ASSERT_TRUE(hit != nullptr);
-  EXPECT_EQ(hit->getName(), "HitLayer");
+  auto hits = file->getLayersUnderPoint(50, 40);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getName(), "HitLayer");
 
-  auto miss = file->hitTest(180, 180);
-  EXPECT_EQ(miss, nullptr);
+  auto miss = file->getLayersUnderPoint(180, 180);
+  EXPECT_TRUE(miss.empty());
+
+  // The hit handle can re-test itself against a surface point.
+  EXPECT_TRUE(hits[0]->hitTestPoint(50, 40));
+  EXPECT_FALSE(hits[0]->hitTestPoint(180, 180));
 }
 
 /**
@@ -6773,8 +6777,8 @@ PAGX_TEST(PAGXTest, HitTestMiss) {
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  EXPECT_EQ(file->hitTest(150, 150), nullptr);
-  EXPECT_EQ(file->hitTest(-10, -10), nullptr);
+  EXPECT_TRUE(file->getLayersUnderPoint(150, 150).empty());
+  EXPECT_TRUE(file->getLayersUnderPoint(-10, -10).empty());
 }
 
 /**
@@ -6810,9 +6814,9 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
   ASSERT_TRUE(file != nullptr);
   ASSERT_EQ(file->composition->childCompositions.size(), 1u);
 
-  auto hit = file->hitTest(50, 50);
-  ASSERT_TRUE(hit != nullptr);
-  EXPECT_EQ(hit->getName(), "NestedChild");
+  auto hits = file->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getName(), "NestedChild");
 }
 
 /**
@@ -6874,6 +6878,50 @@ PAGX_TEST(PAGXTest, HitTestSharedCompositionPerInstance) {
   // Cross-instance lookup misses: instance A's map does not know instance B's tgfx layer.
   EXPECT_EQ(bindingA.nodeForLayer(tgfxChildB.get()), nullptr);
   EXPECT_EQ(bindingB.nodeForLayer(tgfxChildA.get()), nullptr);
+}
+
+/**
+ * Test case: PAGLayer::getGlobalMatrix maps the layer's local space to surface space, combining the
+ * layer's position in the tree with the display list's zoomScale and contentOffset.
+ */
+PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "PosLayer";
+  layer->x = 30;
+  layer->y = 20;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  // Apply a zoomScale and contentOffset so the matrix has non-trivial surface terms.
+  auto* options = file->getDisplayOptions();
+  options->setZoomScale(2.0f);
+  options->setContentOffset(10.0f, 5.0f);
+
+  auto hits = file->getLayersUnderPoint(2.0f * 30 + 10, 2.0f * 20 + 5);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getName(), "PosLayer");
+
+  // local (0,0) maps to surface = zoomScale * (layerPos) + contentOffset.
+  // layer translate is (30, 20); surface tx = 2*30 + 10 = 70, ty = 2*20 + 5 = 45; scale = 2.
+  auto matrix = hits[0]->getGlobalMatrix();
+  EXPECT_FLOAT_EQ(matrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(matrix.d, 2.0f);
+  EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
+  EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
 }
 
 }  // namespace pag

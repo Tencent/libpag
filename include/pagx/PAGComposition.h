@@ -57,14 +57,16 @@ class PAGComposition {
   void apply(float mix = 1.0f);
 
   /**
-   * Returns the top-most PAGLayer under the given point, or nullptr if nothing is hit. Coordinates
-   * are in this composition's root coordinate space (for PAGFile this is the surface/display space
-   * before zoom and contentOffset are applied — see PAGFile::hitTest, which performs that
-   * conversion). Hit testing uses layer bounding boxes; it does not require a prior GPU render.
+   * Returns an array of PAGLayers under the given point. The first layer in the array is the
+   * top-most under the point, the last is the bottom-most. Returns an empty array if nothing is
+   * hit. Coordinates are in this composition's root coordinate space (for PAGFile this is the
+   * surface/display space before zoom and contentOffset are applied — see
+   * PAGFile::getLayersUnderPoint, which performs that conversion). Hit testing uses layer bounding
+   * boxes; it does not require a prior GPU render.
    * @param x the x coordinate in the composition root coordinate space.
    * @param y the y coordinate in the composition root coordinate space.
    */
-  std::shared_ptr<PAGLayer> hitTest(float x, float y);
+  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
 
  protected:
   PAGComposition();

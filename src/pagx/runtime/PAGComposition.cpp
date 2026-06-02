@@ -146,24 +146,30 @@ const Node* PAGComposition::Impl::resolveHitNode(const tgfx::Layer* hitLayer) {
   return nullptr;
 }
 
-std::shared_ptr<PAGLayer> PAGComposition::hitTest(float x, float y) {
+std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float x, float y) {
+  std::vector<std::shared_ptr<PAGLayer>> result = {};
   if (composition->root == nullptr) {
-    return nullptr;
+    return result;
   }
-  // getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
+  // tgfx getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
   // coordinate space, covering the whole subtree (child composition roots are attached into the
   // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not registered
-  // as a node's primary layer; we walk the list and return the first that resolves to a PAGX Layer
-  // node. Resolution probes this composition's reverse map and recurses into descendant
-  // compositions, since each composition instance owns the binding for the subtree it built.
+  // as a node's primary layer; we keep only those that resolve to a PAGX Layer node. Resolution
+  // probes this composition's reverse map and recurses into descendant compositions, since each
+  // composition instance owns the binding for the subtree it built. The first array entry stays the
+  // top-most layer.
   auto hitLayers = composition->root->getLayersUnderPoint(x, y);
   for (const auto& hitLayer : hitLayers) {
     const Node* node = composition->resolveHitNode(hitLayer.get());
     if (node != nullptr && node->nodeType() == NodeType::Layer) {
-      return PAGLayer::Wrap(static_cast<const Layer*>(node));
+      auto handle =
+          PAGLayer::Wrap(static_cast<const Layer*>(node), hitLayer.get(), composition->parentFile);
+      if (handle != nullptr) {
+        result.push_back(std::move(handle));
+      }
     }
   }
-  return nullptr;
+  return result;
 }
 
 }  // namespace pagx

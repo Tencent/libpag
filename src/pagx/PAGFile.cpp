@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGFile.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/PAGComposition.h"
+#include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -40,6 +42,9 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   }
   auto file = std::shared_ptr<PAGFile>(new PAGFile());
   file->document = document;
+  // The file is itself the root composition; point its base parentFile at the file so hit-test
+  // handles built from the root subtree can reach the file for surface coordinate conversion.
+  file->composition->parentFile = file.get();
   file->fileStorage = std::make_unique<FileStorage>();
   file->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(file));
   auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
@@ -176,15 +181,43 @@ void PAGFile::advanceAndApply(int64_t deltaMicroseconds) {
   apply();
 }
 
-std::shared_ptr<PAGLayer> PAGFile::hitTest(float surfaceX, float surfaceY) {
+std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersUnderPoint(float surfaceX,
+                                                                    float surfaceY) {
+  float rootX = 0;
+  float rootY = 0;
+  if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+    return {};
+  }
+  return PAGComposition::getLayersUnderPoint(rootX, rootY);
+}
+
+bool PAGFile::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
+  if (fileStorage == nullptr || rootX == nullptr || rootY == nullptr) {
+    return false;
+  }
   float zoomScale = fileStorage->displayList.zoomScale();
   if (zoomScale == 0.0f) {
-    return nullptr;
+    return false;
   }
   const auto& contentOffset = fileStorage->displayList.contentOffset();
-  float globalX = (surfaceX - contentOffset.x) / zoomScale;
-  float globalY = (surfaceY - contentOffset.y) / zoomScale;
-  return PAGComposition::hitTest(globalX, globalY);
+  *rootX = (surfaceX - contentOffset.x) / zoomScale;
+  *rootY = (surfaceY - contentOffset.y) / zoomScale;
+  return true;
+}
+
+bool PAGFile::rootToSurfaceMatrix(Matrix* out) const {
+  if (fileStorage == nullptr || out == nullptr) {
+    return false;
+  }
+  float zoomScale = fileStorage->displayList.zoomScale();
+  const auto& contentOffset = fileStorage->displayList.contentOffset();
+  // surface = zoomScale * root + contentOffset.
+  *out = {zoomScale, 0, 0, zoomScale, contentOffset.x, contentOffset.y};
+  return true;
+}
+
+void* PAGFile::rootRuntimeLayer() const {
+  return composition != nullptr ? composition->root.get() : nullptr;
 }
 
 void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {

@@ -32,6 +32,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+struct Matrix;
 struct RuntimeBinding;
 
 /**
@@ -131,14 +132,15 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   void advanceAndApply(int64_t deltaMicroseconds);
 
   /**
-   * Returns the top-most PAGLayer under the given surface point, or nullptr if nothing is hit.
-   * Surface coordinates are converted to the layer tree's root coordinate space using the display
-   * list's zoomScale and contentOffset before delegating to PAGComposition::hitTest. Hit testing
-   * uses layer bounding boxes and does not require a prior draw().
+   * Returns an array of PAGLayers under the given surface point. The first layer in the array is
+   * the top-most under the point, the last is the bottom-most. Returns an empty array if nothing
+   * is hit. Surface coordinates are converted to the layer tree's root coordinate space using the
+   * display list's zoomScale and contentOffset. Hit testing uses layer bounding boxes and does not
+   * require a prior draw().
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
-  std::shared_ptr<PAGLayer> hitTest(float surfaceX, float surfaceY);
+  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
 
  private:
   PAGFile() = default;
@@ -158,6 +160,21 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
 
   void* getDisplayListForOptions() const;
 
+  // Converts a surface-space point to the layer tree's root coordinate space using the display
+  // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
+  // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
+  bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
+
+  // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
+  // Returns false if the transform is unavailable. Used by PAGLayer::getGlobalMatrix to build the
+  // local-to-surface matrix. Returned as a pagx Matrix to keep tgfx out of this header.
+  bool rootToSurfaceMatrix(Matrix* out) const;
+
+  // Returns the top tgfx layer of the runtime tree as an opaque pointer (the base composition's
+  // root). Used by PAGLayer to compute a layer's transform relative to the tree root without
+  // requiring the tree to be attached to a display list. Concrete type lives in PAGFile.cpp.
+  void* rootRuntimeLayer() const;
+
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
@@ -173,6 +190,7 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   friend class PAGTimeline;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
+  friend class PAGLayer;
 };
 
 }  // namespace pagx
