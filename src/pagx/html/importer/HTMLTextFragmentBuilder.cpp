@@ -193,6 +193,54 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
                                                 const HTMLInheritedStyle& inherited) {
   std::vector<TextFragment> fragments;
   collectFragments(element, inherited, fragments);
+  collapseFragmentWhitespace(fragments);
+  if (fragments.empty()) {
+    return nullptr;
+  }
+  if (box.absolute) {
+    _diagnostics.warn("html: position: absolute on text leaf '<" + element->name +
+                      ">' is downgraded to absolute on the surrounding Layer");
+  }
+
+  bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
+  bool hasMultipleFragments = fragments.size() > 1;
+  bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
+  std::string wm = ToLower(Trim(inherited.writingMode));
+  bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
+  // A child inline run that carries an explicit `line-height` (e.g. the digit-badge idiom
+  // `<div height:20><span line-height:20>02</span></div>`) raises the line-box height
+  // beyond the run's font metrics. The bare `<Text>+<Fill>` no-TextBox path has nowhere to
+  // record that, so the glyph would render at its intrinsic font height aligned to the
+  // top of the box instead of being vertically padded to the line-box. Force a TextBox in
+  // that case so the line-height fallback below has somewhere to land.
+  bool fragmentHasExplicitLineHeight = false;
+  for (const auto& f : fragments) {
+    if (!std::isnan(f.lineHeight) && f.lineHeight > 0) {
+      fragmentHasExplicitLineHeight = true;
+      break;
+    }
+  }
+  // CSS `transform` is reproduced via `Layer.matrix` on the outer Layer (handled by
+  // applyBoxTransform in buildTextHostLayers); it does NOT force a TextBox to be synthesised.
+  // The earlier codepath set TextBox.skew/rotation/scale and required an explicit TextBox to
+  // host them, but the unified Layer.matrix path makes the wrapping Layer transform every
+  // descendant uniformly — including the bare `<Text>+<Fill>` pair the no-TextBox branch
+  // emits — so the extra TextBox is no longer needed.
+  bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
+                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
+                      isVertical || fragmentHasExplicitLineHeight;
+
+  Layer* textHost = nullptr;
+  Layer* wrapper = buildTextHostLayers(element, box, hasBgVisuals, textHost);
+  populateTextHostContents(textHost, fragments, inherited, box, needsTextBox, isVertical,
+                           hasNoWrap);
+  emitTextDecorations(textHost, fragments, inherited);
+
+  _idAllocator.assign(wrapper, element);
+  return wrapper;
+}
+
+void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragment>& fragments) {
   // Collapse whitespace as if the inline-formatting-context were a single CSS run, not as
   // independent fragments. Each fragment carries its own font size, so a trailing space in a
   // parent span followed by a child span (`灵魂内核层 <span>SOUL...</span>`) must keep that
@@ -228,42 +276,11 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
     }
   }
   fragments.resize(writeIndex);
-  if (fragments.empty()) {
-    return nullptr;
-  }
-  if (box.absolute) {
-    _diagnostics.warn("html: position: absolute on text leaf '<" + element->name +
-                      ">' is downgraded to absolute on the surrounding Layer");
-  }
+}
 
-  bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
-  bool hasMultipleFragments = fragments.size() > 1;
-  bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
-  std::string wm = ToLower(Trim(inherited.writingMode));
-  bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
-  // A child inline run that carries an explicit `line-height` (e.g. the digit-badge idiom
-  // `<div height:20><span line-height:20>02</span></div>`) raises the line-box height
-  // beyond the run's font metrics. The bare `<Text>+<Fill>` no-TextBox path has nowhere to
-  // record that, so the glyph would render at its intrinsic font height aligned to the
-  // top of the box instead of being vertically padded to the line-box. Force a TextBox in
-  // that case so the line-height fallback below has somewhere to land.
-  bool fragmentHasExplicitLineHeight = false;
-  for (const auto& f : fragments) {
-    if (!std::isnan(f.lineHeight) && f.lineHeight > 0) {
-      fragmentHasExplicitLineHeight = true;
-      break;
-    }
-  }
-  // CSS `transform` is reproduced via `Layer.matrix` on the outer Layer (handled below by
-  // applyBoxTransform); it does NOT force a TextBox to be synthesised. The earlier
-  // codepath set TextBox.skew/rotation/scale and required an explicit TextBox to host
-  // them, but the unified Layer.matrix path makes the wrapping Layer transform every
-  // descendant uniformly — including the bare `<Text>+<Fill>` pair the no-TextBox branch
-  // emits — so the extra TextBox is no longer needed.
-  bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
-                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
-                      isVertical || fragmentHasExplicitLineHeight;
-
+Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNode>& element,
+                                                    const HTMLBoxAttributes& box, bool hasBgVisuals,
+                                                    Layer*& outTextHost) {
   auto outer = _document->makeNode<Layer>();
   _layerBuilder.applySizeAndPosition(outer, box);
   _layerBuilder.applyLayerAttributes(outer, element, box);
@@ -286,98 +303,108 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   // root of this subtree returned to the caller; `outer` (and `textHost`) keep their
   // existing role as the clipping/text host inside the wrapper.
   Layer* wrapper = _layerBuilder.maybeSplitBoxShadowFromClip(outer);
+  outTextHost = textHost;
+  return wrapper;
+}
 
+void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
+                                                       const std::vector<TextFragment>& fragments,
+                                                       const HTMLInheritedStyle& inherited,
+                                                       const HTMLBoxAttributes& box,
+                                                       bool needsTextBox, bool isVertical,
+                                                       bool hasNoWrap) {
   if (!needsTextBox) {
     const auto& f = fragments.front();
     textHost->contents.push_back(buildTextElement(f));
     textHost->contents.push_back(buildTextFill(f));
-  } else {
-    auto textBox = _document->makeNode<TextBox>();
-    // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
-    // this the TextBox would adopt its single-line natural width and overflow the parent box.
-    textBox->percentWidth = 100.0f;
-    std::string ta = ToLower(Trim(inherited.textAlign));
-    if (!ta.empty()) {
-      if (ta == "left" || ta == "start") textBox->textAlign = TextAlign::Start;
-      else if (ta == "center")
-        textBox->textAlign = TextAlign::Center;
-      else if (ta == "right" || ta == "end")
-        textBox->textAlign = TextAlign::End;
-      else if (ta == "justify")
-        textBox->textAlign = TextAlign::Justify;
-      else
-        _diagnostics.warn("html: unsupported text-align '" + ta + "'");
-    }
-    if (!inherited.lineHeight.empty()) {
-      float lh = _valueParser.resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
-      if (!std::isnan(lh) && lh > 0) textBox->lineHeight = lh;
-    }
-    // CSS line-box height = max of the parent's line-height and every inline child's
-    // line-height. The block above only consulted the outer element's cascade, so it
-    // would silently drop a child run's `line-height` whenever the outer was `normal` or
-    // had no explicit value (for example the `<div height:20><span line-height:20>02</span></div>`
-    // digit-badge pattern, where the outer span only carries background/size and the
-    // inner span supplies the line-height that vertically centres the glyph). Walk the
-    // fragments and lift their resolved values to TextBox.lineHeight when they exceed the
-    // outer-driven value, mirroring the browser's max-of-participants rule.
-    for (const auto& f : fragments) {
-      if (!std::isnan(f.lineHeight) && f.lineHeight > textBox->lineHeight) {
-        textBox->lineHeight = f.lineHeight;
-      }
-    }
-    if (hasNoWrap) {
-      textBox->wordWrap = false;
-    }
-    if (box.clipOverflow) {
-      textBox->overflow = Overflow::Hidden;
-    }
-    if (isVertical) {
-      textBox->writingMode = WritingMode::Vertical;
-    }
-    for (size_t i = 0; i < fragments.size(); i++) {
-      const auto& f = fragments[i];
-      if (i == 0) {
-        textBox->elements.push_back(buildTextElement(f));
-        textBox->elements.push_back(buildTextFill(f));
-      } else {
-        auto group = _document->makeNode<Group>();
-        group->elements.push_back(buildTextElement(f));
-        group->elements.push_back(buildTextFill(f));
-        textBox->elements.push_back(group);
-      }
-    }
-    textHost->contents.push_back(textBox);
+    return;
   }
 
+  auto textBox = _document->makeNode<TextBox>();
+  // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
+  // this the TextBox would adopt its single-line natural width and overflow the parent box.
+  textBox->percentWidth = 100.0f;
+  std::string ta = ToLower(Trim(inherited.textAlign));
+  if (!ta.empty()) {
+    if (ta == "left" || ta == "start") textBox->textAlign = TextAlign::Start;
+    else if (ta == "center")
+      textBox->textAlign = TextAlign::Center;
+    else if (ta == "right" || ta == "end")
+      textBox->textAlign = TextAlign::End;
+    else if (ta == "justify")
+      textBox->textAlign = TextAlign::Justify;
+    else
+      _diagnostics.warn("html: unsupported text-align '" + ta + "'");
+  }
+  if (!inherited.lineHeight.empty()) {
+    float lh = _valueParser.resolveLineHeightPx(inherited.lineHeight, fragments.front().fontSize);
+    if (!std::isnan(lh) && lh > 0) textBox->lineHeight = lh;
+  }
+  // CSS line-box height = max of the parent's line-height and every inline child's
+  // line-height. The block above only consulted the outer element's cascade, so it
+  // would silently drop a child run's `line-height` whenever the outer was `normal` or
+  // had no explicit value (for example the `<div height:20><span line-height:20>02</span></div>`
+  // digit-badge pattern, where the outer span only carries background/size and the
+  // inner span supplies the line-height that vertically centres the glyph). Walk the
+  // fragments and lift their resolved values to TextBox.lineHeight when they exceed the
+  // outer-driven value, mirroring the browser's max-of-participants rule.
+  for (const auto& f : fragments) {
+    if (!std::isnan(f.lineHeight) && f.lineHeight > textBox->lineHeight) {
+      textBox->lineHeight = f.lineHeight;
+    }
+  }
+  if (hasNoWrap) {
+    textBox->wordWrap = false;
+  }
+  if (box.clipOverflow) {
+    textBox->overflow = Overflow::Hidden;
+  }
+  if (isVertical) {
+    textBox->writingMode = WritingMode::Vertical;
+  }
+  for (size_t i = 0; i < fragments.size(); i++) {
+    const auto& f = fragments[i];
+    if (i == 0) {
+      textBox->elements.push_back(buildTextElement(f));
+      textBox->elements.push_back(buildTextFill(f));
+    } else {
+      auto group = _document->makeNode<Group>();
+      group->elements.push_back(buildTextElement(f));
+      group->elements.push_back(buildTextFill(f));
+      textBox->elements.push_back(group);
+    }
+  }
+  textHost->contents.push_back(textBox);
+}
+
+void HTMLTextFragmentBuilder::emitTextDecorations(Layer* textHost,
+                                                  const std::vector<TextFragment>& fragments,
+                                                  const HTMLInheritedStyle& inherited) {
   std::string deco = ToLower(Trim(inherited.textDecoration));
-  if (!deco.empty() && deco != "none") {
-    Color textColor = fragments.front().color;
-    Color decorationColor = textColor;
-    bool decorationColorDiffers = false;
-    if (!inherited.textDecorationColor.empty()) {
-      Color parsed = _valueParser.parseColor(inherited.textDecorationColor);
-      if (!(parsed == textColor)) {
-        decorationColor = parsed;
-        decorationColorDiffers = true;
-      }
-    }
-    if (deco.find("underline") != std::string::npos) {
-      _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
-                                           decorationColorDiffers,
-                                           /*bottom=*/0.0f, /*centerY=*/NAN);
-    }
-    if (deco.find("line-through") != std::string::npos) {
-      _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
-                                           decorationColorDiffers,
-                                           /*bottom=*/NAN, /*centerY=*/0.0f);
-    }
-    if (deco.find("overline") != std::string::npos) {
-      _diagnostics.warn("html: text-decoration overline not supported");
+  if (deco.empty() || deco == "none") return;
+  Color textColor = fragments.front().color;
+  Color decorationColor = textColor;
+  bool decorationColorDiffers = false;
+  if (!inherited.textDecorationColor.empty()) {
+    Color parsed = _valueParser.parseColor(inherited.textDecorationColor);
+    if (!(parsed == textColor)) {
+      decorationColor = parsed;
+      decorationColorDiffers = true;
     }
   }
-
-  _idAllocator.assign(wrapper, element);
-  return wrapper;
+  if (deco.find("underline") != std::string::npos) {
+    _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
+                                         decorationColorDiffers,
+                                         /*bottom=*/0.0f, /*centerY=*/NAN);
+  }
+  if (deco.find("line-through") != std::string::npos) {
+    _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
+                                         decorationColorDiffers,
+                                         /*bottom=*/NAN, /*centerY=*/0.0f);
+  }
+  if (deco.find("overline") != std::string::npos) {
+    _diagnostics.warn("html: text-decoration overline not supported");
+  }
 }
 
 }  // namespace pagx

@@ -169,6 +169,13 @@ float CssDirectionToAngle(const std::string& kw);
 // "linear-gradient(a, b, c)" -> "a, b, c".
 std::string ExtractParenArgs(const std::string& value);
 
+// Parse a single-call CSS function expression. `trimmed` is expected to be already
+// whitespace-trimmed. On success `outName` receives the lower-cased function name and
+// `outArgs` receives the trimmed argument body. The parser is strict: it rejects compound
+// or nested calls (any `)` other than the final one, any non-whitespace content after the
+// closing `)`, or an empty function name).
+bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs);
+
 // Strip trailing slashes so file path resolution doesn't pick up wrong directories.
 std::string DirectoryOf(const std::string& filePath);
 
@@ -180,6 +187,25 @@ Color HexToColor(uint32_t hex, bool hasAlpha);
 
 // Builds a Padding shorthand from 1-4 numbers (CSS top/right/bottom/left expansion).
 Padding BuildPaddingShorthand(const std::vector<float>& nums);
+
+// CSS 1-4 token shorthand result. Slots are named in the canonical CSS edge order
+// (top, right, bottom, left). For `border-radius` callers the slots map to
+// top-left, top-right, bottom-right, bottom-left.
+struct FourSidedValue {
+  float top = 0.0f;
+  float right = 0.0f;
+  float bottom = 0.0f;
+  float left = 0.0f;
+};
+
+// CSS 1-4 token shorthand expansion. Used by `margin`, `padding`, `border-width`, and
+// `border-radius` longhand resolution.
+//   - 1 token : all four slots receive `nums[0]`
+//   - 2 tokens: top/bottom = nums[0], right/left = nums[1]
+//   - 3 tokens: top = nums[0], right/left = nums[1], bottom = nums[2]
+//   - 4+ tokens: nums[0..3] map directly to top/right/bottom/left (extras ignored)
+//   - 0 tokens : all four slots default to 0
+FourSidedValue ExpandFourSideShorthand(const std::vector<float>& nums);
 
 // Parses a CSS dimension string into either an explicit pixel value or a percent value.
 // Returns true on success and writes one of `outPx` / `outPct` (the other stays NaN).

@@ -43,6 +43,30 @@ bool ApproxEqual(float a, float b, float eps) {
   return std::fabs(a - b) <= eps;
 }
 
+// Common walker entry-point guard. Returns true (caller must `return` immediately) when the
+// node is null/non-element or the recursion depth limit has been reached. On the depth path
+// a `subset:max-depth` warning is emitted whose body cites `phase` so authors can tell which
+// pass aborted the descent.
+bool ShouldSkipWalkerNode(const std::shared_ptr<DOMNode>& node, int depth,
+                          HTMLTransformContext& ctx, const char* phase) {
+  if (!node || node->type != DOMNodeType::Element) return true;
+  if (depth >= MAX_HTML_RECURSION_DEPTH) {
+    std::string msg = "html: maximum recursion depth reached during ";
+    msg += phase;
+    msg += "; subtree skipped";
+    ctx.warn("subset:max-depth", msg, node);
+    return true;
+  }
+  return false;
+}
+
+// Returns true for nodes whose subtree the cascade / property-filter / layout / emit passes
+// treat as opaque. Currently only `<svg>` qualifies; its attributes are forwarded verbatim
+// by the importer (the SVG resolver runs as a separate pipeline).
+bool IsOpaqueSubtreeRoot(const std::shared_ptr<DOMNode>& node) {
+  return node && node->type == DOMNodeType::Element && node->name == "svg";
+}
+
 // CSS properties that inherit by default in the subset. Mirrors `HTMLInheritedStyle` in the
 // importer so that the cascade carries identical semantics through both layers.
 const std::vector<std::string>& InheritableProperties() {
@@ -311,13 +335,7 @@ void CoalesceWebkitAlias(PropertyMap& resolved, const std::string& vendorName,
 
 void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inheritedIn,
                  HTMLTransformContext& ctx, int depth) {
-  if (!element || element->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn("subset:max-depth",
-             "html: maximum recursion depth reached during style resolution; subtree skipped",
-             element);
-    return;
-  }
+  if (ShouldSkipWalkerNode(element, depth, ctx, "style resolution")) return;
   PropertyMap inherited = inheritedIn;
   // Compute this element's resolved style and update `inherited` for descendants.
   if (!IsNonRenderedTag(element->name)) {
@@ -333,7 +351,7 @@ void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inh
     }
   }
   // SVG subtrees are opaque to the cascade.
-  if (element->name == "svg") return;
+  if (IsOpaqueSubtreeRoot(element)) return;
   auto child = element->firstChild;
   while (child) {
     ResolveTree(child, inherited, ctx, depth + 1);
@@ -500,19 +518,13 @@ float FilterElement(const std::shared_ptr<DOMNode>& element, float parentFontSiz
 
 void FilterTree(const std::shared_ptr<DOMNode>& element, float parentFontSizePx,
                 HTMLTransformContext& ctx, int depth) {
-  if (!element || element->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn("subset:max-depth",
-             "html: maximum recursion depth reached during property filtering; subtree skipped",
-             element);
-    return;
-  }
+  if (ShouldSkipWalkerNode(element, depth, ctx, "property filtering")) return;
   float fontSizeForChildren = parentFontSizePx;
   if (!IsNonRenderedTag(element->name)) {
     fontSizeForChildren = FilterElement(element, parentFontSizePx, ctx);
   }
   // SVG subtrees are opaque to property filtering.
-  if (element->name == "svg") return;
+  if (IsOpaqueSubtreeRoot(element)) return;
   auto child = element->firstChild;
   while (child) {
     FilterTree(child, fontSizeForChildren, ctx, depth + 1);
@@ -1147,14 +1159,9 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
 }
 
 void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx, int depth) {
-  if (!node || node->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn("subset:max-depth",
-             "html: maximum recursion depth reached during flex inference; subtree skipped", node);
-    return;
-  }
+  if (ShouldSkipWalkerNode(node, depth, ctx, "flex inference")) return;
   // SVG subtrees are opaque (their absolute geometry is meaningful at a different layer).
-  if (node->name == "svg") return;
+  if (IsOpaqueSubtreeRoot(node)) return;
   // Recurse children first: a parent that folds into `align-items: stretch` erases its
   // children's cross-axis size, so each child must finish its own inference while its
   // explicit width/height is still intact.
@@ -1339,15 +1346,8 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
 
 void WalkPromoteMarginToGap(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx,
                             int depth) {
-  if (!node || node->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn(
-        "subset:max-depth",
-        "html: maximum recursion depth reached during margin-to-gap promotion; subtree skipped",
-        node);
-    return;
-  }
-  if (node->name == "svg") return;
+  if (ShouldSkipWalkerNode(node, depth, ctx, "margin-to-gap promotion")) return;
+  if (IsOpaqueSubtreeRoot(node)) return;
   TryPromoteMarginToGap(node, ctx);
   auto child = node->firstChild;
   while (child) {
@@ -1482,15 +1482,9 @@ void TryCollapseSpaceJustify(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
 
 void WalkCollapseSpaceJustify(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx,
                               int depth) {
-  if (!node || node->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn("subset:max-depth",
-             "html: maximum recursion depth reached during space-justify collapse; subtree skipped",
-             node);
-    return;
-  }
+  if (ShouldSkipWalkerNode(node, depth, ctx, "space-justify collapse")) return;
   // SVG subtrees use an independent layout model; skip them entirely.
-  if (node->name == "svg") return;
+  if (IsOpaqueSubtreeRoot(node)) return;
   TryCollapseSpaceJustify(node, ctx);
   auto child = node->firstChild;
   while (child) {
@@ -1549,17 +1543,11 @@ void WrapStrayText(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext&
 // Recurse into element children, dropping unknown tags, then run WrapStrayText on the result.
 void NormalizeChildren(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx,
                        int depth) {
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn(
-        "subset:max-depth",
-        "html: maximum recursion depth reached during structure normalization; subtree skipped",
-        parent);
-    return;
-  }
+  if (ShouldSkipWalkerNode(parent, depth, ctx, "structure normalization")) return;
   // SVG subtrees are opaque: their tag set (`<circle>`, `<path>`, ...) is not part of the HTML
   // subset, but the importer captures the verbatim XML and feeds it to the SVG resolver. We
   // therefore leave the subtree untouched.
-  if (parent->type == DOMNodeType::Element && parent->name == "svg") {
+  if (IsOpaqueSubtreeRoot(parent)) {
     return;
   }
   std::shared_ptr<DOMNode> prev = nullptr;
@@ -1673,13 +1661,7 @@ void EmitStyleAttribute(const std::shared_ptr<DOMNode>& element, HTMLTransformCo
 }
 
 void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx, int depth) {
-  if (!element || element->type != DOMNodeType::Element) return;
-  if (depth >= MAX_HTML_RECURSION_DEPTH) {
-    ctx.warn("subset:max-depth",
-             "html: maximum recursion depth reached during inline style emission; subtree skipped",
-             element);
-    return;
-  }
+  if (ShouldSkipWalkerNode(element, depth, ctx, "inline style emission")) return;
   if (!IsNonRenderedTag(element->name)) {
     EmitStyleAttribute(element, ctx);
     if (!ctx.options().preserveClassAttribute) {
@@ -1689,7 +1671,7 @@ void EmitTree(const std::shared_ptr<DOMNode>& element, HTMLTransformContext& ctx
     }
   }
   // SVG subtrees are opaque; their attributes are forwarded verbatim by the importer.
-  if (element->name == "svg") return;
+  if (IsOpaqueSubtreeRoot(element)) return;
   auto child = element->firstChild;
   while (child) {
     EmitTree(child, ctx, depth + 1);

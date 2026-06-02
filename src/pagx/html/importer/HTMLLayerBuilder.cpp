@@ -86,6 +86,37 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
   out.close();
 }
 
+// Hands the parent-facing layout slot (positional anchors, percent sizing, and flex
+// participation) over from `inner` to `outer`. Used by the wrapper helpers that hoist a Layer
+// "out from under" inner so the wrapper occupies the same space `inner` previously held.
+void MoveLayoutSlot(Layer* outer, Layer* inner) {
+  outer->left = inner->left;
+  outer->right = inner->right;
+  outer->top = inner->top;
+  outer->bottom = inner->bottom;
+  outer->centerX = inner->centerX;
+  outer->centerY = inner->centerY;
+  outer->percentWidth = inner->percentWidth;
+  outer->percentHeight = inner->percentHeight;
+  outer->includeInLayout = inner->includeInLayout;
+  outer->flex = inner->flex;
+}
+
+// Resets the positional anchors and flex slot on `inner` so the parent layout will route
+// through the wrapper instead. `percentWidth`/`percentHeight` are NOT reset here because the
+// two wrapper paths disagree: `maybeSplitBoxShadowFromClip` wants `inner` to fill the wrapper
+// (100%) while `wrapForMargin` wants `inner` to keep its own intrinsic size (NaN).
+void ResetLayoutAnchors(Layer* inner) {
+  inner->left = NAN;
+  inner->right = NAN;
+  inner->top = NAN;
+  inner->bottom = NAN;
+  inner->centerX = NAN;
+  inner->centerY = NAN;
+  inner->includeInLayout = true;
+  inner->flex = 0.0f;
+}
+
 }  // namespace
 
 HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser)
@@ -512,20 +543,12 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
 
   auto* outer = _document->makeNode<Layer>();
 
-  // Move the layout slot (the wrapper occupies the same space in its parent that `inner`
-  // previously held).
+  // Move the parent-facing layout slot (the wrapper occupies the same space in its parent
+  // that `inner` previously held). `width`/`height` are also moved here because the shadow-
+  // split path lets `inner` fill the wrapper via `percentWidth/percentHeight = 100` below.
+  MoveLayoutSlot(outer, inner);
   outer->width = inner->width;
   outer->height = inner->height;
-  outer->percentWidth = inner->percentWidth;
-  outer->percentHeight = inner->percentHeight;
-  outer->left = inner->left;
-  outer->right = inner->right;
-  outer->top = inner->top;
-  outer->bottom = inner->bottom;
-  outer->centerX = inner->centerX;
-  outer->centerY = inner->centerY;
-  outer->includeInLayout = inner->includeInLayout;
-  outer->flex = inner->flex;
 
   // Move "through-effects" that semantically wrap the element + its shadow in CSS.
   outer->alpha = inner->alpha;
@@ -541,18 +564,11 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   // Reset the moved fields on `inner` so the wrapping is invisible to downstream
   // consumers. `inner` now fills the wrapper exactly; its clipToBounds / contents
   // / styles-that-stayed remain in place.
+  ResetLayoutAnchors(inner);
   inner->width = NAN;
   inner->height = NAN;
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
-  inner->left = NAN;
-  inner->right = NAN;
-  inner->top = NAN;
-  inner->bottom = NAN;
-  inner->centerX = NAN;
-  inner->centerY = NAN;
-  inner->includeInLayout = true;
-  inner->flex = 0.0f;
   inner->alpha = 1.0f;
   inner->blendMode = BlendMode::Normal;
   inner->matrix = Matrix{};
@@ -599,27 +615,11 @@ Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& bo
   outer->padding.bottom = box.marginBottomPx;
   outer->padding.left = box.marginLeftPx;
 
-  outer->left = inner->left;
-  outer->right = inner->right;
-  outer->top = inner->top;
-  outer->bottom = inner->bottom;
-  outer->centerX = inner->centerX;
-  outer->centerY = inner->centerY;
-  outer->percentWidth = inner->percentWidth;
-  outer->percentHeight = inner->percentHeight;
-  outer->includeInLayout = inner->includeInLayout;
-  outer->flex = inner->flex;
+  MoveLayoutSlot(outer, inner);
 
-  inner->left = NAN;
-  inner->right = NAN;
-  inner->top = NAN;
-  inner->bottom = NAN;
-  inner->centerX = NAN;
-  inner->centerY = NAN;
+  ResetLayoutAnchors(inner);
   inner->percentWidth = NAN;
   inner->percentHeight = NAN;
-  inner->includeInLayout = true;
-  inner->flex = 0.0f;
 
   outer->children.push_back(inner);
   return outer;

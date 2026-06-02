@@ -287,34 +287,20 @@ std::string TransformTransform(const std::string& value, const PropertyContext&,
   if (trimmed.empty()) return std::string();
   std::string lc = ToLower(trimmed);
   if (lc == "none") return std::string();
-  size_t openParen = trimmed.find('(');
-  if (openParen == std::string::npos || openParen == 0) {
-    return DropProperty("transform", value, "is not a recognised function form", diags);
-  }
-  size_t closeParen = trimmed.find_last_of(')');
-  if (closeParen == std::string::npos || closeParen <= openParen) {
-    return DropProperty("transform", value, "is malformed", diags);
-  }
-  // The argument body lives between the FIRST `(` and its matching `)`. If anything other
-  // than whitespace appears outside that span (either before the function name, between
-  // the function call and the closing `)`, or after the closing `)`) the value is a
-  // compound chain or contains nested calls — neither is supported in the single-function
-  // subset, so drop with a diagnostic.
-  size_t firstClose = trimmed.find(')');
-  if (firstClose != closeParen) {
+  std::string fn;
+  std::string args;
+  if (!ParseCssFunctionCall(trimmed, fn, args)) {
+    // Distinguish "no parens at all" from "compound chain or trailing junk" so the diagnostic
+    // matches the caller's authoring mistake.
+    size_t openParen = trimmed.find('(');
+    if (openParen == std::string::npos || openParen == 0) {
+      return DropProperty("transform", value, "is not a recognised function form", diags);
+    }
     return DropProperty("transform", value,
                         "compound transforms are not supported; use a single function "
                         "(skewX/skewY/rotate/scale/translate)",
                         diags);
   }
-  std::string trailing = Trim(trimmed.substr(closeParen + 1));
-  if (!trailing.empty()) {
-    return DropProperty("transform", value,
-                        "compound transforms are not supported; use a single function "
-                        "(skewX/skewY/rotate/scale/translate)",
-                        diags);
-  }
-  std::string fn = ToLower(Trim(trimmed.substr(0, openParen)));
   if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
       fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey" ||
       fn == "matrix") {

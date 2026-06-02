@@ -115,6 +115,31 @@ class HTMLTextFragmentBuilder {
                         const HTMLInheritedStyle& inherited, std::vector<TextFragment>& out,
                         int depth = 0);
 
+  /** Collapses HTML whitespace across the fragment run as if it were a single CSS inline-
+   *  formatting context (the per-fragment font size differs, so the trim must respect
+   *  fragment boundaries). Empty fragments are pruned in place. */
+  static void collapseFragmentWhitespace(std::vector<TextFragment>& fragments);
+
+  /** Builds the outer / wrapper / text-host Layer chain for the leaf, applying size,
+   *  position, transforms, background visuals (when present), padding, and the
+   *  shadow-from-clip split. Returns the wrapper Layer that the caller publishes upwards;
+   *  writes the inner host (where text contents land) into `outTextHost`. */
+  Layer* buildTextHostLayers(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
+                             bool hasBgVisuals, Layer*& outTextHost);
+
+  /** Populates `textHost->contents` with either a bare `<Text>+<Fill>` pair (single-style
+   *  run) or a `TextBox` carrying per-fragment `Group`s. `inherited` and `box` supply the
+   *  TextBox-only attributes (text-align, line-height, word-wrap, overflow, writing-mode). */
+  void populateTextHostContents(Layer* textHost, const std::vector<TextFragment>& fragments,
+                                const HTMLInheritedStyle& inherited, const HTMLBoxAttributes& box,
+                                bool needsTextBox, bool isVertical, bool hasNoWrap);
+
+  /** Emits underline / line-through decoration lines onto `textHost` derived from the
+   *  inherited `text-decoration` and `text-decoration-color`. `<overline>` is unsupported
+   *  and produces a diagnostic. */
+  void emitTextDecorations(Layer* textHost, const std::vector<TextFragment>& fragments,
+                           const HTMLInheritedStyle& inherited);
+
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   HTMLLayerBuilder& _layerBuilder;

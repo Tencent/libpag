@@ -434,6 +434,22 @@ std::string ExtractParenArgs(const std::string& value) {
   return {};
 }
 
+bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs) {
+  size_t openParen = trimmed.find('(');
+  if (openParen == std::string::npos || openParen == 0) return false;
+  size_t closeParen = trimmed.find_last_of(')');
+  if (closeParen == std::string::npos || closeParen <= openParen) return false;
+  // Reject nested or compound calls: there must be exactly one `)` (the closing one) and
+  // no non-whitespace content after it.
+  if (trimmed.find(')') != closeParen) return false;
+  if (!Trim(trimmed.substr(closeParen + 1)).empty()) return false;
+  std::string name = ToLower(Trim(trimmed.substr(0, openParen)));
+  if (name.empty()) return false;
+  outName = std::move(name);
+  outArgs = Trim(trimmed.substr(openParen + 1, closeParen - openParen - 1));
+  return true;
+}
+
 std::string DirectoryOf(const std::string& filePath) {
   auto lastSlash = filePath.find_last_of("/\\");
   if (lastSlash == std::string::npos) {
@@ -473,23 +489,33 @@ Color HexToColor(uint32_t hex, bool hasAlpha) {
 }
 
 Padding BuildPaddingShorthand(const std::vector<float>& nums) {
+  FourSidedValue v = ExpandFourSideShorthand(nums);
   Padding p = {};
-  if (nums.size() == 1) {
-    p.top = p.right = p.bottom = p.left = nums[0];
-  } else if (nums.size() == 2) {
-    p.top = p.bottom = nums[0];
-    p.left = p.right = nums[1];
-  } else if (nums.size() == 3) {
-    p.top = nums[0];
-    p.left = p.right = nums[1];
-    p.bottom = nums[2];
-  } else if (nums.size() >= 4) {
-    p.top = nums[0];
-    p.right = nums[1];
-    p.bottom = nums[2];
-    p.left = nums[3];
-  }
+  p.top = v.top;
+  p.right = v.right;
+  p.bottom = v.bottom;
+  p.left = v.left;
   return p;
+}
+
+FourSidedValue ExpandFourSideShorthand(const std::vector<float>& nums) {
+  FourSidedValue v = {};
+  if (nums.size() == 1) {
+    v.top = v.right = v.bottom = v.left = nums[0];
+  } else if (nums.size() == 2) {
+    v.top = v.bottom = nums[0];
+    v.left = v.right = nums[1];
+  } else if (nums.size() == 3) {
+    v.top = nums[0];
+    v.left = v.right = nums[1];
+    v.bottom = nums[2];
+  } else if (nums.size() >= 4) {
+    v.top = nums[0];
+    v.right = nums[1];
+    v.bottom = nums[2];
+    v.left = nums[3];
+  }
+  return v;
 }
 
 bool ParseSizingDimension(const std::string& raw, float& outPx, float& outPct) {

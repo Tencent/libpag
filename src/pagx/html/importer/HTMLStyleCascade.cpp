@@ -60,15 +60,7 @@ std::vector<std::string> SplitCommaArgs(const std::string& args) {
 // value is a compound chain and is rejected.
 bool SplitTransformFunction(const std::string& trimmed, std::string& fnName,
                             std::string& argsBody) {
-  size_t openParen = trimmed.find('(');
-  if (openParen == std::string::npos || openParen == 0) return false;
-  size_t closeParen = trimmed.find_last_of(')');
-  if (closeParen == std::string::npos || closeParen <= openParen) return false;
-  if (trimmed.find(')') != closeParen) return false;
-  if (!Trim(trimmed.substr(closeParen + 1)).empty()) return false;
-  fnName = ToLower(Trim(trimmed.substr(0, openParen)));
-  argsBody = Trim(trimmed.substr(openParen + 1, closeParen - openParen - 1));
-  return !fnName.empty();
+  return ParseCssFunctionCall(trimmed, fnName, argsBody);
 }
 
 bool ParseScalarFloat(const std::string& token, float& out) {
@@ -80,6 +72,201 @@ bool ParseScalarFloat(const std::string& token, float& out) {
   if (!Trim(end).empty()) return false;
   out = v;
   return true;
+}
+
+// `parseBoxTransform` per-function handler context. The diagnostics sink and value parser
+// are forwarded so the static handlers can stay outside the class while still emitting the
+// same warnings the class member used to.
+struct TransformParseCtx {
+  const std::string& transform;
+  const std::vector<std::string>& parts;
+  HTMLDiagnosticSink& diagnostics;
+  HTMLValueParser& valueParser;
+};
+
+// Each handler returns true (and fills `parsed`) on success; false means a diagnostic was
+// already emitted and the caller should bail.
+using TransformHandler = bool (*)(const TransformParseCtx&, HTMLTransform&);
+
+bool ParseSkewX(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 1) {
+    ctx.diagnostics.warn("html: skewX expects 1 argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  parsed.skew = -ParseAngle(ctx.parts[0]);
+  parsed.skewAxis = 0.0f;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseSkewY(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 1) {
+    ctx.diagnostics.warn("html: skewY expects 1 argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  parsed.skew = ParseAngle(ctx.parts[0]);
+  parsed.skewAxis = 90.0f;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseRotate(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 1) {
+    ctx.diagnostics.warn("html: rotate expects 1 argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  parsed.rotation = ParseAngle(ctx.parts[0]);
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseScale(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  float sx = 1.0f;
+  float sy = 1.0f;
+  if (ctx.parts.size() == 1 && ParseScalarFloat(ctx.parts[0], sx)) {
+    sy = sx;
+  } else if (ctx.parts.size() == 2 && ParseScalarFloat(ctx.parts[0], sx) &&
+             ParseScalarFloat(ctx.parts[1], sy)) {
+    // sx/sy already filled.
+  } else {
+    ctx.diagnostics.warn("html: scale expects 1 or 2 numeric arguments; got '" + ctx.transform +
+                         "'");
+    return false;
+  }
+  parsed.scaleX = sx;
+  parsed.scaleY = sy;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseScaleX(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  float v = 1.0f;
+  if (ctx.parts.size() != 1 || !ParseScalarFloat(ctx.parts[0], v)) {
+    ctx.diagnostics.warn("html: scaleX expects 1 numeric argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  parsed.scaleX = v;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseScaleY(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  float v = 1.0f;
+  if (ctx.parts.size() != 1 || !ParseScalarFloat(ctx.parts[0], v)) {
+    ctx.diagnostics.warn("html: scaleY expects 1 numeric argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  parsed.scaleY = v;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseTranslate(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.empty() || ctx.parts.size() > 2) {
+    ctx.diagnostics.warn("html: translate expects 1 or 2 length arguments; got '" + ctx.transform +
+                         "'");
+    return false;
+  }
+  float tx = ctx.valueParser.parseAbsoluteLengthPx(ctx.parts[0]);
+  if (std::isnan(tx)) {
+    ctx.diagnostics.warn("html: translate first argument '" + ctx.parts[0] +
+                         "' is not a px length; ignored");
+    return false;
+  }
+  float ty = 0.0f;
+  if (ctx.parts.size() == 2) {
+    ty = ctx.valueParser.parseAbsoluteLengthPx(ctx.parts[1]);
+    if (std::isnan(ty)) {
+      ctx.diagnostics.warn("html: translate second argument '" + ctx.parts[1] +
+                           "' is not a px length; ignored");
+      return false;
+    }
+  }
+  parsed.translateX = tx;
+  parsed.translateY = ty;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseTranslateX(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 1) {
+    ctx.diagnostics.warn("html: translateX expects 1 length argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  float v = ctx.valueParser.parseAbsoluteLengthPx(ctx.parts[0]);
+  if (std::isnan(v)) {
+    ctx.diagnostics.warn("html: translateX argument '" + ctx.parts[0] +
+                         "' is not a px length; ignored");
+    return false;
+  }
+  parsed.translateX = v;
+  parsed.valid = true;
+  return true;
+}
+
+bool ParseTranslateY(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 1) {
+    ctx.diagnostics.warn("html: translateY expects 1 length argument; got '" + ctx.transform + "'");
+    return false;
+  }
+  float v = ctx.valueParser.parseAbsoluteLengthPx(ctx.parts[0]);
+  if (std::isnan(v)) {
+    ctx.diagnostics.warn("html: translateY argument '" + ctx.parts[0] +
+                         "' is not a px length; ignored");
+    return false;
+  }
+  parsed.translateY = v;
+  parsed.valid = true;
+  return true;
+}
+
+// `matrix(a, b, c, d, tx, ty)` populates `parsed.matrix` directly (the discrete fields are
+// ambiguous from a raw matrix). The caller skips the post-pass discrete-field composition for
+// this form, so `parsed.valid` carries the identity check used by downstream consumers.
+bool ParseMatrix(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 6) {
+    ctx.diagnostics.warn("html: matrix expects 6 numeric arguments; got '" + ctx.transform + "'");
+    return false;
+  }
+  float m[6];
+  for (size_t i = 0; i < 6; i++) {
+    if (!ParseScalarFloat(ctx.parts[i], m[i])) {
+      ctx.diagnostics.warn("html: matrix argument '" + ctx.parts[i] + "' is not a number; ignored");
+      return false;
+    }
+  }
+  parsed.matrix.a = m[0];
+  parsed.matrix.b = m[1];
+  parsed.matrix.c = m[2];
+  parsed.matrix.d = m[3];
+  parsed.matrix.tx = m[4];
+  parsed.matrix.ty = m[5];
+  parsed.valid = !parsed.matrix.isIdentity();
+  return true;
+}
+
+// `parseBoxTransform` dispatch table. `composeMatrix` is true when the discrete-field
+// composition (`T * R * Skew * S`) should run after the handler — `matrix()` is the lone
+// false case because it has already populated `parsed.matrix` directly.
+struct TransformHandlerEntry {
+  const char* name;
+  TransformHandler handler;
+  bool composeMatrix;
+};
+
+const TransformHandlerEntry kTransformHandlers[] = {
+    {"skewx", &ParseSkewX, true},           {"skewy", &ParseSkewY, true},
+    {"rotate", &ParseRotate, true},         {"scale", &ParseScale, true},
+    {"scalex", &ParseScaleX, true},         {"scaley", &ParseScaleY, true},
+    {"translate", &ParseTranslate, true},   {"translatex", &ParseTranslateX, true},
+    {"translatey", &ParseTranslateY, true}, {"matrix", &ParseMatrix, false},
+};
+
+const TransformHandlerEntry* FindTransformHandler(const std::string& fn) {
+  for (const auto& entry : kTransformHandlers) {
+    if (fn == entry.name) return &entry;
+  }
+  return nullptr;
 }
 
 // CSS edge-overlap scaling: when the sum of two border radii exceeds the box edge they
@@ -466,36 +653,11 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
         }
         nums.push_back(v);
       }
-      float t = 0.0f;
-      float r = 0.0f;
-      float b = 0.0f;
-      float l = 0.0f;
-      switch (nums.size()) {
-        case 0:
-          break;
-        case 1:
-          t = r = b = l = nums[0];
-          break;
-        case 2:
-          t = b = nums[0];
-          r = l = nums[1];
-          break;
-        case 3:
-          t = nums[0];
-          r = l = nums[1];
-          b = nums[2];
-          break;
-        default:
-          t = nums[0];
-          r = nums[1];
-          b = nums[2];
-          l = nums[3];
-          break;
-      }
-      box.marginTopPx = t;
-      box.marginRightPx = r;
-      box.marginBottomPx = b;
-      box.marginLeftPx = l;
+      FourSidedValue m = ExpandFourSideShorthand(nums);
+      box.marginTopPx = m.top;
+      box.marginRightPx = m.right;
+      box.marginBottomPx = m.bottom;
+      box.marginLeftPx = m.left;
     }
     applyMarginLonghand(props, "margin-top", box.marginTopPx);
     applyMarginLonghand(props, "margin-right", box.marginRightPx);
@@ -639,140 +801,21 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   auto parts = SplitCommaArgs(args);
   HTMLTransform parsed = {};
 
-  if (fn == "skewx") {
-    if (parts.size() != 1) {
-      _diagnostics.warn("html: skewX expects 1 argument; got '" + transform + "'");
-      return;
-    }
-    parsed.skew = -ParseAngle(parts[0]);
-    parsed.skewAxis = 0.0f;
-    parsed.valid = true;
-  } else if (fn == "skewy") {
-    if (parts.size() != 1) {
-      _diagnostics.warn("html: skewY expects 1 argument; got '" + transform + "'");
-      return;
-    }
-    parsed.skew = ParseAngle(parts[0]);
-    parsed.skewAxis = 90.0f;
-    parsed.valid = true;
-  } else if (fn == "rotate") {
-    if (parts.size() != 1) {
-      _diagnostics.warn("html: rotate expects 1 argument; got '" + transform + "'");
-      return;
-    }
-    parsed.rotation = ParseAngle(parts[0]);
-    parsed.valid = true;
-  } else if (fn == "scale") {
-    float sx = 1.0f;
-    float sy = 1.0f;
-    if (parts.size() == 1 && ParseScalarFloat(parts[0], sx)) {
-      sy = sx;
-    } else if (parts.size() == 2 && ParseScalarFloat(parts[0], sx) &&
-               ParseScalarFloat(parts[1], sy)) {
-      // sx/sy already filled.
-    } else {
-      _diagnostics.warn("html: scale expects 1 or 2 numeric arguments; got '" + transform + "'");
-      return;
-    }
-    parsed.scaleX = sx;
-    parsed.scaleY = sy;
-    parsed.valid = true;
-  } else if (fn == "scalex" || fn == "scaley") {
-    float v = 1.0f;
-    if (parts.size() != 1 || !ParseScalarFloat(parts[0], v)) {
-      _diagnostics.warn("html: " + fn + " expects 1 numeric argument; got '" + transform + "'");
-      return;
-    }
-    if (fn == "scalex") {
-      parsed.scaleX = v;
-    } else {
-      parsed.scaleY = v;
-    }
-    parsed.valid = true;
-  } else if (fn == "translate") {
-    if (parts.empty() || parts.size() > 2) {
-      _diagnostics.warn("html: translate expects 1 or 2 length arguments; got '" + transform + "'");
-      return;
-    }
-    float tx = _valueParser.parseAbsoluteLengthPx(parts[0]);
-    if (std::isnan(tx)) {
-      _diagnostics.warn("html: translate first argument '" + parts[0] +
-                        "' is not a px length; ignored");
-      return;
-    }
-    float ty = 0.0f;
-    if (parts.size() == 2) {
-      ty = _valueParser.parseAbsoluteLengthPx(parts[1]);
-      if (std::isnan(ty)) {
-        _diagnostics.warn("html: translate second argument '" + parts[1] +
-                          "' is not a px length; ignored");
-        return;
-      }
-    }
-    parsed.translateX = tx;
-    parsed.translateY = ty;
-    parsed.valid = true;
-  } else if (fn == "translatex" || fn == "translatey") {
-    if (parts.size() != 1) {
-      _diagnostics.warn("html: " + fn + " expects 1 length argument; got '" + transform + "'");
-      return;
-    }
-    float v = _valueParser.parseAbsoluteLengthPx(parts[0]);
-    if (std::isnan(v)) {
-      _diagnostics.warn("html: " + fn + " argument '" + parts[0] + "' is not a px length; ignored");
-      return;
-    }
-    if (fn == "translatex") {
-      parsed.translateX = v;
-    } else {
-      parsed.translateY = v;
-    }
-    parsed.valid = true;
-  } else if (fn == "matrix") {
-    // The catch-all `matrix(a, b, c, d, tx, ty)` form. The browser emits
-    // this whenever computed style is asked for `transform` — utility CSS
-    // frameworks (Tailwind, UnoCSS) compose multiple `--tw-*` values into a
-    // single function chain that resolves to a matrix, and the
-    // html-snapshot tool forwards exactly that string. We can't recover the
-    // original CSS function (rotate vs skew vs scale) from the matrix
-    // without ambiguity, so the discrete fields stay at their defaults and
-    // only `parsed.matrix` is populated. Non-text Layers consume the matrix
-    // directly; the legacy TextBox path (which keys off `parsed.rotation` /
-    // `parsed.skew` / `parsed.scale*`) sees an identity transform here and
-    // is therefore not engaged for matrix-form transforms — that's
-    // intentional, the new generic Layer path covers the same case.
-    if (parts.size() != 6) {
-      _diagnostics.warn("html: matrix expects 6 numeric arguments; got '" + transform + "'");
-      return;
-    }
-    float m[6];
-    for (size_t i = 0; i < 6; i++) {
-      if (!ParseScalarFloat(parts[i], m[i])) {
-        _diagnostics.warn("html: matrix argument '" + parts[i] + "' is not a number; ignored");
-        return;
-      }
-    }
-    parsed.matrix.a = m[0];
-    parsed.matrix.b = m[1];
-    parsed.matrix.c = m[2];
-    parsed.matrix.d = m[3];
-    parsed.matrix.tx = m[4];
-    parsed.matrix.ty = m[5];
-    parsed.valid = !parsed.matrix.isIdentity();
-  } else {
+  const TransformHandlerEntry* entry = FindTransformHandler(fn);
+  if (entry == nullptr) {
     _diagnostics.warn("html: transform function '" + fn + "' is not in the supported subset");
     return;
   }
+  TransformParseCtx ctx{transform, parts, _diagnostics, _valueParser};
+  if (!entry->handler(ctx, parsed)) return;
 
   // Compose the discrete-field representation into `parsed.matrix` for the
-  // single-function branches. Skipped for the `matrix(...)` branch above
-  // (which already populated `parsed.matrix` directly and intentionally
-  // left the discrete fields at their defaults), and for the case where
-  // none of the branches set `valid` (early returns). Order mirrors the
-  // CSS spec: T(translate) * R(rotation) * Skew(skew, skewAxis) * S(scale).
-  // `transform-origin` is NOT folded in here; the Layer-side consumer
-  // applies it as `T(cx, cy) * matrix * T(-cx, -cy)`.
-  if (parsed.valid && fn != "matrix") {
+  // single-function branches. Skipped for the `matrix(...)` branch (which already populated
+  // `parsed.matrix` directly and intentionally left the discrete fields at their defaults),
+  // and for the case where the handler bailed early. Order mirrors the CSS spec:
+  // T(translate) * R(rotation) * Skew(skew, skewAxis) * S(scale). `transform-origin` is NOT
+  // folded in here; the Layer-side consumer applies it as `T(cx, cy) * matrix * T(-cx, -cy)`.
+  if (parsed.valid && entry->composeMatrix) {
     Matrix translate = Matrix::Translate(parsed.translateX, parsed.translateY);
     Matrix rotate =
         (parsed.rotation != 0.0f) ? Matrix::Rotate(parsed.rotation) : Matrix::Identity();
@@ -874,35 +917,13 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
   }
 
   // CSS shorthand expansion. We tolerate the irregular 0/empty-token case by padding with 0s
-  // so a malformed input doesn't lose unrelated corner data.
-  float tl = 0.0f;
-  float tr = 0.0f;
-  float brad = 0.0f;
-  float bl = 0.0f;
-  switch (nums.size()) {
-    case 1:
-      tl = tr = brad = bl = nums[0];
-      break;
-    case 2:
-      tl = brad = nums[0];
-      tr = bl = nums[1];
-      break;
-    case 3:
-      tl = nums[0];
-      tr = bl = nums[1];
-      brad = nums[2];
-      break;
-    default:  // 4+
-      tl = nums[0];
-      tr = nums[1];
-      brad = nums[2];
-      bl = nums[3];
-      break;
-  }
-  tl = std::max(tl, 0.0f);
-  tr = std::max(tr, 0.0f);
-  brad = std::max(brad, 0.0f);
-  bl = std::max(bl, 0.0f);
+  // so a malformed input doesn't lose unrelated corner data. Slot mapping for `border-radius`
+  // is top-left / top-right / bottom-right / bottom-left.
+  FourSidedValue rs = ExpandFourSideShorthand(nums);
+  float tl = std::max(rs.top, 0.0f);
+  float tr = std::max(rs.right, 0.0f);
+  float brad = std::max(rs.bottom, 0.0f);
+  float bl = std::max(rs.left, 0.0f);
 
   // CSS edge-overlap clamp: shrink all radii uniformly so the sum of the two radii on any
   // edge never exceeds that edge's length. Pre-clamp values like `9999px` collapse to the
