@@ -107,27 +107,10 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   PAGDisplayOptions* getDisplayOptions() const;
 
   /**
-   * Advances every runtime composition (recursing into nested child compositions) by
-   * deltaMicroseconds and applies the result to the runtime tree. Drives only the timelines
-   * spawned by Layer.timelines drivers that declare auto-play; top-level animations are not
-   * touched and must be driven explicitly via getTimeline(...)->advanceAndApply(...).
-   *
-   * Inherited from PAGComposition: the file root spawns no timelines of its own, so advance()
-   * only recurses into the child compositions. When mixing multiple top-level animations, drive
-   * each timeline via getTimeline(id)->advance(dt) / apply(mix) yourself, then call advance(dt)
-   * once for the compositions.
-   */
-  using PAGComposition::advance;
-
-  /**
-   * Re-applies every runtime composition (recursing into nested child compositions) at its
-   * current time, without advancing. Useful after a new PAGSurface is bound. Inherited from
-   * PAGComposition.
-   */
-  using PAGComposition::apply;
-
-  /**
-   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply().
+   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
+   * apply() are inherited from PAGComposition: they drive only the timelines spawned by
+   * Layer.timelines drivers (recursing into child compositions). Top-level animations are not
+   * driven here and must be driven explicitly via getTimeline(id)->advanceAndApply(...).
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
