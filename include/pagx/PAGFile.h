@@ -148,14 +148,6 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
-  // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
-  // runtime binding and resolving channel targets against contextDoc. Used by
-  // PAGComposition::MakeChild for composition-spawned timelines. Caller owns the returned
-  // shared_ptr; the file does not register these timelines into timelinesByAnimation.
-  std::shared_ptr<PAGTimeline> createCompositionTimeline(Animation* animation,
-                                                         RuntimeBinding* binding,
-                                                         PAGXDocument* contextDoc);
-
   RuntimeBinding* mutableBinding();
 
   void* getDisplayListForOptions() const;

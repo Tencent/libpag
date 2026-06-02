@@ -224,16 +224,6 @@ void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
   // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
 }
 
-std::shared_ptr<PAGTimeline> PAGFile::createCompositionTimeline(Animation* animation,
-                                                                RuntimeBinding* binding,
-                                                                PAGXDocument* contextDoc) {
-  if (animation == nullptr || binding == nullptr) {
-    return nullptr;
-  }
-  auto* effectiveDoc = contextDoc != nullptr ? contextDoc : document.get();
-  return std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding, effectiveDoc));
-}
-
 RuntimeBinding* PAGFile::mutableBinding() {
   return &composition->binding;
 }

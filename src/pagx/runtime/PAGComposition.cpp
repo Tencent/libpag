@@ -35,7 +35,7 @@ void PAGComposition::Impl::buildSubtree() {
 }
 
 void PAGComposition::Impl::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
-  if (parentFile == nullptr || document == nullptr) {
+  if (document == nullptr) {
     return;
   }
   for (const auto& driver : drivers) {
@@ -47,10 +47,11 @@ void PAGComposition::Impl::spawnTimelines(const std::vector<std::unique_ptr<Time
     if (animation == nullptr) {
       continue;
     }
-    auto timeline = parentFile->createCompositionTimeline(animation, &binding, document);
-    if (timeline == nullptr) {
-      continue;
-    }
+    // The timeline targets this composition's own binding and resolves channel target IDs against
+    // this composition's document (which is the layer's externalDoc for sealed cross-document
+    // compositions). All inputs are owned by this composition, so it constructs the timeline
+    // directly.
+    auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, &binding, document));
     if (animationDriver->playing) {
       timeline->play();
     }
