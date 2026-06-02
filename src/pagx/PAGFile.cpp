@@ -176,6 +176,17 @@ void PAGFile::advanceAndApply(int64_t deltaMicroseconds) {
   apply();
 }
 
+std::shared_ptr<PAGLayer> PAGFile::hitTest(float surfaceX, float surfaceY) {
+  float zoomScale = fileStorage->displayList.zoomScale();
+  if (zoomScale == 0.0f) {
+    return nullptr;
+  }
+  const auto& contentOffset = fileStorage->displayList.contentOffset();
+  float globalX = (surfaceX - contentOffset.x) / zoomScale;
+  float globalY = (surfaceY - contentOffset.y) / zoomScale;
+  return PAGComposition::hitTest(globalX, globalY);
+}
+
 void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
   // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
 }

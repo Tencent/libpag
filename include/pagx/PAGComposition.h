@@ -27,6 +27,7 @@ namespace pagx {
 
 class Layer;
 class PAGFile;
+class PAGLayer;
 class PAGTimeline;
 
 /**
@@ -54,6 +55,16 @@ class PAGComposition {
    * @param mix blend weight, defaults to 1.0 (full overwrite).
    */
   void apply(float mix = 1.0f);
+
+  /**
+   * Returns the top-most PAGLayer under the given point, or nullptr if nothing is hit. Coordinates
+   * are in this composition's root coordinate space (for PAGFile this is the surface/display space
+   * before zoom and contentOffset are applied — see PAGFile::hitTest, which performs that
+   * conversion). Hit testing uses layer bounding boxes; it does not require a prior GPU render.
+   * @param x the x coordinate in the composition root coordinate space.
+   * @param y the y coordinate in the composition root coordinate space.
+   */
+  std::shared_ptr<PAGLayer> hitTest(float x, float y);
 
  protected:
   PAGComposition();

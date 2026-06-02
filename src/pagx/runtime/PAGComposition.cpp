@@ -18,6 +18,7 @@
 
 #include "pagx/runtime/PAGComposition.h"
 #include "pagx/PAGFile.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -126,6 +127,38 @@ void PAGComposition::apply(float mix) {
       child->apply(mix);
     }
   }
+}
+
+std::shared_ptr<PAGLayer> PAGComposition::hitTest(float x, float y) {
+  if (composition->root == nullptr) {
+    return nullptr;
+  }
+  // getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
+  // coordinate space. A hit tgfx layer may be an internal sub-layer (mask, vector content) not
+  // registered as a node's primary layer, so we walk the list and return the first one that
+  // resolves to a PAGX Layer node.
+  auto hitLayers = composition->root->getLayersUnderPoint(x, y);
+  for (const auto& hitLayer : hitLayers) {
+    const Node* node = composition->binding.nodeForLayer(hitLayer.get());
+    // For Phase 2 a hit may belong to a child composition's own subtree (built with its own
+    // binding), so also probe each child composition's reverse map. This is a flat probe and does
+    // not recurse into grandchildren; nested-composition coordinate handling is refined later.
+    if (node == nullptr) {
+      for (auto& child : composition->childCompositions) {
+        if (child == nullptr) {
+          continue;
+        }
+        node = child->composition->binding.nodeForLayer(hitLayer.get());
+        if (node != nullptr) {
+          break;
+        }
+      }
+    }
+    if (node != nullptr && node->nodeType() == NodeType::Layer) {
+      return PAGLayer::Wrap(static_cast<const Layer*>(node));
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace pagx

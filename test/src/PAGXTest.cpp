@@ -29,6 +29,7 @@
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGFile.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
@@ -6715,6 +6716,103 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionNestedFiles) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("nested.png", imageData));
   EXPECT_TRUE(doc->getExternalFilePaths().empty());
+}
+
+/**
+ * Test case: hitTest resolves a point inside a layer to the layer's PAGLayer handle, and returns
+ * nullptr for a point outside the layer.
+ */
+PAGX_TEST(PAGXTest, HitTestSingleLayer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "HitLayer";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 40};
+  rect->size = {100, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto hit = file->hitTest(50, 40);
+  ASSERT_TRUE(hit != nullptr);
+  EXPECT_EQ(hit->getName(), "HitLayer");
+
+  auto miss = file->hitTest(180, 180);
+  EXPECT_EQ(miss, nullptr);
+}
+
+/**
+ * Test case: hitTest returns nullptr when the point lies outside every layer in the file.
+ */
+PAGX_TEST(PAGXTest, HitTestMiss) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = "OnlyLayer";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {25, 25};
+  rect->size = {50, 50};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 1, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  EXPECT_EQ(file->hitTest(150, 150), nullptr);
+  EXPECT_EQ(file->hitTest(-10, -10), nullptr);
+}
+
+/**
+ * Test case: hitTest over a layer that references a Composition resolves to the nested child
+ * layer that the point falls on, by probing the child composition's reverse map.
+ */
+PAGX_TEST(PAGXTest, HitTestNestedComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->name = "NestedChild";
+  auto childRect = doc->makeNode<pagx::Rectangle>();
+  childRect->position = {50, 50};
+  childRect->size = {100, 100};
+  auto childFill = doc->makeNode<pagx::Fill>();
+  auto childSolid = doc->makeNode<pagx::SolidColor>();
+  childSolid->color = {0, 0, 1, 1};
+  childFill->color = childSolid;
+  childLayer->contents.push_back(childRect);
+  childLayer->contents.push_back(childFill);
+  comp->layers.push_back(childLayer);
+
+  auto compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->name = "CompLayer";
+  compLayer->composition = comp;
+  doc->layers.push_back(compLayer);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->composition->childCompositions.size(), 1u);
+
+  auto hit = file->hitTest(50, 50);
+  ASSERT_TRUE(hit != nullptr);
+  EXPECT_EQ(hit->getName(), "NestedChild");
 }
 
 }  // namespace pag

@@ -206,6 +206,7 @@ class LayerBuilderContext {
     if (layer) {
       // Register layer for mask lookups and animation writers.
       _result.binding.set(node, layer);
+      _result.binding.mapLayer(layer.get(), node);
       bindLayerChannels(node, layer);
 
       applyLayerAttributes(node, layer.get());

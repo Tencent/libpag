@@ -130,6 +130,16 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
+  /**
+   * Returns the top-most PAGLayer under the given surface point, or nullptr if nothing is hit.
+   * Surface coordinates are converted to the layer tree's root coordinate space using the display
+   * list's zoomScale and contentOffset before delegating to PAGComposition::hitTest. Hit testing
+   * uses layer bounding boxes and does not require a prior draw().
+   * @param surfaceX the x coordinate in surface (device) space.
+   * @param surfaceY the y coordinate in surface (device) space.
+   */
+  std::shared_ptr<PAGLayer> hitTest(float surfaceX, float surfaceY);
+
  private:
   PAGFile() = default;
 
