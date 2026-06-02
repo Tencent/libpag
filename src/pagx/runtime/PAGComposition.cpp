@@ -129,31 +129,36 @@ void PAGComposition::apply(float mix) {
   }
 }
 
+const Node* PAGComposition::Impl::resolveHitNode(const tgfx::Layer* hitLayer) {
+  const Node* node = binding.nodeForLayer(hitLayer);
+  if (node != nullptr) {
+    return node;
+  }
+  for (auto& child : childCompositions) {
+    if (child == nullptr) {
+      continue;
+    }
+    node = child->composition->resolveHitNode(hitLayer);
+    if (node != nullptr) {
+      return node;
+    }
+  }
+  return nullptr;
+}
+
 std::shared_ptr<PAGLayer> PAGComposition::hitTest(float x, float y) {
   if (composition->root == nullptr) {
     return nullptr;
   }
   // getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
-  // coordinate space. A hit tgfx layer may be an internal sub-layer (mask, vector content) not
-  // registered as a node's primary layer, so we walk the list and return the first one that
-  // resolves to a PAGX Layer node.
+  // coordinate space, covering the whole subtree (child composition roots are attached into the
+  // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not registered
+  // as a node's primary layer; we walk the list and return the first that resolves to a PAGX Layer
+  // node. Resolution probes this composition's reverse map and recurses into descendant
+  // compositions, since each composition instance owns the binding for the subtree it built.
   auto hitLayers = composition->root->getLayersUnderPoint(x, y);
   for (const auto& hitLayer : hitLayers) {
-    const Node* node = composition->binding.nodeForLayer(hitLayer.get());
-    // For Phase 2 a hit may belong to a child composition's own subtree (built with its own
-    // binding), so also probe each child composition's reverse map. This is a flat probe and does
-    // not recurse into grandchildren; nested-composition coordinate handling is refined later.
-    if (node == nullptr) {
-      for (auto& child : composition->childCompositions) {
-        if (child == nullptr) {
-          continue;
-        }
-        node = child->composition->binding.nodeForLayer(hitLayer.get());
-        if (node != nullptr) {
-          break;
-        }
-      }
-    }
+    const Node* node = composition->resolveHitNode(hitLayer.get());
     if (node != nullptr && node->nodeType() == NodeType::Layer) {
       return PAGLayer::Wrap(static_cast<const Layer*>(node));
     }

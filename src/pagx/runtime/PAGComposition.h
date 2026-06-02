@@ -49,6 +49,11 @@ struct PAGComposition::Impl {
   void buildSubtree();
   void spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers);
   void buildChildCompositions();
+
+  // Resolves a hit tgfx layer to its PAGX Layer node by probing this composition's reverse map,
+  // then recursively every descendant composition's reverse map. Returns nullptr if no composition
+  // in this subtree owns the layer.
+  const Node* resolveHitNode(const tgfx::Layer* hitLayer);
 };
 
 }  // namespace pagx
