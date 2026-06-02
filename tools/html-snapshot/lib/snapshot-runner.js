@@ -89,24 +89,6 @@ function entryToDataUri(entry) {
 //                            snapshot.js's pre-extraction behaviour (one
 //                            "skipped" line per cross-origin image was too
 //                            noisy).
-// Default values for the user-facing snapshot options. Defined in lib/cli.js
-// so the CLI parser, the HTTP service, and this runner share a single source.
-// Run a best-effort save step (fonts or images): on success, log the count;
-// on failure, log the error and return an empty array so the rest of the
-// pipeline still proceeds. Centralised so the font and image branches stop
-// re-implementing the same try/catch/log scaffolding around their respective
-// `save*` calls.
-async function bestEffortSave(saveFn, cache, dir, log, label) {
-  try {
-    const arr = await saveFn(cache, dir, log || (() => {}));
-    if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
-    return arr;
-  } catch (err) {
-    if (log) log(`${label} download failed: ${errMessage(err)}`);
-    return [];
-  }
-}
-
 // Run a best-effort save step (fonts or images): on success, log the count;
 // on failure, log the error and return an empty array so the rest of the
 // pipeline still proceeds. Centralised so the font and image branches stop

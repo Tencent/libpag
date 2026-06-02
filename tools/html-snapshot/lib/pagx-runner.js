@@ -110,9 +110,9 @@ function spawnPagxImport({ pagxBin, htmlPath, outPath, inferFlex }) {
 // text leaf — the importer's normaliser handles them silently in the
 // resulting PAGX, but the warnings still spam stderr at one line per
 // element. We strip them here so a 200-element page doesn't produce 200
-// lines of noise on every HTTP request. lib/pipeline.js exports an
-// equivalent `filterKnownWarnings` for the on-disk pipeline; the two stay
-// aligned so the CLI and the HTTP service surface the same diagnostics.
+// lines of noise on every HTTP request. The on-disk pipeline
+// (lib/pipeline.js) re-exports this helper so the CLI and the HTTP
+// service surface the same diagnostics.
 function filterKnownWarnings(stderr) {
   if (!stderr) return '';
   return stderr
@@ -175,5 +175,6 @@ async function runPagxImport({ pagxBin, html, inferFlex = true, log } = {}) {
 module.exports = {
   defaultPagxBin,
   runPagxImport,
+  filterKnownWarnings,
   PagxImportError,
 };

@@ -39,23 +39,8 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const { defaultPagxBin } = require('./pagx-runner');
-
-// `pagx import --format html` emits one warning per absolute-positioned text
-// leaf — the importer normalises them silently in the resulting PAGX, but
-// the warnings still spam stderr at one line per element. The bash wrapper
-// (`html2pagx`) used to filter them out before printing pagx's stderr; we do
-// the same here so a 200-element page doesn't produce 200 lines of noise.
-// Kept as a standalone function so server.js and eval can share the same
-// filter rule without each maintaining its own.
-function filterKnownWarnings(stderr) {
-  if (!stderr) return '';
-  return stderr
-    .split('\n')
-    .filter((line) => !line.includes('warning: html: position: absolute on text leaf'))
-    .join('\n')
-    .trim();
-}
+const { defaultPagxBin, filterKnownWarnings } = require('./pagx-runner');
+const { isHttpUrl } = require('./cli');
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -267,17 +252,32 @@ function readFontManifest(opts = {}) {
     .filter((l) => l && fs.existsSync(l));
 }
 
-// Detect an http(s) URL in the same way the snapshot CLI does. Centralised so
-// runHtmlToPagx and html2pagx agree on the rule (and to avoid importing
-// `cli.js` here, which would pull the snapshot-side flag table for no reason).
-function isHttpUrl(s) {
-  return typeof s === 'string' && /^https?:\/\//i.test(s);
-}
-
+// Detect an http(s) URL via the same rule the snapshot CLI uses (re-exported
+// from cli.js). Centralised so runHtmlToPagx and html2pagx agree on the rule.
 // Default callers' `log` to a no-op when omitted; runHtmlToPagx prints
 // `[N/M] step ...` progress lines through this hook so html2pagx can stream
 // them to stdout while embedded callers stay quiet.
 function noopLog() {}
+
+// Standard "did the step succeed?" check used by every fork-based step in
+// runHtmlToPagx. The contract is: on a non-zero exit, surface stderr and
+// throw a `PipelineStepError` so the html2pagx CLI can emit a uniform
+// `html2pagx: <step> failed` message; on a zero exit, still forward any
+// captured stderr (warnings, deprecation notices) so the operator sees
+// diagnostics. The `pagx import` step does its own check because it also
+// needs to verify the output file materialised on disk and routes its
+// stderr through the importer's filtered `log` callback instead.
+function assertStepOk(stepName, result) {
+  if (result.code !== 0) {
+    process.stderr.write(result.stderr);
+    throw new PipelineStepError(`${stepName} failed`, {
+      step: stepName,
+      code: result.code,
+      stderr: result.stderr,
+    });
+  }
+  if (result.stderr) process.stderr.write(result.stderr);
+}
 
 // End-to-end orchestrator. Runs snapshot → import → optional resolve →
 // optional font embed → optional render. Throws `PipelineStepError` on the
@@ -393,16 +393,7 @@ async function runHtmlToPagx(opts = {}) {
       imageDir,
       extraArgs: opts.snapshotExtraArgs,
     });
-    if (snapshotResult.code !== 0) {
-      process.stderr.write(snapshotResult.stderr);
-      throw new PipelineStepError('snapshot failed', {
-        step: 'snapshot',
-        code: snapshotResult.code,
-        stderr: snapshotResult.stderr,
-      });
-    } else if (snapshotResult.stderr) {
-      process.stderr.write(snapshotResult.stderr);
-    }
+    assertStepOk('snapshot', snapshotResult);
 
     let fonts = [];
     if (downloadFonts) {
@@ -420,6 +411,10 @@ async function runHtmlToPagx(opts = {}) {
       inferFlex: opts.inferFlex !== false,
       log: (line) => process.stderr.write(line + '\n'),
     });
+    // Import has its own check: stderr was already routed through the
+    // filtered `log` callback above, and we additionally require the output
+    // file to exist (zero exit + missing pagxFile means "tool ran but
+    // produced nothing", which assertStepOk wouldn't catch).
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
       throw new PipelineStepError('pagx import failed', {
         step: 'pagx import',
@@ -435,30 +430,12 @@ async function runHtmlToPagx(opts = {}) {
 
     log(`[3/${totalSteps}] resolve   ${pagxFile}`);
     const resolveResult = await runPagxResolve({ pagxBin, pagxFile });
-    if (resolveResult.code !== 0) {
-      process.stderr.write(resolveResult.stderr);
-      throw new PipelineStepError('pagx resolve failed', {
-        step: 'pagx resolve',
-        code: resolveResult.code,
-        stderr: resolveResult.stderr,
-      });
-    } else if (resolveResult.stderr) {
-      process.stderr.write(resolveResult.stderr);
-    }
+    assertStepOk('pagx resolve', resolveResult);
 
     if (embedFonts && fonts.length > 0) {
       log(`[font-embed] ${pagxFile} (${fonts.length} font file(s))`);
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
-      if (embedResult.code !== 0) {
-        process.stderr.write(embedResult.stderr);
-        throw new PipelineStepError('pagx font embed failed', {
-          step: 'pagx font embed',
-          code: embedResult.code,
-          stderr: embedResult.stderr,
-        });
-      } else if (embedResult.stderr) {
-        process.stderr.write(embedResult.stderr);
-      }
+      assertStepOk('pagx font embed', embedResult);
     }
 
     if (!doRender) {
@@ -474,16 +451,7 @@ async function runHtmlToPagx(opts = {}) {
       scale: opts.scale || 1,
       fontFallbacks: fonts,
     });
-    if (renderResult.code !== 0) {
-      process.stderr.write(renderResult.stderr);
-      throw new PipelineStepError('pagx render failed', {
-        step: 'pagx render',
-        code: renderResult.code,
-        stderr: renderResult.stderr,
-      });
-    } else if (renderResult.stderr) {
-      process.stderr.write(renderResult.stderr);
-    }
+    assertStepOk('pagx render', renderResult);
 
     log(`[done] ${pngFile}`);
     return { subsetHtml, pagx: pagxFile, png: pngFile, fonts };

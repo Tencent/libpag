@@ -28,6 +28,8 @@ const {
   isHttpUrl,
 } = require('./lib/pipeline');
 const { runBatch } = require('./lib/batch');
+const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./lib/browser-engine');
+const { parseNumber } = require('./lib/cli');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';
@@ -141,12 +143,17 @@ function parseArgs(argv) {
     // Browser engine: defaults to puppeteer; --browser-engine wins over the
     // env var which wins over this default. Captured separately from the
     // flag pass-through so the preflight check below can read it.
-    browserEngine: process.env.HTML_SNAPSHOT_BROWSER || 'puppeteer',
+    browserEngine: process.env.HTML_SNAPSHOT_BROWSER || DEFAULT_ENGINE,
   };
   const requireValue = (flag, value) => {
     if (value === undefined) failArg(`'${flag}' requires a value`);
     return value;
   };
+  // CLI-style numeric parser shared with snapshot.js / server.js: routes
+  // failures through `failArg` so html2pagx prints its own usage hint
+  // alongside the diagnostic, instead of cli.js's bare exit-code-2 fallback.
+  const parseFlagNumber = (flag, value, opts) =>
+    parseNumber(flag, value, { ...(opts || {}), fail: failArg });
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -166,8 +173,12 @@ function parseArgs(argv) {
         opts.pagxBin = requireValue(a, argv[++i]);
         break;
       case '--scale': {
-        const v = Number(requireValue(a, argv[++i]));
-        if (!Number.isFinite(v) || v <= 0) failArg(`--scale expects a positive number, got '${argv[i]}'`);
+        const raw = requireValue(a, argv[++i]);
+        const v = Number(raw);
+        // Allow fractional scales (0.5, 1.5, 2x), but reject 0/negatives — the
+        // CLI parseNumber's `>= ${min}` template would print an unreadable
+        // `>= 5e-324` here, so keep this check inline.
+        if (!Number.isFinite(v) || v <= 0) failArg(`--scale expects a positive number, got '${raw}'`);
         opts.scale = v;
         break;
       }
@@ -211,24 +222,15 @@ function parseArgs(argv) {
       case '--header':
         opts.headers.push(requireValue(a, argv[++i]));
         break;
-      case '--viewport-width': {
-        const v = Number(requireValue(a, argv[++i]));
-        if (!Number.isFinite(v) || v <= 0) failArg(`--viewport-width expects a positive number, got '${argv[i]}'`);
-        opts.viewportWidth = v;
+      case '--viewport-width':
+        opts.viewportWidth = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 1 });
         break;
-      }
-      case '--viewport-height': {
-        const v = Number(requireValue(a, argv[++i]));
-        if (!Number.isFinite(v) || v <= 0) failArg(`--viewport-height expects a positive number, got '${argv[i]}'`);
-        opts.viewportHeight = v;
+      case '--viewport-height':
+        opts.viewportHeight = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 1 });
         break;
-      }
-      case '--wait-ms': {
-        const v = Number(requireValue(a, argv[++i]));
-        if (!Number.isFinite(v) || v < 0) failArg(`--wait-ms expects a non-negative number, got '${argv[i]}'`);
-        opts.waitMs = v;
+      case '--wait-ms':
+        opts.waitMs = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 0 });
         break;
-      }
       case '--selector':
         opts.selector = requireValue(a, argv[++i]);
         break;
@@ -295,9 +297,8 @@ function parseArgs(argv) {
 // same checks so a "puppeteer not installed" diagnosis stays a clear up-front
 // error instead of an opaque stack trace from snapshot.js.
 function preflightBrowser(opts) {
-  const engines = ['puppeteer', 'playwright'];
-  if (!engines.includes(opts.browserEngine)) {
-    fail(`unsupported --browser-engine '${opts.browserEngine}' (expected puppeteer or playwright)`, 2);
+  if (!SUPPORTED_ENGINES.includes(opts.browserEngine)) {
+    fail(`unsupported --browser-engine '${opts.browserEngine}' (expected ${SUPPORTED_ENGINES.join(' or ')})`, 2);
   }
   const enginePkgDir = path.join(SCRIPT_DIR, 'node_modules', opts.browserEngine);
   if (!fs.existsSync(enginePkgDir)) {
