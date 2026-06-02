@@ -42,7 +42,7 @@ std::vector<HardwareDecoder*>& GetActiveDecoders() {
 // didBecomeActive). Read by onDecodeFrame() to fast-fail any decode attempt while in this
 // window, since calling VTDecompressionSessionDecodeFrame may block indefinitely once the
 // app moves to the background, defeating the invalidateSession() unblock done at willResign.
-std::atomic<bool> g_appInactive{false};
+std::atomic<bool> appInactive{false};
 
 // Registers global willResignActive / didBecomeActive observers once. The blocks run on a
 // dedicated NSOperationQueue (not the main thread), so they bypass the synchronous-observer
@@ -59,7 +59,7 @@ void RegisterAppLifecycleObserversOnce() {
                     object:nil
                      queue:queue
                 usingBlock:^(NSNotification*) {
-                  g_appInactive.store(true, std::memory_order_release);
+                  appInactive.store(true, std::memory_order_release);
                   std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
                   for (auto* decoder : GetActiveDecoders()) {
                     decoder->invalidateSession();
@@ -70,7 +70,7 @@ void RegisterAppLifecycleObserversOnce() {
                     object:nil
                      queue:queue
                 usingBlock:^(NSNotification*) {
-                  g_appInactive.store(false, std::memory_order_release);
+                  appInactive.store(false, std::memory_order_release);
                 }];
   });
 }
@@ -348,7 +348,7 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   // iOS suspends the hardware decoder pipeline as the app heads to the background; returning
   // Error here lets the caller release device.locker so the main thread can complete
   // EAGLDevice::finish() within the watchdog window.
-  if (g_appInactive.load(std::memory_order_acquire)) {
+  if (appInactive.load(std::memory_order_acquire)) {
     return DecodingResult::Error;
   }
 
