@@ -130,13 +130,6 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
-  // Evaluates the given animation at the given microsecond time and writes results into the
-  // supplied runtime binding. contextDoc is the document whose nodeMap channel target IDs are
-  // looked up against; it differs from `document` when the timeline was spawned by a sealed
-  // cross-document wrapper. Called by PAGTimeline::apply().
-  void applyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
-                      int64_t microseconds, float mix);
-
   // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
   // runtime binding and resolving channel targets against contextDoc. Used by PAGComposition::Make
   // for composition-spawned timelines. Caller owns the returned shared_ptr; the file does not

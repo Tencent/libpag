@@ -30,7 +30,7 @@ class PAGXDocument;
 
 /**
  * PAGTimeline drives a single Animation inside a PAGFile. It owns the playback state (current
- * frame, playing flag) and writes the evaluated property values back to the runtime tgfx tree of
+ * frame, playing flag) and writes the evaluated property values back to the runtime layer tree of
  * its owning PAGFile via apply().
  *
  * PAGTimeline must not be constructed directly; obtain instances through PAGFile::getTimeline().
@@ -80,7 +80,7 @@ class PAGTimeline {
 
   /**
    * Sets the current playback time in microseconds. Only updates the internal time; callers must
-   * invoke apply() to write the resulting values into the runtime tgfx tree.
+   * invoke apply() to write the resulting values into the runtime layer tree.
    */
   void setCurrentTime(int64_t microseconds);
 
@@ -91,7 +91,7 @@ class PAGTimeline {
 
   /**
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not write any
-   * values to the runtime tgfx tree.
+   * values to the runtime layer tree.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
    * @return true if the current time changed, false if the timeline is paused or
    *         deltaMicroseconds is zero.
@@ -99,8 +99,8 @@ class PAGTimeline {
   bool advance(int64_t deltaMicroseconds);
 
   /**
-   * Evaluates all properties at the current time and writes the results into the runtime tgfx
-   * tree of the owning PAGFile, blended with the existing values by mix.
+   * Evaluates all properties at the current time and writes the results into the runtime layer
+   * tree, blended with the existing values by mix.
    *
    * Mixing rules:
    *   - Continuous channels (float / Color): result = lerp(current, evaluated, mix). Color channels
@@ -122,22 +122,21 @@ class PAGTimeline {
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
  private:
-  PAGTimeline(std::weak_ptr<PAGFile> file, Animation* animation, RuntimeBinding* binding,
-              PAGXDocument* contextDoc);
+  PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc);
 
-  std::weak_ptr<PAGFile> ownerFile = {};
   Animation* animation = nullptr;
   // Runtime binding the channel writers should target. Top-level timelines use the owning
-  // PAGFile's binding; slot timelines use the binding built for that slot.
+  // PAGFile's binding; composition timelines use the binding built for that composition.
   RuntimeBinding* binding = nullptr;
   // Document used to resolve channel target IDs at apply time. Top-level timelines use the file's
-  // primary document; slot timelines spawned by external composition layers use the layer's
-  // externalDoc so internal IDs of the external file stay self-contained.
+  // primary document; timelines spawned by external composition layers use the layer's externalDoc
+  // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
   int64_t currentTimeUs = 0;
   bool playing = false;
 
   friend class PAGFile;
+  friend class PAGComposition;
 };
 
 }  // namespace pagx

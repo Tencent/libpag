@@ -18,8 +18,11 @@
 
 #include "pagx/PAGTimeline.h"
 #include <algorithm>
-#include "pagx/PAGFile.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Property.h"
+#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
@@ -35,9 +38,39 @@ static int64_t DurationMicros(const Animation* animation) {
                               static_cast<double>(animation->frameRate));
 }
 
-PAGTimeline::PAGTimeline(std::weak_ptr<PAGFile> file, Animation* anim, RuntimeBinding* binding,
-                         PAGXDocument* contextDoc)
-    : ownerFile(std::move(file)), animation(anim), binding(binding), contextDoc(contextDoc) {
+// Evaluates the given animation at the given microsecond time and writes the results into the
+// supplied runtime binding. contextDoc is the document whose nodeMap channel target IDs are looked
+// up against; it differs from the file's primary document when the timeline was spawned by a sealed
+// cross-document composition. Stateless: depends only on its arguments.
+static void ApplyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
+                           int64_t microseconds, float mix) {
+  if (animation == nullptr || binding == nullptr || contextDoc == nullptr) {
+    return;
+  }
+  if (mix <= 0.0f) {
+    return;
+  }
+  auto clampedMix = std::min(1.0f, mix);
+  for (auto* object : animation->objects) {
+    if (object == nullptr) {
+      continue;
+    }
+    auto* targetNode = contextDoc->findNode(object->target);
+    if (targetNode == nullptr) {
+      continue;
+    }
+    for (auto* property : object->properties) {
+      if (property == nullptr) {
+        continue;
+      }
+      binding->apply(targetNode, property->channel,
+                     property->evaluateAt(microseconds, animation->frameRate), clampedMix);
+    }
+  }
+}
+
+PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc)
+    : animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
 const std::string& PAGTimeline::getId() const {
@@ -123,15 +156,11 @@ void PAGTimeline::apply(float mix) {
   if (animation == nullptr) {
     return;
   }
-  auto file = ownerFile.lock();
-  if (file == nullptr) {
-    return;
-  }
   auto clamped = std::clamp(mix, 0.0f, 1.0f);
   if (clamped <= 0.0f) {
     return;
   }
-  file->applyAnimation(animation, binding, contextDoc, currentTimeUs, clamped);
+  ApplyAnimation(animation, binding, contextDoc, currentTimeUs, clamped);
 }
 
 bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {

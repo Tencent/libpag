@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGFile.h"
-#include <algorithm>
 #include "pagx/nodes/Animation.h"
-#include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/PAGComposition.h"
@@ -115,8 +112,8 @@ std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& id) {
   }
   // Top-level timelines target the file's top-level runtime binding directly. Channel target IDs
   // are resolved against the primary document.
-  auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(
-      std::weak_ptr<PAGFile>(shared_from_this()), matched, &layerTree->binding, document.get()));
+  auto timeline =
+      std::shared_ptr<PAGTimeline>(new PAGTimeline(matched, &layerTree->binding, document.get()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -203,34 +200,6 @@ void PAGFile::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
   // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
 }
 
-void PAGFile::applyAnimation(Animation* animation, RuntimeBinding* binding,
-                             PAGXDocument* contextDoc, int64_t microseconds, float mix) {
-  if (animation == nullptr || document == nullptr || binding == nullptr) {
-    return;
-  }
-  if (mix <= 0.0f) {
-    return;
-  }
-  auto* lookupDoc = contextDoc != nullptr ? contextDoc : document.get();
-  auto clampedMix = std::min(1.0f, mix);
-  for (auto* object : animation->objects) {
-    if (object == nullptr) {
-      continue;
-    }
-    auto* targetNode = lookupDoc->findNode(object->target);
-    if (targetNode == nullptr) {
-      continue;
-    }
-    for (auto* property : object->properties) {
-      if (property == nullptr) {
-        continue;
-      }
-      binding->apply(targetNode, property->channel,
-                     property->evaluateAt(microseconds, animation->frameRate), clampedMix);
-    }
-  }
-}
-
 std::shared_ptr<PAGTimeline> PAGFile::createCompositionTimeline(Animation* animation,
                                                                 RuntimeBinding* binding,
                                                                 PAGXDocument* contextDoc) {
@@ -238,8 +207,7 @@ std::shared_ptr<PAGTimeline> PAGFile::createCompositionTimeline(Animation* anima
     return nullptr;
   }
   auto* effectiveDoc = contextDoc != nullptr ? contextDoc : document.get();
-  return std::shared_ptr<PAGTimeline>(new PAGTimeline(std::weak_ptr<PAGFile>(shared_from_this()),
-                                                      animation, binding, effectiveDoc));
+  return std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding, effectiveDoc));
 }
 
 RuntimeBinding* PAGFile::mutableBinding() {
