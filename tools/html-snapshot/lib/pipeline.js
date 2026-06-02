@@ -295,6 +295,12 @@ function noopLog() {}
 //
 // `keepSubsetHtml` controls whether the subset HTML survives on disk after
 // import; when false the file is written to a self-cleaning temp dir.
+//
+// `snapshotImpl` (optional) replaces the default fork-`node snapshot.js` step
+// with a caller-provided async function of the same `(snapshotArgs) => { code,
+// durationMs, stderr }` shape. Batch mode injects an in-process variant that
+// reuses one long-lived browser across many files; everyone else relies on the
+// default fork-per-file path.
 async function runHtmlToPagx(opts = {}) {
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
   const pagxBin = opts.pagxBin || defaultPagxBin();
@@ -355,15 +361,21 @@ async function runHtmlToPagx(opts = {}) {
   }
 
   // Step counter for human-readable progress prints. Matches the old bash
-  // wrapper's `[N/M] step ...` format that batch-html2pagx.sh and CI logs
-  // depend on for line-wise grepping.
+  // wrapper's `[N/M] step ...` format that lib/batch.js and CI logs depend
+  // on for line-wise grepping.
   let totalSteps = 2;
   if (doResolve) totalSteps = 3;
   if (doRender) totalSteps = 4;
 
+  // Step 1 implementation is injectable. Default = fork `node snapshot.js` per
+  // file (the historical CLI behaviour). Batch mode (`lib/batch.js`) injects an
+  // in-process variant that calls `lib/snapshot-runner.js` against a single
+  // long-lived browser, saving ~1.5s of Chromium startup per file.
+  const snapshotImpl = typeof opts.snapshotImpl === 'function' ? opts.snapshotImpl : runSnapshot;
+
   try {
     log(`[1/${totalSteps}] snapshot  ${opts.input}`);
-    const snapshotResult = await runSnapshot({
+    const snapshotResult = await snapshotImpl({
       input: opts.input,
       output: subsetHtml,
       scriptDir,

@@ -10,6 +10,12 @@
 // Pipeline orchestration lives in `lib/pipeline.js`; this file is the CLI
 // front-end. eval/run.js consumes the same pipeline module so a behaviour
 // change here automatically lands on both entry points.
+//
+// `--batch <dir>` switches to the recursive directory mode (formerly the
+// separate `batch-html2pagx.sh` wrapper). Batch runs route through
+// `lib/batch.js`, which launches one browser, then loops calling
+// `runHtmlToPagx` with an in-process snapshot adapter so Chromium startup
+// is paid once for the whole batch instead of once per file.
 
 'use strict';
 
@@ -21,6 +27,7 @@ const {
   runHtmlToPagx,
   isHttpUrl,
 } = require('./lib/pipeline');
+const { runBatch } = require('./lib/batch');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';
@@ -35,10 +42,21 @@ rendered PAGX. Wraps four steps:
 
 Usage:
   html2pagx <input.html | http(s)://url> [options]
+  html2pagx --batch <input-dir> [options]
 
 Options (any unknown flag is forwarded to snapshot.js):
   -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
-  --output-name <name>       Base name for outputs (required when input is a URL)
+  --output-name <name>       Base name for outputs (required when input is a URL,
+                             rejected in --batch mode)
+  --batch <dir>              Recursively scan <dir> for .html/.htm (excluding
+                             *.subset.html / *.subset.htm) and run the pipeline
+                             on each file with one shared headless browser
+  --output-root <dir>        Mirror batch outputs under <dir> instead of next
+                             to inputs (--batch only)
+  --skip-existing            In --batch mode, skip files whose target .pagx
+                             already exists
+  --dry-run                  In --batch mode, list the files that would be
+                             processed without launching a browser or pagx
   --pagx-bin <path>          Path to the pagx CLI (default: $PAGX_BIN or
                              ../../cmake-build-debug/pagx relative to this script)
   --scale <N>                Render scale factor (default: 1)
@@ -114,6 +132,12 @@ function parseArgs(argv) {
     viewportHeight: undefined,
     waitMs: undefined,
     selector: '',
+    // Batch-mode flags. `batchDir` doubling as the mode switch keeps the
+    // single-file CLI intact when the flag is absent.
+    batchDir: '',
+    outputRoot: '',
+    skipExisting: false,
+    dryRun: false,
     // Browser engine: defaults to puppeteer; --browser-engine wins over the
     // env var which wins over this default. Captured separately from the
     // flag pass-through so the preflight check below can read it.
@@ -211,6 +235,18 @@ function parseArgs(argv) {
       case '--browser-engine':
         opts.browserEngine = requireValue(a, argv[++i]);
         break;
+      case '--batch':
+        opts.batchDir = requireValue(a, argv[++i]);
+        break;
+      case '--output-root':
+        opts.outputRoot = requireValue(a, argv[++i]);
+        break;
+      case '--skip-existing':
+        opts.skipExisting = true;
+        break;
+      case '--dry-run':
+        opts.dryRun = true;
+        break;
       case '--':
         // Everything past `--` would have been forwarded to snapshot.js by
         // the old bash wrapper. None of the supported flags are positional,
@@ -231,8 +267,25 @@ function parseArgs(argv) {
         break;
     }
   }
-  if (!opts.input) {
-    failArg('missing input HTML file');
+  if (opts.batchDir) {
+    // Batch mode owns the input slot — accepting a positional `input` here
+    // would let the user accidentally pass both an HTML file and a directory.
+    if (opts.input) {
+      failArg(`--batch is incompatible with positional input '${opts.input}'`);
+    }
+    if (opts.outputName) {
+      failArg('--batch is incompatible with --output-name (each file derives its own name)');
+    }
+    if (opts.outputDir) {
+      failArg('--batch uses --output-root, not --output-dir');
+    }
+  } else {
+    if (opts.outputRoot) failArg('--output-root only applies in --batch mode');
+    if (opts.skipExisting) failArg('--skip-existing only applies in --batch mode');
+    if (opts.dryRun) failArg('--dry-run only applies in --batch mode');
+    if (!opts.input) {
+      failArg('missing input HTML file');
+    }
   }
   return opts;
 }
@@ -302,6 +355,47 @@ function preflightPagxBin(opts) {
 
 async function main() {
   const opts = parseArgs(process.argv);
+
+  // Batch mode forks the control flow early: lib/batch.js owns directory
+  // walking, browser lifecycle, and progress prints. The single-file path
+  // below stays unchanged so existing CLI invocations are unaffected.
+  if (opts.batchDir) {
+    preflightBrowser(opts);
+    preflightPagxBin(opts);
+    let result;
+    try {
+      result = await runBatch({
+        inputDir: opts.batchDir,
+        outputRoot: opts.outputRoot,
+        skipExisting: opts.skipExisting,
+        dryRun: opts.dryRun,
+        scriptDir: SCRIPT_DIR,
+        pagxBin: opts.pagxBin,
+        scale: opts.scale,
+        doResolve: opts.doResolve,
+        doRender: opts.doRender,
+        inferFlex: opts.inferFlex,
+        keepSubsetHtml: opts.keepSubsetHtml,
+        embedFonts: opts.embedFonts,
+        downloadFonts: opts.downloadFonts,
+        fontDir: opts.fontDir,
+        downloadImages: opts.downloadImages,
+        imageDir: opts.imageDir,
+        browserEngine: opts.browserEngine,
+        inlineIconFonts: opts.inlineIconFonts,
+        cookies: opts.cookies,
+        headers: opts.headers,
+        viewportWidth: opts.viewportWidth,
+        viewportHeight: opts.viewportHeight,
+        waitMs: opts.waitMs,
+        selector: opts.selector,
+      });
+    } catch (err) {
+      fail(err && err.message ? err.message : String(err), 1);
+    }
+    if (result.failed > 0) process.exit(1);
+    return;
+  }
 
   if (isHttpUrl(opts.input)) {
     if (!opts.outputName) {
