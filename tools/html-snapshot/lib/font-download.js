@@ -44,14 +44,7 @@ const crypto = require('crypto');
 const { errMessage } = require('./common');
 const { writeFileAtomic } = require('./atomic-write');
 const { makeCaptureListener } = require('./capture-listener');
-
-let opentype = null;
-let wawoff2 = null;
-function loadDeps() {
-  if (!opentype) opentype = require('opentype.js');
-  if (!wawoff2) wawoff2 = require('wawoff2');
-  return { opentype, wawoff2 };
-}
+const { loadFontCodec } = require('./font-codec');
 
 // Hard cap on reading a single font response body. Mirrors the icon-font
 // fetch timeout — a hung CDN must not stall the whole snapshot.
@@ -81,7 +74,7 @@ function isWoff(buf) {
 //     to SFNT with `font.toArrayBuffer()` so tgfx can load it.
 //   - SFNT:  returned unchanged.
 async function toSfnt(buffer) {
-  const { opentype: ot, wawoff2: w2 } = loadDeps();
+  const { opentype: ot, wawoff2: w2 } = loadFontCodec();
   if (isWoff2(buffer)) {
     const decoded = await w2.decompress(buffer);
     return Buffer.isBuffer(decoded) ? decoded : Buffer.from(decoded);
@@ -129,7 +122,7 @@ function nameFrom(names, key) {
 // font by the family name *inside* the file at load time, so a wrong filename
 // here never affects rendering, only legibility on disk.
 function readFontMeta(sfnt) {
-  const { opentype: ot } = loadDeps();
+  const { opentype: ot } = loadFontCodec();
   let family = '';
   let style = '';
   let isCFF = false;

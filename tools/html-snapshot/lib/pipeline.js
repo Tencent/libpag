@@ -41,18 +41,19 @@ const { spawn } = require('child_process');
 
 const { defaultPagxBin, filterKnownWarnings } = require('./pagx-runner');
 const { isHttpUrl } = require('./common');
+const { ChildProcessError } = require('./errors');
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
 // html2pagx CLI can print a clean `html2pagx: <step> failed` message and
-// surface the underlying tool's diagnostics.
-class PipelineStepError extends Error {
-  constructor(message, { step, code, stderr } = {}) {
-    super(message);
+// surface the underlying tool's diagnostics. Inherits `{ code, stderr }`
+// field initialisation from `ChildProcessError`; only the `step` label and
+// `name` are specific to this subclass.
+class PipelineStepError extends ChildProcessError {
+  constructor(message, opts = {}) {
+    super(message, opts);
     this.name = 'PipelineStepError';
-    this.step = step || '';
-    this.code = code === undefined ? null : code;
-    this.stderr = stderr || '';
+    this.step = opts.step || '';
   }
 }
 

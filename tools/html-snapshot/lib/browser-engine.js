@@ -244,6 +244,35 @@ async function addInitScript(page, engine, script) {
   await page.evaluateOnNewDocument(script);
 }
 
+// Patterns thrown by puppeteer / playwright when the browser binary is
+// missing or wasn't downloaded into the cache the engine looks at. Lives in
+// one place so the diagnostic helper below stays in sync with what the
+// engines actually emit.
+const LAUNCH_MISSING_BROWSER_RE = /Could not find Chrome|Failed to launch the browser process|Executable doesn't exist/i;
+
+// Inspect a `launchBrowser` rejection and return a list of stderr lines that
+// tell the user how to install the missing browser binary, or `null` when
+// the error is something other than "browser cache empty / wrong path".
+//
+// Centralised so the exact wording (and the install commands embedded in it)
+// lives next to the launcher itself, instead of being copied into every
+// entry point that calls `launchBrowser`. Returning lines (rather than
+// printing) lets each caller route them through its own logger / log
+// prefix; snapshot.js prepends `LOG_PREFIX` to each line, the HTTP server
+// would prepend its own banner, etc.
+function formatLaunchHint(err, engine) {
+  const msg = (err && typeof err.message === 'string') ? err.message : String(err);
+  if (!LAUNCH_MISSING_BROWSER_RE.test(msg)) return null;
+  const lines = [`failed to launch headless Chromium for engine '${engine}'. Try:`];
+  if (engine === 'playwright') {
+    lines.push(`  npx --prefix tools/html-snapshot playwright install chromium`);
+  } else {
+    lines.push(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
+    lines.push(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
+  }
+  return lines;
+}
+
 module.exports = {
   SUPPORTED_ENGINES,
   DEFAULT_ENGINE,
@@ -257,4 +286,5 @@ module.exports = {
   addCookies,
   responseBytes,
   addInitScript,
+  formatLaunchHint,
 };

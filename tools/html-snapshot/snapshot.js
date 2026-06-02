@@ -28,8 +28,8 @@
 
 const fs = require('fs');
 const { parseArgs } = require('./lib/cli');
-const { LOG_PREFIX, errMessage } = require('./lib/common');
-const { launchBrowser } = require('./lib/browser-engine');
+const { LOG_PREFIX } = require('./lib/common');
+const { launchBrowser, formatLaunchHint } = require('./lib/browser-engine');
 const { runSnapshot } = require('./lib/snapshot-runner');
 
 async function main() {
@@ -52,15 +52,9 @@ async function main() {
     // `npm install` redirected the engine's download cache. Surface a one-line
     // hint so users can fix it without reading the full stack trace; the
     // original error still propagates so non-cache failures aren't masked.
-    const msg = errMessage(err);
-    if (/Could not find Chrome|Failed to launch the browser process|Executable doesn't exist/i.test(msg)) {
-      console.error(`${LOG_PREFIX}failed to launch headless Chromium for engine '${opts.browserEngine}'. Try:`);
-      if (opts.browserEngine === 'playwright') {
-        console.error(`  npx --prefix tools/html-snapshot playwright install chromium`);
-      } else {
-        console.error(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
-        console.error(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
-      }
+    const hint = formatLaunchHint(err, opts.browserEngine);
+    if (hint) {
+      for (const line of hint) console.error(`${LOG_PREFIX}${line}`);
     }
     throw err;
   }

@@ -27,6 +27,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const { ChildProcessError } = require('./errors');
 
 // Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
@@ -43,13 +44,14 @@ function defaultPagxBin() {
 
 // Tagged error type so the caller (HTTP handler) can distinguish a pagx
 // failure from a snapshot failure and surface a clean 5xx with a
-// remediation hint, without losing pagx's stderr trail.
-class PagxImportError extends Error {
-  constructor(message, { stderr, code } = {}) {
-    super(message);
+// remediation hint, without losing pagx's stderr trail. Inherits the
+// `{ code, stderr }` field initialisation from `ChildProcessError`; the
+// override here only sets `name` so `instanceof PagxImportError` and the
+// stringified stack still identify the specific failure mode.
+class PagxImportError extends ChildProcessError {
+  constructor(message, opts) {
+    super(message, opts);
     this.name = 'PagxImportError';
-    this.stderr = stderr || '';
-    this.code = code === undefined ? null : code;
   }
 }
 

@@ -37,14 +37,7 @@
 const fsp = require('fs').promises;
 const { DROP_TAG_NAMES } = require('./dom-tags');
 const { errMessage } = require('./common');
-
-let opentype = null;
-let wawoff2 = null;
-function loadDeps() {
-  if (!opentype) opentype = require('opentype.js');
-  if (!wawoff2) wawoff2 = require('wawoff2');
-  return { opentype, wawoff2 };
-}
+const { loadFontCodec } = require('./font-codec');
 
 // ===== Browser-side helpers =====
 //
@@ -419,7 +412,7 @@ async function fetchFontBytes(url) {
 // decoder; everything else is fed straight to `opentype.parse`, which
 // already handles WOFF natively.
 async function parseFontBuffer(buffer) {
-  const { opentype, wawoff2 } = loadDeps();
+  const { opentype, wawoff2 } = loadFontCodec();
   let bytes = buffer;
   if (bytes.length >= 4 && bytes[0] === 0x77 && bytes[1] === 0x4F && bytes[2] === 0x46 && bytes[3] === 0x32) {
     const decoded = await wawoff2.decompress(bytes);
