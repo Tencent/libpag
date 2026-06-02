@@ -6371,11 +6371,11 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositions.size(), 1u);
+  ASSERT_EQ(file->composition->childCompositions.size(), 1u);
 
   // Per-slot binding should expose the child Layer's tgfx instance — and that instance must
   // differ from anything stored in the top-level binding (top-level has the slot Layer only).
-  auto& slotTree = file->compositions[0]->mutableBinding();
+  auto& slotTree = file->composition->childCompositions[0]->composition->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
   ASSERT_TRUE(tgfxChild != nullptr);
 
@@ -6423,10 +6423,10 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   doc->layers.push_back(slotB);
 
   auto file = pagx::PAGFile::Make(doc);
-  ASSERT_EQ(file->compositions.size(), 2u);
+  ASSERT_EQ(file->composition->childCompositions.size(), 2u);
 
-  auto& treeA = file->compositions[0]->mutableBinding();
-  auto& treeB = file->compositions[1]->mutableBinding();
+  auto& treeA = file->composition->childCompositions[0]->composition->binding;
+  auto& treeB = file->composition->childCompositions[1]->composition->binding;
   auto tgfxChildA = treeA.get<tgfx::Layer>(fx.childLayer);
   auto tgfxChildB = treeB.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
@@ -6478,13 +6478,13 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositions.size(), 1u);
+  ASSERT_EQ(file->composition->childCompositions.size(), 1u);
 
   // The inner child's tgfx layer lives in the nested child composition's binding.
-  auto& outerComposition = *file->compositions[0];
-  ASSERT_EQ(outerComposition.childCompositions.size(), 1u);
-  auto& innerComposition = *outerComposition.childCompositions[0];
-  auto tgfxInnerChild = innerComposition.mutableBinding().get<tgfx::Layer>(inner.childLayer);
+  auto& outerComposition = *file->composition->childCompositions[0];
+  ASSERT_EQ(outerComposition.composition->childCompositions.size(), 1u);
+  auto& innerComposition = *outerComposition.composition->childCompositions[0];
+  auto tgfxInnerChild = innerComposition.composition->binding.get<tgfx::Layer>(inner.childLayer);
   ASSERT_TRUE(tgfxInnerChild != nullptr);
 
   // Advance 30 frames @ 60fps = 500_000 us. The nested timeline must be driven to alpha = 0.5.
@@ -6609,7 +6609,7 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
 
   // The composition's driver timeline did advance — verify via the child alpha after apply.
   file->apply();
-  auto& compositionTree = file->compositions[0]->mutableBinding();
+  auto& compositionTree = file->composition->childCompositions[0]->composition->binding;
   auto tgfxChild = compositionTree.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 
@@ -6678,12 +6678,12 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositions.size(), 1u);
+  ASSERT_EQ(file->composition->childCompositions.size(), 1u);
   file->advanceAndApply(500'000);
 
   auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(externalChild != nullptr);
-  auto& slotTree = file->compositions[0]->mutableBinding();
+  auto& slotTree = file->composition->childCompositions[0]->composition->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
   ASSERT_TRUE(tgfxChild != nullptr);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);

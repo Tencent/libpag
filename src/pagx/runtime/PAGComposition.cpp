@@ -27,32 +27,13 @@
 
 namespace pagx {
 
-std::unique_ptr<PAGComposition> PAGComposition::Make(const Layer* ownerLayer, PAGFile* parentFile) {
-  if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
-    return nullptr;
-  }
-  auto composition = std::unique_ptr<PAGComposition>(new PAGComposition(ownerLayer, parentFile));
-  auto* externalDoc = ownerLayer->externalDoc.get();
-  composition->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
-  composition->buildSubtree();
-  composition->spawnTimelines(ownerLayer->timelines);
-  composition->buildChildCompositions();
-  return composition;
-}
-
-PAGComposition::PAGComposition(const Layer* ownerLayer, PAGFile* parentFile)
-    : ownerLayer(ownerLayer), parentFile(parentFile) {
-}
-
-PAGComposition::~PAGComposition() = default;
-
-void PAGComposition::buildSubtree() {
+void PAGComposition::Impl::buildSubtree() {
   auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
   root = std::move(buildResult.root);
   binding = std::move(buildResult.binding);
 }
 
-void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
+void PAGComposition::Impl::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
   if (parentFile == nullptr || document == nullptr) {
     return;
   }
@@ -76,33 +57,7 @@ void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>
   }
 }
 
-void PAGComposition::advance(int64_t deltaMicroseconds) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->advance(deltaMicroseconds);
-    }
-  }
-  for (auto& child : childCompositions) {
-    if (child != nullptr) {
-      child->advance(deltaMicroseconds);
-    }
-  }
-}
-
-void PAGComposition::apply(float mix) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->apply(mix);
-    }
-  }
-  for (auto& child : childCompositions) {
-    if (child != nullptr) {
-      child->apply(mix);
-    }
-  }
-}
-
-void PAGComposition::buildChildCompositions() {
+void PAGComposition::Impl::buildChildCompositions() {
   if (ownerLayer == nullptr || ownerLayer->composition == nullptr) {
     return;
   }
@@ -110,11 +65,11 @@ void PAGComposition::buildChildCompositions() {
     if (compLayer == nullptr || compLayer->composition == nullptr) {
       continue;
     }
-    auto childComposition = PAGComposition::Make(compLayer, parentFile);
+    auto childComposition = PAGComposition::MakeChild(compLayer, parentFile);
     if (childComposition == nullptr) {
       continue;
     }
-    auto childRoot = childComposition->rootLayer();
+    auto childRoot = childComposition->composition->root;
     if (childRoot != nullptr) {
       auto container = binding.get<tgfx::Layer>(compLayer);
       if (container != nullptr) {
@@ -122,6 +77,54 @@ void PAGComposition::buildChildCompositions() {
       }
     }
     childCompositions.push_back(std::move(childComposition));
+  }
+}
+
+std::unique_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
+                                                          PAGFile* parentFile) {
+  if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
+    return nullptr;
+  }
+  auto composition = std::unique_ptr<PAGComposition>(new PAGComposition());
+  auto* impl = composition->composition.get();
+  impl->ownerLayer = ownerLayer;
+  impl->parentFile = parentFile;
+  auto* externalDoc = ownerLayer->externalDoc.get();
+  impl->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
+  impl->buildSubtree();
+  impl->spawnTimelines(ownerLayer->timelines);
+  impl->buildChildCompositions();
+  return composition;
+}
+
+PAGComposition::PAGComposition() : composition(std::make_unique<Impl>()) {
+}
+
+PAGComposition::~PAGComposition() = default;
+
+void PAGComposition::advance(int64_t deltaMicroseconds) {
+  for (auto& timeline : composition->timelines) {
+    if (timeline != nullptr) {
+      timeline->advance(deltaMicroseconds);
+    }
+  }
+  for (auto& child : composition->childCompositions) {
+    if (child != nullptr) {
+      child->advance(deltaMicroseconds);
+    }
+  }
+}
+
+void PAGComposition::apply(float mix) {
+  for (auto& timeline : composition->timelines) {
+    if (timeline != nullptr) {
+      timeline->apply(mix);
+    }
+  }
+  for (auto& child : composition->childCompositions) {
+    if (child != nullptr) {
+      child->apply(mix);
+    }
   }
 }
 

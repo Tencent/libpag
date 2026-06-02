@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
@@ -31,7 +32,6 @@ namespace pagx {
 
 class Animation;
 class Node;
-class PAGComposition;
 struct RuntimeBinding;
 
 /**
@@ -39,10 +39,14 @@ struct RuntimeBinding;
  * registry, and the draw surface binding. Multiple PAGFile instances can be created from the same
  * PAGXDocument; each one has independent runtime state but shares the underlying template data.
  *
+ * PAGFile is the top-level PAGComposition: its base holds the file's top-level runtime subtree,
+ * binding, and the nested child compositions. PAGFile adds the file-level state (source document,
+ * timeline registry, display options, and the draw surface binding).
+ *
  * PAGFile keeps the source PAGXDocument alive through a shared_ptr held internally, so callers
  * may release their own document handle once the PAGFile is created.
  */
-class PAGFile : public std::enable_shared_from_this<PAGFile> {
+class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFile> {
  public:
   /**
    * Creates a PAGFile bound to the given PAGXDocument. The document is retained for the lifetime
@@ -107,17 +111,19 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    * spawned by Layer.timelines drivers that declare auto-play; top-level animations are not
    * touched and must be driven explicitly via getTimeline(...)->advanceAndApply(...).
    *
-   * Business code calls this once per frame to advance the composition subtree. When mixing
-   * multiple top-level animations, drive each timeline via getTimeline(id)->advance(dt) /
-   * apply(mix) yourself, then call advance(dt) once for the compositions.
+   * Inherited from PAGComposition: the file root spawns no timelines of its own, so advance()
+   * only recurses into the child compositions. When mixing multiple top-level animations, drive
+   * each timeline via getTimeline(id)->advance(dt) / apply(mix) yourself, then call advance(dt)
+   * once for the compositions.
    */
-  void advance(int64_t deltaMicroseconds);
+  using PAGComposition::advance;
 
   /**
    * Re-applies every runtime composition (recursing into nested child compositions) at its
-   * current time, without advancing. Useful after a new PAGSurface is bound.
+   * current time, without advancing. Useful after a new PAGSurface is bound. Inherited from
+   * PAGComposition.
    */
-  void apply();
+  using PAGComposition::apply;
 
   /**
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply().
@@ -131,9 +137,9 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
   // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
-  // runtime binding and resolving channel targets against contextDoc. Used by PAGComposition::Make
-  // for composition-spawned timelines. Caller owns the returned shared_ptr; the file does not
-  // register these timelines into timelinesByAnimation.
+  // runtime binding and resolving channel targets against contextDoc. Used by
+  // PAGComposition::MakeChild for composition-spawned timelines. Caller owns the returned
+  // shared_ptr; the file does not register these timelines into timelinesByAnimation.
   std::shared_ptr<PAGTimeline> createCompositionTimeline(Animation* animation,
                                                          RuntimeBinding* binding,
                                                          PAGXDocument* contextDoc);
@@ -145,13 +151,11 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
-  // Runtime compositions, one per top-level Layer with composition!=null.
-  std::vector<std::unique_ptr<PAGComposition>> compositions = {};
-
-  // The runtime layer tree opaque pointer; concrete type lives in PAGFile.cpp to avoid pulling
-  // tgfx layer types into the public header.
-  struct LayerTreeStorage;
-  std::unique_ptr<LayerTreeStorage> layerTree = {};
+  // File-level runtime extras not held by the PAGComposition base: the draw surface display list
+  // and its attachment flag. The top-level subtree root and binding live in the base composition.
+  // The concrete type lives in PAGFile.cpp to avoid pulling tgfx layer types into this header.
+  struct FileStorage;
+  std::unique_ptr<FileStorage> fileStorage = {};
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 

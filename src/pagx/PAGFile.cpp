@@ -26,9 +26,7 @@
 
 namespace pagx {
 
-struct PAGFile::LayerTreeStorage {
-  std::shared_ptr<tgfx::Layer> root = nullptr;
-  RuntimeBinding binding = {};
+struct PAGFile::FileStorage {
   tgfx::DisplayList displayList;
   bool rootAttached = false;
 };
@@ -42,29 +40,30 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   }
   auto file = std::shared_ptr<PAGFile>(new PAGFile());
   file->document = document;
-  file->layerTree = std::make_unique<LayerTreeStorage>();
+  file->fileStorage = std::make_unique<FileStorage>();
   file->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(file));
   auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
-  file->layerTree->root = std::move(buildResult.root);
-  file->layerTree->binding = std::move(buildResult.binding);
+  file->composition->root = std::move(buildResult.root);
+  file->composition->binding = std::move(buildResult.binding);
   // Build runtime compositions: each top-level Layer with composition!=null gets its own
   // PAGComposition instance, which constructs a per-instance subtree and spawns timeline drivers.
+  // These become the file root's child compositions in the PAGComposition base.
   for (auto* layer : document->layers) {
     if (layer == nullptr || layer->composition == nullptr) {
       continue;
     }
-    auto composition = PAGComposition::Make(layer, file.get());
+    auto composition = PAGComposition::MakeChild(layer, file.get());
     if (composition == nullptr) {
       continue;
     }
-    auto compositionRoot = composition->rootLayer();
+    auto compositionRoot = composition->composition->root;
     if (compositionRoot != nullptr) {
-      auto container = file->layerTree->binding.get<tgfx::Layer>(layer);
+      auto container = file->composition->binding.get<tgfx::Layer>(layer);
       if (container != nullptr) {
         container->addChild(compositionRoot);
       }
     }
-    file->compositions.push_back(std::move(composition));
+    file->composition->childCompositions.push_back(std::move(composition));
   }
   // PR1 only registers the file itself; node-level reverse mapping is populated when notifyChange
   // dispatch is wired up (PR11). Pass an empty referenced-node list for now.
@@ -113,7 +112,7 @@ std::shared_ptr<PAGTimeline> PAGFile::getTimeline(const std::string& id) {
   // Top-level timelines target the file's top-level runtime binding directly. Channel target IDs
   // are resolved against the primary document.
   auto timeline =
-      std::shared_ptr<PAGTimeline>(new PAGTimeline(matched, &layerTree->binding, document.get()));
+      std::shared_ptr<PAGTimeline>(new PAGTimeline(matched, &composition->binding, document.get()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -133,13 +132,13 @@ bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
   if (surface == nullptr || surface->drawable == nullptr) {
     return false;
   }
-  if (layerTree == nullptr || layerTree->root == nullptr) {
+  if (composition->root == nullptr) {
     return false;
   }
   auto& drawable = surface->drawable;
-  if (!layerTree->rootAttached) {
-    layerTree->displayList.root()->addChild(layerTree->root);
-    layerTree->rootAttached = true;
+  if (!fileStorage->rootAttached) {
+    fileStorage->displayList.root()->addChild(composition->root);
+    fileStorage->rootAttached = true;
   }
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -154,7 +153,7 @@ bool PAGFile::draw(const std::shared_ptr<PAGSurface>& surface) {
     device->unlock();
     return false;
   }
-  layerTree->displayList.render(tgfxSurface.get());
+  fileStorage->displayList.render(tgfxSurface.get());
   drawable->present(context);
   device->unlock();
   return true;
@@ -170,25 +169,6 @@ float PAGFile::getHeight() const {
 
 PAGDisplayOptions* PAGFile::getDisplayOptions() const {
   return displayOptions.get();
-}
-
-void PAGFile::advance(int64_t deltaMicroseconds) {
-  // Drives only the timelines spawned by Layer.timelines drivers. Each runtime composition advances
-  // its own timelines and recursively advances its child compositions. Top-level animations are not
-  // driven here; callers advance them explicitly via getTimeline(...).
-  for (auto& composition : compositions) {
-    if (composition != nullptr) {
-      composition->advance(deltaMicroseconds);
-    }
-  }
-}
-
-void PAGFile::apply() {
-  for (auto& composition : compositions) {
-    if (composition != nullptr) {
-      composition->apply(1.0f);
-    }
-  }
 }
 
 void PAGFile::advanceAndApply(int64_t deltaMicroseconds) {
@@ -211,11 +191,11 @@ std::shared_ptr<PAGTimeline> PAGFile::createCompositionTimeline(Animation* anima
 }
 
 RuntimeBinding* PAGFile::mutableBinding() {
-  return layerTree != nullptr ? &layerTree->binding : nullptr;
+  return &composition->binding;
 }
 
 void* PAGFile::getDisplayListForOptions() const {
-  return layerTree != nullptr ? &layerTree->displayList : nullptr;
+  return fileStorage != nullptr ? &fileStorage->displayList : nullptr;
 }
 
 }  // namespace pagx
