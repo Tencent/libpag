@@ -30,7 +30,7 @@ Text::~Text() {
 Text::Text() : glyphData(new GlyphData()) {
 }
 
-static TextLayoutParams MakeStandaloneParams(const Text* text) {
+static TextLayoutParams MakeTextNodeStandaloneParams(const Text* text) {
   TextLayoutParams params = {};
   params.baseline = text->baseline;
   switch (text->textAnchor) {
@@ -49,7 +49,7 @@ static TextLayoutParams MakeStandaloneParams(const Text* text) {
 
 void Text::onMeasure(LayoutContext* context) {
   textScale = 1.0f;
-  auto params = MakeStandaloneParams(this);
+  auto params = MakeTextNodeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
@@ -77,7 +77,7 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
   float origH = textBounds.height;
   if (scale != 1.0f) {
     textScale = scale;
-    auto params = MakeStandaloneParams(this);
+    auto params = MakeTextNodeStandaloneParams(this);
     params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
