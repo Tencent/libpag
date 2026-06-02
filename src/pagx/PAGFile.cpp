@@ -50,24 +50,24 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
   file->layerTree->root = std::move(buildResult.root);
   file->layerTree->binding = std::move(buildResult.binding);
-  // Build runtime composition slots: each top-level Layer with composition!=null gets its own
-  // PAGComposition instance, which constructs a per-slot subtree and spawns timeline drivers.
+  // Build runtime compositions: each top-level Layer with composition!=null gets its own
+  // PAGComposition instance, which constructs a per-instance subtree and spawns timeline drivers.
   for (auto* layer : document->layers) {
     if (layer == nullptr || layer->composition == nullptr) {
       continue;
     }
-    auto slot = PAGComposition::Make(layer, file.get());
-    if (slot == nullptr) {
+    auto composition = PAGComposition::Make(layer, file.get());
+    if (composition == nullptr) {
       continue;
     }
-    auto slotRoot = slot->rootLayer();
-    if (slotRoot != nullptr) {
+    auto compositionRoot = composition->rootLayer();
+    if (compositionRoot != nullptr) {
       auto container = file->layerTree->binding.get<tgfx::Layer>(layer);
       if (container != nullptr) {
-        container->addChild(slotRoot);
+        container->addChild(compositionRoot);
       }
     }
-    file->compositionSlots.push_back(std::move(slot));
+    file->compositions.push_back(std::move(composition));
   }
   // PR1 only registers the file itself; node-level reverse mapping is populated when notifyChange
   // dispatch is wired up (PR11). Pass an empty referenced-node list for now.
@@ -180,28 +180,20 @@ const PAGDisplayOptions* PAGFile::getDisplayOptions() const {
 }
 
 void PAGFile::advance(int64_t deltaMicroseconds) {
-  // Default top-level timeline acts as master clock.
-  auto defaultTimeline = getDefaultTimeline();
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->advance(deltaMicroseconds);
-  }
-  // Slot timelines spawned by Layer.timelines drivers follow the master clock. Each slot advances
-  // its own timelines and recursively advances its nested child slots.
-  for (auto& slot : compositionSlots) {
-    if (slot != nullptr) {
-      slot->advance(deltaMicroseconds);
+  // Drives only the timelines spawned by Layer.timelines drivers. Each runtime composition advances
+  // its own timelines and recursively advances its child compositions. Top-level animations are not
+  // driven here; callers advance them explicitly via getTimeline(...).
+  for (auto& composition : compositions) {
+    if (composition != nullptr) {
+      composition->advance(deltaMicroseconds);
     }
   }
 }
 
 void PAGFile::apply() {
-  auto defaultTimeline = getDefaultTimeline();
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->apply(1.0f);
-  }
-  for (auto& slot : compositionSlots) {
-    if (slot != nullptr) {
-      slot->apply(1.0f);
+  for (auto& composition : compositions) {
+    if (composition != nullptr) {
+      composition->apply(1.0f);
     }
   }
 }
@@ -243,9 +235,9 @@ void PAGFile::applyAnimation(Animation* animation, RuntimeBinding* binding,
   }
 }
 
-std::shared_ptr<PAGTimeline> PAGFile::createSlotTimeline(Animation* animation,
-                                                         RuntimeBinding* binding,
-                                                         PAGXDocument* contextDoc) {
+std::shared_ptr<PAGTimeline> PAGFile::createCompositionTimeline(Animation* animation,
+                                                                RuntimeBinding* binding,
+                                                                PAGXDocument* contextDoc) {
   if (animation == nullptr || binding == nullptr) {
     return nullptr;
   }

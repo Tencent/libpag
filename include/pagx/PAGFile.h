@@ -107,23 +107,22 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    */
   const PAGDisplayOptions* getDisplayOptions() const;
 
- private:
-  PAGFile() = default;
-
   /**
-   * Advances the master clock by deltaMicroseconds and applies the result to the runtime tree.
-   * The master clock drives the default top-level timeline (animations[0]) and every spawned slot
-   * timeline inside Composition slots, recursing into nested child slots; non-default top-level
-   * timelines are independent and must be advanced via getTimeline(...) directly.
+   * Advances every runtime composition (recursing into nested child compositions) by
+   * deltaMicroseconds and applies the result to the runtime tree. Drives only the timelines
+   * spawned by Layer.timelines drivers that declare auto-play; top-level animations are not
+   * touched and must be driven explicitly via getTimeline(...)->advanceAndApply(...).
    *
-   * Internal driving entry point. The public playback API for callers is getTimeline(...), through
-   * which a PAGTimeline is advanced and applied explicitly.
+   * Mirrors Rive's artboard.advance(dt): business code calls this once per frame to advance the
+   * composition subtree. When mixing multiple top-level animations, drive each timeline via
+   * getTimeline(id)->advance(dt) / apply(mix) yourself, then call advance(dt) once for the
+   * compositions.
    */
   void advance(int64_t deltaMicroseconds);
 
   /**
-   * Re-applies the default timeline plus every spawned slot timeline (recursing into nested child
-   * slots) at their current times, without advancing.
+   * Re-applies every runtime composition (recursing into nested child compositions) at its
+   * current time, without advancing. Useful after a new PAGSurface is bound.
    */
   void apply();
 
@@ -131,6 +130,9 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply().
    */
   void advanceAndApply(int64_t deltaMicroseconds);
+
+ private:
+  PAGFile() = default;
 
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
@@ -144,10 +146,11 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
 
   // Constructs a PAGTimeline targeting the given animation, applying its writes to the supplied
   // runtime binding and resolving channel targets against contextDoc. Used by PAGComposition::Make
-  // for slot-spawned timelines. Caller owns the returned shared_ptr; the file does not register
-  // slot timelines into timelinesByAnimation.
-  std::shared_ptr<PAGTimeline> createSlotTimeline(Animation* animation, RuntimeBinding* binding,
-                                                  PAGXDocument* contextDoc);
+  // for composition-spawned timelines. Caller owns the returned shared_ptr; the file does not
+  // register these timelines into timelinesByAnimation.
+  std::shared_ptr<PAGTimeline> createCompositionTimeline(Animation* animation,
+                                                         RuntimeBinding* binding,
+                                                         PAGXDocument* contextDoc);
 
   RuntimeBinding* mutableBinding();
 
@@ -156,8 +159,8 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
-  // Composition slots, one per top-level Layer with composition!=null.
-  std::vector<std::unique_ptr<PAGComposition>> compositionSlots = {};
+  // Runtime compositions, one per top-level Layer with composition!=null.
+  std::vector<std::unique_ptr<PAGComposition>> compositions = {};
 
   // The runtime layer tree opaque pointer; concrete type lives in PAGFile.cpp to avoid pulling
   // tgfx layer types into the public header.

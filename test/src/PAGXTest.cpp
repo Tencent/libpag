@@ -6371,11 +6371,11 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositionSlots.size(), 1u);
+  ASSERT_EQ(file->compositions.size(), 1u);
 
   // Per-slot binding should expose the child Layer's tgfx instance — and that instance must
   // differ from anything stored in the top-level binding (top-level has the slot Layer only).
-  auto& slotTree = file->compositionSlots[0]->mutableBinding();
+  auto& slotTree = file->compositions[0]->mutableBinding();
   auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
   ASSERT_TRUE(tgfxChild != nullptr);
 
@@ -6423,10 +6423,10 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   doc->layers.push_back(slotB);
 
   auto file = pagx::PAGFile::Make(doc);
-  ASSERT_EQ(file->compositionSlots.size(), 2u);
+  ASSERT_EQ(file->compositions.size(), 2u);
 
-  auto& treeA = file->compositionSlots[0]->mutableBinding();
-  auto& treeB = file->compositionSlots[1]->mutableBinding();
+  auto& treeA = file->compositions[0]->mutableBinding();
+  auto& treeB = file->compositions[1]->mutableBinding();
   auto tgfxChildA = treeA.get<tgfx::Layer>(fx.childLayer);
   auto tgfxChildB = treeB.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
@@ -6445,46 +6445,46 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
 
 /**
  * Test case: A Composition nested inside another Composition has its driver-spawned timeline
- * advanced by the master clock too. The inner slot is built recursively (childSlots) and its
- * timeline must be reached by PAGFile::advance, otherwise the nested animation stays frozen.
+ * advanced too. The inner composition is built recursively (childCompositions) and its timeline
+ * must be reached by PAGFile::advance, otherwise the nested animation stays frozen.
  */
-PAGX_TEST(PAGXTest, CompositionSlotNestedDriver) {
+PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   // Inner composition with a child Layer whose alpha is animated 0 -> 1.
   auto inner = MakeAlphaComposition(doc.get(), "inner", "innerEnter", "innerChild");
 
   // Outer composition holds a Layer that references the inner composition and carries a driver
-  // for the inner animation. This Layer becomes a nested child slot of the outer slot.
+  // for the inner animation. This Layer becomes a nested child composition of the outer one.
   auto outerComp = doc->makeNode<pagx::Composition>("outer");
   outerComp->width = 50;
   outerComp->height = 50;
-  auto innerSlotLayer = doc->makeNode<pagx::Layer>("innerSlot");
-  innerSlotLayer->width = 50;
-  innerSlotLayer->height = 50;
-  innerSlotLayer->composition = inner.comp;
+  auto innerRefLayer = doc->makeNode<pagx::Layer>("innerRef");
+  innerRefLayer->width = 50;
+  innerRefLayer->height = 50;
+  innerRefLayer->composition = inner.comp;
   auto innerDriver = std::make_unique<pagx::AnimationTimeline>();
   innerDriver->animationId = inner.animationId;
   innerDriver->playing = true;
-  innerSlotLayer->timelines.push_back(std::move(innerDriver));
-  outerComp->layers.push_back(innerSlotLayer);
+  innerRefLayer->timelines.push_back(std::move(innerDriver));
+  outerComp->layers.push_back(innerRefLayer);
 
-  // Top-level slot Layer references the outer composition (no driver of its own).
-  auto outerSlot = doc->makeNode<pagx::Layer>("outerSlot");
-  outerSlot->composition = outerComp;
-  outerSlot->width = 50;
-  outerSlot->height = 50;
-  doc->layers.push_back(outerSlot);
+  // Top-level Layer references the outer composition (no driver of its own).
+  auto outerRefLayer = doc->makeNode<pagx::Layer>("outerRef");
+  outerRefLayer->composition = outerComp;
+  outerRefLayer->width = 50;
+  outerRefLayer->height = 50;
+  doc->layers.push_back(outerRefLayer);
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositionSlots.size(), 1u);
+  ASSERT_EQ(file->compositions.size(), 1u);
 
-  // The inner child's tgfx layer lives in the nested child slot's binding.
-  auto& outerSlotComp = *file->compositionSlots[0];
-  ASSERT_EQ(outerSlotComp.childSlots.size(), 1u);
-  auto& innerSlotComp = *outerSlotComp.childSlots[0];
-  auto tgfxInnerChild = innerSlotComp.mutableBinding().get<tgfx::Layer>(inner.childLayer);
+  // The inner child's tgfx layer lives in the nested child composition's binding.
+  auto& outerComposition = *file->compositions[0];
+  ASSERT_EQ(outerComposition.childCompositions.size(), 1u);
+  auto& innerComposition = *outerComposition.childCompositions[0];
+  auto tgfxInnerChild = innerComposition.mutableBinding().get<tgfx::Layer>(inner.childLayer);
   ASSERT_TRUE(tgfxInnerChild != nullptr);
 
   // Advance 30 frames @ 60fps = 500_000 us. The nested timeline must be driven to alpha = 0.5.
@@ -6497,9 +6497,7 @@ PAGX_TEST(PAGXTest, CompositionSlotNestedDriver) {
 }
 
 /**
- * Test case: PAGFile::advance acts as the master clock. Calling it advances the default top-level
- * timeline and every slot timeline by the same delta, while non-default top-level timelines are
- * not touched.
+ * Test case: PAGDisplayOptions getters/setters round-trip the configured values.
  */
 PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -6546,11 +6544,11 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   EXPECT_EQ(constFile->getDisplayOptions(), options);
 }
 
-PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
+PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
 
-  // Top-level "main" animation drives a top-level Layer's alpha; this is the master clock.
+  // Top-level "main" animation drives a top-level Layer's alpha; driven explicitly by the caller.
   auto bgLayer = doc->makeNode<pagx::Layer>("bg");
   bgLayer->width = 100;
   bgLayer->height = 100;
@@ -6569,7 +6567,7 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   mainProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   mainObj->properties.push_back(mainProp);
 
-  // A non-default top-level animation that should NOT be advanced by the master clock.
+  // Another top-level animation that must stay untouched by PAGFile::advance.
   auto hintAnim = doc->makeNode<pagx::Animation>("hint");
   hintAnim->duration = 60;
   hintAnim->frameRate = 60;
@@ -6583,16 +6581,16 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   hintProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   hintObj->properties.push_back(hintProp);
 
-  // Slot Layer with composition + driver.
-  auto slot = doc->makeNode<pagx::Layer>("slot");
-  slot->composition = fx.comp;
-  slot->width = 50;
-  slot->height = 50;
+  // Layer referencing a composition + an auto-play driver.
+  auto compLayer = doc->makeNode<pagx::Layer>("compLayer");
+  compLayer->composition = fx.comp;
+  compLayer->width = 50;
+  compLayer->height = 50;
   auto driver = std::make_unique<pagx::AnimationTimeline>();
   driver->animationId = fx.animationId;
   driver->playing = true;
-  slot->timelines.push_back(std::move(driver));
-  doc->layers.push_back(slot);
+  compLayer->timelines.push_back(std::move(driver));
+  doc->layers.push_back(compLayer);
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
@@ -6601,24 +6599,23 @@ PAGX_TEST(PAGXTest, CompositionSlotMasterClockSemantics) {
   auto hintTimeline = file->getTimeline("hint");
   ASSERT_TRUE(mainTimeline != nullptr);
   ASSERT_TRUE(hintTimeline != nullptr);
-  // hint must remain paused (default state); only the master advance call should drive it.
-  EXPECT_FALSE(hintTimeline->isPlaying());
 
-  // Default timeline (master) needs play() to participate in advance(); slot timelines were
-  // started by their drivers' playing=true and stay autonomous.
+  // PAGFile::advance drives only composition-spawned timelines; top-level animations are not
+  // touched, regardless of their playing state.
   mainTimeline->play();
   file->advance(500'000);
-
-  // Master clock advanced default (main).
-  EXPECT_EQ(mainTimeline->currentTime(), 500'000);
-  // Master clock left non-default timelines alone.
+  EXPECT_EQ(mainTimeline->currentTime(), 0);
   EXPECT_EQ(hintTimeline->currentTime(), 0);
-  // Slot timeline (inside the only slot) advanced too — verify by checking slot child alpha
-  // after apply.
+
+  // The composition's driver timeline did advance — verify via the child alpha after apply.
   file->apply();
-  auto& slotTree = file->compositionSlots[0]->mutableBinding();
-  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
+  auto& compositionTree = file->compositions[0]->mutableBinding();
+  auto tgfxChild = compositionTree.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+
+  // Top-level main is driven explicitly by the caller.
+  mainTimeline->advanceAndApply(500'000);
+  EXPECT_EQ(mainTimeline->currentTime(), 500'000);
 }
 
 namespace {
@@ -6681,12 +6678,12 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 
   auto file = pagx::PAGFile::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->compositionSlots.size(), 1u);
+  ASSERT_EQ(file->compositions.size(), 1u);
   file->advanceAndApply(500'000);
 
   auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(externalChild != nullptr);
-  auto& slotTree = file->compositionSlots[0]->mutableBinding();
+  auto& slotTree = file->compositions[0]->mutableBinding();
   auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
   ASSERT_TRUE(tgfxChild != nullptr);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);

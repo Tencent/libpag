@@ -34,18 +34,18 @@ class PAGFile;
 class PAGTimeline;
 
 /**
- * PAGComposition is the runtime instance backing a single Layer.composition slot. Each slot owns
- * its own per-slot layer subtree and timeline list, so multiple Layers referencing the same
- * Composition keep independent state. Children Compositions are constructed recursively.
+ * PAGComposition is the runtime instance backing a single Layer.composition reference. Each
+ * instance owns its own layer subtree and timeline list, so multiple Layers referencing the same
+ * Composition keep independent state. Child compositions are constructed recursively.
  *
  * Internal to the runtime; no public API surface exposes this type.
  */
 class PAGComposition {
  public:
   /**
-   * Builds a runtime slot for ownerLayer.composition. Returns nullptr if ownerLayer is null,
-   * has no composition, or the document is not laid out.
-   * @param ownerLayer the slot Layer in the source document.
+   * Builds a runtime composition instance for ownerLayer.composition. Returns nullptr if ownerLayer
+   * is null, has no composition, or the document is not laid out.
+   * @param ownerLayer the Layer in the source document referencing the composition.
    * @param parentFile the owning PAGFile, used to register spawned PAGTimeline instances. Must not
    *                   be null.
    */
@@ -54,35 +54,29 @@ class PAGComposition {
   ~PAGComposition();
 
   /**
-   * The tgfx layer holding this slot's runtime subtree. The owning PAGFile attaches this layer
-   * as a child of the slot Layer's tgfx container.
+   * The tgfx layer holding this composition's runtime subtree. The owning PAGFile attaches this
+   * layer as a child of the owner Layer's tgfx container.
    */
   std::shared_ptr<tgfx::Layer> rootLayer() const {
     return root;
   }
 
   /**
-   * Per-slot binding used by runtime writers when targeting nodes inside this slot.
+   * Binding used by runtime writers when targeting nodes inside this composition.
    */
   RuntimeBinding& mutableBinding() {
     return binding;
   }
 
   /**
-   * The PAGTimeline instances spawned by this slot's Layer.timelines drivers.
-   */
-  const std::vector<std::shared_ptr<PAGTimeline>>& timelines() const {
-    return slotTimelines;
-  }
-
-  /**
-   * Advances this slot's own spawned timelines, then recursively advances every nested child slot,
-   * so the master clock reaches all timelines in the slot subtree.
+   * Advances this composition's own spawned timelines, then recursively advances every child
+   * composition, so the master clock reaches all timelines in the composition subtree.
    */
   void advance(int64_t deltaMicroseconds);
 
   /**
-   * Applies this slot's own spawned timelines, then recursively applies every nested child slot.
+   * Applies this composition's own spawned timelines, then recursively applies every child
+   * composition.
    */
   void apply(float mix);
 
@@ -91,16 +85,17 @@ class PAGComposition {
 
   void buildSubtree();
   void spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers);
-  void buildChildSlots();
+  void buildChildCompositions();
 
   const Layer* ownerLayer = nullptr;
   PAGFile* parentFile = nullptr;
   PAGXDocument* document = nullptr;
   std::shared_ptr<tgfx::Layer> root = nullptr;
   RuntimeBinding binding = {};
-  std::vector<std::shared_ptr<PAGTimeline>> slotTimelines = {};
-  // Recursive child slots: one entry per Layer inside this slot whose composition field is set.
-  std::vector<std::unique_ptr<PAGComposition>> childSlots = {};
+  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+  // Recursive child compositions: one entry per Layer inside this composition whose composition
+  // field is set.
+  std::vector<std::unique_ptr<PAGComposition>> childCompositions = {};
 };
 
 }  // namespace pagx
