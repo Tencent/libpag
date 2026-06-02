@@ -76,6 +76,32 @@ void PAGComposition::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>
   }
 }
 
+void PAGComposition::advance(int64_t deltaMicroseconds) {
+  for (auto& timeline : slotTimelines) {
+    if (timeline != nullptr) {
+      timeline->advance(deltaMicroseconds);
+    }
+  }
+  for (auto& child : childSlots) {
+    if (child != nullptr) {
+      child->advance(deltaMicroseconds);
+    }
+  }
+}
+
+void PAGComposition::apply(float mix) {
+  for (auto& timeline : slotTimelines) {
+    if (timeline != nullptr) {
+      timeline->apply(mix);
+    }
+  }
+  for (auto& child : childSlots) {
+    if (child != nullptr) {
+      child->apply(mix);
+    }
+  }
+}
+
 void PAGComposition::buildChildSlots() {
   if (ownerLayer == nullptr || ownerLayer->composition == nullptr) {
     return;

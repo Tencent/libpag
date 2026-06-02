@@ -75,6 +75,17 @@ class PAGComposition {
     return slotTimelines;
   }
 
+  /**
+   * Advances this slot's own spawned timelines, then recursively advances every nested child slot,
+   * so the master clock reaches all timelines in the slot subtree.
+   */
+  void advance(int64_t deltaMicroseconds);
+
+  /**
+   * Applies this slot's own spawned timelines, then recursively applies every nested child slot.
+   */
+  void apply(float mix);
+
  private:
   PAGComposition(const Layer* ownerLayer, PAGFile* parentFile);
 

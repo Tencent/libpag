@@ -107,20 +107,23 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    */
   const PAGDisplayOptions* getDisplayOptions() const;
 
+ private:
+  PAGFile() = default;
+
   /**
    * Advances the master clock by deltaMicroseconds and applies the result to the runtime tree.
    * The master clock drives the default top-level timeline (animations[0]) and every spawned slot
-   * timeline inside Composition slots; non-default top-level timelines are independent and must
-   * be advanced via getTimeline(...) directly.
+   * timeline inside Composition slots, recursing into nested child slots; non-default top-level
+   * timelines are independent and must be advanced via getTimeline(...) directly.
    *
-   * Mirrors Rive's artboard.advanceAndApply(dt) idiom: business code typically just calls
-   * file->advance(dt) per frame, then file->draw(surface).
+   * Internal driving entry point. The public playback API for callers is getTimeline(...), through
+   * which a PAGTimeline is advanced and applied explicitly.
    */
   void advance(int64_t deltaMicroseconds);
 
   /**
-   * Re-applies the default timeline plus every spawned slot timeline at their current times,
-   * without advancing. Useful after notifyChange or when a new PAGSurface is bound.
+   * Re-applies the default timeline plus every spawned slot timeline (recursing into nested child
+   * slots) at their current times, without advancing.
    */
   void apply();
 
@@ -128,9 +131,6 @@ class PAGFile : public std::enable_shared_from_this<PAGFile> {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply().
    */
   void advanceAndApply(int64_t deltaMicroseconds);
-
- private:
-  PAGFile() = default;
 
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);

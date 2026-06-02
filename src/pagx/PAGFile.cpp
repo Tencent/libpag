@@ -185,15 +185,11 @@ void PAGFile::advance(int64_t deltaMicroseconds) {
   if (defaultTimeline != nullptr) {
     defaultTimeline->advance(deltaMicroseconds);
   }
-  // Slot timelines spawned by Layer.timelines drivers follow the master clock.
+  // Slot timelines spawned by Layer.timelines drivers follow the master clock. Each slot advances
+  // its own timelines and recursively advances its nested child slots.
   for (auto& slot : compositionSlots) {
-    if (slot == nullptr) {
-      continue;
-    }
-    for (auto& timeline : slot->timelines()) {
-      if (timeline != nullptr) {
-        timeline->advance(deltaMicroseconds);
-      }
+    if (slot != nullptr) {
+      slot->advance(deltaMicroseconds);
     }
   }
 }
@@ -204,13 +200,8 @@ void PAGFile::apply() {
     defaultTimeline->apply(1.0f);
   }
   for (auto& slot : compositionSlots) {
-    if (slot == nullptr) {
-      continue;
-    }
-    for (auto& timeline : slot->timelines()) {
-      if (timeline != nullptr) {
-        timeline->apply(1.0f);
-      }
+    if (slot != nullptr) {
+      slot->apply(1.0f);
     }
   }
 }

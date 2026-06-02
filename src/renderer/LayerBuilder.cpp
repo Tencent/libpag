@@ -475,6 +475,28 @@ class LayerBuilderContext {
     return shapePath;
   }
 
+  static void WriteTextX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* text = static_cast<tgfx::Text*>(object);
+    auto pos = text->position();
+    pos.x = MixFloat(pos.x, *v, mix);
+    text->setPosition(pos);
+  }
+
+  static void WriteTextY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* text = static_cast<tgfx::Text*>(object);
+    auto pos = text->position();
+    pos.y = MixFloat(pos.y, *v, mix);
+    text->setPosition(pos);
+  }
+
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
     auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
@@ -489,6 +511,8 @@ class LayerBuilderContext {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
       _result.binding.set(node, tgfxText);
+      _result.binding.setWriter(node, "x", WriteTextX);
+      _result.binding.setWriter(node, "y", WriteTextY);
     }
     return tgfxText;
   }

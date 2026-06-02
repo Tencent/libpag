@@ -89,6 +89,7 @@
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/SolidColor.h"
+#include "tgfx/layers/vectors/Text.h"
 #include "utils/Baseline.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
@@ -5795,6 +5796,63 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
 }
 
 /**
+ * Test case: Text.x and Text.y channels write the tgfx Text position, blending with mix.
+ */
+PAGX_TEST(PAGXTest, ChannelTextPosition) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto text = doc->makeNode<pagx::Text>("T");
+  text->text = "Hi";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 20;
+  text->position = {0, 0};
+  layer->contents.push_back(text);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "T";
+  anim->objects.push_back(object);
+  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  xProp->channel = "x";
+  xProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(xProp);
+  auto* yProp = doc->makeNode<pagx::TypedProperty<float>>();
+  yProp->channel = "y";
+  yProp->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->properties.push_back(yProp);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+  auto tgfxText = tree.get<tgfx::Text>(text);
+  ASSERT_TRUE(tgfxText != nullptr);
+
+  tgfxText->setPosition(tgfx::Point::Make(20, 40));
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(0.5f);
+  // x: 20 + (100-20)*0.5 = 60; y: 40 + (80-40)*0.5 = 60.
+  EXPECT_FLOAT_EQ(tgfxText->position().x, 60.0f);
+  EXPECT_FLOAT_EQ(tgfxText->position().y, 60.0f);
+}
+
+/**
  * Test case: SolidColor.color channel applies via solidMap with RGBA lerp.
  */
 PAGX_TEST(PAGXTest, ChannelSolidColor) {
@@ -6383,6 +6441,59 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   // Slot B's child apply still ran (apply is independent of playing state) but the timeline's
   // currentTime stayed at 0, so the start-of-segment value (alpha=0) is written.
   EXPECT_NEAR(tgfxChildB->alpha(), 0.0f, 1.0e-3f);
+}
+
+/**
+ * Test case: A Composition nested inside another Composition has its driver-spawned timeline
+ * advanced by the master clock too. The inner slot is built recursively (childSlots) and its
+ * timeline must be reached by PAGFile::advance, otherwise the nested animation stays frozen.
+ */
+PAGX_TEST(PAGXTest, CompositionSlotNestedDriver) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  // Inner composition with a child Layer whose alpha is animated 0 -> 1.
+  auto inner = MakeAlphaComposition(doc.get(), "inner", "innerEnter", "innerChild");
+
+  // Outer composition holds a Layer that references the inner composition and carries a driver
+  // for the inner animation. This Layer becomes a nested child slot of the outer slot.
+  auto outerComp = doc->makeNode<pagx::Composition>("outer");
+  outerComp->width = 50;
+  outerComp->height = 50;
+  auto innerSlotLayer = doc->makeNode<pagx::Layer>("innerSlot");
+  innerSlotLayer->width = 50;
+  innerSlotLayer->height = 50;
+  innerSlotLayer->composition = inner.comp;
+  auto innerDriver = std::make_unique<pagx::AnimationTimeline>();
+  innerDriver->animationId = inner.animationId;
+  innerDriver->playing = true;
+  innerSlotLayer->timelines.push_back(std::move(innerDriver));
+  outerComp->layers.push_back(innerSlotLayer);
+
+  // Top-level slot Layer references the outer composition (no driver of its own).
+  auto outerSlot = doc->makeNode<pagx::Layer>("outerSlot");
+  outerSlot->composition = outerComp;
+  outerSlot->width = 50;
+  outerSlot->height = 50;
+  doc->layers.push_back(outerSlot);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->compositionSlots.size(), 1u);
+
+  // The inner child's tgfx layer lives in the nested child slot's binding.
+  auto& outerSlotComp = *file->compositionSlots[0];
+  ASSERT_EQ(outerSlotComp.childSlots.size(), 1u);
+  auto& innerSlotComp = *outerSlotComp.childSlots[0];
+  auto tgfxInnerChild = innerSlotComp.mutableBinding().get<tgfx::Layer>(inner.childLayer);
+  ASSERT_TRUE(tgfxInnerChild != nullptr);
+
+  // Advance 30 frames @ 60fps = 500_000 us. The nested timeline must be driven to alpha = 0.5.
+  file->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxInnerChild->alpha(), 0.5f, 1.0e-3f);
+
+  // Advance to the end of the segment.
+  file->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxInnerChild->alpha(), 1.0f, 1.0e-3f);
 }
 
 /**
