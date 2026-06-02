@@ -28,7 +28,8 @@ namespace pagx {
  * progress (vertical) at that point. Implementation uses Newton-Raphson with bisection fallback;
  * accuracy is well below the millisecond range needed for keyframe interpolation.
  *
- * Inputs are clamped to [0,1] before solving; the returned value is also clamped to [0,1].
+ * Input progress outside [0,1] short-circuits to the curve endpoints: values <= 0 return 0 and
+ * values >= 1 return 1. The returned value is also clamped to [0,1].
  */
 double SolveBezierEasing(double p1x, double p1y, double p2x, double p2y, double input);
 
