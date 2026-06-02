@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke advanced — blendMode="multiply", miterLimit="2", dashAdaptive true vs false -->
+<pagx width="440" height="300">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="stretch">
+      <Layer height="20">
+        <Text text="Stroke: Advanced" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="blendMode, miterLimit, dashAdaptive" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="12,16,12,16" gap="10" alignment="stretch">
+
+        <!-- Row 1: blendMode + miterLimit side by side -->
+        <Layer layout="horizontal" gap="16" alignment="stretch" arrangement="center">
+
+          <!-- blendMode="multiply" demo -->
+          <Layer layout="vertical" gap="6" alignment="center">
+            <Layer height="12">
+              <Text text="blendMode=multiply" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer width="120" height="70">
+              <Layer name="redCircle">
+                <Ellipse position="45,35" size="55,55"/>
+                <Stroke color="#EF4444" width="8" blendMode="multiply"/>
+              </Layer>
+              <Layer name="blueCircle">
+                <Ellipse position="75,35" size="55,55"/>
+                <Stroke color="#3B82F6" width="8" blendMode="multiply"/>
+              </Layer>
+            </Layer>
+          </Layer>
+
+          <!-- miterLimit demo -->
+          <Layer layout="vertical" gap="6" alignment="center">
+            <Layer height="12">
+              <Text text="miterLimit" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer layout="horizontal" gap="12" alignment="stretch" arrangement="center">
+              <!-- default miterLimit=4 -->
+              <Layer layout="vertical" gap="4" alignment="center">
+                <Layer height="10">
+                  <Text text="default (4)" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                  <Fill color="#64748B"/>
+                </Layer>
+                <Layer width="50" height="40">
+                  <Path data="M 5,5 L 17,35 L 30,5 L 45,35"/>
+                  <Stroke color="#8B5CF6" width="4" join="miter" miterLimit="4"/>
+                </Layer>
+              </Layer>
+              <!-- miterLimit=2 -->
+              <Layer layout="vertical" gap="4" alignment="center">
+                <Layer height="10">
+                  <Text text="miter=2" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+                  <Fill color="#64748B"/>
+                </Layer>
+                <Layer width="50" height="40">
+                  <Path data="M 5,5 L 17,35 L 30,5 L 45,35"/>
+                  <Stroke color="#EC4899" width="4" join="miter" miterLimit="2"/>
+                </Layer>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+
+        <!-- Divider -->
+        <Layer height="1">
+          <Rectangle left="0" right="0" top="0" bottom="0"/>
+          <Fill color="#E2E8F0"/>
+        </Layer>
+
+        <!-- Row 2: dashAdaptive comparison -->
+        <Layer layout="horizontal" gap="12" alignment="stretch" arrangement="center">
+          <!-- dashAdaptive=false -->
+          <Layer flex="1" layout="vertical" gap="6" alignment="center">
+            <Layer height="12">
+              <Text text="dashAdaptive=false" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer width="160" height="58">
+              <Layer name="curveNoAdapt">
+                <Path data="M 5,22 C 40,2 100,52 155,17"/>
+                <Stroke color="#10B981" width="3" cap="round" dashes="12,8" dashAdaptive="false"/>
+              </Layer>
+              <Layer name="lineNoAdapt">
+                <Path data="M 5,47 L 155,47"/>
+                <Stroke color="#10B981" width="2" cap="round" dashes="12,8" dashAdaptive="false"/>
+              </Layer>
+            </Layer>
+          </Layer>
+
+          <!-- Vertical divider -->
+          <Layer width="1">
+            <Rectangle left="0" right="0" top="0" bottom="0"/>
+            <Fill color="#CBD5E1"/>
+          </Layer>
+
+          <!-- dashAdaptive=true -->
+          <Layer flex="1" layout="vertical" gap="6" alignment="center">
+            <Layer height="12">
+              <Text text="dashAdaptive=true" fontFamily="Arial" fontStyle="Bold" fontSize="10" centerX="0" textAnchor="center"/>
+              <Fill color="#94A3B8"/>
+            </Layer>
+            <Layer width="160" height="58">
+              <Layer name="curveAdapt">
+                <Path data="M 5,22 C 40,2 100,52 155,17"/>
+                <Stroke color="#F59E0B" width="3" cap="round" dashes="12,8" dashAdaptive="true"/>
+              </Layer>
+              <Layer name="lineAdapt">
+                <Path data="M 5,47 L 155,47"/>
+                <Stroke color="#F59E0B" width="2" cap="round" dashes="12,8" dashAdaptive="true"/>
+              </Layer>
+            </Layer>
+          </Layer>
+        </Layer>
+
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

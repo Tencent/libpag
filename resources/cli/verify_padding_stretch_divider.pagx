@@ -1,0 +1,7 @@
+<!-- Test: stretch-fill divider affected by horizontal padding -->
+<pagx width="400" height="200">
+  <Layer width="400" height="200" padding="16">
+    <Rectangle left="0" right="0" height="1"/>
+    <Fill color="#ECF0F1"/>
+  </Layer>
+</pagx>

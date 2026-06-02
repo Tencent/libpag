@@ -51,11 +51,6 @@ class PAGXDocument : public Node {
   static std::shared_ptr<PAGXDocument> Make(float width, float height);
 
   /**
-   * Format version.
-   */
-  std::string version = "1.0";
-
-  /**
    * Canvas width.
    */
   float width = 0;
@@ -233,6 +228,21 @@ class PAGXDocument : public Node {
   bool isLayoutApplied() const {
     return layoutApplied;
   }
+
+  /**
+   * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
+   * The document must have had applyLayout() called first so that Text nodes contain valid
+   * layout run data.
+   * @return true if embedding succeeded, false if layout has not been applied.
+   */
+  bool embed();
+
+  /**
+   * Clears all embedded GlyphRuns from Text nodes in the document. Typically called before a
+   * subsequent applyLayout() when re-embedding a file that already has embedded fonts, so that
+   * layout performs runtime shaping instead of reusing stale embedded data.
+   */
+  void clearEmbed();
 
   NodeType nodeType() const override {
     return NodeType::Document;

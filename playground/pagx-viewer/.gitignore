@@ -1,0 +1,11 @@
+# Build outputs
+wasm-mt/
+wasm/
+
+# Build cache
+build-pagx-viewer/
+.*.md5
+.build.lock
+lib/
+types/
+node_modules/

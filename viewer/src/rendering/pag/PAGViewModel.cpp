@@ -227,11 +227,13 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
 
   auto newPagFile = pag::PAGFile::Load(byteData->data(), byteData->length());
   if (newPagFile == nullptr) {
+    Q_EMIT filePathChanged("");
     return false;
   }
 

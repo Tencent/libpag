@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer name="bg">
+    <Rectangle width="200" height="200"/>
+    <Fill color="#336699"/>
+  </Layer>
+</pagx>

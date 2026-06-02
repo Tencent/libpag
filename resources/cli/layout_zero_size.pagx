@@ -1,0 +1,12 @@
+<pagx width="400" height="300">
+  <Layer id="parent" name="parent" width="400" height="300">
+    <Layer id="zero_w" name="zero_w" width="0" height="100">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+    <Layer id="zero_h" name="zero_h" x="50" width="100" height="0">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+  </Layer>
+</pagx>

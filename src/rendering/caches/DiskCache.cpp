@@ -17,6 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
+#ifdef _WIN32
+#include <process.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
+#include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/utils/Directory.h"
@@ -25,6 +32,19 @@
 #include "tgfx/core/Stream.h"
 
 namespace pag {
+
+static void RemoveFileTask(std::string path) {
+  if (remove(path.c_str()) != 0) {
+    LOGE("Failed to remove cached file: %s", path.c_str());
+  }
+}
+
+void DiskCache::RemoveFileAsync(const std::string& filePath) {
+  if (filePath.empty()) {
+    return;
+  }
+  DiskIOWorker::GetInstance()->submit(std::bind(RemoveFileTask, filePath));
+}
 
 class FileInfo {
  public:
@@ -71,7 +91,7 @@ void DiskCache::setCacheDir(const std::string& dir) {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [&](const std::string& path, size_t) { remove(path.c_str()); });
+                            [](const std::string& path, size_t) { RemoveFileAsync(path); });
     }
   }
 }
@@ -102,7 +122,7 @@ DiskCache::DiskCache() {
     cacheFolder = Directory::JoinPath(cacheDir, "files");
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
-                            [&](const std::string& path, size_t) { remove(path.c_str()); });
+                            [](const std::string& path, size_t) { RemoveFileAsync(path); });
     }
   }
 }
@@ -133,7 +153,7 @@ void DiskCache::removeAll() {
     if (openedFiles.count(fileID) > 0) {
       return;
     }
-    remove(path.c_str());
+    RemoveFileAsync(path);
   });
   cachedFileIDs.clear();
   cachedFiles.clear();
@@ -258,7 +278,7 @@ bool DiskCache::checkDiskSpace(size_t maxSize) {
       break;
     }
     auto filePath = fileIDToPath(fileInfo->fileID);
-    remove(filePath.c_str());
+    RemoveFileAsync(filePath);
     totalDiskSize -= fileInfo->fileSize;
     removeFromCachedFiles(fileInfo);
     changed = true;
@@ -332,7 +352,7 @@ bool DiskCache::readConfig() {
     auto fileID = filePathToID(path);
     auto result = cachedFileInfos.find(fileID);
     if (result == cachedFileInfos.end()) {
-      remove(path.c_str());
+      RemoveFileAsync(path);
     } else {
       result->second->fileSize = fileSize;
     }
@@ -355,17 +375,22 @@ bool DiskCache::readConfig() {
 }
 
 void DiskCache::saveConfig() {
-  Directory::CreateRecursively(Directory::GetParentDirectory(configPath));
-  auto file = fopen(configPath.c_str(), "wb");
-  if (file == nullptr) {
-    return;
-  }
+  // Serialize the config data in memory while still holding the lock (caller holds locker).
   size_t bufferSize = 0;
   for (auto& item : cachedFiles) {
     bufferSize += 8 + item->cacheKey.size();
   }
-  tgfx::Buffer buffer(bufferSize);
-  tgfx::DataView dataView(buffer.bytes(), buffer.size());
+  // If there's nothing to save, write an empty config file synchronously (it's fast).
+  if (bufferSize == 0) {
+    Directory::CreateRecursively(Directory::GetParentDirectory(configPath));
+    auto file = fopen(configPath.c_str(), "wb");
+    if (file != nullptr) {
+      fclose(file);
+    }
+    return;
+  }
+  auto data = std::make_shared<tgfx::Buffer>(bufferSize);
+  tgfx::DataView dataView(data->bytes(), data->size());
   size_t pos = 0;
   for (auto item = cachedFiles.rbegin(); item != cachedFiles.rend(); item++) {
     auto& fileInfo = *item;
@@ -376,8 +401,50 @@ void DiskCache::saveConfig() {
     memcpy(dataView.writableBytes() + pos, cacheKey.data(), cacheKey.size());
     pos += cacheKey.size();
   }
-  fwrite(buffer.data(), 1, bufferSize, file);
+  // Increment the version to coalesce multiple rapid saves. If a newer save is queued
+  // before this one executes, skip this write entirely.
+  auto currentVersion = ++configSaveVersion;
+  // Write to disk asynchronously via DiskIOWorker to avoid blocking the calling thread on IO.
+  // Uses temp file + rename for atomic write to prevent corruption if app exits mid-write.
+  // Include PID in temp filename to avoid conflicts when multiple processes share the cache dir.
+  auto path = configPath;
+  auto tempPath = configPath + ".tmp." + std::to_string(getpid());
+  DiskIOWorker::GetInstance()->submit(
+      std::bind(&DiskCache::WriteConfigTask, path, tempPath, data, currentVersion));
+}
+
+void DiskCache::WriteConfigTask(const std::string& path, const std::string& tempPath,
+                                std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion) {
+  // Skip this write if a newer version has been queued.
+  if (currentVersion != GetInstance()->configSaveVersion.load(std::memory_order_acquire)) {
+    return;
+  }
+  Directory::CreateRecursively(Directory::GetParentDirectory(path));
+  auto file = fopen(tempPath.c_str(), "wb");
+  if (file == nullptr) {
+    LOGE("Failed to open config file for writing: %s", tempPath.c_str());
+    return;
+  }
+  auto written = fwrite(data->data(), 1, data->size(), file);
   fclose(file);
+  if (written == data->size()) {
+    // Atomic rename to replace the config file.
+    rename(tempPath.c_str(), path.c_str());
+  } else {
+    // Write failed, remove the incomplete temp file.
+    LOGE("Failed to write config file: %s (written %zu of %zu bytes)", tempPath.c_str(), written,
+         data->size());
+    remove(tempPath.c_str());
+  }
+}
+
+void DiskCache::CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id) {
+  if (fileToClose != nullptr) {
+    fclose(fileToClose);
+  }
+  if (cache != nullptr) {
+    cache->notifyFileClosed(id);
+  }
 }
 
 uint32_t DiskCache::getFileID(const std::string& key) {
@@ -423,7 +490,7 @@ void DiskCache::notifyFileClosed(uint32_t fileID) {
   auto result = cachedFileInfos.find(fileID);
   if (result == cachedFileInfos.end()) {
     auto filePath = fileIDToPath(fileID);
-    remove(filePath.c_str());
+    RemoveFileAsync(filePath);
   } else {
     auto fileInfo = result->second;
     moveToBeforeOpenedFiles(fileInfo);

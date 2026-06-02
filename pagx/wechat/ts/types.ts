@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import type {TGFX} from '@tgfx/types';
+import type {PagxCheckResult} from './pagx-check';
+import type {View} from './pagx-view';
 
 /**
  * Native C++ PAGXView interface exposed via Emscripten bindings.
@@ -110,6 +112,8 @@ export interface PAGXViewNative {
     setBoundsOrigin: (x: number, y: number) => void;
     /** Toggles gesture-freeze rendering; true during active pan/zoom, false otherwise. */
     setGestureActive: (active: boolean) => void;
+    /** Toggles the fitSnapshot fast path. Default true. Disable to force full render every frame. */
+    setSnapshotEnabled: (enabled: boolean) => void;
     /** Returns content transform parameters for mapping cocraft coordinates to canvas positions. */
     getContentTransform: () => ContentTransform;
     /** Looks up a node by ID and returns its position relative to the canvas. */
@@ -218,6 +222,19 @@ export interface PAGX extends TGFX {
         /** Creates a PAGXView instance with the given canvas dimensions. */
         MakeFrom: (width: number, height: number) => PAGXViewNative | null;
     };
+    /**
+     * High-level View class bound onto the module by binding(); only available after
+     * PAGXInit() resolves. Use View.init(module, canvas, options?) to create an instance.
+     */
+    View: typeof View;
+    /**
+     * Asynchronously evaluates the rendering-stutter risk of a PAGX file on the current
+     * device. Bound onto the module by binding(); only callable after PAGXInit() resolves.
+     *
+     * @param pagxData PAGX file bytes.
+     * @returns A promise that resolves with score, benchmark level, device tier and platform.
+     */
+    CheckPagx: (pagxData: Uint8Array) => Promise<PagxCheckResult>;
     VectorString: any;
     module: PAGX;
 }

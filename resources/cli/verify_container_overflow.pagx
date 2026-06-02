@@ -1,0 +1,16 @@
+<pagx width="400" height="300">
+  <Layer width="300" layout="horizontal" gap="10">
+    <Layer width="150">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+    <Layer width="150">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#EF4444"/>
+    </Layer>
+    <Layer width="150">
+      <Rectangle width="100%" height="100%"/>
+      <Fill color="#10B981"/>
+    </Layer>
+  </Layer>
+</pagx>

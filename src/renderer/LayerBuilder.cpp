@@ -36,6 +36,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -182,10 +183,8 @@ class LayerBuilderContext {
                    static_cast<long long>(SampleWasmHeap()));
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
-    // [TEMP] Completely disable scrollRect to verify if the tgfx clip processing causes binding
-    // error. If error disappears, the root cause is in tgfx ClipStack or applyClip.
-    // TODO: Remove this line after root cause is confirmed and fixed.
-    // rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
+    // Apply canvas clipping: the root layer clips to the canvas dimensions.
+    rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer);
       if (childLayer) {
@@ -511,8 +510,9 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
-    rect->setPosition(ToTGFX(node->position));
-    rect->setSize({node->size.width, node->size.height});
+    rect->setPosition(ToTGFX(node->renderPosition()));
+    auto size = node->renderSize();
+    rect->setSize({size.width, size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
     return rect;
@@ -520,18 +520,19 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Ellipse> convertEllipse(const Ellipse* node) {
     auto ellipse = tgfx::Ellipse::Make();
-    ellipse->setPosition(ToTGFX(node->position));
-    ellipse->setSize({node->size.width, node->size.height});
+    ellipse->setPosition(ToTGFX(node->renderPosition()));
+    auto size = node->renderSize();
+    ellipse->setSize({size.width, size.height});
     ellipse->setReversed(node->reversed);
     return ellipse;
   }
 
   std::shared_ptr<tgfx::Polystar> convertPolystar(const Polystar* node) {
     auto polystar = tgfx::Polystar::Make();
-    polystar->setPosition(ToTGFX(node->position));
+    polystar->setPosition(ToTGFX(node->renderPosition()));
     polystar->setPointCount(node->pointCount);
-    polystar->setOuterRadius(node->outerRadius);
-    polystar->setInnerRadius(node->innerRadius);
+    polystar->setOuterRadius(node->renderOuterRadius());
+    polystar->setInnerRadius(node->renderInnerRadius());
     polystar->setOuterRoundness(node->outerRoundness);
     polystar->setInnerRoundness(node->innerRoundness);
     polystar->setRotation(node->rotation);
@@ -544,11 +545,25 @@ class LayerBuilderContext {
     return polystar;
   }
 
+  tgfx::Path getScaledPath(const PathData* pathData, float scale) {
+    PathCacheKey key = {pathData, scale};
+    auto it = _scaledPathCache.find(key);
+    if (it != _scaledPathCache.end()) {
+      return it->second;
+    }
+    auto path = ToTGFX(*pathData);
+    if (scale != 1.0f) {
+      path.transform(tgfx::Matrix::MakeScale(scale));
+    }
+    _scaledPathCache[key] = path;
+    return path;
+  }
+
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
-    shapePath->setPosition(ToTGFX(node->position));
+    shapePath->setPosition(ToTGFX(node->renderPosition()));
     if (node->data) {
-      shapePath->setPath(ToTGFX(*node->data));
+      shapePath->setPath(getScaledPath(node->data, node->renderScale()));
     }
     shapePath->setReversed(node->reversed);
     return shapePath;
@@ -562,7 +577,8 @@ class LayerBuilderContext {
     }
     auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
     if (tgfxText) {
-      tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+      auto pos = node->renderPosition();
+      tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
     }
     return tgfxText;
   }
@@ -685,20 +701,22 @@ class LayerBuilderContext {
     }
   }
 
-  static std::shared_ptr<tgfx::ColorSource> ApplyGradientMatrix(
-      std::shared_ptr<tgfx::Gradient> gradient, const Matrix& matrix) {
-    if (!gradient) {
-      return gradient;
+
+  static std::shared_ptr<tgfx::ColorSource> ApplyGradientProperties(
+      std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node) {
+    if (gradient) {
+      //gradient->setFitsToGeometry(node->fitsToGeometry);
+      // tgfx's new Gradient API defaults _fitsToGeometry = true, which would reinterpret
+      // startPoint/endPoint/center as 0..1 bounding-box relative coordinates. PAGX stores those
+      // points in the parent container's local coordinate space (absolute design-space pixels), so
+      // opt out of per-geometry fitting to preserve the existing semantics. When LayerBuilder is
+      // rewritten to emit bounds-relative gradients this call can be removed.
+      gradient->setFitsToGeometry(false);
+      if (!node->matrix.isIdentity()) {
+        gradient->setMatrix(ToTGFX(node->matrix));
+      }
     }
-    // tgfx's new Gradient API defaults _fitsToGeometry = true, which would reinterpret
-    // startPoint/endPoint/center as 0..1 bounding-box relative coordinates. PAGX stores those
-    // points in the parent container's local coordinate space (absolute design-space pixels), so
-    // opt out of per-geometry fitting to preserve the existing semantics. When LayerBuilder is
-    // rewritten to emit bounds-relative gradients this call can be removed.
-    gradient->setFitsToGeometry(false);
-    if (!matrix.isIdentity()) {
-      gradient->setMatrix(ToTGFX(matrix));
-    }
+
     return gradient;
   }
 
@@ -706,37 +724,35 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
+    return ApplyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
-        node->matrix);
+        node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions),
-        node->matrix);
+    return ApplyGradientProperties(
+        tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
-                                                         node->endAngle, colors, positions),
-                               node->matrix);
+    return ApplyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                             node->endAngle, colors, positions),
+                                   node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     ExtractGradientStops(node->colorStops, &colors, &positions);
-    return ApplyGradientMatrix(
-        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions),
-        node->matrix);
+    return ApplyGradientProperties(
+        tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -751,8 +767,6 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    auto patternMatrix = ToTGFX(node->matrix);
-
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
@@ -766,9 +780,13 @@ class LayerBuilderContext {
     // the fitting business by selecting ScaleMode::None. Once LayerBuilder is migrated to emit
     // ImagePattern::setScaleMode() natively, this opt-out together with
     // ImagePatternMatrixCalculator can be removed in one shot.
-    pattern->setScaleMode(tgfx::ScaleMode::None);
-    if (!patternMatrix.isIdentity()) {
-      pattern->setMatrix(patternMatrix);
+    // pattern->setScaleMode(ToTGFX(node->scaleMode));
+    if (pattern) {
+      pattern->setScaleMode(tgfx::ScaleMode::None);
+      // pattern->setScaleMode(ToTGFX(node->scaleMode));
+      if (!node->matrix.isIdentity()) {
+        pattern->setMatrix(ToTGFX(node->matrix));
+      }
     }
 
     return pattern;
@@ -834,9 +852,14 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::TextPath> convertTextPath(const TextPath* node) {
     auto textPath = tgfx::TextPath::Make();
     if (node->path != nullptr) {
-      textPath->setPath(ToTGFX(*node->path));
+      auto path = getScaledPath(node->path, node->renderScale());
+      auto pos = node->renderPosition();
+      if (pos.x != 0 || pos.y != 0) {
+        path.transform(tgfx::Matrix::MakeTrans(pos.x, pos.y));
+      }
+      textPath->setPath(std::move(path));
     }
-    textPath->setBaselineOrigin(ToTGFX(node->baselineOrigin));
+    textPath->setBaselineOrigin(ToTGFX(node->renderBaselineOrigin()));
     textPath->setBaselineAngle(node->baselineAngle);
     textPath->setFirstMargin(node->firstMargin);
     textPath->setLastMargin(node->lastMargin);
@@ -950,8 +973,9 @@ class LayerBuilderContext {
     if (node->anchor.x != 0 || node->anchor.y != 0) {
       group->setAnchor(ToTGFX(node->anchor));
     }
-    if (node->position.x != 0 || node->position.y != 0) {
-      group->setPosition(ToTGFX(node->position));
+    auto renderPos = node->renderPosition();
+    if (renderPos.x != 0 || renderPos.y != 0) {
+      group->setPosition(ToTGFX(renderPos));
     }
     if (node->scale.x != 1 || node->scale.y != 1) {
       group->setScale(ToTGFX(node->scale));
@@ -981,8 +1005,9 @@ class LayerBuilderContext {
 
     // Apply transformation: combine x/y translation with matrix
     auto matrix = ToTGFX(node->matrix);
-    if (node->x != 0 || node->y != 0) {
-      matrix = tgfx::Matrix::MakeTrans(node->x, node->y) * matrix;
+    auto layerPos = node->renderPosition();
+    if (layerPos.x != 0 || layerPos.y != 0) {
+      matrix = tgfx::Matrix::MakeTrans(layerPos.x, layerPos.y) * matrix;
     }
     if (!matrix.isIdentity()) {
       layer->setMatrix(matrix);
@@ -1128,6 +1153,22 @@ class LayerBuilderContext {
 
   std::unordered_map<const Layer*, std::vector<std::shared_ptr<tgfx::Layer>>>
       _tgfxLayersByPagxLayer = {};
+  struct PathCacheKey {
+    const PathData* data;
+    float scale;
+    bool operator==(const PathCacheKey& other) const {
+      return data == other.data && scale == other.scale;
+    }
+  };
+  struct PathCacheHash {
+    size_t operator()(const PathCacheKey& key) const {
+      auto h1 = std::hash<const void*>{}(key.data);
+      auto h2 = std::hash<float>{}(key.scale);
+      return h1 ^ (h2 << 1);
+    }
+  };
+  std::unordered_map<PathCacheKey, tgfx::Path, PathCacheHash> _scaledPathCache = {};
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};

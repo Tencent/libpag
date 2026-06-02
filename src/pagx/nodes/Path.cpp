@@ -19,46 +19,56 @@
 #include "pagx/nodes/Path.h"
 #include <cmath>
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
 void Path::onMeasure(LayoutContext*) {
   if (data) {
     auto bounds = data->getBounds();
-    preferredX = bounds.x;
-    preferredY = bounds.y;
-    preferredWidth = bounds.width;
-    preferredHeight = bounds.height;
+    // position is the offset of the path coordinate system origin relative to the node origin.
+    preferredX = position.x + bounds.x;
+    preferredY = position.y + bounds.y;
+    // Preferred size: authored width/height overrides the intrinsic path bounds when present.
+    // percentWidth/Height are not consulted here.
+    preferredWidth = std::isnan(width) ? bounds.width : width;
+    preferredHeight = std::isnan(height) ? bounds.height : height;
   }
 }
 
-void Path::setLayoutSize(LayoutContext*, float width, float height) {
+void Path::setLayoutSize(LayoutContext*, float targetWidth, float targetHeight) {
   if (!data) {
     return;
   }
-  float scale = LayoutNode::ComputeUniformScale(preferredWidth, preferredHeight, width, height);
-  if (scale != 1.0f) {
-    data->transform(Matrix::Scale(scale, scale));
-  }
+  // Scale intrinsic path bounds to fit the requested target. NaN on an axis means the parent did
+  // not constrain that axis, so ComputeUniformScale skips it (single-axis proportional scaling).
+  // When both axes are NaN, fall back to the preferred size on both axes so an authored
+  // width/height still drives the scaling even without parent constraints.
   auto bounds = data->getBounds();
-  layoutWidth = bounds.width;
-  layoutHeight = bounds.height;
+  float tW = targetWidth;
+  float tH = targetHeight;
+  if (std::isnan(tW) && std::isnan(tH)) {
+    tW = preferredWidth;
+    tH = preferredHeight;
+  }
+  float scale = LayoutNode::ComputeUniformScale(bounds.width, bounds.height, tW, tH);
+  layoutWidth = bounds.width * scale;
+  layoutHeight = bounds.height * scale;
 }
 
-void Path::setLayoutPosition(LayoutContext*, float x, float y) {
+Point Path::renderPosition() const {
   if (!data) {
-    return;
+    return computeRenderPosition({}, 0, 0);
   }
   auto bounds = data->getBounds();
-  if (!std::isnan(x)) {
-    position.x = x - bounds.x;
-    layoutX = x;
+  return computeRenderPosition(bounds, bounds.width, bounds.height);
+}
+
+float Path::renderScale() const {
+  if (!data) {
+    return 1.0f;
   }
-  if (!std::isnan(y)) {
-    position.y = y - bounds.y;
-    layoutY = y;
-  }
+  auto bounds = data->getBounds();
+  return computeRenderScale(bounds.width, bounds.height);
 }
 
 }  // namespace pagx

@@ -58,7 +58,8 @@ static tgfx::Matrix ComputeGroupMatrix(const Group* group) {
     matrix.postConcat(temp);
   }
   matrix.postRotate(group->rotation);
-  matrix.postTranslate(group->position.x, group->position.y);
+  auto pos = group->renderPosition();
+  matrix.postTranslate(pos.x, pos.y);
   return matrix;
 }
 
@@ -97,6 +98,7 @@ class TextLayoutContext {
     float ascent = 0;
     float descent = 0;
     float fontLineHeight = 0;
+    float letterSpacing = 0;
     Text* sourceText = nullptr;
     uint32_t cluster = 0;
     float xOffset = 0;
@@ -227,7 +229,7 @@ class TextLayoutContext {
     auto metrics = GetFontMetrics(font);
     GlyphInfo gi = {};
     gi.unichar = '\n';
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -250,7 +252,7 @@ class TextLayoutContext {
     gi.unichar = '\t';
     gi.advance = tabAdvance;
     gi.xPosition = xPosition;
-    gi.fontSize = text->fontSize;
+    gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
     gi.descent = metrics.descent;
     gi.fontLineHeight = std::max(0.0f, fabsf(metrics.ascent) + metrics.descent + metrics.leading);
@@ -295,7 +297,7 @@ class TextLayoutContext {
       ShapedInfo info = {};
       info.text = text;
       if (!text->text.empty()) {
-        shapeText(text, info, params.writingMode == WritingMode::Vertical);
+        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.textScale);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -372,7 +374,7 @@ class TextLayoutContext {
     return result;
   }
 
-  void shapeText(Text* text, ShapedInfo& info, bool vertical = false) {
+  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float textScale = 1.0f) {
     auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
@@ -382,15 +384,17 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    tgfx::Font primaryFont(primaryTypeface, text->fontSize);
+    float effectiveFontSize = text->fontSize * textScale;
+    tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(text->fauxBold);
     primaryFont.setFauxItalic(text->fauxItalic);
-    tgfx::Font metricsFont(metricsTypeface, text->fontSize);
+    tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(text->fauxBold);
     metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
-    bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
+    float effectiveLetterSpacing = text->letterSpacing * textScale;
+    bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
 
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
@@ -403,7 +407,7 @@ class TextLayoutContext {
     }
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
-    float tabWidth = text->fontSize * 4;
+    float tabWidth = effectiveFontSize * 4;
 
     for (auto& seg : segments) {
       if (seg.isNewline) {
@@ -460,7 +464,7 @@ class TextLayoutContext {
         gi.advance = sg.xAdvance;
         gi.xPosition = currentX;
         gi.unichar = unichar;
-        gi.fontSize = text->fontSize;
+        gi.fontSize = effectiveFontSize;
         gi.ascent = metrics.ascent;
         gi.descent = metrics.descent;
         gi.fontLineHeight =
@@ -469,16 +473,17 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
+        gi.letterSpacing = effectiveLetterSpacing;
         gi.bidiLevel = seg.bidiLevel;
         info.allGlyphs.push_back(gi);
 
-        currentX += sg.xAdvance + text->letterSpacing;
+        currentX += sg.xAdvance + effectiveLetterSpacing;
       }
     }
 
     // Remove the extra letterSpacing after the last glyph.
     if (hasLetterSpacing && currentX > 0) {
-      currentX -= text->letterSpacing;
+      currentX -= effectiveLetterSpacing;
     }
     info.totalWidth = currentX;
   }
@@ -508,11 +513,20 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       float glyphEndX = currentLineWidth + glyph.advance;
 
+      // CSS hanging whitespace rule: a trailing space/tab at end of line does NOT trigger wrap
+      // even when it exceeds boxWidth. The wrap only fires when the next non-whitespace glyph
+      // pushes the line past boxWidth. Matches Chromium / WebKit / Gecko behaviour so HTML
+      // exporter output aligns with PAGX native rendering without any browser-specific
+      // workarounds. U+3000 (CJK IDEOGRAPHIC SPACE) is excluded because CSS treats it as a
+      // regular glyph that *does* contribute to overflow.
+      bool currentIsHangableWhitespace = (glyph.unichar == ' ' || glyph.unichar == '\t');
+
       // Auto-wrap check
-      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > params.boxWidth) {
+      if (doWrap && !currentLine->glyphs.empty() && glyphEndX > params.boxWidth &&
+          !currentIsHangableWhitespace) {
         if (lastBreakIndex >= 0) {
           // Split at break point: move glyphs after lastBreakIndex to new line
           std::vector<GlyphInfo> overflow(currentLine->glyphs.begin() + lastBreakIndex + 1,
@@ -536,8 +550,7 @@ class TextLayoutContext {
           currentLineWidth = 0;
           for (size_t j = skipCount; j < overflow.size(); j++) {
             overflow[j].xPosition = currentLineWidth;
-            float ls =
-                (overflow[j].sourceText != nullptr) ? overflow[j].sourceText->letterSpacing : 0;
+            float ls = overflow[j].letterSpacing;
             currentLineWidth += overflow[j].advance + ls;
             currentLine->glyphs.push_back(overflow[j]);
           }
@@ -675,8 +688,7 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
-        float ls =
-            (line.glyphs[i].sourceText != nullptr) ? line.glyphs[i].sourceText->letterSpacing : 0;
+        float ls = line.glyphs[i].letterSpacing;
         xPos += effectiveAdvance + ls;
       }
 
@@ -796,6 +808,82 @@ class TextLayoutContext {
         runs.push_back(std::move(run));
         runStart = runEnd;
       }
+    }
+  }
+
+  // Records per-Text column metadata for vertical layouts. Each ColumnInfo becomes one entry in
+  // result.textLines so the PPT exporter can replay columns the same way it replays horizontal
+  // lines. baselineY stores -columnX, mapping right-to-left visual order onto the ascending sort
+  // contract that downstream consumers (PPT writer's stable_sort by baselineY) already use for
+  // top-to-bottom horizontal ordering. Empty ranges (whitespace-only or '\n'-only columns) are
+  // skipped because the PPT writer reconstructs '\n' breaks by walking the source byte gap
+  // between consecutive non-empty entries.
+  static void RecordPerTextColumnMetadata(const ColumnInfo& column, float columnX,
+                                          TextLayoutResult& result) {
+    std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
+    for (const auto& vg : column.glyphs) {
+      for (const auto& g : vg.glyphs) {
+        if (g.unichar == '\n' || g.unichar == '\t' || g.sourceText == nullptr) {
+          continue;
+        }
+        auto rangeIt = perTextClusterRange.find(g.sourceText);
+        if (rangeIt == perTextClusterRange.end()) {
+          perTextClusterRange[g.sourceText] = {g.cluster, g.cluster};
+        } else {
+          rangeIt->second.first = std::min(rangeIt->second.first, g.cluster);
+          rangeIt->second.second = std::max(rangeIt->second.second, g.cluster);
+        }
+      }
+    }
+    for (auto& [text, range] : perTextClusterRange) {
+      uint32_t byteEnd = range.second;
+      if (byteEnd < text->text.size()) {
+        int32_t dummy = 0;
+        size_t charLen =
+            DecodeUTF8Char(text->text.data() + byteEnd, text->text.size() - byteEnd, &dummy);
+        byteEnd += static_cast<uint32_t>(charLen > 0 ? charLen : 1);
+      }
+      TextLayoutLineInfo info = {};
+      info.baselineY = -columnX;
+      info.startX = 0;
+      info.byteStart = range.first;
+      info.byteEnd = byteEnd;
+      result.textLines[text].push_back(info);
+    }
+  }
+
+  // Records per-Text line metadata (byte ranges and positions) for text export. For each Text
+  // element that contributes glyphs to this line, computes the min/max cluster (byte offset in
+  // the source UTF-8 string) and stores it together with the line's baseline Y and start X.
+  static void RecordPerTextLineMetadata(const LineInfo& line, float baselineY, float xOffset,
+                                        TextLayoutResult& result) {
+    std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
+    for (auto& g : line.glyphs) {
+      if (g.unichar == '\n' || g.unichar == '\t' || g.sourceText == nullptr) {
+        continue;
+      }
+      auto rangeIt = perTextClusterRange.find(g.sourceText);
+      if (rangeIt == perTextClusterRange.end()) {
+        perTextClusterRange[g.sourceText] = {g.cluster, g.cluster};
+      } else {
+        rangeIt->second.first = std::min(rangeIt->second.first, g.cluster);
+        rangeIt->second.second = std::max(rangeIt->second.second, g.cluster);
+      }
+    }
+    for (auto& [text, range] : perTextClusterRange) {
+      uint32_t byteEnd = range.second;
+      if (byteEnd < text->text.size()) {
+        int32_t dummy = 0;
+        size_t charLen =
+            DecodeUTF8Char(text->text.data() + byteEnd, text->text.size() - byteEnd, &dummy);
+        byteEnd += static_cast<uint32_t>(charLen > 0 ? charLen : 1);
+      }
+      TextLayoutLineInfo lineInfo = {};
+      lineInfo.baselineY = baselineY;
+      lineInfo.startX = xOffset;
+      lineInfo.byteStart = range.first;
+      lineInfo.byteEnd = byteEnd;
+      result.textLines[text].push_back(lineInfo);
     }
   }
 
@@ -981,7 +1069,7 @@ class TextLayoutContext {
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
-          float letterSpacing = (g.sourceText != nullptr) ? g.sourceText->letterSpacing : 0;
+          float letterSpacing = g.letterSpacing;
           xPos += g.advance + letterSpacing;
         }
       }
@@ -1031,6 +1119,8 @@ class TextLayoutContext {
           tb = Rect::MakeXYWH(left, top, right - left, bottom - top);
         }
       }
+
+      RecordPerTextLineMetadata(line, baselineY, xOffset, result);
     }
   }
 
@@ -1042,9 +1132,7 @@ class TextLayoutContext {
     if (lastVG.glyphs.empty()) {
       return;
     }
-    float ls = (lastVG.glyphs.front().sourceText != nullptr)
-                   ? lastVG.glyphs.front().sourceText->letterSpacing
-                   : 0;
+    float ls = lastVG.glyphs.front().letterSpacing;
     if (ls != 0) {
       lastVG.height -= ls;
     }
@@ -1089,7 +1177,7 @@ class TextLayoutContext {
         continue;
       }
 
-      float letterSpacing = (glyph.sourceText != nullptr) ? glyph.sourceText->letterSpacing : 0;
+      float letterSpacing = glyph.letterSpacing;
       auto orientation = VerticalTextUtils::GetOrientation(glyph.unichar);
 
       {
@@ -1355,6 +1443,11 @@ class TextLayoutContext {
         break;
       }
 
+      // Record per-Text byte ranges for this visible column so the PPT exporter can emit one
+      // <a:t> + <a:br/> per column (mirrors the horizontal getTextLines path). Truncated
+      // columns above are excluded for free because we exit the loop before recording.
+      RecordPerTextColumnMetadata(column, columnX, result);
+
       // Center of this column for centering upright glyphs.
       float columnCenterX = columnX + allocatedWidth / 2;
 
@@ -1468,6 +1561,14 @@ Rect TextLayoutResult::getTextBounds(Text* text) const {
     return it->second;
   }
   return {};
+}
+
+const std::vector<TextLayoutLineInfo>* TextLayoutResult::getTextLines(Text* text) const {
+  auto it = textLines.find(text);
+  if (it != textLines.end()) {
+    return &it->second;
+  }
+  return nullptr;
 }
 
 const std::vector<TextLayoutGlyphRun>* TextLayoutResult::getGlyphRuns(Text* text) const {

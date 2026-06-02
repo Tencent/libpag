@@ -1,0 +1,8 @@
+<pagx width="400" height="300">
+  <Layer width="400" height="300" layout="horizontal">
+    <Layer flex="1">
+      <Path data="M 30 30 L 80 30 L 80 60 L 30 60 Z"/>
+      <Fill color="#F00"/>
+    </Layer>
+  </Layer>
+</pagx>

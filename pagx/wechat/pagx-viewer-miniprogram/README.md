@@ -2,7 +2,7 @@
 
 微信小程序 PAGX 查看器 SDK，提供在微信小程序中渲染 PAGX 动画文件的能力。基于 TGFX 和 WebAssembly 实现高性能 WebGL 渲染。
 
-> 当前版本：**v1.6**
+> 当前版本：**v1.9.2**
 
 ## 目录结构
 
@@ -11,9 +11,10 @@ pagx-viewer-miniprogram/
 ├── package.json
 ├── lib/
 │   ├── pagx-viewer.js        # PAGX 核心库（含 WASM 绑定）
-│   └── pagx-viewer.wasm.br   # 压缩后的 WASM 模块（~954KB）
+│   ├── pagx-viewer.wasm      # 未压缩 WASM 模块（~3.4MB）
+│   └── pagx-viewer.wasm.br   # Brotli 压缩 WASM 模块（~980KB）
 ├── types/                    # TypeScript 类型定义
-│   ├── pagx/wechat/ts/       # PAGX 核心类型
+│   ├── pagx/wechat/ts/       # PAGX 核心类型（pagx / pagx-view / pagx-check / types ...）
 │   └── third_party/tgfx/     # TGFX 图形库类型
 ├── CHANGELOG.md
 └── README.md
@@ -36,7 +37,7 @@ pagx-viewer-miniprogram/
 ```json
 {
   "dependencies": {
-    "@tencent/pagx-viewer-miniprogram": "1.4.0"
+    "@tencent/pagx-viewer-miniprogram": "1.9.1"
   }
 }
 ```
@@ -194,15 +195,31 @@ const module = await PAGXInit({
 | `View.loadPAGX(data: Uint8Array)` | 一步加载 PAGX 文件（解析+构建层树） |
 | `View.parsePAGX(data: Uint8Array)` | 仅解析 PAGX 文件，不构建层树（三步加载第 1 步） |
 | `View.getExternalFilePaths()` | 获取外部图片资源路径列表（三步加载第 2 步） |
-| `View.loadFileData(filePath, fileData)` | 加载外部文件数据到对应 Image 节点（三步加载第 2 步） |
+| `View.loadFileData(filePath, fileData)` | 加载外部文件字节流到对应 Image 节点（wasm 内解码） |
+| `View.loadFileDataAsNativeImage(filePath, nativeImage)` | 把宿主解码好的图片注入 Image 节点；可在 `buildLayers()` 之后调用，用于渐进式首次填图（v1.9+） |
+| `View.upgradeImageFromNative(filePath, nativeImage)` | 替换某 `filePath` 已挂载图片为新版本（缩略图 → 高清升级），并就地重建引用层（v1.9+） |
+| `View.attachNativeImage(filePath, nativeImage, quality)` | 按质量等级（`Thumbnail` / `Full`）上传宿主解码图片为 GPU 常驻 backend texture，并接入 SDK 的 LRU 驱逐（v1.9+） |
+| `View.setTextureEventHandler(handler)` | 注册纹理生命周期回调（`onTextureRequest` / `onTextureEvict`）（v1.9+） |
+| `View.isFullBudgetSaturated()` | 查询 Full 桶是否已越过硬上限（渐进升级循环 gating 用）（v1.9+） |
+| `View.getImageBounds(filePaths)` | 查询图片在 root-space 下的 `unionBounds` / `largestBounds`，需在 `buildLayers()` 之后（v1.9+） |
+| `View.getImageMetadata()` | 列出每个外部图片的原始尺寸 + 每处 `ImagePattern` 用法，需在 `parsePAGX()` 之后（v1.9+） |
 | `View.buildLayers()` | 构建层树，完成渲染内容准备（三步加载第 3 步） |
 | `View.contentWidth()` | 获取 PAGX 内容宽度（物理像素） |
 | `View.contentHeight()` | 获取 PAGX 内容高度（物理像素） |
-| `View.updateZoomScaleAndOffset(zoom, offsetX, offsetY)` | 更新缩放比例和偏移量 |
+| `View.updateZoomScaleAndOffset(zoom, offsetX, offsetY)` | 直接设置缩放与偏移（绝对值，不做 clamp） |
+| `View.panBy(deltaX, deltaY)` | 增量 pan + 自动 clamp + 越界报告（推荐手势驱动） |
+| `View.beginPinchGesture()` | 开始 pinch 手势会话，抓 snapshot（v1.8+） |
+| `View.pinchBy(scale, focalX, focalY)` | 绝对式 pinch zoom + 自动 clamp（v1.8+，覆盖手势/单次离散两种场景） |
+| `View.endPinchGesture()` | 结束 pinch 手势会话，清 snapshot（v1.8+） |
+| `View.setPadding(logicalPx)` | 配置单 Frame 预览单边留白（逻辑像素，默认 0） |
+| `View.getViewportInfo()` | 一次性获取 viewport + content size + boundary 状态 |
 | `View.onZoomEnd()` | ~~缩放结束通知~~（已弃用，内部自动检测） |
 | `View.getContentTransform()` | 获取坐标转换参数，用于评论浮层定位 |
 | `View.getNodePosition(nodeId)` | 通过节点 ID 查询节点相对于画布的位置 |
 | `View.setBoundsOrigin(x, y)` | 手动设置 boundsOrigin，覆盖 PAGX 文件中的值 |
+| `View.setGestureActive(active)` | pan/zoom 开始/结束时切换手势冻结快路径，native 侧 readback surface 作为 cachedSnapshot（v1.9+） |
+| `View.setSnapshotEnabled(enabled)` | fitSnapshot 快路径开关，默认 `true`；关闭可让渐进式加载实时反映新图（v1.9+） |
+| `View.resetForFreshCapture()` | 丢弃 init 之前的 cached / fit 快照、复位首帧标志（v1.9+） |
 | `View.setRenderCallbacks(onBefore?, onAfter?)` | 设置帧渲染回调 |
 | `View.startRendering()` | 开始持续渲染 |
 | `View.stopRendering()` | 停止渲染 |
@@ -210,6 +227,8 @@ const module = await PAGXInit({
 | `View.isCurrentlyRendering()` | 是否正在渲染 |
 | `View.updateSize(width?, height?)` | 更新视图尺寸 |
 | `View.destroy()` | 销毁实例并释放资源 |
+| `View.decodeImageFromPath(filePath)` *(static)* | 把临时文件 / URL 解码到 `OffscreenCanvas`（小程序原生解码线程，可并发）（v1.9+） |
+| `View.decodeImageFromBytes(bytes, hint?)` *(static)* | 把字节流落临时文件后调 `decodeImageFromPath`，自动清理（v1.9+） |
 
 #### View.init 的 options 参数
 
@@ -576,6 +595,142 @@ if (result.found) {
 
 手动设置 boundsOrigin，覆盖 PAGX 文件中的值。当 PAGX 文件未嵌入 `bounds-origin` 数据时使用。
 
+## 单 Frame 预览与手势接入（v1.7+）
+
+`v1.7+` 提供了完整的"单 Frame 预览 + 手势"工具集：`setPadding` / `panBy` /
+`beginPinchGesture` / `pinchBy` / `endPinchGesture` / `getViewportInfo`。SDK
+内部统一处理 fitScale、padding、pan/zoom 边界 clamp，业务层只需把触摸事件
+翻译成对应调用。
+
+> **注意（v1.8 破坏性变更）**：v1.7 的 `zoomBy(scaleDelta, focalX, focalY)`
+> 已删除——它的增量式语义在连续 pinch 手势中会累积浮点误差 + focal 偏移挤压，
+> 视觉上表现为缩放过程中持续平移。请改用 `pinchBy` 系列接口。
+
+### 初始化
+
+```javascript
+// 加载完 PAGX 后配置单边留白（逻辑像素，默认 0）
+View.setPadding(100);
+// 复位到初始 fit + 居中
+View.updateZoomScaleAndOffset(1, 0, 0);
+```
+
+### 单指 pan（带越界报告）
+
+```javascript
+const dpr = wx.getSystemInfoSync().pixelRatio;
+let lastX, lastY;
+
+onTouchStart(e) {
+  if (e.touches.length === 1) {
+    lastX = e.touches[0].x;
+    lastY = e.touches[0].y;
+  }
+},
+onTouchMove(e) {
+  if (e.touches.length !== 1) return;
+  const deltaX = (e.touches[0].x - lastX) * dpr;  // 物理像素增量
+  const deltaY = (e.touches[0].y - lastY) * dpr;
+  lastX = e.touches[0].x;
+  lastY = e.touches[0].y;
+
+  const r = View.panBy(deltaX, deltaY);
+  // r.remainingX > 0：用户继续往右拖但 SDK 已 clamp（已贴右边界）
+  // r.remainingX < 0：用户继续往左拖但 SDK 已 clamp（已贴左边界）
+  // 业务层据此决定是否触发翻页 / 弹性反馈
+  if (r.remainingX !== 0) {
+    // ...更新越界 UI（如箭头提示）
+  }
+}
+```
+
+### 双指 pinch zoom（手势会话）
+
+```javascript
+let initialDist = 0;
+let focalX = 0;
+let focalY = 0;
+
+onTouchStart(e) {
+  if (e.touches.length === 2) {
+    initialDist = Math.hypot(
+      e.touches[1].x - e.touches[0].x,
+      e.touches[1].y - e.touches[0].y
+    );
+    // 锁定双指开始时的捏合中心作为 zoom 锚点（物理像素）。整个手势期间不变。
+    focalX = (e.touches[0].x + e.touches[1].x) * 0.5 * dpr;
+    focalY = (e.touches[0].y + e.touches[1].y) * 0.5 * dpr;
+    View.beginPinchGesture();   // SDK 抓 snapshot
+  }
+},
+onTouchMove(e) {
+  if (e.touches.length !== 2) return;
+  const currentDist = Math.hypot(
+    e.touches[1].x - e.touches[0].x,
+    e.touches[1].y - e.touches[0].y
+  );
+  // scale 是从手势起点到当前的累计比例（绝对值），不是每帧 delta
+  const scale = currentDist / initialDist;
+  View.pinchBy(scale, focalX, focalY);
+  // SDK 内部基于 begin 时的 snapshot 重算 zoom/offset，每帧都是绝对计算 →
+  // 无浮点累积、focal 那个像素视觉上不动、其他内容向 focal 辐射缩放。
+},
+onTouchEnd(e) {
+  if (e.touches.length < 2) {
+    View.endPinchGesture();   // 清 snapshot
+  }
+}
+```
+
+### 单次 zoom（鼠标滚轮 / 双击 / 按钮）
+
+无需 begin/end，直接调 `pinchBy` 单次：
+
+```javascript
+// 鼠标滚轮放大 10%
+View.pinchBy(1.1, mouseX, mouseY);
+
+// 双击放大 2 倍
+View.pinchBy(2, tapX, tapY);
+
+// 按钮 zoom-in 20%（围绕画布中心）
+View.pinchBy(1.2, canvasWidth / 2, canvasHeight / 2);
+```
+
+未在手势会话内调用时，`pinchBy` 基于当前 view 状态做一次绝对 zoom，等价于
+v1.7 旧版 `zoomBy(scale, x, y)` 的单次调用语义。
+
+### 查询当前视口
+
+```javascript
+const v = View.getViewportInfo();
+// {
+//   zoom, offsetX, offsetY,           // 当前 transform
+//   canvasWidth, canvasHeight,         // canvas 物理像素
+//   contentWidth, contentHeight,       // 文档原始尺寸
+//   fitScale,                          // SDK 内部 contain fit 系数
+//   atLeft, atRight, atTop, atBottom,  // 边界标记（0.5px 容差）
+// }
+
+if (v.atLeft) {
+  // 文档已贴到左边界
+}
+```
+
+### 复位
+
+```javascript
+View.updateZoomScaleAndOffset(1, 0, 0);
+```
+
+### 何时直接用 updateZoomScaleAndOffset？
+
+- **绝对跳转**：已知目标 zoom/offset 直接写入（例如恢复历史状态）
+- **自带 clamp 的业务**：业务层已经维护一套自己的边界策略，不希望 SDK 介入
+
+否则推荐用 `panBy / pinchBy` —— SDK 会自动应用 clamp 策略，业务层无需关心
+fitScale、padding、minZoom 等显示数学。
+
 ## 常见问题
 
 ### Canvas 显示黑屏或空白
@@ -646,6 +801,193 @@ onUnload() {
 ### Canvas 尺寸变化后评论位置不对
 
 Canvas 尺寸变化会影响 `fitScale` 和 `centerOffset`。调用 `View.updateSize()` 后需要重新调用 `getContentTransform()` 并重新计算所有评论的 `baseX`/`baseY`。
+
+## 渐进式图片加载（v1.9+）
+
+`v1.9` 引入一套渐进式图片加载工具链，把 webp/png/jpeg 解码从 wasm 主线程下放到小程序原生
+解码器，并在 SDK 内部维护**缩略图 + 高清图**双桶 LRU 缓存。业务层只需关心"下载哪张图"，
+其余（GPU 上传、内存预算、淘汰、缩略图兜底）由 SDK 接管。
+
+### 加载流程
+
+```
+parsePAGX()                        ← 解析 PAGX 文件
+  → getImageMetadata()             ← 拿到所有图片的原始尺寸 + ImagePattern 用法
+  → buildLayers()                  ← 立刻完成布局（图片节点暂为空）
+
+setTextureEventHandler({...})      ← 注册纹理生命周期回调（解决驱逐后的回填）
+
+// 第一阶段：填充缩略图，让所有画面非空
+for (const path of view.getExternalFilePaths()) {
+  attachNativeImage(path, decodedThumbCanvas, ImageQuality.Thumbnail);
+}
+
+// 第二阶段：渐进升级到高清（首屏 / 视口附近优先）
+const bounds = view.getImageBounds(viewportPaths);
+// 按 bounds 与视口距离排序，逐一上传 Full：
+for (const path of sortedPaths) {
+  if (view.isFullBudgetSaturated()) break;
+  attachNativeImage(path, decodedFullCanvas, ImageQuality.Full);
+}
+```
+
+### 双桶模型
+
+| 桶 | 来源 | 是否参与 LRU | 兜底语义 |
+|----|------|-------------|---------|
+| `Thumbnail` | `attachNativeImage(path, canvas, ImageQuality.Thumbnail)` | 不参与（只在桶满时静默淘汰最旧条目）| `Full` 缺失或被驱逐时自动回退绘制 |
+| `Full` | `attachNativeImage(path, canvas, ImageQuality.Full)` | 每帧 LRU 扫描，超预算驱逐时触发 `onTextureEvict` | 主显示纹理 |
+
+被 LRU 扫到的 Full 路径会通过 `onTextureRequest(filePath)` 在下一帧渲染时再次请求；业务层
+拉到原图后再次 `attachNativeImage(..., Full)` 即可。**对 `onTextureRequest` 的响应始终是
+1:1 替换**，不会让总字节数超出预算。
+
+### 解码工具
+
+```javascript
+// 1. 已有 URL / 临时文件路径
+const canvas = await View.decodeImageFromPath(tempFilePath);
+
+// 2. 已有字节流（自动落临时文件 → 解码 → 删除）
+const canvas = await View.decodeImageFromBytes(bytes, 'thumb.webp');
+
+// 3. 注入到对应 Image 节点
+view.attachNativeImage(filePath, canvas, ImageQuality.Full);
+// canvas 可在调用返回后立即丢弃，SDK 已把像素拷到 GPU
+```
+
+`decodeImageFromPath` 走小程序原生 webp/png/jpeg 解码线程，多张图可并发；多次解码不会
+阻塞 wasm 渲染主线程。
+
+### 完整示例
+
+```javascript
+import { PAGXInit, ImageQuality } from './utils/pagx-viewer';
+
+async function progressiveLoad(view, pagxBytes) {
+  view.parsePAGX(pagxBytes);
+
+  // 注册回调：被 LRU 驱逐的路径要在下一帧重新填充
+  view.setTextureEventHandler({
+    onTextureRequest(filePath) {
+      // 异步取原图 → 解码 → 上传 Full（替换性 1:1，安全）
+      fetchAndAttach(filePath, ImageQuality.Full);
+    },
+    onTextureEvict(paths) {
+      paths.forEach((p) => myLocalCache.drop(p));
+    },
+  });
+
+  view.buildLayers();
+
+  // 第一阶段：所有图都先挂缩略图，画面立刻非空
+  const metadata = view.getImageMetadata();
+  await Promise.all(metadata.map(async (m) => {
+    const thumbBytes = await downloadThumb(m.filePath, pickThumbSize(m));
+    const canvas = await View.decodeImageFromBytes(thumbBytes);
+    view.attachNativeImage(m.filePath, canvas, ImageQuality.Thumbnail);
+  }));
+
+  // 第二阶段：按视口距离 / 显示面积排序，渐进升级 Full
+  const bounds = view.getImageBounds(metadata.map((m) => m.filePath));
+  const sortedPaths = sortByViewportDistance(bounds);
+  for (const filePath of sortedPaths) {
+    if (view.isFullBudgetSaturated()) break;
+    await fetchAndAttach(filePath, ImageQuality.Full);
+  }
+
+  async function fetchAndAttach(filePath, quality) {
+    const bytes = await myDownloader(filePath);
+    const canvas = await View.decodeImageFromBytes(bytes);
+    view.attachNativeImage(filePath, canvas, quality);
+  }
+}
+```
+
+### 注意事项
+
+- `getImageBounds()` 必须在 `buildLayers()` 之后调用；首次调用因 tgfx 内部 lazy 计算
+  localBounds 较重，建议放到首帧渲染完成后的 idle 时机（如 `setTimeout(0)` 或 `wx.nextTick`）
+- `getImageMetadata()` 需在 `parsePAGX()` 之后调用，可作为决定缩略图档位的依据
+- 渐进式加载场景下，建议关闭 `setSnapshotEnabled(false)`，避免缩略图被永久 cache 而看不到高清升级
+- `loadFileDataAsNativeImage()`（v1.9 之前已存在的旧入口）仍保留，作为不区分质量等级的简单注入；
+  推荐新代码统一走 `attachNativeImage(..., quality)`，享受 LRU + 缩略图兜底
+
+## PAGX 渲染卡顿预检（v1.9+）
+
+针对低端机加载复杂 PAGX 文件可能卡顿的场景，SDK 提供 `CheckPagx(pagxData)` 异步预检接口，
+业务层可在加载前快速判断当前设备 + 当前文件是否可顺畅渲染。
+
+> **调用方式**：`CheckPagx` 不是从包顶层 import 的独立函数，而是挂在 `PAGXInit` 返回的
+> `module` 上。必须先 `await PAGXInit({...})`，才能通过 `module.CheckPagx(data)` 调用。
+>
+> v1.9.1 起 `PAGX` interface 已显式声明 `CheckPagx` 字段，TypeScript 用户在 `module.CheckPagx(data)`
+> 上可获得完整的入参类型与返回值（`PagxCheckResult`）字段补全。
+
+```javascript
+import { PAGXInit } from './utils/pagx-viewer';
+
+Page({
+  module: null,
+
+  async onLoad() {
+    // 先初始化 wasm 模块
+    this.module = await PAGXInit({
+      locateFile: (file) => '/utils/' + file,
+    });
+
+    // 之后才能调用 CheckPagx
+    await this.safeLoad('/assets/your-animation.pagx');
+  },
+
+  async safeLoad(filePath) {
+    const fs = wx.getFileSystemManager();
+    const data = new Uint8Array(fs.readFileSync(filePath));
+
+    const result = await this.module.CheckPagx(data);
+    // result = { score, benchmarkLevel, deviceTier, platform }
+
+    const minScore = result.platform === 'android' ? 65 : 75;
+    if (result.score < minScore) {
+      wx.showToast({ title: '该文件可能导致卡顿', icon: 'none' });
+      return;
+    }
+
+    // 通过预检 → 正常加载
+    this.View.loadPAGX(data);
+  },
+});
+```
+
+### 评分模型
+
+SDK 沿"五条独立失效路径"中最高风险路径打分（0-100，越高越流畅）：
+
+| 路径 | 计算 |
+|------|------|
+| A. BgBlur × 下方不可缓存元素 | `bg_count × (inner + blur + grad/10)` |
+| B. Path 几何量 | `path_data_bytes (MB)` |
+| C. 大画布 × 元素密度 | `(pix_M/100) × (imgPat + layer/30 + grad/20)` |
+| D. BgBlur 数量 | `bg_count` |
+| E. Layer XML 数量 | 源 XML 中 `<Layer>` 数量 |
+
+### 设备档位（按 `wx.getDeviceBenchmarkInfo`）
+
+| 平台 | 高端机 | 中端机 | 低端机 |
+|------|-------|-------|-------|
+| Android | `benchmarkLevel ≥ 30` | `23–29` | `≤ 22` |
+| iOS | `benchmarkLevel ≥ 36` | `30–35` | `≤ 29` |
+
+中低端机阈值会自动收紧。`benchmarkLevel = -1` 时 `deviceTier = 'unknown'`，使用最保守阈值。
+
+### 返回值
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `score` | `number` | 0-100，越高越流畅 |
+| `benchmarkLevel` | `number` | 微信 API 原始性能等级（-1 = 未知）|
+| `deviceTier` | `'high' \| 'mid' \| 'low' \| 'unknown'` | 档位 |
+| `platform` | `'ios' \| 'android' \| 'other'` | 平台 |
 
 ## 技术限制
 

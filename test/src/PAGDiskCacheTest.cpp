@@ -100,6 +100,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_FALSE(sequenceFile->isComplete());
   EXPECT_EQ(sequenceFile->cachedFrames, 11);
   auto diskCache = sequenceFile->diskCache;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions during readConfig()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
   EXPECT_TRUE(diskCache->cachedFileInfos.size() == 2);
@@ -192,9 +193,11 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
   EXPECT_EQ(diskCache->totalDiskSize,
             lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions from checkDiskSpace()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   PAGDiskCache::SetMaxDiskSize(0);
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_EQ(diskCache->totalDiskSize, sequenceFile->fileSize());
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
@@ -210,6 +213,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/5.bin"));
   sequenceFile = nullptr;
   sequenceFile2 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
   pag::PAGDiskCache::RemoveAll();
@@ -325,18 +329,23 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount);
   decoder2 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
   decoder3 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
   decoder4 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 2);
   decoder5 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 3);
 
@@ -427,6 +436,61 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
   EXPECT_EQ(data->size(), cacheData->size());
   EXPECT_TRUE(memcmp(data->bytes(), cacheData->bytes(), data->size()) == 0);
   pag::PAGDiskCache::RemoveAll();
+}
+
+/**
+ * Tests for DiskIOWorker: serial execution order and waitAll behavior.
+ */
+PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
+  auto worker = DiskIOWorker::GetInstance();
+
+  // Test 1: Verify serial execution order
+  std::vector<int> executionOrder;
+  std::mutex orderMutex;
+  for (int i = 0; i < 5; i++) {
+    worker->submit([i, &executionOrder, &orderMutex]() {
+      std::lock_guard<std::mutex> lock(orderMutex);
+      executionOrder.push_back(i);
+    });
+  }
+  worker->waitAll();
+  ASSERT_EQ(executionOrder.size(), 5u);
+  for (int i = 0; i < 5; i++) {
+    EXPECT_EQ(executionOrder[i], i);
+  }
+
+  // Test 2: Verify waitAll blocks until all tasks complete
+  std::atomic<int> counter{0};
+  for (int i = 0; i < 10; i++) {
+    worker->submit([&counter]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      counter++;
+    });
+  }
+  // Before waitAll, counter may not be 10 yet
+  worker->waitAll();
+  // After waitAll, all tasks must be complete
+  EXPECT_EQ(counter.load(), 10);
+
+  // Test 3: Verify nullptr task is safely ignored
+  worker->submit(nullptr);
+  worker->waitAll();  // Should not crash
+
+  // Test 4: Verify concurrent submit from multiple threads
+  counter = 0;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; i++) {
+    threads.emplace_back([worker, &counter]() {
+      for (int j = 0; j < 25; j++) {
+        worker->submit([&counter]() { counter++; });
+      }
+    });
+  }
+  for (auto& t : threads) {
+    t.join();
+  }
+  worker->waitAll();
+  EXPECT_EQ(counter.load(), 100);
 }
 
 }  // namespace pag

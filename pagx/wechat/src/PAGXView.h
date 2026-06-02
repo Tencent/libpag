@@ -362,6 +362,18 @@ class PAGXView {
   void setGestureActive(bool active);
 
   /**
+   * Toggles the fitSnapshot fast path. When enabled (default), draw() blits a cached
+   * fit-to-canvas snapshot during gestures and at zoom <= 1.02 to avoid the cost of a full
+   * displayList.render(). When disabled, draw() always runs a full render and never captures
+   * a fit snapshot, trading per-frame rendering cost for first-frame clarity and freshness
+   * under progressive image loading.
+   *
+   * Disabling drops any existing fit snapshot and resets the zoom-out idle short-circuit so
+   * the next draw() runs a full render. The setting persists across parsePAGX/buildLayers.
+   */
+  void setSnapshotEnabled(bool enabled);
+
+  /**
    * Returns the content transform parameters needed for mapping cocraft canvas coordinates to
    * canvas pixel positions. The returned JavaScript object contains:
    * - boundsOriginX/Y: PAGX content origin in cocraft canvas coordinates.
@@ -433,6 +445,9 @@ class PAGXView {
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
   // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
   bool zoomedOutFrameSettled = false;
+  // Master switch for the fitSnapshot fast path. When false, draw() always performs a full
+  // displayList.render() and never captures a fit snapshot. Toggled via setSnapshotEnabled().
+  bool snapshotEnabled = true;
   // 距离最近一次手势结束的时间戳（emscripten_get_now ms）。用于让 cachedSnapshot 的
   // 刷新延后到用户真正停下来再做：手势密集时复用上一次稳定 capture 的 cached，避免
   // capture 抓到含 tile fallback 的过渡画面、避免连续 full render 的内存抖动。

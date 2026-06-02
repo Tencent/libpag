@@ -18,7 +18,6 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
-#include <cstdio>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -34,6 +33,7 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -58,222 +58,9 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLBuilder.h"
 
 namespace pagx {
-
-//==============================================================================
-// XMLBuilder - XML generation helper
-//==============================================================================
-
-class XMLBuilder {
- public:
-  XMLBuilder() {
-    tagStack.reserve(32);
-  }
-
-  void appendDeclaration() {
-    buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  }
-
-  void openElement(const char* tag) {
-    writeIndent();
-    buffer += "<";
-    buffer += tag;
-    tagStack.push_back(tag);
-  }
-
-  void addAttribute(const char* name, const std::string& value) {
-    if (!value.empty()) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += escapeXML(value);
-      buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, float value, float defaultValue = 0) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += FloatToString(value);
-      buffer += "\"";
-    }
-  }
-
-  void addRequiredAttribute(const char* name, float value) {
-    buffer += " ";
-    buffer += name;
-    buffer += "=\"";
-    buffer += FloatToString(value);
-    buffer += "\"";
-  }
-
-  void addRequiredAttribute(const char* name, const std::string& value) {
-    buffer += " ";
-    buffer += name;
-    buffer += "=\"";
-    buffer += escapeXML(value);
-    buffer += "\"";
-  }
-
-  void addAttribute(const char* name, int value, int defaultValue = 0) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += std::to_string(value);
-      buffer += "\"";
-    }
-  }
-
-  void addAttribute(const char* name, bool value, bool defaultValue = false) {
-    if (value != defaultValue) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += (value ? "true" : "false");
-      buffer += "\"";
-    }
-  }
-
-  void addOptionalAttribute(const char* name, float value) {
-    if (!std::isnan(value)) {
-      buffer += " ";
-      buffer += name;
-      buffer += "=\"";
-      buffer += FloatToString(value);
-      buffer += "\"";
-    }
-  }
-
-  void closeElementStart() {
-    buffer += ">\n";
-    indentLevel++;
-  }
-
-  void closeElementSelfClosing() {
-    buffer += "/>\n";
-    tagStack.pop_back();
-  }
-
-  void closeElement() {
-    indentLevel--;
-    writeIndent();
-    buffer += "</";
-    buffer += tagStack.back();
-    buffer += ">\n";
-    tagStack.pop_back();
-  }
-
-  void writeRaw(const std::string& content) {
-    buffer += content;
-  }
-
-  void writeRawLine(const std::string& content) {
-    // Handle multi-line content by indenting each line individually.
-    size_t start = 0;
-    while (start < content.size()) {
-      auto end = content.find('\n', start);
-      if (end == std::string::npos) {
-        writeIndent();
-        buffer.append(content, start, content.size() - start);
-        buffer += "\n";
-        break;
-      }
-      writeIndent();
-      buffer.append(content, start, end - start);
-      buffer += "\n";
-      start = end + 1;
-    }
-  }
-
-  void writeComment(const std::string& text) {
-    writeIndent();
-    buffer += "<!-- ";
-    buffer += text;
-    buffer += " -->\n";
-  }
-
-  std::string release() {
-    return std::move(buffer);
-  }
-
- private:
-  std::string buffer = {};
-  std::vector<const char*> tagStack = {};
-  int indentLevel = 0;
-
-  void writeIndent() {
-    buffer.append(static_cast<size_t>(indentLevel * 2), ' ');
-  }
-
-  static std::string escapeXML(const std::string& input) {
-    size_t extraSize = 0;
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          extraSize += 4;  // &amp;
-          break;
-        case '<':
-          extraSize += 3;  // &lt;
-          break;
-        case '"':
-          extraSize += 5;  // &quot;
-          break;
-        case '\'':
-          extraSize += 5;  // &apos;
-          break;
-        case '\n':
-          extraSize += 4;  // &#10;
-          break;
-        case '\r':
-          extraSize += 4;  // &#13;
-          break;
-        case '\t':
-          extraSize += 3;  // &#9;
-          break;
-        default:
-          break;
-      }
-    }
-    if (extraSize == 0) {
-      return input;
-    }
-    std::string result;
-    result.reserve(input.size() + extraSize);
-    for (char c : input) {
-      switch (c) {
-        case '&':
-          result += "&amp;";
-          break;
-        case '<':
-          result += "&lt;";
-          break;
-        case '"':
-          result += "&quot;";
-          break;
-        case '\'':
-          result += "&apos;";
-          break;
-        case '\n':
-          result += "&#10;";
-          break;
-        case '\r':
-          result += "&#13;";
-          break;
-        case '\t':
-          result += "&#9;";
-          break;
-        default:
-          result += c;
-          break;
-      }
-    }
-    return result;
-  }
-};
 
 //==============================================================================
 // Helper functions for converting types to strings
@@ -324,8 +111,11 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
                                float top, float right, float bottom, float centerX, float centerY) {
   bool hasH = !std::isnan(left) || !std::isnan(right) || !std::isnan(centerX);
   bool hasV = !std::isnan(top) || !std::isnan(bottom) || !std::isnan(centerY);
-  bool isDefault = (position.x == defaultPos.x && position.y == defaultPos.y);
-  return (hasH && hasV) || isDefault;
+  bool xIsDefault =
+      (std::isnan(defaultPos.x) && std::isnan(position.x)) || position.x == defaultPos.x;
+  bool yIsDefault =
+      (std::isnan(defaultPos.y) && std::isnan(position.y)) || position.y == defaultPos.y;
+  return (hasH && hasV) || (xIsDefault && yIsDefault);
 }
 
 //==============================================================================
@@ -343,7 +133,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
-    if (Node::IsValidCustomDataKey(key)) {
+    if (IsValidCustomDataKey(key)) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }
@@ -379,16 +169,17 @@ static void WriteColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stop
   }
 }
 
-static void WriteGradientMatrixAndStops(XMLBuilder& xml, const Matrix& matrix,
-                                        const std::vector<ColorStop*>& colorStops) {
-  if (!matrix.isIdentity()) {
-    xml.addAttribute("matrix", MatrixToString(matrix));
+static void WriteGradientCommon(XMLBuilder& xml, const Gradient* gradient) {
+  xml.addAttribute("fitsToGeometry", gradient->fitsToGeometry,
+                   Default<LinearGradient>().fitsToGeometry);
+  if (!gradient->matrix.isIdentity()) {
+    xml.addAttribute("matrix", MatrixToString(gradient->matrix));
   }
-  if (colorStops.empty()) {
+  if (gradient->colorStops.empty()) {
     xml.closeElementSelfClosing();
   } else {
     xml.closeElementStart();
-    WriteColorStops(xml, colorStops);
+    WriteColorStops(xml, gradient->colorStops);
     xml.closeElement();
   }
 }
@@ -411,9 +202,11 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->startPoint != Default<LinearGradient>().startPoint) {
         xml.addAttribute("startPoint", PointToString(grad->startPoint));
       }
-      xml.addRequiredAttribute("endPoint", PointToString(grad->endPoint));
+      if (grad->endPoint != Default<LinearGradient>().endPoint) {
+        xml.addAttribute("endPoint", PointToString(grad->endPoint));
+      }
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::RadialGradient: {
@@ -423,9 +216,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->center != Default<RadialGradient>().center) {
         xml.addAttribute("center", PointToString(grad->center));
       }
-      xml.addRequiredAttribute("radius", grad->radius);
+      xml.addAttribute("radius", grad->radius, Default<RadialGradient>().radius);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::ConicGradient: {
@@ -438,7 +231,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       xml.addAttribute("startAngle", grad->startAngle, Default<ConicGradient>().startAngle);
       xml.addAttribute("endAngle", grad->endAngle, Default<ConicGradient>().endAngle);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -448,9 +241,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->center != Default<DiamondGradient>().center) {
         xml.addAttribute("center", PointToString(grad->center));
       }
-      xml.addRequiredAttribute("radius", grad->radius);
+      xml.addAttribute("radius", grad->radius, Default<DiamondGradient>().radius);
       WriteCustomData(xml, node);
-      WriteGradientMatrixAndStops(xml, grad->matrix, grad->colorStops);
+      WriteGradientCommon(xml, grad);
       break;
     }
     case NodeType::ImagePattern: {
@@ -480,6 +273,9 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->mipmapMode != Default<ImagePattern>().mipmapMode) {
         xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
       }
+      if (pattern->scaleMode != Default<ImagePattern>().scaleMode) {
+        xml.addAttribute("scaleMode", ScaleModeToString(pattern->scaleMode));
+      }
       if (!pattern->matrix.isIdentity()) {
         xml.addAttribute("matrix", MatrixToString(pattern->matrix));
       }
@@ -501,9 +297,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
-      Point rectDefaultPos = {rect->size.width * 0.5f, rect->size.height * 0.5f};
-      if (!ShouldSkipPosition(rect->position, rectDefaultPos, rect->left, rect->top, rect->right,
-                              rect->bottom, rect->centerX, rect->centerY)) {
+      if (!ShouldSkipPosition(rect->position, Default<Rectangle>().position, rect->left, rect->top,
+                              rect->right, rect->bottom, rect->centerX, rect->centerY)) {
         xml.addAttribute("position", PointToString(rect->position));
       }
       if (rect->size.width != 0 || rect->size.height != 0) {
@@ -517,6 +312,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", rect->bottom);
       xml.addOptionalAttribute("centerX", rect->centerX);
       xml.addOptionalAttribute("centerY", rect->centerY);
+      xml.addDimensionAttribute("width", rect->width, rect->percentWidth);
+      xml.addDimensionAttribute("height", rect->height, rect->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -524,9 +321,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
-      Point ellipseDefaultPos = {ellipse->size.width * 0.5f, ellipse->size.height * 0.5f};
-      if (!ShouldSkipPosition(ellipse->position, ellipseDefaultPos, ellipse->left, ellipse->top,
-                              ellipse->right, ellipse->bottom, ellipse->centerX,
+      if (!ShouldSkipPosition(ellipse->position, Default<Ellipse>().position, ellipse->left,
+                              ellipse->top, ellipse->right, ellipse->bottom, ellipse->centerX,
                               ellipse->centerY)) {
         xml.addAttribute("position", PointToString(ellipse->position));
       }
@@ -540,6 +336,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", ellipse->bottom);
       xml.addOptionalAttribute("centerX", ellipse->centerX);
       xml.addOptionalAttribute("centerY", ellipse->centerY);
+      xml.addDimensionAttribute("width", ellipse->width, ellipse->percentWidth);
+      xml.addDimensionAttribute("height", ellipse->height, ellipse->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -547,10 +345,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
-      auto polyBounds = polystar->getContentBounds();
-      Point polyDefaultPos = {-polyBounds.x, -polyBounds.y};
-      if (!ShouldSkipPosition(polystar->position, polyDefaultPos, polystar->left, polystar->top,
-                              polystar->right, polystar->bottom, polystar->centerX,
+      if (!ShouldSkipPosition(polystar->position, Default<Polystar>().position, polystar->left,
+                              polystar->top, polystar->right, polystar->bottom, polystar->centerX,
                               polystar->centerY)) {
         xml.addAttribute("position", PointToString(polystar->position));
       }
@@ -570,6 +366,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", polystar->bottom);
       xml.addOptionalAttribute("centerX", polystar->centerX);
       xml.addOptionalAttribute("centerY", polystar->centerY);
+      xml.addDimensionAttribute("width", polystar->width, polystar->percentWidth);
+      xml.addDimensionAttribute("height", polystar->height, polystar->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -595,6 +393,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", path->bottom);
       xml.addOptionalAttribute("centerX", path->centerX);
       xml.addOptionalAttribute("centerY", path->centerY);
+      xml.addDimensionAttribute("width", path->width, path->percentWidth);
+      xml.addDimensionAttribute("height", path->height, path->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -629,6 +429,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", text->bottom);
       xml.addOptionalAttribute("centerX", text->centerX);
       xml.addOptionalAttribute("centerY", text->centerY);
+      xml.addDimensionAttribute("width", text->width, text->percentWidth);
+      xml.addDimensionAttribute("height", text->height, text->percentHeight);
       WriteCustomData(xml, node);
       if (options.skipGlyphData || text->glyphRuns.empty()) {
         xml.closeElementSelfClosing();
@@ -882,6 +684,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addOptionalAttribute("bottom", textPath->bottom);
       xml.addOptionalAttribute("centerX", textPath->centerX);
       xml.addOptionalAttribute("centerY", textPath->centerY);
+      xml.addDimensionAttribute("width", textPath->width, textPath->percentWidth);
+      xml.addDimensionAttribute("height", textPath->height, textPath->percentHeight);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -906,8 +710,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("skewAxis", textBox->skewAxis, Default<TextBox>().skewAxis);
       xml.addAttribute("alpha", textBox->alpha, Default<TextBox>().alpha);
       // Layout dimensions
-      xml.addOptionalAttribute("width", textBox->width);
-      xml.addOptionalAttribute("height", textBox->height);
+      xml.addDimensionAttribute("width", textBox->width, textBox->percentWidth);
+      xml.addDimensionAttribute("height", textBox->height, textBox->percentHeight);
       if (!textBox->padding.isZero()) {
         xml.addAttribute("padding", PaddingToString(textBox->padding));
       }
@@ -987,8 +791,8 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("skew", group->skew, Default<Group>().skew);
       xml.addAttribute("skewAxis", group->skewAxis, Default<Group>().skewAxis);
       xml.addAttribute("alpha", group->alpha, Default<Group>().alpha);
-      xml.addOptionalAttribute("width", group->width);
-      xml.addOptionalAttribute("height", group->height);
+      xml.addDimensionAttribute("width", group->width, group->percentWidth);
+      xml.addDimensionAttribute("height", group->height, group->percentHeight);
       if (!group->padding.isZero()) {
         xml.addAttribute("padding", PaddingToString(group->padding));
       }
@@ -1266,8 +1070,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
   xml.addAttribute("x", node->x, Default<Layer>().x);
   xml.addAttribute("y", node->y, Default<Layer>().y);
-  xml.addOptionalAttribute("width", node->width);
-  xml.addOptionalAttribute("height", node->height);
+  xml.addDimensionAttribute("width", node->width, node->percentWidth);
+  xml.addDimensionAttribute("height", node->height, node->percentHeight);
   if (node->layout != Default<Layer>().layout) {
     xml.addAttribute("layout", LayoutModeToString(node->layout));
   }
@@ -1371,11 +1175,10 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 //==============================================================================
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
-  XMLBuilder xml = {};
+  XMLBuilder xml(true);
   xml.appendDeclaration();
 
   xml.openElement("pagx");
-  xml.addAttribute("version", doc.version);
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
   WriteCustomData(xml, &doc);

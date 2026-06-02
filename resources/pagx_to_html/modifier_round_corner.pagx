@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RoundCorner modifier → convert sharp corners to bezier arcs -->
+<pagx width="300" height="280">
+  <!-- Background -->
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F1F5F9"/>
+  </Layer>
+
+  <!-- Main container -->
+  <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="20,30,20,30" gap="8" alignment="stretch">
+    <!-- Title area -->
+    <Layer layout="vertical" gap="2" alignment="center">
+      <Layer height="20">
+        <Text text="Round Corner Modifier" fontFamily="Arial" fontStyle="Bold" fontSize="16" centerX="0" textAnchor="center"/>
+        <Fill color="#1E293B"/>
+      </Layer>
+      <Layer height="14">
+        <Text text="Sharp corners converted to bezier arcs" fontFamily="Arial" fontSize="10" centerX="0" textAnchor="center"/>
+        <Fill color="#94A3B8"/>
+      </Layer>
+    </Layer>
+
+    <!-- Card -->
+    <Layer flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0" roundness="16"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#1E293B15"/>
+
+      <Layer left="0" right="0" top="0" bottom="0" layout="vertical" padding="16" gap="6" alignment="center" arrangement="center">
+        <!-- Triangle with rounded corners -->
+        <Layer width="160" height="140">
+          <Layer name="item">
+            <Polystar position="80,75" type="polygon" pointCount="3" outerRadius="70" rotation="-90"/>
+            <RoundCorner radius="15"/>
+            <Fill color="#8B5CF6"/>
+          </Layer>
+        </Layer>
+        <!-- Label -->
+        <Layer height="14">
+          <Text text="radius=15" fontFamily="Arial" fontSize="9" centerX="0" textAnchor="center"/>
+          <Fill color="#64748B"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </Layer>
+</pagx>

@@ -13,15 +13,12 @@ they **must not** be omitted.
 
 | Element | Required Attributes |
 |---------|---------------------|
-| **pagx** | `version`, `width`, `height` |
+| **pagx** | `width`, `height` |
 | **Composition** | `width`, `height` |
 | **Image** | `source` |
 | **PathData** | `data` |
 | **Glyph** | `advance` |
 | **SolidColor** | `color` |
-| **LinearGradient** | `endPoint` |
-| **RadialGradient** | `radius` |
-| **DiamondGradient** | `radius` |
 | **ColorStop** | `offset`, `color` |
 | **ImagePattern** | `image` |
 | **BlendFilter** | `color` |
@@ -39,8 +36,6 @@ Basic container for content, child layers, styles, and filters.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | — | Layout width for container layout and constraint positioning |
-| `height` | float | — | Layout height for container layout and constraint positioning |
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing in parent container layout |
@@ -48,12 +43,6 @@ Basic container for content, child layers, styles, and filters.
 | `alignment` | Alignment | stretch | Cross-axis alignment of child Layers |
 | `arrangement` | Arrangement | start | Main-axis arrangement of child Layers |
 | `includeInLayout` | bool | true | Whether to participate in parent container layout flow |
-| `left` | float | — | Distance from layer left edge to parent left edge |
-| `right` | float | — | Distance from layer right edge to parent right edge |
-| `top` | float | — | Distance from layer top edge to parent top edge |
-| `bottom` | float | — | Distance from layer bottom edge to parent bottom edge |
-| `centerX` | float | — | Horizontal offset from parent center (0 = centered) |
-| `centerY` | float | — | Vertical offset from parent center (0 = centered) |
 | `name` | string | "" | Display name |
 | `visible` | bool | true | Whether the layer is visible |
 | `alpha` | float | 1 | Opacity 0~1 |
@@ -79,6 +68,8 @@ Basic container for content, child layers, styles, and filters.
 | `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
 | `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
 
+Layer also supports all constraint attributes. See §Constraint Attributes below.
+
 ### Composition
 
 Reusable layer subtree (similar to After Effects pre-comps). Its dimensions serve as the constraint container for top-level Layers inside it.
@@ -97,15 +88,7 @@ VectorElement container with transform properties, creating isolated scopes for 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | — | Layout width for constraint positioning of children |
-| `height` | float | — | Layout height for constraint positioning of children |
 | `padding` | Padding | 0 | Insets the constraint reference frame for child elements. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
 | `anchor` | Point | 0,0 | Anchor point for transforms |
 | `position` | Point | 0,0 | Position in parent coordinate system (prefer constraint attributes) |
 
@@ -117,26 +100,20 @@ VectorElement container with transform properties, creating isolated scopes for 
 | `skewAxis` | float | 0 | Skew axis angle in degrees |
 | `alpha` | float | 1 | Opacity 0~1 |
 
+Group also supports all constraint attributes. See §Constraint Attributes below.
+
 ### Rectangle
 
 Geometry element defined from center point with uniform corner rounding support.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable, prefer `width`/`height` attributes for static layout |
 | `roundness` | float | 0 | Corner radius (auto-clamped to half the shorter side) |
 | `reversed` | bool | false | Reverse path direction |
-| `position` | Point | (center of bounding box) | Center point coordinate (prefer constraint attributes) |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
-Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
-over `position`. When constraints are set, `position` is computed automatically.
-See §Constraint Attributes below.
+Rectangle supports all constraint attributes. See §Constraint Attributes below.
 
 ### Ellipse
 
@@ -144,17 +121,11 @@ Geometry element defined from center point for circles and ovals.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `size` | Size | 0,0 | Dimensions "width,height" |
+| `size` | Size | 0,0 | Dimensions "width,height"; animatable, prefer `width`/`height` attributes for static layout |
 | `reversed` | bool | false | Reverse path direction |
-| `position` | Point | (center of bounding box) | Center point coordinate (prefer constraint attributes) |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
+| `position` | Point | (center of bounding box) | Center point coordinate; animatable, prefer constraint attributes for static layout |
 
-Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
+Ellipse supports all constraint attributes. See §Constraint Attributes below.
 
 ### Polystar
 
@@ -171,14 +142,8 @@ Geometry element supporting regular polygon and star modes.
 | `innerRoundness` | float | 0 | Inner corner roundness 0~1 (star mode only) |
 | `reversed` | bool | false | Reverse path direction |
 | `position` | Point | (-bounds.x, -bounds.y) | Center point coordinate (prefer constraint attributes) |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
 
-Positioning: prefer constraint attributes over `position`. See §Constraint Attributes below.
+Polystar supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the star is scaled to fit. See §Constraint Attributes below.
 
 ### Path
 
@@ -189,12 +154,8 @@ Geometry element defining arbitrary shapes using SVG path syntax or PathData res
 | `data` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
 | `position` | Point | 0,0 | Offset of the path coordinate system origin (prefer constraint attributes) |
 | `reversed` | bool | false | Reverse path direction |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
+
+Path supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the path is scaled to fit. See §Constraint Attributes below.
 
 > `position` is the **coordinate system origin**. Prefer constraint attributes (`left`/`top`) for positioning. When `position="0,0"`, path data coordinates directly define drawing positions.
 
@@ -279,8 +240,9 @@ Color source that interpolates along a line from start point to end point.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | Point | `0,0` | Gradient start point |
-| `endPoint` | Point | (required) | Gradient end point |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `endPoint` | Point | `1,0` | Gradient end point (default: horizontal left-to-right) |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ColorStop
 
@@ -302,9 +264,10 @@ Color source that radiates outward from a center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ConicGradient
 
@@ -312,10 +275,11 @@ Color source (sweep gradient) that interpolates along the circumference between 
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
+| `center` | Point | `0.5,0.5` | Gradient center point |
 | `startAngle` | float | 0 | Start angle in degrees (0° = right, clockwise positive) |
 | `endAngle` | float | 360 | End angle in degrees |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### DiamondGradient
 
@@ -323,9 +287,10 @@ Color source that radiates from center toward four corners using Chebyshev dista
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | Point | 0,0 | Gradient center point |
-| `radius` | float | (required) | Gradient radius |
-| `matrix` | Matrix | identity | Transform matrix for the gradient coordinate system |
+| `center` | Point | `0.5,0.5` | Gradient center point |
+| `radius` | float | `0.5` | Gradient radius |
+| `matrix` | Matrix | identity | Transform applied in the selected coordinate space |
+| `fitsToGeometry` | boolean | true | Coordinate space for the gradient. `true`: the geometry's normalized 0-1 bounding box. `false`: the parent container's (Layer or Group) coordinate space, origin at (0,0) |
 
 ### ImagePattern
 
@@ -334,11 +299,12 @@ Color source that uses an image as a fill pattern with configurable tiling.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `image` | string/idref | (required) | Image source: @id resource reference, file path, or data URI |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `tileModeX` | TileMode | decal | X-direction tile mode |
+| `tileModeY` | TileMode | decal | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | Matrix | identity | Transform matrix for the pattern coordinate system |
+| `matrix` | Matrix | identity | Transform matrix applied to the image in its local coordinate space |
+| `scaleMode` | ScaleMode | letterBox | How the transformed image is fitted into each geometry's bounding box. Values: `stretch`, `letterBox`, `zoom` (auto-fit per geometry); `none` (no per-geometry fitting; image placed in the parent container's (Layer or Group) coordinate space, origin at (0,0)) |
 
 ### DropShadowStyle
 
@@ -455,7 +421,7 @@ Rendering data for a single glyph within a Font. Either `path` or `image` must b
 
 ### Text
 
-Geometry element providing text shapes; produces a glyph list after shaping.
+Geometry element providing text content; produces a glyph list after shaping.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -469,16 +435,8 @@ Geometry element providing text shapes; produces a glyph list after shaping.
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin |
 | `baseline` | TextBaseline | lineBox | Baseline mode: lineBox (y = linebox top) or alphabetic (y = baseline) |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
 
-Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
-over `position`. When constraints are set, `position` is computed automatically.
-See §Constraint Attributes below.
+Text supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the text is scaled to fit. See §Constraint Attributes below.
 
 ### TextModifier
 
@@ -529,18 +487,10 @@ Text modifier that arranges text along a specified path curve, mapping glyph pos
 | `perpendicular` | bool | true | Rotate glyphs perpendicular to the path tangent |
 | `reversed` | bool | false | Reverse path direction for text flow |
 | `forceAlignment` | bool | false | Force stretch text to fill available path length |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
 
-Positioning: prefer constraint attributes (`left`/`top`/`right`/`bottom`/`centerX`/`centerY`)
-for positioning. When constraints are set, the path coordinate origin is computed automatically.
-Opposite-pair constraints use scale-to-fit (same as Path). See §Constraint Attributes below.
+TextPath supports all constraint attributes. When opposite-edge constraints or percentage dimensions are set, the path is scaled to fit. See §Constraint Attributes below.
 
-### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Child Layers)
+### Constraint Attributes (Geometry Elements, TextPath, TextBox, Groups, and Layers)
 
 These attributes position or stretch an element relative to its container.
 The container's size comes from explicit `width`/`height`, parent layout assignment, or
@@ -562,6 +512,8 @@ For **child Layers**, constraints are only active when:
 | `bottom` | float | — | Distance from element bottom edge to container bottom edge |
 | `centerX` | float | — | Horizontal offset from container center (0 = centered) |
 | `centerY` | float | — | Vertical offset from container center (0 = centered) |
+| `width` | Dimension | — | Layout width; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
+| `height` | Dimension | — | Layout height; supports pixels (e.g., `100`) or percentage (e.g., `50%`) relative to container |
 
 ### TextBox
 
@@ -571,14 +523,6 @@ Text layout container that inherits from Group. Provides paragraph-level feature
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `width` | float | NaN | Layout width (NaN = no boundary, auto-sizing) |
-| `height` | float | NaN | Layout height (NaN = no boundary, auto-sizing) |
-| `left` | float | — | Distance from left edge to container left edge |
-| `right` | float | — | Distance from right edge to container right edge |
-| `top` | float | — | Distance from top edge to container top edge |
-| `bottom` | float | — | Distance from bottom edge to container bottom edge |
-| `centerX` | float | — | Horizontal offset from container center (0 = centered) |
-| `centerY` | float | — | Vertical offset from container center (0 = centered) |
 | `anchor` | Point | 0,0 | Anchor point for transforms |
 | `position` | Point | 0,0 | Top-left corner in parent coordinate system (prefer constraint attributes) |
 | `rotation` | float | 0 | Rotation angle in degrees |
@@ -587,6 +531,8 @@ Text layout container that inherits from Group. Provides paragraph-level feature
 | `skewAxis` | float | 0 | Skew axis angle in degrees |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `padding` | Padding | 0 | Insets the text layout area and the constraint reference frame for non-Text child elements (inherited from Group). CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
+
+TextBox inherits all constraint attributes from Group. For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing). See §Constraint Attributes above.
 
 **TextBox-specific:**
 

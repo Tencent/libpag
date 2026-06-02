@@ -21,6 +21,7 @@
 #include <cmath>
 #include <vector>
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -29,9 +30,10 @@ class Element;
 class LayoutContext;
 
 /**
- * LayoutNode provides constraint-based positioning for elements within a parent container. It stores
- * constraint attributes (left, right, top, bottom, centerX, centerY) and manages the two-phase
- * layout process: bottom-up measurement followed by top-down constraint resolution.
+ * LayoutNode provides constraint-based positioning for elements within a parent container. It
+ * stores constraint attributes (left, right, top, bottom, centerX, centerY) along with explicit
+ * dimensions (width, height, percentWidth, percentHeight) and manages the two-phase layout
+ * process: bottom-up measurement followed by top-down constraint resolution.
  */
 class LayoutNode {
  public:
@@ -67,6 +69,36 @@ class LayoutNode {
    */
   float centerY = NAN;
 
+  /**
+   * Width as a percentage of the parent container layout width (inside padding). Expected range is
+   * [0, 100]; values outside this range produce undefined layout. NaN means the percentage is
+   * unspecified and the authored width (if any) is used instead. Takes priority over explicit
+   * width. Overridden by opposite-edge constraints (left + right) when both are set.
+   */
+  float percentWidth = NAN;
+
+  /**
+   * Height as a percentage of the parent container layout height (inside padding). Expected range
+   * is [0, 100]; values outside this range produce undefined layout. NaN means the percentage is
+   * unspecified and the authored height (if any) is used instead. Takes priority over explicit
+   * height. Overridden by opposite-edge constraints (top + bottom) when both are set.
+   */
+  float percentHeight = NAN;
+
+  /**
+   * Explicit layout width in pixels. NaN means not set. Takes priority over intrinsic content size
+   * but lower priority than percentWidth or opposite-edge constraints. For scalable elements
+   * (Path, Polystar, Text, TextPath) this defines the target layout width and the element scales
+   * uniformly to fit.
+   */
+  float width = NAN;
+
+  /**
+   * Explicit layout height in pixels. NaN means not set. Takes priority over intrinsic content
+   * size but lower priority than percentHeight or opposite-edge constraints.
+   */
+  float height = NAN;
+
   virtual ~LayoutNode() = default;
 
   /** Returns true if any constraint attribute is set. */
@@ -92,15 +124,22 @@ class LayoutNode {
 
   /**
    * Writes self rendering attributes and layoutWidth/layoutHeight. Does not touch children.
+   *
+   * Rounding policy: the measure phase (`onMeasure` / `preferredWidth` / `preferredHeight`) must
+   * preserve authored values exactly, so it does not round. Only sizes allocated by the layout
+   * phase — constraint-resolved `targetWidth`/`targetHeight` — are ceiled (in
+   * `PerformConstraintLayout`) to keep each allocation on whole-pixel boundaries. When
+   * `setLayoutSize` falls back to `preferredWidth`/`preferredHeight` (NaN target), it passes that
+   * value through without rounding so the authored or content-measured size stays exact.
+   *
    * @param context the current layout context
-   * @param width target width from constraints, NaN means use intrinsic size
-   * @param height target height from constraints, NaN means use intrinsic size
+   * @param targetWidth target width from parent constraints, NaN means use preferred size
+   * @param targetHeight target height from parent constraints, NaN means use preferred size
    */
-  virtual void setLayoutSize(LayoutContext* context, float width, float height);
+  virtual void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight);
 
-  /** Writes self position and layoutX/layoutY. */
-  virtual void setLayoutPosition(LayoutContext* /*context*/, float /*x*/, float /*y*/) {
-  }
+  /** Writes layoutX/layoutY from constraint-resolved position. */
+  virtual void setLayoutPosition(LayoutContext* context, float x, float y);
 
   /**
    * Lays out children using layoutWidth/layoutHeight as container size.
@@ -163,12 +202,31 @@ class LayoutNode {
  protected:
   LayoutNode() = default;
 
-  /** Writes preferredWidth/preferredHeight. Called by updateSize when not yet measured. */
+  /**
+   * Writes preferredX/Y/Width/Height. Called by updateSize when not yet measured. Implementations
+   * compute preferred size from intrinsic content and, when the node authored an explicit
+   * width/height, use that value in place of the intrinsic axis. percentWidth/percentHeight are
+   * not consulted here — they are resolved by the parent via PerformConstraintLayout.
+   */
   virtual void onMeasure(LayoutContext*) {
   }
 
+  /**
+   * Computes the render position by centering contentBounds within layoutBounds after uniform
+   * scaling. Uses the supplied intrinsic size (not preferredSize) so that the node's original
+   * content dimensions — which may differ from preferredSize when an explicit width/height is set
+   * — drive the uniform scale computation.
+   */
+  Point computeRenderPosition(const Rect& contentBounds, float intrinsicWidth,
+                              float intrinsicHeight) const;
+
+  /** Computes the uniform scale factor from intrinsic size to layout size. */
+  float computeRenderScale(float intrinsicWidth, float intrinsicHeight) const;
+
  private:
-  // Preferred position and size (written by onMeasure during updateSize, read-only after that).
+  // Preferred position and size: the node's own preferred layout output, written by onMeasure
+  // during updateSize(). Preferred size already folds in the authored width/height when present.
+  // Read-only after updateSize().
   float preferredX = 0;
   float preferredY = 0;
   float preferredWidth = NAN;

@@ -51,10 +51,19 @@ class Path : public Element, public LayoutNode {
     return NodeType::Path;
   }
 
+  /**
+   * Returns the final position offset for rendering, computed from layoutBounds and data bounds.
+   */
+  Point renderPosition() const;
+
+  /**
+   * Returns the scale factor for rendering, computed from layoutBounds and intrinsic size.
+   */
+  float renderScale() const;
+
  protected:
   void onMeasure(LayoutContext* context) override;
-  void setLayoutSize(LayoutContext* context, float width, float height) override;
-  void setLayoutPosition(LayoutContext* context, float x, float y) override;
+  void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
 
  private:
   Path() = default;

@@ -24,6 +24,7 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Repeater.h"
+#include "tgfx/layers/vectors/ScaleMode.h"
 #include "tgfx/layers/vectors/TextSelector.h"
 
 namespace pagx {
@@ -297,6 +298,20 @@ tgfx::MipmapMode ToTGFX(MipmapMode mode) {
       return tgfx::MipmapMode::Linear;
   }
   return tgfx::MipmapMode::Linear;
+}
+
+tgfx::ScaleMode ToTGFX(ScaleMode mode) {
+  switch (mode) {
+    case ScaleMode::None:
+      return tgfx::ScaleMode::None;
+    case ScaleMode::Stretch:
+      return tgfx::ScaleMode::Stretch;
+    case ScaleMode::LetterBox:
+      return tgfx::ScaleMode::LetterBox;
+    case ScaleMode::Zoom:
+      return tgfx::ScaleMode::Zoom;
+  }
+  return tgfx::ScaleMode::LetterBox;
 }
 
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {

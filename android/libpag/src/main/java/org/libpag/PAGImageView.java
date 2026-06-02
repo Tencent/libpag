@@ -679,9 +679,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
                 flushBitmap.prepareToDraw();
             }
             renderBitmap = flushBitmap;
-        }
-        if (_cacheAllFramesInMemory && renderBitmap != null) {
-            bitmapCache.put(frame, renderBitmap);
+            if (_cacheAllFramesInMemory && flushBitmap != null) {
+                bitmapCache.put(frame, flushBitmap);
+            }
         }
         return true;
     }

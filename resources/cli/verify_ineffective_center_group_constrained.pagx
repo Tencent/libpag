@@ -1,0 +1,10 @@
+<pagx width="200" height="200">
+  <!-- Group with opposite-edge constraints derives size from constraints.
+       centerX/centerY on child elements should NOT trigger ineffective-centering. -->
+  <Layer width="200" height="200">
+    <Group width="100%" height="100%">
+      <Rectangle centerX="0" centerY="0" width="50" height="50"/>
+      <Fill color="#F00"/>
+    </Group>
+  </Layer>
+</pagx>

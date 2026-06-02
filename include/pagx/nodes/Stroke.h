@@ -28,7 +28,7 @@
 namespace pagx {
 
 /**
- * Stroke represents a stroke painter that outlines shapes with a solid color, gradient, or
+ * Stroke represents a stroke painter that outlines geometry with a solid color, gradient, or
  * pattern. It supports various line cap styles, join styles, dash patterns, and stroke alignment.
  * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
  * a reference to a defined color source (e.g., "@gradientId").

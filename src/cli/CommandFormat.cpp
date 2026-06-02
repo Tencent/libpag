@@ -26,6 +26,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "cli/CliUtils.h"
 #include "cli/FormatUtils.h"
 
 namespace pagx::cli {
@@ -90,7 +91,7 @@ int RunFormat(int argc, char* argv[]) {
     outputPath = inputPath;
   }
 
-  auto doc = xmlReadFile(inputPath.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
+  auto doc = xmlReadFile(inputPath.c_str(), nullptr, XML_PARSE_NONET);
   if (doc == nullptr) {
     std::cerr << "pagx format: failed to parse '" << inputPath << "'\n";
     return 1;
@@ -105,24 +106,20 @@ int RunFormat(int argc, char* argv[]) {
 
   ReorderAttributesRecursive(root);
 
-  std::string output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  SerializeNode(output, root, 0, indentSpaces);
+  std::string output;
+  std::ifstream probe(inputPath);
+  std::string firstLine;
+  if (std::getline(probe, firstLine) && firstLine.find("<?xml") != std::string::npos) {
+    output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  }
+  SerializeNode(output, doc->children, 0, indentSpaces);
 
   xmlFreeDoc(doc);
 
-  std::ofstream out(outputPath);
-  if (!out.is_open()) {
-    std::cerr << "pagx format: failed to write '" << outputPath << "'\n";
-    return 1;
-  }
-  out << output;
-  out.close();
-  if (out.fail()) {
-    std::cerr << "pagx format: error writing to '" << outputPath << "'\n";
+  if (!WriteStringToFile(output, outputPath, "pagx format")) {
     return 1;
   }
 
-  std::cout << "pagx format: wrote " << outputPath << "\n";
   return 0;
 }
 
