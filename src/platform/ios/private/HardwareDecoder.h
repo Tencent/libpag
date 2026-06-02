@@ -21,6 +21,7 @@
 #include <CoreMedia/CoreMedia.h>
 #include <VideoToolbox/VideoToolbox.h>
 #include <list>
+#include <mutex>
 #include <unordered_map>
 #include "rendering/video/VideoDecoder.h"
 
@@ -41,9 +42,17 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
+  /**
+   * Aborts any in-progress synchronous decompression by invalidating the underlying VT session.
+   * Safe to call from any thread. Used by the willResignActive observer to unblock the worker
+   * thread so it can release device.locker before the main thread enters EAGLDevice::finish().
+   */
+  void invalidateSession();
+
  private:
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
+  std::mutex sessionLocker = {};
   CMFormatDescriptionRef videoFormatDescription = nullptr;
   tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
