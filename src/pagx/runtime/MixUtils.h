@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/types/Color.h"
 #include "tgfx/core/Color.h"
 
 namespace pagx {
@@ -27,16 +26,6 @@ namespace pagx {
 // and overwrite directly, so they don't go through these helpers.
 inline float MixFloat(float current, float target, float mix) {
   return current + (target - current) * mix;
-}
-
-inline Color MixColor(const Color& current, const Color& target, float mix) {
-  Color result = current;
-  result.red = MixFloat(current.red, target.red, mix);
-  result.green = MixFloat(current.green, target.green, mix);
-  result.blue = MixFloat(current.blue, target.blue, mix);
-  result.alpha = MixFloat(current.alpha, target.alpha, mix);
-  result.colorSpace = target.colorSpace;
-  return result;
 }
 
 inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& target, float mix) {
