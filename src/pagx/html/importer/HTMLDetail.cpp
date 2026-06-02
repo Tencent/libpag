@@ -28,6 +28,24 @@
 
 namespace pagx::html {
 
+bool IsContainerTag(const std::string& tag) {
+  return tag == "div" || tag == "section" || tag == "header" || tag == "footer" || tag == "main" ||
+         tag == "aside" || tag == "nav" || tag == "article" || tag == "body";
+}
+
+bool IsTextLeafTag(const std::string& tag) {
+  return tag == "p" || tag == "h1" || tag == "h2" || tag == "h3" || tag == "h4" || tag == "h5" ||
+         tag == "h6" || tag == "span" || tag == "a";
+}
+
+bool IsInlineRunTag(const std::string& tag) {
+  return tag == "span" || tag == "a" || tag == "br";
+}
+
+bool IsInlineLeafChildName(const std::string& name) {
+  return IsInlineRunTag(name) || name == "br";
+}
+
 std::vector<std::string> SplitTopLevelCommas(const std::string& s) {
   std::vector<std::string> out;
   int depth = 0;

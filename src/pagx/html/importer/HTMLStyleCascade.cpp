@@ -98,8 +98,9 @@ HTMLStyleCascade::HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& va
     : _diagnostics(sink), _valueParser(valueParser) {
 }
 
-void HTMLStyleCascade::setFontFallbackSink(FontFallbackSink sink) {
-  _fontFallbackSink = std::move(sink);
+void HTMLStyleCascade::setFontFallbackSink(FontFallbackThunk thunk, void* userData) {
+  _fontFallbackThunk = thunk;
+  _fontFallbackUserData = userData;
 }
 
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
@@ -252,8 +253,8 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
     if (!out.fontFamilyChain.empty()) {
       out.primaryFontFamily = out.fontFamilyChain.front();
     }
-    if (_fontFallbackSink) {
-      _fontFallbackSink(out.fontFamilyChain);
+    if (_fontFallbackThunk) {
+      _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
     }
   }
   CopyProperty(props, "font-size", out.fontSize);

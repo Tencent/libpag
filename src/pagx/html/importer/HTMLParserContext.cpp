@@ -19,7 +19,6 @@
 #include "pagx/html/importer/HTMLParserContext.h"
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <utility>
 #include "pagx/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -34,6 +33,11 @@ using namespace pagx::html;
 // HTMLParserContext: top-level traversal
 //==================================================================================================
 
+void HTMLParserContext::RecordFontFallbacksThunk(void* userData,
+                                                 const std::vector<std::string>& chain) {
+  static_cast<HTMLParserContext*>(userData)->recordFontFallbacks(chain);
+}
+
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
   _diagnostics = std::make_unique<HTMLDiagnosticSink>(_options.strict);
   _idAllocator = std::make_unique<HTMLIdAllocator>();
@@ -41,12 +45,11 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
+  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
-  _styleCascade->setFontFallbackSink(
-      std::bind(&HTMLParserContext::recordFontFallbacks, this, std::placeholders::_1));
+  _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {

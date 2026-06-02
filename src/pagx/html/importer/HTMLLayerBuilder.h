@@ -30,7 +30,6 @@ class ColorSource;
 class Element;
 class Fill;
 class HTMLDiagnosticSink;
-class HTMLIdAllocator;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
@@ -42,13 +41,12 @@ class PAGXDocument;
  * The builder is layer-side: its public surface treats elements as opaque DOM nodes (used only
  * for `data-*` attribute forwarding in `applyLayerAttributes`) and never decides which element
  * becomes which kind of layer — that classification stays in `HTMLParserContext`. Borrows the
- * importer's diagnostic sink, value parser, and id allocator; the document handle is bound via
- * `bindDocument` after `PAGXDocument::Make` runs.
+ * importer's diagnostic sink and value parser; the document handle is bound via `bindDocument`
+ * after `PAGXDocument::Make` runs.
  */
 class HTMLLayerBuilder {
  public:
-  HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
-                   HTMLIdAllocator& idAllocator);
+  HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
   void bindDocument(PAGXDocument* document);
 
@@ -121,7 +119,6 @@ class HTMLLayerBuilder {
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
-  HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
 };
 

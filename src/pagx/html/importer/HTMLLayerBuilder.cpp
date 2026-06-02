@@ -88,10 +88,8 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
 
 }  // namespace
 
-HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
-                                   HTMLIdAllocator& idAllocator)
-    : _diagnostics(sink), _valueParser(valueParser), _idAllocator(idAllocator) {
-  (void)_idAllocator;  // Reserved for future per-layer id assignment paths.
+HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser)
+    : _diagnostics(sink), _valueParser(valueParser) {
 }
 
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {

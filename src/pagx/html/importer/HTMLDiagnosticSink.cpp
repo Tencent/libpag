@@ -18,6 +18,7 @@
 
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include <utility>
+#include "pagx/PAGXDocument.h"
 
 namespace pagx {
 

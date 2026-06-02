@@ -249,6 +249,11 @@ class HTMLParserContext {
   // dedup set. Empty inputs and duplicates are silently skipped.
   void recordFontFallbacks(const std::vector<std::string>& chain);
 
+  // Static trampoline that adapts the cascade's `FontFallbackThunk` (function pointer + opaque
+  // user data) to the parser context's `recordFontFallbacks` member, so the cascade can stay
+  // independent of `HTMLParserContext` and we avoid `std::bind` / lambda at the wiring site.
+  static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
+
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
   // discovered during the walk is available for per-glyph fallback at layout time.

@@ -92,25 +92,15 @@ std::string ResolveGenericFontFamily(const std::string& name);
 
 // ----- Tag-set predicates -------------------------------------------------------------------
 
-inline bool IsContainerTag(const std::string& tag) {
-  return tag == "div" || tag == "section" || tag == "header" || tag == "footer" || tag == "main" ||
-         tag == "aside" || tag == "nav" || tag == "article" || tag == "body";
-}
+bool IsContainerTag(const std::string& tag);
 
-inline bool IsTextLeafTag(const std::string& tag) {
-  return tag == "p" || tag == "h1" || tag == "h2" || tag == "h3" || tag == "h4" || tag == "h5" ||
-         tag == "h6" || tag == "span" || tag == "a";
-}
+bool IsTextLeafTag(const std::string& tag);
 
-inline bool IsInlineRunTag(const std::string& tag) {
-  return tag == "span" || tag == "a" || tag == "br";
-}
+bool IsInlineRunTag(const std::string& tag);
 
 // True for elements that may legally appear inside a text leaf (`<span>`, `<a>`, `<br>`).
 // Hoisted out of HTMLImporter to keep the project's "no lambda" rule.
-inline bool IsInlineLeafChildName(const std::string& name) {
-  return IsInlineRunTag(name) || name == "br";
-}
+bool IsInlineLeafChildName(const std::string& name);
 
 // ----- CSS tables ---------------------------------------------------------------------------
 

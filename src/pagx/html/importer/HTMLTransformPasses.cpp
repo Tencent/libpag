@@ -37,6 +37,12 @@ namespace pagx::html {
 
 namespace {
 
+// Float equality with explicit tolerance, used by passes that compare CSS lengths after
+// arithmetic (rounding errors accumulate over `ResolveLength`).
+bool ApproxEqual(float a, float b, float eps) {
+  return std::fabs(a - b) <= eps;
+}
+
 // CSS properties that inherit by default in the subset. Mirrors `HTMLInheritedStyle` in the
 // importer so that the cascade carries identical semantics through both layers.
 const std::vector<std::string>& InheritableProperties() {
@@ -1257,13 +1263,12 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
   // `kEps` absorbs the same sub-pixel rounding that `ResolveLength` introduces when
   // converting Tailwind arbitrary values; tighter equality misfires on legitimate uniformity.
   constexpr float kEps = 0.05f;
-  auto eq = [&](float a, float b) { return std::fabs(a - b) <= kEps; };
 
   // Trailing pattern: all leadMargins must be ~0; trailMargins[0..n-2] uniform > 0; the
   // last trailMargin is 0 or matches the others.
   bool trailingOK = true;
   for (float l : leadMargins) {
-    if (!eq(l, 0.0f)) {
+    if (!ApproxEqual(l, 0.0f, kEps)) {
       trailingOK = false;
       break;
     }
@@ -1274,14 +1279,14 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
       trailingOK = false;
     } else {
       for (size_t i = 1; i + 1 < n; ++i) {
-        if (!eq(trailMargins[i], g)) {
+        if (!ApproxEqual(trailMargins[i], g, kEps)) {
           trailingOK = false;
           break;
         }
       }
       if (trailingOK) {
         float last = trailMargins[n - 1];
-        if (!eq(last, 0.0f) && !eq(last, g)) trailingOK = false;
+        if (!ApproxEqual(last, 0.0f, kEps) && !ApproxEqual(last, g, kEps)) trailingOK = false;
       }
     }
     if (trailingOK) {
@@ -1299,7 +1304,7 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
   // leadMargin is 0 or matches the others.
   bool leadingOK = true;
   for (float t : trailMargins) {
-    if (!eq(t, 0.0f)) {
+    if (!ApproxEqual(t, 0.0f, kEps)) {
       leadingOK = false;
       break;
     }
@@ -1310,14 +1315,14 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
       leadingOK = false;
     } else {
       for (size_t i = 2; i < n; ++i) {
-        if (!eq(leadMargins[i], g)) {
+        if (!ApproxEqual(leadMargins[i], g, kEps)) {
           leadingOK = false;
           break;
         }
       }
       if (leadingOK) {
         float first = leadMargins[0];
-        if (!eq(first, 0.0f) && !eq(first, g)) leadingOK = false;
+        if (!ApproxEqual(first, 0.0f, kEps) && !ApproxEqual(first, g, kEps)) leadingOK = false;
       }
     }
     if (leadingOK) {

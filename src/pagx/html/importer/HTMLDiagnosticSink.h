@@ -20,9 +20,10 @@
 
 #include <string>
 #include <vector>
-#include "pagx/PAGXDocument.h"
 
 namespace pagx {
+
+class PAGXDocument;
 
 /**
  * Collects diagnostics produced during HTML import.

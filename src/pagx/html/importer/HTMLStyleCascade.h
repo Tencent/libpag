@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -46,13 +45,17 @@ class HTMLValueParser;
 class HTMLStyleCascade {
  public:
   using PropertyMap = std::unordered_map<std::string, std::string>;
-  using FontFallbackSink = std::function<void(const std::vector<std::string>&)>;
+  // Receives concrete font-family chains. `userData` is the pointer registered alongside the
+  // thunk via `setFontFallbackSink`. The function-pointer + opaque-pointer shape avoids
+  // pulling `<functional>` into the cascade header and lets the caller wire a member sink
+  // without `std::bind`.
+  using FontFallbackThunk = void (*)(void* userData, const std::vector<std::string>& chain);
 
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
   /** Wires the callback that receives concrete font-family chains discovered by
    *  `resolveInheritedStyle`. Caller pools them for FontConfig fallback registration. */
-  void setFontFallbackSink(FontFallbackSink sink);
+  void setFontFallbackSink(FontFallbackThunk thunk, void* userData);
 
   /** Walks `<head>` and populates the class / element rule tables from `<style>` blocks. */
   void collectStyles(const std::shared_ptr<DOMNode>& head);
@@ -94,7 +97,8 @@ class HTMLStyleCascade {
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
-  FontFallbackSink _fontFallbackSink = nullptr;
+  FontFallbackThunk _fontFallbackThunk = nullptr;
+  void* _fontFallbackUserData = nullptr;
 
   // CSS class selectors (key = class name without the dot). Pre-parsed at <style>-collection
   // time so per-element resolution can copy entries instead of re-running ParseStyleString
