@@ -128,8 +128,8 @@ class LayerBuilderContext {
  public:
   LayerBuilderContext() = default;
 
-  void setSlotsHandedOff(bool value) {
-    _slotsHandedOff = value;
+  void setNeedsRuntimeData(bool value) {
+    _needsRuntimeData = value;
   }
 
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
@@ -294,9 +294,9 @@ class LayerBuilderContext {
     // Layers referencing the same Composition stay independent. When LayerBuilder is invoked
     // standalone (no PAGFile in play, e.g. from optimizer / cli rendering paths) the slot is
     // populated immediately with a flat expansion to preserve backward-compatible static
-    // rendering. PAGFile sets _slotsHandedOff before calling Build() to opt out of this path.
+    // rendering. PAGFile sets _needsRuntimeData before calling Build() to opt out of this path.
     auto containerLayer = tgfx::Layer::Make();
-    if (_slotsHandedOff) {
+    if (_needsRuntimeData) {
       return containerLayer;
     }
     for (const auto& compLayer : comp->layers) {
@@ -1257,7 +1257,7 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
-  bool _slotsHandedOff = false;
+  bool _needsRuntimeData = false;
 };
 
 // Public API implementation
@@ -1292,19 +1292,19 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   return context.buildWithMap(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithSlotsHandedOff(PAGXDocument* document) {
+LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
   if (!document->isLayoutApplied()) {
     LOGE(
-        "LayerBuilder::BuildWithSlotsHandedOff() called before applyLayout(). Call "
+        "LayerBuilder::BuildForRuntime() called before applyLayout(). Call "
         "document->applyLayout() first.");
     DEBUG_ASSERT(false);
     return {};
   }
   LayerBuilderContext context;
-  context.setSlotsHandedOff(true);
+  context.setNeedsRuntimeData(true);
   return context.buildWithMap(*document);
 }
 
@@ -1314,7 +1314,7 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   }
   LayerBuilderContext context;
   // Slot's recursive children build their own subtrees independently.
-  context.setSlotsHandedOff(true);
+  context.setNeedsRuntimeData(true);
   return context.buildSubtree(composition);
 }
 

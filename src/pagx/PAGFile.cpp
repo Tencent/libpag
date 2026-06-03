@@ -53,7 +53,7 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   base->document = document.get();
   file->fileStorage = std::make_unique<FileStorage>();
   file->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(file));
-  auto buildResult = LayerBuilder::BuildWithSlotsHandedOff(document.get());
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   base->runtimeLayer = std::move(buildResult.root);
   *base->binding = std::move(buildResult.binding);
   // Build the persistent per-layer runtime node tree: one node per top-level Layer (a PAGComposition
