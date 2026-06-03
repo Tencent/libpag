@@ -25,7 +25,6 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
-#include "pagx/utils/CSSFontStyle.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
