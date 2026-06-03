@@ -1255,6 +1255,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
+  } else if (!node->compositionFilePath.empty()) {
+    xml.addAttribute("composition", node->compositionFilePath);
   }
 
   // Build directive attributes.
