@@ -165,6 +165,10 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     return false;
   }
   bool found = false;
+  // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
+  // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
+  // makeNode<Composition>(), which push_back()s into nodes and would invalidate this iterator.
+  std::vector<Layer*> layers = {};
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
@@ -174,12 +178,14 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
         found = true;
       }
     } else if (node->nodeType() == NodeType::Layer) {
-      auto* layer = static_cast<Layer*>(node.get());
-      bool loadedComposition = LoadExternalComposition(this, layer, filePath, data);
-      found = loadedComposition || found;
-      if (!loadedComposition && layer->externalDoc != nullptr) {
-        found = layer->externalDoc->loadFileData(filePath, data) || found;
-      }
+      layers.push_back(static_cast<Layer*>(node.get()));
+    }
+  }
+  for (auto* layer : layers) {
+    bool loadedComposition = LoadExternalComposition(this, layer, filePath, data);
+    found = loadedComposition || found;
+    if (!loadedComposition && layer->externalDoc != nullptr) {
+      found = layer->externalDoc->loadFileData(filePath, data) || found;
     }
   }
   return found;
