@@ -6178,15 +6178,15 @@ PAGX_TEST(PAGXTest, PAGFileDrawAndReadPixels) {
  * against per-frame baselines, so a regression in advance/apply or rendering is caught.
  */
 PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
-  auto doc = pagx::PAGXDocument::Make(8, 8);
+  auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->width = 8;
-  layer->height = 8;
+  layer->width = 200;
+  layer->height = 200;
   doc->layers.push_back(layer);
 
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 8;
-  rect->size.height = 8;
+  rect->size.width = 200;
+  rect->size.height = 200;
   layer->contents.push_back(rect);
 
   auto fill = doc->makeNode<pagx::Fill>();
@@ -6215,11 +6215,11 @@ PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
   ASSERT_TRUE(timeline != nullptr);
   timeline->play();
 
-  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_TRUE(surface != nullptr);
 
   // Reads the surface into an RGBA_8888 premultiplied bitmap matching pagx::PAGSurface::readPixels.
-  tgfx::Bitmap frame(8, 8, false, false);
+  tgfx::Bitmap frame(200, 200, false, false);
   tgfx::Pixmap framePixmap(frame);
 
   // Frame 0: t=0, alpha=0.

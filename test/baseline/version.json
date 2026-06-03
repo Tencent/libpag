@@ -8547,6 +8547,9 @@
         "RenderXPathLayer": "15eaf7440"
     },
     "PAGXTest": {
+        "AdvanceRendersDistinctFrames_0": "d7adf1ea8",
+        "AdvanceRendersDistinctFrames_1": "d7adf1ea8",
+        "AdvanceRendersDistinctFrames_2": "d7adf1ea8",
         "LayerBuilderAPIConsistency": "f40e23b6",
         "PrecomposedTextRender": "9b6dea6a",
         "html": {
