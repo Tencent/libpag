@@ -385,37 +385,13 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    // Synthesize bold / italic when the resolved typeface does not actually carry the weight
-    // or slant requested by `fontStyle`. This is the common case for web pages imported via the
-    // HTML / SVG pipeline: a page asks for e.g. "Noto Sans SC" Black Italic, but that exact face
-    // is rarely installed on the render host, so `findTypeface` falls back to a Regular system
-    // face (or a glyph-fallback CJK face). Without faux synthesis the authored weight and slant
-    // are silently dropped. We only enable faux for the portion the resolved face fails to
-    // provide, so a host that *does* have the real Bold / Italic face still uses it instead of
-    // double-emboldening on top of it.
-    bool fauxBold = text->fauxBold;
-    bool fauxItalic = text->fauxItalic;
-    {
-      ParsedFontStyle requested = ParseFontStyleName(text->fontStyle);
-      ParsedFontStyle resolved =
-          primaryTypeface ? ParseFontStyleName(primaryTypeface->fontStyle()) : ParsedFontStyle{};
-      // Threshold mirrors CSS bold synthesis: a SemiBold-or-heavier request (>= 600) that lands
-      // on a lighter face gets emboldened.
-      if (requested.weight >= 600 && resolved.weight < 600) {
-        fauxBold = true;
-      }
-      if (requested.italic && !resolved.italic) {
-        fauxItalic = true;
-      }
-    }
-
     float effectiveFontSize = text->fontSize * textScale;
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
-    primaryFont.setFauxBold(fauxBold);
-    primaryFont.setFauxItalic(fauxItalic);
+    primaryFont.setFauxBold(text->fauxBold);
+    primaryFont.setFauxItalic(text->fauxItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
-    metricsFont.setFauxBold(fauxBold);
-    metricsFont.setFauxItalic(fauxItalic);
+    metricsFont.setFauxBold(text->fauxBold);
+    metricsFont.setFauxItalic(text->fauxItalic);
     float currentX = 0;
     const std::string& content = text->text;
     float effectiveLetterSpacing = text->letterSpacing * textScale;
