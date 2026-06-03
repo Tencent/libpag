@@ -102,6 +102,10 @@ int RunEmbed(int argc, char* argv[]) {
     std::cerr << "pagx embed: --skip-fonts and --skip-images cannot both be set\n";
     return 1;
   }
+  if (options.skipFonts && !options.fallbacks.empty()) {
+    std::cerr << "pagx embed: --skip-fonts and --fallback cannot both be set\n";
+    return 1;
+  }
 
   auto document = LoadDocument(options.inputFile, "pagx embed");
   if (document == nullptr) {
