@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -180,6 +181,29 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
   return result;
 }
 
+// Returns true when the painter's color source is a gradient (of any kind).
+// A gradient cannot be applied to a <g> that wraps multiple child <path>s while
+// each path carries its own transform: SVG resolves both objectBoundingBox and
+// userSpaceOnUse gradients in each referencing element's own coordinate space,
+// so every glyph re-fits the gradient to itself. The transform must therefore
+// be baked into the path data so all glyphs share one coordinate space — this
+// is required regardless of fitsToGeometry (true also needs the run bounds baked
+// into gradientTransform; false just needs the consistent coordinate space).
+static bool IsGradientSource(const ColorSource* source) {
+  if (source == nullptr) {
+    return false;
+  }
+  switch (source->nodeType()) {
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Detects an image MIME type from the leading bytes of the encoded stream so that
 // data URIs declare the actual format (PNG/JPEG/WebP). Defaults to image/png when
 // the magic bytes are not recognized, matching the long-standing assumption that
@@ -276,6 +300,14 @@ class SVGWriter {
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
+
+  // When non-empty, a gradient color source written while this is set is
+  // resolved into userSpaceOnUse coordinates spanning these bounds instead of
+  // emitting objectBoundingBox. Used when a single fitsToGeometry gradient must
+  // span a <g> that wraps multiple child geometries (per-glyph text paths):
+  // SVG re-fits objectBoundingBox/userSpaceOnUse gradients to each child's own
+  // box, so the gradient has to be baked against the whole run's bounds.
+  Rect _gradientUserSpaceBounds = {};
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -469,9 +501,24 @@ void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorS
   // objectBoundingBox mode provides exactly this semantic. When false the
   // coordinates are in the parent container's document space, so userSpaceOnUse
   // is correct.
-  _defs->addAttribute("gradientUnits", fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
-  if (!matrix.isIdentity()) {
-    _defs->addAttribute("gradientTransform", MatrixToSVGTransform(matrix));
+  Matrix effectiveMatrix = matrix;
+  bool useUserSpace = !fitsToGeometry;
+  if (fitsToGeometry && !_gradientUserSpaceBounds.isEmpty()) {
+    // The painter is shared across multiple child geometries (e.g. the
+    // per-glyph <path>s of a text run), so objectBoundingBox would re-fit the
+    // gradient to each glyph's own box. Bake the run's bounding box into the
+    // gradient transform and emit userSpaceOnUse so the normalized (0-1)
+    // coordinates fit the whole run once. The unit-box → run-box matrix is
+    // pre-multiplied so it applies after the gradient's own matrix, matching
+    // objectBoundingBox's coordinate order.
+    const Rect& b = _gradientUserSpaceBounds;
+    Matrix bboxMatrix = {b.width, 0.0f, 0.0f, b.height, b.x, b.y};
+    effectiveMatrix = bboxMatrix * matrix;
+    useUserSpace = true;
+  }
+  _defs->addAttribute("gradientUnits", useUserSpace ? "userSpaceOnUse" : "objectBoundingBox");
+  if (!effectiveMatrix.isIdentity()) {
+    _defs->addAttribute("gradientTransform", MatrixToSVGTransform(effectiveMatrix));
   }
   if (stops.empty()) {
     _defs->closeElementSelfClosing();
@@ -1446,17 +1493,66 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
+
+  // A gradient must span the whole glyph run, but the fill/stroke here is
+  // inherited by every per-glyph <path>, and SVG re-fits both objectBoundingBox
+  // and userSpaceOnUse gradients to each <path>'s own coordinate space (each
+  // glyph carries its own transform). Bake the glyph transforms into the path
+  // data so all glyphs share the group's coordinate space. For fitsToGeometry
+  // gradients the run's combined bounds are then baked into gradientTransform
+  // (see finishGradientDef); for pixel-space (fitsToGeometry=false) gradients
+  // the shared coordinate space alone is enough.
+  bool fitGradientToRun = IsGradientSource(fs.fill ? fs.fill->color : nullptr) ||
+                          IsGradientSource(fs.stroke ? fs.stroke->color : nullptr);
+
+  std::vector<std::string> bakedPaths;
+  if (fitGradientToRun) {
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
+    bakedPaths.reserve(glyphPaths.size());
+    for (const auto& gp : glyphPaths) {
+      if (!gp.pathData) {
+        continue;
+      }
+      PathData baked = PathDataFromSVGString("");
+      baked = *gp.pathData;
+      baked.transform(gp.transform);
+      Rect b = baked.getBounds();
+      minX = std::min(minX, b.x);
+      minY = std::min(minY, b.y);
+      maxX = std::max(maxX, b.x + b.width);
+      maxY = std::max(maxY, b.y + b.height);
+      bakedPaths.push_back(PathDataToSVGString(baked));
+    }
+    if (maxX > minX && maxY > minY) {
+      _gradientUserSpaceBounds = Rect::MakeLTRB(minX, minY, maxX, maxY);
+    }
+  }
+
   // Fill/stroke here only apply to the vector glyph <path> children; <image>
   // children have an intrinsic bitmap and ignore fill. We still emit the group
   // attributes so SVG renderers inherit them onto the glyph paths.
   applyPainters(out, fs, {}, alpha);
+  // The gradient def was written by applyPainters; clear the run bounds so the
+  // bitmap glyph branch and any nested writers fall back to the default mode.
+  _gradientUserSpaceBounds = {};
   out.closeElementStart();
 
-  for (const auto& gp : glyphPaths) {
-    out.openElement("path");
-    out.addAttribute("transform", MatrixToSVGTransform(gp.transform));
-    out.addAttribute("d", PathDataToSVGString(*gp.pathData));
-    out.closeElementSelfClosing();
+  if (fitGradientToRun) {
+    for (const auto& d : bakedPaths) {
+      out.openElement("path");
+      out.addAttribute("d", d);
+      out.closeElementSelfClosing();
+    }
+  } else {
+    for (const auto& gp : glyphPaths) {
+      out.openElement("path");
+      out.addAttribute("transform", MatrixToSVGTransform(gp.transform));
+      out.addAttribute("d", PathDataToSVGString(*gp.pathData));
+      out.closeElementSelfClosing();
+    }
   }
 
   // Bitmap glyphs (emoji / colour fonts). Each image is emitted as an <image>
