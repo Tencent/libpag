@@ -20,6 +20,7 @@
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
@@ -28,23 +29,6 @@ Text::~Text() {
 }
 
 Text::Text() : glyphData(new GlyphData()) {
-}
-
-static TextLayoutParams MakeStandaloneParams(const Text* text) {
-  TextLayoutParams params = {};
-  params.baseline = text->baseline;
-  switch (text->textAnchor) {
-    case TextAnchor::Start:
-      params.textAlign = TextAlign::Start;
-      break;
-    case TextAnchor::Center:
-      params.textAlign = TextAlign::Center;
-      break;
-    case TextAnchor::End:
-      params.textAlign = TextAlign::End;
-      break;
-  }
-  return params;
 }
 
 void Text::onMeasure(LayoutContext* context) {
