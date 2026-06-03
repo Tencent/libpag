@@ -468,10 +468,16 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
       ownBgImage.find("gradient") != std::string::npos) {
     out.textFillImage = ownBgImage;
   }
-  // Compute combined font-style label used by PAGX Text. Maps CSS font-weight (numeric or
-  // keyword) and font-style to a single PAGX `fontStyle` keyword such as "Bold Italic" or
-  // "Black Italic". Regular weight collapses the weight portion to empty.
-  out.fontStyleName = ResolveFontStyleName(out.fontWeight, out.fontStyle);
+  // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
+  // resolves plus the synthetic (faux) axes the renderer embosses on top. Bold (weight >= 600) and
+  // italic/oblique are baked as faux flags and dropped from the label so an uninstalled web face
+  // (e.g. "Noto Sans SC Black Italic") still renders at the authored weight and slant instead of
+  // collapsing to a thin upright fallback. Lighter weights (Light / Medium) cannot be synthesised
+  // and stay in the label.
+  FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
+  out.fontStyleName = fontSynthesis.fontStyleName;
+  out.fauxBold = fontSynthesis.fauxBold;
+  out.fauxItalic = fontSynthesis.fauxItalic;
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",

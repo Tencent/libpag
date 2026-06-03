@@ -36,6 +36,36 @@ namespace pagx {
 //   ("normal", "italic") -> "Italic"
 std::string ResolveFontStyleName(const std::string& cssFontWeight, const std::string& cssFontStyle);
 
+// Splits a CSS font-weight / font-style request into the real face style the renderer should
+// resolve plus the synthetic (faux) axes it must emboss on top. This lets an importer bake the
+// authored weight / slant into a `.pagx` without relying on render-time face introspection:
+// uninstalled web faces (the common case for HTML / SVG imports such as "Noto Sans SC Black
+// Italic") still render at the authored weight and slant via faux synthesis.
+//
+// The synthesised axes are *removed* from `fontStyleName` rather than kept alongside the faux
+// flags. A host that does ship the real heavy / italic face must not be emboldened twice
+// (faux-on-top-of-real, which the renderer layers additively), and keeping the styled name would
+// trigger exactly that whenever the styled face is resolvable. Stripping it makes the rendered
+// result identical whether or not the styled face is installed. Weights below the bold threshold
+// (Thin / ExtraLight / Light / Medium) cannot be synthesised — faux only adds weight, never
+// removes it — so those keywords are preserved in `fontStyleName` and carry no faux flag.
+//
+// Examples (threshold mirrors CSS bold synthesis at weight >= 600):
+//   ("900", "italic") -> {fontStyleName: "",       fauxBold: true,  fauxItalic: true}
+//   ("700", "")       -> {fontStyleName: "",       fauxBold: true,  fauxItalic: false}
+//   ("600", "italic") -> {fontStyleName: "",       fauxBold: true,  fauxItalic: true}
+//   ("500", "italic") -> {fontStyleName: "Medium", fauxBold: false, fauxItalic: true}
+//   ("300", "")       -> {fontStyleName: "Light",  fauxBold: false, fauxItalic: false}
+//   ("400", "italic") -> {fontStyleName: "",       fauxBold: false, fauxItalic: true}
+//   ("400", "")       -> {fontStyleName: "",       fauxBold: false, fauxItalic: false}
+struct FontStyleSynthesis {
+  std::string fontStyleName = {};
+  bool fauxBold = false;
+  bool fauxItalic = false;
+};
+FontStyleSynthesis ResolveFontStyleSynthesis(const std::string& cssFontWeight,
+                                             const std::string& cssFontStyle);
+
 // Parsed view of a PAGX/CSS font-style label.
 struct ParsedFontStyle {
   // Numeric weight on the CSS scale (100..900). 400 means Regular when the input did not

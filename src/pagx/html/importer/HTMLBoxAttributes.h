@@ -66,7 +66,14 @@ struct HTMLInheritedStyle {
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
-  std::string fontStyleName = {};  // computed combination, e.g. "Bold Italic"
+  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Medium" / ""
+  // Synthetic weight / slant the renderer must emboss on top of the resolved face. Set by
+  // `resolveInheritedStyle` for bold (CSS weight >= 600) and italic/oblique requests whose axis is
+  // dropped from `fontStyleName` (see `ResolveFontStyleSynthesis`). Carried through to
+  // `Text::fauxBold` / `Text::fauxItalic` so authored weight / slant survives even when the styled
+  // web face is not installed on the render host.
+  bool fauxBold = false;
+  bool fauxItalic = false;
   std::string letterSpacing = {};
   std::string lineHeight = {};
   std::string textAlign = {};

@@ -130,6 +130,26 @@ std::string ResolveFontStyleName(const std::string& cssFontWeight,
   return std::string();
 }
 
+FontStyleSynthesis ResolveFontStyleSynthesis(const std::string& cssFontWeight,
+                                             const std::string& cssFontStyle) {
+  FontStyleSynthesis out;
+  int numericWeight = CssFontWeightToNumeric(cssFontWeight);
+  bool italic = IsItalicCssStyle(cssFontStyle);
+  // Threshold mirrors CSS bold synthesis: SemiBold-or-heavier (>= 600) is treated as a faux-bold
+  // request because the renderer's faux emboldening is a single fixed step and cannot distinguish
+  // SemiBold from Black anyway.
+  out.fauxBold = numericWeight >= 600;
+  out.fauxItalic = italic;
+  // Keep only the real-face axes in the style label: a synthesised axis is dropped so the renderer
+  // resolves a base (Regular / lighter) face and faux adds the missing weight / slant on top,
+  // instead of resolving the styled face and doubling up.
+  const char* weightKeyword = out.fauxBold ? nullptr : WeightKeywordForRoundedHundreds(numericWeight);
+  if (weightKeyword) {
+    out.fontStyleName = weightKeyword;
+  }
+  return out;
+}
+
 ParsedFontStyle ParseFontStyleName(const std::string& fontStyleName) {
   ParsedFontStyle out;
   bool sawWeightToken = false;

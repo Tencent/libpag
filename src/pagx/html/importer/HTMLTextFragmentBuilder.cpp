@@ -55,6 +55,8 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   t->text = fragment.text;
   t->fontFamily = fragment.fontFamily;
   t->fontStyle = fragment.fontStyleName;
+  t->fauxBold = fragment.fauxBold;
+  t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;
   t->letterSpacing = fragment.letterSpacing;
   return t;
@@ -80,6 +82,8 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.fontFamily =
       inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.primaryFontFamily;
   frag.fontStyleName = inherited.fontStyleName;
+  frag.fauxBold = inherited.fauxBold;
+  frag.fauxItalic = inherited.fauxItalic;
   frag.fontSize = inherited.fontSizePx;
   frag.letterSpacing = inherited.letterSpacingPx;
   frag.color = inherited.resolvedTextColor;
@@ -98,6 +102,7 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
   // the float fields. The tolerance is well below any visually-meaningful step.
   constexpr float epsilon = 1e-3f;
   return a.fontFamily == b.fontFamily && a.fontStyleName == b.fontStyleName &&
+         a.fauxBold == b.fauxBold && a.fauxItalic == b.fauxItalic &&
          std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
@@ -110,6 +115,7 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
                                ? a.fontFamily == HTML_DEFAULT_FONT_FAMILY
                                : a.fontFamily == inherited.primaryFontFamily;
   return familyMatch && a.fontStyleName == inherited.fontStyleName &&
+         a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
