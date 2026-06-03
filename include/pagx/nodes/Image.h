@@ -32,7 +32,7 @@ namespace pagx {
 class Image : public Node {
  public:
   /**
-   * Image binary data (decoded from base64).
+   * Image binary data (decoded from base64 or provided by ResourceLoader).
    */
   std::shared_ptr<Data> data = nullptr;
 

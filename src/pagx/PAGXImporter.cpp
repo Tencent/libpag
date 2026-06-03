@@ -34,6 +34,7 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -41,11 +42,13 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -58,6 +61,7 @@
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/ResourceLoader.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -78,6 +82,63 @@ namespace pagx {
 // Forward declarations and utility functions
 //==============================================================================
 
+// Per-thread stack of base directories for resolving relative `composition="path.pagx"` paths,
+// plus a stack of currently-loading file paths used to break cyclic includes. Both stacks are
+// pushed at the entry of FromXML / cross-doc load and popped on return.
+namespace {
+thread_local std::vector<std::string> g_baseDirStack;
+thread_local std::vector<std::string> g_loadingPathStack;
+thread_local std::vector<ResourceLoader*> g_resourceLoaderStack;
+}  // namespace
+
+static void PushLoadBaseDir(const std::string& baseDir) {
+  g_baseDirStack.push_back(baseDir);
+}
+
+static void PopLoadBaseDir() {
+  if (!g_baseDirStack.empty()) {
+    g_baseDirStack.pop_back();
+  }
+}
+
+static void PushResourceLoader(ResourceLoader* loader) {
+  g_resourceLoaderStack.push_back(loader);
+}
+
+static void PopResourceLoader() {
+  if (!g_resourceLoaderStack.empty()) {
+    g_resourceLoaderStack.pop_back();
+  }
+}
+
+static ResourceLoader* CurrentResourceLoader() {
+  return g_resourceLoaderStack.empty() ? nullptr : g_resourceLoaderStack.back();
+}
+
+static const std::string& CurrentLoadBaseDir() {
+  static const std::string empty = {};
+  return g_baseDirStack.empty() ? empty : g_baseDirStack.back();
+}
+
+// Resolves a relative path against the current base directory. Absolute paths and URI-style
+// schemes pass through unchanged.
+static std::string ResolveRelativePath(const std::string& path) {
+  if (path.empty() || path[0] == '/' || path.find("://") != std::string::npos) {
+    return path;
+  }
+  return CurrentLoadBaseDir() + path;
+}
+
+// Returns true if the given absolute path is already on the load stack (cycle).
+static bool IsOnLoadingStack(const std::string& absolutePath) {
+  for (const auto& entry : g_loadingPathStack) {
+    if (entry == absolutePath) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static const std::string& EmptyString() {
   static const std::string empty = {};
   return empty;
@@ -89,6 +150,14 @@ static void ReportError(PAGXDocument* doc, const DOMNode* node, const std::strin
 #if DEBUG
   LOGE("%s", fullMessage.c_str());
 #endif
+}
+
+static std::shared_ptr<Resource> GetOrLoadResource(const ResourceLoadRequest& request) {
+  if (request.source.empty()) {
+    return nullptr;
+  }
+  auto* loader = CurrentResourceLoader();
+  return loader != nullptr ? loader->load(request) : nullptr;
 }
 
 static const std::string& GetAttribute(const DOMNode* node, const std::string& name,
@@ -498,7 +567,75 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
                   "Resource '" + compositionAttr + "' not found for 'composition' attribute.");
     }
   } else if (!compositionAttr.empty()) {
-    layer->compositionFilePath = compositionAttr;
+    std::shared_ptr<PAGXDocument> subDoc = nullptr;
+
+    ResourceLoadRequest request = {};
+    request.type = ResourceType::Composition;
+    request.id = layer->id;
+    request.source = compositionAttr;
+    request.customData = layer->customData;
+    auto resource = GetOrLoadResource(request);
+    if (resource != nullptr) {
+      if (resource->resourceType() == ResourceType::Composition) {
+        auto compositionResource = static_cast<CompositionResource*>(resource.get());
+        auto data = compositionResource->data();
+        auto baseDir = compositionResource->baseDir().empty() ? CurrentLoadBaseDir()
+                                                              : compositionResource->baseDir();
+        subDoc =
+            PAGXImporter::FromXML(data->bytes(), data->size(), baseDir, CurrentResourceLoader());
+      } else {
+        ReportError(doc, node,
+                    "ResourceLoader returned non-composition resource for Layer composition '" +
+                        compositionAttr + "'. Falling back to internal composition loading.");
+      }
+    }
+
+    if (subDoc == nullptr) {
+      // External composition path fallback: load the referenced .pagx file and wrap it in a sealed
+      // Composition node owned by the current document. The wrapper hides the external document's
+      // internal IDs and resources from the host so cross-doc lookups stay confined to the wrapper.
+      if (CurrentLoadBaseDir().empty()) {
+        ReportError(doc, node,
+                    "External composition '" + compositionAttr +
+                        "' requires a base directory. Use PAGXImporter::FromFile or pass baseDir "
+                        "to FromXML.");
+      } else {
+        auto absolutePath = ResolveRelativePath(compositionAttr);
+        if (IsOnLoadingStack(absolutePath)) {
+          ReportError(doc, node,
+                      "Cyclic external composition reference detected: '" + compositionAttr + "'.");
+        } else {
+          g_loadingPathStack.push_back(absolutePath);
+          subDoc = PAGXImporter::FromFile(absolutePath, CurrentResourceLoader());
+          g_loadingPathStack.pop_back();
+          if (subDoc == nullptr) {
+            ReportError(doc, node,
+                        "Failed to load external composition '" + compositionAttr + "'.");
+          }
+        }
+      }
+    }
+
+    if (subDoc != nullptr) {
+      // Propagate errors from the external document to the host so callers see one unified
+      // error list.
+      for (const auto& err : subDoc->errors) {
+        doc->errors.push_back("[" + compositionAttr + "] " + err);
+      }
+      // Anonymous wrapper Composition (no id). Reuses sub-document's top-level layers and
+      // animations so internal lookups stay in the external nodeMap; subDoc keeps the node
+      // ownership alive via shared_ptr.
+      auto* wrapper = doc->makeNode<Composition>();
+      // Do not register the original source in nodeMap. The wrapper id is used only for export
+      // round-trip of non-@ composition references.
+      wrapper->id = compositionAttr;
+      wrapper->width = subDoc->width;
+      wrapper->height = subDoc->height;
+      wrapper->layers = subDoc->layers;
+      wrapper->animations = subDoc->animations;
+      wrapper->externalDoc = subDoc;
+      layer->composition = wrapper;
+    }
   }
   layer->timelines.clear();
 
@@ -1440,6 +1577,25 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   auto source = GetAttribute(node, "source");
+  image->filePath = source;
+  if (!source.empty()) {
+    ResourceLoadRequest request = {};
+    request.type = ResourceType::Image;
+    request.id = image->id;
+    request.source = source;
+    request.customData = image->customData;
+    auto resource = GetOrLoadResource(request);
+    if (resource != nullptr) {
+      if (resource->resourceType() == ResourceType::Image) {
+        auto imageResource = static_cast<ImageResource*>(resource.get());
+        image->data = imageResource->data();
+        return image;
+      }
+      ReportError(doc, node,
+                  "ResourceLoader returned non-image resource for Image '" + image->id +
+                      "'. Falling back to internal image loading.");
+    }
+  }
   auto data = DecodeBase64DataURI(source);
   if (data) {
     image->data = data;
@@ -1766,12 +1922,46 @@ static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animat
   }
 }
 
+static std::string GetFontResourceSource(const Font* font) {
+  auto it = font->customData.find("source");
+  if (it != font->customData.end() && !it->second.empty()) {
+    return it->second;
+  }
+  it = font->customData.find("resource");
+  if (it != font->customData.end() && !it->second.empty()) {
+    return it->second;
+  }
+  return font->id;
+}
+
 static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
   auto font = makeNodeFromXML<Font>(node, doc);
   if (!font) {
     return nullptr;
   }
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
+  auto source = GetFontResourceSource(font);
+  bool handledByLoader = false;
+  if (!source.empty()) {
+    ResourceLoadRequest request = {};
+    request.type = ResourceType::Font;
+    request.id = font->id;
+    request.source = source;
+    request.customData = font->customData;
+    auto resource = GetOrLoadResource(request);
+    if (resource != nullptr) {
+      if (resource->resourceType() == ResourceType::Font) {
+        handledByLoader = true;
+      } else {
+        ReportError(doc, node,
+                    "ResourceLoader returned non-font resource for Font '" + font->id +
+                        "'. Falling back to embedded glyphs.");
+      }
+    }
+  }
+  if (handledByLoader) {
+    return font;
+  }
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -2433,7 +2623,8 @@ static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocume
 // Public API implementation
 //==============================================================================
 
-std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
+std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath,
+                                                     ResourceLoader* loader) {
   std::ifstream file(filePath, std::ios::binary | std::ios::ate);
   if (!file) {
     return nullptr;
@@ -2449,22 +2640,21 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
     return nullptr;
   }
 
-  auto doc = FromXML(content);
-  if (doc) {
-    // Convert relative paths to absolute paths
-    std::string basePath = {};
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      basePath = filePath.substr(0, lastSlash + 1);
-    }
-    if (!basePath.empty()) {
-      for (auto& node : doc->nodes) {
-        if (node->nodeType() == NodeType::Image) {
-          auto* image = static_cast<Image*>(node.get());
-          if (!image->filePath.empty() && image->filePath[0] != '/' &&
-              image->filePath.find("://") == std::string::npos) {
-            image->filePath = basePath + image->filePath;
-          }
+  // Convert relative paths to absolute paths
+  std::string basePath = {};
+  auto lastSlash = filePath.find_last_of("/\\");
+  if (lastSlash != std::string::npos) {
+    basePath = filePath.substr(0, lastSlash + 1);
+  }
+
+  auto doc = FromXML(content, basePath, loader);
+  if (doc && !basePath.empty()) {
+    for (auto& node : doc->nodes) {
+      if (node->nodeType() == NodeType::Image) {
+        auto* image = static_cast<Image*>(node.get());
+        if (!image->filePath.empty() && image->filePath[0] != '/' &&
+            image->filePath.find("://") == std::string::npos) {
+          image->filePath = basePath + image->filePath;
         }
       }
     }
@@ -2472,11 +2662,16 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
   return doc;
 }
 
-std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent) {
-  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size());
+std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent,
+                                                    const std::string& baseDir,
+                                                    ResourceLoader* loader) {
+  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size(), baseDir,
+                 loader);
 }
 
-std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
+std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length,
+                                                    const std::string& baseDir,
+                                                    ResourceLoader* loader) {
   auto dom = XMLDOM::Make(data, length);
   if (!dom) {
     return nullptr;
@@ -2486,7 +2681,11 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
     return nullptr;
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
+  PushLoadBaseDir(baseDir);
+  PushResourceLoader(loader);
   ParseDocument(root.get(), doc.get());
+  PopResourceLoader();
+  PopLoadBaseDir();
   return doc;
 }
 

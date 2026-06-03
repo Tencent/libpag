@@ -1094,11 +1094,11 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      if (image->data) {
+      if (!image->filePath.empty()) {
+        xml.addAttribute("source", image->filePath);
+      } else if (image->data) {
         xml.addAttribute("source", "data:image/png;base64," +
                                        Base64Encode(image->data->bytes(), image->data->size()));
-      } else {
-        xml.addAttribute("source", image->filePath);
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1254,9 +1254,11 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
-    xml.addAttribute("composition", "@" + node->composition->id);
-  } else if (!node->compositionFilePath.empty()) {
-    xml.addAttribute("composition", node->compositionFilePath);
+    if (node->composition->externalDoc != nullptr) {
+      xml.addAttribute("composition", node->composition->id);
+    } else {
+      xml.addAttribute("composition", "@" + node->composition->id);
+    }
   }
 
   // Build directive attributes.

@@ -45,15 +45,19 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontProvider.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -62,12 +66,14 @@
 #include "pagx/nodes/Property.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/ResourceLoader.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -161,6 +167,31 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
     file.write(xml.data(), static_cast<std::streamsize>(xml.size()));
   }
   return outPath;
+}
+
+static std::string FrameKey(const std::string& folder, int index) {
+  auto text = std::to_string(index);
+  while (text.size() < 3) {
+    text = "0" + text;
+  }
+  return folder + "/frame_" + text;
+}
+
+static bool SavePAGXSurfaceFrame(const std::shared_ptr<pagx::PAGSurface>& surface,
+                                 const std::string& key) {
+  if (surface == nullptr || surface->width() <= 0 || surface->height() <= 0) {
+    return false;
+  }
+  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false);
+  if (bitmap.isEmpty()) {
+    return false;
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
+    return false;
+  }
+  SaveImage(pixmap, key);
+  return true;
 }
 
 /**
@@ -7019,6 +7050,325 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.d, 2.0f);
   EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
+}
+
+PAGX_TEST(PAGXTest, RuntimeTimelineSequenceFrames) {
+  auto doc = pagx::PAGXDocument::Make(160, 120);
+
+  auto layer = doc->makeNode<pagx::Layer>("rectLayer");
+  layer->width = 160;
+  layer->height = 120;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {80.0f, 60.0f};
+  rect->size.width = 72.0f;
+  rect->size.height = 72.0f;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("boxColor");
+  solid->color = {0.1f, 0.2f, 0.9f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto animation = doc->makeNode<pagx::Animation>("main");
+  animation->duration = 180;
+  animation->frameRate = 60.0f;
+  animation->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animation);
+
+  auto layerObject = doc->makeNode<pagx::AnimationObject>();
+  layerObject->target = "rectLayer";
+  animation->objects.push_back(layerObject);
+
+  auto xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  xProp->channel = "x";
+  xProp->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, pagx::Point{0.42f, 0.0f}, {}});
+  xProp->keyframes.push_back({90, 44.0f, pagx::KeyframeInterpolationType::Bezier,
+                              pagx::Point{0.42f, 0.0f}, pagx::Point{0.58f, 1.0f}});
+  xProp->keyframes.push_back(
+      {180, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, pagx::Point{0.58f, 1.0f}});
+  layerObject->properties.push_back(xProp);
+
+  auto alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  alphaProp->channel = "alpha";
+  alphaProp->keyframes.push_back({0, 0.35f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({90, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({180, 0.35f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  layerObject->properties.push_back(alphaProp);
+
+  auto colorObject = doc->makeNode<pagx::AnimationObject>();
+  colorObject->target = "boxColor";
+  animation->objects.push_back(colorObject);
+
+  auto colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  colorProp->channel = "color";
+  colorProp->keyframes.push_back(
+      {0, pagx::Color{0.1f, 0.2f, 0.9f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorProp->keyframes.push_back(
+      {90, pagx::Color{1.0f, 0.25f, 0.1f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorProp->keyframes.push_back(
+      {180, pagx::Color{0.1f, 0.2f, 0.9f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorObject->properties.push_back(colorProp);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->play();
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(160, 120);
+  ASSERT_TRUE(surface != nullptr);
+
+  const std::string folder = "PAGXTimelineSequence";
+  constexpr int FrameCount = 30;
+  constexpr int64_t FrameDurationUs = 100'000;  // 10 fps output, 3 seconds total.
+
+  file->apply();
+  ASSERT_TRUE(file->draw(surface));
+  ASSERT_TRUE(SavePAGXSurfaceFrame(surface, FrameKey(folder, 0)));
+
+  for (int i = 1; i < FrameCount; ++i) {
+    file->advanceAndApply(FrameDurationUs);
+    ASSERT_TRUE(file->draw(surface));
+    ASSERT_TRUE(SavePAGXSurfaceFrame(surface, FrameKey(folder, i)));
+  }
+}
+
+namespace {
+class TestFontProvider : public pagx::FontProvider {
+ public:
+  int unitsPerEm() const override {
+    return 1000;
+  }
+  int glyphCount() const override {
+    return 1;
+  }
+  float glyphAdvance(int) const override {
+    return 500.0f;
+  }
+  bool getGlyphPath(int, pagx::PathData*) const override {
+    return false;
+  }
+};
+
+class TestResourceLoader : public pagx::ResourceLoader {
+ public:
+  std::unordered_map<std::string, int> counts = {};
+  std::unordered_map<std::string, std::shared_ptr<pagx::Resource>> resources = {};
+
+  std::shared_ptr<pagx::Resource> load(const pagx::ResourceLoadRequest& request) override {
+    counts[request.source]++;
+    auto it = resources.find(request.source);
+    return it != resources.end() ? it->second : nullptr;
+  }
+};
+
+static std::string ResourceTestImageDataURI() {
+  return "data:image/png;base64,"
+         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/"
+         "PchI7wAAAABJRU5ErkJggg==";
+}
+
+static std::string ResourceSubCompositionXML() {
+  return "<pagx width=\"16\" height=\"16\">\n"
+         "  <Layer id=\"subLayer\" width=\"16\" height=\"16\">\n"
+         "    <Rectangle width=\"16\" height=\"16\"/>\n"
+         "    <Fill><SolidColor color=\"#FF0000\"/></Fill>\n"
+         "  </Layer>\n"
+         "</pagx>\n";
+}
+}  // namespace
+
+PAGX_TEST(PAGXTest, ResourceLoaderImageHandled) {
+  const std::string bytes = "fake-encoded-image";
+  TestResourceLoader loader;
+  loader.resources["biz://image/a"] = pagx::ImageResource::FromBytes(bytes.data(), bytes.size());
+
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources><Image id=\"img\" source=\"biz://image/a\"/></Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* image = doc->findNode<pagx::Image>("img");
+  ASSERT_TRUE(image != nullptr);
+  ASSERT_TRUE(image->data != nullptr);
+  EXPECT_EQ(image->filePath, "biz://image/a");
+  EXPECT_EQ(loader.counts["biz://image/a"], 1);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("source=\"biz://image/a\""), std::string::npos);
+  EXPECT_EQ(exported.find("data:image/png;base64"), std::string::npos);
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderImageSkipFallback) {
+  TestResourceLoader loader;
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources><Image id=\"img\" source=\"relative.png\"/></Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* image = doc->findNode<pagx::Image>("img");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_EQ(image->filePath, "relative.png");
+  EXPECT_EQ(loader.counts["relative.png"], 1);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("source=\"relative.png\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderImageSharedResource) {
+  const std::string bytes = "same-image";
+  TestResourceLoader loader;
+  loader.resources["biz://image/shared"] =
+      pagx::ImageResource::FromBytes(bytes.data(), bytes.size());
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources>\n"
+      "    <Image id=\"a\" source=\"biz://image/shared\"/>\n"
+      "    <Image id=\"b\" source=\"biz://image/shared\"/>\n"
+      "  </Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* a = doc->findNode<pagx::Image>("a");
+  auto* b = doc->findNode<pagx::Image>("b");
+  ASSERT_TRUE(a != nullptr);
+  ASSERT_TRUE(b != nullptr);
+  EXPECT_EQ(loader.counts["biz://image/shared"], 2);
+  EXPECT_EQ(a->data.get(), b->data.get());
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderFontHandled) {
+  TestResourceLoader loader;
+  loader.resources["biz://font/a"] =
+      pagx::FontResource::MakeCustom(std::make_shared<TestFontProvider>());
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources><Font id=\"f\" data-source=\"biz://font/a\"/></Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* font = doc->findNode<pagx::Font>("f");
+  ASSERT_TRUE(font != nullptr);
+  EXPECT_TRUE(font->glyphs.empty());
+  EXPECT_EQ(loader.counts["biz://font/a"], 1);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("data-source=\"biz://font/a\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderFontSkipEmbeddedGlyphFallback) {
+  TestResourceLoader loader;
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources>\n"
+      "    <Font id=\"f\" data-source=\"biz://font/a\">\n"
+      "      <Glyph path=\"M0 0 L10 0 L10 10 Z\" advance=\"10\"/>\n"
+      "    </Font>\n"
+      "  </Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* font = doc->findNode<pagx::Font>("f");
+  ASSERT_TRUE(font != nullptr);
+  ASSERT_EQ(font->glyphs.size(), 1u);
+  EXPECT_TRUE(font->glyphs[0]->path != nullptr);
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderCompositionHandled) {
+  auto subXml = ResourceSubCompositionXML();
+  TestResourceLoader loader;
+  loader.resources["biz://comp/card"] =
+      pagx::CompositionResource::FromBytes(subXml.data(), subXml.size());
+  std::string xml =
+      "<pagx width=\"20\" height=\"20\">\n"
+      "  <Layer id=\"slot\" composition=\"biz://comp/card\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* layer = doc->layers[0];
+  ASSERT_TRUE(layer->composition != nullptr);
+  EXPECT_EQ(layer->composition->id, "biz://comp/card");
+  ASSERT_TRUE(layer->composition->externalDoc != nullptr);
+  EXPECT_EQ(loader.counts["biz://comp/card"], 1);
+
+  auto file = pagx::PAGFile::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(file->draw(surface));
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("composition=\"biz://comp/card\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderCompositionSkipFallbackToPath) {
+  auto subPath = SavePAGXFile(ResourceSubCompositionXML(), "PAGXTest/resource_loader_sub.pagx");
+  auto mainPath = SavePAGXFile(
+      "<pagx width=\"20\" height=\"20\"><Layer composition=\"resource_loader_sub.pagx\"/></pagx>",
+      "PAGXTest/resource_loader_main.pagx");
+  TestResourceLoader loader;
+  auto doc = pagx::PAGXImporter::FromFile(mainPath, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_TRUE(doc->layers[0]->composition != nullptr);
+  ASSERT_TRUE(doc->layers[0]->composition->externalDoc != nullptr);
+  EXPECT_EQ(loader.counts["resource_loader_sub.pagx"], 1);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("composition=\"resource_loader_sub.pagx\""), std::string::npos);
+  (void)subPath;
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderCompositionSharedResource) {
+  auto subXml = ResourceSubCompositionXML();
+  TestResourceLoader loader;
+  loader.resources["biz://comp/shared"] =
+      pagx::CompositionResource::FromBytes(subXml.data(), subXml.size());
+  std::string xml =
+      "<pagx width=\"20\" height=\"20\">\n"
+      "  <Layer id=\"a\" composition=\"biz://comp/shared\"/>\n"
+      "  <Layer id=\"b\" composition=\"biz://comp/shared\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_EQ(doc->layers.size(), 2u);
+  ASSERT_TRUE(doc->layers[0]->composition != nullptr);
+  ASSERT_TRUE(doc->layers[1]->composition != nullptr);
+  EXPECT_EQ(loader.counts["biz://comp/shared"], 2);
+  EXPECT_EQ(doc->layers[0]->composition->id, "biz://comp/shared");
+  EXPECT_EQ(doc->layers[1]->composition->id, "biz://comp/shared");
+}
+
+PAGX_TEST(PAGXTest, ResourceLoaderTypeMismatchFallback) {
+  TestResourceLoader loader;
+  loader.resources[ResourceTestImageDataURI()] =
+      pagx::FontResource::MakeCustom(std::make_shared<TestFontProvider>());
+  std::string xml =
+      "<pagx width=\"10\" height=\"10\">\n"
+      "  <Resources><Image id=\"img\" source=\"" +
+      ResourceTestImageDataURI() +
+      "\"/></Resources>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  ASSERT_TRUE(doc != nullptr);
+  auto* image = doc->findNode<pagx::Image>("img");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_TRUE(image->data != nullptr);  // data URI fallback still worked
+  bool foundTypeError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("non-image resource") != std::string::npos) {
+      foundTypeError = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundTypeError);
 }
 
 }  // namespace pag

@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/ResourceLoader.h"
 
 namespace pagx {
 
@@ -33,19 +34,24 @@ class PAGXImporter {
    * Parses a PAGX file and returns a PAGXDocument.
    * Returns nullptr if the file cannot be loaded or parsing fails.
    */
-  static std::shared_ptr<PAGXDocument> FromFile(const std::string& filePath);
+  static std::shared_ptr<PAGXDocument> FromFile(const std::string& filePath,
+                                                ResourceLoader* loader = nullptr);
 
   /**
    * Parses PAGX XML content and returns a PAGXDocument.
    * Returns nullptr if parsing fails.
    */
-  static std::shared_ptr<PAGXDocument> FromXML(const std::string& xmlContent);
+  static std::shared_ptr<PAGXDocument> FromXML(const std::string& xmlContent,
+                                               const std::string& baseDir = {},
+                                               ResourceLoader* loader = nullptr);
 
   /**
    * Parses PAGX XML data and returns a PAGXDocument.
    * Returns nullptr if parsing fails.
    */
-  static std::shared_ptr<PAGXDocument> FromXML(const uint8_t* data, size_t length);
+  static std::shared_ptr<PAGXDocument> FromXML(const uint8_t* data, size_t length,
+                                               const std::string& baseDir = {},
+                                               ResourceLoader* loader = nullptr);
 };
 
 }  // namespace pagx

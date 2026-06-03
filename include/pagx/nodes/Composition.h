@@ -26,6 +26,7 @@ namespace pagx {
 
 class Animation;
 class Layer;
+class PAGXDocument;
 
 /**
  * Composition represents a reusable composition resource that contains a set of layers. It can be
@@ -52,6 +53,11 @@ class Composition : public Node {
    * The animations contained in this composition.
    */
   std::vector<Animation*> animations = {};
+
+  // When this composition was loaded from an external PAGX document (via ResourceLoader or
+  // cross-doc file reference), externalDoc keeps the sub-document alive so that its nodes remain
+  // valid for runtime binding. Null for inline compositions defined in the host document.
+  std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
   NodeType nodeType() const override {
     return NodeType::Composition;
