@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
@@ -41,7 +42,6 @@
 
 namespace pagx {
 
-class Composition;
 class PAGXDocument;
 
 /**
