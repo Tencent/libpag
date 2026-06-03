@@ -295,21 +295,72 @@ pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pag
 
 ## pagx import
 
-Convert a file from another format (e.g. SVG) to a standalone PAGX file.
+Convert a file from another format to a standalone PAGX file. Two input formats are
+supported: **SVG** and **HTML** (a restricted HTML/CSS subset — see `spec/html_subset.md`).
+The format is inferred from the input file extension and can be forced with `--format`.
+The output is optimized via `PAGXOptimizer` (PathData is inlined rather than shared) so the
+result is close to hand-authored PAGX and can be polished further with the other CLI tools.
+
+Unsupported constructs are handled on a best-effort basis: offending elements/properties are
+skipped or downgraded and reported as warnings on stderr (use `--html-strict` to turn HTML
+warnings into hard errors).
 
 ```bash
-pagx import --input icon.svg                     # SVG to icon.pagx
-pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
+pagx import --input icon.svg                      # SVG to icon.pagx
+pagx import --input icon.svg --output out.pagx    # SVG to out.pagx
+pagx import --input layout.html                   # HTML to layout.pagx
+pagx import --input page.html --output card.pagx  # HTML to card.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input file to import (required) |
-| `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
-| `--format <format>` | Force input format (`svg`; default: inferred from extension) |
+| `--input <file\|url>` | Input file or URL to import (required; URL inputs require `--html-snapshot`) |
+| `--output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
+| `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
+
+### SVG options
+
+| Option | Description |
+|--------|-------------|
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+### HTML options
+
+| Option | Description |
+|--------|-------------|
+| `--html-strict` | Treat HTML import warnings (unsupported elements/properties) as hard errors |
+| `--html-preserve-unknown` | Keep unknown HTML tags as empty Layers tagged `data-html-unknown="<tag>"` (debug) |
+| `--html-no-prefer-body-size` | Prefer the caller-provided target size over the `<body>` intrinsic/declared size |
+| `--html-no-normalize` | Skip the HTML subset normalizer (debug; importer then sees raw DOM) |
+| `--html-infer-flex` | Recover `display:flex` semantics from an absolute-positioned layout (lossy heuristic) |
+| `--html-snapshot` | Pre-render the input through `tools/html-snapshot/snapshot.js` before import |
+| `--html-snapshot-bin <path>` | Override the path to `snapshot.js` |
+
+By default the importer runs a subset normalizer that resolves the `<style>` cascade into
+inline styles, drops disallowed properties, and prunes unsupported elements so it only ever
+sees subset-compliant HTML. `--html-no-normalize` disables this (debug only).
+
+### HTML snapshot workflow
+
+`--html-snapshot` pipes the input through a headless-browser renderer (`snapshot.js`) before
+importing. This is how JS/React/Tailwind-driven pages are flattened into a static,
+absolute-positioned HTML subset that the importer understands. It is typically paired with
+`--html-infer-flex` to recover flex layout from the absolute output. It requires `node` on
+`PATH` and a `snapshot.js` install; the script is located in this order:
+
+1. `--html-snapshot-bin <path>` (explicit override)
+2. `PAGX_HTML_SNAPSHOT_BIN` environment variable
+3. Upward search from the current directory for `tools/html-snapshot/snapshot.js`
+
+URL inputs (`http://` / `https://`) are only valid with `--html-snapshot` (the importer
+cannot fetch URLs itself) and require an explicit `--output`.
+
+```bash
+pagx import --input app.html --html-snapshot --html-infer-flex      # React/Tailwind page
+pagx import --input https://example.com/demo --html-snapshot --output demo.pagx   # URL input
+```
 
 ---
 
