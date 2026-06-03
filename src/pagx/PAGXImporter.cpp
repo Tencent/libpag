@@ -569,6 +569,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   } else if (!compositionAttr.empty()) {
     std::shared_ptr<PAGXDocument> subDoc = nullptr;
 
+    // 1. Try ResourceLoader first.
     ResourceLoadRequest request = {};
     request.type = ResourceType::Composition;
     request.id = layer->id;
@@ -583,31 +584,23 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       } else {
         ReportError(doc, node,
                     "ResourceLoader returned non-composition resource for Layer composition '" +
-                        compositionAttr + "'. Falling back to internal composition loading.");
+                        compositionAttr + "'. Falling back to file path resolution.");
       }
     }
 
-    if (subDoc == nullptr) {
-      // External composition path fallback: load the referenced .pagx file and wrap it in a sealed
-      // Composition node owned by the current document. The wrapper hides the external document's
-      // internal IDs and resources from the host so cross-doc lookups stay confined to the wrapper.
-      if (CurrentLoadBaseDir().empty()) {
+    // 2. Try resolving as a file path relative to the current base directory.
+    if (subDoc == nullptr && !CurrentLoadBaseDir().empty()) {
+      auto absolutePath = ResolveRelativePath(compositionAttr);
+      if (IsOnLoadingStack(absolutePath)) {
         ReportError(doc, node,
-                    "External composition '" + compositionAttr +
-                        "' requires a base directory. Use PAGXImporter::FromFile.");
+                    "Cyclic external composition reference detected: '" + compositionAttr + "'.");
       } else {
-        auto absolutePath = ResolveRelativePath(compositionAttr);
-        if (IsOnLoadingStack(absolutePath)) {
+        g_loadingPathStack.push_back(absolutePath);
+        subDoc = PAGXImporter::FromFile(absolutePath, CurrentResourceLoader());
+        g_loadingPathStack.pop_back();
+        if (subDoc == nullptr) {
           ReportError(doc, node,
-                      "Cyclic external composition reference detected: '" + compositionAttr + "'.");
-        } else {
-          g_loadingPathStack.push_back(absolutePath);
-          subDoc = PAGXImporter::FromFile(absolutePath, CurrentResourceLoader());
-          g_loadingPathStack.pop_back();
-          if (subDoc == nullptr) {
-            ReportError(doc, node,
-                        "Failed to load external composition '" + compositionAttr + "'.");
-          }
+                      "Failed to load external composition '" + compositionAttr + "'.");
         }
       }
     }
@@ -618,12 +611,11 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       for (const auto& err : subDoc->errors) {
         doc->errors.push_back("[" + compositionAttr + "] " + err);
       }
-      // Anonymous wrapper Composition (no id). Reuses sub-document's top-level layers and
-      // animations so internal lookups stay in the external nodeMap; subDoc keeps the node
-      // ownership alive via shared_ptr.
+      // Anonymous wrapper Composition. Reuses sub-document's top-level layers and animations so
+      // internal lookups stay in the external nodeMap; subDoc keeps the node ownership alive via
+      // shared_ptr.
       auto* wrapper = doc->makeNode<Composition>();
-      // Do not register the original source in nodeMap. The wrapper id is used only for export
-      // round-trip of non-@ composition references.
+      // The wrapper id is used for export round-trip of non-@ composition references.
       wrapper->id = compositionAttr;
       wrapper->width = subDoc->width;
       wrapper->height = subDoc->height;
@@ -631,6 +623,9 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       wrapper->animations = subDoc->animations;
       wrapper->externalDoc = subDoc;
       layer->composition = wrapper;
+    } else {
+      // 3. Last resort: record as unresolved compositionFilePath for later loadFileData().
+      layer->compositionFilePath = compositionAttr;
     }
   }
   layer->timelines.clear();
