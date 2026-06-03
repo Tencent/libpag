@@ -23,13 +23,13 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
 
-class Animation;
 class LayoutContext;
 class PAGFile;
 
