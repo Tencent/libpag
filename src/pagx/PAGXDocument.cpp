@@ -152,9 +152,10 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
-  // FontEmbedder only detaches GlyphRuns from Text nodes; the embedded Font nodes themselves
-  // remain in `nodes`. Drop their render-side caches so a subsequent embed() cycle (which creates
-  // fresh Font nodes) does not leave the now-detached Fonts holding stale render state.
+  // The Font nodes themselves remain in `nodes`, but they are no longer reachable from any
+  // Text->glyphRuns and will not be touched by the next embed/render cycle. Drop their cached
+  // tgfx typefaces here so the typeface memory is reclaimed promptly instead of being held
+  // until the document is destroyed.
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Font) {
       static_cast<Font*>(node.get())->resetRenderCache();

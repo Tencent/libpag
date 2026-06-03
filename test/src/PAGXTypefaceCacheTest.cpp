@@ -24,6 +24,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontRenderCache.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
@@ -37,9 +38,18 @@
 namespace pag {
 using namespace tgfx;
 
+// Returns the cached tgfx typeface on a Font node, or nullptr if no cache has been built yet.
+static std::shared_ptr<Typeface> CachedTypeface(const pagx::Font* fontNode) {
+  if (fontNode == nullptr || fontNode->renderCache == nullptr) {
+    return nullptr;
+  }
+  return fontNode->renderCache->typeface;
+}
+
 // Builds a minimal text document, embeds fonts, and reloads it from XML so the embedded glyphRun
-// path (the one that lazily builds and stores Font::renderTypeface) is exercised by LayerBuilder.
-// Returns nullptr if the fallback font asset is missing on disk so the test is skipped gracefully.
+// path (the one that lazily builds and caches a tgfx typeface on each Font node) is exercised by
+// LayerBuilder. Returns nullptr if the fallback font asset is missing on disk so the test is
+// skipped gracefully.
 static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
   auto typeface = Typeface::MakeFromPath(fontPath);
@@ -102,12 +112,12 @@ CLI_TEST(PAGXTypefaceCacheTest, BuildPopulatesFontTypeface) {
 
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
-  EXPECT_EQ(fontNode->renderTypeface, nullptr);
+  EXPECT_EQ(CachedTypeface(fontNode), nullptr);
 
   auto rootLayer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(rootLayer != nullptr);
 
-  EXPECT_TRUE(fontNode->renderTypeface != nullptr);
+  EXPECT_TRUE(CachedTypeface(fontNode) != nullptr);
 }
 
 CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
@@ -120,11 +130,11 @@ CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   ASSERT_NE(fontNode, nullptr);
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  auto firstTypeface = fontNode->renderTypeface;
+  auto firstTypeface = CachedTypeface(fontNode);
   ASSERT_TRUE(firstTypeface != nullptr);
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  auto secondTypeface = fontNode->renderTypeface;
+  auto secondTypeface = CachedTypeface(fontNode);
   EXPECT_EQ(firstTypeface.get(), secondTypeface.get())
       << "second LayerBuilder::Build should hit the cache, not rebuild the typeface";
 }
@@ -141,8 +151,8 @@ CLI_TEST(PAGXTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   auto* fontB = FindFirstEmbeddedFont(docB.get());
   ASSERT_NE(fontA, nullptr);
   ASSERT_NE(fontB, nullptr);
-  EXPECT_TRUE(fontA->renderTypeface != nullptr);
-  EXPECT_EQ(fontB->renderTypeface, nullptr);
+  EXPECT_TRUE(CachedTypeface(fontA) != nullptr);
+  EXPECT_EQ(CachedTypeface(fontB), nullptr);
 }
 
 CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
@@ -155,7 +165,7 @@ CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   ASSERT_NE(fontNode, nullptr);
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
-  std::weak_ptr<Typeface> weak = fontNode->renderTypeface;
+  std::weak_ptr<Typeface> weak = CachedTypeface(fontNode);
   ASSERT_FALSE(weak.expired());
   fontNode = nullptr;
 
@@ -172,10 +182,10 @@ CLI_TEST(PAGXTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
-  ASSERT_TRUE(fontNode->renderTypeface != nullptr);
+  ASSERT_TRUE(CachedTypeface(fontNode) != nullptr);
 
   doc->clearEmbed();
-  EXPECT_EQ(fontNode->renderTypeface, nullptr);
+  EXPECT_EQ(CachedTypeface(fontNode), nullptr);
 }
 
 }  // namespace pag

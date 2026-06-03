@@ -21,6 +21,7 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontRenderCache.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
@@ -102,13 +103,17 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
   if (fontNode == nullptr) {
     return nullptr;
   }
-  if (fontNode->typefaceBuilt) {
-    return fontNode->renderTypeface;
+  if (fontNode->renderCache == nullptr) {
+    fontNode->renderCache = std::make_unique<FontRenderCache>();
+  }
+  auto& cache = *fontNode->renderCache;
+  if (cache.built) {
+    return cache.typeface;
   }
 
   // Mark the build as attempted up-front so that pathological Fonts (empty glyphs, mixed
   // path+image, or builders that fail to detach) are not retried on every render call.
-  fontNode->typefaceBuilt = true;
+  cache.built = true;
 
   if (fontNode->glyphs.empty()) {
     return nullptr;
@@ -168,7 +173,7 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
     typeface = builder.detach();
   }
 
-  fontNode->renderTypeface = typeface;
+  fontNode->renderCache->typeface = typeface;
   return typeface;
 }
 

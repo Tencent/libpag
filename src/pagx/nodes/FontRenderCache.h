@@ -16,17 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/Font.h"
-#include "pagx/nodes/FontRenderCache.h"
+#pragma once
+
+#include <memory>
+#include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-Font::Font() = default;
+// Internal render-side cache attached to each Font node. Defined in a private header so that
+// public consumers of pagx::Font never see tgfx types in their include graph.
+//
+// Lifetime: owned by Font via std::unique_ptr<FontRenderCache>; created lazily by
+// GlyphRunRenderer on the first render and dropped via Font::resetRenderCache (called from
+// PAGXDocument::clearEmbed) or when the owning Font is destroyed.
+struct FontRenderCache {
+  // Built tgfx typeface, or nullptr if the build was attempted and produced no result.
+  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
 
-Font::~Font() = default;
-
-void Font::resetRenderCache() {
-  renderCache.reset();
-}
+  // Sentinel that tracks whether the typeface build was already attempted (success or failure).
+  // Used to avoid re-running the (potentially expensive or pathological) build on every render.
+  bool built = false;
+};
 
 }  // namespace pagx

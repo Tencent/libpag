@@ -37,6 +37,12 @@ struct LayerBuildResult {
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
  * The document must have applyLayout() called before building.
+ *
+ * Thread safety: not safe to call Build / BuildWithMap concurrently on the same PAGXDocument.
+ * The renderer lazily caches a built tgfx::Typeface on each Font node referenced by the document
+ * on the first call, and the cache is updated without synchronization. Callers that share a
+ * PAGXDocument across threads must serialize Build / BuildWithMap calls themselves (e.g. by
+ * mutex or by rendering on a single dedicated thread).
  */
 class LayerBuilder {
  public:
