@@ -5390,32 +5390,32 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   EXPECT_EQ(obj2->target, "targetLayer");
   ASSERT_EQ(obj2->properties.size(), 6u);
 
-  auto* p0 = dynamic_cast<pagx::TypedProperty<float>*>(obj2->properties[0]);
-  ASSERT_TRUE(p0 != nullptr);
+  ASSERT_EQ(obj2->properties[0]->valueType(), pagx::PropertyValueType::Float);
+  auto* p0 = static_cast<pagx::TypedProperty<float>*>(obj2->properties[0]);
   EXPECT_EQ(p0->channel, "alpha");
   ASSERT_EQ(p0->keyframes.size(), 2u);
   EXPECT_FLOAT_EQ(p0->keyframes[1].value, 1.0f);
 
-  auto* p1 = dynamic_cast<pagx::TypedProperty<bool>*>(obj2->properties[1]);
-  ASSERT_TRUE(p1 != nullptr);
+  ASSERT_EQ(obj2->properties[1]->valueType(), pagx::PropertyValueType::Bool);
+  auto* p1 = static_cast<pagx::TypedProperty<bool>*>(obj2->properties[1]);
   EXPECT_EQ(p1->keyframes[0].value, false);
   EXPECT_EQ(p1->keyframes[1].value, true);
 
-  auto* p2 = dynamic_cast<pagx::TypedProperty<int>*>(obj2->properties[2]);
-  ASSERT_TRUE(p2 != nullptr);
+  ASSERT_EQ(obj2->properties[2]->valueType(), pagx::PropertyValueType::Int);
+  auto* p2 = static_cast<pagx::TypedProperty<int>*>(obj2->properties[2]);
   EXPECT_EQ(p2->keyframes[1].value, 4);
 
-  auto* p3 = dynamic_cast<pagx::TypedProperty<std::string>*>(obj2->properties[3]);
-  ASSERT_TRUE(p3 != nullptr);
+  ASSERT_EQ(obj2->properties[3]->valueType(), pagx::PropertyValueType::String);
+  auto* p3 = static_cast<pagx::TypedProperty<std::string>*>(obj2->properties[3]);
   EXPECT_EQ(p3->keyframes[1].value, "World");
 
-  auto* p4 = dynamic_cast<pagx::TypedProperty<pagx::ImageRef>*>(obj2->properties[4]);
-  ASSERT_TRUE(p4 != nullptr);
+  ASSERT_EQ(obj2->properties[4]->valueType(), pagx::PropertyValueType::ImageRef);
+  auto* p4 = static_cast<pagx::TypedProperty<pagx::ImageRef>*>(obj2->properties[4]);
   EXPECT_EQ(p4->keyframes[0].value.id, "imgA");
   EXPECT_EQ(p4->keyframes[1].value.id, "imgB");
 
-  auto* p5 = dynamic_cast<pagx::TypedProperty<pagx::Color>*>(obj2->properties[5]);
-  ASSERT_TRUE(p5 != nullptr);
+  ASSERT_EQ(obj2->properties[5]->valueType(), pagx::PropertyValueType::Color);
+  auto* p5 = static_cast<pagx::TypedProperty<pagx::Color>*>(obj2->properties[5]);
   EXPECT_FLOAT_EQ(p5->keyframes[0].value.red, 1.0f);
   EXPECT_FLOAT_EQ(p5->keyframes[1].value.green, 1.0f);
 }
@@ -5453,9 +5453,10 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   ASSERT_TRUE(loaded->errors.empty());
   ASSERT_EQ(loaded->animations.size(), 1u);
 
+  ASSERT_EQ(loaded->animations[0]->objects[0]->properties[0]->valueType(),
+            pagx::PropertyValueType::Float);
   auto* prop2 =
-      dynamic_cast<pagx::TypedProperty<float>*>(loaded->animations[0]->objects[0]->properties[0]);
-  ASSERT_TRUE(prop2 != nullptr);
+      static_cast<pagx::TypedProperty<float>*>(loaded->animations[0]->objects[0]->properties[0]);
   ASSERT_EQ(prop2->keyframes.size(), 3u);
 
   EXPECT_EQ(prop2->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
