@@ -143,7 +143,8 @@ FontStyleSynthesis ResolveFontStyleSynthesis(const std::string& cssFontWeight,
   // Keep only the real-face axes in the style label: a synthesised axis is dropped so the renderer
   // resolves a base (Regular / lighter) face and faux adds the missing weight / slant on top,
   // instead of resolving the styled face and doubling up.
-  const char* weightKeyword = out.fauxBold ? nullptr : WeightKeywordForRoundedHundreds(numericWeight);
+  const char* weightKeyword =
+      out.fauxBold ? nullptr : WeightKeywordForRoundedHundreds(numericWeight);
   if (weightKeyword) {
     out.fontStyleName = weightKeyword;
   }
