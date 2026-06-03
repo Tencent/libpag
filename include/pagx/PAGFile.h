@@ -55,7 +55,12 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
    */
   static std::shared_ptr<PAGFile> Make(std::shared_ptr<PAGXDocument> document);
 
-  ~PAGFile();
+  ~PAGFile() override;
+
+  /**
+   * Returns the runtime layer type of the file root, which is always PAGLayerType::File.
+   */
+  PAGLayerType type() const override;
 
   /**
    * Returns the ids of all top-level animations in the source document, preserving declaration
@@ -120,7 +125,7 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
 
  private:
-  PAGFile() = default;
+  PAGFile();
 
   // PAGXDocument::notifyChange dispatches here.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);

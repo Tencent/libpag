@@ -24,47 +24,33 @@
 
 namespace pagx {
 
-struct PAGLayer::Impl {
-  const Layer* node = nullptr;
-  tgfx::Layer* runtimeLayer = nullptr;
-  PAGFile* rootFile = nullptr;
-};
-
-PAGLayer::PAGLayer() : impl(std::make_unique<Impl>()) {
+PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGFile* rootFile)
+    : node(node), runtimeLayer(std::move(runtimeLayer)), rootFile(rootFile) {
 }
 
 PAGLayer::~PAGLayer() = default;
 
-std::shared_ptr<PAGLayer> PAGLayer::Wrap(const Layer* node, const void* runtimeLayer,
-                                         PAGFile* rootFile) {
-  if (node == nullptr) {
-    return nullptr;
-  }
-  auto layer = std::shared_ptr<PAGLayer>(new PAGLayer());
-  layer->impl->node = node;
-  layer->impl->runtimeLayer =
-      const_cast<tgfx::Layer*>(static_cast<const tgfx::Layer*>(runtimeLayer));
-  layer->impl->rootFile = rootFile;
-  return layer;
+PAGLayerType PAGLayer::type() const {
+  return PAGLayerType::Layer;
 }
 
 std::string PAGLayer::name() const {
-  return impl->node != nullptr ? impl->node->name : std::string();
+  return node != nullptr ? node->name : std::string();
 }
 
 Matrix PAGLayer::getGlobalMatrix() const {
-  if (impl->runtimeLayer == nullptr || impl->rootFile == nullptr) {
+  if (runtimeLayer == nullptr || rootFile == nullptr) {
     return Matrix::Identity();
   }
   Matrix rootToSurface = {};
-  if (!impl->rootFile->rootToSurfaceMatrix(&rootToSurface)) {
+  if (!rootFile->rootToSurfaceMatrix(&rootToSurface)) {
     return Matrix::Identity();
   }
   // local -> root: the runtime layer's transform relative to the tree root. The tree may not be
   // attached to a display list (no draw() yet), so use the file's root tgfx layer directly rather
   // than tgfx::Layer::root() which is null for a detached subtree.
-  auto* rootLayer = static_cast<tgfx::Layer*>(impl->rootFile->rootRuntimeLayer());
-  auto localToRoot = impl->runtimeLayer->getRelativeMatrix(rootLayer);
+  auto* rootLayer = static_cast<tgfx::Layer*>(rootFile->rootRuntimeLayer());
+  auto localToRoot = runtimeLayer->getRelativeMatrix(rootLayer);
   auto localToSurface = ToTGFX(rootToSurface) * localToRoot;
   return {localToSurface.getScaleX(),     localToSurface.getSkewY(),
           localToSurface.getSkewX(),      localToSurface.getScaleY(),
@@ -72,15 +58,15 @@ Matrix PAGLayer::getGlobalMatrix() const {
 }
 
 bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
-  if (impl->runtimeLayer == nullptr || impl->rootFile == nullptr) {
+  if (runtimeLayer == nullptr || rootFile == nullptr) {
     return false;
   }
   float rootX = 0;
   float rootY = 0;
-  if (!impl->rootFile->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+  if (!rootFile->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return false;
   }
-  return impl->runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);
+  return runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);
 }
 
 }  // namespace pagx

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/runtime/PAGComposition.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGFile.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGTimeline.h"
@@ -25,123 +25,118 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
-void PAGComposition::Impl::buildSubtree() {
-  auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
-  root = std::move(buildResult.root);
-  binding = std::move(buildResult.binding);
-}
-
-void PAGComposition::Impl::spawnTimelines(const std::vector<std::unique_ptr<Timeline>>& drivers) {
-  if (document == nullptr) {
-    return;
-  }
-  for (const auto& driver : drivers) {
-    if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
-      continue;
-    }
-    auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation = document->findNode<Animation>(animationDriver->animationId);
-    if (animation == nullptr) {
-      continue;
-    }
-    // The timeline targets this composition's own binding and resolves channel target IDs against
-    // this composition's document (which is the layer's externalDoc for sealed cross-document
-    // compositions). All inputs are owned by this composition, so it constructs the timeline
-    // directly.
-    auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, &binding, document));
-    if (animationDriver->playing) {
-      timeline->play();
-    }
-    timelines.push_back(std::move(timeline));
-  }
-}
-
-void PAGComposition::Impl::buildChildCompositions() {
-  if (ownerLayer == nullptr || ownerLayer->composition == nullptr) {
-    return;
-  }
-  for (auto* compLayer : ownerLayer->composition->layers) {
-    if (compLayer == nullptr || compLayer->composition == nullptr) {
-      continue;
-    }
-    auto childComposition = PAGComposition::MakeChild(compLayer, parentFile);
-    if (childComposition == nullptr) {
-      continue;
-    }
-    auto childRoot = childComposition->composition->root;
-    if (childRoot != nullptr) {
-      auto container = binding.get<tgfx::Layer>(compLayer);
-      if (container != nullptr) {
-        container->addChild(childRoot);
-      }
-    }
-    childCompositions.push_back(std::move(childComposition));
-  }
-}
-
-std::unique_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
-                                                          PAGFile* parentFile) {
-  if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
-    return nullptr;
-  }
-  auto composition = std::unique_ptr<PAGComposition>(new PAGComposition());
-  auto* impl = composition->composition.get();
-  impl->ownerLayer = ownerLayer;
-  impl->parentFile = parentFile;
-  auto* externalDoc = ownerLayer->externalDoc.get();
-  impl->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
-  impl->buildSubtree();
-  impl->spawnTimelines(ownerLayer->timelines);
-  impl->buildChildCompositions();
-  return composition;
-}
-
-PAGComposition::PAGComposition() : composition(std::make_unique<Impl>()) {
+PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
+                               PAGFile* rootFile)
+    : PAGLayer(node, std::move(runtimeLayer), rootFile),
+      binding(std::make_unique<RuntimeBinding>()) {
 }
 
 PAGComposition::~PAGComposition() = default;
 
+PAGLayerType PAGComposition::type() const {
+  return PAGLayerType::Composition;
+}
+
+std::shared_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
+                                                          PAGFile* parentFile) {
+  if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
+    return nullptr;
+  }
+  auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
+  auto composition = std::shared_ptr<PAGComposition>(
+      new PAGComposition(ownerLayer, std::move(buildResult.root), parentFile));
+  *composition->binding = std::move(buildResult.binding);
+  auto* externalDoc = ownerLayer->externalDoc.get();
+  composition->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
+  // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
+  // document, then build the persistent per-layer runtime node tree for the composition content.
+  for (const auto& driver : ownerLayer->timelines) {
+    if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
+      continue;
+    }
+    auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
+    auto* animation = composition->document != nullptr
+                          ? composition->document->findNode<Animation>(animationDriver->animationId)
+                          : nullptr;
+    if (animation == nullptr) {
+      continue;
+    }
+    auto timeline = std::shared_ptr<PAGTimeline>(
+        new PAGTimeline(animation, composition->binding.get(), composition->document));
+    if (animationDriver->playing) {
+      timeline->play();
+    }
+    composition->timelines.push_back(std::move(timeline));
+  }
+  composition->buildChildren(ownerLayer->composition->layers);
+  return composition;
+}
+
+void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
+  for (auto* layer : layers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    auto layerRuntime = binding->get<tgfx::Layer>(layer);
+    if (layer->composition != nullptr) {
+      auto childComposition = PAGComposition::MakeChild(layer, rootFile);
+      if (childComposition == nullptr) {
+        continue;
+      }
+      if (childComposition->runtimeLayer != nullptr && layerRuntime != nullptr) {
+        layerRuntime->addChild(childComposition->runtimeLayer);
+      }
+      children.push_back(std::move(childComposition));
+    } else {
+      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, rootFile)));
+    }
+  }
+}
+
 void PAGComposition::advance(int64_t deltaMicroseconds) {
-  for (auto& timeline : composition->timelines) {
+  for (auto& timeline : timelines) {
     if (timeline != nullptr) {
       timeline->advance(deltaMicroseconds);
     }
   }
-  for (auto& child : composition->childCompositions) {
-    if (child != nullptr) {
-      child->advance(deltaMicroseconds);
+  for (auto& child : children) {
+    if (child != nullptr && child->type() != PAGLayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->advance(deltaMicroseconds);
     }
   }
 }
 
 void PAGComposition::apply(float mix) {
-  for (auto& timeline : composition->timelines) {
+  for (auto& timeline : timelines) {
     if (timeline != nullptr) {
       timeline->apply(mix);
     }
   }
-  for (auto& child : composition->childCompositions) {
-    if (child != nullptr) {
-      child->apply(mix);
+  for (auto& child : children) {
+    if (child != nullptr && child->type() != PAGLayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->apply(mix);
     }
   }
 }
 
-const Node* PAGComposition::Impl::resolveHitNode(const tgfx::Layer* hitLayer) {
-  const Node* node = binding.nodeForLayer(hitLayer);
-  if (node != nullptr) {
-    return node;
-  }
-  for (auto& child : childCompositions) {
+std::shared_ptr<PAGLayer> PAGComposition::findChildForLayer(const tgfx::Layer* hitLayer) {
+  for (auto& child : children) {
     if (child == nullptr) {
       continue;
     }
-    node = child->composition->resolveHitNode(hitLayer);
-    if (node != nullptr) {
-      return node;
+    if (child->runtimeLayer.get() == hitLayer) {
+      return child;
+    }
+    if (child->type() != PAGLayerType::Layer) {
+      auto found = static_cast<PAGComposition*>(child.get())->findChildForLayer(hitLayer);
+      if (found != nullptr) {
+        return found;
+      }
     }
   }
   return nullptr;
@@ -149,25 +144,20 @@ const Node* PAGComposition::Impl::resolveHitNode(const tgfx::Layer* hitLayer) {
 
 std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float x, float y) {
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  if (composition->root == nullptr) {
+  if (runtimeLayer == nullptr) {
     return result;
   }
   // tgfx getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
   // coordinate space, covering the whole subtree (child composition roots are attached into the
-  // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not registered
-  // as a node's primary layer; we keep only those that resolve to a PAGX Layer node. Resolution
-  // probes this composition's reverse map and recurses into descendant compositions, since each
-  // composition instance owns the binding for the subtree it built. The first array entry stays the
-  // top-most layer.
-  auto hitLayers = composition->root->getLayersUnderPoint(x, y);
+  // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not bound to a
+  // persistent node; keep only those that match a persistent PAGLayer node's runtimeLayer.
+  // Resolution searches this composition's children and recurses into descendant compositions. The
+  // first array entry stays the top-most layer.
+  auto hitLayers = runtimeLayer->getLayersUnderPoint(x, y);
   for (const auto& hitLayer : hitLayers) {
-    const Node* node = composition->resolveHitNode(hitLayer.get());
-    if (node != nullptr && node->nodeType() == NodeType::Layer) {
-      auto handle =
-          PAGLayer::Wrap(static_cast<const Layer*>(node), hitLayer.get(), composition->parentFile);
-      if (handle != nullptr) {
-        result.push_back(std::move(handle));
-      }
+    auto matched = findChildForLayer(hitLayer.get());
+    if (matched != nullptr && matched->type() == PAGLayerType::Layer) {
+      result.push_back(std::move(matched));
     }
   }
   return result;

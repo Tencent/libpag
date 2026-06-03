@@ -22,19 +22,40 @@
 #include <string>
 #include "pagx/types/Matrix.h"
 
+namespace tgfx {
+class Layer;
+}  // namespace tgfx
+
 namespace pagx {
 
 class Layer;
 class PAGFile;
 
 /**
- * PAGLayer is a handle to one layer of a running composition, returned by hit testing to identify
- * the layer under a point. When the same source layer appears in multiple composition instances,
- * each instance yields its own PAGLayer handle with its own on-screen position.
+ * Identifies the concrete runtime type of a PAGLayer in the runtime layer hierarchy, so callers can
+ * downcast without RTTI. Layer is a leaf runtime layer, Composition adds animation playback and hit
+ * testing over its content, and File is the root composition of a whole PAGXDocument.
+ */
+enum class PAGLayerType { Layer, Composition, File };
+
+/**
+ * PAGLayer is the base class of the runtime layer hierarchy. One PAGLayer node exists per source
+ * layer of a running composition, mirroring the document's layer tree. It reports the layer's
+ * on-screen position and answers hit-test queries. When the same source layer appears in multiple
+ * composition instances, each instance owns its own PAGLayer node with its own on-screen position.
+ *
+ * PAGComposition derives from PAGLayer to add animation playback and child lookup, and PAGFile
+ * derives from PAGComposition as the root composition of a document.
  */
 class PAGLayer {
  public:
-  ~PAGLayer();
+  virtual ~PAGLayer();
+
+  /**
+   * Returns the concrete runtime type of this layer. Use it to downcast safely (via static_cast)
+   * to PAGComposition or PAGFile without runtime type information.
+   */
+  virtual PAGLayerType type() const;
 
   /**
    * Returns the display name of the layer. Returns an empty string if the layer has no name.
@@ -58,20 +79,18 @@ class PAGLayer {
    */
   bool hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest = false);
 
- private:
-  PAGLayer();
+ protected:
+  // Constructs a runtime layer node for the given source Layer node, the runtime tgfx layer it maps
+  // to in a specific composition instance, and the root PAGFile used for surface coordinate
+  // conversion and for resolving the tree root. node may be null for the file root (which has no
+  // owning source layer). Created by the PAGComposition/PAGFile factories.
+  PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGFile* rootFile);
 
-  // Creates a PAGLayer handle for the given source Layer node, the runtime tgfx layer it maps to in
-  // a specific composition instance, and the root PAGFile used for surface coordinate conversion
-  // and for resolving the tree root. Returns nullptr if node is null. The runtimeLayer is passed as
-  // void* to keep tgfx out of this public header; PAGLayer.cpp casts it back. Used by
-  // PAGComposition hit testing.
-  static std::shared_ptr<PAGLayer> Wrap(const Layer* node, const void* runtimeLayer,
-                                        PAGFile* rootFile);
+  const Layer* node = nullptr;
+  std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
+  PAGFile* rootFile = nullptr;
 
-  struct Impl;
-  std::unique_ptr<Impl> impl;
-
+  friend class PAGFile;
   friend class PAGComposition;
 };
 
