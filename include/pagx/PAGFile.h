@@ -118,11 +118,13 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   /**
    * Returns the layers under the given surface point. The first layer in the array is the top-most
    * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
-   * testing does not require a prior draw().
+   * testing does not require a prior draw(). Overrides PAGComposition to accept surface coordinates
+   * (with zoom and content offset applied) instead of the composition's local coordinates.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
-  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
+  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX,
+                                                              float surfaceY) override;
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full

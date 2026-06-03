@@ -59,14 +59,15 @@ class PAGComposition : public PAGLayer {
   void apply(float mix = 1.0f);
 
   /**
-   * Returns the layers under the given point. The first layer in the array is the top-most under
-   * the point, the last is the bottom-most. Returns an empty array if nothing is hit. The point is
-   * in this composition's coordinate space; PAGFile::getLayersUnderPoint takes surface coordinates
-   * instead. Hit testing does not require the content to have been drawn first.
-   * @param x the x coordinate in the composition coordinate space.
-   * @param y the y coordinate in the composition coordinate space.
+   * Returns the layers under the given point in this composition's coordinate space. The first layer
+   * in the array is the top-most under the point, the last is the bottom-most. Returns an empty
+   * array if nothing is hit. Hit testing does not require the content to have been drawn first.
+   * PAGComposition takes coordinates in its own local space; PAGFile overrides this to accept
+   * surface coordinates instead.
+   * @param x the x coordinate in this composition's coordinate space.
+   * @param y the y coordinate in this composition's coordinate space.
    */
-  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
+  virtual std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the file root),
