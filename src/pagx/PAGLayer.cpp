@@ -19,6 +19,7 @@
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGFile.h"
 #include "pagx/nodes/Layer.h"
+#include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/Layer.h"
 

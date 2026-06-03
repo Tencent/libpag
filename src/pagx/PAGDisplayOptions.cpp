@@ -18,6 +18,7 @@
 
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGFile.h"
+#include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
