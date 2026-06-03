@@ -169,9 +169,10 @@ class PAGXDocument : public Node {
   
   /**
    * Notifies all live PAGFile instances created from this document that the given nodes have
-   * changed. PAGFile instances will rebuild their runtime state for the affected nodes on the next
-   * draw. Callers must invoke this method after directly mutating fields on document nodes;
-   * otherwise the changes will not be reflected by any rendering pipeline.
+   * changed. Note: runtime rebuild dispatch is not yet implemented; in the current version this
+   * method only maintains internal bookkeeping (pruning expired PAGFile references) and does not
+   * yet trigger any runtime state rebuild. A future version will rebuild the affected nodes on the
+   * next draw so callers can reflect direct field mutations through the rendering pipeline.
    * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
    * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    */
