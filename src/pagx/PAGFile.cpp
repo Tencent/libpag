@@ -61,9 +61,7 @@ std::shared_ptr<PAGFile> PAGFile::Make(std::shared_ptr<PAGXDocument> document) {
   // their own subtrees and spawn timeline drivers, and their tgfx roots are attached into the
   // top-level slot containers.
   base->buildChildren(document->layers);
-  // PR1 only registers the file itself; node-level reverse mapping is populated when notifyChange
-  // dispatch is wired up (PR11). Pass an empty referenced-node list for now.
-  document->registerLiveFile(file, {});
+  document->registerLiveFile(file);
   return file;
 }
 

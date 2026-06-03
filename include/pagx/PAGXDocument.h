@@ -189,8 +189,7 @@ class PAGXDocument : public Node {
   void registerNode(Node* node, const std::string& id);
 
   // PAGFile lifecycle hooks (called from PAGFile::Make / ~PAGFile).
-  void registerLiveFile(const std::shared_ptr<PAGFile>& file,
-                        const std::vector<Node*>& referencedNodes);
+  void registerLiveFile(const std::shared_ptr<PAGFile>& file);
   void unregisterLiveFile(PAGFile* file);
 
   FontConfig fontConfig;
@@ -200,11 +199,6 @@ class PAGXDocument : public Node {
   // Live PAGFile instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGFile alive; expired entries are pruned during notifyChange.
   std::vector<std::weak_ptr<PAGFile>> liveFiles = {};
-
-  // Reverse index from node to the PAGFile instances that reference it. Raw pointers because the
-  // owning weak_ptr lives in liveFiles; PAGFile must unregister itself on destruction to keep this
-  // map free of dangling pointers.
-  std::unordered_map<Node*, std::vector<PAGFile*>> nodeToFiles = {};
 
   friend class PAGXImporter;
   friend class PAGXExporter;
