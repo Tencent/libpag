@@ -35,18 +35,17 @@ namespace pag {
 #define NV12_PLANE_COUNT 2
 
 namespace {
-// RAII wrapper for per-frame NV12 CPU buffers. The lifetime is owned by the SoftwareData
+// RAII wrapper for per-frame NV12 CPU buffers. The Y and UV planes share a single contiguous
+// allocation, so only the base pointer is owned. The lifetime is owned by the SoftwareData
 // attached to the ImageBuffer, so the memory stays alive until the asynchronous GPU upload
 // task finishes, even if the decoder has been destroyed in the meantime.
 struct NV12FrameBuffer {
-  uint8_t* data[2] = {nullptr, nullptr};
-  int lineSize[2] = {0, 0};
+  uint8_t* data = nullptr;
 
   NV12FrameBuffer() = default;
 
   ~NV12FrameBuffer() {
-    delete[] data[0];
-    delete[] data[1];
+    delete[] data;
   }
 
   NV12FrameBuffer(const NV12FrameBuffer&) = delete;
@@ -341,37 +340,24 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
     // Allocate a fresh frame buffer for every decoded frame. SoftwareData keeps a
     // shared_ptr to the NV12FrameBuffer, so the memory stays alive until the asynchronous
     // GPU upload task consumes it, even if the decoder is destroyed in the meantime.
+    // One extra Y-stride row is over-allocated as trailing padding: on some HarmonyOS devices
+    // libGLES_mali.so reads past the last row of the source buffer during glTexSubImage2D,
+    // which crashes when the buffer has no padding behind it. The pad row is zeroed so the
+    // driver's out-of-bounds read always lands on valid, mapped memory.
     auto frameBuffer = std::make_shared<NV12FrameBuffer>();
-    frameBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
-    if (frameBuffer->data[0] == nullptr) {
+    size_t allocSize = requiredSize + static_cast<size_t>(videoStride);
+    frameBuffer->data = new (std::nothrow) uint8_t[allocSize];
+    if (frameBuffer->data == nullptr) {
       return nullptr;
     }
-    frameBuffer->lineSize[0] = videoStride;
-    memcpy(frameBuffer->data[0], yuvAddress, yBufferSize);
+    memcpy(frameBuffer->data, yuvAddress, requiredSize);
+    memset(frameBuffer->data + requiredSize, 0, static_cast<size_t>(videoStride));
 
-    // Repack the UV plane into a tightly packed buffer (rowBytes == width). This avoids
-    // relying on GL_UNPACK_ROW_LENGTH during NV12 texture upload, which has been observed
-    // to crash inside libGLES_mali.so on certain HarmonyOS devices when the source buffer
-    // lacks the trailing padding the driver tries to read. The per-row memcpy is cheaper
-    // than the per-row glTexSubImage2D fallback path that would otherwise be required to
-    // work around the driver bug.
-    int uvHeight = videoFormat.height / 2;
-    size_t uvRowBytes = static_cast<size_t>(videoFormat.width);
-    size_t uvAllocSize = uvRowBytes * static_cast<size_t>(uvHeight);
-    frameBuffer->data[1] = new (std::nothrow) uint8_t[uvAllocSize];
-    if (frameBuffer->data[1] == nullptr) {
-      return nullptr;
-    }
-    frameBuffer->lineSize[1] = static_cast<int>(uvRowBytes);
-
-    const uint8_t* uvSrc = yuvAddress + yBufferSize;
-    for (int row = 0; row < uvHeight; ++row) {
-      memcpy(frameBuffer->data[1] + static_cast<size_t>(row) * uvRowBytes,
-             uvSrc + static_cast<size_t>(row) * static_cast<size_t>(videoStride), uvRowBytes);
-    }
-
-    uint8_t* planes[3] = {frameBuffer->data[0], frameBuffer->data[1], nullptr};
-    int lineSizes[3] = {frameBuffer->lineSize[0], frameBuffer->lineSize[1], 0};
+    // Y and UV planes share the single allocation; UV starts right after the Y plane. Both
+    // keep the decoder's stride as rowBytes, so the GPU upload uses GL_UNPACK_ROW_LENGTH to
+    // skip the per-row padding (supported on the GLES 3 context libpag creates).
+    uint8_t* planes[3] = {frameBuffer->data, frameBuffer->data + yBufferSize, nullptr};
+    int lineSizes[3] = {videoStride, videoStride, 0};
     auto yuvData =
         SoftwareData<NV12FrameBuffer>::Make(videoFormat.width, videoFormat.height, planes,
                                             lineSizes, NV12_PLANE_COUNT, std::move(frameBuffer));
