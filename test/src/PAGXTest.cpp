@@ -46,19 +46,15 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
-#include "pagx/nodes/FontProvider.h"
-#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -7138,31 +7134,50 @@ PAGX_TEST(PAGXTest, RuntimeTimelineSequenceFrames) {
 }
 
 namespace {
-class TestFontProvider : public pagx::FontProvider {
- public:
-  int unitsPerEm() const override {
-    return 1000;
-  }
-  int glyphCount() const override {
-    return 1;
-  }
-  float glyphAdvance(int) const override {
-    return 500.0f;
-  }
-  bool getGlyphPath(int, pagx::PathData*) const override {
-    return false;
-  }
-};
-
 class TestResourceLoader : public pagx::ResourceLoader {
  public:
   std::unordered_map<std::string, int> counts = {};
-  std::unordered_map<std::string, std::shared_ptr<pagx::Resource>> resources = {};
+  std::unordered_map<std::string, std::shared_ptr<pagx::Data>> imageData = {};
+  std::unordered_map<std::string, bool> handledFonts = {};
+  std::unordered_map<std::string, std::string> compositionXML = {};
+  std::unordered_map<std::string, bool> imageTakeovers = {};
 
-  std::shared_ptr<pagx::Resource> load(const pagx::ResourceLoadRequest& request) override {
+  bool loadImage(const pagx::ResourceLoadRequest& request, pagx::Image* image) override {
     counts[request.source]++;
-    auto it = resources.find(request.source);
-    return it != resources.end() ? it->second : nullptr;
+    if (imageTakeovers[request.source]) {
+      return true;
+    }
+    auto it = imageData.find(request.source);
+    if (it == imageData.end()) {
+      return false;
+    }
+    image->data = it->second;
+    return true;
+  }
+
+  bool loadFont(const pagx::ResourceLoadRequest& request, pagx::Font*) override {
+    counts[request.source]++;
+    return handledFonts[request.source];
+  }
+
+  bool loadComposition(const pagx::ResourceLoadRequest& request,
+                       pagx::Composition* composition) override {
+    counts[request.source]++;
+    auto it = compositionXML.find(request.source);
+    if (it == compositionXML.end()) {
+      return false;
+    }
+    auto subDoc = pagx::PAGXImporter::FromXML(it->second, this);
+    if (subDoc == nullptr) {
+      return true;
+    }
+    composition->id = request.source;
+    composition->width = subDoc->width;
+    composition->height = subDoc->height;
+    composition->layers = subDoc->layers;
+    composition->animations = subDoc->animations;
+    composition->externalDoc = subDoc;
+    return true;
   }
 };
 
@@ -7185,7 +7200,7 @@ static std::string ResourceSubCompositionXML() {
 PAGX_TEST(PAGXTest, ResourceLoaderImageHandled) {
   const std::string bytes = "fake-encoded-image";
   TestResourceLoader loader;
-  loader.resources["biz://image/a"] = pagx::ImageResource::FromBytes(bytes.data(), bytes.size());
+  loader.imageData["biz://image/a"] = pagx::Data::MakeWithCopy(bytes.data(), bytes.size());
 
   std::string xml =
       "<pagx width=\"10\" height=\"10\">\n"
@@ -7224,8 +7239,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageSkipFallback) {
 PAGX_TEST(PAGXTest, ResourceLoaderImageSharedResource) {
   const std::string bytes = "same-image";
   TestResourceLoader loader;
-  loader.resources["biz://image/shared"] =
-      pagx::ImageResource::FromBytes(bytes.data(), bytes.size());
+  loader.imageData["biz://image/shared"] = pagx::Data::MakeWithCopy(bytes.data(), bytes.size());
   std::string xml =
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources>\n"
@@ -7245,8 +7259,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageSharedResource) {
 
 PAGX_TEST(PAGXTest, ResourceLoaderFontHandled) {
   TestResourceLoader loader;
-  loader.resources["biz://font/a"] =
-      pagx::FontResource::MakeCustom(std::make_shared<TestFontProvider>());
+  loader.handledFonts["biz://font/a"] = true;
   std::string xml =
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources><Font id=\"f\" data-source=\"biz://font/a\"/></Resources>\n"
@@ -7283,8 +7296,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderFontSkipEmbeddedGlyphFallback) {
 PAGX_TEST(PAGXTest, ResourceLoaderCompositionHandled) {
   auto subXml = ResourceSubCompositionXML();
   TestResourceLoader loader;
-  loader.resources["biz://comp/card"] =
-      pagx::CompositionResource::FromBytes(subXml.data(), subXml.size());
+  loader.compositionXML["biz://comp/card"] = subXml;
   std::string xml =
       "<pagx width=\"20\" height=\"20\">\n"
       "  <Layer id=\"slot\" composition=\"biz://comp/card\"/>\n"
@@ -7329,8 +7341,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderCompositionSkipFallbackToPath) {
 PAGX_TEST(PAGXTest, ResourceLoaderCompositionSharedResource) {
   auto subXml = ResourceSubCompositionXML();
   TestResourceLoader loader;
-  loader.resources["biz://comp/shared"] =
-      pagx::CompositionResource::FromBytes(subXml.data(), subXml.size());
+  loader.compositionXML["biz://comp/shared"] = subXml;
   std::string xml =
       "<pagx width=\"20\" height=\"20\">\n"
       "  <Layer id=\"a\" composition=\"biz://comp/shared\"/>\n"
@@ -7346,10 +7357,9 @@ PAGX_TEST(PAGXTest, ResourceLoaderCompositionSharedResource) {
   EXPECT_EQ(doc->layers[1]->composition->id, "biz://comp/shared");
 }
 
-PAGX_TEST(PAGXTest, ResourceLoaderTypeMismatchFallback) {
+PAGX_TEST(PAGXTest, ResourceLoaderImageTakeoverSkipsFallback) {
   TestResourceLoader loader;
-  loader.resources[ResourceTestImageDataURI()] =
-      pagx::FontResource::MakeCustom(std::make_shared<TestFontProvider>());
+  loader.imageTakeovers[ResourceTestImageDataURI()] = true;
   std::string xml =
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources><Image id=\"img\" source=\"" +
@@ -7360,15 +7370,9 @@ PAGX_TEST(PAGXTest, ResourceLoaderTypeMismatchFallback) {
   ASSERT_TRUE(doc != nullptr);
   auto* image = doc->findNode<pagx::Image>("img");
   ASSERT_TRUE(image != nullptr);
-  EXPECT_TRUE(image->data != nullptr);  // data URI fallback still worked
-  bool foundTypeError = false;
-  for (const auto& error : doc->errors) {
-    if (error.find("non-image resource") != std::string::npos) {
-      foundTypeError = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(foundTypeError);
+  EXPECT_TRUE(image->data == nullptr);
+  EXPECT_EQ(image->filePath, ResourceTestImageDataURI());
+  EXPECT_EQ(loader.counts[ResourceTestImageDataURI()], 1);
 }
 
 }  // namespace pag

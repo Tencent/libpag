@@ -34,7 +34,6 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -42,13 +41,11 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
-#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -150,14 +147,6 @@ static void ReportError(PAGXDocument* doc, const DOMNode* node, const std::strin
 #if DEBUG
   LOGE("%s", fullMessage.c_str());
 #endif
-}
-
-static std::shared_ptr<Resource> GetOrLoadResource(const ResourceLoadRequest& request) {
-  if (request.source.empty()) {
-    return nullptr;
-  }
-  auto* loader = CurrentResourceLoader();
-  return loader != nullptr ? loader->load(request) : nullptr;
 }
 
 static const std::string& GetAttribute(const DOMNode* node, const std::string& name,
@@ -568,28 +557,23 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
   } else if (!compositionAttr.empty()) {
     std::shared_ptr<PAGXDocument> subDoc = nullptr;
+    bool handledByLoader = false;
+    auto* wrapper = doc->makeNode<Composition>();
+    wrapper->id = compositionAttr;
 
     // 1. Try ResourceLoader first.
-    ResourceLoadRequest request = {};
-    request.type = ResourceType::Composition;
-    request.id = layer->id;
-    request.source = compositionAttr;
-    request.customData = layer->customData;
-    auto resource = GetOrLoadResource(request);
-    if (resource != nullptr) {
-      if (resource->resourceType() == ResourceType::Composition) {
-        auto compositionResource = static_cast<CompositionResource*>(resource.get());
-        auto data = compositionResource->data();
-        subDoc = PAGXImporter::FromXML(data->bytes(), data->size(), CurrentResourceLoader());
-      } else {
-        ReportError(doc, node,
-                    "ResourceLoader returned non-composition resource for Layer composition '" +
-                        compositionAttr + "'. Falling back to file path resolution.");
-      }
+    auto* loader = CurrentResourceLoader();
+    if (loader != nullptr) {
+      ResourceLoadRequest request = {};
+      request.type = ResourceType::Composition;
+      request.id = layer->id;
+      request.source = compositionAttr;
+      request.customData = layer->customData;
+      handledByLoader = loader->loadComposition(request, wrapper);
     }
 
     // 2. Try resolving as a file path relative to the current base directory.
-    if (subDoc == nullptr && !CurrentLoadBaseDir().empty()) {
+    if (!handledByLoader && !CurrentLoadBaseDir().empty()) {
       auto absolutePath = ResolveRelativePath(compositionAttr);
       if (IsOnLoadingStack(absolutePath)) {
         ReportError(doc, node,
@@ -599,30 +583,27 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
         subDoc = PAGXImporter::FromFile(absolutePath, CurrentResourceLoader());
         g_loadingPathStack.pop_back();
         if (subDoc == nullptr) {
-          ReportError(doc, node,
-                      "Failed to load external composition '" + compositionAttr + "'.");
+          ReportError(doc, node, "Failed to load external composition '" + compositionAttr + "'.");
         }
       }
     }
 
-    if (subDoc != nullptr) {
+    if (!handledByLoader && subDoc != nullptr) {
       // Propagate errors from the external document to the host so callers see one unified
       // error list.
       for (const auto& err : subDoc->errors) {
         doc->errors.push_back("[" + compositionAttr + "] " + err);
       }
-      // Anonymous wrapper Composition. Reuses sub-document's top-level layers and animations so
-      // internal lookups stay in the external nodeMap; subDoc keeps the node ownership alive via
-      // shared_ptr.
-      auto* wrapper = doc->makeNode<Composition>();
-      // The wrapper id is used for export round-trip of non-@ composition references.
-      wrapper->id = compositionAttr;
       wrapper->width = subDoc->width;
       wrapper->height = subDoc->height;
       wrapper->layers = subDoc->layers;
       wrapper->animations = subDoc->animations;
       wrapper->externalDoc = subDoc;
+    }
+
+    if (handledByLoader || subDoc != nullptr) {
       layer->composition = wrapper;
+      layer->externalDoc = wrapper->externalDoc;
     } else {
       // 3. Last resort: record as unresolved compositionFilePath for later loadFileData().
       layer->compositionFilePath = compositionAttr;
@@ -1569,22 +1550,15 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
   }
   auto source = GetAttribute(node, "source");
   image->filePath = source;
-  if (!source.empty()) {
+  auto* loader = CurrentResourceLoader();
+  if (!source.empty() && loader != nullptr) {
     ResourceLoadRequest request = {};
     request.type = ResourceType::Image;
     request.id = image->id;
     request.source = source;
     request.customData = image->customData;
-    auto resource = GetOrLoadResource(request);
-    if (resource != nullptr) {
-      if (resource->resourceType() == ResourceType::Image) {
-        auto imageResource = static_cast<ImageResource*>(resource.get());
-        image->data = imageResource->data();
-        return image;
-      }
-      ReportError(doc, node,
-                  "ResourceLoader returned non-image resource for Image '" + image->id +
-                      "'. Falling back to internal image loading.");
+    if (loader->loadImage(request, image)) {
+      return image;
     }
   }
   auto data = DecodeBase64DataURI(source);
@@ -1933,22 +1907,14 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
   auto source = GetFontResourceSource(font);
   bool handledByLoader = false;
-  if (!source.empty()) {
+  auto* loader = CurrentResourceLoader();
+  if (!source.empty() && loader != nullptr) {
     ResourceLoadRequest request = {};
     request.type = ResourceType::Font;
     request.id = font->id;
     request.source = source;
     request.customData = font->customData;
-    auto resource = GetOrLoadResource(request);
-    if (resource != nullptr) {
-      if (resource->resourceType() == ResourceType::Font) {
-        handledByLoader = true;
-      } else {
-        ReportError(doc, node,
-                    "ResourceLoader returned non-font resource for Font '" + font->id +
-                        "'. Falling back to embedded glyphs.");
-      }
-    }
+    handledByLoader = loader->loadFont(request, font);
   }
   if (handledByLoader) {
     return font;

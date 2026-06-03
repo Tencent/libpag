@@ -69,10 +69,12 @@ static bool LoadExternalComposition(PAGXDocument* document, Layer* layer,
     document->errors.push_back("[" + filePath + "] " + error);
   }
   auto* wrapper = document->makeNode<Composition>();
+  wrapper->id = filePath;
   wrapper->width = externalDoc->width;
   wrapper->height = externalDoc->height;
   wrapper->layers = externalDoc->layers;
   wrapper->animations = externalDoc->animations;
+  wrapper->externalDoc = externalDoc;
   layer->composition = wrapper;
   layer->externalDoc = externalDoc;
   layer->compositionFilePath = {};
