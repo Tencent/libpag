@@ -94,6 +94,10 @@ tgfx::Rect ToTGFX(const Rect& r) {
   return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
 }
 
+Rect FromTGFX(const tgfx::Rect& r) {
+  return Rect::MakeXYWH(r.x(), r.y(), r.width(), r.height());
+}
+
 tgfx::LineCap ToTGFX(LineCap cap) {
   switch (cap) {
     case LineCap::Butt:

@@ -197,7 +197,7 @@ Rect PAGFile::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
-  return {surfaceBounds.x(), surfaceBounds.y(), surfaceBounds.width(), surfaceBounds.height()};
+  return FromTGFX(surfaceBounds);
 }
 
 bool PAGFile::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {

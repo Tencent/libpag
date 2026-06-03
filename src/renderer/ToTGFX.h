@@ -75,6 +75,8 @@ tgfx::Matrix ToTGFX(const Matrix& matrix);
 
 tgfx::Rect ToTGFX(const Rect& rect);
 
+Rect FromTGFX(const tgfx::Rect& rect);
+
 tgfx::Path ToTGFX(const PathData& pathData);
 
 tgfx::LineCap ToTGFX(LineCap cap);

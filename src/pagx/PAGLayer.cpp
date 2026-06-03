@@ -75,7 +75,7 @@ Rect PAGLayer::getBounds() const {
   }
   // Bounds relative to the layer's own coordinate space, i.e. before its own transform is applied.
   auto bounds = runtimeLayer->getBounds(runtimeLayer.get());
-  return {bounds.x(), bounds.y(), bounds.width(), bounds.height()};
+  return FromTGFX(bounds);
 }
 
 }  // namespace pagx
