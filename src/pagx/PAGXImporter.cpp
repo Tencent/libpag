@@ -84,7 +84,7 @@ namespace pagx {
 
 // Per-thread stack of base directories for resolving relative `composition="path.pagx"` paths,
 // plus a stack of currently-loading file paths used to break cyclic includes. Both stacks are
-// pushed at the entry of FromXML / cross-doc load and popped on return.
+// pushed at the entry of FromFile / cross-doc load and popped on return.
 namespace {
 thread_local std::vector<std::string> g_baseDirStack;
 thread_local std::vector<std::string> g_loadingPathStack;
@@ -579,10 +579,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       if (resource->resourceType() == ResourceType::Composition) {
         auto compositionResource = static_cast<CompositionResource*>(resource.get());
         auto data = compositionResource->data();
-        auto baseDir = compositionResource->baseDir().empty() ? CurrentLoadBaseDir()
-                                                              : compositionResource->baseDir();
-        subDoc =
-            PAGXImporter::FromXML(data->bytes(), data->size(), baseDir, CurrentResourceLoader());
+        subDoc = PAGXImporter::FromXML(data->bytes(), data->size(), CurrentResourceLoader());
       } else {
         ReportError(doc, node,
                     "ResourceLoader returned non-composition resource for Layer composition '" +
@@ -597,8 +594,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       if (CurrentLoadBaseDir().empty()) {
         ReportError(doc, node,
                     "External composition '" + compositionAttr +
-                        "' requires a base directory. Use PAGXImporter::FromFile or pass baseDir "
-                        "to FromXML.");
+                        "' requires a base directory. Use PAGXImporter::FromFile.");
       } else {
         auto absolutePath = ResolveRelativePath(compositionAttr);
         if (IsOnLoadingStack(absolutePath)) {
@@ -2640,14 +2636,16 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
     return nullptr;
   }
 
-  // Convert relative paths to absolute paths
+  // Derive the base directory from the file path for resolving relative references.
   std::string basePath = {};
   auto lastSlash = filePath.find_last_of("/\\");
   if (lastSlash != std::string::npos) {
     basePath = filePath.substr(0, lastSlash + 1);
   }
 
-  auto doc = FromXML(content, basePath, loader);
+  PushLoadBaseDir(basePath);
+  auto doc = FromXML(content, loader);
+  PopLoadBaseDir();
   if (doc && !basePath.empty()) {
     for (auto& node : doc->nodes) {
       if (node->nodeType() == NodeType::Image) {
@@ -2663,14 +2661,11 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent,
-                                                    const std::string& baseDir,
                                                     ResourceLoader* loader) {
-  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size(), baseDir,
-                 loader);
+  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size(), loader);
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length,
-                                                    const std::string& baseDir,
                                                     ResourceLoader* loader) {
   auto dom = XMLDOM::Make(data, length);
   if (!dom) {
@@ -2681,11 +2676,9 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
     return nullptr;
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  PushLoadBaseDir(baseDir);
   PushResourceLoader(loader);
   ParseDocument(root.get(), doc.get());
   PopResourceLoader();
-  PopLoadBaseDir();
   return doc;
 }
 

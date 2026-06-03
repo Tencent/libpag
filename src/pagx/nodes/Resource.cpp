@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/ImageResource.h"
-#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/CompositionResource.h"
+#include "pagx/nodes/FontResource.h"
+#include "pagx/nodes/ImageResource.h"
 
 namespace pagx {
 
@@ -53,17 +53,15 @@ std::shared_ptr<FontResource> FontResource::MakeCustom(std::shared_ptr<FontProvi
 }
 
 std::shared_ptr<CompositionResource> CompositionResource::FromBytes(const void* bytes,
-                                                                    size_t length,
-                                                                    const std::string& baseDir) {
-  return FromData(Data::MakeWithCopy(bytes, length), baseDir);
+                                                                    size_t length) {
+  return FromData(Data::MakeWithCopy(bytes, length));
 }
 
-std::shared_ptr<CompositionResource> CompositionResource::FromData(std::shared_ptr<Data> data,
-                                                                   const std::string& baseDir) {
+std::shared_ptr<CompositionResource> CompositionResource::FromData(std::shared_ptr<Data> data) {
   if (data == nullptr || data->empty()) {
     return nullptr;
   }
-  return std::shared_ptr<CompositionResource>(new CompositionResource(std::move(data), baseDir));
+  return std::shared_ptr<CompositionResource>(new CompositionResource(std::move(data)));
 }
 
 }  // namespace pagx

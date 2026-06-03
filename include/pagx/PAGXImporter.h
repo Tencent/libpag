@@ -42,7 +42,6 @@ class PAGXImporter {
    * Returns nullptr if parsing fails.
    */
   static std::shared_ptr<PAGXDocument> FromXML(const std::string& xmlContent,
-                                               const std::string& baseDir = {},
                                                ResourceLoader* loader = nullptr);
 
   /**
@@ -50,7 +49,6 @@ class PAGXImporter {
    * Returns nullptr if parsing fails.
    */
   static std::shared_ptr<PAGXDocument> FromXML(const uint8_t* data, size_t length,
-                                               const std::string& baseDir = {},
                                                ResourceLoader* loader = nullptr);
 };
 

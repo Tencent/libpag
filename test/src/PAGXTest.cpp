@@ -27,6 +27,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGFile.h"
 #include "pagx/PAGLayer.h"
@@ -73,7 +74,6 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/PAGComposition.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -7191,7 +7191,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageHandled) {
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources><Image id=\"img\" source=\"biz://image/a\"/></Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* image = doc->findNode<pagx::Image>("img");
   ASSERT_TRUE(image != nullptr);
@@ -7210,7 +7210,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageSkipFallback) {
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources><Image id=\"img\" source=\"relative.png\"/></Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* image = doc->findNode<pagx::Image>("img");
   ASSERT_TRUE(image != nullptr);
@@ -7233,7 +7233,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageSharedResource) {
       "    <Image id=\"b\" source=\"biz://image/shared\"/>\n"
       "  </Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* a = doc->findNode<pagx::Image>("a");
   auto* b = doc->findNode<pagx::Image>("b");
@@ -7251,7 +7251,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderFontHandled) {
       "<pagx width=\"10\" height=\"10\">\n"
       "  <Resources><Font id=\"f\" data-source=\"biz://font/a\"/></Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* font = doc->findNode<pagx::Font>("f");
   ASSERT_TRUE(font != nullptr);
@@ -7272,7 +7272,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderFontSkipEmbeddedGlyphFallback) {
       "    </Font>\n"
       "  </Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* font = doc->findNode<pagx::Font>("f");
   ASSERT_TRUE(font != nullptr);
@@ -7289,7 +7289,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderCompositionHandled) {
       "<pagx width=\"20\" height=\"20\">\n"
       "  <Layer id=\"slot\" composition=\"biz://comp/card\"/>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* layer = doc->layers[0];
@@ -7336,7 +7336,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderCompositionSharedResource) {
       "  <Layer id=\"a\" composition=\"biz://comp/shared\"/>\n"
       "  <Layer id=\"b\" composition=\"biz://comp/shared\"/>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   ASSERT_EQ(doc->layers.size(), 2u);
   ASSERT_TRUE(doc->layers[0]->composition != nullptr);
@@ -7356,7 +7356,7 @@ PAGX_TEST(PAGXTest, ResourceLoaderTypeMismatchFallback) {
       ResourceTestImageDataURI() +
       "\"/></Resources>\n"
       "</pagx>\n";
-  auto doc = pagx::PAGXImporter::FromXML(xml, {}, &loader);
+  auto doc = pagx::PAGXImporter::FromXML(xml, &loader);
   ASSERT_TRUE(doc != nullptr);
   auto* image = doc->findNode<pagx::Image>("img");
   ASSERT_TRUE(image != nullptr);
