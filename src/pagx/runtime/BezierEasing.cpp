@@ -43,6 +43,7 @@ static double SampleDerivative(double p1, double p2, double t) {
 // is too small to converge or iterations exceed the budget.
 static double SolveCurveX(double p1x, double p2x, double input) {
   constexpr int kNewtonIterations = 8;
+  constexpr int kMaxBisectionIterations = 60;
   constexpr double kEpsilon = 1.0e-7;
 
   double t = input;
@@ -58,11 +59,14 @@ static double SolveCurveX(double p1x, double p2x, double input) {
     t -= currentX / derivative;
   }
 
-  // Bisection fallback within [0, 1].
+  // Bisection fallback within [0, 1]. The iteration cap guards against non-convergence on
+  // malformed control points (e.g. x outside [0, 1] yielding a non-monotonic x(t)), where the
+  // midpoint can round onto a bound and make no further progress; 60 steps is well beyond what
+  // double precision can resolve.
   double low = 0.0;
   double high = 1.0;
   t = input;
-  while (low < high) {
+  for (int i = 0; i < kMaxBisectionIterations && low < high; ++i) {
     double currentX = SampleCurve(p1x, p2x, t);
     if (std::fabs(currentX - input) < kEpsilon) {
       return t;
