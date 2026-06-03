@@ -20,6 +20,7 @@
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
@@ -30,26 +31,9 @@ Text::~Text() {
 Text::Text() : glyphData(new GlyphData()) {
 }
 
-static TextLayoutParams MakeTextNodeStandaloneParams(const Text* text) {
-  TextLayoutParams params = {};
-  params.baseline = text->baseline;
-  switch (text->textAnchor) {
-    case TextAnchor::Start:
-      params.textAlign = TextAlign::Start;
-      break;
-    case TextAnchor::Center:
-      params.textAlign = TextAlign::Center;
-      break;
-    case TextAnchor::End:
-      params.textAlign = TextAlign::End;
-      break;
-  }
-  return params;
-}
-
 void Text::onMeasure(LayoutContext* context) {
   textScale = 1.0f;
-  auto params = MakeTextNodeStandaloneParams(this);
+  auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   textBounds = result.bounds;
@@ -77,7 +61,7 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
   float origH = textBounds.height;
   if (scale != 1.0f) {
     textScale = scale;
-    auto params = MakeTextNodeStandaloneParams(this);
+    auto params = MakeStandaloneParams(this);
     params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
