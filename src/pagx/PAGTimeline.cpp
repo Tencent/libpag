@@ -47,10 +47,6 @@ static void ApplyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDo
   if (animation == nullptr || binding == nullptr || contextDoc == nullptr) {
     return;
   }
-  if (mix <= 0.0f) {
-    return;
-  }
-  auto clampedMix = std::min(1.0f, mix);
   for (auto* object : animation->objects) {
     if (object == nullptr) {
       continue;
@@ -64,7 +60,7 @@ static void ApplyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDo
         continue;
       }
       binding->apply(targetNode, property->channel,
-                     property->evaluateAt(microseconds, animation->frameRate), clampedMix);
+                     property->evaluateAt(microseconds, animation->frameRate), mix);
     }
   }
 }
