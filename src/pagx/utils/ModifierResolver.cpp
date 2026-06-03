@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -437,6 +438,9 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
   // Indices into `output` of every shape-like element produced so far in this
   // group. Modifiers operate on the contents of these slots.
   std::vector<size_t> shapeSlots;
+  // Set when a MergePath in this scope produced an even-odd-oriented path; the
+  // scope's Fill painters get their fill rule re-stamped to EvenOdd afterwards.
+  bool scopeNeedsEvenOddFill = false;
 
   for (auto* element : elements) {
     auto type = element->nodeType();
@@ -514,6 +518,19 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         }
         auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
         CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
+        // tgfx boolean ops (Skia path-ops) emit geometry oriented for even-odd
+        // coverage, not winding: e.g. a Difference hole keeps the inner contour
+        // wound the same way as the outer one and relies on the path's even-odd
+        // fill type to punch it out. MakePathDataFromTGFX copies only verbs and
+        // points, so that fill type is lost; remember it here and re-stamp it
+        // onto this scope's Fill painters after the walk (painters may sit
+        // before or after the MergePath in source order) so every downstream
+        // exporter (which reads Fill::fillRule) renders the merged shape
+        // correctly instead of filling holes solid.
+        if (combined.getFillType() == tgfx::PathFillType::EvenOdd ||
+            combined.getFillType() == tgfx::PathFillType::InverseEvenOdd) {
+          scopeNeedsEvenOddFill = true;
+        }
         break;
       }
       case NodeType::Repeater: {
@@ -596,6 +613,14 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // dedicated writers downstream.
         output.push_back(element);
         break;
+    }
+  }
+
+  if (scopeNeedsEvenOddFill) {
+    for (auto* el : output) {
+      if (el->nodeType() == NodeType::Fill) {
+        static_cast<Fill*>(el)->fillRule = FillRule::EvenOdd;
+      }
     }
   }
 
