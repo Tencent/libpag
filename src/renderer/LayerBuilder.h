@@ -22,37 +22,15 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Property.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-class BlurFilter;
-class DropShadowFilter;
-class DropShadowStyle;
-class FillStyle;
 class Gradient;
-class Image;
-class ImagePattern;
-class SolidColor;
-class StrokeStyle;
-class Text;
 }  // namespace tgfx
 
 namespace pagx {
-
-class BlurFilter;
-class ColorStop;
-class DropShadowFilter;
-class DropShadowStyle;
-class Fill;
-class Gradient;
-class Image;
-class ImagePattern;
-class SolidColor;
-class Stroke;
-class Text;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
