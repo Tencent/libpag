@@ -23,10 +23,10 @@
 #include "pagx/PAGFile.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
-#include "renderer/LayerBuilder.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
+#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
