@@ -395,7 +395,11 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
         operations << FileOperation::copyFile(sourcePath, targetPath);
       }
 
-      // Copy Qt DLLs to AE directories for DLL search path.
+      // Copy Qt DLLs to AE directories for DLL search path, and remove any legacy
+      // PAGExporter.aex left behind in <AE>/Plug-ins/ from earlier builds that installed
+      // the plugin there instead of Common/Plug-ins/.../MediaCore. Without this cleanup,
+      // upgrading users would end up with two copies of the plugin and AE may load the
+      // wrong one.
       if (!aePaths.isEmpty()) {
         QString appDir = getQtResourceDir();
         QDir dir(appDir);
@@ -403,6 +407,8 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
         QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
         for (const QString& aePath : aePaths) {
+          operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
+
           for (const QString& dllFile : dllFiles) {
             if (shouldExcludeFile(dllFile)) {
               continue;
@@ -413,7 +419,8 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
             if (shouldExcludeDir(subDir)) {
               continue;
             }
-            operations << FileOperation::copyDirectory(appDir + "/" + subDir, aePath + "/" + subDir);
+            operations << FileOperation::copyDirectory(appDir + "/" + subDir,
+                                                       aePath + "/" + subDir);
           }
         }
       }
