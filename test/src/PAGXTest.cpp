@@ -5315,9 +5315,6 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   auto layer = doc->makeNode<pagx::Layer>("targetLayer");
   doc->layers.push_back(layer);
 
-  auto solid = doc->makeNode<pagx::SolidColor>("targetSolid");
-  (void)solid;
-
   auto animation = doc->makeNode<pagx::Animation>("main");
   animation->duration = 120;
   animation->frameRate = 60;
