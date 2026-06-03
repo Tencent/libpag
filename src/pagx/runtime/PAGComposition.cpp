@@ -38,8 +38,8 @@ PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> r
 
 PAGComposition::~PAGComposition() = default;
 
-PAGLayerType PAGComposition::type() const {
-  return PAGLayerType::Composition;
+LayerType PAGComposition::layerType() const {
+  return LayerType::Composition;
 }
 
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
@@ -105,7 +105,7 @@ void PAGComposition::advance(int64_t deltaMicroseconds) {
     }
   }
   for (auto& child : children) {
-    if (child != nullptr && child->type() != PAGLayerType::Layer) {
+    if (child != nullptr && child->layerType() != LayerType::Layer) {
       static_cast<PAGComposition*>(child.get())->advance(deltaMicroseconds);
     }
   }
@@ -118,7 +118,7 @@ void PAGComposition::apply(float mix) {
     }
   }
   for (auto& child : children) {
-    if (child != nullptr && child->type() != PAGLayerType::Layer) {
+    if (child != nullptr && child->layerType() != LayerType::Layer) {
       static_cast<PAGComposition*>(child.get())->apply(mix);
     }
   }
@@ -132,7 +132,7 @@ std::shared_ptr<PAGLayer> PAGComposition::findChildForLayer(const tgfx::Layer* h
     if (child->runtimeLayer.get() == hitLayer) {
       return child;
     }
-    if (child->type() != PAGLayerType::Layer) {
+    if (child->layerType() != LayerType::Layer) {
       auto found = static_cast<PAGComposition*>(child.get())->findChildForLayer(hitLayer);
       if (found != nullptr) {
         return found;
@@ -156,7 +156,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float
   auto hitLayers = runtimeLayer->getLayersUnderPoint(x, y);
   for (const auto& hitLayer : hitLayers) {
     auto matched = findChildForLayer(hitLayer.get());
-    if (matched != nullptr && matched->type() == PAGLayerType::Layer) {
+    if (matched != nullptr && matched->layerType() == LayerType::Layer) {
       result.push_back(std::move(matched));
     }
   }

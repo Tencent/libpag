@@ -42,7 +42,7 @@ class PAGComposition : public PAGLayer {
  public:
   ~PAGComposition() override;
 
-  PAGLayerType type() const override;
+  LayerType layerType() const override;
 
   /**
    * Advances the animations that play automatically inside this composition, including those in

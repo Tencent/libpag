@@ -30,8 +30,8 @@ PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
 
 PAGLayer::~PAGLayer() = default;
 
-PAGLayerType PAGLayer::type() const {
-  return PAGLayerType::Layer;
+LayerType PAGLayer::layerType() const {
+  return LayerType::Layer;
 }
 
 std::string PAGLayer::name() const {

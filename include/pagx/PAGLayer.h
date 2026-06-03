@@ -36,7 +36,7 @@ class PAGFile;
  * downcast without RTTI. Layer is a leaf runtime layer, Composition adds animation playback and hit
  * testing over its content, and File is the root composition of a whole PAGXDocument.
  */
-enum class PAGLayerType { Layer, Composition, File };
+enum class LayerType { Layer, Composition, File };
 
 /**
  * PAGLayer is the base class of the runtime layer hierarchy. One PAGLayer node exists per source
@@ -55,7 +55,7 @@ class PAGLayer {
    * Returns the concrete runtime type of this layer. Use it to downcast safely (via static_cast)
    * to PAGComposition or PAGFile without runtime type information.
    */
-  virtual PAGLayerType type() const;
+  virtual LayerType layerType() const;
 
   /**
    * Returns the display name of the layer. Returns an empty string if the layer has no name.

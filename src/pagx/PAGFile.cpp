@@ -72,8 +72,8 @@ PAGFile::~PAGFile() {
   }
 }
 
-PAGLayerType PAGFile::type() const {
-  return PAGLayerType::File;
+LayerType PAGFile::layerType() const {
+  return LayerType::File;
 }
 
 std::vector<std::string> PAGFile::getTimelineIds() const {

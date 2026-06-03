@@ -58,9 +58,9 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
   ~PAGFile() override;
 
   /**
-   * Returns the runtime layer type of the file root, which is always PAGLayerType::File.
+   * Returns the runtime layer type of the file root, which is always LayerType::File.
    */
-  PAGLayerType type() const override;
+  LayerType layerType() const override;
 
   /**
    * Returns the ids of all top-level animations in the source document, preserving declaration
