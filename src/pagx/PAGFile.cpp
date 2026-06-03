@@ -185,7 +185,8 @@ std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersUnderPoint(float surfac
 }
 
 Rect PAGFile::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
-  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr || fileStorage == nullptr) {
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr || fileStorage == nullptr ||
+      pagLayer->rootFile != this) {
     return {};
   }
   // Bounds of the layer relative to the runtime tree root, then mapped into surface space via the
@@ -194,9 +195,7 @@ Rect PAGFile::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
   auto* rootLayer = static_cast<tgfx::Layer*>(rootRuntimeLayer());
   auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
   Matrix rootToSurface = {};
-  if (!rootToSurfaceMatrix(&rootToSurface)) {
-    return {};
-  }
+  rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
   return {surfaceBounds.x(), surfaceBounds.y(), surfaceBounds.width(), surfaceBounds.height()};
 }
