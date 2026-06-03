@@ -3080,6 +3080,26 @@ CLI_TEST(PAGXCliTest, Embed_FileFlag_RejectedAsUnknown) {
   EXPECT_NE(errCapture.str().find("pagx embed: unknown option"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Embed_FontFileImport_RoundTrips) {
+  // Import a PAGX with Font(file) — verify file path survives import without existence check
+  // (D-05: no file existence check during import).
+  auto path = TestResourcePath("embed_font_file.pagx");
+  auto document = pagx::PAGXImporter::FromFile(path);
+  ASSERT_NE(document, nullptr);
+  bool foundFileFont = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        foundFileFont = true;
+        EXPECT_NE(font->file.find("NotoSansSC-Regular"), std::string::npos)
+            << "Font::file should contain the resolved font filename";
+      }
+    }
+  }
+  EXPECT_TRUE(foundFileFont);
+}
+
 CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
   auto content = ReadFile(tempPagx);
