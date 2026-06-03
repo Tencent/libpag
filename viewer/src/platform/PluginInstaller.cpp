@@ -43,8 +43,8 @@ bool PluginInstaller::hasUpdate() const {
     // Flag an update when the source version is strictly newer, or when the installed version
     // is unparseable (returns 0) but the source version is valid — this handles upgrading from
     // old builds that lacked embedded version resources.
-    auto sourceVersion = getPluginVersion(sourcePath);
-    auto installedVersion = getPluginVersion(installPath);
+    int64_t sourceVersion = getPluginVersion(sourcePath);
+    int64_t installedVersion = getPluginVersion(installPath);
     if (sourceVersion == 0) {
       continue;
     }
