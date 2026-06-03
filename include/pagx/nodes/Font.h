@@ -18,8 +18,12 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
+#include "pagx/nodes/FontProvider.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Data.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -68,13 +72,28 @@ class Glyph : public Node {
  * bitmaps). PAGX files embed glyph data for complete self-containment, ensuring cross-platform
  * rendering consistency.
  */
-class Font : public Node {
+class Font : public Node, public ResourceReferencer {
  public:
   /**
    * Units per em of the font design space. Rendering scale = fontSize / unitsPerEm.
    * The default value is 1000.
    */
   int unitsPerEm = 1000;
+
+  /**
+   * Raw font bytes supplied by ResourceLoader. When set, embedded glyph data is skipped.
+   */
+  std::shared_ptr<Data> data = nullptr;
+
+  /**
+   * TrueType collection index associated with data.
+   */
+  int ttcIndex = 0;
+
+  /**
+   * Custom font provider supplied by ResourceLoader. Mutually exclusive with data.
+   */
+  std::shared_ptr<FontProvider> provider = nullptr;
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing
@@ -85,6 +104,12 @@ class Font : public Node {
   NodeType nodeType() const override {
     return NodeType::Font;
   }
+
+  /**
+   * Consumes FontResource updates by copying font data or provider into this Font and notifying the
+   * owner document.
+   */
+  void resourceUpdated(Resource* resource) override;
 
  private:
   Font() = default;

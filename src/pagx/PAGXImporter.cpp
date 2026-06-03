@@ -34,6 +34,7 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -41,11 +42,13 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -557,6 +560,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
   } else if (!compositionAttr.empty()) {
     std::shared_ptr<PAGXDocument> subDoc = nullptr;
+    std::shared_ptr<CompositionResource> resource = nullptr;
     bool handledByLoader = false;
     auto* wrapper = doc->makeNode<Composition>();
     wrapper->id = compositionAttr;
@@ -569,7 +573,11 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       request.id = layer->id;
       request.source = compositionAttr;
       request.customData = layer->customData;
-      handledByLoader = loader->loadComposition(request, wrapper);
+      resource = CompositionResource::MakeEmpty();
+      handledByLoader = loader->load(request, resource);
+      if (handledByLoader) {
+        layer->setResource(resource);
+      }
     }
 
     // 2. Try resolving as a file path relative to the current base directory.
@@ -604,7 +612,11 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     if (handledByLoader || subDoc != nullptr) {
       layer->composition = wrapper;
       layer->externalDoc = wrapper->externalDoc;
+      if (handledByLoader && resource != nullptr) {
+        layer->resourceUpdated(resource.get());
+      }
     } else {
+      layer->setResource(nullptr);
       // 3. Last resort: record as unresolved compositionFilePath for later loadFileData().
       layer->compositionFilePath = compositionAttr;
     }
@@ -1557,10 +1569,14 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
     request.id = image->id;
     request.source = source;
     request.customData = image->customData;
-    if (loader->loadImage(request, image)) {
+    auto resource = ImageResource::MakeEmpty();
+    if (loader->load(request, resource)) {
+      image->setResource(resource);
+      image->resourceUpdated(resource.get());
       return image;
     }
   }
+  image->setResource(nullptr);
   auto data = DecodeBase64DataURI(source);
   if (data) {
     image->data = data;
@@ -1914,11 +1930,17 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
     request.id = font->id;
     request.source = source;
     request.customData = font->customData;
-    handledByLoader = loader->loadFont(request, font);
+    auto resource = FontResource::MakeEmpty();
+    handledByLoader = loader->load(request, resource);
+    if (handledByLoader) {
+      font->setResource(resource);
+      font->resourceUpdated(resource.get());
+    }
   }
   if (handledByLoader) {
     return font;
   }
+  font->setResource(nullptr);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {

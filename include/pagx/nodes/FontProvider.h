@@ -18,44 +18,41 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include "pagx/nodes/ImageResource.h"
-#include "pagx/nodes/Node.h"
-#include "pagx/types/Data.h"
-
 namespace pagx {
 
+class PathData;
+
 /**
- * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI.
+ * FontProvider describes a custom font supplied by business code at document-load time. The
+ * provider exposes PAGX data types only, so callers do not need to depend on renderer internals.
  */
-class Image : public Node, public ResourceReferencer {
+class FontProvider {
  public:
-  /**
-   * Image binary data (decoded from base64 or provided by ResourceLoader).
-   */
-  std::shared_ptr<Data> data = nullptr;
+  virtual ~FontProvider() = default;
 
   /**
-   * External file path (mutually exclusive with data, data has priority).
+   * Returns the font design-space units per em.
    */
-  std::string filePath = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Image;
-  }
+  virtual int unitsPerEm() const = 0;
 
   /**
-   * Consumes ImageResource updates by copying encoded bytes into data and notifying the owner
-   * document.
+   * Returns the number of glyphs exposed by this provider.
    */
-  void resourceUpdated(Resource* resource) override;
+  virtual int glyphCount() const = 0;
 
- private:
-  Image() = default;
+  /**
+   * Returns the advance width of the glyph at glyphIndex in design-space units.
+   * @param glyphIndex zero-based glyph index.
+   */
+  virtual float glyphAdvance(int glyphIndex) const = 0;
 
-  friend class PAGXDocument;
+  /**
+   * Writes the vector outline for glyphIndex into path.
+   * @param glyphIndex zero-based glyph index.
+   * @param path output path owned by the caller.
+   * @return false if the glyph has no vector path or glyphIndex is invalid.
+   */
+  virtual bool getGlyphPath(int glyphIndex, PathData* path) const = 0;
 };
 
 }  // namespace pagx

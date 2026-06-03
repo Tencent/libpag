@@ -51,6 +51,7 @@
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/Resource.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -1254,7 +1255,9 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
-    if (node->composition->externalDoc != nullptr) {
+    if ((node->resource() != nullptr &&
+         node->resource()->resourceType() == ResourceType::Composition) ||
+        node->composition->externalDoc != nullptr) {
       xml.addAttribute("composition", node->composition->id);
     } else {
       xml.addAttribute("composition", "@" + node->composition->id);

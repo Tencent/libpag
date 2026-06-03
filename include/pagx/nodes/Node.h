@@ -23,6 +23,8 @@
 
 namespace pagx {
 
+class PAGXDocument;
+
 /**
  * NodeType enumerates all types of nodes that can be stored in a PAGX document. This includes
  * resources (Image, Composition, ColorSources) and elements (geometry, painters, modifiers, etc.).
@@ -250,6 +252,11 @@ class Node {
 
  protected:
   Node() = default;
+
+  PAGXDocument* ownerDocument = nullptr;
+
+ private:
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

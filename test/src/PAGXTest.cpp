@@ -46,15 +46,18 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CompositionResource.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -7141,43 +7144,42 @@ class TestResourceLoader : public pagx::ResourceLoader {
   std::unordered_map<std::string, bool> handledFonts = {};
   std::unordered_map<std::string, std::string> compositionXML = {};
   std::unordered_map<std::string, bool> imageTakeovers = {};
+  std::unordered_map<std::string, bool> compositionTakeovers = {};
+  std::unordered_map<std::string, std::shared_ptr<pagx::Resource>> retainedResources = {};
 
-  bool loadImage(const pagx::ResourceLoadRequest& request, pagx::Image* image) override {
+  bool load(const pagx::ResourceLoadRequest& request,
+            std::shared_ptr<pagx::Resource> resource) override {
     counts[request.source]++;
-    if (imageTakeovers[request.source]) {
-      return true;
-    }
-    auto it = imageData.find(request.source);
-    if (it == imageData.end()) {
+    retainedResources[request.source] = resource;
+    if (resource == nullptr || resource->resourceType() != request.type) {
       return false;
     }
-    image->data = it->second;
-    return true;
-  }
-
-  bool loadFont(const pagx::ResourceLoadRequest& request, pagx::Font*) override {
-    counts[request.source]++;
-    return handledFonts[request.source];
-  }
-
-  bool loadComposition(const pagx::ResourceLoadRequest& request,
-                       pagx::Composition* composition) override {
-    counts[request.source]++;
-    auto it = compositionXML.find(request.source);
-    if (it == compositionXML.end()) {
-      return false;
+    switch (request.type) {
+      case pagx::ResourceType::Image: {
+        if (imageTakeovers[request.source]) {
+          return true;
+        }
+        auto it = imageData.find(request.source);
+        if (it == imageData.end()) {
+          return false;
+        }
+        return std::static_pointer_cast<pagx::ImageResource>(resource)->setData(it->second);
+      }
+      case pagx::ResourceType::Font:
+        return handledFonts[request.source];
+      case pagx::ResourceType::Composition: {
+        if (compositionTakeovers[request.source]) {
+          return true;
+        }
+        auto it = compositionXML.find(request.source);
+        if (it == compositionXML.end()) {
+          return false;
+        }
+        return std::static_pointer_cast<pagx::CompositionResource>(resource)->setBytes(
+            it->second.data(), it->second.size());
+      }
     }
-    auto subDoc = pagx::PAGXImporter::FromXML(it->second, this);
-    if (subDoc == nullptr) {
-      return true;
-    }
-    composition->id = request.source;
-    composition->width = subDoc->width;
-    composition->height = subDoc->height;
-    composition->layers = subDoc->layers;
-    composition->animations = subDoc->animations;
-    composition->externalDoc = subDoc;
-    return true;
+    return false;
   }
 };
 
@@ -7373,6 +7375,14 @@ PAGX_TEST(PAGXTest, ResourceLoaderImageTakeoverSkipsFallback) {
   EXPECT_TRUE(image->data == nullptr);
   EXPECT_EQ(image->filePath, ResourceTestImageDataURI());
   EXPECT_EQ(loader.counts[ResourceTestImageDataURI()], 1);
+
+  const std::string bytes = "delayed-image";
+  auto resource = std::static_pointer_cast<pagx::ImageResource>(
+      loader.retainedResources[ResourceTestImageDataURI()]);
+  ASSERT_TRUE(resource != nullptr);
+  EXPECT_TRUE(resource->setBytes(bytes.data(), bytes.size()));
+  ASSERT_TRUE(image->data != nullptr);
+  EXPECT_EQ(image->data->size(), bytes.size());
 }
 
 }  // namespace pag

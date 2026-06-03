@@ -119,6 +119,10 @@ Node* PAGXDocument::findNode(const std::string& id) const {
 }
 
 void PAGXDocument::registerNode(Node* node, const std::string& id) {
+  if (node == nullptr) {
+    return;
+  }
+  node->ownerDocument = this;
   if (id.empty()) {
     return;
   }
