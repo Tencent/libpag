@@ -69,4 +69,13 @@ bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
   return runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);
 }
 
+Rect PAGLayer::getBounds() const {
+  if (runtimeLayer == nullptr) {
+    return {};
+  }
+  // Bounds relative to the layer's own coordinate space, i.e. before its own transform is applied.
+  auto bounds = runtimeLayer->getBounds(runtimeLayer.get());
+  return {bounds.x(), bounds.y(), bounds.width(), bounds.height()};
+}
+
 }  // namespace pagx

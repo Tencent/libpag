@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Rect.h"
 
 namespace tgfx {
 class Layer;
@@ -69,6 +70,13 @@ class PAGLayer {
    * matrix if the mapping is unavailable.
    */
   Matrix getGlobalMatrix() const;
+
+  /**
+   * Returns the layer's bounds in its own local coordinate space, before its own transform is
+   * applied. Returns an empty rectangle if the bounds are unavailable. For bounds in surface
+   * coordinates, use PAGFile::getGlobalBounds.
+   */
+  Rect getBounds() const;
 
   /**
    * Returns whether this layer overlaps the given surface point. pixelHitTest selects the actual

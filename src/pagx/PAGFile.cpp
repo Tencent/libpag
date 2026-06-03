@@ -23,6 +23,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -183,6 +184,23 @@ std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersUnderPoint(float surfac
     return {};
   }
   return PAGComposition::getLayersUnderPoint(rootX, rootY);
+}
+
+Rect PAGFile::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr || fileStorage == nullptr) {
+    return {};
+  }
+  // Bounds of the layer relative to the runtime tree root, then mapped into surface space via the
+  // display list's zoomScale and contentOffset. The tree may not be attached to a display list yet,
+  // so use the file's root tgfx layer directly as the target coordinate space.
+  auto* rootLayer = static_cast<tgfx::Layer*>(rootRuntimeLayer());
+  auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
+  Matrix rootToSurface = {};
+  if (!rootToSurfaceMatrix(&rootToSurface)) {
+    return {};
+  }
+  auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
+  return {surfaceBounds.x(), surfaceBounds.y(), surfaceBounds.width(), surfaceBounds.height()};
 }
 
 bool PAGFile::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {

@@ -6821,6 +6821,36 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   // The hit handle can re-test itself against a surface point.
   EXPECT_TRUE(hits[0]->hitTestPoint(50, 40));
   EXPECT_FALSE(hits[0]->hitTestPoint(180, 180));
+
+  // Local bounds are the layer's untransformed content extent (a 100x80 rect), in the layer's own
+  // coordinate space (origin at 0,0).
+  auto localBounds = hits[0]->getBounds();
+  EXPECT_FLOAT_EQ(localBounds.x, 0);
+  EXPECT_FLOAT_EQ(localBounds.y, 0);
+  EXPECT_FLOAT_EQ(localBounds.width, 100);
+  EXPECT_FLOAT_EQ(localBounds.height, 80);
+
+  // With identity zoom/offset the surface bounds match the local bounds.
+  auto globalBounds = file->getGlobalBounds(hits[0]);
+  EXPECT_FLOAT_EQ(globalBounds.x, 0);
+  EXPECT_FLOAT_EQ(globalBounds.y, 0);
+  EXPECT_FLOAT_EQ(globalBounds.width, 100);
+  EXPECT_FLOAT_EQ(globalBounds.height, 80);
+
+  // Applying a zoom scale and content offset scales and shifts the surface bounds accordingly.
+  auto* options = file->getDisplayOptions();
+  options->setZoomScale(2.0f);
+  options->setContentOffset(10.0f, 5.0f);
+  auto zoomedBounds = file->getGlobalBounds(hits[0]);
+  EXPECT_FLOAT_EQ(zoomedBounds.x, 10);
+  EXPECT_FLOAT_EQ(zoomedBounds.y, 5);
+  EXPECT_FLOAT_EQ(zoomedBounds.width, 2.0f * 100);
+  EXPECT_FLOAT_EQ(zoomedBounds.height, 2.0f * 80);
+
+  // getGlobalBounds on a null handle returns an empty rect.
+  auto emptyBounds = file->getGlobalBounds(nullptr);
+  EXPECT_FLOAT_EQ(emptyBounds.width, 0);
+  EXPECT_FLOAT_EQ(emptyBounds.height, 0);
 }
 
 /**

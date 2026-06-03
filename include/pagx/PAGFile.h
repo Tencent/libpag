@@ -124,6 +124,15 @@ class PAGFile : public PAGComposition, public std::enable_shared_from_this<PAGFi
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
 
+  /**
+   * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
+   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
+   * rectangle if the layer is null or does not belong to this file. For the layer's untransformed
+   * local bounds, use PAGLayer::getBounds.
+   * @param pagLayer a layer handle obtained from this file (e.g. via getLayersUnderPoint).
+   */
+  Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
+
  private:
   PAGFile();
 
