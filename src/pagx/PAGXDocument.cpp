@@ -20,6 +20,7 @@
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
@@ -151,6 +152,15 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
+  // The Font nodes themselves remain in `nodes`, but they are no longer reachable from any
+  // Text->glyphRuns and will not be touched by the next embed/render cycle. Drop their cached
+  // tgfx typefaces here so the typeface memory is reclaimed promptly instead of being held
+  // until the document is destroyed.
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      static_cast<Font*>(node.get())->resetRenderCache();
+    }
+  }
 }
 
 }  // namespace pagx
