@@ -139,7 +139,12 @@ bool PAGXDocument::hasUnresolvedImports() const {
 static bool IsUrlPath(const std::string& path) {
   // Match known URL schemes (case-insensitive per RFC 3986 Section 3.1) rather than generic ://
   // to avoid false positives on Windows paths like C://Users/file.png.
-  // data: is handled by PAGXImporter before this point.
+  // data: URIs have no "://" so they are checked separately.
+  if (path.size() >= 5 && (path[0] == 'd' || path[0] == 'D') &&
+      (path[1] == 'a' || path[1] == 'A') && (path[2] == 't' || path[2] == 'T') &&
+      (path[3] == 'a' || path[3] == 'A') && path[4] == ':') {
+    return true;
+  }
   auto schemeEnd = path.find("://");
   if (schemeEnd == std::string::npos) {
     return false;
