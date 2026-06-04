@@ -26,6 +26,7 @@
 namespace pagx {
 
 class PAGTimeline;
+class PAGScene;
 class PAGXDocument;
 struct RuntimeBinding;
 
@@ -35,8 +36,6 @@ struct RuntimeBinding;
  * against its content. When the same composition is referenced from multiple places, each reference
  * produces an independent PAGComposition with its own playback state, so animating or hit-testing
  * one does not affect the others.
- *
- * PAGFile is a PAGComposition, so a whole file is driven and queried through the same interface.
  */
 class PAGComposition : public PAGLayer {
  public:
@@ -62,23 +61,21 @@ class PAGComposition : public PAGLayer {
    * Returns the layers under the given point in this composition's coordinate space. The first layer
    * in the array is the top-most under the point, the last is the bottom-most. Returns an empty
    * array if nothing is hit. Hit testing does not require the content to have been drawn first.
-   * PAGComposition takes coordinates in its own local space; PAGFile overrides this to accept
-   * surface coordinates instead.
    * @param x the x coordinate in this composition's coordinate space.
    * @param y the y coordinate in this composition's coordinate space.
    */
   virtual std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
 
  protected:
-  // Constructs a runtime composition node bound to the given source layer (null for the file root),
-  // its built subtree root, and the root PAGFile. The subtree, binding, timelines, and children are
-  // populated by the PAGComposition/PAGFile factories after construction.
-  PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGFile* rootFile);
+  // Constructs a runtime composition node bound to the given source layer (null for the root
+  // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,
+  // and children are populated by the PAGComposition/PAGScene factories after construction.
+  PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGScene* rootScene);
 
   // Builds a runtime child composition for ownerLayer.composition. Returns nullptr if ownerLayer
   // is null, has no composition, or the document is not laid out. Internal factory used by
-  // PAGFile and PAGComposition to populate child runtime nodes.
-  static std::shared_ptr<PAGComposition> MakeChild(const Layer* ownerLayer, PAGFile* parentFile);
+  // PAGScene and PAGComposition to populate child runtime nodes.
+  static std::shared_ptr<PAGComposition> MakeChild(const Layer* ownerLayer, PAGScene* parentScene);
 
   // Builds the persistent per-layer runtime node tree for this composition: one PAGLayer node per
   // source layer (PAGComposition for layers that reference a composition, plain PAGLayer otherwise),
@@ -93,15 +90,15 @@ class PAGComposition : public PAGLayer {
   std::shared_ptr<PAGLayer> findChildForLayer(const tgfx::Layer* hitLayer);
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
-  // sealed external composition this is the layer's externalDoc; otherwise the file's document.
+  // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding = nullptr;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   // The full per-layer runtime node tree of this composition, one entry per source layer, mixing
-  // plain PAGLayer leaves and PAGComposition children. Persistent for the PAGFile lifetime.
+  // plain PAGLayer leaves and PAGComposition children. Persistent for the PAGScene lifetime.
   std::vector<std::shared_ptr<PAGLayer>> children = {};
 
-  friend class PAGFile;
+  friend class PAGScene;
   friend class PAGTimeline;
 };
 

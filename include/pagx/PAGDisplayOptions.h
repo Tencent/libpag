@@ -24,10 +24,10 @@
 
 namespace pagx {
 
-class PAGFile;
+class PAGScene;
 
 /**
- * PAGRenderMode defines how a PAGFile display list is rendered to a PAGSurface.
+ * PAGRenderMode defines how a PAGScene display list is rendered to a PAGSurface.
  */
 enum class PAGRenderMode {
   /**
@@ -48,11 +48,8 @@ enum class PAGRenderMode {
 };
 
 /**
- * PAGDisplayOptions exposes display-list rendering options owned by a PAGFile.
- *
- * It only configures how the current PAGFile runtime tree is viewed and cached during drawing.
- * It does not expose the internal layer tree, does not render by itself, and does not expose any
- * tgfx types in the public API. Use PAGFile::draw() to render with these options.
+ * PAGDisplayOptions exposes display-list rendering options owned by a PAGScene. Use
+ * PAGScene::getDisplayOptions() to obtain the options and PAGScene::draw() to render with them.
  */
 class PAGDisplayOptions {
  public:
@@ -176,13 +173,13 @@ class PAGDisplayOptions {
   void setSubtreeCacheMaxSize(int maxSize);
 
  private:
-  explicit PAGDisplayOptions(std::shared_ptr<PAGFile> file);
+  explicit PAGDisplayOptions(std::shared_ptr<PAGScene> scene);
 
   void* getDisplayList() const;
 
-  std::weak_ptr<PAGFile> file = {};
+  std::weak_ptr<PAGScene> scene = {};
 
-  friend class PAGFile;
+  friend class PAGScene;
 };
 
 }  // namespace pagx

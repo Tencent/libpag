@@ -25,9 +25,8 @@ namespace pagx {
 
 /**
  * AnimationTimeline attaches a referenced Animation to the owning Layer's runtime composition.
- * The Animation is resolved via PAGXDocument::findNode<Animation>(animationId) at build time;
- * the id must match an Animation defined anywhere in the same document (animation ids are unique
- * across the entire document, not scoped to a single Composition).
+ * The referenced Animation is looked up by animationId, which must match an Animation defined
+ * in the same document.
  */
 class AnimationTimeline : public Timeline {
  public:
@@ -39,7 +38,7 @@ class AnimationTimeline : public Timeline {
   std::string animationId = {};
 
   /**
-   * Initial playing state when the embedding PAGFile first builds the runtime tree. Setting this
+   * Initial playing state when the embedding PAGScene first builds the runtime tree. Setting this
    * to false constructs the timeline in the paused state; callers can call play() later. Default
    * is true.
    */

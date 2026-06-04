@@ -31,7 +31,7 @@
 namespace pagx {
 
 class LayoutContext;
-class PAGFile;
+class PAGScene;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -63,7 +63,7 @@ class PAGXDocument : public Node {
   std::vector<Layer*> layers = {};
 
   /**
-   * Top-level animations (raw pointers, owned by nodes).
+   * Top-level animations.
    */
   std::vector<Animation*> animations = {};
 
@@ -166,13 +166,10 @@ class PAGXDocument : public Node {
    * layout performs runtime shaping instead of reusing stale embedded data.
    */
   void clearEmbed();
-  
+
   /**
-   * Notifies all live PAGFile instances created from this document that the given nodes have
-   * changed. Note: runtime rebuild dispatch is not yet implemented; in the current version this
-   * method only maintains internal bookkeeping (pruning expired PAGFile references) and does not
-   * yet trigger any runtime state rebuild. A future version will rebuild the affected nodes on the
-   * next draw so callers can reflect direct field mutations through the rendering pipeline.
+   * Notifies all live PAGScene instances created from this document that the given nodes have
+   * changed, so that affected content is rebuilt on the next draw.
    * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
    * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    */
@@ -189,22 +186,22 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
-  // PAGFile lifecycle hooks (called from PAGFile::Make / ~PAGFile).
-  void registerLiveFile(const std::shared_ptr<PAGFile>& file);
-  void unregisterLiveFile(PAGFile* file);
+  // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
+  void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
+  void unregisterLiveScene(PAGScene* scene);
 
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
-  // Live PAGFile instances created from this document. Stored as weak_ptr so that the document
-  // does not keep PAGFile alive; expired entries are pruned during notifyChange.
-  std::vector<std::weak_ptr<PAGFile>> liveFiles = {};
+  // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
+  // does not keep PAGScene alive; expired entries are pruned during notifyChange.
+  std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
-  friend class PAGFile;
+  friend class PAGScene;
 };
 
 }  // namespace pagx

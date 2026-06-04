@@ -25,14 +25,14 @@
 namespace pagx {
 
 struct RuntimeBinding;
-class PAGFile;
+class PAGScene;
 class PAGXDocument;
 
 /**
- * PAGTimeline controls the playback of a single animation in a PAGFile. It holds the playback state
+ * PAGTimeline controls the playback of a single animation in a PAGScene. It holds the playback state
  * (current time and playing flag) and applies the animation to the file's content via apply().
  *
- * PAGTimeline must not be constructed directly; obtain instances through PAGFile::getTimeline().
+ * PAGTimeline must not be constructed directly; obtain instances through PAGScene::getTimeline().
  * Multiple lookups for the same animation name return the same PAGTimeline instance, so playback
  * state is shared across all callers driving that animation.
  */
@@ -41,18 +41,17 @@ class PAGTimeline {
   ~PAGTimeline() = default;
 
   /**
-   * Returns the animation id. Equal to the corresponding Animation::id in the source document.
+   * Returns the animation id.
    */
   const std::string& getId() const;
 
   /**
-   * Returns the animation duration in microseconds, derived from Animation::duration (in frames)
-   * and Animation::frameRate.
+   * Returns the animation duration in microseconds.
    */
   int64_t duration() const;
 
   /**
-   * Returns the animation frame rate. Equal to Animation::frameRate.
+   * Returns the animation frame rate.
    */
   float frameRate() const;
 
@@ -125,7 +124,7 @@ class PAGTimeline {
 
   Animation* animation = nullptr;
   // Runtime binding the channel writers should target. Top-level timelines use the owning
-  // PAGFile's binding; composition timelines use the binding built for that composition.
+  // PAGScene's binding; composition timelines use the binding built for that composition.
   RuntimeBinding* binding = nullptr;
   // Document used to resolve channel target IDs at apply time. Top-level timelines use the file's
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
@@ -134,7 +133,7 @@ class PAGTimeline {
   int64_t currentTimeUs = 0;
   bool playing = false;
 
-  friend class PAGFile;
+  friend class PAGScene;
   friend class PAGComposition;
 };
 

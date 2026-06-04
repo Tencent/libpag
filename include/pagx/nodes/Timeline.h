@@ -34,11 +34,7 @@ enum class TimelineType : uint8_t {
 /**
  * Timeline is the abstract base for entries inside a Layer's <Timelines> XML element. Each entry
  * describes a time-driven behavior to attach when the owning Layer references a Composition.
- * v1 only ships AnimationTimeline; future PRs may add TimeMachineTimeline, StateMachineTimeline,
- * etc.
- *
- * This is the template-layer Timeline (pure data). The runtime instance that actually advances
- * time and writes back to the tgfx tree is PAGTimeline, constructed by PAGFile from these entries.
+ * v1 only ships AnimationTimeline; future versions may add other timeline kinds.
  */
 class Timeline {
  public:
