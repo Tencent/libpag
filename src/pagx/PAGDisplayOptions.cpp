@@ -46,14 +46,13 @@ Color ToPAGX(const tgfx::Color& color) {
 
 }  // namespace
 
-PAGDisplayOptions::PAGDisplayOptions(std::shared_ptr<PAGScene> scene) : scene(scene) {
+PAGDisplayOptions::PAGDisplayOptions(PAGScene* scene) : scene(scene) {
 }
 
 PAGDisplayOptions::~PAGDisplayOptions() = default;
 
 tgfx::DisplayList* PAGDisplayOptions::getDisplayList() const {
-  auto owner = scene.lock();
-  return owner != nullptr ? owner->getDisplayListForOptions() : nullptr;
+  return scene != nullptr ? scene->getDisplayListForOptions() : nullptr;
 }
 
 float PAGDisplayOptions::getZoomScale() const {

@@ -40,7 +40,7 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   auto scene = std::shared_ptr<PAGScene>(new PAGScene());
   scene->document = document;
   scene->displayList = std::make_unique<tgfx::DisplayList>();
-  scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene));
+  scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), scene));
@@ -179,7 +179,7 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   if (scene.get() != this) {
     return {};
   }
-  auto* rootLayer = static_cast<tgfx::Layer*>(rootRuntimeLayer());
+  auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
   auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
@@ -209,10 +209,6 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   const auto& contentOffset = displayList->contentOffset();
   *out = {zoomScale, 0, 0, zoomScale, contentOffset.x, contentOffset.y};
   return true;
-}
-
-void* PAGScene::rootRuntimeLayer() const {
-  return _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
 }
 
 void PAGScene::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {

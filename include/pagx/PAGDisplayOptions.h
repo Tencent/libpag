@@ -177,11 +177,11 @@ class PAGDisplayOptions {
   void setSubtreeCacheMaxSize(int maxSize);
 
  private:
-  explicit PAGDisplayOptions(std::shared_ptr<PAGScene> scene);
+  explicit PAGDisplayOptions(PAGScene* scene);
 
   tgfx::DisplayList* getDisplayList() const;
 
-  std::weak_ptr<PAGScene> scene = {};
+  PAGScene* scene = nullptr;
 
   friend class PAGScene;
 };

@@ -158,12 +158,6 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // matrix. Returned as a pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
 
-  // Returns the top tgfx layer of the runtime tree as an opaque pointer (the root composition's
-  // runtime layer). Used by PAGLayer to compute a layer's transform relative to the tree root
-  // without requiring the tree to be attached to a display list. Concrete type lives in
-  // PAGScene.cpp.
-  void* rootRuntimeLayer() const;
-
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};

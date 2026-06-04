@@ -52,7 +52,8 @@ Matrix PAGLayer::getGlobalMatrix() const {
   // local -> root: the runtime layer's transform relative to the tree root. The tree may not be
   // attached to a display list (no draw() yet), so use the scene's root tgfx layer directly rather
   // than tgfx::Layer::root() which is null for a detached subtree.
-  auto* rootLayer = static_cast<tgfx::Layer*>(scene->rootRuntimeLayer());
+  auto rootComp = scene->rootComposition();
+  auto* rootLayer = rootComp != nullptr ? rootComp->runtimeLayer.get() : nullptr;
   auto localToRoot = runtimeLayer->getRelativeMatrix(rootLayer);
   auto localToSurface = ToTGFX(rootToSurface) * localToRoot;
   return {localToSurface.getScaleX(),     localToSurface.getSkewY(),
