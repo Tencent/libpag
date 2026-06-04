@@ -16,12 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/ppt/PPTModifierResolver.h"
+#include "pagx/utils/ModifierResolver.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
 #include <vector>
 #include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -101,8 +102,8 @@ static PathData* MakePathDataFromTGFX(PAGXDocument* doc, const tgfx::Path& tp) {
 // position=(0,0) and we prime its preferred layout from the data bounds.
 // Without this, layoutBounds() reports an empty rect and any later modifier
 // that re-enters PrimitiveToTGFXPath sees renderScale()==0 — collapsing the
-// geometry to the origin and dropping the shape from the PPTX.
-Element* PPTModifierResolver::makePathFromData(PathData* data) const {
+// geometry to the origin and dropping the shape from the output.
+Element* ModifierResolver::makePathFromData(PathData* data) const {
   auto* p = _doc->makeNode<Path>();
   p->data = data;
   p->position = {0.0f, 0.0f};
@@ -323,7 +324,9 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // Modifier appliers. Each returns the new pagx::Path replacement(s).
 //==============================================================================
 
-Element* PPTModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
+// Apply a TrimPath modifier to `shape`, returning a freshly allocated Path
+// (or `shape` unchanged when the trim collapses or the shape is degenerate).
+Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
   auto tp = PrimitiveToTGFXPath(shape);
   if (tp.isEmpty()) {
     return shape;
@@ -336,8 +339,10 @@ Element* PPTModifierResolver::applyTrimToElement(Element* shape, const TrimPath*
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
-Element* PPTModifierResolver::applyRoundCornerToElement(Element* shape,
-                                                        const RoundCorner* corner) const {
+// Apply a RoundCorner modifier to `shape`, returning a freshly allocated Path (or `shape`
+// unchanged when the radius is non-positive or the shape is degenerate).
+Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
+                                                     const RoundCorner* corner) const {
   if (corner->radius <= 0.0f) {
     return shape;
   }
@@ -415,7 +420,7 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
   // BuildGroupMatrix's read of renderPosition() returns the per-copy offset.
   // Without this, layoutBounds() falls back to preferredX/Y == 0 (these
   // synthetic groups never participate in the document layout pass) and every
-  // copy collapses onto the origin, hiding all repeater offsets in the PPTX.
+  // copy collapses onto the origin, hiding all repeater offsets in the output.
   // Skip Group::updateSize's child recursion — body children were already
   // measured by the document's layout pass — and call the base directly so
   // virtual dispatch invokes Group::onMeasure to seed preferredX/Y.
@@ -427,12 +432,15 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
 // resolve()
 //==============================================================================
 
-std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& elements) {
+std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& elements) {
   std::vector<Element*> output;
   output.reserve(elements.size());
   // Indices into `output` of every shape-like element produced so far in this
   // group. Modifiers operate on the contents of these slots.
   std::vector<size_t> shapeSlots;
+  // Set when a MergePath in this scope produced an even-odd-oriented path; the
+  // scope's Fill painters get their fill rule re-stamped to EvenOdd afterwards.
+  bool scopeNeedsEvenOddFill = false;
 
   for (auto* element : elements) {
     auto type = element->nodeType();
@@ -510,6 +518,19 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         }
         auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
         CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
+        // tgfx boolean ops (Skia path-ops) emit geometry oriented for even-odd
+        // coverage, not winding: e.g. a Difference hole keeps the inner contour
+        // wound the same way as the outer one and relies on the path's even-odd
+        // fill type to punch it out. MakePathDataFromTGFX copies only verbs and
+        // points, so that fill type is lost; remember it here and re-stamp it
+        // onto this scope's Fill painters after the walk (painters may sit
+        // before or after the MergePath in source order) so every downstream
+        // exporter (which reads Fill::fillRule) renders the merged shape
+        // correctly instead of filling holes solid.
+        if (combined.getFillType() == tgfx::PathFillType::EvenOdd ||
+            combined.getFillType() == tgfx::PathFillType::InverseEvenOdd) {
+          scopeNeedsEvenOddFill = true;
+        }
         break;
       }
       case NodeType::Repeater: {
@@ -534,8 +555,8 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         // values near INT_MAX would invoke UB in the cast, and values around
         // 1e6 would still allocate gigabytes via `generated.reserve(maxCount)`
         // below. 10000 is comfortably above any visually meaningful copy count.
-        constexpr float kMaxRepeaterCopies = 10000.0f;
-        copiesF = std::min(copiesF, kMaxRepeaterCopies);
+        constexpr float MAX_REPEATER_COPIES = 10000.0f;
+        copiesF = std::min(copiesF, MAX_REPEATER_COPIES);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This
@@ -592,6 +613,14 @@ std::vector<Element*> PPTModifierResolver::resolve(const std::vector<Element*>& 
         // dedicated writers downstream.
         output.push_back(element);
         break;
+    }
+  }
+
+  if (scopeNeedsEvenOddFill) {
+    for (auto* el : output) {
+      if (el->nodeType() == NodeType::Fill) {
+        static_cast<Fill*>(el)->fillRule = FillRule::EvenOdd;
+      }
     }
   }
 

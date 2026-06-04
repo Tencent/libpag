@@ -3409,7 +3409,7 @@ PAGX_TEST(PAGXPPTTest, TextToPathEmptyGlyphRuns) {
 }
 
 //==============================================================================
-// Coverage boost: PPTModifierResolver paths (Polystar / Repeater / TrimPath /
+// Coverage boost: ModifierResolver paths (Polystar / Repeater / TrimPath /
 // RoundCorner / MergePath) plus PPTFeatureProbe escalation paths.
 //==============================================================================
 
@@ -5377,7 +5377,7 @@ PAGX_TEST(PAGXPPTTest, NestedTextBoxFeatureProbe) {
 }
 
 //==============================================================================
-// Coverage boost: PPTModifierResolver edge branches.
+// Coverage boost: ModifierResolver edge branches.
 //==============================================================================
 
 PAGX_TEST(PAGXPPTTest, PolystarZeroPointsResolved) {
@@ -5444,7 +5444,7 @@ PAGX_TEST(PAGXPPTTest, TrimPathOnPolystarPath) {
 
 PAGX_TEST(PAGXPPTTest, RoundCornerZeroRadiusNoOp) {
   // RoundCorner with radius<=0 returns shape unchanged via the early-return
-  // branch at PPTModifierResolver line 341-343.
+  // branch at ModifierResolver applyRoundCornerToElement.
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
