@@ -111,24 +111,8 @@ struct RuntimeBinding {
     return it->second.apply(channel, value, mix);
   }
 
-  // Records the reverse mapping from a rendered tgfx::Layer back to its source PAGX node. Used by
-  // hit testing to resolve a hit tgfx layer to the PAGX Layer node that produced it.
-  void mapLayer(const tgfx::Layer* tgfxLayer, const Node* node) {
-    if (tgfxLayer != nullptr && node != nullptr) {
-      layerToNode[tgfxLayer] = node;
-    }
-  }
-
-  // Returns the source PAGX node for a rendered tgfx::Layer, or nullptr if the layer is an internal
-  // sub-layer that was not registered as a node's primary layer.
-  const Node* nodeForLayer(const tgfx::Layer* tgfxLayer) const {
-    auto it = layerToNode.find(tgfxLayer);
-    return it == layerToNode.end() ? nullptr : it->second;
-  }
-
  private:
   std::unordered_map<const Node*, RuntimeTarget> targets = {};
-  std::unordered_map<const tgfx::Layer*, const Node*> layerToNode = {};
 };
 
 /**

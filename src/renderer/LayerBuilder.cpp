@@ -206,7 +206,6 @@ class LayerBuilderContext {
     if (layer) {
       // Register layer for mask lookups and animation writers.
       _result.binding.set(node, layer);
-      _result.binding.mapLayer(layer.get(), node);
       bindLayerChannels(node);
 
       applyLayerAttributes(node, layer.get());
@@ -1030,6 +1029,8 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        _result.binding.set(style, tgfxStyle);
+        bindInnerShadowStyleChannels(style);
         return tgfxStyle;
       }
       case NodeType::BackgroundBlurStyle: {
@@ -1039,6 +1040,8 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        _result.binding.set(style, tgfxStyle);
+        bindBackgroundBlurStyleChannels(style);
         return tgfxStyle;
       }
       default:
@@ -1107,6 +1110,83 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "blurY", WriteDropShadowStyleBlurY);
     _result.binding.setWriter(node, "color", WriteDropShadowStyleColor);
     _result.binding.setWriter(node, "showBehindLayer", WriteDropShadowStyleShowBehindLayer);
+  }
+
+  static void WriteInnerShadowStyleOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::InnerShadowStyle*>(object);
+    style->setOffsetX(MixFloat(style->offsetX(), *v, mix));
+  }
+
+  static void WriteInnerShadowStyleOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::InnerShadowStyle*>(object);
+    style->setOffsetY(MixFloat(style->offsetY(), *v, mix));
+  }
+
+  static void WriteInnerShadowStyleBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::InnerShadowStyle*>(object);
+    style->setBlurrinessX(MixFloat(style->blurrinessX(), *v, mix));
+  }
+
+  static void WriteInnerShadowStyleBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::InnerShadowStyle*>(object);
+    style->setBlurrinessY(MixFloat(style->blurrinessY(), *v, mix));
+  }
+
+  static void WriteInnerShadowStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::InnerShadowStyle*>(object);
+    auto target = ToTGFX(*v);
+    style->setColor(MixTGFXColor(style->color(), target, mix));
+  }
+
+  void bindInnerShadowStyleChannels(const InnerShadowStyle* node) {
+    _result.binding.setWriter(node, "offsetX", WriteInnerShadowStyleOffsetX);
+    _result.binding.setWriter(node, "offsetY", WriteInnerShadowStyleOffsetY);
+    _result.binding.setWriter(node, "blurX", WriteInnerShadowStyleBlurX);
+    _result.binding.setWriter(node, "blurY", WriteInnerShadowStyleBlurY);
+    _result.binding.setWriter(node, "color", WriteInnerShadowStyleColor);
+  }
+
+  static void WriteBackgroundBlurStyleBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::BackgroundBlurStyle*>(object);
+    style->setBlurrinessX(MixFloat(style->blurrinessX(), *v, mix));
+  }
+
+  static void WriteBackgroundBlurStyleBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::BackgroundBlurStyle*>(object);
+    style->setBlurrinessY(MixFloat(style->blurrinessY(), *v, mix));
+  }
+
+  void bindBackgroundBlurStyleChannels(const BackgroundBlurStyle* node) {
+    _result.binding.setWriter(node, "blurX", WriteBackgroundBlurStyleBlurX);
+    _result.binding.setWriter(node, "blurY", WriteBackgroundBlurStyleBlurY);
   }
 
   static void WriteBlurFilterX(void* object, const KeyValue& value, float mix) {
@@ -1195,6 +1275,69 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "shadowOnly", WriteDropShadowFilterShadowOnly);
   }
 
+  static void WriteInnerShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::InnerShadowFilter*>(object);
+    filter->setOffsetX(MixFloat(filter->offsetX(), *v, mix));
+  }
+
+  static void WriteInnerShadowFilterOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::InnerShadowFilter*>(object);
+    filter->setOffsetY(MixFloat(filter->offsetY(), *v, mix));
+  }
+
+  static void WriteInnerShadowFilterBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::InnerShadowFilter*>(object);
+    filter->setBlurrinessX(MixFloat(filter->blurrinessX(), *v, mix));
+  }
+
+  static void WriteInnerShadowFilterBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::InnerShadowFilter*>(object);
+    filter->setBlurrinessY(MixFloat(filter->blurrinessY(), *v, mix));
+  }
+
+  static void WriteInnerShadowFilterColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::InnerShadowFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteInnerShadowFilterShadowOnly(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::InnerShadowFilter*>(object)->setInnerShadowOnly(*v);
+  }
+
+  void bindInnerShadowFilterChannels(const InnerShadowFilter* node) {
+    _result.binding.setWriter(node, "offsetX", WriteInnerShadowFilterOffsetX);
+    _result.binding.setWriter(node, "offsetY", WriteInnerShadowFilterOffsetY);
+    _result.binding.setWriter(node, "blurX", WriteInnerShadowFilterBlurX);
+    _result.binding.setWriter(node, "blurY", WriteInnerShadowFilterBlurY);
+    _result.binding.setWriter(node, "color", WriteInnerShadowFilterColor);
+    _result.binding.setWriter(node, "shadowOnly", WriteInnerShadowFilterShadowOnly);
+  }
+
   std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
@@ -1220,9 +1363,12 @@ class LayerBuilderContext {
       }
       case NodeType::InnerShadowFilter: {
         auto filter = static_cast<const pagx::InnerShadowFilter*>(node);
-        return tgfx::InnerShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
-                                             filter->blurY, ToTGFX(filter->color),
-                                             filter->shadowOnly);
+        auto tgfxFilter =
+            tgfx::InnerShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                          filter->blurY, ToTGFX(filter->color), filter->shadowOnly);
+        _result.binding.set(filter, tgfxFilter);
+        bindInnerShadowFilterChannels(filter);
+        return tgfxFilter;
       }
       case NodeType::BlendFilter: {
         auto filter = static_cast<const pagx::BlendFilter*>(node);
