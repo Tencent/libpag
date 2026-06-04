@@ -48,6 +48,7 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   rootComp->document = document.get();
   scene->rootComposition = rootComp;
   scene->rootComposition->buildChildren(document->layers);
+  scene->displayList->root()->addChild(rootComp->runtimeLayer);
   document->registerLiveScene(scene);
   return scene;
 }
@@ -115,10 +116,6 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface) {
     return false;
   }
   auto& drawable = surface->drawable;
-  if (!rootAttached) {
-    displayList->root()->addChild(rootComposition->runtimeLayer);
-    rootAttached = true;
-  }
   auto device = drawable->getDevice();
   if (device == nullptr) {
     return false;

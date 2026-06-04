@@ -164,7 +164,6 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList = {};
-  bool rootAttached = false;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 
