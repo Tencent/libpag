@@ -173,6 +173,39 @@ const BASE_RISK_PATHS: Record<string, RiskPathConfig> = {
   layer_xml: { yellow: 15000, red: 30000 },
 };
 
+const LOCAL_RISK_PATHS = {
+  bgBlurAreaRadius: { yellow: 25, red: 120 },
+  imageLoadMP: { yellow: 80, red: 220 },
+  imageRuntimeRisk: { yellow: 45, red: 95 },
+};
+const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = { yellow: 2000, red: 4000 };
+const BARELY_USABLE_SCORE = 50;
+const NEUTRAL_SDK_GREEN_SCORE = 75;
+const SMALL_AREA_BLUR_RISK = 25;
+const LARGE_DOWNSCALE_RATIO = 16;
+
+interface LocalRiskRaw {
+  bgBlurAreaRadius: number;
+  imageDecodeMP: number;
+  imageDownscaleMP: number;
+  sdkBgUncacheableRisk: number;
+  docMP: number;
+  layerCount: number;
+  textCount: number;
+  innerShadowCount: number;
+}
+
+interface ImageRiskState {
+  uniqueOriginalPixels: Map<string, number>;
+  downscaleOriginalPixels: Map<string, number>;
+  patternIndex: number;
+}
+
+interface LayerScanState {
+  maxShapeArea: number;
+  bgBlurRadii: number[];
+}
+
 /**
  * 根据设备档位和平台调整阈值
  * 最终系数 = 设备档位系数 × 平台系数
@@ -538,6 +571,186 @@ function normalize(value: number, yellow: number, red: number): number {
   return (19.0 * red) / value;
 }
 
+function readNumericAttr(attribs: Record<string, string>, name: string): number {
+  const value = Number(attribs[name]);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function readShapeArea(node: XmlNode): number {
+  const size = node.attribs.size;
+  if (!size) return 0;
+  const [widthText, heightText] = size.split(',');
+  const width = Number(widthText);
+  const height = Number(heightText);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return 0;
+  return width * height;
+}
+
+function currentLayerState(stack: LayerScanState[]): LayerScanState | null {
+  return stack.length > 0 ? stack[stack.length - 1] : null;
+}
+
+function addImageRisk(node: XmlNode, state: ImageRiskState): void {
+  const origWidth = readNumericAttr(node.attribs, 'data-orig-image-width');
+  const origHeight = readNumericAttr(node.attribs, 'data-orig-image-height');
+  const nodeWidth = readNumericAttr(node.attribs, 'data-node-width');
+  const nodeHeight = readNumericAttr(node.attribs, 'data-node-height');
+  const originalPixels = Math.max(0, origWidth) * Math.max(0, origHeight);
+  const displayPixels = Math.max(0, nodeWidth) * Math.max(0, nodeHeight);
+  if (originalPixels <= 0) return;
+
+  const imageKey = node.attribs.image || `__inline_${state.patternIndex}`;
+  state.patternIndex += 1;
+  state.uniqueOriginalPixels.set(
+    imageKey,
+    Math.max(state.uniqueOriginalPixels.get(imageKey) ?? 0, originalPixels),
+  );
+
+  if (displayPixels > 0 && originalPixels / displayPixels >= LARGE_DOWNSCALE_RATIO) {
+    state.downscaleOriginalPixels.set(
+      imageKey,
+      Math.max(state.downscaleOriginalPixels.get(imageKey) ?? 0, originalPixels),
+    );
+  }
+}
+
+function scanLocalRisk(root: XmlNode): LocalRiskRaw {
+  const docWidth = readNumericAttr(root.attribs, 'width');
+  const docHeight = readNumericAttr(root.attribs, 'height');
+  const raw: LocalRiskRaw = {
+    bgBlurAreaRadius: 0,
+    imageDecodeMP: 0,
+    imageDownscaleMP: 0,
+    sdkBgUncacheableRisk: 0,
+    docMP: Math.max(0, docWidth) * Math.max(0, docHeight) / 1_000_000,
+    layerCount: 0,
+    textCount: 0,
+    innerShadowCount: 0,
+  };
+  const layerStack: LayerScanState[] = [];
+  const imageState: ImageRiskState = {
+    uniqueOriginalPixels: new Map<string, number>(),
+    downscaleOriginalPixels: new Map<string, number>(),
+    patternIndex: 0,
+  };
+  let bgBlurCount = 0;
+  let innerShadowCount = 0;
+  let blurFilterCount = 0;
+  let gradientCount = 0;
+
+  function visit(node: XmlNode): void {
+    let layerState: LayerScanState | null = null;
+    if (node.tag === 'Layer') {
+      raw.layerCount += 1;
+      layerState = { maxShapeArea: 0, bgBlurRadii: [] };
+      layerStack.push(layerState);
+    }
+
+    if (node.tag === 'Text' || node.tag === 'GlyphRun') raw.textCount += 1;
+    if (node.tag === 'Rectangle' || node.tag === 'Ellipse') {
+      const currentLayer = currentLayerState(layerStack);
+      const area = readShapeArea(node);
+      if (currentLayer && area > currentLayer.maxShapeArea) currentLayer.maxShapeArea = area;
+    }
+    if (node.tag === 'BackgroundBlurStyle') {
+      bgBlurCount += 1;
+      const currentLayer = currentLayerState(layerStack);
+      if (currentLayer) {
+        currentLayer.bgBlurRadii.push(
+          Math.max(readNumericAttr(node.attribs, 'blurX'), readNumericAttr(node.attribs, 'blurY'), 0),
+        );
+      }
+    }
+    if (node.tag === 'InnerShadowStyle') {
+      innerShadowCount += 1;
+      raw.innerShadowCount += 1;
+    }
+    if (node.tag === 'BlurFilter') blurFilterCount += 1;
+    if (node.tag === 'LinearGradient' || node.tag === 'RadialGradient' || node.tag === 'SweepGradient') {
+      gradientCount += 1;
+    }
+    if (node.tag === 'ImagePattern') addImageRisk(node, imageState);
+
+    for (const child of node.children) visit(child);
+
+    if (node.tag === 'Layer' && layerState) {
+      const areaMP = layerState.maxShapeArea / 1_000_000;
+      for (const radius of layerState.bgBlurRadii) raw.bgBlurAreaRadius += areaMP * radius;
+      layerStack.pop();
+      const parentLayer = currentLayerState(layerStack);
+      if (parentLayer && layerState.maxShapeArea > parentLayer.maxShapeArea) {
+        parentLayer.maxShapeArea = layerState.maxShapeArea;
+      }
+    }
+  }
+
+  visit(root);
+  raw.imageDecodeMP = Array.from(imageState.uniqueOriginalPixels.values())
+    .reduce((sum, pixels) => sum + pixels, 0) / 1_000_000;
+  raw.imageDownscaleMP = Array.from(imageState.downscaleOriginalPixels.values())
+    .reduce((sum, pixels) => sum + pixels, 0) / 1_000_000;
+  raw.sdkBgUncacheableRisk = bgBlurCount * (innerShadowCount + blurFilterCount + gradientCount / 10);
+  return raw;
+}
+
+function scoreBgBlurAreaRadius(value: number): number {
+  if (value <= 0) return 100;
+  return Math.max(
+    normalize(value, LOCAL_RISK_PATHS.bgBlurAreaRadius.yellow, LOCAL_RISK_PATHS.bgBlurAreaRadius.red),
+    BARELY_USABLE_SCORE,
+  );
+}
+
+function getImageRuntimeRisk(raw: LocalRiskRaw): number {
+  const contentComplexity = raw.layerCount / 1500 + raw.textCount / 400 + raw.innerShadowCount / 10;
+  const runtimeComplexity = raw.bgBlurAreaRadius / 80 * contentComplexity
+    + raw.layerCount / 6000
+    + raw.docMP / 100;
+  return raw.imageDownscaleMP * runtimeComplexity;
+}
+
+function scoreImageLoadRisk(raw: LocalRiskRaw): number {
+  return normalize(
+    Math.max(raw.imageDecodeMP, raw.imageDownscaleMP),
+    LOCAL_RISK_PATHS.imageLoadMP.yellow,
+    LOCAL_RISK_PATHS.imageLoadMP.red,
+  );
+}
+
+function scoreImageRuntimeRisk(raw: LocalRiskRaw): number {
+  return normalize(
+    getImageRuntimeRisk(raw),
+    LOCAL_RISK_PATHS.imageRuntimeRisk.yellow,
+    LOCAL_RISK_PATHS.imageRuntimeRisk.red,
+  );
+}
+
+function scoreLocalRisk(raw: LocalRiskRaw): number {
+  return Math.min(
+    scoreBgBlurAreaRadius(raw.bgBlurAreaRadius),
+    scoreImageLoadRisk(raw),
+    scoreImageRuntimeRisk(raw),
+  );
+}
+
+function scoreNeutralSdkRisk(raw: LocalRiskRaw): number {
+  return normalize(
+    raw.sdkBgUncacheableRisk,
+    NEUTRAL_SDK_BG_UNCACHEABLE_RISK.yellow,
+    NEUTRAL_SDK_BG_UNCACHEABLE_RISK.red,
+  );
+}
+
+function protectDeviceSpread(baseScore: number, localScore: number, neutralScore: number, raw: LocalRiskRaw): number {
+  const isSmallAreaBlur = raw.bgBlurAreaRadius > 0 && raw.bgBlurAreaRadius <= SMALL_AREA_BLUR_RISK;
+  if (baseScore < BARELY_USABLE_SCORE
+      && localScore >= BARELY_USABLE_SCORE
+      && (neutralScore >= NEUTRAL_SDK_GREEN_SCORE || isSmallAreaBlur)) {
+    return BARELY_USABLE_SCORE;
+  }
+  return baseScore;
+}
+
 function uint8ArrayToString(data: Uint8Array): string {
   if (typeof TextDecoder !== 'undefined') {
     return new TextDecoder('utf-8').decode(data);
@@ -670,9 +883,18 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     if (score < minScore) minScore = score;
   }
 
+  // 业务侧真机样本补充校准：
+  // - 大面积 bgBlur 最低落在 50 分（可打开但不建议）
+  // - 图片压力只有叠加 bgBlur / 图层 / 文本 / 画布复杂度时才作为运行期 FPS 风险
+  // - 小面积多数量 blur 避免被 SDK A 路径误杀
+  const localRiskRaw = scanLocalRisk(root);
+  const localScore = scoreLocalRisk(localRiskRaw);
+  const neutralScore = scoreNeutralSdkRisk(localRiskRaw);
+  const protectedBaseScore = protectDeviceSpread(minScore, localScore, neutralScore, localRiskRaw);
+
   // 返回完整结果
   return {
-    score: minScore,
+    score: Math.min(protectedBaseScore, localScore),
     benchmarkLevel: deviceInfo.benchmarkLevel,
     deviceTier: deviceInfo.tier,
     platform: deviceInfo.platform,
