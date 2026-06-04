@@ -85,16 +85,19 @@ class PAGXDocument : public Node {
   }
 
   /**
-   * Finds a node by ID.
-   * Returns nullptr if not found.
+   * Finds a node by ID within this document's own node index.
+   * Returns nullptr if not found, or if the node belongs to an external composition document.
+   * @param id The unique identifier of the node.
+   * @return A pointer to the node, or nullptr if not found in this document.
    */
   Node* findNode(const std::string& id) const;
 
   /**
-   * Finds a node of the specified type by ID.
+   * Finds a node of the specified type by ID within this document's own node index.
    * The caller must ensure T matches the actual node type, otherwise behavior is undefined.
+   * Returns nullptr if not found, or if the node belongs to an external composition document.
    * @param id The unique identifier of the node.
-   * @return A pointer to the node cast to type T, or nullptr if not found.
+   * @return A pointer to the node cast to type T, or nullptr if not found in this document.
    */
   template <typename T>
   T* findNode(const std::string& id) const {
