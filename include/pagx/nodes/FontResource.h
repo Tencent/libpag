@@ -85,7 +85,7 @@ class FontResource : public Resource {
   }
 
   /**
-   * Sets raw font bytes and notifies all referencers.
+   * Sets raw font bytes and notifies all listeners.
    * @param data raw font bytes.
    * @param ttcIndex TrueType collection index. Ignored for non-TTC font data.
    * @return true if data is non-null and non-empty.
@@ -93,7 +93,7 @@ class FontResource : public Resource {
   bool setData(std::shared_ptr<Data> data, int ttcIndex = 0);
 
   /**
-   * Copies raw font bytes into this resource and notifies all referencers.
+   * Copies raw font bytes into this resource and notifies all listeners.
    * @param bytes pointer to font bytes.
    * @param length byte length.
    * @param ttcIndex TrueType collection index. Ignored for non-TTC font data.
@@ -102,7 +102,7 @@ class FontResource : public Resource {
   bool setBytes(const void* bytes, size_t length, int ttcIndex = 0);
 
   /**
-   * Sets a custom provider and notifies all referencers.
+   * Sets a custom provider and notifies all listeners.
    * @param provider custom font provider.
    * @return true if provider is non-null.
    */

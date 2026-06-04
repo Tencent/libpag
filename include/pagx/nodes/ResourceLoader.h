@@ -59,8 +59,8 @@ struct ResourceLoadRequest {
  * importer continue with its normal fallback path.
  *
  * Returning true does not require the resource to be fully loaded immediately. A loader may retain
- * the shared Resource and call its setter methods later; importer-owned ResourceReferencer nodes
- * will consume the update when data arrives.
+ * the shared Resource and call its setter methods later; the importing PAGXDocument will consume
+ * the update when data arrives.
  */
 class ResourceLoader {
  public:

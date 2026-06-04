@@ -19,55 +19,33 @@
 #include "pagx/nodes/Resource.h"
 #include <algorithm>
 #include <utility>
-#include "pagx/PAGXDocument.h"
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/CompositionResource.h"
-#include "pagx/nodes/Font.h"
 #include "pagx/nodes/FontResource.h"
-#include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImageResource.h"
-#include "pagx/nodes/Layer.h"
 
 namespace pagx {
 
-void Resource::addReferencer(ResourceReferencer* referencer) {
-  if (referencer == nullptr) {
+void Resource::addListener(ResourceListener* listener) {
+  if (listener == nullptr) {
     return;
   }
-  if (std::find(resourceReferencers.begin(), resourceReferencers.end(), referencer) ==
-      resourceReferencers.end()) {
-    resourceReferencers.push_back(referencer);
+  if (std::find(resourceListeners.begin(), resourceListeners.end(), listener) ==
+      resourceListeners.end()) {
+    resourceListeners.push_back(listener);
   }
 }
 
-void Resource::removeReferencer(ResourceReferencer* referencer) {
-  resourceReferencers.erase(
-      std::remove(resourceReferencers.begin(), resourceReferencers.end(), referencer),
-      resourceReferencers.end());
+void Resource::removeListener(ResourceListener* listener) {
+  resourceListeners.erase(std::remove(resourceListeners.begin(), resourceListeners.end(), listener),
+                          resourceListeners.end());
 }
 
 void Resource::notifyUpdated() {
-  auto referencers = resourceReferencers;
-  for (auto* referencer : referencers) {
-    if (referencer != nullptr) {
-      referencer->resourceUpdated(this);
+  auto listeners = resourceListeners;
+  for (auto* listener : listeners) {
+    if (listener != nullptr) {
+      listener->resourceUpdated(this);
     }
-  }
-}
-
-ResourceReferencer::~ResourceReferencer() {
-  if (retainedResource != nullptr) {
-    retainedResource->removeReferencer(this);
-  }
-}
-
-void ResourceReferencer::setResource(std::shared_ptr<Resource> resource) {
-  if (retainedResource != nullptr) {
-    retainedResource->removeReferencer(this);
-  }
-  retainedResource = std::move(resource);
-  if (retainedResource != nullptr) {
-    retainedResource->addReferencer(this);
   }
 }
 
@@ -175,67 +153,6 @@ bool CompositionResource::setData(std::shared_ptr<Data> data) {
 
 bool CompositionResource::setBytes(const void* bytes, size_t length) {
   return setData(Data::MakeWithCopy(bytes, length));
-}
-
-void Image::resourceUpdated(Resource* resource) {
-  if (resource == nullptr || resource->resourceType() != ResourceType::Image) {
-    return;
-  }
-  auto imageResource = static_cast<ImageResource*>(resource);
-  if (imageResource == nullptr || imageResource->data() == nullptr) {
-    return;
-  }
-  data = imageResource->data();
-  if (ownerDocument != nullptr) {
-    ownerDocument->notifyChange({this});
-  }
-}
-
-void Font::resourceUpdated(Resource* resource) {
-  if (resource == nullptr || resource->resourceType() != ResourceType::Font) {
-    return;
-  }
-  auto fontResource = static_cast<FontResource*>(resource);
-  if (fontResource == nullptr ||
-      (fontResource->data() == nullptr && fontResource->provider() == nullptr)) {
-    return;
-  }
-  data = fontResource->data();
-  ttcIndex = fontResource->ttcIndex();
-  provider = fontResource->provider();
-  if (ownerDocument != nullptr) {
-    ownerDocument->notifyChange({this});
-  }
-}
-
-void Layer::resourceUpdated(Resource* resource) {
-  if (resource == nullptr || resource->resourceType() != ResourceType::Composition ||
-      ownerDocument == nullptr) {
-    return;
-  }
-  auto compositionResource = static_cast<CompositionResource*>(resource);
-  if (compositionResource == nullptr || compositionResource->data() == nullptr) {
-    return;
-  }
-  auto data = compositionResource->data();
-  auto externalDocument = PAGXImporter::FromXML(data->bytes(), data->size());
-  if (externalDocument == nullptr) {
-    return;
-  }
-  if (composition == nullptr) {
-    composition = ownerDocument->makeNode<Composition>();
-  }
-  for (const auto& error : externalDocument->errors) {
-    ownerDocument->errors.push_back(error);
-  }
-  composition->width = externalDocument->width;
-  composition->height = externalDocument->height;
-  composition->layers = externalDocument->layers;
-  composition->animations = externalDocument->animations;
-  composition->externalDoc = externalDocument;
-  externalDoc = externalDocument;
-  compositionFilePath = {};
-  ownerDocument->notifyChange({this});
 }
 
 }  // namespace pagx

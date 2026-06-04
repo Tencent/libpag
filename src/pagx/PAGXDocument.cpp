@@ -23,7 +23,11 @@
 #include "pagx/PAGFile.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CompositionResource.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
@@ -113,6 +117,14 @@ std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight
   return doc;
 }
 
+PAGXDocument::~PAGXDocument() {
+  for (auto& item : resourceNodes) {
+    if (item.first != nullptr) {
+      item.first->removeListener(this);
+    }
+  }
+}
+
 Node* PAGXDocument::findNode(const std::string& id) const {
   auto it = nodeMap.find(id);
   return it != nodeMap.end() ? it->second : nullptr;
@@ -132,6 +144,146 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   }
   node->id = id;
   nodeMap[id] = node;
+}
+
+void PAGXDocument::setResourceForNode(Node* node, std::shared_ptr<Resource> resource) {
+  if (node == nullptr) {
+    return;
+  }
+  removeResourceBinding(node);
+  if (resource == nullptr) {
+    return;
+  }
+  auto* resourcePtr = resource.get();
+  nodeResources[node] = std::move(resource);
+  auto resourceIt = resourceNodes.find(resourcePtr);
+  if (resourceIt == resourceNodes.end()) {
+    resourceNodes[resourcePtr] = {node};
+    resourcePtr->addListener(this);
+  } else if (std::find(resourceIt->second.begin(), resourceIt->second.end(), node) ==
+             resourceIt->second.end()) {
+    resourceIt->second.push_back(node);
+  }
+  if (applyResourceToNode(node, resourcePtr)) {
+    notifyChange({node});
+  }
+}
+
+std::shared_ptr<Resource> PAGXDocument::getResourceForNode(const Node* node) const {
+  if (node == nullptr) {
+    return nullptr;
+  }
+  auto it = nodeResources.find(const_cast<Node*>(node));
+  return it != nodeResources.end() ? it->second : nullptr;
+}
+
+void PAGXDocument::removeResourceBinding(Node* node) {
+  auto nodeIt = nodeResources.find(node);
+  if (nodeIt == nodeResources.end()) {
+    return;
+  }
+  auto* resource = nodeIt->second.get();
+  auto resourceIt = resourceNodes.find(resource);
+  if (resourceIt != resourceNodes.end()) {
+    resourceIt->second.erase(
+        std::remove(resourceIt->second.begin(), resourceIt->second.end(), node),
+        resourceIt->second.end());
+    if (resourceIt->second.empty()) {
+      if (resource != nullptr) {
+        resource->removeListener(this);
+      }
+      resourceNodes.erase(resourceIt);
+    }
+  }
+  nodeResources.erase(nodeIt);
+}
+
+bool PAGXDocument::applyResourceToNode(Node* node, Resource* resource) {
+  if (node == nullptr || resource == nullptr) {
+    return false;
+  }
+  switch (node->nodeType()) {
+    case NodeType::Image:
+      return applyResourceToImage(static_cast<Image*>(node), resource);
+    case NodeType::Font:
+      return applyResourceToFont(static_cast<Font*>(node), resource);
+    case NodeType::Layer:
+      return applyResourceToLayer(static_cast<Layer*>(node), resource);
+    default:
+      break;
+  }
+  return false;
+}
+
+bool PAGXDocument::applyResourceToImage(Image* image, Resource* resource) {
+  if (image == nullptr || resource == nullptr || resource->resourceType() != ResourceType::Image) {
+    return false;
+  }
+  auto* imageResource = static_cast<ImageResource*>(resource);
+  if (imageResource->data() == nullptr) {
+    return false;
+  }
+  image->data = imageResource->data();
+  return true;
+}
+
+bool PAGXDocument::applyResourceToFont(Font* font, Resource* resource) {
+  if (font == nullptr || resource == nullptr || resource->resourceType() != ResourceType::Font) {
+    return false;
+  }
+  auto* fontResource = static_cast<FontResource*>(resource);
+  if (fontResource->data() == nullptr && fontResource->provider() == nullptr) {
+    return false;
+  }
+  font->data = fontResource->data();
+  font->ttcIndex = fontResource->ttcIndex();
+  font->provider = fontResource->provider();
+  return true;
+}
+
+bool PAGXDocument::applyResourceToLayer(Layer* layer, Resource* resource) {
+  if (layer == nullptr || resource == nullptr ||
+      resource->resourceType() != ResourceType::Composition) {
+    return false;
+  }
+  auto* compositionResource = static_cast<CompositionResource*>(resource);
+  if (compositionResource->data() == nullptr) {
+    return false;
+  }
+  auto data = compositionResource->data();
+  auto externalDocument = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (externalDocument == nullptr) {
+    return false;
+  }
+  if (layer->composition == nullptr) {
+    layer->composition = makeNode<Composition>();
+  }
+  for (const auto& error : externalDocument->errors) {
+    errors.push_back(error);
+  }
+  layer->composition->width = externalDocument->width;
+  layer->composition->height = externalDocument->height;
+  layer->composition->layers = externalDocument->layers;
+  layer->composition->animations = externalDocument->animations;
+  layer->composition->externalDoc = externalDocument;
+  layer->externalDoc = externalDocument;
+  layer->compositionFilePath = {};
+  return true;
+}
+
+void PAGXDocument::resourceUpdated(Resource* resource) {
+  auto it = resourceNodes.find(resource);
+  if (it == resourceNodes.end()) {
+    return;
+  }
+  auto nodes = it->second;
+  std::vector<Node*> dirtyNodes = {};
+  for (auto* node : nodes) {
+    if (applyResourceToNode(node, resource)) {
+      dirtyNodes.push_back(node);
+    }
+  }
+  notifyChange(dirtyNodes);
 }
 
 static bool LayersHaveImports(const std::vector<Layer*>& layers) {

@@ -133,8 +133,10 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node);
 static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options);
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          const PAGXDocument* doc);
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       const PAGXDocument* doc);
 static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
@@ -1089,7 +1091,8 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          const PAGXDocument* doc) {
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -1125,8 +1128,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
+        auto* layerDoc = comp->externalDoc != nullptr ? comp->externalDoc.get() : doc;
         for (const auto& layer : comp->layers) {
-          WriteLayer(xml, layer, options);
+          WriteLayer(xml, layer, options, layerDoc);
         }
         WriteAnimations(xml, comp->animations);
         xml.closeElement();
@@ -1195,7 +1199,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 // Layer writing
 //==============================================================================
 
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options) {
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       const PAGXDocument* doc) {
   xml.openElement("Layer");
   if (!node->id.empty()) {
     xml.addAttribute("id", node->id);
@@ -1255,8 +1260,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
-    if ((node->resource() != nullptr &&
-         node->resource()->resourceType() == ResourceType::Composition) ||
+    auto resource = doc != nullptr ? doc->getResourceForNode(node) : nullptr;
+    if ((resource != nullptr && resource->resourceType() == ResourceType::Composition) ||
         node->composition->externalDoc != nullptr) {
       xml.addAttribute("composition", node->composition->id);
     } else {
@@ -1328,7 +1333,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    WriteLayer(xml, child, options);
+    WriteLayer(xml, child, options, doc);
   }
 
   xml.closeElement();
@@ -1350,7 +1355,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    WriteLayer(xml, layer, options);
+    WriteLayer(xml, layer, options, &doc);
   }
   WriteAnimations(xml, doc.animations);
 
@@ -1371,7 +1376,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
     for (const auto& resource : doc.nodes) {
       if (!resource->id.empty()) {
-        WriteResource(xml, resource.get(), options);
+        WriteResource(xml, resource.get(), options, &doc);
       }
     }
 

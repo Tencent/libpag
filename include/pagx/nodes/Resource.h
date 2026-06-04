@@ -33,12 +33,12 @@ enum class ResourceType : uint8_t {
   Composition = 2,
 };
 
-class ResourceReferencer;
+class ResourceListener;
 
 /**
  * Resource is a retained, loader-facing asset object. A ResourceLoader may fill it immediately or
- * keep it for delayed completion. When resource data changes, all registered ResourceReferencer
- * objects are notified so importer-owned nodes can consume the new data.
+ * keep it for delayed completion. When resource data changes, registered ResourceListener objects
+ * are notified so document-managed nodes can consume the new data.
  */
 class Resource {
  public:
@@ -50,67 +50,47 @@ class Resource {
   virtual ResourceType resourceType() const = 0;
 
   /**
-   * Registers a node or other internal object that consumes this resource.
-   * @param referencer the object to notify when this resource updates.
+   * Registers an object that receives update notifications from this resource.
+   * @param listener the object to notify when this resource updates.
    */
-  void addReferencer(ResourceReferencer* referencer);
+  void addListener(ResourceListener* listener);
 
   /**
-   * Removes a previously registered resource consumer.
-   * @param referencer the object to stop notifying.
+   * Removes a previously registered update listener.
+   * @param listener the object to stop notifying.
    */
-  void removeReferencer(ResourceReferencer* referencer);
+  void removeListener(ResourceListener* listener);
 
   /**
-   * Returns all current resource consumers.
+   * Returns all current update listeners.
    */
-  const std::vector<ResourceReferencer*>& referencers() const {
-    return resourceReferencers;
+  const std::vector<ResourceListener*>& listeners() const {
+    return resourceListeners;
   }
 
  protected:
   /**
-   * Notifies registered referencers that this resource has new data.
+   * Notifies registered listeners that this resource has new data.
    */
   void notifyUpdated();
 
  private:
-  std::vector<ResourceReferencer*> resourceReferencers = {};
+  std::vector<ResourceListener*> resourceListeners = {};
 };
 
 /**
- * ResourceReferencer is implemented by importer-owned nodes that consume retained Resources. It
- * mirrors Rive's FileAssetReferencer model: setting a Resource registers this object with that
- * Resource, and later resource updates are delivered through resourceUpdated().
+ * ResourceListener receives update callbacks from retained Resources. PAGXDocument implements this
+ * interface to keep resource ownership and node mutation centralized in the document.
  */
-class ResourceReferencer {
+class ResourceListener {
  public:
-  virtual ~ResourceReferencer();
+  virtual ~ResourceListener() = default;
 
   /**
-   * Sets the retained Resource consumed by this referencer. The referencer is automatically removed
-   * from the previous Resource and added to the new one.
-   * @param resource the new retained Resource, or nullptr to clear the reference.
+   * Called when the retained Resource changes.
+   * @param resource the updated resource.
    */
-  virtual void setResource(std::shared_ptr<Resource> resource);
-
-  /**
-   * Returns the retained Resource consumed by this referencer.
-   */
-  std::shared_ptr<Resource> resource() const {
-    return retainedResource;
-  }
-
-  /**
-   * Called when the retained Resource changes. Subclasses copy data from resource into their own
-   * importer-owned node fields and notify the owning document.
-   */
-  virtual void resourceUpdated(Resource* resource) {
-    (void)resource;
-  }
-
- protected:
-  std::shared_ptr<Resource> retainedResource = nullptr;
+  virtual void resourceUpdated(Resource* resource) = 0;
 };
 
 }  // namespace pagx

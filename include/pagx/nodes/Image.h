@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <string>
-#include "pagx/nodes/ImageResource.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 
@@ -30,7 +29,7 @@ namespace pagx {
  * Image represents an image resource that can be referenced by other nodes. The image source can
  * be a file path, a URL, or a base64-encoded data URI.
  */
-class Image : public Node, public ResourceReferencer {
+class Image : public Node {
  public:
   /**
    * Image binary data (decoded from base64 or provided by ResourceLoader).
@@ -45,12 +44,6 @@ class Image : public Node, public ResourceReferencer {
   NodeType nodeType() const override {
     return NodeType::Image;
   }
-
-  /**
-   * Consumes ImageResource updates by copying encoded bytes into data and notifying the owner
-   * document.
-   */
-  void resourceUpdated(Resource* resource) override;
 
  private:
   Image() = default;

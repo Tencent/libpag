@@ -61,14 +61,14 @@ class CompositionResource : public Resource {
   }
 
   /**
-   * Sets PAGX XML bytes and notifies all referencers.
+   * Sets PAGX XML bytes and notifies all listeners.
    * @param data PAGX XML bytes.
    * @return true if data is non-null and non-empty.
    */
   bool setData(std::shared_ptr<Data> data);
 
   /**
-   * Copies PAGX XML bytes into this resource and notifies all referencers.
+   * Copies PAGX XML bytes into this resource and notifies all listeners.
    * @param bytes pointer to PAGX XML bytes.
    * @param length byte length.
    * @return true if bytes were copied.

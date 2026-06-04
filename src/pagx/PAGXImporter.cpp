@@ -575,9 +575,6 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       request.customData = layer->customData;
       resource = CompositionResource::MakeEmpty();
       handledByLoader = loader->load(request, resource);
-      if (handledByLoader) {
-        layer->setResource(resource);
-      }
     }
 
     // 2. Try resolving as a file path relative to the current base directory.
@@ -613,10 +610,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       layer->composition = wrapper;
       layer->externalDoc = wrapper->externalDoc;
       if (handledByLoader && resource != nullptr) {
-        layer->resourceUpdated(resource.get());
+        doc->setResourceForNode(layer, resource);
       }
     } else {
-      layer->setResource(nullptr);
+      doc->setResourceForNode(layer, nullptr);
       // 3. Last resort: record as unresolved compositionFilePath for later loadFileData().
       layer->compositionFilePath = compositionAttr;
     }
@@ -1571,12 +1568,11 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
     request.customData = image->customData;
     auto resource = ImageResource::MakeEmpty();
     if (loader->load(request, resource)) {
-      image->setResource(resource);
-      image->resourceUpdated(resource.get());
+      doc->setResourceForNode(image, resource);
       return image;
     }
   }
-  image->setResource(nullptr);
+  doc->setResourceForNode(image, nullptr);
   auto data = DecodeBase64DataURI(source);
   if (data) {
     image->data = data;
@@ -1933,14 +1929,13 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
     auto resource = FontResource::MakeEmpty();
     handledByLoader = loader->load(request, resource);
     if (handledByLoader) {
-      font->setResource(resource);
-      font->resourceUpdated(resource.get());
+      doc->setResourceForNode(font, resource);
     }
   }
   if (handledByLoader) {
     return font;
   }
-  font->setResource(nullptr);
+  doc->setResourceForNode(font, nullptr);
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {

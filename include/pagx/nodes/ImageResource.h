@@ -27,7 +27,7 @@ namespace pagx {
 
 /**
  * ImageResource stores encoded image bytes supplied by ResourceLoader. A loader may create an empty
- * resource and call setData() or setBytes() later; all registered ResourceReferencer objects are
+ * resource and call setData() or setBytes() later; all registered ResourceListener objects are
  * notified when data is set.
  */
 class ImageResource : public Resource {
@@ -62,14 +62,14 @@ class ImageResource : public Resource {
   }
 
   /**
-   * Sets encoded image bytes and notifies all referencers.
+   * Sets encoded image bytes and notifies all listeners.
    * @param data encoded image bytes.
    * @return true if data is non-null and non-empty.
    */
   bool setData(std::shared_ptr<Data> data);
 
   /**
-   * Copies encoded image bytes into this resource and notifies all referencers.
+   * Copies encoded image bytes into this resource and notifies all listeners.
    * @param bytes pointer to encoded image bytes.
    * @param length byte length.
    * @return true if bytes were copied.

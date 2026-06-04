@@ -26,10 +26,13 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/Resource.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
 
+class Font;
+class Image;
 class LayoutContext;
 class PAGFile;
 
@@ -38,7 +41,7 @@ class PAGFile;
  * It contains resources and layers. This is a pure data structure class.
  * Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
-class PAGXDocument : public Node {
+class PAGXDocument : public Node, private ResourceListener {
  public:
   /**
    * Creates an empty document with the specified size.
@@ -46,6 +49,11 @@ class PAGXDocument : public Node {
    * @param height the canvas height in pixels
    */
   static std::shared_ptr<PAGXDocument> Make(float width, float height);
+
+  /**
+   * Destroys the document and unregisters any retained resource callbacks owned by it.
+   */
+  ~PAGXDocument() override;
 
   /**
    * Canvas width.
@@ -126,6 +134,22 @@ class PAGXDocument : public Node {
   std::vector<std::string> getExternalFilePaths() const;
 
   /**
+   * Binds a retained resource to a document-owned node. The document keeps the resource alive,
+   * listens for future resource updates, and applies compatible resource data to the node. Passing
+   * nullptr clears the node's retained resource binding.
+   * @param node the document-owned Image, Font, or Layer node that consumes the resource.
+   * @param resource the retained resource to bind, or nullptr to clear the binding.
+   */
+  void setResourceForNode(Node* node, std::shared_ptr<Resource> resource);
+
+  /**
+   * Returns the retained resource currently bound to a document-owned node.
+   * @param node the node whose retained resource binding should be queried.
+   * @return the retained resource bound to the node, or nullptr if there is no binding.
+   */
+  std::shared_ptr<Resource> getResourceForNode(const Node* node) const;
+
+  /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
    * @param filePath the external file path to match against Image nodes or composition layers
@@ -188,6 +212,12 @@ class PAGXDocument : public Node {
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
+  void removeResourceBinding(Node* node);
+  bool applyResourceToNode(Node* node, Resource* resource);
+  bool applyResourceToImage(Image* image, Resource* resource);
+  bool applyResourceToFont(Font* font, Resource* resource);
+  bool applyResourceToLayer(Layer* layer, Resource* resource);
+  void resourceUpdated(Resource* resource) override;
 
   // PAGFile lifecycle hooks (called from PAGFile::Make / ~PAGFile).
   void registerLiveFile(const std::shared_ptr<PAGFile>& file);
@@ -196,6 +226,8 @@ class PAGXDocument : public Node {
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
+  std::unordered_map<Node*, std::shared_ptr<Resource>> nodeResources = {};
+  std::unordered_map<Resource*, std::vector<Node*>> resourceNodes = {};
 
   // Live PAGFile instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGFile alive; expired entries are pruned during notifyChange.

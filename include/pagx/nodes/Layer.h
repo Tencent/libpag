@@ -23,9 +23,8 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/CompositionResource.h"
-#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
@@ -49,7 +48,7 @@ class PAGXDocument;
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
  * layers. It is the main building block for composing visual content in a PAGX document.
  */
-class Layer : public Node, public LayoutNode, public ResourceReferencer {
+class Layer : public Node, public LayoutNode {
  public:
   /**
    * The display name of the layer.
@@ -269,12 +268,6 @@ class Layer : public Node, public LayoutNode, public ResourceReferencer {
 
   /** Returns the layer position adjusted to the layout bounds. */
   Point renderPosition() const;
-
-  /**
-   * Consumes CompositionResource updates by parsing PAGX XML bytes into an external composition
-   * wrapper and notifying the owner document.
-   */
-  void resourceUpdated(Resource* resource) override;
 
  private:
   Layer() = default;

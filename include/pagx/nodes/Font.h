@@ -21,7 +21,6 @@
 #include <memory>
 #include <vector>
 #include "pagx/nodes/FontProvider.h"
-#include "pagx/nodes/FontResource.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/Point.h"
@@ -72,7 +71,7 @@ class Glyph : public Node {
  * bitmaps). PAGX files embed glyph data for complete self-containment, ensuring cross-platform
  * rendering consistency.
  */
-class Font : public Node, public ResourceReferencer {
+class Font : public Node {
  public:
   /**
    * Units per em of the font design space. Rendering scale = fontSize / unitsPerEm.
@@ -104,12 +103,6 @@ class Font : public Node, public ResourceReferencer {
   NodeType nodeType() const override {
     return NodeType::Font;
   }
-
-  /**
-   * Consumes FontResource updates by copying font data or provider into this Font and notifying the
-   * owner document.
-   */
-  void resourceUpdated(Resource* resource) override;
 
  private:
   Font() = default;
