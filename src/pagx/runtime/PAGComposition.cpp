@@ -31,9 +31,8 @@
 namespace pagx {
 
 PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
-                               PAGScene* rootScene)
-    : PAGLayer(node, std::move(runtimeLayer), rootScene),
-      binding(std::make_unique<RuntimeBinding>()) {
+                               const std::shared_ptr<PAGScene>& scene)
+    : PAGLayer(node, std::move(runtimeLayer), scene), binding(std::make_unique<RuntimeBinding>()) {
 }
 
 PAGComposition::~PAGComposition() = default;
@@ -42,8 +41,8 @@ LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
 }
 
-std::shared_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
-                                                          PAGScene* parentScene) {
+std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
+    const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene) {
   if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
     return nullptr;
   }
@@ -78,13 +77,17 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLaye
 }
 
 void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
+  auto scene = rootScene.lock();
+  if (!scene) {
+    return;
+  }
   for (auto* layer : layers) {
     if (layer == nullptr) {
       continue;
     }
     auto layerRuntime = binding->get<tgfx::Layer>(layer);
     if (layer->composition != nullptr) {
-      auto childComposition = PAGComposition::MakeChild(layer, rootScene);
+      auto childComposition = PAGComposition::MakeChild(layer, scene);
       if (childComposition == nullptr) {
         continue;
       }
@@ -93,7 +96,7 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
       }
       children.push_back(std::move(childComposition));
     } else {
-      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, rootScene)));
+      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
     }
   }
 }

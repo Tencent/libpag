@@ -26,8 +26,8 @@
 namespace pagx {
 
 PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
-                   PAGScene* rootScene)
-    : node(node), runtimeLayer(std::move(runtimeLayer)), rootScene(rootScene) {
+                   const std::shared_ptr<PAGScene>& scene)
+    : node(node), runtimeLayer(std::move(runtimeLayer)), rootScene(scene) {
 }
 
 PAGLayer::~PAGLayer() = default;
@@ -41,17 +41,18 @@ std::string PAGLayer::name() const {
 }
 
 Matrix PAGLayer::getGlobalMatrix() const {
-  if (runtimeLayer == nullptr || rootScene == nullptr) {
+  auto scene = rootScene.lock();
+  if (runtimeLayer == nullptr || scene == nullptr) {
     return Matrix::Identity();
   }
   Matrix rootToSurface = {};
-  if (!rootScene->rootToSurfaceMatrix(&rootToSurface)) {
+  if (!scene->rootToSurfaceMatrix(&rootToSurface)) {
     return Matrix::Identity();
   }
   // local -> root: the runtime layer's transform relative to the tree root. The tree may not be
   // attached to a display list (no draw() yet), so use the scene's root tgfx layer directly rather
   // than tgfx::Layer::root() which is null for a detached subtree.
-  auto* rootLayer = static_cast<tgfx::Layer*>(rootScene->rootRuntimeLayer());
+  auto* rootLayer = static_cast<tgfx::Layer*>(scene->rootRuntimeLayer());
   auto localToRoot = runtimeLayer->getRelativeMatrix(rootLayer);
   auto localToSurface = ToTGFX(rootToSurface) * localToRoot;
   return {localToSurface.getScaleX(),     localToSurface.getSkewY(),
@@ -60,12 +61,13 @@ Matrix PAGLayer::getGlobalMatrix() const {
 }
 
 bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
-  if (runtimeLayer == nullptr || rootScene == nullptr) {
+  auto scene = rootScene.lock();
+  if (runtimeLayer == nullptr || scene == nullptr) {
     return false;
   }
   float rootX = 0;
   float rootY = 0;
-  if (!rootScene->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+  if (!scene->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return false;
   }
   return runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);

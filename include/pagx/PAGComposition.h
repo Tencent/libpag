@@ -72,12 +72,14 @@ class PAGComposition : public PAGLayer {
   // Constructs a runtime composition node bound to the given source layer (null for the root
   // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,
   // and children are populated by the PAGComposition/PAGScene factories after construction.
-  PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGScene* rootScene);
+  PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
+                 const std::shared_ptr<PAGScene>& scene);
 
   // Builds a runtime child composition for ownerLayer.composition. Returns nullptr if ownerLayer
   // is null, has no composition, or the document is not laid out. Internal factory used by
   // PAGScene and PAGComposition to populate child runtime nodes.
-  static std::shared_ptr<PAGComposition> MakeChild(const Layer* ownerLayer, PAGScene* parentScene);
+  static std::shared_ptr<PAGComposition> MakeChild(const Layer* ownerLayer,
+                                                   const std::shared_ptr<PAGScene>& parentScene);
 
   // Builds the persistent per-layer runtime node tree for this composition: one PAGLayer node per
   // source layer (PAGComposition for layers that reference a composition, plain PAGLayer otherwise),

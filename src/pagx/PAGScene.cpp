@@ -43,7 +43,7 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene));
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
-      new PAGComposition(nullptr, std::move(buildResult.root), scene.get()));
+      new PAGComposition(nullptr, std::move(buildResult.root), scene));
   *rootComp->binding = std::move(buildResult.binding);
   rootComp->document = document.get();
   scene->_rootComposition = rootComp;
@@ -172,7 +172,11 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
 }
 
 Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
-  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr || pagLayer->rootScene != this) {
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
+    return {};
+  }
+  auto scene = pagLayer->rootScene.lock();
+  if (scene.get() != this) {
     return {};
   }
   auto* rootLayer = static_cast<tgfx::Layer*>(rootRuntimeLayer());

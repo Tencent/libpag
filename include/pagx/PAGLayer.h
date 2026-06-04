@@ -91,11 +91,12 @@ class PAGLayer {
   // to in a specific composition instance, and the root PAGScene used for surface coordinate
   // conversion and for resolving the tree root. node may be null for the root composition (which
   // has no owning source layer). Created by the PAGComposition/PAGScene factories.
-  PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGScene* rootScene);
+  PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
+           const std::shared_ptr<PAGScene>& scene);
 
   const Layer* node = nullptr;
   std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
-  PAGScene* rootScene = nullptr;
+  std::weak_ptr<PAGScene> rootScene = {};
 
   friend class PAGScene;
   friend class PAGComposition;
