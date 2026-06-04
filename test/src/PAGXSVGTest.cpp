@@ -774,8 +774,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_GroupSkew) {
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  // The SVG matrix for a pure skewX(30°) is matrix(1, 0, tan(30°), 1, 0, 0).
-  // tan(30°) ≈ 0.5774, so the third component (skewX) must be positive.
+  // The SVG matrix for a pure skewX(30°) is matrix(1, 0, -tan(30°), 1, 0, 0) under
+  // PAGX's skew convention (matching tgfx native rendering, which shears with
+  // DegreesToRadians(-skew)). tan(30°) ≈ 0.5774, so the third component (skewX)
+  // must be negative for a positive skew angle.
   auto matrixPos = svg.find("matrix(");
   ASSERT_NE(matrixPos, std::string::npos);
   auto matrixEnd = svg.find(")", matrixPos);
@@ -783,8 +785,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_GroupSkew) {
   // Parse matrix(a,b,c,d,e,f) — c is the third value.
   float a = 0, b = 0, c = 0, d = 0;
   sscanf(matrixStr.c_str(), "%f,%f,%f,%f", &a, &b, &c, &d);
-  // skewX component (c) must be positive for positive skew angle.
-  EXPECT_NEAR(c, std::tan(30 * static_cast<float>(M_PI) / 180), 0.001f);
+  // skewX component (c) is the negation of tan(skew) under PAGX's convention.
+  EXPECT_NEAR(c, -std::tan(30 * static_cast<float>(M_PI) / 180), 0.001f);
   SaveFile(svg, "PAGXSVGTest/svg_export_group_skew.svg");
 }
 

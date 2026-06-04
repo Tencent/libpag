@@ -476,52 +476,6 @@ std::string LayerTransformCSS(const Layer* layer) {
   return MatrixTransformToCSS(m);
 }
 
-// HTML-local skew sign fix. Mirrors pagx::BuildGroupMatrix line-for-line except for one shear:
-// the shear coefficient uses `tan(-group->skew)` so the result agrees with tgfx native rendering
-// (VectorGroup::ApplySkew passes `DegreesToRadians(-skew)` into the shear). The shared
-// pagx::BuildGroupMatrix uses the +skew sign because main's PAGXSVGTest.SVGExport_GroupSkew
-// pinned that convention for SVG output, and the SVG/PPT exporters depend on it. Rather than
-// flipping the shared helper (which would break those exporters and the pinned test) we keep
-// the HTML exporter's path bake aligned with native by routing every BuildGroupMatrix call
-// through this wrapper. Any change to the rest of BuildGroupMatrix must be mirrored here.
-Matrix BuildGroupMatrixForHTML(const Group* group) {
-  auto renderPos = group->renderPosition();
-  bool hasAnchor = !FloatNearlyZero(group->anchor.x) || !FloatNearlyZero(group->anchor.y);
-  bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
-  bool hasRotation = !FloatNearlyZero(group->rotation);
-  bool hasScale =
-      !FloatNearlyZero(group->scale.x - 1.0f) || !FloatNearlyZero(group->scale.y - 1.0f);
-  bool hasSkew = !FloatNearlyZero(group->skew);
-
-  if (!hasAnchor && !hasPosition && !hasRotation && !hasScale && !hasSkew) {
-    return {};
-  }
-
-  Matrix m = {};
-  if (hasAnchor) {
-    m = Matrix::Translate(-group->anchor.x, -group->anchor.y);
-  }
-  if (hasScale) {
-    m = Matrix::Scale(group->scale.x, group->scale.y) * m;
-  }
-  if (hasSkew) {
-    m = Matrix::Rotate(group->skewAxis) * m;
-    Matrix shear = {};
-    // Sign deliberately negated relative to pagx::BuildGroupMatrix; see function comment.
-    shear.c = std::tan(DegreesToRadians(-group->skew));
-    m = shear * m;
-    m = Matrix::Rotate(-group->skewAxis) * m;
-  }
-  if (hasRotation) {
-    m = Matrix::Rotate(group->rotation) * m;
-  }
-  if (hasPosition) {
-    m = Matrix::Translate(renderPos.x, renderPos.y) * m;
-  }
-
-  return m;
-}
-
 //==============================================================================
 // Text & Font
 //==============================================================================

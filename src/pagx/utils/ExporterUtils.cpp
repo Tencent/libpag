@@ -95,9 +95,12 @@ Matrix BuildGroupMatrix(const Group* group) {
     m = Matrix::Scale(group->scale.x, group->scale.y) * m;
   }
   if (hasSkew) {
+    // Sign matches the native renderer (ShapeRenderer::SkewFromAxis passes
+    // DegreesToRadians(-skew)). Keeping a single convention across native, SVG,
+    // PPT, and HTML exporters avoids per-pipeline sign flips.
     m = Matrix::Rotate(group->skewAxis) * m;
     Matrix shear = {};
-    shear.c = std::tan(DegreesToRadians(group->skew));
+    shear.c = std::tan(DegreesToRadians(-group->skew));
     m = shear * m;
     m = Matrix::Rotate(-group->skewAxis) * m;
   }

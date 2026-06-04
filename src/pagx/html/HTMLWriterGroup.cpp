@@ -26,6 +26,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -38,7 +39,7 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   if (guard.overflowed()) {
     return;
   }
-  Matrix gm = BuildGroupMatrixForHTML(group);
+  Matrix gm = BuildGroupMatrix(group);
   if (!parentMatrix.isIdentity()) {
     gm = parentMatrix * gm;
   }
