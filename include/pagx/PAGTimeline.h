@@ -30,7 +30,7 @@ class PAGXDocument;
 
 /**
  * PAGTimeline controls the playback of a single animation in a PAGScene. It holds the playback state
- * (current time and playing flag) and applies the animation to the file's content via apply().
+ * (current time and playing flag) and applies the animation to the scene's content via apply().
  *
  * PAGTimeline must not be constructed directly; obtain instances through PAGScene::getTimeline().
  * Multiple lookups for the same animation name return the same PAGTimeline instance, so playback
@@ -126,7 +126,7 @@ class PAGTimeline {
   // Runtime binding the channel writers should target. Top-level timelines use the owning
   // PAGScene's binding; composition timelines use the binding built for that composition.
   RuntimeBinding* binding = nullptr;
-  // Document used to resolve channel target IDs at apply time. Top-level timelines use the file's
+  // Document used to resolve channel target IDs at apply time. Top-level timelines use the scene's
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
   // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;

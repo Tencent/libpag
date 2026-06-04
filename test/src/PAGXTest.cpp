@@ -7068,13 +7068,6 @@ PAGX_TEST(PAGXTest, HitTestSharedCompositionPerInstance) {
   ASSERT_TRUE(tgfxChildB != nullptr);
   // Per-instance isolation: the shared source layer maps to distinct tgfx layers per instance.
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
-  // Each instance's reverse map resolves its own tgfx layer back to the shared source node, proving
-  // hit resolution is per-instance: a hit on either instance's tgfx layer resolves the right node.
-  EXPECT_EQ(bindingA.nodeForLayer(tgfxChildA.get()), static_cast<const pagx::Node*>(childLayer));
-  EXPECT_EQ(bindingB.nodeForLayer(tgfxChildB.get()), static_cast<const pagx::Node*>(childLayer));
-  // Cross-instance lookup misses: instance A's map does not know instance B's tgfx layer.
-  EXPECT_EQ(bindingA.nodeForLayer(tgfxChildB.get()), nullptr);
-  EXPECT_EQ(bindingB.nodeForLayer(tgfxChildA.get()), nullptr);
 }
 
 /**

@@ -54,7 +54,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Creates a PAGScene bound to the given PAGXDocument. The document is retained for the lifetime
    * of the returned PAGScene, and the PAGScene is registered with the document so that future
    * notifyChange() calls can reach it.
-   * @param document the source document. Must be non-null and have applyLayout() called.
+   * @param document the source document. Must be non-null. Make() applies layout automatically if
+   * it has not already been applied.
    * @return a shared_ptr to the new PAGScene, or nullptr if the document is null.
    */
   static std::shared_ptr<PAGScene> Make(std::shared_ptr<PAGXDocument> document);
@@ -141,7 +142,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
  private:
   PAGScene();
 
-  // PAGXDocument::notifyChange dispatches here.
+  // Intended dispatch target for PAGXDocument::notifyChange; wiring is not yet implemented.
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
   RuntimeBinding* mutableBinding();

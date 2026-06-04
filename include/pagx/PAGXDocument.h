@@ -171,8 +171,10 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Notifies all live PAGScene instances created from this document that the given nodes have
-   * changed, so that affected content is rebuilt on the next draw.
+   * Performs internal bookkeeping for live PAGScene instances created from this document after the
+   * given nodes have been mutated. Currently this only prunes expired live-scene references; it
+   * does not yet rebuild or refresh any rendered content. Runtime rebuild dispatch to live scenes
+   * is not implemented yet.
    * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
    * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    */
