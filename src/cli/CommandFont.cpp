@@ -139,7 +139,7 @@ int RunFont(int argc, char* argv[]) {
       std::cerr << "pagx font: unknown option '" << arg << "'\n";
       return 1;
     } else {
-      std::cerr << "pagx font: unexpected argument '" << arg << "'\n";
+      std::cerr << "pagx font: unknown subcommand '" << arg << "'\n";
       return 1;
     }
     i++;

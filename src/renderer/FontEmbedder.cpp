@@ -472,11 +472,18 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
   }
 
-  // Assign sequential IDs to all embedded fonts using a reserved prefix to avoid
-  // collisions with user-created nodes.
+  // Assign sequential IDs to all embedded fonts. Skip any index already taken by a user node to
+  // avoid silently displacing it from the nodeMap.
   int fontIndex = 1;
+  auto nextEmbedFontId = [&]() -> std::string {
+    std::string id;
+    do {
+      id = "__embed_font_" + std::to_string(fontIndex++);
+    } while (document->findNode(id) != nullptr);
+    return id;
+  };
   if (vectorBuilder.font != nullptr) {
-    document->setNodeId(vectorBuilder.font, "__embed_font_" + std::to_string(fontIndex++));
+    document->setNodeId(vectorBuilder.font, nextEmbedFontId());
   }
   for (auto* typeface : bitmapTypefaces) {
     if (typeface == nullptr) {
@@ -484,7 +491,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
     auto builderIt = bitmapBuilders.find(typeface);
     if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-      document->setNodeId(builderIt->second.font, "__embed_font_" + std::to_string(fontIndex++));
+      document->setNodeId(builderIt->second.font, nextEmbedFontId());
     }
   }
 

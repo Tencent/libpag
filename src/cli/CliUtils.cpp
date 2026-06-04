@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
+#include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include "pagx/PAGXImporter.h"
@@ -64,15 +66,26 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
 
 bool WriteStringToFile(const std::string& content, const std::string& filePath,
                        const std::string& command) {
-  std::ofstream out(filePath);
-  if (!out.is_open()) {
-    std::cerr << command << ": failed to write '" << filePath << "'\n";
-    return false;
+  auto tempPath = filePath + ".tmp";
+  {
+    std::ofstream out(tempPath);
+    if (!out.is_open()) {
+      std::cerr << command << ": failed to write '" << tempPath << "'\n";
+      return false;
+    }
+    out << content;
+    out.close();
+    if (out.fail()) {
+      std::cerr << command << ": error writing to '" << tempPath << "'\n";
+      std::remove(tempPath.c_str());
+      return false;
+    }
   }
-  out << content;
-  out.close();
-  if (out.fail()) {
-    std::cerr << command << ": error writing to '" << filePath << "'\n";
+  std::error_code ec;
+  std::filesystem::rename(tempPath, filePath, ec);
+  if (ec) {
+    std::cerr << command << ": failed to replace '" << filePath << "'\n";
+    std::remove(tempPath.c_str());
     return false;
   }
   std::cout << command << ": wrote " << filePath << "\n";

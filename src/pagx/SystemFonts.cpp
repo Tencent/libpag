@@ -817,7 +817,6 @@ FontLocation SystemFonts::FindFont(const std::string& family, const std::string&
   if (!style.empty()) {
     FcPatternAddString(pattern, FC_STYLE, reinterpret_cast<const FcChar8*>(style.c_str()));
   }
-  FcPatternAddBool(pattern, FC_SCALABLE, FcTrue);
   FcConfigSubstitute(nullptr, pattern, FcMatchPattern);
   FcDefaultSubstitute(pattern);
 
