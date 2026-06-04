@@ -55,10 +55,20 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
   }
 }
 
-static bool LoadExternalComposition(PAGXDocument* document, Layer* layer,
-                                    const std::string& filePath, std::shared_ptr<Data> data) {
+static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, Layer* layer,
+                                    const std::string& filePath, std::shared_ptr<Data> data,
+                                    const std::vector<std::string>& chain) {
   if (document == nullptr || layer == nullptr || data == nullptr ||
       layer->compositionFilePath != filePath || layer->composition != nullptr) {
+    return false;
+  }
+  // Cycle guard: if this file path already appears among the ancestor origins on the load chain,
+  // resolving it would nest externalDocs without end across repeated host load passes. Clear the
+  // layer's compositionFilePath so getExternalFilePaths() stops returning it and the host loop
+  // converges, then report the cycle on the root document.
+  if (std::find(chain.begin(), chain.end(), filePath) != chain.end()) {
+    root->errors.push_back("Cyclic external composition reference detected: '" + filePath + "'.");
+    layer->compositionFilePath = {};
     return false;
   }
   auto externalDoc = PAGXImporter::FromXML(data->bytes(), data->size());
@@ -75,8 +85,45 @@ static bool LoadExternalComposition(PAGXDocument* document, Layer* layer,
   wrapper->animations = externalDoc->animations;
   layer->composition = wrapper;
   layer->externalDoc = externalDoc;
-  layer->compositionFilePath = {};
+  // compositionFilePath is retained as the origin path of this externalDoc: it identifies the
+  // ancestor source on the load chain for cycle detection, and lets the exporter round-trip the
+  // external reference when the wrapper composition has no id.
   return true;
+}
+
+static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
+                                const std::string& filePath, std::shared_ptr<Data> data,
+                                std::vector<std::string>& chain) {
+  bool found = false;
+  // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
+  // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
+  // makeNode<Composition>(), which push_back()s into nodes and would invalidate this iterator.
+  std::vector<Layer*> layers = {};
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->filePath == filePath) {
+        image->data = data;
+        image->filePath = {};
+        found = true;
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      layers.push_back(static_cast<Layer*>(node.get()));
+    }
+  }
+  for (auto* layer : layers) {
+    bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
+    found = loadedComposition || found;
+    if (!loadedComposition && layer->externalDoc != nullptr) {
+      // Descend into an already-resolved externalDoc, pushing its origin path so a reference back
+      // to any ancestor origin (a cycle) is detected. Sibling externalDocs that legitimately share
+      // the same downstream file are not flagged because their origins are popped on return.
+      chain.push_back(layer->compositionFilePath);
+      found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain) || found;
+      chain.pop_back();
+    }
+  }
+  return found;
 }
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
@@ -97,7 +144,9 @@ void PAGXDocument::applyLayout(const FontConfig* config) {
     if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        layer->externalDoc->layoutApplied = true;
+        // Recurse so the externalDoc lays out its own layers (and any deeper externalDocs); it sets
+        // its own layoutApplied flag internally.
+        layer->externalDoc->applyLayout(&fontConfig);
       }
     }
   }
@@ -173,31 +222,8 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
-  bool found = false;
-  // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
-  // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
-  // makeNode<Composition>(), which push_back()s into nodes and would invalidate this iterator.
-  std::vector<Layer*> layers = {};
-  for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Image) {
-      auto* image = static_cast<Image*>(node.get());
-      if (image->filePath == filePath) {
-        image->data = data;
-        image->filePath = {};
-        found = true;
-      }
-    } else if (node->nodeType() == NodeType::Layer) {
-      layers.push_back(static_cast<Layer*>(node.get()));
-    }
-  }
-  for (auto* layer : layers) {
-    bool loadedComposition = LoadExternalComposition(this, layer, filePath, data);
-    found = loadedComposition || found;
-    if (!loadedComposition && layer->externalDoc != nullptr) {
-      found = layer->externalDoc->loadFileData(filePath, data) || found;
-    }
-  }
-  return found;
+  std::vector<std::string> chain = {};
+  return LoadFileDataInChain(this, this, filePath, data, chain);
 }
 
 bool PAGXDocument::embed() {

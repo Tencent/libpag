@@ -6788,6 +6788,11 @@ std::shared_ptr<pagx::Data> MakePAGXData(const std::string& xml) {
   return pagx::Data::MakeWithCopy(xml.data(), xml.size());
 }
 
+std::string MakeCompositionRefXML(const std::string& compositionPath) {
+  return "<pagx width=\"50\" height=\"50\">\n  <Layer composition=\"" + compositionPath +
+         "\"/>\n</pagx>\n";
+}
+
 std::string MakeExternalCompositionXML(const std::string& layerId, const std::string& animationId) {
   std::string xml;
   xml += "<pagx width=\"50\" height=\"50\">\n";
@@ -6884,9 +6889,125 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionNestedFiles) {
 }
 
 /**
- * Test case: hitTest resolves a point inside a layer to the layer's PAGLayer handle, and returns
- * nullptr for a point outside the layer.
+ * Test case: a self-referencing external composition (a.pagx whose layer references a.pagx) is
+ * detected as a cycle, reported on the root document, and getExternalFilePaths() converges to empty
+ * so the host load loop terminates.
  */
+PAGX_TEST(PAGXTest, ExternalPAGXCompositionSelfReferenceCycle) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer composition=\"a.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto paths = doc->getExternalFilePaths();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths[0], "a.pagx");
+
+  // a.pagx references itself through its only layer.
+  auto selfXML = MakeCompositionRefXML("a.pagx");
+  doc->loadFileData("a.pagx", MakePAGXData(selfXML));
+
+  // First load resolves the root layer's externalDoc; the self-reference inside it is only reached
+  // on the next pass, so drive the host loop until it converges.
+  int guard = 0;
+  while (!doc->getExternalFilePaths().empty() && guard < 10) {
+    doc->loadFileData("a.pagx", MakePAGXData(selfXML));
+    guard++;
+  }
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  bool hasCycleError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("Cyclic external composition reference detected") != std::string::npos) {
+      hasCycleError = true;
+    }
+  }
+  EXPECT_TRUE(hasCycleError);
+}
+
+/**
+ * Test case: a mutual reference cycle (a.pagx -> b.pagx -> a.pagx) is detected after the chained
+ * loads reach the back-reference, reported on the root document, and the external file enumeration
+ * converges to empty.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXCompositionMutualReferenceCycle) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer composition=\"a.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto aXML = MakeCompositionRefXML("b.pagx");
+  auto bXML = MakeCompositionRefXML("a.pagx");
+
+  // Drive the host loop: each pass feeds whichever external file is currently requested. a -> b -> a
+  // forms a cycle that is hit once the back-reference to a.pagx lands on the chain.
+  int guard = 0;
+  while (!doc->getExternalFilePaths().empty() && guard < 10) {
+    auto paths = doc->getExternalFilePaths();
+    if (paths[0] == "a.pagx") {
+      doc->loadFileData("a.pagx", MakePAGXData(aXML));
+    } else if (paths[0] == "b.pagx") {
+      doc->loadFileData("b.pagx", MakePAGXData(bXML));
+    } else {
+      break;
+    }
+    guard++;
+  }
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  bool hasCycleError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("Cyclic external composition reference detected") != std::string::npos) {
+      hasCycleError = true;
+    }
+  }
+  EXPECT_TRUE(hasCycleError);
+}
+
+/**
+ * Test case: a legal deep nesting (a.pagx -> b.pagx -> c.pagx, no cycle) loads fully without any
+ * false cycle detection, and all distinct external files resolve.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXCompositionDeepNestingNoFalseCycle) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer composition=\"a.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto aXML = MakeCompositionRefXML("b.pagx");
+  auto bXML = MakeCompositionRefXML("c.pagx");
+  std::string cXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"leaf\" width=\"50\" height=\"50\"/>\n"
+      "</pagx>\n";
+
+  int guard = 0;
+  while (!doc->getExternalFilePaths().empty() && guard < 10) {
+    auto paths = doc->getExternalFilePaths();
+    if (paths[0] == "a.pagx") {
+      EXPECT_TRUE(doc->loadFileData("a.pagx", MakePAGXData(aXML)));
+    } else if (paths[0] == "b.pagx") {
+      EXPECT_TRUE(doc->loadFileData("b.pagx", MakePAGXData(bXML)));
+    } else if (paths[0] == "c.pagx") {
+      EXPECT_TRUE(doc->loadFileData("c.pagx", MakePAGXData(cXML)));
+    } else {
+      break;
+    }
+    guard++;
+  }
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  for (const auto& error : doc->errors) {
+    EXPECT_TRUE(error.find("Cyclic external composition reference detected") == std::string::npos);
+  }
+}
+
 PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
