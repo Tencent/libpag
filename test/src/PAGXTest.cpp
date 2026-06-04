@@ -5662,6 +5662,99 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
 }
 
 /**
+ * Test case: PAGTimeline advance in PingPong mode covers forward/backward/mirror paths.
+ */
+PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto anim = doc->makeNode<pagx::Animation>("pp");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::PingPong;
+  doc->animations.push_back(anim);
+
+  auto file = pagx::PAGScene::Make(doc);
+  auto timeline = file->getTimeline("pp");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->play();
+  EXPECT_EQ(timeline->currentTime(), 0);
+
+  // Forward within first half (pos < duration, straight).
+  EXPECT_TRUE(timeline->advance(500'000));
+  EXPECT_EQ(timeline->currentTime(), 500'000);
+
+  // Forward across the turn-around (pos >= duration, mirror: period - pos).
+  EXPECT_TRUE(timeline->advance(1'100'000));
+  EXPECT_EQ(timeline->currentTime(), 400'000);
+
+  // Reset and test negative delta before start (pos < 0, pos += period).
+  timeline->stop();
+  timeline->play();
+  EXPECT_TRUE(timeline->advance(-500'000));
+  EXPECT_EQ(timeline->currentTime(), 500'000);
+
+  // Negative delta across the turn-around from within the mirror half.
+  EXPECT_TRUE(timeline->advance(-600'000));
+  EXPECT_EQ(timeline->currentTime(), 100'000);
+}
+
+/**
+ * Test case: PAGTimeline advance with negative delta in Loop and Once modes.
+ */
+PAGX_TEST(PAGXTest, PAGTimelineNegativeDelta) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+
+  // Loop mode with negative delta.
+  auto loopAnim = doc->makeNode<pagx::Animation>("loop");
+  loopAnim->duration = 60;
+  loopAnim->frameRate = 60;
+  loopAnim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(loopAnim);
+
+  // Once mode with negative delta.
+  auto onceAnim = doc->makeNode<pagx::Animation>("once");
+  onceAnim->duration = 60;
+  onceAnim->frameRate = 60;
+  onceAnim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(onceAnim);
+
+  auto file = pagx::PAGScene::Make(doc);
+
+  // Loop: negative delta wraps correctly.
+  auto loopTl = file->getTimeline("loop");
+  loopTl->play();
+  loopTl->setCurrentTime(200'000);
+  EXPECT_TRUE(loopTl->advance(-500'000));
+  EXPECT_EQ(loopTl->currentTime(), 700'000);
+
+  // Once: negative delta stops at 0 and pauses.
+  auto onceTl = file->getTimeline("once");
+  onceTl->play();
+  onceTl->setCurrentTime(300'000);
+  EXPECT_TRUE(onceTl->advance(-500'000));
+  EXPECT_EQ(onceTl->currentTime(), 0);
+  EXPECT_FALSE(onceTl->isPlaying());
+}
+
+/**
+ * Test case: PAGTimeline advance with duration == 0 short-circuits.
+ */
+PAGX_TEST(PAGXTest, PAGTimelineZeroDuration) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto anim = doc->makeNode<pagx::Animation>("zero");
+  anim->duration = 0;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(anim);
+
+  auto file = pagx::PAGScene::Make(doc);
+  auto timeline = file->getTimeline("zero");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->play();
+  EXPECT_FALSE(timeline->advance(100'000));
+  EXPECT_EQ(timeline->currentTime(), 0);
+}
+
+/**
  * Test case: PAGSurface::MakeOffscreen creates a real GPU-backed surface with the requested size.
  */
 PAGX_TEST(PAGXTest, PAGSurfaceMakeOffscreen) {
