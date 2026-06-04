@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGLayer.h"
-#include "pagx/PAGFile.h"
+#include "pagx/PAGScene.h"
 #include "pagx/nodes/Layer.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
@@ -25,8 +25,9 @@
 
 namespace pagx {
 
-PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGFile* rootFile)
-    : node(node), runtimeLayer(std::move(runtimeLayer)), rootFile(rootFile) {
+PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
+                   PAGScene* rootScene)
+    : node(node), runtimeLayer(std::move(runtimeLayer)), rootScene(rootScene) {
 }
 
 PAGLayer::~PAGLayer() = default;
@@ -40,17 +41,17 @@ std::string PAGLayer::name() const {
 }
 
 Matrix PAGLayer::getGlobalMatrix() const {
-  if (runtimeLayer == nullptr || rootFile == nullptr) {
+  if (runtimeLayer == nullptr || rootScene == nullptr) {
     return Matrix::Identity();
   }
   Matrix rootToSurface = {};
-  if (!rootFile->rootToSurfaceMatrix(&rootToSurface)) {
+  if (!rootScene->rootToSurfaceMatrix(&rootToSurface)) {
     return Matrix::Identity();
   }
   // local -> root: the runtime layer's transform relative to the tree root. The tree may not be
-  // attached to a display list (no draw() yet), so use the file's root tgfx layer directly rather
+  // attached to a display list (no draw() yet), so use the scene's root tgfx layer directly rather
   // than tgfx::Layer::root() which is null for a detached subtree.
-  auto* rootLayer = static_cast<tgfx::Layer*>(rootFile->rootRuntimeLayer());
+  auto* rootLayer = static_cast<tgfx::Layer*>(rootScene->rootRuntimeLayer());
   auto localToRoot = runtimeLayer->getRelativeMatrix(rootLayer);
   auto localToSurface = ToTGFX(rootToSurface) * localToRoot;
   return {localToSurface.getScaleX(),     localToSurface.getSkewY(),
@@ -59,12 +60,12 @@ Matrix PAGLayer::getGlobalMatrix() const {
 }
 
 bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
-  if (runtimeLayer == nullptr || rootFile == nullptr) {
+  if (runtimeLayer == nullptr || rootScene == nullptr) {
     return false;
   }
   float rootX = 0;
   float rootY = 0;
-  if (!rootFile->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+  if (!rootScene->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return false;
   }
   return runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);

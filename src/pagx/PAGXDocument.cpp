@@ -20,7 +20,7 @@
 #include <algorithm>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
-#include "pagx/PAGFile.h"
+#include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
@@ -209,34 +209,35 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
   if (dirtyNodes.empty()) {
     return;
   }
-  // Prune expired weak_ptr entries to keep liveFiles bounded.
-  liveFiles.erase(std::remove_if(liveFiles.begin(), liveFiles.end(),
-                                 [](const std::weak_ptr<PAGFile>& weak) { return weak.expired(); }),
-                  liveFiles.end());
-  // Dispatch to PAGFile::onNodesChanged by iterating liveFiles; each file decides which dirty nodes
-  // are relevant using its own runtime binding. Implementation lives in PAGFile.cpp to avoid pulling
-  // PAGFile.h into the document header.
-  // TODO(PR11): wire to PAGFile::onNodesChanged once that method is implemented.
+  // Prune expired weak_ptr entries to keep liveScenes bounded.
+  liveScenes.erase(
+      std::remove_if(liveScenes.begin(), liveScenes.end(),
+                     [](const std::weak_ptr<PAGScene>& weak) { return weak.expired(); }),
+      liveScenes.end());
+  // Dispatch to PAGScene::onNodesChanged by iterating liveScenes; each scene decides which dirty
+  // nodes are relevant using its own runtime binding. Implementation lives in PAGScene.cpp to avoid
+  // pulling PAGScene.h into the document header.
+  // TODO(PR11): wire to PAGScene::onNodesChanged once that method is implemented.
   (void)dirtyNodes;
 }
 
-void PAGXDocument::registerLiveFile(const std::shared_ptr<PAGFile>& file) {
-  if (file == nullptr) {
+void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {
+  if (scene == nullptr) {
     return;
   }
-  liveFiles.emplace_back(file);
+  liveScenes.emplace_back(scene);
 }
 
-void PAGXDocument::unregisterLiveFile(PAGFile* file) {
-  if (file == nullptr) {
+void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
+  if (scene == nullptr) {
     return;
   }
-  liveFiles.erase(std::remove_if(liveFiles.begin(), liveFiles.end(),
-                                 [file](const std::weak_ptr<PAGFile>& weak) {
-                                   auto locked = weak.lock();
-                                   return weak.expired() || locked.get() == file;
-                                 }),
-                  liveFiles.end());
+  liveScenes.erase(std::remove_if(liveScenes.begin(), liveScenes.end(),
+                                  [scene](const std::weak_ptr<PAGScene>& weak) {
+                                    auto locked = weak.lock();
+                                    return weak.expired() || locked.get() == scene;
+                                  }),
+                   liveScenes.end());
 }
 
 }  // namespace pagx

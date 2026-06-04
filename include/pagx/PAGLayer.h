@@ -30,14 +30,14 @@ class Layer;
 namespace pagx {
 
 class Layer;
-class PAGFile;
+class PAGScene;
 
 /**
  * Identifies the concrete runtime type of a PAGLayer in the runtime layer hierarchy, so callers can
  * downcast without RTTI. Layer is a leaf runtime layer, Composition adds animation playback and hit
- * testing over its content, and File is the root composition of a whole PAGXDocument.
+ * testing over its content.
  */
-enum class LayerType { Layer, Composition, File };
+enum class LayerType { Layer, Composition };
 
 /**
  * PAGLayer is the base class of the runtime layer hierarchy. One PAGLayer node exists per source
@@ -45,8 +45,7 @@ enum class LayerType { Layer, Composition, File };
  * on-screen position and answers hit-test queries. When the same source layer appears in multiple
  * composition instances, each instance owns its own PAGLayer node with its own on-screen position.
  *
- * PAGComposition derives from PAGLayer to add animation playback and child lookup, and PAGFile
- * derives from PAGComposition as the root composition of a document.
+ * PAGComposition derives from PAGLayer to add animation playback and child lookup.
  */
 class PAGLayer {
  public:
@@ -54,7 +53,7 @@ class PAGLayer {
 
   /**
    * Returns the concrete runtime type of this layer. Use it to downcast safely (via static_cast)
-   * to PAGComposition or PAGFile without runtime type information.
+   * to PAGComposition without runtime type information.
    */
   virtual LayerType layerType() const;
 
@@ -74,7 +73,7 @@ class PAGLayer {
   /**
    * Returns the layer's bounds in its own local coordinate space, before its own transform is
    * applied. Returns an empty rectangle if the bounds are unavailable. For bounds in surface
-   * coordinates, use PAGFile::getGlobalBounds.
+   * coordinates, use PAGScene::getGlobalBounds.
    */
   Rect getBounds() const;
 
@@ -89,16 +88,16 @@ class PAGLayer {
 
  protected:
   // Constructs a runtime layer node for the given source Layer node, the runtime tgfx layer it maps
-  // to in a specific composition instance, and the root PAGFile used for surface coordinate
-  // conversion and for resolving the tree root. node may be null for the file root (which has no
-  // owning source layer). Created by the PAGComposition/PAGFile factories.
-  PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGFile* rootFile);
+  // to in a specific composition instance, and the root PAGScene used for surface coordinate
+  // conversion and for resolving the tree root. node may be null for the root composition (which
+  // has no owning source layer). Created by the PAGComposition/PAGScene factories.
+  PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer, PAGScene* rootScene);
 
   const Layer* node = nullptr;
   std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
-  PAGFile* rootFile = nullptr;
+  PAGScene* rootScene = nullptr;
 
-  friend class PAGFile;
+  friend class PAGScene;
   friend class PAGComposition;
 };
 

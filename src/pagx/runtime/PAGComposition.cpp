@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGComposition.h"
-#include "pagx/PAGFile.h"
 #include "pagx/PAGLayer.h"
+#include "pagx/PAGScene.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -31,8 +31,8 @@
 namespace pagx {
 
 PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
-                               PAGFile* rootFile)
-    : PAGLayer(node, std::move(runtimeLayer), rootFile),
+                               PAGScene* rootScene)
+    : PAGLayer(node, std::move(runtimeLayer), rootScene),
       binding(std::make_unique<RuntimeBinding>()) {
 }
 
@@ -43,16 +43,16 @@ LayerType PAGComposition::layerType() const {
 }
 
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(const Layer* ownerLayer,
-                                                          PAGFile* parentFile) {
-  if (ownerLayer == nullptr || parentFile == nullptr || ownerLayer->composition == nullptr) {
+                                                          PAGScene* parentScene) {
+  if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
     return nullptr;
   }
   auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
   auto composition = std::shared_ptr<PAGComposition>(
-      new PAGComposition(ownerLayer, std::move(buildResult.root), parentFile));
+      new PAGComposition(ownerLayer, std::move(buildResult.root), parentScene));
   *composition->binding = std::move(buildResult.binding);
   auto* externalDoc = ownerLayer->externalDoc.get();
-  composition->document = externalDoc != nullptr ? externalDoc : parentFile->document.get();
+  composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
   // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
   // document, then build the persistent per-layer runtime node tree for the composition content.
   for (const auto& driver : ownerLayer->timelines) {
@@ -84,7 +84,7 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
     }
     auto layerRuntime = binding->get<tgfx::Layer>(layer);
     if (layer->composition != nullptr) {
-      auto childComposition = PAGComposition::MakeChild(layer, rootFile);
+      auto childComposition = PAGComposition::MakeChild(layer, rootScene);
       if (childComposition == nullptr) {
         continue;
       }
@@ -93,7 +93,7 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
       }
       children.push_back(std::move(childComposition));
     } else {
-      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, rootFile)));
+      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, rootScene)));
     }
   }
 }

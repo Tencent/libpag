@@ -24,15 +24,15 @@
 namespace pagx {
 
 class Drawable;
-class PAGFile;
+class PAGScene;
 
 /**
- * PAGSurface is a render target that PAGFile draws into. It is a thin opaque wrapper around an
+ * PAGSurface is a render target that PAGScene draws into. It is a thin opaque wrapper around an
  * underlying tgfx::Surface and the GPU device that owns it; no platform or rendering backend
  * types are exposed by this header.
  *
- * A PAGSurface is passive: it never advances time or owns a PAGFile, and the same PAGSurface may
- * be drawn into by multiple PAGFile instances in sequence.
+ * A PAGSurface is passive: it never advances time or owns a PAGScene, and the same PAGSurface may
+ * be drawn into by multiple PAGScene instances in sequence.
  */
 class PAGSurface {
  public:
@@ -83,7 +83,7 @@ class PAGSurface {
 
   std::shared_ptr<Drawable> drawable = nullptr;
 
-  friend class PAGFile;
+  friend class PAGScene;
 };
 
 }  // namespace pagx
