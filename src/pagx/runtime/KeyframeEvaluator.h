@@ -23,6 +23,7 @@
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/types/Color.h"
+#include "pagx/utils/ColorSpaceUtils.h"
 
 namespace pagx {
 
@@ -45,11 +46,14 @@ inline float LerpFloat(float a, float b, double t) {
 
 template <>
 inline Color LerpKeyframeValue<Color>(const Color& a, const Color& b, double t) {
-  Color result = a;
-  result.red = LerpFloat(a.red, b.red, t);
-  result.green = LerpFloat(a.green, b.green, t);
-  result.blue = LerpFloat(a.blue, b.blue, t);
-  result.alpha = LerpFloat(a.alpha, b.alpha, t);
+  // Interpolate in b's color space. When the endpoints differ, convert a into b's space first so
+  // the components blend within a single gamut rather than mixing raw values from two spaces.
+  Color start = a.colorSpace == b.colorSpace ? a : ConvertColorSpace(a, b.colorSpace);
+  Color result = b;
+  result.red = LerpFloat(start.red, b.red, t);
+  result.green = LerpFloat(start.green, b.green, t);
+  result.blue = LerpFloat(start.blue, b.blue, t);
+  result.alpha = LerpFloat(start.alpha, b.alpha, t);
   result.colorSpace = b.colorSpace;
   return result;
 }
@@ -76,6 +80,13 @@ inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /
   return a;
 }
 
+// Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.
+// Defined as a named function template because the project forbids lambdas.
+template <typename T>
+static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
+  return value < static_cast<double>(kf.time);
+}
+
 // Evaluates a Hold/None/Linear/Bezier-segmented keyframe sequence at the given continuous frame
 // position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
 // keyframes.back().time] return the boundary value.
@@ -95,9 +106,8 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     return keyframes.back().value;
   }
   // Locate the segment whose right endpoint exceeds framePosition.
-  auto upper = std::upper_bound(
-      keyframes.begin(), keyframes.end(), framePosition,
-      [](double value, const Keyframe<T>& kf) { return value < static_cast<double>(kf.time); });
+  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
+                                FramePositionBeforeKeyframe<T>);
   auto right = upper;
   auto left = upper - 1;
   double leftTime = static_cast<double>(left->time);

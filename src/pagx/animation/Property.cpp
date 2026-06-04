@@ -24,17 +24,11 @@ namespace pagx {
 
 template <typename T>
 KeyValue TypedProperty<T>::onEvaluateAtFrame(Frame frame) const {
-  if (keyframes.empty()) {
-    return T{};
-  }
   return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame));
 }
 
 template <typename T>
 KeyValue TypedProperty<T>::onEvaluateAtMicros(int64_t microseconds, float frameRate) const {
-  if (keyframes.empty()) {
-    return T{};
-  }
   double framePosition =
       frameRate > 0.0f ? static_cast<double>(microseconds) * static_cast<double>(frameRate) / 1.0e6
                        : 0.0;

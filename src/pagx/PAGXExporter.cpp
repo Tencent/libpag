@@ -153,6 +153,7 @@ static std::string LoopModeToString(LoopMode loop) {
     case LoopMode::Once:
       return "once";
   }
+  return "once";
 }
 
 static std::string KeyframeInterpolationToString(KeyframeInterpolationType interpolation) {
@@ -166,6 +167,7 @@ static std::string KeyframeInterpolationToString(KeyframeInterpolationType inter
     case KeyframeInterpolationType::Linear:
       return "linear";
   }
+  return "none";
 }
 
 template <typename T>
@@ -1086,6 +1088,26 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
+// Mirrors the node types handled by WriteResource. Nodes outside this set (e.g. Animation,
+// AnimationObject, Property) produce no output and must not trigger a Resources block.
+static bool IsExportableResource(const Node* node) {
+  switch (node->nodeType()) {
+    case NodeType::Image:
+    case NodeType::PathData:
+    case NodeType::Composition:
+    case NodeType::Font:
+    case NodeType::SolidColor:
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient:
+    case NodeType::ImagePattern:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Image: {
@@ -1350,20 +1372,21 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;
   for (const auto& resource : doc.nodes) {
-    if (!resource->id.empty()) {
-      if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
-        continue;
-      }
-      hasResources = true;
-      break;
+    if (resource->id.empty() || !IsExportableResource(resource.get())) {
+      continue;
     }
+    if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
+      continue;
+    }
+    hasResources = true;
+    break;
   }
   if (hasResources) {
     xml.openElement("Resources");
     xml.closeElementStart();
 
     for (const auto& resource : doc.nodes) {
-      if (!resource->id.empty()) {
+      if (!resource->id.empty() && IsExportableResource(resource.get())) {
         WriteResource(xml, resource.get(), options);
       }
     }
