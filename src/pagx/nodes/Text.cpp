@@ -20,7 +20,7 @@
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/TextUtils.h"
 
 namespace pagx {
 

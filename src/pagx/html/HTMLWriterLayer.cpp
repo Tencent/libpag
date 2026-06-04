@@ -43,7 +43,6 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MergePathMode.h"
-#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
