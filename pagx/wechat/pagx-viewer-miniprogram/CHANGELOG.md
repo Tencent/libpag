@@ -1,10 +1,21 @@
 # Changelog
 
+## v1.9.3
+
+### 新增
+
+- `View.setImageOriginalSize(filePath, width, height)`：向 SDK 声明外部图片的原始像素尺寸（全分辨率），
+  用于校正 new-format PAGX 的 ImagePattern 变换矩阵。当宿主下载缩略图后通过
+  `attachNativeImage()` 注入时，SDK 根据原始尺寸与缩略图尺寸的比例修正填充偏移，避免图案错位。
+  应在 `parsePAGX()` 之后、`buildLayers()` / `attachNativeImage()` 之前调用。
+
+---
+
 ## v1.9.2
 
 ### 变更
 
-- 修复渲渐变效果显示异常的问题
+- 修复渐变效果显示异常的问题
 
 ---
 
