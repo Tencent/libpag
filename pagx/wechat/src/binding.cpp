@@ -41,6 +41,7 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("upgradeImageFromNative", &PAGXView::upgradeImageFromNative)
       .function("getImageBounds", &PAGXView::getImageBounds)
       .function("getImageMetadata", &PAGXView::getImageMetadata)
+      .function("setImageOriginalSize", &PAGXView::setImageOriginalSize)
       .function("buildLayers", &PAGXView::buildLayers)
       .function("updateSize", &PAGXView::updateSize)
       .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)

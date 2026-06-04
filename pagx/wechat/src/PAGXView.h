@@ -277,6 +277,26 @@ class PAGXView {
   emscripten::val getImageMetadata() const;
 
   /**
+   * Records the original (authoring-time) pixel dimensions of an external image referenced by
+   * filePath. New PAGX exports bake their ImagePattern.matrix in the original-image pixel
+   * coordinate system, so when the host attaches a downscaled CDN variant via
+   * attachNativeImage() the renderer needs to know the original dimensions to post-correct the
+   * baked matrix against the actual attached pixels.
+   *
+   * Call this once per external image after parsePAGX() and before buildLayers() / the first
+   * attachNativeImage() so resolveImagePatternMatricesByFilePath sees the original size and
+   * can apply the diag(origW/actualW, origH/actualH) post-scale to keep visual placement
+   * stable across thumbnail/full quality swaps.
+   *
+   * Subsequent calls overwrite the previous record. parsePAGX() clears the entire table.
+   *
+   * @param filePath The external file path matching pagx::Image::filePath. Must be non-empty.
+   * @param width    Original image width in pixels (> 0).
+   * @param height   Original image height in pixels (> 0).
+   */
+  void setImageOriginalSize(const std::string& filePath, float width, float height);
+
+  /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
    * any loadFileData() calls to finalize the rendering content.
    */
@@ -566,6 +586,17 @@ class PAGXView {
   // surfacing it again would re-request the asset every frame during the perfectly normal
   // pre-attach window. Cleared on parsePAGX() and on each successful attachNativeImage(Full).
   std::unordered_set<std::string> evictedFullPaths = {};
+
+  // Original (authoring-time) pixel dimensions for external images, populated by the host
+  // through setImageOriginalSize(). New PAGX exports bake ImagePattern.matrix in the
+  // original-image pixel coordinate system; when the host attaches a downscaled CDN variant
+  // (thumbnail or scaled full) the renderer reads this map to post-correct the baked matrix
+  // against the attached image's actual pixel dimensions, keeping visual placement stable
+  // regardless of which CDN variant landed.
+  //
+  // Cleared on parsePAGX(); the host is responsible for repopulating it before buildLayers()
+  // and any subsequent attachNativeImage() so resolve passes have the data they need.
+  std::unordered_map<std::string, std::pair<float, float>> imageOriginalSizes = {};
 
   // GL.textures indices retired during the current draw (eviction, replacement upload, or
   // document reset) but not yet handed to gl.deleteTexture. drainPendingTextureDeletes()
