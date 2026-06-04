@@ -699,8 +699,13 @@ CLI_TEST(PAGXCliTest, FontList_MutualExclusive) {
 }
 
 CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
   auto ret = CallRun(pagx::cli::RunFont, {"font", "xyz"});
+  std::cerr.rdbuf(oldCerr);
   EXPECT_NE(ret, 0);
+  EXPECT_NE(capturedErr.str().find("pagx font: unknown subcommand 'xyz'"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, FontEmbed_Retired_PrintsRedirectError) {
@@ -3062,6 +3067,9 @@ CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
       if (!font->file.empty()) {
         hasFileFont = true;
         EXPECT_TRUE(font->id == "noto");
+        // fileOriginal should be preserved; the resolved absolute path must not be written out.
+        EXPECT_EQ(font->fileOriginal, "NotoSansSC-Regular.otf")
+            << "fileOriginal should retain the verbatim relative path from the source XML";
       }
       if (font->id.find("__embed_font_") == 0) {
         hasEmbedFont = true;
@@ -3135,6 +3143,9 @@ CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
       if (!font->file.empty()) {
         hasFileFont = true;
         EXPECT_TRUE(font->id == "noto");
+        // fileOriginal must survive the second embed round-trip unchanged.
+        EXPECT_EQ(font->fileOriginal, "NotoSansSC-Regular.otf")
+            << "fileOriginal must not become absolute after a second embed round-trip";
       }
     }
   }

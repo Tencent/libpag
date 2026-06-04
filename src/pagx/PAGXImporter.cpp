@@ -2152,6 +2152,9 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
         }
         if (node->nodeType() == NodeType::Font) {
           auto* font = static_cast<Font*>(node.get());
+          if (!font->file.empty()) {
+            font->fileOriginal = font->file;
+          }
           ResolveRelativePath(basePath, font->file);
         }
       }

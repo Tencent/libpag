@@ -1005,7 +1005,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("id", font->id);
       xml.addAttribute("unitsPerEm", font->unitsPerEm, Default<Font>().unitsPerEm);
       if (!font->file.empty()) {
-        xml.addAttribute("file", font->file);
+        const std::string& fileAttr = !font->fileOriginal.empty() ? font->fileOriginal : font->file;
+        xml.addAttribute("file", fileAttr);
       }
       WriteCustomData(xml, node);
       if (font->glyphs.empty()) {
