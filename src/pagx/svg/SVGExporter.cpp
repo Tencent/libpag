@@ -289,11 +289,11 @@ class SVGWriter {
  public:
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
-            PAGXDocument* doc = nullptr, bool bakeUnsupported = true, int rasterDPI = 192,
+            PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             bool resolveModifiers = true, std::vector<std::string>* warnings = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rasterDPI(rasterDPI), _resolveModifiers(resolveModifiers), _warnings(warnings),
+        _rasterScale(rasterScale), _resolveModifiers(resolveModifiers), _warnings(warnings),
         _layoutContext(layoutContext), _resolver(doc), _doc(doc) {
   }
 
@@ -305,7 +305,7 @@ class SVGWriter {
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
   bool _bakeUnsupported = true;
-  int _rasterDPI = 192;
+  float _rasterScale = 2.0f;
   bool _resolveModifiers = true;
   std::vector<std::string>* _warnings = nullptr;
   LayoutContext* _layoutContext = nullptr;
@@ -674,7 +674,7 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     int h = static_cast<int>(ceilf(shapeBounds.height));
     float offsetX = pattern->matrix.tx - shapeBounds.x;
     float offsetY = pattern->matrix.ty - shapeBounds.y;
-    float pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+    float pixelScale = _rasterScale;
 
     auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY, pixelScale);
     if (tiledPng && tiledPng->size() > 0) {
@@ -2233,7 +2233,7 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
                "' reported empty bounds; falling back to vector emission.");
     return false;
   }
-  auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+  auto pixelScale = _rasterScale;
   auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
     addWarning("rasterize failed: PNG bake for layer '" +
@@ -2629,22 +2629,18 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
   }
-  // Clamp rasterDPI to a sane range. 0 / negative would silently produce a zero-pixel surface
+  // Clamp rasterScale to a sane range. 0 / negative would silently produce a zero-pixel surface
   // (the bake then fails and the exporter falls through to the vector path, contradicting
-  // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * pixelScale))`
-  // away from float→int implementation-defined behaviour on huge canvases.
-  int safeRasterDPI = options.rasterDPI;
-  if (safeRasterDPI < 1) {
-    safeRasterDPI = 1;
-  } else if (safeRasterDPI > 4096) {
-    safeRasterDPI = 4096;
-  }
+  // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * rasterScale))`
+  // away from float→int implementation-defined behaviour on huge canvases. Range matches
+  // HTMLExportOptions::rasterScale.
+  float safeRasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
   SVGBuilder svg(true, options.indent);
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
-                   &doc, options.bakeUnsupported, safeRasterDPI, options.resolveModifiers,
+                   &doc, options.bakeUnsupported, safeRasterScale, options.resolveModifiers,
                    warnings);
 
   if (options.xmlDeclaration) {

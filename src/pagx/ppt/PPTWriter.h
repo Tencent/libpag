@@ -659,8 +659,9 @@ class PPTWriter {
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
-        _bakeUnsupported(options.bakeUnsupported), _rasterDPI(options.rasterDPI),
-        _layoutContext(layoutContext), _resolver(doc) {
+        _bakeUnsupported(options.bakeUnsupported),
+        _rasterScale(std::clamp(options.rasterScale, 0.01f, 4.0f)), _layoutContext(layoutContext),
+        _resolver(doc) {
   }
 
   // Top-level entry: walks every layer in `_doc->layers`, pairing each with its corresponding
@@ -692,12 +693,12 @@ class PPTWriter {
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _bakeUnsupported = true;
-  // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
-  // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
-  // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>
-  // keeps using logical EMU dimensions so the consumer stretches the denser
-  // bitmap over the same visible extent, yielding a crisper result.
-  int _rasterDPI = 192;
+  // Oversampling factor applied to every PNG bake (masked layer, scrollRect bake,
+  // blend/wide-gamut fallback, tiled pattern). Drives the off-screen Surface size:
+  // physical pixels = ceil(logicalSize * rasterScale). The placed <p:pic>/<a:blipFill>
+  // keeps using logical EMU dimensions so the consumer stretches the denser bitmap
+  // over the same visible extent, yielding a crisper result.
+  float _rasterScale = 2.0f;
   LayoutContext* _layoutContext = nullptr;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};

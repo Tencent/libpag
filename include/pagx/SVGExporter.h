@@ -81,17 +81,18 @@ struct SVGExportOptions {
   bool bakeUnsupported = true;
 
   /**
-   * Pixel DPI used when a layer or tiled pattern has to be baked to PNG. The Surface behind every
-   * bake is sized by `rasterDPI / 96` relative to the layer's logical extent, while the placed
-   * &lt;image&gt; keeps using logical dimensions so consumers stretch the denser bitmap over the
-   * same visible extent, yielding a crisper result.
+   * Oversampling factor applied when a layer or tiled pattern has to be baked to PNG. The Surface
+   * behind every bake is sized at `ceil(logicalSize * rasterScale)` physical pixels, while the
+   * placed &lt;image&gt; keeps using logical dimensions so consumers stretch the denser bitmap
+   * over the same visible extent, yielding a crisper result.
    *
-   * Valid range: [1, 4096]. Values outside this range are clamped at the entry point — passing 0
-   * or a negative value would otherwise silently disable rasterization (the bake would produce a
+   * Valid range: (0, 4]. Values outside this range are clamped at the entry point — passing 0 or
+   * a negative value would otherwise silently disable rasterization (the bake would produce a
    * zero-pixel surface and the exporter would fall through to the vector path), contradicting the
-   * intent of `bakeUnsupported = true`. The default value is 192 (2x of the default 96 DPI).
+   * intent of `bakeUnsupported = true`. The default is 2.0 (i.e. @2x assets), matching the
+   * default of HTMLExportOptions::rasterScale.
    */
-  int rasterDPI = 192;
+  float rasterScale = 2.0f;
 };
 
 /**

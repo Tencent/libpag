@@ -2133,10 +2133,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedHonoursScrollRect) {
   EXPECT_EQ(imageTag.find("height=\"300\""), std::string::npos);
 }
 
-// Coverage for the rasterDPI clamp: 0 / negative / huge values must be clamped to a usable
+// Coverage for the rasterScale clamp: 0 / negative / huge values must be clamped to a usable
 // range so bakeUnsupported=true still produces a non-empty <image>. The placed <image> always
-// keeps logical coordinates regardless of the chosen DPI, but the PNG payload size scales.
-PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIDefaultProducesImage) {
+// keeps logical coordinates regardless of the chosen scale, but the PNG payload size scales.
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleDefaultProducesImage) {
   auto doc = pagx::PAGXDocument::Make(120, 120);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -2155,12 +2155,12 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIDefaultProducesImage) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.rasterDPI = 192;
+  opts.rasterScale = 2.0f;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
 }
 
-PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsZeroAndNegative) {
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleClampsZeroAndNegative) {
   auto doc = pagx::PAGXDocument::Make(120, 120);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -2178,20 +2178,20 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsZeroAndNegative) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  // rasterDPI=0 / negative would silently produce a zero-pixel surface and the bake would
+  // rasterScale=0 / negative would silently produce a zero-pixel surface and the bake would
   // fall through to the vector path, contradicting bakeUnsupported=true. The clamp at the
   // entry point keeps the bake alive.
   pagx::SVGExporter::Options opts;
-  opts.rasterDPI = 0;
+  opts.rasterScale = 0.0f;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
 
-  opts.rasterDPI = -100;
+  opts.rasterScale = -1.0f;
   auto svg2 = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg2.find("data:image/png;base64,"), std::string::npos);
 }
 
-PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsHugeValue) {
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleClampsHugeValue) {
   auto doc = pagx::PAGXDocument::Make(60, 60);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -2209,10 +2209,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RasterDPIClampsHugeValue) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  // Huge rasterDPI is clamped at the entry point so float→int cast in the bake stays well
+  // Huge rasterScale is clamped at the entry point so float→int cast in the bake stays well
   // within int range. The exported SVG keeps logical pixel dimensions.
   pagx::SVGExporter::Options opts;
-  opts.rasterDPI = 100000;
+  opts.rasterScale = 1000.0f;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
 }

@@ -281,8 +281,7 @@ void PPTWriter::writeImagePatternFill(XMLBuilder& out, const ImagePattern* patte
     int h = static_cast<int>(ceilf(shapeBounds.height));
     float offsetX = pattern->matrix.tx - shapeBounds.x;
     float offsetY = pattern->matrix.ty - shapeBounds.y;
-    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY,
-                                       static_cast<float>(_rasterDPI) / 96.0f);
+    auto tiledPng = RenderTiledPattern(&_gpu, pattern, w, h, offsetX, offsetY, _rasterScale);
     if (tiledPng) {
       auto relId = _ctx->addRawImage(std::move(tiledPng));
       out.openElement("a:blipFill").closeElementStart();
