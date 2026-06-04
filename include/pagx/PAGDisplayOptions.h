@@ -22,6 +22,10 @@
 #include "pagx/types/Color.h"
 #include "pagx/types/Point.h"
 
+namespace tgfx {
+class DisplayList;
+}  // namespace tgfx
+
 namespace pagx {
 
 class PAGScene;
@@ -175,7 +179,7 @@ class PAGDisplayOptions {
  private:
   explicit PAGDisplayOptions(std::shared_ptr<PAGScene> scene);
 
-  void* getDisplayList() const;
+  tgfx::DisplayList* getDisplayList() const;
 
   std::weak_ptr<PAGScene> scene = {};
 
