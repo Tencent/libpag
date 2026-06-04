@@ -79,7 +79,7 @@ int64_t PAGTimeline::duration() const {
 }
 
 float PAGTimeline::frameRate() const {
-  return animation != nullptr ? animation->frameRate : 60.0f;
+  return animation != nullptr ? animation->frameRate : 0.0f;
 }
 
 void PAGTimeline::play() {

@@ -18,6 +18,10 @@
 
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGScene.h"
+
+// The fallback values used when getDisplayList() returns nullptr must match the default member
+// values in tgfx::DisplayList (tgfx/include/tgfx/layers/DisplayList.h). Update this file if the
+// tgfx defaults change.
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
