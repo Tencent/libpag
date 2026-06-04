@@ -16,39 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <vector>
-#include "pagx/nodes/Element.h"
-#include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/Layer.h"
+#include "pagx/utils/StrokeGeometryUtils.h"
+#include <algorithm>
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextBox.h"
-#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
-struct FillStrokeInfo {
-  const Fill* fill = nullptr;
-  const Stroke* stroke = nullptr;
-  const TextBox* textBox = nullptr;
-};
+float StrokeAlignInset(const Stroke* stroke) {
+  if (stroke == nullptr || stroke->width <= 0) {
+    return 0.0f;
+  }
+  switch (stroke->align) {
+    case StrokeAlign::Inside:
+      return stroke->width / 2.0f;
+    case StrokeAlign::Outside:
+      return -stroke->width / 2.0f;
+    case StrokeAlign::Center:
+    default:
+      return 0.0f;
+  }
+}
 
-FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);
-
-Matrix BuildLayerMatrix(const Layer* layer);
-
-Matrix BuildGroupMatrix(const Group* group);
-
-FillRule DetectMaskFillRule(const Layer* maskLayer);
-
-/**
- * Decomposes the X and Y scale factors of a 2D affine matrix.  The X scale is the
- * length of the (a, b) basis vector; the Y scale is derived from |det(m)| / sx so
- * that sx * sy equals the absolute area scale of the matrix (and sy stays positive
- * even when the matrix is mirrored).  Returns sx = sy = 0 for degenerate matrices.
- */
-void DecomposeScale(const Matrix& m, float* sx, float* sy);
+void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
+                         float* roundness) {
+  float inset = StrokeAlignInset(stroke);
+  if (inset == 0.0f) {
+    return;
+  }
+  float maxInset = std::min(w, h) / 2.0f;
+  if (inset > maxInset) {
+    inset = maxInset;
+  }
+  x += inset;
+  y += inset;
+  w -= inset * 2.0f;
+  h -= inset * 2.0f;
+  if (roundness) {
+    *roundness = std::max(0.0f, *roundness - inset);
+  }
+}
 
 }  // namespace pagx

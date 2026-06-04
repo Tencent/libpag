@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ImageFormatUtils.h"
 #include "tgfx/core/Data.h"
 
 namespace pagx {
