@@ -702,11 +702,18 @@ function scoreBgBlurAreaRadius(value: number): number {
 }
 
 function getImageRuntimeRisk(raw: LocalRiskRaw): number {
+  const effectiveDownscaleMP = Math.max(0, raw.imageDownscaleMP - 10);
+  if (effectiveDownscaleMP <= 0) return 0;
+
   const contentComplexity = raw.layerCount / 1500 + raw.textCount / 400 + raw.innerShadowCount / 10;
-  const runtimeComplexity = raw.bgBlurAreaRadius / 80 * contentComplexity
-    + raw.layerCount / 6000
-    + raw.docMP / 100;
-  return raw.imageDownscaleMP * runtimeComplexity;
+  const bgBlurInteraction = raw.bgBlurAreaRadius > 0
+    && raw.bgBlurAreaRadius <= LOCAL_RISK_PATHS.bgBlurAreaRadius.red
+    ? (raw.bgBlurAreaRadius / 60) * contentComplexity
+    : 0;
+  const layoutInteraction = raw.imageDownscaleMP >= LOCAL_RISK_PATHS.imageLoadMP.yellow
+    ? raw.layerCount / 6000 + raw.docMP / 100
+    : 0;
+  return effectiveDownscaleMP * (bgBlurInteraction + layoutInteraction);
 }
 
 function scoreImageLoadRisk(raw: LocalRiskRaw): number {
