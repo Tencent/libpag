@@ -53,10 +53,10 @@ class GPUDrawable : public Drawable {
  private:
   explicit GPUDrawable(std::string canvasID);
 
-  std::string canvasID;
+  std::string _canvasID;
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::WebGLWindow> _window = nullptr;
 };
 
 }  // namespace pagx

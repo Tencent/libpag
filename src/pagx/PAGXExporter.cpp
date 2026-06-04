@@ -151,7 +151,6 @@ static std::string LoopModeToString(LoopMode loop) {
     case LoopMode::PingPong:
       return "pingPong";
     case LoopMode::Once:
-    default:
       return "once";
   }
 }
@@ -165,7 +164,6 @@ static std::string KeyframeInterpolationToString(KeyframeInterpolationType inter
     case KeyframeInterpolationType::Hold:
       return "hold";
     case KeyframeInterpolationType::Linear:
-    default:
       return "linear";
   }
 }

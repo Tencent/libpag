@@ -172,8 +172,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
 }
 
 Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
-  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr ||
-      pagLayer->rootScene != this) {
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr || pagLayer->rootScene != this) {
     return {};
   }
   auto* rootLayer = static_cast<tgfx::Layer*>(rootRuntimeLayer());

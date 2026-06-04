@@ -154,8 +154,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
 
   // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
-  // Returns false if the transform is unavailable. Used by PAGLayer::getGlobalMatrix to build the
-  // local-to-surface matrix. Returned as a pagx Matrix to keep tgfx out of this header.
+  // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
+  // matrix. Returned as a pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
 
   // Returns the top tgfx layer of the runtime tree as an opaque pointer (the root composition's

@@ -34,11 +34,11 @@ std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)
-    : _width(width), _height(height), device(std::move(device)) {
+    : _width(width), _height(height), _device(std::move(device)) {
 }
 
 std::shared_ptr<tgfx::Device> OffscreenDrawable::getDevice() {
-  return device;
+  return _device;
 }
 
 std::shared_ptr<tgfx::Surface> OffscreenDrawable::getSurface(tgfx::Context* context) {

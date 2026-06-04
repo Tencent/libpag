@@ -58,9 +58,11 @@ class PAGComposition : public PAGLayer {
   void apply(float mix = 1.0f);
 
   /**
-   * Returns the layers under the given point in this composition's coordinate space. The first layer
-   * in the array is the top-most under the point, the last is the bottom-most. Returns an empty
-   * array if nothing is hit. Hit testing does not require the content to have been drawn first.
+   * Returns the leaf layers under the given point in this composition's coordinate space.
+   * Composition nodes are excluded from results; only concrete renderable layers are returned.
+   * The first layer in the array is the top-most under the point, the last is the bottom-most.
+   * Returns an empty array if nothing is hit. Hit testing does not require the content to have
+   * been drawn first.
    * @param x the x coordinate in this composition's coordinate space.
    * @param y the y coordinate in this composition's coordinate space.
    */

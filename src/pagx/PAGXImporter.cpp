@@ -1529,8 +1529,11 @@ static bool LooksLikeFloat(const std::string& value) {
     return false;
   }
   char* end = nullptr;
-  strtof(value.c_str(), &end);
-  return end != value.c_str() && *end == '\0';
+  float f = strtof(value.c_str(), &end);
+  if (end != value.c_str() && *end == '\0') {
+    return std::isfinite(f);
+  }
+  return false;
 }
 
 template <typename T>
@@ -1550,7 +1553,7 @@ bool ParseTypedValue<bool>(const std::string& value, PAGXDocument*, const DOMNod
 
 template <>
 int ParseTypedValue<int>(const std::string& value, PAGXDocument*, const DOMNode*) {
-  return std::atoi(value.c_str());
+  return static_cast<int>(std::strtol(value.c_str(), nullptr, 10));
 }
 
 template <>

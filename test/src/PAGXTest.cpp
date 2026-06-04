@@ -5554,8 +5554,7 @@ PAGX_TEST(PAGXTest, PAGSceneLiveSceneRegistration) {
   EXPECT_EQ(doc->liveScenes[0].lock().get(), file.get());
 
   file.reset();
-  EXPECT_TRUE(doc->liveScenes.empty() ||
-              (doc->liveScenes.size() == 1u && doc->liveScenes[0].expired()));
+  EXPECT_TRUE(doc->liveScenes.empty());
 
   auto file2 = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file2 != nullptr);
@@ -6443,7 +6442,8 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
 
   // Per-slot binding should expose the child Layer's tgfx instance — and that instance must
   // differ from anything stored in the top-level binding (top-level has the slot Layer only).
-  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
   ASSERT_TRUE(tgfxChild != nullptr);
 
@@ -6493,8 +6493,10 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_EQ(file->rootComposition()->children.size(), 2u);
 
-  auto& treeA = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
-  auto& treeB = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
+  auto& treeA =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& treeB =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
   auto tgfxChildA = treeA.get<tgfx::Layer>(fx.childLayer);
   auto tgfxChildB = treeB.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
@@ -6549,7 +6551,8 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   ASSERT_EQ(file->rootComposition()->children.size(), 1u);
 
   // The inner child's tgfx layer lives in the nested child composition's binding.
-  auto& outerComposition = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get());
+  auto& outerComposition =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get());
   ASSERT_EQ(outerComposition.children.size(), 1u);
   auto& innerComposition = *static_cast<pagx::PAGComposition*>(outerComposition.children[0].get());
   auto tgfxInnerChild = innerComposition.binding->get<tgfx::Layer>(inner.childLayer);
@@ -6752,7 +6755,8 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 
   auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(externalChild != nullptr);
-  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
   ASSERT_TRUE(tgfxChild != nullptr);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
@@ -6961,8 +6965,10 @@ PAGX_TEST(PAGXTest, HitTestSharedCompositionPerInstance) {
 
   // Each instance has its own reverse map keyed by its own tgfx layers, but resolves to the same
   // shared source child node.
-  auto& bindingA = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
-  auto& bindingB = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
+  auto& bindingA =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& bindingB =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
   auto tgfxChildA = bindingA.get<tgfx::Layer>(childLayer);
   auto tgfxChildB = bindingB.get<tgfx::Layer>(childLayer);
   ASSERT_TRUE(tgfxChildA != nullptr);

@@ -207,7 +207,7 @@ class LayerBuilderContext {
       // Register layer for mask lookups and animation writers.
       _result.binding.set(node, layer);
       _result.binding.mapLayer(layer.get(), node);
-      bindLayerChannels(node, layer);
+      bindLayerChannels(node);
 
       applyLayerAttributes(node, layer.get());
 
@@ -277,7 +277,7 @@ class LayerBuilderContext {
     layer->setMatrix(matrix);
   }
 
-  void bindLayerChannels(const Layer* node, const std::shared_ptr<tgfx::Layer>&) {
+  void bindLayerChannels(const Layer* node) {
     _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
     _result.binding.setWriter(node, "visible", WriteLayerVisible);
     _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
@@ -1020,7 +1020,7 @@ class LayerBuilderContext {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
         _result.binding.set(style, tgfxStyle);
-        bindDropShadowStyleChannels(style, tgfxStyle);
+        bindDropShadowStyleChannels(style);
         return tgfxStyle;
       }
       case NodeType::InnerShadowStyle: {
@@ -1100,8 +1100,7 @@ class LayerBuilderContext {
     static_cast<tgfx::DropShadowStyle*>(object)->setShowBehindLayer(*v);
   }
 
-  void bindDropShadowStyleChannels(const DropShadowStyle* node,
-                                   const std::shared_ptr<tgfx::DropShadowStyle>&) {
+  void bindDropShadowStyleChannels(const DropShadowStyle* node) {
     _result.binding.setWriter(node, "offsetX", WriteDropShadowStyleOffsetX);
     _result.binding.setWriter(node, "offsetY", WriteDropShadowStyleOffsetY);
     _result.binding.setWriter(node, "blurX", WriteDropShadowStyleBlurX);
@@ -1128,7 +1127,7 @@ class LayerBuilderContext {
     filter->setBlurrinessY(MixFloat(filter->blurrinessY(), *v, mix));
   }
 
-  void bindBlurFilterChannels(const BlurFilter* node, const std::shared_ptr<tgfx::BlurFilter>&) {
+  void bindBlurFilterChannels(const BlurFilter* node) {
     _result.binding.setWriter(node, "blurX", WriteBlurFilterX);
     _result.binding.setWriter(node, "blurY", WriteBlurFilterY);
   }
@@ -1187,8 +1186,7 @@ class LayerBuilderContext {
     static_cast<tgfx::DropShadowFilter*>(object)->setDropsShadowOnly(*v);
   }
 
-  void bindDropShadowFilterChannels(const DropShadowFilter* node,
-                                    const std::shared_ptr<tgfx::DropShadowFilter>&) {
+  void bindDropShadowFilterChannels(const DropShadowFilter* node) {
     _result.binding.setWriter(node, "offsetX", WriteDropShadowFilterOffsetX);
     _result.binding.setWriter(node, "offsetY", WriteDropShadowFilterOffsetY);
     _result.binding.setWriter(node, "blurX", WriteDropShadowFilterBlurX);
@@ -1208,7 +1206,7 @@ class LayerBuilderContext {
         auto tgfxFilter =
             tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
         _result.binding.set(filter, tgfxFilter);
-        bindBlurFilterChannels(filter, tgfxFilter);
+        bindBlurFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {
@@ -1217,7 +1215,7 @@ class LayerBuilderContext {
             tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
                                          filter->blurY, ToTGFX(filter->color), filter->shadowOnly);
         _result.binding.set(filter, tgfxFilter);
-        bindDropShadowFilterChannels(filter, tgfxFilter);
+        bindDropShadowFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::InnerShadowFilter: {

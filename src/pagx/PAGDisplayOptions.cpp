@@ -34,7 +34,6 @@ PAGRenderMode ToPAGX(tgfx::RenderMode renderMode) {
     case tgfx::RenderMode::Tiled:
       return PAGRenderMode::Tiled;
   }
-  return PAGRenderMode::Partial;
 }
 
 Color ToPAGX(const tgfx::Color& color) {

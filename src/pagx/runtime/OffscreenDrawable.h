@@ -47,7 +47,7 @@ class OffscreenDrawable : public Drawable {
 
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::Device> device = nullptr;
+  std::shared_ptr<tgfx::Device> _device = nullptr;
 };
 
 }  // namespace pagx

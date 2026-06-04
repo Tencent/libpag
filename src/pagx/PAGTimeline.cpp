@@ -26,7 +26,7 @@
 
 namespace pagx {
 
-static constexpr int64_t kMicrosPerSecond = 1'000'000;
+static constexpr int64_t MICROS_PER_SECOND = 1'000'000;
 
 // Returns the animation duration in microseconds. Returns 0 for invalid animations.
 static int64_t DurationMicros(const Animation* animation) {
@@ -34,7 +34,7 @@ static int64_t DurationMicros(const Animation* animation) {
     return 0;
   }
   return static_cast<int64_t>(static_cast<double>(animation->duration) *
-                              static_cast<double>(kMicrosPerSecond) /
+                              static_cast<double>(MICROS_PER_SECOND) /
                               static_cast<double>(animation->frameRate));
 }
 
@@ -70,8 +70,8 @@ PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument*
 }
 
 const std::string& PAGTimeline::getId() const {
-  static const std::string kEmpty;
-  return animation != nullptr ? animation->id : kEmpty;
+  static const std::string EMPTY;
+  return animation != nullptr ? animation->id : EMPTY;
 }
 
 int64_t PAGTimeline::duration() const {

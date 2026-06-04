@@ -37,14 +37,19 @@ inline float LerpKeyframeValue<float>(const float& a, const float& b, double t) 
   return static_cast<float>(a + (b - a) * t);
 }
 
+// Linearly interpolate between two float values by fraction t. Used by LerpKeyframeValue<Color>
+// to interpolate each color component.
+inline float LerpFloat(float a, float b, double t) {
+  return static_cast<float>(a + (static_cast<double>(b) - a) * t);
+}
+
 template <>
 inline Color LerpKeyframeValue<Color>(const Color& a, const Color& b, double t) {
   Color result = a;
-  auto lerpComponent = [t](float ax, float bx) { return static_cast<float>(ax + (bx - ax) * t); };
-  result.red = lerpComponent(a.red, b.red);
-  result.green = lerpComponent(a.green, b.green);
-  result.blue = lerpComponent(a.blue, b.blue);
-  result.alpha = lerpComponent(a.alpha, b.alpha);
+  result.red = LerpFloat(a.red, b.red, t);
+  result.green = LerpFloat(a.green, b.green, t);
+  result.blue = LerpFloat(a.blue, b.blue, t);
+  result.alpha = LerpFloat(a.alpha, b.alpha, t);
   result.colorSpace = b.colorSpace;
   return result;
 }

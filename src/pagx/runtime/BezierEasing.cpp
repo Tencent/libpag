@@ -24,19 +24,29 @@ namespace pagx {
 
 // Cubic Bezier in one dimension: B(t) = 3*(1-t)^2*t*p1 + 3*(1-t)*t^2*p2 + t^3.
 // Endpoints are implicit (0 at t=0, 1 at t=1) so the formula simplifies once expanded.
-static double SampleCurve(double p1, double p2, double t) {
-  // Coefficients of the polynomial form, derived by expanding the Bernstein form.
+
+struct BezierCoefficients {
+  double cx0;
+  double cx1;
+  double cx2;
+};
+
+static BezierCoefficients ComputeBezierCoefficients(double p1, double p2) {
   double cx0 = 3.0 * p1;
   double cx1 = 3.0 * (p2 - p1) - cx0;
   double cx2 = 1.0 - cx0 - cx1;
-  return ((cx2 * t + cx1) * t + cx0) * t;
+  return {cx0, cx1, cx2};
+}
+
+static double SampleCurve(double p1, double p2, double t) {
+  // Coefficients of the polynomial form, derived by expanding the Bernstein form.
+  auto coeff = ComputeBezierCoefficients(p1, p2);
+  return ((coeff.cx2 * t + coeff.cx1) * t + coeff.cx0) * t;
 }
 
 static double SampleDerivative(double p1, double p2, double t) {
-  double cx0 = 3.0 * p1;
-  double cx1 = 3.0 * (p2 - p1) - cx0;
-  double cx2 = 1.0 - cx0 - cx1;
-  return (3.0 * cx2 * t + 2.0 * cx1) * t + cx0;
+  auto coeff = ComputeBezierCoefficients(p1, p2);
+  return (3.0 * coeff.cx2 * t + 2.0 * coeff.cx1) * t + coeff.cx0;
 }
 
 // Solves x(t) == input for t using Newton-Raphson, falling back to bisection when the derivative
