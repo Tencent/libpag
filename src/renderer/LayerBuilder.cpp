@@ -701,7 +701,6 @@ class LayerBuilderContext {
     }
   }
 
-
   static std::shared_ptr<tgfx::ColorSource> ApplyGradientProperties(
       std::shared_ptr<tgfx::Gradient> gradient, const Gradient* node) {
     if (gradient) {
@@ -773,17 +772,8 @@ class LayerBuilderContext {
     if (!pattern) {
       return pattern;
     }
-    // tgfx's new ImagePattern API defaults _scaleMode = ScaleMode::LetterBox, which would fit the
-    // image into each geometry's bounding box and then layer that on top of the matrix we just
-    // computed -- two conflicting fits stacked on top of each other. ImagePatternMatrixCalculator
-    // already bakes the exporter's scale-mode choice into pattern->matrix, so we keep tgfx out of
-    // the fitting business by selecting ScaleMode::None. Once LayerBuilder is migrated to emit
-    // ImagePattern::setScaleMode() natively, this opt-out together with
-    // ImagePatternMatrixCalculator can be removed in one shot.
-    // pattern->setScaleMode(ToTGFX(node->scaleMode));
     if (pattern) {
-      pattern->setScaleMode(tgfx::ScaleMode::None);
-      // pattern->setScaleMode(ToTGFX(node->scaleMode));
+      pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
       }

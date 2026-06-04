@@ -20,6 +20,8 @@
 
 #include <cstddef>
 #include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -46,21 +48,46 @@ pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
                                          float scaleFactor = 0.5f,
                                          float origImageWidth = 0.0f, float origImageHeight = 0.0f);
 
+// Per-image original-pixel-size lookup used by the new-format resolve path. Maps the Image
+// node's filePath ("hash:..." / "emoji:...") to the full-resolution pixel dimensions that the
+// exporter assumed when baking pattern->matrix. The table is owned by PAGXView and populated
+// via PAGXView::setImageOriginalSize() before attachNativeImage(); resolveImagePatternMatrix()
+// reads it to undo any scaling applied by progressive thumbnail/full downloads. May be null
+// to skip the new-format path entirely (legacy customData-only flow).
+using ImageOriginalSizeMap = std::unordered_map<std::string, std::pair<float, float>>;
+
 // Resolves a single ImagePattern's transform matrix from its customData and actual image
-// dimensions. Idempotent: the original paint transform is cached in customData on first call,
-// so repeated invocations after decodedImage changes recompute against the current image size
-// rather than re-baking the previously baked matrix.
-bool resolveImagePatternMatrix(pagx::ImagePattern* pattern);
+// dimensions. Idempotent: the original paint transform / matrix is cached in customData on
+// first call, so repeated invocations after decodedImage changes recompute against the current
+// image size rather than re-baking the previously baked matrix.
+//
+// Two formats are supported:
+//   1. Legacy CoCraft format (customData carries image-scale-mode, node-width/height,
+//      orig-image-width/height, scale-factor): rebuilt via calculateImagePatternMatrix() against
+//      the current image's pixel dimensions.
+//   2. New PAGX standard format (no image-scale-mode in customData): the exporter has already
+//      baked pattern->matrix in original-image pixel coordinates. When the actually attached
+//      image has different pixel dimensions (progressive thumbnail / CDN-shrunk variant), the
+//      matrix is post-scaled by diag(origW/actualW, origH/actualH) so tgfx's getFitMatrix /
+//      shader sampling sees the same visual layout regardless of the asset's actual resolution.
+//      origW/origH source priority: first read from pattern->customData
+//      ("orig-image-width"/"orig-image-height", written by the new exporter); if missing,
+//      fall back to origSizeMap[filePath] populated by the host via setImageOriginalSize();
+//      if both are unavailable the authored matrix is left unchanged.
+bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
+                               const ImageOriginalSizeMap* origSizeMap = nullptr);
 
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().
-void resolveAllImagePatternMatrices(pagx::PAGXDocument* document);
+void resolveAllImagePatternMatrices(pagx::PAGXDocument* document,
+                                    const ImageOriginalSizeMap* origSizeMap = nullptr);
 
 // Resolves ImagePattern transform matrices for every pattern whose backing Image node has the
 // given filePath. Returns the number of patterns whose matrix was refreshed. Intended for the
 // progressive image upgrade path: when a higher-resolution image replaces the initial one, the
 // baked pattern matrix must be recomputed against the new image dimensions.
 size_t resolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
-                                             const std::string& filePath);
+                                             const std::string& filePath,
+                                             const ImageOriginalSizeMap* origSizeMap = nullptr);
 
 }  // namespace pagx

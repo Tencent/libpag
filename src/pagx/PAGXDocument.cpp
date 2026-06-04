@@ -27,8 +27,8 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Stroke.h"
-#include "tgfx/core/Image.h"
 #include "renderer/FontEmbedder.h"
+#include "tgfx/core/Image.h"
 
 namespace pagx {
 

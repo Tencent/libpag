@@ -283,6 +283,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // callers do not need to re-register on every parsePAGX().
   inFlightFullRequests.clear();
   evictedFullPaths.clear();
+  imageOriginalSizes.clear();
 
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
@@ -417,7 +418,7 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   // wrong scale/offset inside the shape). resolveImagePatternMatricesByFilePath is idempotent
   // thanks to the paint-transform cache in customData, so each upgrade call refreshes against
   // the newly attached decodedImage without losing the original paint transform.
-  resolveImagePatternMatricesByFilePath(document.get(), filePath);
+  resolveImagePatternMatricesByFilePath(document.get(), filePath, &imageOriginalSizes);
   // Regenerate every layer whose fill/stroke currently points at this filePath. The return
   // value is the number of tgfx layers whose contents were refreshed; zero means nothing in
   // the document references the path (callers typically treat this as a no-op success, but
@@ -636,7 +637,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       externalTexturesTotalBytes += p.sizeBytes;
       // Refresh ImagePattern matrices against the newly attached image dimensions; mirrors the
       // upgradeImageFromNative path so progressive thumbnail->full swaps stay aligned.
-      resolveImagePatternMatricesByFilePath(document.get(), p.filePath);
+      resolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
       }
@@ -666,7 +667,12 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       // (clamped to edge). resolveImagePatternMatrix's source priority falls through to
       // thumbnailImage when decodedImage is absent so this stays correct after a later
       // Full attach overwrites the matrix to the full-resolution dimensions.
-      resolveImagePatternMatricesByFilePath(document.get(), p.filePath);
+      resolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
+      // [DIAG-EXP] Re-enable rebuildForFilePath. Internal rebuildVectorContents call is
+      // disabled inside LayerBuilderSession::rebuildForFilePath (LayerBuilder.cpp) for this
+      // experiment so only invalidateImagesByFilePath runs. If Full attach still does not
+      // crash, the corruption originates from rebuildVectorContents -> setContents. If it
+      // crashes, the corruption is in invalidateImagesByFilePath (_imageCache.erase).
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
       }
@@ -751,7 +757,7 @@ void PAGXView::enforceFullBudget() {
     // attached; otherwise the fallback fill would sample outside the thumbnail's UV domain
     // and render blank (clamp-to-edge). When a replacement Full is later re-attached, the
     // upload path runs the same resolve again with the full-resolution dimensions.
-    resolveImagePatternMatricesByFilePath(document.get(), c.path);
+    resolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes);
     if (builderSession) {
       builderSession->rebuildForFilePath(c.path);
     }
@@ -1036,6 +1042,13 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   return result;
 }
 
+void PAGXView::setImageOriginalSize(const std::string& filePath, float width, float height) {
+  if (filePath.empty() || width <= 0.0f || height <= 0.0f) {
+    return;
+  }
+  imageOriginalSizes[filePath] = {width, height};
+}
+
 val PAGXView::getImageMetadata() const {
   val result = val::array();
   if (!document) {
@@ -1100,7 +1113,33 @@ val PAGXView::getImageMetadata() const {
     float origHeight = parseFloatAttr(data, "orig-image-height", 0.0f);
     float nodeWidth = parseFloatAttr(data, "node-width", 0.0f);
     float nodeHeight = parseFloatAttr(data, "node-height", 0.0f);
-    int scaleMode = parseIntAttr(data, "image-scale-mode", 0);
+    // scaleMode mapping: the JS side expects the CoCraft business enum
+    // (0=FILL, 1=FIT, 2=STRETCH, 3=TILE), not the pagx::ScaleMode enum. Two PAGX exporter
+    // generations need to be handled here:
+    //   - Legacy (CoCraft pre-rework): writes "image-scale-mode" into customData with the
+    //     business-enum integer directly. The XML side does not carry a "scaleMode" attribute,
+    //     so PAGXImporter falls back to the default LetterBox and pattern->scaleMode is not a
+    //     reliable source. We honour the customData value as-is.
+    //   - New (CoCraft post-rework): omits "image-scale-mode" and instead writes the canonical
+    //     "scaleMode" XML attribute plus tileModeX="repeat" for tiled fills. PAGXImporter
+    //     deserialises both onto the pattern, so we recover the business-enum integer by
+    //     inspecting the structured fields. The mapping is unambiguous because TILE is the
+    //     only mode that uses tileModeX=Repeat.
+    int scaleMode;
+    if (data.find("image-scale-mode") != data.end()) {
+      scaleMode = parseIntAttr(data, "image-scale-mode", 0);
+    } else if (pattern->tileModeX == TileMode::Repeat) {
+      scaleMode = 3;  // TILE
+    } else if (pattern->scaleMode == ScaleMode::Zoom) {
+      scaleMode = 0;  // FILL
+    } else if (pattern->scaleMode == ScaleMode::LetterBox) {
+      scaleMode = 1;  // FIT
+    } else {
+      // Stretch / None both fall through here. None is only emitted by SVGImporter for
+      // absolute-coordinate fills which the WeChat host never feeds through this metadata
+      // path, so treating it as STRETCH is a safe fallback for the edge case.
+      scaleMode = 2;  // STRETCH
+    }
     // 0.5 matches the default used by ImagePatternMatrixCalculator so TILE patterns that omit
     // the attribute behave identically in C++ and JS.
     float scaleFactor = parseFloatAttr(data, "scale-factor", 0.5f);
@@ -1163,7 +1202,7 @@ void PAGXView::buildLayers() {
   // to compute the final ImagePattern matrices. PAGX files generated by libpag embed image data
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
-  resolveAllImagePatternMatrices(document.get());
+  resolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
 
   document->applyLayout(&fontConfig);
   LogMemProbe("buildLayers.afterApplyLayout");

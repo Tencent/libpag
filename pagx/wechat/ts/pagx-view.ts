@@ -370,6 +370,32 @@ export class View {
   }
 
   /**
+   * Provides the original (full-resolution) pixel dimensions of an external image to the SDK
+   * so that the new-format PAGX ImagePattern matrix can be corrected when the host attaches a
+   * downscaled variant.
+   *
+   * Background: New-format PAGX bakes the ImagePattern matrix in the original image's pixel
+   * coordinate system. When the host attaches a scaled-down variant via attachNativeImage(),
+   * the SDK must post-multiply the authored matrix by diag(origW/actualW, origH/actualH) to
+   * keep the fill aligned. Without this hint the SDK falls back to using the attached image's
+   * own dimensions, which produces a misaligned fill.
+   *
+   * Call this right after parsePAGX() and before buildLayers() / attachNativeImage(). The
+   * filePath must match the value returned by getImageMetadata() (i.e. the Image node's
+   * source path). Calling parsePAGX() again clears the entire table.
+   *
+   * @param filePath The external file path identifying the image (matches Image.filePath).
+   * @param width Original image pixel width; must be > 0.
+   * @param height Original image pixel height; must be > 0.
+   */
+  public setImageOriginalSize(filePath: string, width: number, height: number): void {
+    if (!this.nativeView) {
+      throw new Error('Native view not initialized');
+    }
+    this.nativeView.setImageOriginalSize(filePath, width, height);
+  }
+
+  /**
    * Registers a JavaScript handler that receives backend-texture lifecycle events from this
    * view. See TextureEventHandler for the expected method shape; both onTextureRequest and
    * onTextureEvict are optional and missing methods are silently skipped.

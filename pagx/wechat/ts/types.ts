@@ -54,6 +54,16 @@ export interface PAGXViewNative {
      */
     attachNativeImage: (filePath: string, nativeImage: any, qualityRaw: number) => boolean;
     /**
+     * Provides the original (full-resolution) pixel dimensions of an external image so that
+     * the new-format PAGX ImagePattern matrix can be corrected when the host attaches a
+     * downscaled variant. New-format PAGX bakes the pattern matrix in the original image's
+     * pixel coordinate system; without this hint the SDK falls back to the attached image's
+     * own dimensions, which produces a misaligned fill. Call right after parsePAGX() and
+     * before buildLayers() / attachNativeImage(). The width/height must be > 0; parsePAGX()
+     * clears the entire table.
+     */
+    setImageOriginalSize: (filePath: string, width: number, height: number) => void;
+    /**
      * Registers a JavaScript object whose onTextureRequest / onTextureEvict methods receive
      * backend-texture lifecycle events. Pass null/undefined to clear a previously registered
      * handler. The handler survives across parsePAGX() calls.
