@@ -46,8 +46,8 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
       new PAGComposition(nullptr, std::move(buildResult.root), scene.get()));
   *rootComp->binding = std::move(buildResult.binding);
   rootComp->document = document.get();
-  scene->rootComposition = rootComp;
-  scene->rootComposition->buildChildren(document->layers);
+  scene->_rootComposition = rootComp;
+  scene->_rootComposition->buildChildren(document->layers);
   scene->displayList->root()->addChild(rootComp->runtimeLayer);
   document->registerLiveScene(scene);
   return scene;
@@ -92,7 +92,7 @@ std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
     return it->second;
   }
   auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, rootComposition->binding.get(), document.get()));
+      new PAGTimeline(matched, _rootComposition->binding.get(), document.get()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -108,11 +108,15 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
   return getTimeline(first->id);
 }
 
+std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {
+  return _rootComposition;
+}
+
 bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface) {
   if (surface == nullptr || surface->drawable == nullptr) {
     return false;
   }
-  if (rootComposition == nullptr || rootComposition->runtimeLayer == nullptr) {
+  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
     return false;
   }
   auto& drawable = surface->drawable;
@@ -148,9 +152,9 @@ PAGDisplayOptions* PAGScene::getDisplayOptions() const {
 }
 
 void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
-  if (rootComposition != nullptr) {
-    rootComposition->advance(deltaMicroseconds);
-    rootComposition->apply();
+  if (_rootComposition != nullptr) {
+    _rootComposition->advance(deltaMicroseconds);
+    _rootComposition->apply();
   }
 }
 
@@ -161,8 +165,8 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return {};
   }
-  if (rootComposition != nullptr) {
-    return rootComposition->getLayersUnderPoint(rootX, rootY);
+  if (_rootComposition != nullptr) {
+    return _rootComposition->getLayersUnderPoint(rootX, rootY);
   }
   return {};
 }
@@ -205,7 +209,7 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
 }
 
 void* PAGScene::rootRuntimeLayer() const {
-  return rootComposition != nullptr ? rootComposition->runtimeLayer.get() : nullptr;
+  return _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
 }
 
 void PAGScene::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
@@ -213,7 +217,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
 }
 
 RuntimeBinding* PAGScene::mutableBinding() {
-  return rootComposition != nullptr ? rootComposition->binding.get() : nullptr;
+  return _rootComposition != nullptr ? _rootComposition->binding.get() : nullptr;
 }
 
 tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {

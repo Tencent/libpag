@@ -28,8 +28,8 @@
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGDisplayOptions.h"
-#include "pagx/PAGFile.h"
 #include "pagx/PAGLayer.h"
+#include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
@@ -5540,33 +5540,33 @@ PAGX_TEST(PAGXTest, TypedPropertyEvaluateAt) {
 }
 
 /**
- * Test case: PAGFile registers itself with the source document on creation and unregisters on
+ * Test case: PAGScene registers itself with the source document on creation and unregisters on
  * destruction.
  */
-PAGX_TEST(PAGXTest, PAGFileLiveFileRegistration) {
+PAGX_TEST(PAGXTest, PAGSceneLiveSceneRegistration) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
-  EXPECT_TRUE(doc->liveFiles.empty());
+  EXPECT_TRUE(doc->liveScenes.empty());
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(doc->liveFiles.size(), 1u);
-  EXPECT_EQ(doc->liveFiles[0].lock().get(), file.get());
+  ASSERT_EQ(doc->liveScenes.size(), 1u);
+  EXPECT_EQ(doc->liveScenes[0].lock().get(), file.get());
 
   file.reset();
-  EXPECT_TRUE(doc->liveFiles.empty() ||
-              (doc->liveFiles.size() == 1u && doc->liveFiles[0].expired()));
+  EXPECT_TRUE(doc->liveScenes.empty() ||
+              (doc->liveScenes.size() == 1u && doc->liveScenes[0].expired()));
 
-  auto file2 = pagx::PAGFile::Make(doc);
+  auto file2 = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file2 != nullptr);
   EXPECT_EQ(file2->width(), 100.0f);
   EXPECT_EQ(file2->height(), 100.0f);
 }
 
 /**
- * Test case: PAGFile timeline lookup by name and identity sharing.
+ * Test case: PAGScene timeline lookup by name and identity sharing.
  */
-PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
+PAGX_TEST(PAGXTest, PAGSceneTimelineLookup) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto main = doc->makeNode<pagx::Animation>("main");
@@ -5579,7 +5579,7 @@ PAGX_TEST(PAGXTest, PAGFileTimelineLookup) {
   hint->frameRate = 60;
   doc->animations.push_back(hint);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto ids = file->getTimelineIds();
@@ -5617,7 +5617,7 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   anim->loop = pagx::LoopMode::Loop;
   doc->animations.push_back(anim);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto timeline = file->getTimeline("loop");
   ASSERT_TRUE(timeline != nullptr);
 
@@ -5696,7 +5696,7 @@ PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
   alphaProp->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   object->properties.push_back(alphaProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto& tree = *file->mutableBinding();
@@ -5743,7 +5743,7 @@ PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
   visProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
   object->properties.push_back(visProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setVisible(true);
@@ -5781,7 +5781,7 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   xProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   object->properties.push_back(xProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
 
@@ -5835,7 +5835,7 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   fontConfig.registerTypeface(typeface);
   doc->applyLayout(&fontConfig);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
   auto& tree = *file->mutableBinding();
   auto tgfxText = tree.get<tgfx::Text>(text);
@@ -5880,7 +5880,7 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
   p->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
   obj->properties.push_back(p);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxSolid = tree.get<tgfx::SolidColor>(solid);
   ASSERT_TRUE(tgfxSolid != nullptr);
@@ -5944,7 +5944,7 @@ PAGX_TEST(PAGXTest, ChannelColorStop) {
   offsetProp->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   obj->properties.push_back(offsetProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxGrad = tree.get<tgfx::Gradient>(gradient);
   ASSERT_TRUE(tgfxGrad != nullptr);
@@ -5990,7 +5990,7 @@ PAGX_TEST(PAGXTest, ChannelBlurFilter) {
   yProp->keyframes.push_back({0, 6.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   obj->properties.push_back(yProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxBlur = tree.get<tgfx::BlurFilter>(blur);
   ASSERT_TRUE(tgfxBlur != nullptr);
@@ -6053,7 +6053,7 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   sblur->keyframes.push_back({0, 12.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   sObj->properties.push_back(sblur);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxFilter = tree.get<tgfx::DropShadowFilter>(dsFilter);
   ASSERT_TRUE(tgfxFilter != nullptr);
@@ -6099,7 +6099,7 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
   MakeAlphaAnim(doc.get(), "base", 0.0f);
   MakeAlphaAnim(doc.get(), "hint", 1.0f);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setAlpha(0.5f);
@@ -6115,10 +6115,10 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
 }
 
 /**
- * Test case: end-to-end PAGFile::draw renders a SolidColor layer into a PAGSurface and the
+ * Test case: end-to-end PAGScene::draw renders a SolidColor layer into a PAGSurface and the
  * resulting pixels match the channel-applied color.
  */
-PAGX_TEST(PAGXTest, PAGFileDrawAndReadPixels) {
+PAGX_TEST(PAGXTest, PAGSceneDrawAndReadPixels) {
   auto doc = pagx::PAGXDocument::Make(8, 8);
   auto layer = doc->makeNode<pagx::Layer>("L");
   layer->width = 8;
@@ -6149,7 +6149,7 @@ PAGX_TEST(PAGXTest, PAGFileDrawAndReadPixels) {
   prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
   obj->properties.push_back(prop);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto timeline = file->getDefaultTimeline();
@@ -6209,7 +6209,7 @@ PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
   alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   obj->properties.push_back(alphaProp);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
   auto timeline = file->getDefaultTimeline();
   ASSERT_TRUE(timeline != nullptr);
@@ -6437,13 +6437,13 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
   slot->timelines.push_back(std::move(driver));
   doc->layers.push_back(slot);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->children.size(), 1u);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
 
   // Per-slot binding should expose the child Layer's tgfx instance — and that instance must
   // differ from anything stored in the top-level binding (top-level has the slot Layer only).
-  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->children[0].get())->binding;
+  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
   ASSERT_TRUE(tgfxChild != nullptr);
 
@@ -6490,11 +6490,11 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
   slotB->timelines.push_back(std::move(driverB));
   doc->layers.push_back(slotB);
 
-  auto file = pagx::PAGFile::Make(doc);
-  ASSERT_EQ(file->children.size(), 2u);
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_EQ(file->rootComposition()->children.size(), 2u);
 
-  auto& treeA = *static_cast<pagx::PAGComposition*>(file->children[0].get())->binding;
-  auto& treeB = *static_cast<pagx::PAGComposition*>(file->children[1].get())->binding;
+  auto& treeA = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& treeB = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
   auto tgfxChildA = treeA.get<tgfx::Layer>(fx.childLayer);
   auto tgfxChildB = treeB.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NE(tgfxChildA.get(), tgfxChildB.get());
@@ -6514,7 +6514,7 @@ PAGX_TEST(PAGXTest, CompositionSlotIndependentState) {
 /**
  * Test case: A Composition nested inside another Composition has its driver-spawned timeline
  * advanced too. The inner composition is built recursively (as a child runtime node) and its
- * timeline must be reached by PAGFile::advance, otherwise the nested animation stays frozen.
+ * timeline must be reached by PAGScene::advance, otherwise the nested animation stays frozen.
  */
 PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -6544,12 +6544,12 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   outerRefLayer->height = 50;
   doc->layers.push_back(outerRefLayer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->children.size(), 1u);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
 
   // The inner child's tgfx layer lives in the nested child composition's binding.
-  auto& outerComposition = *static_cast<pagx::PAGComposition*>(file->children[0].get());
+  auto& outerComposition = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get());
   ASSERT_EQ(outerComposition.children.size(), 1u);
   auto& innerComposition = *static_cast<pagx::PAGComposition*>(outerComposition.children[0].get());
   auto tgfxInnerChild = innerComposition.binding->get<tgfx::Layer>(inner.childLayer);
@@ -6569,7 +6569,7 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
  */
 PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto* options = file->getDisplayOptions();
@@ -6608,8 +6608,8 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setSubtreeCacheMaxSize(1024);
   EXPECT_EQ(options->getSubtreeCacheMaxSize(), 1024);
 
-  const auto constFile = std::const_pointer_cast<const pagx::PAGFile>(file);
-  EXPECT_EQ(constFile->getDisplayOptions(), options);
+  const auto constScene = std::const_pointer_cast<const pagx::PAGScene>(file);
+  EXPECT_EQ(constScene->getDisplayOptions(), options);
 }
 
 PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
@@ -6635,7 +6635,7 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   mainProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   mainObj->properties.push_back(mainProp);
 
-  // Another top-level animation that must stay untouched by PAGFile::advance.
+  // Another top-level animation that must stay untouched by PAGScene::advance.
   auto hintAnim = doc->makeNode<pagx::Animation>("hint");
   hintAnim->duration = 60;
   hintAnim->frameRate = 60;
@@ -6660,7 +6660,7 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   compLayer->timelines.push_back(std::move(driver));
   doc->layers.push_back(compLayer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto mainTimeline = file->getTimeline("main");
@@ -6668,16 +6668,17 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   ASSERT_TRUE(mainTimeline != nullptr);
   ASSERT_TRUE(hintTimeline != nullptr);
 
-  // PAGFile::advance drives only composition-spawned timelines; top-level animations are not
+  // PAGScene::advance drives only composition-spawned timelines; top-level animations are not
   // touched, regardless of their playing state.
   mainTimeline->play();
-  file->advance(500'000);
+  file->rootComposition()->advance(500'000);
   EXPECT_EQ(mainTimeline->currentTime(), 0);
   EXPECT_EQ(hintTimeline->currentTime(), 0);
 
   // The composition's driver timeline did advance — verify via the child alpha after apply.
-  file->apply();
-  auto& compositionTree = *static_cast<pagx::PAGComposition*>(file->children[1].get())->binding;
+  file->rootComposition()->apply();
+  auto& compositionTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
   auto tgfxChild = compositionTree.get<tgfx::Layer>(fx.childLayer);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
 
@@ -6744,14 +6745,14 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
   ASSERT_TRUE(slotLayer->composition != nullptr);
   ASSERT_TRUE(slotLayer->externalDoc != nullptr);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->children.size(), 1u);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
   file->advanceAndApply(500'000);
 
   auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(externalChild != nullptr);
-  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->children[0].get())->binding;
+  auto& slotTree = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
   auto tgfxChild = slotTree.get<tgfx::Layer>(externalChild);
   ASSERT_TRUE(tgfxChild != nullptr);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
@@ -6806,7 +6807,7 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   auto hits = file->getLayersUnderPoint(50, 40);
@@ -6871,7 +6872,7 @@ PAGX_TEST(PAGXTest, HitTestMiss) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   EXPECT_TRUE(file->getLayersUnderPoint(150, 150).empty());
@@ -6907,9 +6908,9 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
   compLayer->composition = comp;
   doc->layers.push_back(compLayer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(file->children.size(), 1u);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
 
   auto hits = file->getLayersUnderPoint(50, 50);
   ASSERT_FALSE(hits.empty());
@@ -6953,15 +6954,15 @@ PAGX_TEST(PAGXTest, HitTestSharedCompositionPerInstance) {
   compLayerB->composition = comp;
   doc->layers.push_back(compLayerB);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
   // Two independent runtime composition instances were built from the one shared Composition.
-  ASSERT_EQ(file->children.size(), 2u);
+  ASSERT_EQ(file->rootComposition()->children.size(), 2u);
 
   // Each instance has its own reverse map keyed by its own tgfx layers, but resolves to the same
   // shared source child node.
-  auto& bindingA = *static_cast<pagx::PAGComposition*>(file->children[0].get())->binding;
-  auto& bindingB = *static_cast<pagx::PAGComposition*>(file->children[1].get())->binding;
+  auto& bindingA = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto& bindingB = *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
   auto tgfxChildA = bindingA.get<tgfx::Layer>(childLayer);
   auto tgfxChildB = bindingB.get<tgfx::Layer>(childLayer);
   ASSERT_TRUE(tgfxChildA != nullptr);
@@ -7000,7 +7001,7 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  auto file = pagx::PAGFile::Make(doc);
+  auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
   // Apply a zoomScale and contentOffset so the matrix has non-trivial surface terms.

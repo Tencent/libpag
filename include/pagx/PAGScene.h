@@ -83,6 +83,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
   /**
+   * Returns the root PAGComposition of this scene.
+   */
+  std::shared_ptr<PAGComposition> rootComposition() const;
+
+  /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
    * callers must advance the scene (or its timelines) beforehand.
    * @param surface the destination surface.
@@ -160,7 +165,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void* rootRuntimeLayer() const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;
-  std::shared_ptr<PAGComposition> rootComposition = nullptr;
+  std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList = {};
