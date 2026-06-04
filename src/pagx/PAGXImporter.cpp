@@ -97,6 +97,8 @@ static float GetFloatAttribute(const DOMNode* node, const std::string& name, flo
                                PAGXDocument* doc = nullptr);
 static int GetIntAttribute(const DOMNode* node, const std::string& name, int defaultValue = 0,
                            PAGXDocument* doc = nullptr);
+static int64_t GetInt64Attribute(const DOMNode* node, const std::string& name,
+                                 int64_t defaultValue = 0, PAGXDocument* doc = nullptr);
 static bool GetBoolAttribute(const DOMNode* node, const std::string& name,
                              bool defaultValue = false, PAGXDocument* doc = nullptr);
 static Point ParsePoint(const std::string& str, bool* outValid = nullptr);
@@ -1542,18 +1544,41 @@ static T ParseTypedValue(const std::string&, PAGXDocument*, const DOMNode*) {
 }
 
 template <>
-float ParseTypedValue<float>(const std::string& value, PAGXDocument*, const DOMNode*) {
-  return strtof(value.c_str(), nullptr);
+float ParseTypedValue<float>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
+  char* endPtr = nullptr;
+  float result = strtof(value.c_str(), &endPtr);
+  if (endPtr == value.c_str() || *endPtr != '\0' || !std::isfinite(result)) {
+    ReportError(doc, node, "Invalid float keyframe value '" + value + "'.");
+    return 0.0f;
+  }
+  return result;
 }
 
 template <>
-bool ParseTypedValue<bool>(const std::string& value, PAGXDocument*, const DOMNode*) {
-  return value == "true" || value == "1";
+bool ParseTypedValue<bool>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
+  if (value == "true" || value == "1") {
+    return true;
+  }
+  if (value == "false" || value == "0") {
+    return false;
+  }
+  ReportError(doc, node, "Invalid bool keyframe value '" + value + "'.");
+  return false;
 }
 
 template <>
-int ParseTypedValue<int>(const std::string& value, PAGXDocument*, const DOMNode*) {
-  return static_cast<int>(std::strtol(value.c_str(), nullptr, 10));
+int ParseTypedValue<int>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
+  char* endPtr = nullptr;
+  long result = std::strtol(value.c_str(), &endPtr, 10);
+  if (endPtr == value.c_str() || *endPtr != '\0') {
+    ReportError(doc, node, "Invalid int keyframe value '" + value + "'.");
+    return 0;
+  }
+  if (result < INT_MIN || result > INT_MAX) {
+    ReportError(doc, node, "Int keyframe value '" + value + "' out of range.");
+    return 0;
+  }
+  return static_cast<int>(result);
 }
 
 template <>
@@ -1586,7 +1611,7 @@ static void ParseKeyframes(const DOMNode* propertyNode, TypedProperty<T>* proper
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Key") {
         Keyframe<T> key = {};
-        key.time = GetIntAttribute(child.get(), "time", 0, doc);
+        key.time = GetInt64Attribute(child.get(), "time", 0, doc);
         key.value = ParseTypedValue<T>(GetAttribute(child.get(), "value"), doc, child.get());
         key.interpolation = ParseKeyframeInterpolation(GetAttribute(child.get(), "interpolation"),
                                                        doc, child.get());
@@ -1718,7 +1743,7 @@ static Animation* ParseAnimation(const DOMNode* node, PAGXDocument* doc) {
   if (!animation) {
     return nullptr;
   }
-  animation->duration = GetIntAttribute(node, "duration", 0, doc);
+  animation->duration = GetInt64Attribute(node, "duration", 0, doc);
   animation->frameRate = GetFloatAttribute(node, "frameRate", 60.0f, doc);
   auto loop = GetAttribute(node, "loop", "once");
   if (loop == "once") {
@@ -2145,6 +2170,23 @@ static int GetIntAttribute(const DOMNode* node, const std::string& name, int def
     return defaultValue;
   }
   return static_cast<int>(value);
+}
+
+static int64_t GetInt64Attribute(const DOMNode* node, const std::string& name, int64_t defaultValue,
+                                 PAGXDocument* doc) {
+  auto* str = node->findAttribute(name);
+  if (!str || str->empty()) {
+    return defaultValue;
+  }
+  char* endPtr = nullptr;
+  int64_t value = strtoll(str->c_str(), &endPtr, 10);
+  if (endPtr == str->c_str()) {
+    if (doc) {
+      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    }
+    return defaultValue;
+  }
+  return value;
 }
 
 static bool GetBoolAttribute(const DOMNode* node, const std::string& name, bool defaultValue,
