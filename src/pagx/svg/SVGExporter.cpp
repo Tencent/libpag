@@ -102,12 +102,17 @@ static std::string ColorToDisplayP3String(const Color& color) {
 }
 
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
+// Compare via the formatted strings so ULP-level differences from upstream transform
+// scaling don't emit redundant anisotropic stdDeviation that browsers would honour.
 static std::string FormatBlurStdDev(float blurX, float blurY) {
-  std::string stdDev = FloatToString(blurX);
-  if (blurX != blurY) {
-    stdDev += " ";
-    stdDev += FloatToString(blurY);
+  std::string xStr = FloatToString(blurX);
+  std::string yStr = FloatToString(blurY);
+  if (xStr == yStr) {
+    return xStr;
   }
+  std::string stdDev = std::move(xStr);
+  stdDev += " ";
+  stdDev += yStr;
   return stdDev;
 }
 
@@ -205,9 +210,8 @@ static bool IsGradientSource(const ColorSource* source) {
 }
 
 // Detects an image MIME type from the leading bytes of the encoded stream so that
-// data URIs declare the actual format (PNG/JPEG/WebP). Defaults to image/png when
-// the magic bytes are not recognized, matching the long-standing assumption that
-// embedded images are PNG and keeping the legacy export behaviour for that case.
+// data URIs declare the actual format (PNG/JPEG/WebP). Returns nullptr when the
+// magic bytes match no known signature so callers can surface the degradation.
 static const char* DetectImageMimeType(const uint8_t* data, size_t size) {
   if (size >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) {
     return "image/png";
@@ -219,12 +223,20 @@ static const char* DetectImageMimeType(const uint8_t* data, size_t size) {
       data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
     return "image/webp";
   }
-  return "image/png";
+  return nullptr;
 }
 
-static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size) {
+// Encodes the image bytes as a data URI. Falls back to declaring image/png when the
+// signature does not match a known format — preserves the long-standing legacy
+// behaviour. When `recognized` is non-null it is set to false in the fallback path so
+// callers can surface a warning to the caller-supplied diagnostics channel.
+static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size, bool* recognized) {
+  const char* mime = DetectImageMimeType(bytes, size);
+  if (recognized != nullptr) {
+    *recognized = (mime != nullptr);
+  }
   std::string href = "data:";
-  href += DetectImageMimeType(bytes, size);
+  href += (mime != nullptr ? mime : "image/png");
   href += ";base64,";
   href += Base64Encode(bytes, size);
   return href;
@@ -234,15 +246,17 @@ static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size) {
 // rely on absolute filesystem paths resolving, so prefer to inline the encoded image
 // bytes as a data URI. Reads from disk on demand when only filePath is populated. When
 // reading fails, return empty so the caller skips the asset rather than embedding a
-// host-local path that would leak filesystem layout and never resolve elsewhere.
-static std::string GetImageHref(const Image* image) {
+// host-local path that would leak filesystem layout and never resolve elsewhere. The
+// optional `mimeRecognized` outparam is set to false when the encoded bytes do not
+// match any known format signature so the caller can record a warning.
+static std::string GetImageHref(const Image* image, bool* mimeRecognized = nullptr) {
   if (image->data) {
-    return EncodeImageDataURI(image->data->bytes(), image->data->size());
+    return EncodeImageDataURI(image->data->bytes(), image->data->size(), mimeRecognized);
   }
   if (!image->filePath.empty()) {
     auto data = GetImageData(image);
     if (data && data->size() > 0) {
-      return EncodeImageDataURI(data->bytes(), data->size());
+      return EncodeImageDataURI(data->bytes(), data->size(), mimeRecognized);
     }
   }
   return {};
@@ -301,29 +315,18 @@ class SVGWriter {
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 
-  // When non-empty, a gradient color source written while this is set is
-  // resolved into userSpaceOnUse coordinates spanning these bounds instead of
-  // emitting objectBoundingBox. Used when a single fitsToGeometry gradient must
-  // span a <g> that wraps multiple child geometries (per-glyph text paths):
-  // SVG re-fits objectBoundingBox/userSpaceOnUse gradients to each child's own
-  // box, so the gradient has to be baked against the whole run's bounds.
   Rect _gradientUserSpaceBounds = {};
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
   }
 
-  // Append a human-readable warning for downstream pipelines that need to surface silent
-  // degradation. No-op when no warnings sink was supplied.
   void addWarning(std::string message) {
     if (_warnings != nullptr) {
       _warnings->push_back(std::move(message));
     }
   }
 
-  // Returns the resolver-baked element list when resolveModifiers is enabled, otherwise the
-  // original list verbatim. Modifier nodes left in the verbatim list are dropped silently by
-  // processVectorScope's switch (matching V1 / PPTExporter::resolveModifiers=false behaviour).
   std::vector<Element*> resolveIfEnabled(const std::vector<Element*>& elements) {
     if (_resolveModifiers) {
       return _resolver.resolve(elements);
@@ -333,19 +336,8 @@ class SVGWriter {
 
   const LayerBuildResult& ensureBuildResult();
 
-  // Rasterizes the given layer to a PNG and emits it as a positioned <image>. Returns true iff a
-  // picture was emitted.
   bool rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer);
 
-  // One geometry instance captured during the scope walk in writeElements.
-  // Only `transform` is baked at collection time; the painter's effective
-  // alpha is supplied at emit time from the painter's own scope so that a
-  // Group's alpha does NOT leak onto outer painters that render the Group's
-  // geometry (Group is an isolation boundary for painters, while geometry
-  // itself still propagates upward). `textBox` carries the in-scope
-  // <TextBox> modifier so Text geometry still picks up box-level layout when
-  // rendered by a downstream painter (matches the legacy
-  // CollectFillStroke().textBox rule).
   struct AccumulatedGeometry {
     const Element* element = nullptr;
     Matrix transform = {};
@@ -647,13 +639,19 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   if (!pattern->image) {
     return {};
   }
-  std::string href = GetImageHref(pattern->image);
+  bool mimeRecognized = true;
+  std::string href = GetImageHref(pattern->image, &mimeRecognized);
   if (href.empty()) {
     addWarning(
         "ImagePattern dropped: image bytes unavailable (no inline data and on-disk read "
         "from filePath '" +
         pattern->image->filePath + "' failed); the affected fill will be empty.");
     return {};
+  }
+  if (!mimeRecognized) {
+    addWarning(
+        "ImagePattern: encoded bytes do not match PNG/JPEG/WebP signature; declared as image/png "
+        "fallback — viewers may fail to decode.");
   }
 
   std::string defId = generateId("pattern");
@@ -1562,9 +1560,15 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     if (!gi.image) {
       continue;
     }
-    std::string href = GetImageHref(gi.image);
+    bool mimeRecognized = true;
+    std::string href = GetImageHref(gi.image, &mimeRecognized);
     if (href.empty()) {
       continue;
+    }
+    if (!mimeRecognized) {
+      addWarning(
+          "Glyph bitmap: encoded bytes do not match PNG/JPEG/WebP signature; declared as image/png "
+          "fallback — viewers may fail to decode.");
     }
     int imgW = 0;
     int imgH = 0;
@@ -1795,9 +1799,7 @@ static size_t FindLastNonEmptyLineIndex(const std::string& text,
     const auto& info = lines[li];
     if (info.byteStart < info.byteEnd &&
         info.byteEnd - info.byteStart <= text.size() - info.byteStart) {
-      if (!text.substr(info.byteStart, info.byteEnd - info.byteStart).empty()) {
-        lastLineIndex = li;
-      }
+      lastLineIndex = li;
     }
   }
   return lastLineIndex;
