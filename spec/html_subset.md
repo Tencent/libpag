@@ -103,9 +103,12 @@ External `<link rel="stylesheet">` is forbidden. The importer never performs HTT
 
 ## 4. Allowed CSS Properties
 
-All lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
-against the parent's inside-padding box, matching PAGX semantics). `em`, `rem`, `vw`,
-`vh`, calc(), and other units are rejected with a warning.
+Lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
+against the parent's inside-padding box, matching PAGX semantics). Relative units `em`,
+`rem`, `pt`, `vw`, and `vh` are **converted** to pixels during normalization (`em` against
+the parent's computed `font-size`, `rem` against a 16px base, `vw`/`vh` against the canvas
+size) and emit a `subset:unit-coerced` note. Only `calc()`, `var()`, `min()`, `max()`, and
+`clamp()` are rejected with a warning.
 
 ### 4.1 Layout
 
@@ -113,16 +116,26 @@ against the parent's inside-padding box, matching PAGX semantics). `em`, `rem`, 
 |-----|------|-------|
 | `display: block` | default (`Layer` without `layout`) | block stacking is the default |
 | `display: flex` | enables `layout` on the parent Layer | required to activate flexbox |
+| `display: inline` / `inline-block` | downgraded to `block` (warning) | not a true inline model |
 | `flex-direction: row` | `layout="horizontal"` | default of flex |
 | `flex-direction: column` | `layout="vertical"` | |
+| `flex-direction: row-reverse` / `column-reverse` | falls back to `row` / `column` (warning) | reverse ordering not modelled |
 | `gap: N` | `gap="N"` | single value only |
 | `padding: …` | `padding="…"` | CSS shorthands `N`, `T R`, `T R B L` |
-| `align-items: stretch | center | flex-start | flex-end` | `alignment="stretch|center|start|end"` | |
+| `margin: …` / `margin-*` | folded into positioning / a transparent padding wrapper (see below) | no PAGX per-child margin; supported, not dropped |
+| `align-items: stretch | center | flex-start | flex-end | baseline` | `alignment="stretch|center|start|end"` (`baseline` passed through) | |
 | `justify-content: flex-start | center | flex-end | space-between | space-evenly | space-around` | `arrangement="start|center|end|spaceBetween|spaceEvenly|spaceAround"` | |
-| `flex: N` | `flex="N"` | only integer/unitless grow values |
+| `flex: N` | `flex="N"` | integer/unitless grow only; `none`→`0`, `auto`/`initial`→`1` |
+| `flex-shrink: 0` | dropped silently (PAGX never shrinks) | other values warn — use `flex: N` |
 
-Disallowed (warning + skip): `margin*`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`
-(use `flex: N` shorthand), `display: inline-block`, `display: grid`, `grid-*`, `float`,
+`margin` is part of the subset: PAGX has no per-child margin, so the importer reproduces it.
+On `position: absolute` elements the margins fold into the existing `left/right/top/bottom`
+anchors; on flow / flex children the importer wraps the element in a transparent outer Layer
+whose `padding` equals the four-side margin. Uniform per-child main-axis margins on a flex
+container are additionally promoted onto the container's `gap` (see §11).
+
+Disallowed (warning + skip): `flex-wrap`, `flex-grow`, `flex-basis`
+(use `flex: N` shorthand), `display: grid`, `grid-*`, `float`,
 `order`, `align-content`, `align-self`, `direction`.
 
 ### 4.2 Sizing
@@ -161,24 +174,29 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-image: conic-gradient(from angle, …)` | inline `<ConicGradient>` (CSS 0° = top, PAGX 0° = right; angle shifted by −90°) |
 | `background-clip: text` (alias `-webkit-background-clip: text`) | combined with a gradient `background-image`: routes the gradient onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient) and suppresses the rectangle that would otherwise paint behind the text. Without a gradient `background-image`, the property is a no-op. |
 | `border-radius: N` (px) or `N%` (resolved against `min(width, height)`; an element with a fixed px size and `border-radius: 50%` becomes a circle) | `Rectangle.roundness = N` |
-| `border: W solid C` | `<Stroke color="C" width="W" align="inside"/>` |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
 | `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
+| `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms only (`skewX`/`skewY`/`rotate`/`scale[X|Y]`/`translate[X|Y]`/`matrix(a,b,c,d,tx,ty)`); compound chains and 3D variants (`matrix3d`/`rotate3d`/`perspective`) are dropped with a warning |
+| `transform-origin` | forwarded; only the default `50% 50%` is honoured (others warn) |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 
+`background-clip: border-box` / `padding-box` / `content-box` are silent no-ops (only the
+`text` keyword has a PAGX effect, see above).
+
 Disallowed (warning + skip): `background-image: url(...)` other than gradients (use `<img>`),
-`background-size`, `background-repeat`, `background-position`, `border-{top,right,bottom,left}`
-with mixed styles, multi-style `border`, `outline`, `transform`, `transform-origin`,
-`perspective`, `clip-path`.
+`background-size`, `background-repeat`, `background-position`, `border-{top,right,bottom,left}`,
+per-corner `border-*-radius`, `outline`, `perspective`, `clip-path`.
 
 ### 4.5 Text
 
 | CSS | PAGX |
 |-----|------|
-| `color: <color>` | `<Fill color="…"/>` next to the text |
+| `color: <color>` | `<Fill color="…"/>` next to the text (inherited) |
+| `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
 | `font-weight: bold | 700+` | `Text.fontStyle = "Bold"` (combined with italic into `"Bold Italic"`) |
@@ -188,6 +206,7 @@ with mixed styles, multi-style `border`, `outline`, `transform`, `transform-orig
 | `line-height: N px` / `line-height: N` (unitless multiplier) / `N%` | `TextBox.lineHeight` (unitless and % are resolved against the element's `font-size`) |
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
+| `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"` (horizontal modes are the default) |
 | `overflow: hidden` on a text container | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
@@ -235,6 +254,9 @@ to isolate its `<Fill>`.
 - `<img src="path" width="W" height="H"/>` resolves `src` into a `<Image>` resource (data
   URI accepted; relative paths are resolved against the input file's directory) and emits
   `<Rectangle width="100%" height="100%"/>` filled with `<ImagePattern image="@id"/>`.
+- `object-fit` on the `<img>` sets `ImagePattern.scaleMode`: `fill`→`Stretch`,
+  `contain`→`LetterBox`, `cover`→`Zoom`. `none` and `scale-down` are downgraded to
+  `contain` with a warning. Omitting `object-fit` defaults to `Stretch` (CSS `fill`).
 - Inline `<svg>...</svg>` is captured verbatim and stored as the host `Layer`'s
   `<svg>` import directive. The SVG is resolved during `pagx verify` / `pagx resolve`.
 - `<img src="path.svg"/>` is converted into an external import directive
@@ -289,7 +311,9 @@ through their own external-import directive path.
 
 ## 9. Pitfalls (mirrors `references/guide.md` §Common Pitfalls)
 
-- Don't use `margin`. Use `padding`, `gap`, or `flex: N`.
+- `margin` is supported (folded into positioning / a padding wrapper, or promoted to `gap`),
+  but `padding`, `gap`, and `flex: N` map more directly — prefer them when laying out flex
+  children. 
 - Don't size flex children with explicit width/height on the main axis — let `flex: N`
   distribute the remaining space.
 - Don't mix `position: absolute` children with a flex parent that already has `gap` /
@@ -324,16 +348,19 @@ Before the importer traverses the DOM it runs `HTMLSubsetTransformer` (see
 form so that the rest of the pipeline only ever sees compliant HTML. It is on by default;
 `HTMLImporter::Options::autoNormalize = false` (or `--html-no-normalize`) disables it.
 
-The transformer runs as a fixed pipeline of six core passes plus one optional pass.
+The transformer runs as a fixed pipeline of eight core passes plus one optional pass (the
+optional `AbsoluteToFlexInference` runs between PropertyFilter and MarginToGapPromotion).
 Behaviour:
 
 | Pass | Silently rewrites | Warns and drops |
 |------|-------------------|-----------------|
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
-| ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px; collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute` | `margin*`, `transform*`, `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-shrink`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function/`matrix()` only), `object-fit`, `writing-mode` | `transform` compound chains & 3D forms, `flex-shrink` (non-zero), `clip-path`, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `background-size`, `background-repeat`, `background-position`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | AbsoluteToFlexInference *(opt-in: `Options::inferFlexFromAbsolute` / `--html-infer-flex`)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
+| MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
+| SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |
 | StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `--html-preserve-unknown` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
 
