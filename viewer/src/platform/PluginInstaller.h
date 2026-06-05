@@ -126,14 +126,9 @@ class PluginInstaller : public QObject {
   QStringList getPluginList() const;
   static const QList<PluginInfo>& pluginInfoList();
 
-  void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
   QString getQtResourceDir() const;
   bool shouldExcludeFile(const QString& fileName) const;
   bool shouldExcludeDir(const QString& dirName) const;
-
-  void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendExporterDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
 
   void storeViewerPathForPlugin() const;
 

@@ -1,0 +1,52 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION @MajorVersion@,@MinorVersion@,@BuildNumber@,0
+    PRODUCTVERSION @MajorVersion@,@MinorVersion@,@BuildNumber@,0
+    FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef DEBUG
+    FILEFLAGS VS_FF_DEBUG
+#else
+    FILEFLAGS 0x0L
+#endif
+    FILEOS VOS_NT_WINDOWS32
+    FILETYPE VFT_DLL
+    FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Tencent"
+            VALUE "FileDescription", "PAG Exporter Plugin for Adobe After Effects"
+            VALUE "FileVersion", "@MajorVersion@.@MinorVersion@.@BuildNumber@"
+            VALUE "InternalName", "PAGExporter"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Tencent. All rights reserved."
+            VALUE "OriginalFilename", "PAGExporter.aex"
+            VALUE "ProductName", "PAGExporter"
+            VALUE "ProductVersion", "@MajorVersion@.@MinorVersion@.@BuildNumber@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END
