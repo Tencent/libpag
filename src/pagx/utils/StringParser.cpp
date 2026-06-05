@@ -88,6 +88,8 @@ const char* NodeTypeName(NodeType type) {
       return "InnerShadowStyle";
     case NodeType::BackgroundBlurStyle:
       return "BackgroundBlurStyle";
+    case NodeType::NoiseStyle:
+      return "NoiseStyle";
     case NodeType::BlurFilter:
       return "BlurFilter";
     case NodeType::DropShadowFilter:
@@ -98,6 +100,8 @@ const char* NodeTypeName(NodeType type) {
       return "BlendFilter";
     case NodeType::ColorMatrixFilter:
       return "ColorMatrixFilter";
+    case NodeType::NoiseFilter:
+      return "NoiseFilter";
     case NodeType::Rectangle:
       return "Rectangle";
     case NodeType::Ellipse:

@@ -45,6 +45,8 @@
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -90,9 +92,11 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
@@ -1044,6 +1048,29 @@ class LayerBuilderContext {
         bindBackgroundBlurStyleChannels(style);
         return tgfxStyle;
       }
+      case NodeType::NoiseStyle: {
+        auto style = static_cast<const pagx::NoiseStyle*>(node);
+        std::shared_ptr<tgfx::NoiseStyle> tgfxStyle;
+        switch (style->mode) {
+          case NoiseMode::Mono:
+            tgfxStyle = tgfx::NoiseStyle::MakeMono(style->size, style->density,
+                                                   ToTGFX(style->color), style->seed);
+            break;
+          case NoiseMode::Duo:
+            tgfxStyle =
+                tgfx::NoiseStyle::MakeDuo(style->size, style->density, ToTGFX(style->firstColor),
+                                          ToTGFX(style->secondColor), style->seed);
+            break;
+          case NoiseMode::Multi:
+            tgfxStyle = tgfx::NoiseStyle::MakeMulti(style->size, style->density, style->opacity,
+                                                    style->seed);
+            break;
+        }
+        if (tgfxStyle && node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        return tgfxStyle;
+      }
       default:
         return nullptr;
     }
@@ -1394,6 +1421,23 @@ class LayerBuilderContext {
       case NodeType::ColorMatrixFilter: {
         auto filter = static_cast<const pagx::ColorMatrixFilter*>(node);
         return tgfx::ColorMatrixFilter::Make(filter->matrix);
+      }
+      case NodeType::NoiseFilter: {
+        auto filter = static_cast<const pagx::NoiseFilter*>(node);
+        auto tgfxBlendMode = ToTGFX(filter->blendMode);
+        switch (filter->mode) {
+          case NoiseMode::Mono:
+            return tgfx::NoiseFilter::MakeMono(filter->size, filter->density, ToTGFX(filter->color),
+                                               filter->seed, tgfxBlendMode);
+          case NoiseMode::Duo:
+            return tgfx::NoiseFilter::MakeDuo(
+                filter->size, filter->density, ToTGFX(filter->firstColor),
+                ToTGFX(filter->secondColor), filter->seed, tgfxBlendMode);
+          case NoiseMode::Multi:
+            return tgfx::NoiseFilter::MakeMulti(filter->size, filter->density, filter->opacity,
+                                                filter->seed, tgfxBlendMode);
+        }
+        return nullptr;
       }
       default:
         return nullptr;
