@@ -1539,6 +1539,12 @@ static bool LooksLikeFloat(const std::string& value) {
   return false;
 }
 
+// Parses a keyframe value string into the typed representation T. Numeric, bool and color
+// specializations are strict: any malformed or out-of-range input is reported via ReportError and
+// falls back to a zero/default value, so a typo never silently produces a misleading animation.
+// std::string and ImageRef are intentionally lenient pass-throughs because every string is a valid
+// payload for them (ImageRef only strips an optional leading '@' reference marker). The unspecialized
+// primary template is unreachable for supported attribute types and merely returns a default-constructed T.
 template <typename T>
 static T ParseTypedValue(const std::string&, PAGXDocument*, const DOMNode*) {
   return T{};
