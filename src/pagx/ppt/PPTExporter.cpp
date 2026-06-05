@@ -366,9 +366,11 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
 // Dispatch a single accumulated geometry through the appropriate per-shape
 // writer with the given Painter applied. Each painter that renders a geometry
 // goes through this function so that multi-fill / multi-stroke produces one
-// PowerPoint shape per painter (overlapping in document order).
+// PowerPoint shape per painter (overlapping in document order). The supplied
+// `alpha` is the alpha of the Painter's enclosing scope, NOT the alpha that
+// was in effect when the entry was collected — see processVectorScope.
 void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
-                                   const FillStrokeInfo& fs,
+                                   const FillStrokeInfo& fs, float alpha,
                                    const std::vector<LayerFilter*>& filters,
                                    const std::vector<LayerStyle*>& styles) {
   FillStrokeInfo localFs = fs;
@@ -378,14 +380,14 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
   switch (entry.element->nodeType()) {
     case NodeType::Rectangle:
       writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
-                     entry.alpha, filters, styles);
+                     alpha, filters, styles);
       break;
     case NodeType::Ellipse:
-      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform,
-                   entry.alpha, filters, styles);
+      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform, alpha,
+                   filters, styles);
       break;
     case NodeType::Path:
-      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, entry.alpha,
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, alpha,
                 filters, styles);
       break;
     case NodeType::Text: {
@@ -402,9 +404,9 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
       if (!text->glyphRuns.empty()) {
-        writeTextAsPath(out, text, localFs, entry.transform, entry.alpha, filters, styles);
+        writeTextAsPath(out, text, localFs, entry.transform, alpha, filters, styles);
       } else {
-        writeNativeText(out, text, localFs, entry.transform, entry.alpha, filters, styles);
+        writeNativeText(out, text, localFs, entry.transform, alpha, filters, styles);
       }
       break;
     }
@@ -447,8 +449,14 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         } else {
           painterFs.stroke = static_cast<const Stroke*>(element);
         }
+        // The painter's effective alpha is the alpha of THIS scope, not the
+        // alpha that was in effect when each geometry was collected. A Group
+        // that contains geometry but whose Painter lives outside the Group
+        // must NOT multiply its own alpha into the outer painter's output —
+        // Group is an isolation boundary for painters even though geometry
+        // propagates upward.
         for (size_t i = scopeStart; i < accumulator.size(); ++i) {
-          emitGeometryWithFs(out, accumulator[i], painterFs, filters, styles);
+          emitGeometryWithFs(out, accumulator[i], painterFs, alpha, filters, styles);
         }
         break;
       }
@@ -459,7 +467,6 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         AccumulatedGeometry entry;
         entry.element = element;
         entry.transform = transform;
-        entry.alpha = alpha;
         entry.textBox = localTextBox;
         accumulator.push_back(entry);
         break;

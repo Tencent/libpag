@@ -708,15 +708,18 @@ class PPTWriter {
   const LayerBuildResult& ensureBuildResult();
 
   // One geometry instance captured during the scope walk in writeElements.
-  // Transform/alpha are baked at collection time so that later painters can
-  // emit the geometry without knowing about the surrounding Group/TextBox
-  // stack. `textBox` carries the in-scope <TextBox> modifier so Text
-  // geometry still picks up box-level layout when rendered by a downstream
-  // Fill or Stroke (matches the legacy CollectFillStroke().textBox rule).
+  // The transform is baked at collection time so that later painters can emit
+  // the geometry without knowing about the surrounding Group/TextBox stack.
+  // Alpha is intentionally NOT baked here: a Painter outside the Group must
+  // render this geometry with the Painter's own scope alpha, not the alpha
+  // that was in effect when this entry was collected — Group is an isolation
+  // boundary for painters even though geometry propagates upward.
+  // `textBox` carries the in-scope <TextBox> modifier so Text geometry still
+  // picks up box-level layout when rendered by a downstream Fill or Stroke
+  // (matches the legacy CollectFillStroke().textBox rule).
   struct AccumulatedGeometry {
     const Element* element = nullptr;
     Matrix transform = {};
-    float alpha = 1.0f;
     const TextBox* textBox = nullptr;
   };
 
@@ -732,7 +735,8 @@ class PPTWriter {
                           std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
 
   void emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
-                          const FillStrokeInfo& fs, const std::vector<LayerFilter*>& filters,
+                          const FillStrokeInfo& fs, float alpha,
+                          const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles);
 
   void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
