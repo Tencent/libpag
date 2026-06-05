@@ -53,12 +53,14 @@
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -103,6 +105,16 @@ static std::string ColorToDisplayP3String(const Color& color) {
          FloatToString(color.blue) + ")";
 }
 
+static void ExpandBounds(float& minX, float& minY, float& maxX, float& maxY, const Rect& bounds) {
+  if (bounds.isEmpty()) {
+    return;
+  }
+  minX = std::min(minX, bounds.x);
+  minY = std::min(minY, bounds.y);
+  maxX = std::max(maxX, bounds.x + bounds.width);
+  maxY = std::max(maxY, bounds.y + bounds.height);
+}
+
 static Rect ComputeContentBounds(const Layer* layer) {
   float minX = std::numeric_limits<float>::max();
   float minY = std::numeric_limits<float>::max();
@@ -114,20 +126,18 @@ static Rect ComputeContentBounds(const Layer* layer) {
         auto rect = static_cast<const Rectangle*>(element);
         auto pos = rect->renderPosition();
         auto size = rect->renderSize();
-        minX = std::min(minX, pos.x - size.width * 0.5f);
-        minY = std::min(minY, pos.y - size.height * 0.5f);
-        maxX = std::max(maxX, pos.x + size.width * 0.5f);
-        maxY = std::max(maxY, pos.y + size.height * 0.5f);
+        ExpandBounds(
+            minX, minY, maxX, maxY,
+            {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height});
         break;
       }
       case NodeType::Ellipse: {
         auto ellipse = static_cast<const Ellipse*>(element);
         auto pos = ellipse->renderPosition();
         auto size = ellipse->renderSize();
-        minX = std::min(minX, pos.x - size.width * 0.5f);
-        minY = std::min(minY, pos.y - size.height * 0.5f);
-        maxX = std::max(maxX, pos.x + size.width * 0.5f);
-        maxY = std::max(maxY, pos.y + size.height * 0.5f);
+        ExpandBounds(
+            minX, minY, maxX, maxY,
+            {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height});
         break;
       }
       case NodeType::Path: {
@@ -137,10 +147,37 @@ static Rect ComputeContentBounds(const Layer* layer) {
         }
         auto bounds = pathNode->data->getBounds();
         auto pos = pathNode->renderPosition();
-        minX = std::min(minX, pos.x + bounds.x);
-        minY = std::min(minY, pos.y + bounds.y);
-        maxX = std::max(maxX, pos.x + bounds.x + bounds.width);
-        maxY = std::max(maxY, pos.y + bounds.y + bounds.height);
+        ExpandBounds(minX, minY, maxX, maxY,
+                     {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height});
+        break;
+      }
+      case NodeType::Polystar: {
+        auto polystar = static_cast<const Polystar*>(element);
+        auto pos = polystar->renderPosition();
+        auto contentBounds = polystar->getContentBounds();
+        auto scale = polystar->renderScale();
+        ExpandBounds(minX, minY, maxX, maxY,
+                     {pos.x, pos.y, contentBounds.width * scale, contentBounds.height * scale});
+        break;
+      }
+      case NodeType::Text: {
+        auto text = static_cast<const Text*>(element);
+        ExpandBounds(minX, minY, maxX, maxY, text->layoutBounds());
+        break;
+      }
+      case NodeType::TextPath: {
+        auto textPath = static_cast<const TextPath*>(element);
+        ExpandBounds(minX, minY, maxX, maxY, textPath->layoutBounds());
+        break;
+      }
+      case NodeType::Group: {
+        auto group = static_cast<const Group*>(element);
+        ExpandBounds(minX, minY, maxX, maxY, group->layoutBounds());
+        break;
+      }
+      case NodeType::TextBox: {
+        auto textBox = static_cast<const TextBox*>(element);
+        ExpandBounds(minX, minY, maxX, maxY, textBox->layoutBounds());
         break;
       }
       default:
@@ -1706,6 +1743,36 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     }
   }
 
+  // NoiseFilter/NoiseStyle uses feOffset to shift the turbulence pattern from (0,0) to
+  // contentBounds center, so the filter region must extend far enough to include both the
+  // source graphic and the pre-offset noise around the origin.
+  if (!contentBounds.isEmpty()) {
+    bool hasNoise = false;
+    for (const auto* filter : filters) {
+      if (filter->nodeType() == NodeType::NoiseFilter) {
+        hasNoise = true;
+        break;
+      }
+    }
+    if (!hasNoise) {
+      for (const auto* style : styles) {
+        if (style->nodeType() == NodeType::NoiseStyle) {
+          hasNoise = true;
+          break;
+        }
+      }
+    }
+    if (hasNoise) {
+      // feOffset shifts the noise by (width/2, height/2). The filter region must
+      // extend enough so feTurbulence covers the pre-offset area that maps to content.
+      // Add padding on all sides so SourceGraphic is not clipped at the filter boundary.
+      marginLeft = std::max(marginLeft, contentBounds.width * 0.5f);
+      marginTop = std::max(marginTop, contentBounds.height * 0.5f);
+      marginRight = std::max(marginRight, contentBounds.width * 0.5f);
+      marginBottom = std::max(marginBottom, contentBounds.height * 0.5f);
+    }
+  }
+
   // Convert pixel margins to percentages, with a minimum of 50% per side to
   // handle arbitrary element sizes gracefully.
   float pctLeft = std::max(50.0f, std::ceil(marginLeft));
@@ -1716,10 +1783,26 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   std::string filterId = generateId("filter");
   _defs->openElement("filter");
   _defs->addAttribute("id", filterId);
-  _defs->addAttribute("x", "-" + FloatToString(pctLeft) + "%");
-  _defs->addAttribute("y", "-" + FloatToString(pctTop) + "%");
-  _defs->addAttribute("width", FloatToString(100.0f + pctLeft + pctRight) + "%");
-  _defs->addAttribute("height", FloatToString(100.0f + pctTop + pctBottom) + "%");
+  if (!contentBounds.isEmpty()) {
+    // Use filterUnits="userSpaceOnUse" with absolute pixel coordinates for filters
+    // containing noise. This decouples the filter region from the bounding box so
+    // feTurbulence samples at absolute coordinates, producing position-dependent
+    // noise phase that matches tgfx behavior.
+    float filterX = contentBounds.x - marginLeft;
+    float filterY = contentBounds.y - marginTop;
+    float filterW = contentBounds.width + marginLeft + marginRight;
+    float filterH = contentBounds.height + marginTop + marginBottom;
+    _defs->addAttribute("filterUnits", "userSpaceOnUse");
+    _defs->addAttribute("x", FloatToString(filterX));
+    _defs->addAttribute("y", FloatToString(filterY));
+    _defs->addAttribute("width", FloatToString(filterW));
+    _defs->addAttribute("height", FloatToString(filterH));
+  } else {
+    _defs->addAttribute("x", "-" + FloatToString(pctLeft) + "%");
+    _defs->addAttribute("y", "-" + FloatToString(pctTop) + "%");
+    _defs->addAttribute("width", FloatToString(100.0f + pctLeft + pctRight) + "%");
+    _defs->addAttribute("height", FloatToString(100.0f + pctTop + pctBottom) + "%");
+  }
   _defs->addAttribute("color-interpolation-filters", "sRGB");
   _defs->closeElementStart();
 

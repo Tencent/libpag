@@ -7126,12 +7126,12 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
  */
 PAGX_TEST(PAGXTest, NoiseFilterModes) {
   constexpr int canvasW = 400;
-  constexpr int canvasH = 350;
+  constexpr int canvasH = 470;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
 
-  auto makeLayer = [&](float x) {
+  auto makeLayer = [&](float x, float y) {
     auto layer = doc->makeNode<pagx::Layer>();
-    layer->matrix = pagx::Matrix::Translate(x, 50);
+    layer->matrix = pagx::Matrix::Translate(x, y);
     auto rect = doc->makeNode<pagx::Rectangle>();
     rect->position = {50, 50};
     rect->size = {100, 100};
@@ -7144,7 +7144,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
     return layer;
   };
 
-  auto layer1 = makeLayer(20);
+  auto layer1 = makeLayer(20, 50);
   auto mono = doc->makeNode<pagx::NoiseFilter>();
   mono->mode = pagx::NoiseMode::Mono;
   mono->size = 8;
@@ -7154,7 +7154,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   layer1->filters.push_back(mono);
   doc->layers.push_back(layer1);
 
-  auto layer2 = makeLayer(150);
+  auto layer2 = makeLayer(150, 50);
   auto duo = doc->makeNode<pagx::NoiseFilter>();
   duo->mode = pagx::NoiseMode::Duo;
   duo->size = 8;
@@ -7165,7 +7165,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   layer2->filters.push_back(duo);
   doc->layers.push_back(layer2);
 
-  auto layer3 = makeLayer(280);
+  auto layer3 = makeLayer(280, 50);
   auto multi = doc->makeNode<pagx::NoiseFilter>();
   multi->mode = pagx::NoiseMode::Multi;
   multi->size = 8;
@@ -7225,6 +7225,39 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   layer6->filters.push_back(multi2);
   doc->layers.push_back(layer6);
 
+  // Row 3: Same rectangle settings as row 1, but use layer matrix for displacement.
+  // This tests contentBounds in layer local coords starting at (0,0).
+  auto layer7 = makeLayer(20, 290);
+  auto mono3 = doc->makeNode<pagx::NoiseFilter>();
+  mono3->mode = pagx::NoiseMode::Mono;
+  mono3->size = 8;
+  mono3->density = 0.5f;
+  mono3->seed = 42;
+  mono3->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer7->filters.push_back(mono3);
+  doc->layers.push_back(layer7);
+
+  auto layer8 = makeLayer(150, 290);
+  auto duo3 = doc->makeNode<pagx::NoiseFilter>();
+  duo3->mode = pagx::NoiseMode::Duo;
+  duo3->size = 8;
+  duo3->density = 0.5f;
+  duo3->seed = 42;
+  duo3->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo3->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer8->filters.push_back(duo3);
+  doc->layers.push_back(layer8);
+
+  auto layer9 = makeLayer(280, 290);
+  auto multi3 = doc->makeNode<pagx::NoiseFilter>();
+  multi3->mode = pagx::NoiseMode::Multi;
+  multi3->size = 8;
+  multi3->density = 0.5f;
+  multi3->seed = 42;
+  multi3->opacity = 1.0f;
+  layer9->filters.push_back(multi3);
+  doc->layers.push_back(layer9);
+
   doc->applyLayout();
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(tgfxLayer != nullptr);
@@ -7252,6 +7285,278 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
 }
 
 /**
- * Test rendering with NoiseFilter combined with DropShadowFilter and DropShadowStyle.
+ * Test that NoiseFilter works correctly on Text content.
  */
+PAGX_TEST(PAGXTest, NoiseFilterOnText) {
+  constexpr int canvasW = 700;
+  constexpr int canvasH = 300;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(50, 120);
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "PAGX";
+  text->fontSize = 72;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.6f, 0.9f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+
+  auto mono = doc->makeNode<pagx::NoiseFilter>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->filters.push_back(mono);
+  doc->layers.push_back(layer);
+
+  // Plain text without noise for visual comparison.
+  auto plainLayer = doc->makeNode<pagx::Layer>();
+  plainLayer->matrix = pagx::Matrix::Translate(400, 120);
+  auto plainText = doc->makeNode<pagx::Text>();
+  plainText->text = "PAGX";
+  plainText->fontSize = 72;
+  auto plainFill = doc->makeNode<pagx::Fill>();
+  auto plainSolid = doc->makeNode<pagx::SolidColor>();
+  plainSolid->color = {0.2f, 0.6f, 0.9f, 1.0f};
+  plainFill->color = plainSolid;
+  plainLayer->contents.push_back(plainText);
+  plainLayer->contents.push_back(plainFill);
+  doc->layers.push_back(plainLayer);
+
+  doc->applyLayout(&fontConfig);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterOnText"));
+
+  pagx::SVGExportOptions svgOpts;
+  svgOpts.fontConfig = &fontConfig;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterOnText.svg");
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
+
+/**
+ * Test NoiseFilter applied to every supported element type (Rectangle, Ellipse, Path, Polystar,
+ * Text, Group, TextBox) plus Repeater, outputting SVG for visual inspection of contentBounds
+ * correctness.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
+  constexpr int canvasW = 800;
+  constexpr int canvasH = 620;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+
+  auto makeNoiseFilter = [&]() {
+    auto noise = doc->makeNode<pagx::NoiseFilter>();
+    noise->mode = pagx::NoiseMode::Mono;
+    noise->size = 10;
+    noise->density = 0.5f;
+    noise->seed = 42;
+    noise->color = {0.0f, 0.0f, 0.0f, 1.0f};
+    return noise;
+  };
+
+  auto makeFill = [&](float r, float g, float b) {
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {r, g, b, 1.0f};
+    fill->color = solid;
+    return fill;
+  };
+
+  // Row 1: Rectangle, Ellipse, Path
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {60, 60};
+    rect->size = {100, 100};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(makeFill(0.2f, 0.5f, 0.8f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {60, 60};
+    ellipse->size = {100, 100};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(makeFill(0.8f, 0.3f, 0.3f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 20);
+
+    auto path = doc->makeNode<pagx::Path>();
+    path->data = doc->makeNode<pagx::PathData>();
+    path->data->moveTo(0, 0);
+    path->data->lineTo(100, 0);
+    path->data->lineTo(50, 100);
+    path->data->close();
+    path->position = {10, 10};
+    layer->contents.push_back(path);
+    layer->contents.push_back(makeFill(0.3f, 0.7f, 0.3f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+
+  // Row 2: Polystar, Text, Group
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 160);
+
+    auto polystar = doc->makeNode<pagx::Polystar>();
+    polystar->position = {60, 60};
+    polystar->outerRadius = 50;
+    polystar->innerRadius = 25;
+    polystar->pointCount = 5;
+    layer->contents.push_back(polystar);
+    layer->contents.push_back(makeFill(0.7f, 0.5f, 0.9f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 160);
+
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "Hi";
+    text->fontSize = 60;
+    layer->contents.push_back(text);
+    layer->contents.push_back(makeFill(0.2f, 0.6f, 0.9f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 160);
+
+    auto group = doc->makeNode<pagx::Group>();
+    group->position = {10, 10};
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {40, 40};
+    rect->size = {60, 60};
+    group->elements.push_back(rect);
+    group->elements.push_back(makeFill(0.9f, 0.6f, 0.1f));
+    layer->contents.push_back(group);
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+
+  // Row 3: TextBox, Repeater
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 320);
+
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->width = 120;
+    textBox->height = 100;
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "AB CD";
+    text->fontSize = 30;
+    textBox->elements.push_back(text);
+    textBox->elements.push_back(makeFill(0.1f, 0.4f, 0.7f));
+    layer->contents.push_back(textBox);
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(200, 320);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {30, 30};
+    rect->size = {40, 40};
+    auto repeater = doc->makeNode<pagx::Repeater>();
+    repeater->copies = 3;
+    repeater->offset = 0;
+    repeater->position = {50, 0};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(makeFill(0.3f, 0.8f, 0.6f));
+    layer->contents.push_back(repeater);
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+
+  // Row 4: Off-center content (contentBounds origin != 0,0)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(440, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {80, 40};
+    rect->size = {60, 60};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(makeFill(0.6f, 0.2f, 0.8f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(580, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {40, 80};
+    ellipse->size = {60, 80};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(makeFill(0.8f, 0.7f, 0.2f));
+    layer->filters.push_back(makeNoiseFilter());
+    doc->layers.push_back(layer);
+  }
+
+  doc->applyLayout(&fontConfig);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterAllElements"));
+
+  pagx::SVGExportOptions svgOpts;
+  svgOpts.fontConfig = &fontConfig;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAllElements.svg");
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
+
 }  // namespace pag
