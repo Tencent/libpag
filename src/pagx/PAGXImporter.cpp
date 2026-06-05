@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <cerrno>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
@@ -1653,6 +1654,12 @@ static Property* ParseProperty(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
   if (type.empty()) {
+    // Infer the property type from the first keyframe value when no explicit type is given. Probes
+    // run most-specific to least-specific so a value that is valid for several types resolves to
+    // the narrowest interpretation: color (#RGB / named) is checked before bool/int because some
+    // color tokens could otherwise be misread; bool ("true"/"false") before image; image ("@id")
+    // before the numeric probes; integer before float (every integer also parses as a float); and
+    // string is the final catch-all that always succeeds.
     bool colorValid = false;
     if (!firstValue.empty()) {
       ParseColor(firstValue, &colorValid);
@@ -1718,6 +1725,15 @@ static AnimationObject* ParseAnimationObject(const DOMNode* node, PAGXDocument* 
   object->target = GetAttribute(node, "target");
   if (object->target.empty()) {
     ReportError(doc, node, "Object requires a non-empty 'target' attribute.");
+  } else {
+    // ColorMatrixFilter exposes only a full 20-element matrix with no animatable scalar channel,
+    // so the runtime cannot apply per-channel keyframes to it. Reject the animation explicitly
+    // instead of silently ignoring it at runtime.
+    auto* targetNode = doc->findNode(object->target);
+    if (targetNode != nullptr && targetNode->nodeType() == NodeType::ColorMatrixFilter) {
+      ReportError(doc, node,
+                  "Animating a ColorMatrixFilter is not supported; it has no animatable channel.");
+    }
   }
   auto child = node->firstChild;
   while (child) {
@@ -2179,10 +2195,17 @@ static int64_t GetInt64Attribute(const DOMNode* node, const std::string& name, i
     return defaultValue;
   }
   char* endPtr = nullptr;
+  errno = 0;
   int64_t value = strtoll(str->c_str(), &endPtr, 10);
-  if (endPtr == str->c_str()) {
+  if (endPtr == str->c_str() || *endPtr != '\0') {
     if (doc) {
       ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
+    }
+    return defaultValue;
+  }
+  if (errno == ERANGE) {
+    if (doc) {
+      ReportError(doc, node, "Value out of range for '" + name + "' attribute.");
     }
     return defaultValue;
   }

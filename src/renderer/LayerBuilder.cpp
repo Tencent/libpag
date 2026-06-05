@@ -1338,6 +1338,20 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "shadowOnly", WriteInnerShadowFilterShadowOnly);
   }
 
+  static void WriteBlendFilterColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::BlendFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  void bindBlendFilterChannels(const BlendFilter* node) {
+    _result.binding.setWriter(node, "color", WriteBlendFilterColor);
+  }
+
   std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
@@ -1372,7 +1386,10 @@ class LayerBuilderContext {
       }
       case NodeType::BlendFilter: {
         auto filter = static_cast<const pagx::BlendFilter*>(node);
-        return tgfx::BlendFilter::Make(ToTGFX(filter->color), ToTGFX(filter->blendMode));
+        auto tgfxFilter = tgfx::BlendFilter::Make(ToTGFX(filter->color), ToTGFX(filter->blendMode));
+        _result.binding.set(filter, tgfxFilter);
+        bindBlendFilterChannels(filter);
+        return tgfxFilter;
       }
       case NodeType::ColorMatrixFilter: {
         auto filter = static_cast<const pagx::ColorMatrixFilter*>(node);

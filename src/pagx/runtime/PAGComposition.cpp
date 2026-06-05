@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGComposition.h"
+#include <unordered_set>
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGTimeline.h"
@@ -42,8 +43,24 @@ LayerType PAGComposition::layerType() const {
 }
 
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
-    const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene) {
+    const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene,
+    std::unordered_set<const Composition*>& visited) {
   if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
+    return nullptr;
+  }
+  // Cycle guard: visited holds the compositions on the current ancestor path. A composition that
+  // references itself (directly or via an A->B->A chain) would otherwise recurse without end and
+  // overflow the stack. Report the cycle on the owning document and drop this subtree. The set is
+  // treated as a path stack (inserted on the way down, erased on return) so a composition reused
+  // by sibling layers is not mistaken for a cycle. The external-file chain guard in
+  // PAGXDocument::LoadExternalComposition does not cover same-document @id references.
+  auto* sourceComposition = ownerLayer->composition;
+  if (visited.find(sourceComposition) != visited.end()) {
+    auto* document = parentScene->document.get();
+    if (document != nullptr) {
+      document->errors.push_back("Cyclic composition reference detected: '@" +
+                                 sourceComposition->id + "'.");
+    }
     return nullptr;
   }
   auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
@@ -72,11 +89,14 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
     }
     composition->timelines.push_back(std::move(timeline));
   }
-  composition->buildChildren(ownerLayer->composition->layers);
+  visited.insert(sourceComposition);
+  composition->buildChildren(ownerLayer->composition->layers, visited);
+  visited.erase(sourceComposition);
   return composition;
 }
 
-void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
+void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
+                                   std::unordered_set<const Composition*>& visited) {
   auto scene = rootScene.lock();
   if (!scene) {
     return;
@@ -87,7 +107,7 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers) {
     }
     auto layerRuntime = binding->get<tgfx::Layer>(layer);
     if (layer->composition != nullptr) {
-      auto childComposition = PAGComposition::MakeChild(layer, scene);
+      auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
       if (childComposition == nullptr) {
         continue;
       }

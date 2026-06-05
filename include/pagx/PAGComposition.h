@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 #include "pagx/PAGLayer.h"
 
@@ -28,6 +29,7 @@ namespace pagx {
 class PAGTimeline;
 class PAGScene;
 class PAGXDocument;
+class Composition;
 struct RuntimeBinding;
 
 /**
@@ -76,17 +78,22 @@ class PAGComposition : public PAGLayer {
                  const std::shared_ptr<PAGScene>& scene);
 
   // Builds a runtime child composition for ownerLayer.composition. Returns nullptr if ownerLayer
-  // is null, has no composition, or the document is not laid out. Internal factory used by
-  // PAGScene and PAGComposition to populate child runtime nodes.
+  // is null, has no composition, or the document is not laid out. visited holds the compositions
+  // on the current ancestor path so a self- or mutually-referencing composition is detected and
+  // dropped instead of recursing without end. Internal factory used by PAGScene and
+  // PAGComposition to populate child runtime nodes.
   static std::shared_ptr<PAGComposition> MakeChild(const Layer* ownerLayer,
-                                                   const std::shared_ptr<PAGScene>& parentScene);
+                                                   const std::shared_ptr<PAGScene>& parentScene,
+                                                   std::unordered_set<const Composition*>& visited);
 
   // Builds the persistent per-layer runtime node tree for this composition: one PAGLayer node per
   // source layer (PAGComposition for layers that reference a composition, plain PAGLayer otherwise),
   // associating each node's runtimeLayer with this composition's tgfx layer for that source layer.
   // Composition children's tgfx roots are attached into their slot containers. Must be called after
-  // the subtree and binding are built.
-  void buildChildren(const std::vector<Layer*>& layers);
+  // the subtree and binding are built. visited carries the ancestor composition path for cycle
+  // detection and is threaded into nested MakeChild calls.
+  void buildChildren(const std::vector<Layer*>& layers,
+                     std::unordered_set<const Composition*>& visited);
 
   // Resolves a hit tgfx layer to the persistent PAGLayer node whose runtimeLayer matches it,
   // searching this composition's children and recursing into descendant composition children.

@@ -193,8 +193,8 @@ list(APPEND PAG_FILES ${SRC_FILES})
 
 if (PAG_BUILD_PAGX)
     # pagx core + utils + xml (always included with PAGX)
-    file(GLOB PAGX_CORE_SOURCES src/pagx/*.cpp)
-    file(GLOB PAGX_NODES_SOURCES src/pagx/nodes/*.cpp)
+    file(GLOB PAGX_CORE_SOURCES CONFIGURE_DEPENDS src/pagx/*.cpp)
+    file(GLOB PAGX_NODES_SOURCES CONFIGURE_DEPENDS src/pagx/nodes/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_NODES_SOURCES})
     file(GLOB PAGX_ANIMATION_SOURCES CONFIGURE_DEPENDS src/pagx/animation/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_ANIMATION_SOURCES})
@@ -215,7 +215,7 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     if (PAG_BUILD_PPT)
-        file(GLOB_RECURSE PAGX_PPT_SOURCES src/pagx/ppt/*.*)
+        file(GLOB_RECURSE PAGX_PPT_SOURCES CONFIGURE_DEPENDS src/pagx/ppt/*.*)
         list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
@@ -223,7 +223,7 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     # HTML exporter
-    file(GLOB_RECURSE HTML_EXPORTER_SOURCES src/pagx/html/*.*)
+    file(GLOB_RECURSE HTML_EXPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/*.*)
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)

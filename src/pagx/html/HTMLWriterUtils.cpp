@@ -35,7 +35,6 @@
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/LineBreaker.h"
 #include "tgfx/core/Data.h"
@@ -452,19 +451,6 @@ const char* BlendModeToMixBlendMode(BlendMode mode) {
     return "darken";
   }
   return nullptr;
-}
-
-Color LerpColor(const Color& a, const Color& b, float t) {
-  // Interpolate in a's color space. When the endpoints differ, convert b into a's space first so
-  // the components blend within a single gamut rather than mixing raw values from two spaces.
-  Color end = a.colorSpace == b.colorSpace ? b : ConvertColorSpace(b, a.colorSpace);
-  Color result = {};
-  result.red = a.red + (end.red - a.red) * t;
-  result.green = a.green + (end.green - a.green) * t;
-  result.blue = a.blue + (end.blue - a.blue) * t;
-  result.alpha = a.alpha + (end.alpha - a.alpha) * t;
-  result.colorSpace = a.colorSpace;
-  return result;
 }
 
 std::string LayerTransformCSS(const Layer* layer) {

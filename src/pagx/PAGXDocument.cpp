@@ -145,7 +145,9 @@ void PAGXDocument::applyLayout(const FontConfig* config) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
         // Recurse so the externalDoc lays out its own layers (and any deeper externalDocs); it sets
-        // its own layoutApplied flag internally.
+        // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
+        // so external compositions are measured and rendered with the host's fonts, keeping text
+        // consistent across the embedded boundary rather than using the external doc's own config.
         layer->externalDoc->applyLayout(&fontConfig);
       }
     }
@@ -221,6 +223,16 @@ std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
 bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Data> data) {
   if (filePath.empty() || data == nullptr) {
     return false;
+  }
+  // loadFileData must run before any PAGScene is built from this document: PAGScene::Make()
+  // snapshots the layer/composition tree once, so external compositions resolved here afterwards
+  // would never reach the already-built runtime tree. A non-empty liveScenes means at least one
+  // scene already exists, so warn that the freshly loaded content will not be visible.
+  if (!liveScenes.empty()) {
+    LOGE(
+        "PAGXDocument::loadFileData() called after a PAGScene was created from this document. "
+        "Load all external file data before PAGScene::Make(); the loaded content will not appear "
+        "in existing scenes.");
   }
   std::vector<std::string> chain = {};
   return LoadFileDataInChain(this, this, filePath, data, chain);

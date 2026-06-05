@@ -28,4 +28,10 @@ namespace pagx {
 // the target space. Used to bring two colors into a common space before component interpolation.
 Color ConvertColorSpace(const Color& color, ColorSpace target);
 
+// Linearly interpolates between two colors by fraction t, always converging onto the start color's
+// space: when the endpoints differ, b is converted into a's space before blending and the result
+// stays in a.colorSpace. Both the runtime keyframe evaluator and the HTML exporter route through
+// this single helper so animation and export agree on color-space convergence direction.
+Color LerpColor(const Color& a, const Color& b, double t);
+
 }  // namespace pagx

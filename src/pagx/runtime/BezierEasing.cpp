@@ -52,18 +52,18 @@ static double SampleDerivative(double p1, double p2, double t) {
 // Solves x(t) == input for t using Newton-Raphson, falling back to bisection when the derivative
 // is too small to converge or iterations exceed the budget.
 static double SolveCurveX(double p1x, double p2x, double input) {
-  constexpr int kNewtonIterations = 8;
-  constexpr int kMaxBisectionIterations = 60;
-  constexpr double kEpsilon = 1.0e-7;
+  constexpr int NEWTON_ITERATIONS = 8;
+  constexpr int MAX_BISECTION_ITERATIONS = 60;
+  constexpr double EPSILON = 1.0e-7;
 
   double t = input;
-  for (int i = 0; i < kNewtonIterations; ++i) {
+  for (int i = 0; i < NEWTON_ITERATIONS; ++i) {
     double currentX = SampleCurve(p1x, p2x, t) - input;
-    if (std::fabs(currentX) < kEpsilon) {
+    if (std::fabs(currentX) < EPSILON) {
       return t;
     }
     double derivative = SampleDerivative(p1x, p2x, t);
-    if (std::fabs(derivative) < kEpsilon) {
+    if (std::fabs(derivative) < EPSILON) {
       break;
     }
     t -= currentX / derivative;
@@ -76,9 +76,9 @@ static double SolveCurveX(double p1x, double p2x, double input) {
   double low = 0.0;
   double high = 1.0;
   t = input;
-  for (int i = 0; i < kMaxBisectionIterations && low < high; ++i) {
+  for (int i = 0; i < MAX_BISECTION_ITERATIONS && low < high; ++i) {
     double currentX = SampleCurve(p1x, p2x, t);
-    if (std::fabs(currentX - input) < kEpsilon) {
+    if (std::fabs(currentX - input) < EPSILON) {
       return t;
     }
     if (input > currentX) {

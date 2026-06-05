@@ -47,7 +47,8 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   *rootComp->binding = std::move(buildResult.binding);
   rootComp->document = document.get();
   scene->_rootComposition = rootComp;
-  scene->_rootComposition->buildChildren(document->layers);
+  std::unordered_set<const Composition*> visited = {};
+  scene->_rootComposition->buildChildren(document->layers, visited);
   scene->displayList->root()->addChild(rootComp->runtimeLayer);
   document->registerLiveScene(scene);
   return scene;

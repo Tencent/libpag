@@ -349,6 +349,11 @@ std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
   if (data == nullptr) {
     return nullptr;
   }
+  // MakeAdopted returns a shared static empty singleton for zero-length input and discards the
+  // releaseProc/context, so the ctx below would leak. Handle the empty case before allocating it.
+  if (data->size() == 0) {
+    return tgfx::Data::MakeEmpty();
+  }
   auto* ctx = new std::shared_ptr<Data>(data);
   auto result = tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);
   if (!result) {
