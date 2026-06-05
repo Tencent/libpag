@@ -39,6 +39,8 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -2955,6 +2957,219 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerMatrix3D) {
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<rect"), std::string::npos);
   EXPECT_NE(svg.find("transform="), std::string::npos);
+}
+
+// =====================================================================
+// embedFontsAsWoff2 — vector Font + GlyphRun rendering paths
+// =====================================================================
+//
+// These tests cover SVGExporter's WOFF2 / @font-face emission path introduced together with
+// SVGExportOptions::embedFontsAsWoff2. The pre-pass in ToSVG generates a WOFF2 byte stream from
+// each embedded vector Font and base64-embeds it as a `data:font/woff2;base64,...` URI inside a
+// <style>@font-face{...}</style> declaration in <defs>. Text nodes whose GlyphRun references a
+// participating Font are emitted as a real <text> element with PUA Unicode characters mapped
+// 1:1 to glyph IDs (0xE000 + (gid-1)). The path output is reserved for cases the <text> element
+// cannot losslessly express: convertTextToPath=true, embedFontsAsWoff2=false, bitmap fonts, runs
+// with per-glyph scales/skews, and gradient fills.
+
+// Builds a minimal vector Font with two square-ish glyph paths plus a Text containing a single
+// GlyphRun that references it. Returns the doc so each test can tweak options independently.
+static std::shared_ptr<pagx::PAGXDocument> MakeVectorGlyphRunDocSVG() {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->id = "vectorFont";
+  font->unitsPerEm = 1000;
+
+  auto* glyph1 = doc->makeNode<pagx::Glyph>();
+  glyph1->path = doc->makeNode<pagx::PathData>();
+  *glyph1->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph1->advance = 700;
+  font->glyphs.push_back(glyph1);
+
+  auto* glyph2 = doc->makeNode<pagx::Glyph>();
+  glyph2->path = doc->makeNode<pagx::PathData>();
+  *glyph2->path = pagx::PathDataFromSVGString("M 350,0 L 700,-800 L 0,-800 Z");
+  glyph2->advance = 700;
+  font->glyphs.push_back(glyph2);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->fontSize = 50;
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1, 2};
+  run->y = 60;
+  run->xOffsets = {10, 60};
+  text->glyphRuns.push_back(run);
+
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFillSVG(doc.get(), 0.1f, 0.1f, 0.1f));
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+/**
+ * Default SVGExportOptions enables embedFontsAsWoff2. A vector Font referenced by a GlyphRun
+ * should become a base64-encoded WOFF2 @font-face declaration, and the Text should emit a
+ * <text> element pointing at the generated `pagx-font-*` family. No <path> should be emitted
+ * for the run — the @font-face renders the glyph silhouettes via the embedded font.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_Default) {
+  auto doc = MakeVectorGlyphRunDocSVG();
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("@font-face"), std::string::npos);
+  EXPECT_NE(svg.find("data:font/woff2;base64,"), std::string::npos);
+  EXPECT_NE(svg.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("font-family=\"&apos;pagx-font-"), std::string::npos);
+  EXPECT_NE(svg.find("format('woff2')"), std::string::npos);
+  EXPECT_EQ(svg.find("<path"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_default.svg");
+}
+
+/**
+ * Disabling embedFontsAsWoff2 should suppress the @font-face emission entirely and route the
+ * GlyphRun through writeTextAsPath, producing a <path> with the glyph outline geometry.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_Disabled) {
+  auto doc = MakeVectorGlyphRunDocSVG();
+
+  pagx::SVGExporter::Options opts;
+  opts.embedFontsAsWoff2 = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_EQ(svg.find("@font-face"), std::string::npos);
+  EXPECT_EQ(svg.find("data:font/woff2"), std::string::npos);
+  EXPECT_EQ(svg.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_disabled.svg");
+}
+
+/**
+ * convertTextToPath=true is the user explicitly asking for outline geometry. The pre-pass must
+ * skip WOFF2 generation regardless of embedFontsAsWoff2's value, and the GlyphRun must render
+ * as a <path>.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_SuppressedByConvertTextToPath) {
+  auto doc = MakeVectorGlyphRunDocSVG();
+
+  pagx::SVGExporter::Options opts;
+  opts.embedFontsAsWoff2 = true;
+  opts.convertTextToPath = true;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
+  EXPECT_EQ(svg.find("@font-face"), std::string::npos);
+  EXPECT_EQ(svg.find("data:font/woff2"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_convert_to_path.svg");
+}
+
+/**
+ * Bitmap (CBDT) fonts must be skipped by the WOFF2 pre-pass because plain SVG <text> cannot
+ * express the per-glyph image transforms a bitmap glyph carries. The Text should fall back to
+ * the writeTextAsPath / <image> rendering path and no @font-face declaration should appear.
+ *
+ * The test avoids relying on a real PNG decoder — Image.data is left empty, which is enough for
+ * SVGExporter's pre-pass to inspect Glyph.image vs Glyph.path and choose its branch.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_BitmapFontFallback) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->id = "bitmapFont";
+  font->unitsPerEm = 100;
+
+  auto* bitmapGlyph = doc->makeNode<pagx::Glyph>();
+  bitmapGlyph->image = doc->makeNode<pagx::Image>();
+  bitmapGlyph->advance = 60;
+  font->glyphs.push_back(bitmapGlyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 60;
+  run->glyphs = {1};
+  run->y = 60;
+  text->glyphRuns.push_back(run);
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFillSVG(doc.get(), 0.0f, 0.0f, 0.0f));
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("@font-face"), std::string::npos);
+  EXPECT_EQ(svg.find("data:font/woff2"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_bitmap_fallback.svg");
+}
+
+/**
+ * GlyphRuns carrying per-glyph scales (or skews) cannot be rendered through plain SVG <text>
+ * because <text> has no per-character scale/skew attribute. writeTextAsFont returns false and
+ * the writer falls back to writeTextAsPath. The @font-face declaration is still emitted (a
+ * different Text in the same document might still use it), but this run renders as <path>.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_PerGlyphScaleFallback) {
+  auto doc = MakeVectorGlyphRunDocSVG();
+  // The doc has one GlyphRun; attach scales to force the fallback branch.
+  for (auto& nodePtr : doc->nodes) {
+    if (nodePtr->nodeType() == pagx::NodeType::GlyphRun) {
+      auto* run = static_cast<pagx::GlyphRun*>(nodePtr.get());
+      run->scales = {{1.2f, 1.2f}, {0.8f, 0.8f}};
+      break;
+    }
+  }
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // @font-face is still produced — the WOFF2 pre-pass runs per Font, not per GlyphRun.
+  EXPECT_NE(svg.find("@font-face"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_per_glyph_scale_fallback.svg");
+}
+
+/**
+ * Gradient fills must fall back to writeTextAsPath because SVG <text> cannot losslessly clip a
+ * gradient to glyph silhouettes — only individual <path> glyph elements can carry their own
+ * userSpaceOnUse gradient transform. The @font-face is still emitted, but the GlyphRun renders
+ * as <path>.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_GradientFillFallback) {
+  auto doc = MakeVectorGlyphRunDocSVG();
+  // Replace the Group's solid Fill with a linear gradient Fill.
+  for (auto& nodePtr : doc->nodes) {
+    if (nodePtr->nodeType() != pagx::NodeType::Group) {
+      continue;
+    }
+    auto* group = static_cast<pagx::Group*>(nodePtr.get());
+    for (auto& element : group->elements) {
+      if (element->nodeType() != pagx::NodeType::Fill) {
+        continue;
+      }
+      auto* fill = static_cast<pagx::Fill*>(element);
+      auto* grad = doc->makeNode<pagx::LinearGradient>();
+      grad->startPoint = {0, 0};
+      grad->endPoint = {200, 0};
+      auto* stop1 = doc->makeNode<pagx::ColorStop>();
+      stop1->offset = 0.0f;
+      stop1->color = {1.0f, 0.0f, 0.0f, 1.0f};
+      auto* stop2 = doc->makeNode<pagx::ColorStop>();
+      stop2->offset = 1.0f;
+      stop2->color = {0.0f, 0.0f, 1.0f, 1.0f};
+      grad->colorStops.push_back(stop1);
+      grad->colorStops.push_back(stop2);
+      fill->color = grad;
+      break;
+    }
+    break;
+  }
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("@font-face"), std::string::npos);
+  EXPECT_NE(svg.find("<linearGradient"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_gradient_fallback.svg");
 }
 
 }  // namespace pag
