@@ -66,6 +66,16 @@ class ModifierResolver {
 
   Element* applyTrimToElement(Element* shape, const TrimPath* trim) const;
 
+  /**
+   * Bakes a Continuous-mode TrimPath into the shapes referenced by `shapeSlots`. Each shape keeps
+   * its own identity in `output` (instead of being fused into one combined path) so downstream
+   * gradient fitting matches the renderer's per-shape semantics. Shapes that fall entirely outside
+   * the trim range are erased from both `output` and `shapeSlots`; the caller's surrounding
+   * indices stay consistent because erasures happen in descending order.
+   */
+  void applyContinuousTrim(std::vector<Element*>& output, std::vector<size_t>& shapeSlots,
+                           const TrimPath* trim) const;
+
   Element* applyRoundCornerToElement(Element* shape, const RoundCorner* corner) const;
 };
 
