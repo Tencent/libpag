@@ -35,6 +35,14 @@ static bool IsExternalFilePath(const std::string& filePath) {
   return !filePath.empty() && filePath.find("data:") != 0;
 }
 
+static bool IsExpiredScene(const std::weak_ptr<PAGScene>& scene) {
+  return scene.expired();
+}
+
+static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
+  scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
+}
+
 static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
   if (document == nullptr || paths == nullptr) {
     return;
@@ -271,10 +279,7 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
     return;
   }
   // Prune expired weak_ptr entries to keep liveScenes bounded.
-  liveScenes.erase(
-      std::remove_if(liveScenes.begin(), liveScenes.end(),
-                     [](const std::weak_ptr<PAGScene>& weak) { return weak.expired(); }),
-      liveScenes.end());
+  PruneExpiredScenes(&liveScenes);
   // Dispatch to PAGScene::onNodesChanged by iterating liveScenes; each scene decides which dirty
   // nodes are relevant using its own runtime binding. Implementation lives in PAGScene.cpp to avoid
   // pulling PAGScene.h into the document header.
@@ -293,12 +298,14 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   if (scene == nullptr) {
     return;
   }
-  liveScenes.erase(std::remove_if(liveScenes.begin(), liveScenes.end(),
-                                  [scene](const std::weak_ptr<PAGScene>& weak) {
-                                    auto locked = weak.lock();
-                                    return weak.expired() || locked.get() == scene;
-                                  }),
-                   liveScenes.end());
+  PruneExpiredScenes(&liveScenes);
+  for (auto it = liveScenes.begin(); it != liveScenes.end();) {
+    if (it->lock().get() == scene) {
+      it = liveScenes.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 }  // namespace pagx
