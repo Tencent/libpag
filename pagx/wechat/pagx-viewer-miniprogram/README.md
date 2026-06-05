@@ -2,7 +2,7 @@
 
 微信小程序 PAGX 查看器 SDK，提供在微信小程序中渲染 PAGX 动画文件的能力。基于 TGFX 和 WebAssembly 实现高性能 WebGL 渲染。
 
-> 当前版本：**v1.9.2**
+> 当前版本：**v1.9.3**
 
 ## 目录结构
 
@@ -199,6 +199,7 @@ const module = await PAGXInit({
 | `View.loadFileDataAsNativeImage(filePath, nativeImage)` | 把宿主解码好的图片注入 Image 节点；可在 `buildLayers()` 之后调用，用于渐进式首次填图（v1.9+） |
 | `View.upgradeImageFromNative(filePath, nativeImage)` | 替换某 `filePath` 已挂载图片为新版本（缩略图 → 高清升级），并就地重建引用层（v1.9+） |
 | `View.attachNativeImage(filePath, nativeImage, quality)` | 按质量等级（`Thumbnail` / `Full`）上传宿主解码图片为 GPU 常驻 backend texture，并接入 SDK 的 LRU 驱逐（v1.9+） |
+| `View.setImageOriginalSize(filePath, width, height)` | 声明外部图片的原始像素尺寸，用于校正降采样注入后的 ImagePattern 矩阵（v1.9.3+） |
 | `View.setTextureEventHandler(handler)` | 注册纹理生命周期回调（`onTextureRequest` / `onTextureEvict`）（v1.9+） |
 | `View.isFullBudgetSaturated()` | 查询 Full 桶是否已越过硬上限（渐进升级循环 gating 用）（v1.9+） |
 | `View.getImageBounds(filePaths)` | 查询图片在 root-space 下的 `unionBounds` / `largestBounds`，需在 `buildLayers()` 之后（v1.9+） |
@@ -902,6 +903,28 @@ async function progressiveLoad(view, pagxBytes) {
     view.attachNativeImage(filePath, canvas, quality);
   }
 }
+```
+
+### ImagePattern 矩阵校正
+
+New-format PAGX 将 ImagePattern 变换矩阵烘焙在原始图片的像素坐标系中。当宿主通过
+`attachNativeImage()` 注入降采样变体（如 256×256 缩略图替代 1024×1024 原图）时，SDK
+需要用 `diag(origW/actualW, origH/actualH)` 后乘原矩阵来保持填充对齐。
+
+**调用时机**：`parsePAGX()` 之后、`buildLayers()` / `attachNativeImage()` 之前。
+
+```javascript
+const metadata = view.getImageMetadata();
+
+// 对每个外部图片注册原始尺寸
+metadata.forEach((m) => {
+  if (m.origWidth > 0 && m.origHeight > 0) {
+    view.setImageOriginalSize(m.filePath, m.origWidth, m.origHeight);
+  }
+});
+
+// 之后再用 attachNativeImage 注入缩略图或高清图
+view.attachNativeImage(m.filePath, thumbCanvas, ImageQuality.Thumbnail);
 ```
 
 ### 注意事项
