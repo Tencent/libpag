@@ -5779,6 +5779,39 @@ PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
   EXPECT_FALSE(timeline->advance(500'000));
   EXPECT_EQ(timeline->currentTime(), 200'000);
   timeline->apply();
+
+  // Getters must also detach: the backing animation is freed with the document, so they must not
+  // dereference it and instead return neutral values.
+  EXPECT_TRUE(timeline->getId().empty());
+  EXPECT_EQ(timeline->duration(), 0);
+  EXPECT_FLOAT_EQ(timeline->frameRate(), 0.0f);
+}
+
+/**
+ * Test case: PAGScene::Make refuses to build when applyLayout reported a cyclic external
+ * composition reference, since the partially laid-out tree is inconsistent.
+ */
+PAGX_TEST(PAGXTest, PAGSceneMakeNullOnLayoutCycle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("comp");
+  layer->width = 50;
+  layer->height = 50;
+  // Build a cycle directly through the API: the layer's externalDoc points back to the host doc,
+  // bypassing loadFileData's own chain guard. applyLayout's visited set must catch it.
+  layer->externalDoc = doc;
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  EXPECT_EQ(scene, nullptr);
+  bool reportedCycle = false;
+  for (const auto& error : doc->errors) {
+    if (error.rfind("Cyclic external composition reference detected", 0) == 0) {
+      reportedCycle = true;
+    }
+  }
+  EXPECT_TRUE(reportedCycle);
+  // Break the intentional shared_ptr cycle so the document is not leaked.
+  layer->externalDoc = nullptr;
 }
 
 /**

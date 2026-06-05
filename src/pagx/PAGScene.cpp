@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include "base/utils/Log.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
@@ -38,6 +39,16 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   }
   if (!document->isLayoutApplied()) {
     document->applyLayout();
+  }
+  // A cyclic external composition reference leaves the document partially laid out: applyLayout()
+  // aborts the offending subtree but the rest of the tree looks valid. Building a scene on top of
+  // that inconsistent state would render a malformed tree, so refuse construction when a cycle was
+  // reported. Other (non-fatal) parse errors such as duplicate ids do not block construction.
+  for (const auto& error : document->errors) {
+    if (error.rfind("Cyclic external composition reference detected", 0) == 0) {
+      LOGE("PAGScene::Make() aborted: %s", error.c_str());
+      return nullptr;
+    }
   }
   auto scene = std::shared_ptr<PAGScene>(new PAGScene());
   scene->document = document;

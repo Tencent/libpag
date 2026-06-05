@@ -88,15 +88,15 @@ void PAGTimeline::resolveTargets() {
 
 const std::string& PAGTimeline::getId() const {
   static const std::string EMPTY;
-  return animation != nullptr ? animation->id : EMPTY;
+  return (!owner.expired() && animation != nullptr) ? animation->id : EMPTY;
 }
 
 int64_t PAGTimeline::duration() const {
-  return DurationMicros(animation);
+  return owner.expired() ? 0 : DurationMicros(animation);
 }
 
 float PAGTimeline::frameRate() const {
-  return animation != nullptr ? animation->frameRate : 0.0f;
+  return (!owner.expired() && animation != nullptr) ? animation->frameRate : 0.0f;
 }
 
 void PAGTimeline::play() {

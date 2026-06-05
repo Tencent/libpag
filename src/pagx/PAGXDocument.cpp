@@ -161,7 +161,6 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     }
   }
   layoutLayers(layers, width, height, &context);
-  layoutApplied = true;
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
@@ -174,6 +173,10 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       }
     }
   }
+  // Mark layout complete only after all external subtrees have finished. Setting it earlier would
+  // leave the document flagged as laid out even when a downstream cycle aborts the recursion,
+  // letting PAGScene::Make build from an inconsistent tree.
+  layoutApplied = true;
   visited.erase(this);
 }
 
