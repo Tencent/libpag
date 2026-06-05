@@ -60,27 +60,32 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Vector Transform Group", &transformStreamHandle);
   auto transform = new pag::ShapeTransform();
-  transform->anchorPoint =
-      GetProperty(transformStreamHandle, "ADBE Vector Anchor", AEStreamParser::PointParser);
-  transform->position =
-      GetProperty(transformStreamHandle, "ADBE Vector Position", AEStreamParser::PointParser);
-  transform->scale =
-      GetProperty(transformStreamHandle, "ADBE Vector Scale", AEStreamParser::ScaleParser);
-  transform->skew =
-      GetProperty(transformStreamHandle, "ADBE Vector Skew", AEStreamParser::FloatParser);
-  transform->skewAxis =
-      GetProperty(transformStreamHandle, "ADBE Vector Skew Axis", AEStreamParser::FloatParser);
-  transform->rotation =
-      GetProperty(transformStreamHandle, "ADBE Vector Rotation", AEStreamParser::FloatParser);
-  transform->opacity = GetProperty(transformStreamHandle, "ADBE Vector Group Opacity",
-                                   AEStreamParser::Opacity0_100Parser);
+  if (transformStreamHandle != nullptr) {
+    transform->anchorPoint =
+        GetProperty(transformStreamHandle, "ADBE Vector Anchor", AEStreamParser::PointParser);
+    transform->position =
+        GetProperty(transformStreamHandle, "ADBE Vector Position", AEStreamParser::PointParser);
+    transform->scale =
+        GetProperty(transformStreamHandle, "ADBE Vector Scale", AEStreamParser::ScaleParser);
+    transform->skew =
+        GetProperty(transformStreamHandle, "ADBE Vector Skew", AEStreamParser::FloatParser);
+    transform->skewAxis =
+        GetProperty(transformStreamHandle, "ADBE Vector Skew Axis", AEStreamParser::FloatParser);
+    transform->rotation =
+        GetProperty(transformStreamHandle, "ADBE Vector Rotation", AEStreamParser::FloatParser);
+    transform->opacity = GetProperty(transformStreamHandle, "ADBE Vector Group Opacity",
+                                     AEStreamParser::Opacity0_100Parser);
+    Suites->StreamSuite4()->AEGP_DisposeStream(transformStreamHandle);
+  }
   element->transform = transform;
-  Suites->StreamSuite4()->AEGP_DisposeStream(transformStreamHandle);
 
   int gradientIndex = 0;
   AEGP_StreamRefH contents = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(PluginID, streamHandle,
                                                                  "ADBE Vectors Group", &contents);
+  if (contents == nullptr) {
+    return element;
+  }
   A_long numElements = 0;
   Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(contents, &numElements);
   for (A_long index = 0; index < numElements; index++) {
@@ -212,7 +217,11 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
       AEGP_StreamRefH childStreamHandle = nullptr;
       Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, dashStreamHandle, index,
                                                                  &childStreamHandle);
+      if (childStreamHandle == nullptr) {
+        continue;
+      }
       if (IsStreamHidden(childStreamHandle)) {
+        Suites->StreamSuite4()->AEGP_DisposeStream(childStreamHandle);
         continue;
       }
       if (!IsStreamHidden(childStreamHandle)) {
@@ -360,8 +369,10 @@ static pag::ShapeElement* GetRepeater(const AEGP_StreamRefH& streamHandle) {
   AEGP_StreamRefH transform = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Vector Repeater Transform", &transform);
-  element->transform = GetRepeaterTransform(transform);
-  Suites->StreamSuite4()->AEGP_DisposeStream(transform);
+  if (transform != nullptr) {
+    element->transform = GetRepeaterTransform(transform);
+    Suites->StreamSuite4()->AEGP_DisposeStream(transform);
+  }
   return element;
 }
 
@@ -435,10 +446,16 @@ std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle) {
   AEGP_StreamRefH layerStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(PluginID, layerHandle,
                                                               &layerStreamHandle);
+  if (layerStreamHandle == nullptr) {
+    return contents;
+  }
   AEGP_StreamRefH rootStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, layerStreamHandle, "ADBE Root Vectors Group", &rootStreamHandle);
   Suites->StreamSuite4()->AEGP_DisposeStream(layerStreamHandle);
+  if (rootStreamHandle == nullptr) {
+    return contents;
+  }
   A_long numStreams = 0;
   Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(rootStreamHandle, &numStreams);
   for (A_long index = 0; index < numStreams; index++) {

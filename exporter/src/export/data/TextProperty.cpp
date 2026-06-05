@@ -138,27 +138,29 @@ static pag::TextRangeSelector* GetTextRangeSelector(const AEGP_StreamRefH& strea
   AEGP_StreamRefH advancedStream = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Text Range Advanced", &advancedStream);
-  selector->units = GetValue(advancedStream, "ADBE Text Range Units",
-                             AEStreamParser::TextRangeSelectorUnitsParser);
-  selector->basedOn =
-      GetValue(advancedStream, "ADBE Text Range Type2", AEStreamParser::TextSelectorBasedOnParser);
-  selector->mode = GetProperty(advancedStream, "ADBE Text Selector Mode",
-                               AEStreamParser::TextSelectorModeParser);
-  selector->amount =
-      GetProperty(advancedStream, "ADBE Text Selector Max Amount", AEStreamParser::PercentParser);
-  selector->shape = GetValue(advancedStream, "ADBE Text Range Shape",
-                             AEStreamParser::TextRangeSelectorShapeParser);
-  selector->smoothness =
-      GetProperty(advancedStream, "ADBE Text Selector Smoothness", AEStreamParser::PercentParser);
-  selector->easeHigh =
-      GetProperty(advancedStream, "ADBE Text Levels Max Ease", AEStreamParser::PercentParser);
-  selector->easeLow =
-      GetProperty(advancedStream, "ADBE Text Levels Min Ease", AEStreamParser::PercentParser);
-  selector->randomizeOrder =
-      GetValue(advancedStream, "ADBE Text Randomize Order", AEStreamParser::BooleanParser);
-  selector->randomSeed =
-      GetProperty(advancedStream, "ADBE Text Random Seed", AEStreamParser::Uint16Parser);
-
+  if (advancedStream != nullptr) {
+    selector->units = GetValue(advancedStream, "ADBE Text Range Units",
+                               AEStreamParser::TextRangeSelectorUnitsParser);
+    selector->basedOn = GetValue(advancedStream, "ADBE Text Range Type2",
+                                 AEStreamParser::TextSelectorBasedOnParser);
+    selector->mode = GetProperty(advancedStream, "ADBE Text Selector Mode",
+                                 AEStreamParser::TextSelectorModeParser);
+    selector->amount =
+        GetProperty(advancedStream, "ADBE Text Selector Max Amount", AEStreamParser::PercentParser);
+    selector->shape = GetValue(advancedStream, "ADBE Text Range Shape",
+                               AEStreamParser::TextRangeSelectorShapeParser);
+    selector->smoothness =
+        GetProperty(advancedStream, "ADBE Text Selector Smoothness", AEStreamParser::PercentParser);
+    selector->easeHigh =
+        GetProperty(advancedStream, "ADBE Text Levels Max Ease", AEStreamParser::PercentParser);
+    selector->easeLow =
+        GetProperty(advancedStream, "ADBE Text Levels Min Ease", AEStreamParser::PercentParser);
+    selector->randomizeOrder =
+        GetValue(advancedStream, "ADBE Text Randomize Order", AEStreamParser::BooleanParser);
+    selector->randomSeed =
+        GetProperty(advancedStream, "ADBE Text Random Seed", AEStreamParser::Uint16Parser);
+    Suites->StreamSuite4()->AEGP_DisposeStream(advancedStream);
+  }
   return selector;
 }
 
