@@ -56,6 +56,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -115,79 +116,148 @@ static void ExpandBounds(float& minX, float& minY, float& maxX, float& maxY, con
   maxY = std::max(maxY, bounds.y + bounds.height);
 }
 
-static Rect ComputeContentBounds(const Layer* layer) {
+static Rect ComputeElementBounds(const Element* element);
+
+// std::pow(negative, non-integer) returns NaN. Raise magnitude and reapply sign.
+static float SignedPow(float base, float exp) {
+  float sign = base < 0.0f ? -1.0f : 1.0f;
+  return sign * std::pow(std::abs(base), exp);
+}
+
+// Apply a 2D affine matrix to a Rect, returning the axis-aligned bounding box
+// of the transformed corners.
+static Rect MapRect(const Matrix& m, const Rect& r) {
+  if (r.isEmpty()) {
+    return {};
+  }
+  float x0 = r.x, y0 = r.y;
+  float x1 = r.x + r.width, y1 = r.y + r.height;
+  auto tl = m.mapPoint({x0, y0});
+  auto tr = m.mapPoint({x1, y0});
+  auto bl = m.mapPoint({x0, y1});
+  auto br = m.mapPoint({x1, y1});
+  float minX = std::min({tl.x, tr.x, bl.x, br.x});
+  float minY = std::min({tl.y, tr.y, bl.y, br.y});
+  float maxX = std::max({tl.x, tr.x, bl.x, br.x});
+  float maxY = std::max({tl.y, tr.y, bl.y, br.y});
+  return {minX, minY, maxX - minX, maxY - minY};
+}
+
+// Build the per-copy transform matrix for a Repeater copy, mirroring the logic
+// in ModifierResolver::MakeCopyGroup and BuildGroupMatrix.
+static Matrix BuildRepeaterCopyMatrix(const Repeater* rep, float progress) {
+  float tx = rep->position.x * progress;
+  float ty = rep->position.y * progress;
+  float sx = SignedPow(rep->scale.x, progress);
+  float sy = SignedPow(rep->scale.y, progress);
+  float rotation = rep->rotation * progress;
+  Matrix m = {};
+  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
+    m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
+  }
+  if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
+    m = Matrix::Scale(sx, sy) * m;
+  }
+  if (!FloatNearlyZero(rotation)) {
+    m = Matrix::Rotate(rotation) * m;
+  }
+  m = Matrix::Translate(tx + rep->anchor.x, ty + rep->anchor.y) * m;
+  return m;
+}
+
+static Rect ComputeElementsBounds(const std::vector<Element*>& elements) {
   float minX = std::numeric_limits<float>::max();
   float minY = std::numeric_limits<float>::max();
   float maxX = -std::numeric_limits<float>::max();
   float maxY = -std::numeric_limits<float>::max();
-  for (const auto* element : layer->contents) {
-    switch (element->nodeType()) {
-      case NodeType::Rectangle: {
-        auto rect = static_cast<const Rectangle*>(element);
-        auto pos = rect->renderPosition();
-        auto size = rect->renderSize();
-        ExpandBounds(
-            minX, minY, maxX, maxY,
-            {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height});
-        break;
+  std::vector<Element*> preceding;
+
+  for (const auto* element : elements) {
+    if (element->nodeType() == NodeType::Repeater) {
+      auto rep = static_cast<const Repeater*>(element);
+      if (rep->copies < 0.0f) {
+        continue;
       }
-      case NodeType::Ellipse: {
-        auto ellipse = static_cast<const Ellipse*>(element);
-        auto pos = ellipse->renderPosition();
-        auto size = ellipse->renderSize();
-        ExpandBounds(
-            minX, minY, maxX, maxY,
-            {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height});
-        break;
+      if (rep->copies == 0.0f) {
+        return {};
       }
-      case NodeType::Path: {
-        auto pathNode = static_cast<const Path*>(element);
-        if (pathNode->data == nullptr || pathNode->data->isEmpty()) {
-          break;
-        }
-        auto bounds = pathNode->data->getBounds();
-        auto pos = pathNode->renderPosition();
-        ExpandBounds(minX, minY, maxX, maxY,
-                     {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height});
-        break;
+      if (preceding.empty()) {
+        continue;
       }
-      case NodeType::Polystar: {
-        auto polystar = static_cast<const Polystar*>(element);
-        auto pos = polystar->renderPosition();
-        auto contentBounds = polystar->getContentBounds();
-        auto scale = polystar->renderScale();
-        ExpandBounds(minX, minY, maxX, maxY,
-                     {pos.x, pos.y, contentBounds.width * scale, contentBounds.height * scale});
-        break;
+      auto bodyBounds = ComputeElementsBounds(preceding);
+      constexpr float MAX_REPEATER_COPIES = 10000.0f;
+      float copiesF = std::min(rep->copies, MAX_REPEATER_COPIES);
+      int maxCount = static_cast<int>(std::ceil(copiesF));
+      for (int i = 0; i < maxCount; i++) {
+        float progress = static_cast<float>(i) + rep->offset;
+        auto copyMatrix = BuildRepeaterCopyMatrix(rep, progress);
+        auto copyBounds = MapRect(copyMatrix, bodyBounds);
+        ExpandBounds(minX, minY, maxX, maxY, copyBounds);
       }
-      case NodeType::Text: {
-        auto text = static_cast<const Text*>(element);
-        ExpandBounds(minX, minY, maxX, maxY, text->layoutBounds());
-        break;
-      }
-      case NodeType::TextPath: {
-        auto textPath = static_cast<const TextPath*>(element);
-        ExpandBounds(minX, minY, maxX, maxY, textPath->layoutBounds());
-        break;
-      }
-      case NodeType::Group: {
-        auto group = static_cast<const Group*>(element);
-        ExpandBounds(minX, minY, maxX, maxY, group->layoutBounds());
-        break;
-      }
-      case NodeType::TextBox: {
-        auto textBox = static_cast<const TextBox*>(element);
-        ExpandBounds(minX, minY, maxX, maxY, textBox->layoutBounds());
-        break;
-      }
-      default:
-        break;
+      continue;
     }
+    auto bounds = ComputeElementBounds(element);
+    if (bounds.width > 0 || bounds.height > 0) {
+      ExpandBounds(minX, minY, maxX, maxY, bounds);
+    }
+    preceding.push_back(const_cast<Element*>(element));
   }
   if (minX > maxX) {
     return {};
   }
   return {minX, minY, maxX - minX, maxY - minY};
+}
+
+static Rect ComputeElementBounds(const Element* element) {
+  switch (element->nodeType()) {
+    case NodeType::Rectangle: {
+      auto rect = static_cast<const Rectangle*>(element);
+      auto pos = rect->renderPosition();
+      auto size = rect->renderSize();
+      return {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height};
+    }
+    case NodeType::Ellipse: {
+      auto ellipse = static_cast<const Ellipse*>(element);
+      auto pos = ellipse->renderPosition();
+      auto size = ellipse->renderSize();
+      return {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height};
+    }
+    case NodeType::Path: {
+      auto pathNode = static_cast<const Path*>(element);
+      if (pathNode->data == nullptr || pathNode->data->isEmpty()) {
+        return {};
+      }
+      auto bounds = pathNode->data->getBounds();
+      auto pos = pathNode->renderPosition();
+      return {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height};
+    }
+    case NodeType::Polystar: {
+      auto polystar = static_cast<const Polystar*>(element);
+      auto pos = polystar->renderPosition();
+      auto outerRadius = polystar->renderOuterRadius();
+      return {pos.x - outerRadius, pos.y - outerRadius, outerRadius * 2, outerRadius * 2};
+    }
+    case NodeType::Group: {
+      auto group = static_cast<const Group*>(element);
+      auto childBounds = ComputeElementsBounds(group->elements);
+      auto pos = group->renderPosition();
+      return {pos.x + childBounds.x, pos.y + childBounds.y, childBounds.width, childBounds.height};
+    }
+    case NodeType::Text: {
+      auto text = static_cast<const Text*>(element);
+      return text->layoutBounds();
+    }
+    case NodeType::TextPath: {
+      auto textPath = static_cast<const TextPath*>(element);
+      return textPath->layoutBounds();
+    }
+    case NodeType::TextBox: {
+      auto textBox = static_cast<const TextBox*>(element);
+      return textBox->layoutBounds();
+    }
+    default:
+      return {};
+  }
 }
 
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
@@ -3189,7 +3259,13 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
   }
 
   if (!layer->filters.empty() || !layer->styles.empty()) {
-    auto contentBounds = ComputeContentBounds(layer);
+    auto contentBounds = ComputeElementsBounds(layer->contents);
+    auto layerBounds = layer->layoutBounds();
+    printf(
+        "Layer[%s] SVG contentBounds: x=%.2f y=%.2f w=%.2f h=%.2f  |  layerBounds: x=%.2f y=%.2f "
+        "w=%.2f h=%.2f\n",
+        layer->id.c_str(), contentBounds.x, contentBounds.y, contentBounds.width,
+        contentBounds.height, layerBounds.x, layerBounds.y, layerBounds.width, layerBounds.height);
     auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles, contentBounds);
     if (!filterId.empty()) {
       out.addAttribute("filter", "url(#" + filterId + ")");
