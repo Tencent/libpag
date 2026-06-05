@@ -85,6 +85,34 @@ using SVGBuilder = XMLBuilder;
 // Utility types and static helpers
 //==============================================================================
 
+// Appends a CSS inline-style entry "name:value;" to the given style string.
+// Centralizes the colon/semicolon punctuation so call sites stay free of literal
+// separators and the property/value pair is the only thing the reader has to look at.
+static void AppendStyleEntry(std::string& style, const char* name, const std::string& value) {
+  style += name;
+  style += ':';
+  style += value;
+  style += ';';
+}
+
+// Joins floats formatted via FloatToString with a single-character separator. Used
+// for matrix(a,b,c,d,e,f), feColorMatrix values, and shadow color rows where the
+// repeated `result += FloatToString(...); result += sep;` pattern obscured intent.
+static std::string JoinFloats(const float* values, size_t count, char separator) {
+  std::string result;
+  if (count == 0) {
+    return result;
+  }
+  result.reserve(count * 12);
+  for (size_t i = 0; i < count; i++) {
+    if (i > 0) {
+      result += separator;
+    }
+    result += FloatToString(values[i]);
+  }
+  return result;
+}
+
 // Returns only the RGB hex string (#RRGGBB). Alpha is handled separately via
 // fill-opacity/stroke-opacity attributes, following standard SVG practice.
 static std::string ColorToSVGString(const Color& color) {
@@ -99,8 +127,8 @@ static std::string ColorToSVGString(const Color& color) {
 // Emits a CSS color(display-p3 ...) value. Only used when the color source has
 // Display P3 color space values; sRGB colors use the standard #RRGGBB format.
 static std::string ColorToDisplayP3String(const Color& color) {
-  return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-         FloatToString(color.blue) + ")";
+  float channels[3] = {color.red, color.green, color.blue};
+  return "color(display-p3 " + JoinFloats(channels, 3, ' ') + ")";
 }
 
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
@@ -128,9 +156,7 @@ static void AppendBlendModeStyle(std::string& styleStr, BlendMode mode) {
   if (!blendStr) {
     return;
   }
-  styleStr += "mix-blend-mode:";
-  styleStr += blendStr;
-  styleStr += ';';
+  AppendStyleEntry(styleStr, "mix-blend-mode", blendStr);
 }
 
 // Appends Display P3 color via CSS color() function when the color source has
@@ -148,18 +174,11 @@ static void AppendP3ColorStyle(std::string& styleStr, const char* property,
   if (solid->color.colorSpace != ColorSpace::DisplayP3) {
     return;
   }
-  styleStr += property;
-  styleStr += ':';
-  styleStr += srgbHex;
-  styleStr += ';';
-  styleStr += property;
-  styleStr += ':';
-  styleStr += ColorToDisplayP3String(solid->color);
-  styleStr += ';';
-  styleStr += property;
-  styleStr += "-opacity:";
-  styleStr += FloatToString(effectiveAlpha);
-  styleStr += ';';
+  AppendStyleEntry(styleStr, property, srgbHex);
+  AppendStyleEntry(styleStr, property, ColorToDisplayP3String(solid->color));
+  std::string opacityProp = property;
+  opacityProp += "-opacity";
+  AppendStyleEntry(styleStr, opacityProp.c_str(), FloatToString(effectiveAlpha));
 }
 
 static std::string MatrixToSVGTransform(const Matrix& matrix) {
@@ -170,22 +189,8 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
   // [a c e]   [scaleX skewX  transX]
   // [b d f] = [skewY  scaleY transY]
   // [0 0 1]   [0      0      1     ]
-  std::string result;
-  result.reserve(80);
-  result += "matrix(";
-  result += FloatToString(matrix.a);
-  result += ',';
-  result += FloatToString(matrix.b);
-  result += ',';
-  result += FloatToString(matrix.c);
-  result += ',';
-  result += FloatToString(matrix.d);
-  result += ',';
-  result += FloatToString(matrix.tx);
-  result += ',';
-  result += FloatToString(matrix.ty);
-  result += ')';
-  return result;
+  float values[6] = {matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty};
+  return "matrix(" + JoinFloats(values, 6, ',') + ")";
 }
 
 // Returns true when the painter's color source is a gradient (of any kind).
@@ -462,6 +467,12 @@ class SVGWriter {
                            std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
   void applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke, const Rect& shapeBounds = {},
                              std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
+  // Shared paint-color emission for both fill and stroke. Writes the paint attribute
+  // (e.g. "fill") plus its "-opacity" sibling and accumulates the Display P3 / blend-mode
+  // CSS fragments into p3Style. Centralizes the alpha math and the default-#000000 rule.
+  void applyPaintColor(SVGBuilder& out, const char* paintAttr, const ColorSource* color,
+                       float painterAlpha, BlendMode blendMode, const Rect& shapeBounds,
+                       float alphaMultiplier, std::string* p3Style);
   // Writes fill, stroke, and the optional collected P3 style fragment as SVG attributes.
   // Every geometry writer ends with this three-call sequence so keeping it together
   // avoids forgetting a step and makes the painter apply order explicit.
@@ -868,6 +879,9 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", inResult);
   _defs->addAttribute("type", "matrix");
+  // feColorMatrix row form: r g b a t — each row outputs <ch>*alpha + t.
+  // Here we drive only the constant column with the flood color so the source
+  // alpha is preserved in the output alpha channel.
   std::string values;
   values.reserve(80);
   values += "0 0 0 0 ";
@@ -927,15 +941,7 @@ void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMa
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", currentSource);
   _defs->addAttribute("type", "matrix");
-  std::string values;
-  values.reserve(200);
-  for (size_t i = 0; i < cm->matrix.size(); i++) {
-    if (i > 0) {
-      values += " ";
-    }
-    values += FloatToString(cm->matrix[i]);
-  }
-  _defs->addAttribute("values", values);
+  _defs->addAttribute("values", JoinFloats(cm->matrix.data(), cm->matrix.size(), ' '));
   _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
   currentSource = resultName;
@@ -1269,27 +1275,35 @@ std::string SVGWriter::writeClipPathDef(const Layer* maskLayer) {
 // SVGWriter – fill / stroke attribute helpers
 //==============================================================================
 
+void SVGWriter::applyPaintColor(SVGBuilder& out, const char* paintAttr, const ColorSource* color,
+                                float painterAlpha, BlendMode blendMode, const Rect& shapeBounds,
+                                float alphaMultiplier, std::string* p3Style) {
+  float alpha = 1.0f;
+  // Per PAGX spec, Fill/Stroke defaults to opaque black (#000000) when no color is specified.
+  std::string paintStr = color ? getColorSourceRef(color, &alpha, shapeBounds) : "#000000";
+  out.addAttribute(paintAttr, paintStr);
+  float effectiveAlpha = alpha * painterAlpha * alphaMultiplier;
+  std::string opacityAttr = paintAttr;
+  opacityAttr += "-opacity";
+  if (effectiveAlpha < 1.0f) {
+    out.addAttribute(opacityAttr.c_str(), FloatToString(effectiveAlpha));
+  }
+  if (p3Style) {
+    AppendP3ColorStyle(*p3Style, paintAttr, color, paintStr, effectiveAlpha);
+    AppendBlendModeStyle(*p3Style, blendMode);
+  }
+}
+
 void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds,
                                     std::string* p3Style, float alphaMultiplier) {
   if (!fill) {
     out.addAttribute("fill", "none");
     return;
   }
-  float alpha = 1.0f;
-  // Per PAGX spec, Fill defaults to opaque black (#000000) when no color is specified.
-  std::string fillStr =
-      fill->color ? getColorSourceRef(fill->color, &alpha, shapeBounds) : "#000000";
-  out.addAttribute("fill", fillStr);
-  float effectiveAlpha = alpha * fill->alpha * alphaMultiplier;
-  if (effectiveAlpha < 1.0f) {
-    out.addAttribute("fill-opacity", FloatToString(effectiveAlpha));
-  }
+  applyPaintColor(out, "fill", fill->color, fill->alpha, fill->blendMode, shapeBounds,
+                  alphaMultiplier, p3Style);
   if (fill->fillRule == FillRule::EvenOdd) {
     out.addAttribute("fill-rule", "evenodd");
-  }
-  if (p3Style) {
-    AppendP3ColorStyle(*p3Style, "fill", fill->color, fillStr, effectiveAlpha);
-    AppendBlendModeStyle(*p3Style, fill->blendMode);
   }
 }
 
@@ -1299,15 +1313,8 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   if (!stroke) {
     return;
   }
-  float alpha = 1.0f;
-  // Per PAGX spec, Stroke defaults to opaque black (#000000) when no color is specified.
-  std::string strokeStr =
-      stroke->color ? getColorSourceRef(stroke->color, &alpha, shapeBounds) : "#000000";
-  out.addAttribute("stroke", strokeStr);
-  float effectiveAlpha = alpha * stroke->alpha * alphaMultiplier;
-  if (effectiveAlpha < 1.0f) {
-    out.addAttribute("stroke-opacity", FloatToString(effectiveAlpha));
-  }
+  applyPaintColor(out, "stroke", stroke->color, stroke->alpha, stroke->blendMode, shapeBounds,
+                  alphaMultiplier, p3Style);
   if (stroke->width != 1.0f) {
     out.addAttribute("stroke-width", FloatToString(stroke->width));
   }
@@ -1325,21 +1332,11 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
     out.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
   }
   if (!stroke->dashes.empty()) {
-    std::string dashStr;
-    for (size_t i = 0; i < stroke->dashes.size(); i++) {
-      if (i > 0) {
-        dashStr += ",";
-      }
-      dashStr += FloatToString(stroke->dashes[i]);
-    }
-    out.addAttribute("stroke-dasharray", dashStr);
+    out.addAttribute("stroke-dasharray",
+                     JoinFloats(stroke->dashes.data(), stroke->dashes.size(), ','));
   }
   if (stroke->dashOffset != 0.0f) {
     out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
-  }
-  if (p3Style) {
-    AppendP3ColorStyle(*p3Style, "stroke", stroke->color, strokeStr, effectiveAlpha);
-    AppendBlendModeStyle(*p3Style, stroke->blendMode);
   }
 }
 
