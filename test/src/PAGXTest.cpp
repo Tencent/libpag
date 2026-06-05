@@ -42,6 +42,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -85,6 +86,7 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
@@ -6160,6 +6162,49 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   EXPECT_FLOAT_EQ(tgfxStyle->blurrinessY(), 12.0f);
 }
 
+/**
+ * Test case: BlendFilter.color channel writes through to the tgfx BlendFilter. The "color" channel
+ * binding is the new path added when wiring BlendFilter into the runtime binding; before the fix
+ * the tgfx filter was created but never registered, so the writer had no target and the keyframe
+ * was silently dropped. Hold-interpolated at t=1 the channel lands exactly on the keyframe color.
+ */
+PAGX_TEST(PAGXTest, ChannelBlendFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto blend = doc->makeNode<pagx::BlendFilter>("BL");
+  blend->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  blend->blendMode = pagx::BlendMode::Multiply;
+  layer->filters.push_back(blend);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "BL";
+  anim->objects.push_back(obj);
+  auto* colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  colorProp->channel = "color";
+  colorProp->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->properties.push_back(colorProp);
+
+  auto file = pagx::PAGScene::Make(doc);
+  auto& tree = *file->mutableBinding();
+  auto tgfxBlend = tree.get<tgfx::BlendFilter>(blend);
+  ASSERT_TRUE(tgfxBlend != nullptr);
+
+  auto timeline = file->getDefaultTimeline();
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxBlend->color().red, 0.0f);
+  EXPECT_FLOAT_EQ(tgfxBlend->color().green, 1.0f);
+  EXPECT_FLOAT_EQ(tgfxBlend->color().blue, 0.0f);
+}
+
 namespace {
 static pagx::Animation* MakeAlphaAnim(pagx::PAGXDocument* doc, const std::string& id, float value) {
   auto anim = doc->makeNode<pagx::Animation>(id);
@@ -7006,6 +7051,109 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionDeepNestingNoFalseCycle) {
   for (const auto& error : doc->errors) {
     EXPECT_TRUE(error.find("Cyclic external composition reference detected") == std::string::npos);
   }
+}
+
+/**
+ * Test case: a same-document composition that references itself through an @id is caught by the
+ * runtime cycle guard in PAGComposition::MakeChild. The external-file chain guard only covers
+ * compositionFilePath references, so a self-referencing in-document composition would otherwise
+ * recurse without bound and overflow the stack when the scene's runtime tree is built. The guard
+ * detects the repeat on the ancestor path, reports it on the document, and drops the subtree so
+ * scene construction returns normally.
+ */
+PAGX_TEST(PAGXTest, SameDocCompositionSelfReferenceCycle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto comp = doc->makeNode<pagx::Composition>("selfComp");
+  comp->width = 50;
+  comp->height = 50;
+
+  // The composition's own layer references the same composition, forming an @selfComp -> @selfComp
+  // cycle entirely within this document.
+  auto inner = doc->makeNode<pagx::Layer>("inner");
+  inner->width = 50;
+  inner->height = 50;
+  inner->composition = comp;
+  comp->layers.push_back(inner);
+
+  // A top-level slot layer instantiates the cyclic composition.
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->width = 50;
+  slot->height = 50;
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  // The slot resolves into one child composition; its self-reference is dropped rather than
+  // recursing, so the tree is finite.
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
+
+  bool hasCycleError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("Cyclic composition reference detected") != std::string::npos) {
+      hasCycleError = true;
+    }
+  }
+  EXPECT_TRUE(hasCycleError);
+}
+
+/**
+ * Test case: GetInt64Attribute rejects malformed and out-of-range integer attributes instead of
+ * silently accepting a truncated or clamped value. The "time" attribute on a keyframe is parsed
+ * through GetInt64Attribute; trailing garbage ("60abc") and a value past INT64_MAX both report a
+ * parse error and fall back to the default rather than producing a bogus time.
+ */
+PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
+  // Trailing non-numeric characters after a valid prefix must be rejected (strtoll alone would
+  // accept the "60" prefix and silently ignore "abc").
+  std::string trailingXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"L\" width=\"50\" height=\"50\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"L\">\n"
+      "        <Property channel=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"60abc\" value=\"1\"/>\n"
+      "        </Property>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto trailingDoc = pagx::PAGXImporter::FromXML(trailingXML);
+  ASSERT_TRUE(trailingDoc != nullptr);
+  bool hasTrailingError = false;
+  for (const auto& error : trailingDoc->errors) {
+    if (error.find("Invalid value '60abc'") != std::string::npos) {
+      hasTrailingError = true;
+    }
+  }
+  EXPECT_TRUE(hasTrailingError);
+
+  // A value beyond the int64 range (errno == ERANGE) must report an out-of-range error rather than
+  // returning the clamped LLONG_MAX.
+  std::string overflowXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"L\" width=\"50\" height=\"50\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"L\">\n"
+      "        <Property channel=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"99999999999999999999\" value=\"1\"/>\n"
+      "        </Property>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto overflowDoc = pagx::PAGXImporter::FromXML(overflowXML);
+  ASSERT_TRUE(overflowDoc != nullptr);
+  bool hasRangeError = false;
+  for (const auto& error : overflowDoc->errors) {
+    if (error.find("out of range") != std::string::npos) {
+      hasRangeError = true;
+    }
+  }
+  EXPECT_TRUE(hasRangeError);
 }
 
 PAGX_TEST(PAGXTest, HitTestSingleLayer) {
