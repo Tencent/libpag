@@ -73,6 +73,19 @@ export class RenderCanvas {
       );
     }
 
+    // Force sRGB drawing buffer color space. On iOS devices with Display P3 screens,
+    // the canvas defaults to Display P3, causing tgfx's sRGB color values to be
+    // interpreted as P3 and rendering with a visible blue/purple shift. Setting
+    // drawingBufferColorSpace to "srgb" ensures consistent cross-platform colors.
+    // See: https://webkit.org/blog/2024/05/color-gamut-in-canvas/
+    if ('drawingBufferColorSpace' in gl) {
+      try {
+        (gl as any).drawingBufferColorSpace = 'srgb';
+      } catch {
+        // Silently fall through on unsupported environments (e.g., older WebViews).
+      }
+    }
+
     // Register context to Emscripten
     this._backendContext = BackendContext.from(module, gl);
   }
