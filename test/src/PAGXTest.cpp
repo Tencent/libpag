@@ -5757,6 +5757,31 @@ PAGX_TEST(PAGXTest, PAGTimelineZeroDuration) {
 }
 
 /**
+ * Test case: a PAGTimeline outliving its PAGScene detaches instead of dereferencing freed content.
+ */
+PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto anim = doc->makeNode<pagx::Animation>("loop");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(anim);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  auto timeline = scene->getTimeline("loop");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->play();
+  timeline->setCurrentTime(200'000);
+
+  scene.reset();
+
+  // With the owning scene gone, advance() and apply() are no-ops and must not crash.
+  EXPECT_FALSE(timeline->advance(500'000));
+  EXPECT_EQ(timeline->currentTime(), 200'000);
+  timeline->apply();
+}
+
+/**
  * Test case: PAGSurface::MakeOffscreen creates a real GPU-backed surface with the requested size.
  */
 PAGX_TEST(PAGXTest, PAGSurfaceMakeOffscreen) {

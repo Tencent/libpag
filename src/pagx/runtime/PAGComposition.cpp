@@ -83,7 +83,7 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
       continue;
     }
     auto timeline = std::shared_ptr<PAGTimeline>(
-        new PAGTimeline(animation, composition->binding.get(), composition->document));
+        new PAGTimeline(animation, composition->binding.get(), composition->document, parentScene));
     if (animationDriver->playing) {
       timeline->play();
     }

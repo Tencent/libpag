@@ -56,8 +56,9 @@ static void ApplyResolved(
   }
 }
 
-PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc)
-    : animation(anim), binding(binding), contextDoc(contextDoc) {
+PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
+                         std::weak_ptr<PAGScene> owner)
+    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
 void PAGTimeline::resolveTargets() {
@@ -124,7 +125,7 @@ int64_t PAGTimeline::currentTime() const {
 }
 
 bool PAGTimeline::advance(int64_t deltaMicroseconds) {
-  if (!playing || deltaMicroseconds == 0 || animation == nullptr) {
+  if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
   auto duration = DurationMicros(animation);
@@ -165,7 +166,7 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
 }
 
 void PAGTimeline::apply(float mix) {
-  if (animation == nullptr) {
+  if (owner.expired() || animation == nullptr) {
     return;
   }
   auto clamped = std::clamp(mix, 0.0f, 1.0f);

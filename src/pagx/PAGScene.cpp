@@ -95,7 +95,7 @@ std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
     return it->second;
   }
   auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, _rootComposition->binding.get(), document.get()));
+      new PAGTimeline(matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }

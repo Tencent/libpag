@@ -40,6 +40,10 @@ class Property;
  * Multiple lookups for the same animation name return the same PAGTimeline instance, so playback
  * state is shared across all callers driving that animation.
  *
+ * Lifetime: a PAGTimeline references content owned by the PAGScene that vended it. Callers may keep
+ * the returned shared_ptr alive past the PAGScene, but once that scene is destroyed the timeline
+ * detaches: advance() and apply() become no-ops rather than dereferencing freed content.
+ *
  * Thread safety: PAGTimeline is not thread-safe. currentTime and the playing flag are plain
  * members with no synchronization, so calls on a given timeline (and on the PAGScene that owns it)
  * must be serialized by the caller.
@@ -128,13 +132,17 @@ class PAGTimeline {
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
  private:
-  PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc);
+  PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
+              std::weak_ptr<PAGScene> owner);
 
   // Resolves each animation object's target node against contextDoc once and caches the
   // (node, properties) pairs, so apply() avoids a per-frame findNode() hash lookup for every
   // object. Built lazily on the first apply() since contextDoc's nodeMap is stable after build.
   void resolveTargets();
 
+  // Owning scene. animation / binding / contextDoc point into content this scene keeps alive, so
+  // advance() and apply() bail out once the scene is gone to avoid dereferencing freed memory.
+  std::weak_ptr<PAGScene> owner;
   Animation* animation = nullptr;
   // Runtime binding the channel writers should target. Top-level timelines use the owning
   // PAGScene's binding; composition timelines use the binding built for that composition.
