@@ -24,9 +24,7 @@
 #include <vector>
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
-#include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
-#include "pagx/PAGXDocument.h"
 
 namespace tgfx {
 class DisplayList;
@@ -36,6 +34,8 @@ namespace pagx {
 
 class Animation;
 class Node;
+class PAGSurface;
+class PAGXDocument;
 struct Matrix;
 struct RuntimeBinding;
 
@@ -47,6 +47,12 @@ struct RuntimeBinding;
  *
  * PAGScene keeps the source PAGXDocument alive internally, so callers may release their own
  * document handle once the PAGScene is created.
+ *
+ * Thread safety: PAGScene and the PAGTimeline instances it vends are not thread-safe. Their
+ * playback and render state carry no internal locking, so all calls on a single PAGScene (and its
+ * timelines) must be serialized by the caller. Distinct PAGScene instances built from the same
+ * PAGXDocument hold independent runtime state and may be driven from different threads, provided
+ * the shared document is not mutated concurrently.
  */
 class PAGScene : public std::enable_shared_from_this<PAGScene> {
  public:

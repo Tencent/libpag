@@ -18,6 +18,8 @@
 
 #include "pagx/PAGScene.h"
 #include "pagx/PAGLayer.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Drawable.h"

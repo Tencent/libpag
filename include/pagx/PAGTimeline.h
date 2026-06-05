@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 #include "pagx/nodes/Animation.h"
 
 namespace pagx {
@@ -27,6 +29,8 @@ namespace pagx {
 struct RuntimeBinding;
 class PAGScene;
 class PAGXDocument;
+class Node;
+class Property;
 
 /**
  * PAGTimeline controls the playback of a single animation in a PAGScene. It holds the playback state
@@ -35,6 +39,10 @@ class PAGXDocument;
  * PAGTimeline must not be constructed directly; obtain instances through PAGScene::getTimeline().
  * Multiple lookups for the same animation name return the same PAGTimeline instance, so playback
  * state is shared across all callers driving that animation.
+ *
+ * Thread safety: PAGTimeline is not thread-safe. currentTime and the playing flag are plain
+ * members with no synchronization, so calls on a given timeline (and on the PAGScene that owns it)
+ * must be serialized by the caller.
  */
 class PAGTimeline {
  public:
@@ -122,6 +130,11 @@ class PAGTimeline {
  private:
   PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc);
 
+  // Resolves each animation object's target node against contextDoc once and caches the
+  // (node, properties) pairs, so apply() avoids a per-frame findNode() hash lookup for every
+  // object. Built lazily on the first apply() since contextDoc's nodeMap is stable after build.
+  void resolveTargets();
+
   Animation* animation = nullptr;
   // Runtime binding the channel writers should target. Top-level timelines use the owning
   // PAGScene's binding; composition timelines use the binding built for that composition.
@@ -130,6 +143,10 @@ class PAGTimeline {
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
   // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
+  // Cached target resolution: each entry pairs a resolved target node with the properties driving
+  // it. Populated by resolveTargets() on first apply(); resolved stays false until then.
+  std::vector<std::pair<Node*, std::vector<Property*>>> resolvedTargets = {};
+  bool resolved = false;
   int64_t currentTimeUs = 0;
   bool playing = false;
 

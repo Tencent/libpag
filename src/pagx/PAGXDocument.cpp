@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXDocument.h"
 #include <algorithm>
+#include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
@@ -57,7 +58,7 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
 
 static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, Layer* layer,
                                     const std::string& filePath, std::shared_ptr<Data> data,
-                                    const std::vector<std::string>& chain) {
+                                    const std::unordered_set<std::string>& chain) {
   if (document == nullptr || layer == nullptr || data == nullptr ||
       layer->compositionFilePath != filePath || layer->composition != nullptr) {
     return false;
@@ -66,7 +67,7 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   // resolving it would nest externalDocs without end across repeated host load passes. Clear the
   // layer's compositionFilePath so getExternalFilePaths() stops returning it and the host loop
   // converges, then report the cycle on the root document.
-  if (std::find(chain.begin(), chain.end(), filePath) != chain.end()) {
+  if (chain.find(filePath) != chain.end()) {
     root->errors.push_back("Cyclic external composition reference detected: '" + filePath + "'.");
     layer->compositionFilePath = {};
     return false;
@@ -93,7 +94,7 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
 
 static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
                                 const std::string& filePath, std::shared_ptr<Data> data,
-                                std::vector<std::string>& chain) {
+                                std::unordered_set<std::string>& chain) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -115,18 +116,31 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
     bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
     found = loadedComposition || found;
     if (!loadedComposition && layer->externalDoc != nullptr) {
-      // Descend into an already-resolved externalDoc, pushing its origin path so a reference back
-      // to any ancestor origin (a cycle) is detected. Sibling externalDocs that legitimately share
-      // the same downstream file are not flagged because their origins are popped on return.
-      chain.push_back(layer->compositionFilePath);
+      // Descend into an already-resolved externalDoc, recording its origin path so a reference back
+      // to any ancestor origin (a cycle) is detected. Only erase the entry this frame inserted:
+      // sibling externalDocs that legitimately share the same downstream file would otherwise drop
+      // an ancestor's marker. insert().second is true exactly when this frame added the path.
+      bool inserted = chain.insert(layer->compositionFilePath).second;
       found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain) || found;
-      chain.pop_back();
+      if (inserted) {
+        chain.erase(layer->compositionFilePath);
+      }
     }
   }
   return found;
 }
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
+  std::unordered_set<const PAGXDocument*> visited = {};
+  applyLayout(config, visited);
+}
+
+void PAGXDocument::applyLayout(const FontConfig* config,
+                               std::unordered_set<const PAGXDocument*>& visited) {
+  if (!visited.insert(this).second) {
+    errors.push_back("Cyclic external composition reference detected during layout.");
+    return;
+  }
   if (config != nullptr) {
     fontConfig = *config;
   }
@@ -148,10 +162,11 @@ void PAGXDocument::applyLayout(const FontConfig* config) {
         // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
         // so external compositions are measured and rendered with the host's fonts, keeping text
         // consistent across the embedded boundary rather than using the external doc's own config.
-        layer->externalDoc->applyLayout(&fontConfig);
+        layer->externalDoc->applyLayout(&fontConfig, visited);
       }
     }
   }
+  visited.erase(this);
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
@@ -234,7 +249,7 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
         "Load all external file data before PAGScene::Make(); the loaded content will not appear "
         "in existing scenes.");
   }
-  std::vector<std::string> chain = {};
+  std::unordered_set<std::string> chain = {};
   return LoadFileDataInChain(this, this, filePath, data, chain);
 }
 

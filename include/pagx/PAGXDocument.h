@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/nodes/Animation.h"
@@ -189,6 +190,10 @@ class PAGXDocument : public Node {
 
  private:
   PAGXDocument() = default;
+  // Recursive layout worker. visited holds the documents on the current ancestor path so an
+  // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
+  // is detected and stops the recursion instead of overflowing the stack.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 

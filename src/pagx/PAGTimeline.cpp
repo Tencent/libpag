@@ -39,12 +39,30 @@ static int64_t DurationMicros(const Animation* animation) {
 }
 
 // Evaluates the given animation at the given microsecond time and writes the results into the
-// supplied runtime binding. contextDoc is the document whose nodeMap channel target IDs are looked
-// up against; it differs from the file's primary document when the timeline was spawned by a sealed
-// cross-document composition. Stateless: depends only on its arguments.
-static void ApplyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
-                           int64_t microseconds, float mix) {
-  if (animation == nullptr || binding == nullptr || contextDoc == nullptr) {
+// supplied runtime binding, using the pre-resolved (target node, properties) pairs to avoid a
+// per-frame node lookup. Stateless: depends only on its arguments.
+static void ApplyResolved(
+    const std::vector<std::pair<Node*, std::vector<Property*>>>& resolvedTargets,
+    Animation* animation, RuntimeBinding* binding, int64_t microseconds, float mix) {
+  if (animation == nullptr || binding == nullptr) {
+    return;
+  }
+  for (const auto& entry : resolvedTargets) {
+    auto* targetNode = entry.first;
+    for (auto* property : entry.second) {
+      binding->apply(targetNode, property->channel,
+                     property->evaluateAt(microseconds, animation->frameRate), mix);
+    }
+  }
+}
+
+PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc)
+    : animation(anim), binding(binding), contextDoc(contextDoc) {
+}
+
+void PAGTimeline::resolveTargets() {
+  resolved = true;
+  if (animation == nullptr || contextDoc == nullptr) {
     return;
   }
   for (auto* object : animation->objects) {
@@ -55,18 +73,16 @@ static void ApplyAnimation(Animation* animation, RuntimeBinding* binding, PAGXDo
     if (targetNode == nullptr) {
       continue;
     }
+    std::vector<Property*> properties = {};
     for (auto* property : object->properties) {
-      if (property == nullptr) {
-        continue;
+      if (property != nullptr) {
+        properties.push_back(property);
       }
-      binding->apply(targetNode, property->channel,
-                     property->evaluateAt(microseconds, animation->frameRate), mix);
+    }
+    if (!properties.empty()) {
+      resolvedTargets.emplace_back(targetNode, std::move(properties));
     }
   }
-}
-
-PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc)
-    : animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
 const std::string& PAGTimeline::getId() const {
@@ -156,7 +172,10 @@ void PAGTimeline::apply(float mix) {
   if (clamped <= 0.0f) {
     return;
   }
-  ApplyAnimation(animation, binding, contextDoc, currentTimeUs, clamped);
+  if (!resolved) {
+    resolveTargets();
+  }
+  ApplyResolved(resolvedTargets, animation, binding, currentTimeUs, clamped);
 }
 
 bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {
