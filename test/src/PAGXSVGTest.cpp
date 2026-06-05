@@ -3172,4 +3172,309 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_GradientFillFallback) {
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_gradient_fallback.svg");
 }
 
+// ===========================================================================
+// ModifierResolver — additional edge branches reachable through SVG export.
+// ===========================================================================
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ReversedPath) {
+  // Path with reversed=true exercises the PrimitiveToTGFXPath reverse branch.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M40 40 L160 40 L160 160 L40 160 Z");
+  path->data = data;
+  path->reversed = true;
+
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Separate;
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.3f, 0.4f, 0.5f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_PathWithNullDataStaysEmpty) {
+  // Path with data == nullptr should resolve to an empty tgfx::Path; trim
+  // applied on top still emits a no-op (the original Path passes through).
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = nullptr;
+
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Separate;
+  trim->start = 0.1f;
+  trim->end = 0.6f;
+
+  layer->contents.push_back(path);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.4f, 0.7f, 0.2f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousReversed) {
+  // start > end triggers the reversed branch in applyContinuousTrim.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->position = {80, 100};
+  rect1->size = {60, 60};
+  auto* rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->position = {220, 100};
+  rect2->size = {60, 60};
+
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Continuous;
+  trim->start = 0.8f;
+  trim->end = 0.2f;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.5f, 0.5f, 0.0f, 1};
+  stroke->color = color;
+  stroke->width = 3;
+
+  layer->contents.push_back(rect1);
+  layer->contents.push_back(rect2);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousFullRange) {
+  // start=0, end=1 → effect == nullptr in applyContinuousTrim.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 100};
+  rect->size = {80, 80};
+
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Continuous;
+  trim->start = 0.0f;
+  trim->end = 1.0f;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.0f, 0.0f, 0.0f, 1};
+  stroke->color = color;
+  stroke->width = 2;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousWrapAround) {
+  // end > 1 forces the wrap-around branch (trimEnd > totalLength).
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* r1 = doc->makeNode<pagx::Rectangle>();
+  r1->position = {80, 100};
+  r1->size = {60, 60};
+  auto* r2 = doc->makeNode<pagx::Rectangle>();
+  r2->position = {220, 100};
+  r2->size = {60, 60};
+
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Continuous;
+  trim->start = 0.7f;
+  trim->end = 1.2f;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.0f, 0.5f, 0.5f, 1};
+  stroke->color = color;
+  stroke->width = 2;
+
+  layer->contents.push_back(r1);
+  layer->contents.push_back(r2);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterClampsExcessiveCopies) {
+  // copies above MAX_REPEATER_COPIES (10000) clamp; emitted output should be
+  // bounded but not crash.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {2, 2};
+  auto* rep = doc->makeNode<pagx::Repeater>();
+  rep->copies = 1000000.0f;
+  rep->position = {0, 0};
+  rep->scale = {1, 1};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.1f, 0.1f, 0.1f));
+  layer->contents.push_back(rep);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScale) {
+  // Negative scale exercises SignedPow's negative branch.
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {80, 100};
+  rect->size = {30, 30};
+  auto* rep = doc->makeNode<pagx::Repeater>();
+  rep->copies = 3;
+  rep->position = {60, 0};
+  rep->scale = {-1.0f, 1.0f};
+  rep->offset = 0.5f;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.5f, 0.2f, 0.5f));
+  layer->contents.push_back(rep);
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MergePathDifferenceForcesEvenOddFill) {
+  // Difference produces an even-odd-oriented combined path; the resolver
+  // should re-stamp the Fill's fillRule to EvenOdd so downstream renderers
+  // punch out the inner contour. Verify by querying the exported SVG.
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* outer = doc->makeNode<pagx::Rectangle>();
+  outer->position = {150, 150};
+  outer->size = {200, 200};
+  auto* inner = doc->makeNode<pagx::Rectangle>();
+  inner->position = {150, 150};
+  inner->size = {80, 80};
+  auto* mp = doc->makeNode<pagx::MergePath>();
+  mp->mode = pagx::MergePathMode::Difference;
+  layer->contents.push_back(outer);
+  layer->contents.push_back(inner);
+  layer->contents.push_back(mp);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.4f, 0.8f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("evenodd"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_MergePathAppendDefaultMode) {
+  // Default-constructed MergePath uses Append mode, mapping to PathOp::Union.
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* r1 = doc->makeNode<pagx::Rectangle>();
+  r1->position = {120, 100};
+  r1->size = {80, 80};
+  auto* r2 = doc->makeNode<pagx::Rectangle>();
+  r2->position = {210, 100};
+  r2->size = {80, 80};
+  auto* mp = doc->makeNode<pagx::MergePath>();
+  mp->mode = pagx::MergePathMode::Append;
+  layer->contents.push_back(r1);
+  layer->contents.push_back(r2);
+  layer->contents.push_back(mp);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.3f, 0.6f, 0.4f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_PolygonReversed) {
+  // Reversed polygon exercises the direction = -1 branch in PolygonToTGFXPath.
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* poly = doc->makeNode<pagx::Polystar>();
+  poly->type = pagx::PolystarType::Polygon;
+  poly->position = {150, 150};
+  poly->pointCount = 5;
+  poly->outerRadius = 70;
+  poly->reversed = true;
+  layer->contents.push_back(poly);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.6f, 0.2f, 0.4f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_StarFractionalPointsReversed) {
+  // Fractional points + reversed exercises the decimalIndex = numPoints - 3
+  // branch in StarToTGFXPath.
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* star = doc->makeNode<pagx::Polystar>();
+  star->type = pagx::PolystarType::Star;
+  star->position = {150, 150};
+  star->pointCount = 4.5f;
+  star->outerRadius = 80;
+  star->innerRadius = 40;
+  star->reversed = true;
+  layer->contents.push_back(star);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.3f, 0.7f, 0.6f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_RoundCornerOnPathPrimitive) {
+  // Apply RoundCorner to a Path (not Rectangle) so applyRoundCornerToElement
+  // routes through PrimitiveToTGFXPath's NodeType::Path branch.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M40 40 L160 40 L160 160 L40 160 Z");
+  path->data = data;
+  auto* rc = doc->makeNode<pagx::RoundCorner>();
+  rc->radius = 12.0f;
+  layer->contents.push_back(path);
+  layer->contents.push_back(rc);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.8f, 0.4f, 0.2f));
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathOnEllipse) {
+  // Apply TrimPath to an Ellipse to hit PrimitiveToTGFXPath's Ellipse branch.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {100, 100};
+  ellipse->size = {120, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->type = pagx::TrimType::Separate;
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.6f, 0.0f, 0.6f, 1};
+  stroke->color = color;
+  stroke->width = 3;
+
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(trim);
+  layer->contents.push_back(stroke);
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
 }  // namespace pag
