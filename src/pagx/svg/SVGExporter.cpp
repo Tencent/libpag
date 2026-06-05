@@ -42,6 +42,7 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -69,6 +70,7 @@
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -277,6 +279,12 @@ class SVGWriterContext {
     return prefix + std::to_string(nextDefId++);
   }
 
+  // Font* → Woff2FontResult mapping. Populated by SVGExporter::ToSVG's pre-processing pass for
+  // every embedded vector Font resource. emitGeometryWithFs checks this mapping to decide whether
+  // to render Text via the WOFF2 <text> path or fall back to the SVG <path> outline path.
+  // The relativeUrl field stores a `data:font/woff2;base64,...` URI so each SVG is self-contained.
+  std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
+
  private:
   int nextDefId = 0;
 };
@@ -366,6 +374,12 @@ class SVGWriter {
                  float alpha);
   void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha);
+  // WOFF2 path: renders pre-shaped GlyphRun glyphs as a real <text> element referencing the
+  // generated @font-face font, using PUA Unicode characters mapped 1:1 to glyph IDs. Returns
+  // false when the run cannot be losslessly expressed as <text> (per-glyph scales / skews,
+  // bitmap font, or every glyph is GID 0); the caller falls back to writeTextAsPath in that case.
+  bool writeTextAsFont(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                       float alpha, const Woff2FontResult& fontResult);
   void writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                            const TextLayoutResult& layoutResult, const Matrix& m, float alpha);
   void writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
@@ -1586,6 +1600,123 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   out.closeElement();
 }
 
+// ── writeTextAsFont ─────────────────────────────────────────────────────────
+//
+// Encodes a Unicode codepoint as UTF-8 and appends to the string. WOFF2 cmap maps
+// 0xE000 + (glyphID - 1) → glyphID, so the character we emit is the PUA codepoint that the
+// embedded font resolves back to the original glyph index.
+static void AppendUTF8Codepoint(std::string& out, uint32_t cp) {
+  if (cp < 0x80) {
+    out += static_cast<char>(cp);
+  } else if (cp < 0x800) {
+    out += static_cast<char>(0xC0 | (cp >> 6));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else if (cp < 0x10000) {
+    out += static_cast<char>(0xE0 | (cp >> 12));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (cp >> 18));
+    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  }
+}
+
+bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha, const Woff2FontResult& fontResult) {
+  // Plain SVG <text> can express per-character (x, y, rotate) positioning lists, but it cannot
+  // express per-glyph scale or skew — those would require a separate <text> element per glyph
+  // (defeating the purpose of using <text> for selectability). When the run carries any such
+  // transform, signal the caller to fall back to writeTextAsPath.
+  for (auto* run : text->glyphRuns) {
+    if (!run->scales.empty() || !run->skews.empty()) {
+      return false;
+    }
+  }
+  // Gradient fills cannot be confined to glyph silhouettes in <text> the way they are in
+  // background-clip:text in HTML; SVG renders the gradient over the bounding rect and we'd lose
+  // visual fidelity. Fall back to writeTextAsPath where each glyph carries its own clipping path.
+  if (IsGradientSource(fs.fill ? fs.fill->color : nullptr) ||
+      IsGradientSource(fs.stroke ? fs.stroke->color : nullptr)) {
+    return false;
+  }
+
+  auto renderPos = text->renderPosition();
+  if (fs.textBox) {
+    renderPos.x += fs.textBox->padding.left;
+    renderPos.y += fs.textBox->padding.top;
+  }
+
+  // Walk every visible glyph and collect its absolute x/y/rotation. Skipping GID 0 (the .notdef
+  // sentinel) matches writeTextAsPath / HTMLWriter::writeEmbeddedShapeGlyphsAsFont so a missing
+  // glyph never paints a blank box.
+  std::string puaText;
+  std::string xList;
+  std::string yList;
+  std::string rotateList;
+  bool hasRotation = false;
+  float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
+  for (auto* run : text->glyphRuns) {
+    if (run->fontSize > 0.0f) {
+      fontSize = run->fontSize;
+    }
+    for (size_t i = 0; i < run->glyphs.size(); ++i) {
+      uint16_t gid = run->glyphs[i];
+      if (gid == 0) {
+        continue;
+      }
+      float gx = run->x;
+      float gy = run->y;
+      if (i < run->xOffsets.size()) {
+        gx += run->xOffsets[i];
+      }
+      if (i < run->positions.size()) {
+        gx += run->positions[i].x;
+        gy += run->positions[i].y;
+      }
+      gx += renderPos.x;
+      gy += renderPos.y;
+      if (!puaText.empty()) {
+        xList += ' ';
+        yList += ' ';
+        rotateList += ' ';
+      }
+      xList += FloatToString(gx);
+      yList += FloatToString(gy);
+      float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
+      rotateList += FloatToString(rotation);
+      if (!FloatNearlyZero(rotation)) {
+        hasRotation = true;
+      }
+      AppendUTF8Codepoint(puaText, 0xE000u + (gid - 1u));
+    }
+  }
+  if (puaText.empty()) {
+    return false;
+  }
+
+  std::string transform = MatrixToSVGTransform(m);
+  out.openElement("text");
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
+  out.addAttribute("font-family", "'" + fontResult.familyName + "'");
+  out.addAttribute("font-size", FloatToString(fontSize));
+  out.addAttribute("x", xList);
+  out.addAttribute("y", yList);
+  if (hasRotation) {
+    // SVG rotate="..." applies one degree value per character around that character's (x, y);
+    // omit when no glyph rotates so simple runs stay terse.
+    out.addAttribute("rotate", rotateList);
+  }
+  // Fill / stroke painting via the shared helper. Solid colors only — the gradient fallback above
+  // sent the run to writeTextAsPath. shapeBounds is empty because gradients are excluded.
+  applyPainters(out, fs, {}, alpha);
+  out.closeElementWithText(puaText);
+  return true;
+}
+
 // ── writeText ───────────────────────────────────────────────────────────────
 
 static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor anchor) {
@@ -2292,6 +2423,27 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
       if (!text->glyphRuns.empty()) {
+        // Prefer the WOFF2 <text> path when the GlyphRun's font is registered as an embedded
+        // vector font: the result is a real <text> element with PUA Unicode characters that
+        // browsers / Inkscape / Preview render via the embedded @font-face, preserving text
+        // selection, search, and per-character animation. Per-glyph scales / skews and bitmap
+        // fonts cannot be expressed in <text>, so writeTextAsFont returns false in those cases
+        // and the caller falls back to the SVG <path> outline path below.
+        const Font* font = nullptr;
+        for (auto* run : text->glyphRuns) {
+          if (run->font) {
+            font = run->font;
+            break;
+          }
+        }
+        if (font != nullptr) {
+          auto it = _context->woff2Fonts.find(font);
+          if (it != _context->woff2Fonts.end()) {
+            if (writeTextAsFont(out, text, localFs, entry.transform, alpha, it->second)) {
+              break;
+            }
+          }
+        }
         writeTextAsPath(out, text, localFs, entry.transform, alpha);
       } else {
         writeText(out, text, localFs, entry.transform, alpha);
@@ -2639,6 +2791,41 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+
+  // Pre-pass: build WOFF2 fonts for embedded vector fonts. Only Font resources whose first glyph
+  // carries vector outline data (Glyph.path, no Glyph.image) participate — bitmap CBDT fonts
+  // remain on the per-glyph <image> rendering path because per-glyph scales/skews cannot be
+  // expressed in a plain SVG <text>. Each generated WOFF2 byte stream is base64-embedded as a
+  // `data:font/woff2;base64,...` URI so the SVG remains self-contained, avoiding the external
+  // resource directory the HTML exporter writes alongside the document. The id-keyed mapping
+  // is consumed by writeText / writeTextAsFont below to decide whether to emit <text> with
+  // PUA Unicode characters (WOFF2 path) or the SVG <path> outline path.
+  if (options.embedFontsAsWoff2 && options.convertTextToPath == false) {
+    for (auto& nodePtr : doc.nodes) {
+      if (nodePtr->nodeType() != NodeType::Font) {
+        continue;
+      }
+      auto* font = static_cast<Font*>(nodePtr.get());
+      if (font->glyphs.empty() || !font->glyphs[0]) {
+        continue;
+      }
+      // Skip bitmap fonts: SVG <text> + CBDT works in browsers but not in Inkscape / Preview, and
+      // per-glyph scales/skews still need the <image> path. Sticking to vector fonts keeps the
+      // WOFF2 path coverage portable and predictable.
+      if (font->glyphs[0]->image || !font->glyphs[0]->path) {
+        continue;
+      }
+      std::string fontId = "f" + std::to_string(context.woff2Fonts.size());
+      auto result = BuildWoff2FromFont(font, fontId);
+      if (result.woff2Data.empty()) {
+        continue;
+      }
+      result.relativeUrl = "data:font/woff2;base64,";
+      result.relativeUrl += Base64Encode(result.woff2Data.data(), result.woff2Data.size());
+      context.woff2Fonts[font] = std::move(result);
+    }
+  }
+
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
                    &doc, options.bakeUnsupported, safeRasterScale, options.resolveModifiers,
                    warnings);
@@ -2661,10 +2848,28 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   }
 
   std::string defsStr = defs.release();
-  if (!defsStr.empty()) {
+  // Prepend @font-face rules to <defs> so embedded WOFF2 fonts are declared before any element
+  // references them via font-family. Browsers tolerate <style> inside <defs>, and keeping the
+  // rules in <defs> avoids a second top-level emission point.
+  std::string fontFaceRules;
+  if (!context.woff2Fonts.empty()) {
+    for (const auto& [font, result] : context.woff2Fonts) {
+      fontFaceRules += "@font-face{font-family:'" + result.familyName + "';src:url(" +
+                       result.relativeUrl + ") format('woff2')}\n";
+    }
+  }
+  if (!defsStr.empty() || !fontFaceRules.empty()) {
     svg.openElement("defs");
     svg.closeElementStart();
-    svg.addRawContent(defsStr);
+    if (!fontFaceRules.empty()) {
+      svg.openElement("style");
+      svg.closeElementStart();
+      svg.addRawContent(fontFaceRules);
+      svg.closeElement();
+    }
+    if (!defsStr.empty()) {
+      svg.addRawContent(defsStr);
+    }
     svg.closeElement();
   }
 

@@ -26,7 +26,6 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
-#include "pagx/html/Woff2FontGenerator.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -47,6 +46,7 @@
 #include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/SelectorTypes.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 
 namespace pagx {
 
