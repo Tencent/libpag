@@ -253,7 +253,7 @@ static Rect ComputeElementBounds(const Element* element) {
     }
     case NodeType::Text: {
       auto text = static_cast<const Text*>(element);
-      return text->layoutBounds();
+      return text->contentBounds();
     }
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(element);
