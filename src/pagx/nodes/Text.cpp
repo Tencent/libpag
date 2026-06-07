@@ -21,6 +21,7 @@
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/GlyphRunRenderer.h"
 
 namespace pagx {
 
@@ -86,6 +87,16 @@ float Text::renderFontSize() const {
 
 Rect Text::contentBounds() const {
   auto pos = renderPosition();
+  auto textBlob = glyphData->textBlob;
+  if (textBlob == nullptr && !glyphData->layoutRuns.empty()) {
+    textBlob =
+        GlyphRunRenderer::BuildTextBlobFromLayoutRuns(glyphData->layoutRuns, tgfx::Matrix::I());
+  }
+  if (textBlob) {
+    auto tightBounds = textBlob->getTightBounds();
+    return {pos.x + tightBounds.x(), pos.y + tightBounds.y(), tightBounds.width(),
+            tightBounds.height()};
+  }
   return {pos.x + textBounds.x, pos.y + textBounds.y, textBounds.width, textBounds.height};
 }
 
