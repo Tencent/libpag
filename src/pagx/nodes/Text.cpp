@@ -84,4 +84,9 @@ float Text::renderFontSize() const {
   return fontSize * textScale;
 }
 
+Rect Text::contentBounds() const {
+  auto pos = renderPosition();
+  return {pos.x + textBounds.x, pos.y + textBounds.y, textBounds.width, textBounds.height};
+}
+
 }  // namespace pagx
