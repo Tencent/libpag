@@ -228,6 +228,11 @@ static Rect ComputeElementBounds(const Element* element) {
         return {};
       }
       auto bounds = pathNode->data->getBounds();
+      auto scale = pathNode->renderScale();
+      bounds.x *= scale;
+      bounds.y *= scale;
+      bounds.width *= scale;
+      bounds.height *= scale;
       auto pos = pathNode->renderPosition();
       return {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height};
     }
@@ -240,8 +245,11 @@ static Rect ComputeElementBounds(const Element* element) {
     case NodeType::Group: {
       auto group = static_cast<const Group*>(element);
       auto childBounds = ComputeElementsBounds(group->elements);
-      auto pos = group->renderPosition();
-      return {pos.x + childBounds.x, pos.y + childBounds.y, childBounds.width, childBounds.height};
+      auto groupMatrix = BuildGroupMatrix(group);
+      if (groupMatrix.isIdentity()) {
+        return childBounds;
+      }
+      return MapRect(groupMatrix, childBounds);
     }
     case NodeType::Text: {
       auto text = static_cast<const Text*>(element);
@@ -249,7 +257,17 @@ static Rect ComputeElementBounds(const Element* element) {
     }
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(element);
-      return textPath->layoutBounds();
+      if (textPath->path == nullptr || textPath->path->isEmpty()) {
+        return textPath->layoutBounds();
+      }
+      auto bounds = textPath->path->getBounds();
+      auto scale = textPath->renderScale();
+      bounds.x *= scale;
+      bounds.y *= scale;
+      bounds.width *= scale;
+      bounds.height *= scale;
+      auto pos = textPath->renderPosition();
+      return {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height};
     }
     case NodeType::TextBox: {
       auto textBox = static_cast<const TextBox*>(element);
