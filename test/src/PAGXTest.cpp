@@ -7369,6 +7369,14 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  auto fontFamily = typeface ? typeface->fontFamily() : std::string();
+  auto fontStyle = typeface ? typeface->fontStyle() : std::string();
+  if (typeface) {
+    fontConfig.registerTypeface(typeface);
+  }
+
   auto makeNoiseFilter = [&]() {
     auto noise = doc->makeNode<pagx::NoiseFilter>();
     noise->mode = pagx::NoiseMode::Mono;
@@ -7450,6 +7458,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
 
     auto text = doc->makeNode<pagx::Text>();
     text->text = "Hi";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
     text->fontSize = 60;
     layer->contents.push_back(text);
     layer->contents.push_back(makeFill(0.2f, 0.6f, 0.9f));
@@ -7482,6 +7492,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     textBox->height = 100;
     auto text = doc->makeNode<pagx::Text>();
     text->text = "AB CD";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
     text->fontSize = 30;
     textBox->elements.push_back(text);
     textBox->elements.push_back(makeFill(0.1f, 0.4f, 0.7f));
@@ -7602,6 +7614,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
 
     auto text = doc->makeNode<pagx::Text>();
     text->text = "Hi";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
     text->fontSize = 60;
     layer->contents.push_back(text);
     layer->contents.push_back(makeFill(0.2f, 0.6f, 0.9f));
@@ -7636,6 +7650,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     textBox->height = 100;
     auto text = doc->makeNode<pagx::Text>();
     text->text = "AB CD";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
     text->fontSize = 30;
     textBox->elements.push_back(text);
     textBox->elements.push_back(makeFill(0.1f, 0.4f, 0.7f));
