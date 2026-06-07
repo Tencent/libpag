@@ -7599,8 +7599,7 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  auto typeface = Typeface::MakeFromPath("/System/Library/Fonts/Helvetica.ttc");
   auto fontFamily = typeface ? typeface->fontFamily() : std::string();
   auto fontStyle = typeface ? typeface->fontStyle() : std::string();
   if (typeface) {
