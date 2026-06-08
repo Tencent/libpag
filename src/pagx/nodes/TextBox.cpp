@@ -21,6 +21,8 @@
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/nodes/Text.h"
+#include "renderer/GlyphRunRenderer.h"
 
 namespace pagx {
 
@@ -167,6 +169,48 @@ void TextBox::updateLayout(LayoutContext* context) {
     text->layoutWidth = NAN;
     text->layoutHeight = NAN;
   }
+}
+
+Rect TextBox::contentBounds() const {
+  std::vector<Text*> childText = {};
+  TextLayout::CollectTextElements(elements, childText);
+  float left = 0, top = 0, right = 0, bottom = 0;
+  bool first = true;
+  for (auto* text : childText) {
+    if (text == nullptr) continue;
+    auto textBlob = text->glyphData->textBlob;
+    if (textBlob == nullptr && !text->glyphData->layoutRuns.empty()) {
+      textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns,
+                                                               tgfx::Matrix::I());
+    }
+    auto pos = text->renderPosition();
+    float tl, tt, tr, tb;
+    if (textBlob) {
+      auto bounds = textBlob->getBounds();
+      tl = pos.x + bounds.x();
+      tt = pos.y + bounds.y();
+      tr = tl + bounds.width();
+      tb = tt + bounds.height();
+    } else {
+      tl = pos.x + text->textBounds.x;
+      tt = pos.y + text->textBounds.y;
+      tr = tl + text->textBounds.width;
+      tb = tt + text->textBounds.height;
+    }
+    if (first) {
+      left = tl;
+      top = tt;
+      right = tr;
+      bottom = tb;
+      first = false;
+    } else {
+      if (tl < left) left = tl;
+      if (tt < top) top = tt;
+      if (tr > right) right = tr;
+      if (tb > bottom) bottom = tb;
+    }
+  }
+  return Rect::MakeLTRB(left, top, right, bottom);
 }
 
 }  // namespace pagx
