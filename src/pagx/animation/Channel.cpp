@@ -36,33 +36,33 @@ KeyValue TypedChannel<T>::onEvaluateAtMicros(int64_t microseconds, float frameRa
 }
 
 template <>
-PropertyValueType TypedChannel<float>::valueType() const {
-  return PropertyValueType::Float;
+ChannelValueType TypedChannel<float>::valueType() const {
+  return ChannelValueType::Float;
 }
 
 template <>
-PropertyValueType TypedChannel<bool>::valueType() const {
-  return PropertyValueType::Bool;
+ChannelValueType TypedChannel<bool>::valueType() const {
+  return ChannelValueType::Bool;
 }
 
 template <>
-PropertyValueType TypedChannel<int>::valueType() const {
-  return PropertyValueType::Int;
+ChannelValueType TypedChannel<int>::valueType() const {
+  return ChannelValueType::Int;
 }
 
 template <>
-PropertyValueType TypedChannel<std::string>::valueType() const {
-  return PropertyValueType::String;
+ChannelValueType TypedChannel<std::string>::valueType() const {
+  return ChannelValueType::String;
 }
 
 template <>
-PropertyValueType TypedChannel<ImageRef>::valueType() const {
-  return PropertyValueType::ImageRef;
+ChannelValueType TypedChannel<ImageRef>::valueType() const {
+  return ChannelValueType::ImageRef;
 }
 
 template <>
-PropertyValueType TypedChannel<Color>::valueType() const {
-  return PropertyValueType::Color;
+ChannelValueType TypedChannel<Color>::valueType() const {
+  return ChannelValueType::Color;
 }
 
 // Explicit instantiations: must cover every alternative of KeyValue.

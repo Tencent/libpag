@@ -1715,8 +1715,8 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
   }
 
   if (result != nullptr) {
-    result->channel = GetAttribute(node, "channel");
-    if (result->channel.empty()) {
+    result->property = GetAttribute(node, "channel");
+    if (result->property.empty()) {
       ReportError(doc, node, "Channel requires a non-empty 'channel' attribute.");
     }
   }

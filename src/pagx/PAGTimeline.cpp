@@ -18,6 +18,7 @@
 
 #include "pagx/PAGTimeline.h"
 #include <algorithm>
+#include <cstdint>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -50,7 +51,7 @@ static void ApplyResolved(
   for (const auto& entry : resolvedTargets) {
     auto* targetNode = entry.first;
     for (auto* channel : entry.second) {
-      binding->apply(targetNode, channel->channel,
+      binding->apply(targetNode, channel->property,
                      channel->evaluateAt(microseconds, animation->frameRate), mix);
     }
   }
@@ -133,7 +134,15 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
     return false;
   }
   auto previous = currentTimeUs;
-  auto next = currentTimeUs + deltaMicroseconds;
+  // Use saturating add to prevent signed overflow UB when deltaMicroseconds is extreme.
+  int64_t next = 0;
+  if (deltaMicroseconds > 0 && currentTimeUs > INT64_MAX - deltaMicroseconds) {
+    next = INT64_MAX;
+  } else if (deltaMicroseconds < 0 && currentTimeUs < INT64_MIN - deltaMicroseconds) {
+    next = INT64_MIN;
+  } else {
+    next = currentTimeUs + deltaMicroseconds;
+  }
   switch (animation->loop) {
     case LoopMode::Once:
       if (next >= duration) {

@@ -29,8 +29,8 @@ namespace pagx {
 
 /**
  * KeyValue is the value carried by a Channel's keyframes. Its std::variant alternatives are
- * ordered to match PropertyValueType, so the active alternative index equals the corresponding
- * PropertyValueType value.
+ * ordered to match ChannelValueType, so the active alternative index equals the corresponding
+ * ChannelValueType value.
  */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
 
@@ -38,7 +38,7 @@ using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
  * KeyValue's std::variant alternatives.
  */
-enum class PropertyValueType : uint8_t {
+enum class ChannelValueType : uint8_t {
   Float = 0,
   Bool = 1,
   Int = 2,
@@ -56,17 +56,17 @@ enum class PropertyValueType : uint8_t {
 class Channel : public Node {
  public:
   /**
-   * The channel this Channel drives on the target node (for example a transform or color
+   * The property name this Channel drives on the target node (for example a transform or color
    * channel). Interpreted by the runtime when applying evaluated values to the layer tree.
    */
-  std::string channel = {};
+  std::string property = {};
 
   /**
    * Returns the value type of this Channel's keyframes. Each TypedChannel<T> specialization
-   * reports a distinct PropertyValueType so callers can dispatch on the concrete type without
+   * reports a distinct ChannelValueType so callers can dispatch on the concrete type without
    * dynamic_cast or RTTI.
    */
-  virtual PropertyValueType valueType() const = 0;
+  virtual ChannelValueType valueType() const = 0;
 
   /**
    * Evaluates the channel value at the given Frame index. Useful for unit tests and any caller
@@ -107,7 +107,7 @@ class Channel : public Node {
 
 /**
  * TypedChannel binds a concrete KeyValue alternative T to an ordered list of keyframes. Each
- * specialization reports a distinct PropertyValueType and provides interpolation for its value
+ * specialization reports a distinct ChannelValueType and provides interpolation for its value
  * type through the runtime KeyframeEvaluator.
  */
 template <typename T>
@@ -119,7 +119,7 @@ class TypedChannel : public Channel {
    */
   std::vector<Keyframe<T>> keyframes = {};
 
-  PropertyValueType valueType() const override;
+  ChannelValueType valueType() const override;
 
  private:
   // Defined in src/pagx/animation/Channel.cpp with explicit instantiations for each KeyValue

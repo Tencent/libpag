@@ -138,9 +138,9 @@ class PAGTimeline {
   // Resolves each animation object's target node against contextDoc once and caches the
   // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup for every
   // object. Built lazily on the first apply(). The cache is valid only as long as the animation's
-  // objects and contextDoc's nodeMap are not mutated after the owning PAGScene is built; there is
-  // no invalidation path yet. PAGScene::onNodesChanged (TODO PR11) must reset resolved to false on
-  // affected timelines whenever it rebuilds nodeMap entries.
+  // objects and contextDoc's nodeMap are not mutated after the owning PAGScene is built.
+  // Cache invalidation will be wired through PAGXDocument::notifyChange → PAGScene::onNodesChanged
+  // which resets resolved to false on affected timelines whenever nodeMap entries change.
   void resolveTargets();
 
   // Owning scene. animation / binding / contextDoc point into content this scene keeps alive, so

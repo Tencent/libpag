@@ -204,7 +204,7 @@ template <typename T>
 static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
                               const char* typeName) {
   xml.openElement("Channel");
-  xml.addRequiredAttribute("channel", channel->channel);
+  xml.addRequiredAttribute("channel", channel->property);
   xml.addAttribute("type", typeName);
   xml.closeElementStart();
   for (const auto& key : channel->keyframes) {
@@ -227,22 +227,22 @@ static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
 
 static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
   switch (channel->valueType()) {
-    case PropertyValueType::Float:
+    case ChannelValueType::Float:
       WriteTypedChannel(xml, static_cast<const TypedChannel<float>*>(channel), "float");
       break;
-    case PropertyValueType::Bool:
+    case ChannelValueType::Bool:
       WriteTypedChannel(xml, static_cast<const TypedChannel<bool>*>(channel), "bool");
       break;
-    case PropertyValueType::Int:
+    case ChannelValueType::Int:
       WriteTypedChannel(xml, static_cast<const TypedChannel<int>*>(channel), "int");
       break;
-    case PropertyValueType::String:
+    case ChannelValueType::String:
       WriteTypedChannel(xml, static_cast<const TypedChannel<std::string>*>(channel), "string");
       break;
-    case PropertyValueType::ImageRef:
+    case ChannelValueType::ImageRef:
       WriteTypedChannel(xml, static_cast<const TypedChannel<ImageRef>*>(channel), "image");
       break;
-    case PropertyValueType::Color:
+    case ChannelValueType::Color:
       WriteTypedChannel(xml, static_cast<const TypedChannel<Color>*>(channel), "color");
       break;
   }
