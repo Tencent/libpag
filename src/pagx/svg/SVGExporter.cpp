@@ -1548,8 +1548,7 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   return resultName;
 }
 
-std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex,
-                                       const Rect&) {
+std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex, const Rect&) {
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
