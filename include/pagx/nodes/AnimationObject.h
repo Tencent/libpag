@@ -24,11 +24,11 @@
 
 namespace pagx {
 
-class Property;
+class Channel;
 
 /**
- * AnimationObject groups the animated properties that target a single node within an Animation.
- * Each AnimationObject binds to one node (identified by target) and carries the set of properties
+ * AnimationObject groups the animated channels that target a single node within an Animation.
+ * Each AnimationObject binds to one node (identified by target) and carries the set of channels
  * whose keyframes drive that node over time.
  */
 class AnimationObject : public Node {
@@ -40,10 +40,10 @@ class AnimationObject : public Node {
   std::string target = {};
 
   /**
-   * The animated properties applied to the target node. Each Property carries its own channel and
-   * keyframes.
+   * The animated channels applied to the target node. Each Channel carries its own channel name
+   * and keyframes.
    */
-  std::vector<Property*> properties = {};
+  std::vector<Channel*> channels = {};
 
   NodeType nodeType() const override {
     return NodeType::AnimationObject;

@@ -30,7 +30,7 @@ struct RuntimeBinding;
 class PAGScene;
 class PAGXDocument;
 class Node;
-class Property;
+class Channel;
 
 /**
  * PAGTimeline controls the playback of a single animation in a PAGScene. It holds the playback state
@@ -136,7 +136,7 @@ class PAGTimeline {
               std::weak_ptr<PAGScene> owner);
 
   // Resolves each animation object's target node against contextDoc once and caches the
-  // (node, properties) pairs, so apply() avoids a per-frame findNode() hash lookup for every
+  // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup for every
   // object. Built lazily on the first apply(). The cache is valid only as long as the animation's
   // objects and contextDoc's nodeMap are not mutated after the owning PAGScene is built; there is
   // no invalidation path yet. PAGScene::onNodesChanged (TODO PR11) must reset resolved to false on
@@ -154,11 +154,11 @@ class PAGTimeline {
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
   // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
-  // Cached target resolution: each entry pairs a resolved target node with the properties driving
+  // Cached target resolution: each entry pairs a resolved target node with the channels driving
   // it. Populated by resolveTargets() on first apply(); resolved stays false until then. Once
   // resolved is set it is never reset, so this cache assumes animation->objects and
   // contextDoc->nodeMap stay stable after the owning PAGScene is built (see resolveTargets()).
-  std::vector<std::pair<Node*, std::vector<Property*>>> resolvedTargets = {};
+  std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;
   bool playing = false;

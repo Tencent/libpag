@@ -44,6 +44,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -60,7 +61,6 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
-#include "pagx/nodes/Property.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -5308,8 +5308,8 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
 }
 
 /**
- * Test case: Top-level Animations / Object / Property / Keyframe round-trip across all six
- * TypedProperty<T> instantiations (float, bool, int, string, image, color).
+ * Test case: Top-level Animations / Object / Channel / Keyframe round-trip across all six
+ * TypedChannel<T> instantiations (float, bool, int, string, image, color).
  */
 PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -5326,47 +5326,47 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   object->target = "targetLayer";
   animation->objects.push_back(object);
 
-  auto floatProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto floatProp = doc->makeNode<pagx::TypedChannel<float>>();
   floatProp->channel = "alpha";
   floatProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   floatProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  object->properties.push_back(floatProp);
+  object->channels.push_back(floatProp);
 
-  auto boolProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  auto boolProp = doc->makeNode<pagx::TypedChannel<bool>>();
   boolProp->channel = "visible";
   boolProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
   boolProp->keyframes.push_back({30, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(boolProp);
+  object->channels.push_back(boolProp);
 
-  auto intProp = doc->makeNode<pagx::TypedProperty<int>>();
+  auto intProp = doc->makeNode<pagx::TypedChannel<int>>();
   intProp->channel = "blendMode";
   intProp->keyframes.push_back({0, 1, pagx::KeyframeInterpolationType::Hold, {}, {}});
   intProp->keyframes.push_back({60, 4, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(intProp);
+  object->channels.push_back(intProp);
 
-  auto strProp = doc->makeNode<pagx::TypedProperty<std::string>>();
+  auto strProp = doc->makeNode<pagx::TypedChannel<std::string>>();
   strProp->channel = "text";
   strProp->keyframes.push_back(
       {0, std::string("Hello"), pagx::KeyframeInterpolationType::Hold, {}, {}});
   strProp->keyframes.push_back(
       {60, std::string("World"), pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(strProp);
+  object->channels.push_back(strProp);
 
-  auto imgProp = doc->makeNode<pagx::TypedProperty<pagx::ImageRef>>();
+  auto imgProp = doc->makeNode<pagx::TypedChannel<pagx::ImageRef>>();
   imgProp->channel = "image";
   imgProp->keyframes.push_back(
       {0, pagx::ImageRef{"imgA"}, pagx::KeyframeInterpolationType::Hold, {}, {}});
   imgProp->keyframes.push_back(
       {60, pagx::ImageRef{"imgB"}, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(imgProp);
+  object->channels.push_back(imgProp);
 
-  auto colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   colorProp->channel = "color";
   pagx::Color colorA{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   pagx::Color colorB{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   colorProp->keyframes.push_back({0, colorA, pagx::KeyframeInterpolationType::Linear, {}, {}});
   colorProp->keyframes.push_back({60, colorB, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  object->properties.push_back(colorProp);
+  object->channels.push_back(colorProp);
 
   doc->animations.push_back(animation);
 
@@ -5387,34 +5387,34 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
 
   auto* obj2 = anim2->objects[0];
   EXPECT_EQ(obj2->target, "targetLayer");
-  ASSERT_EQ(obj2->properties.size(), 6u);
+  ASSERT_EQ(obj2->channels.size(), 6u);
 
-  ASSERT_EQ(obj2->properties[0]->valueType(), pagx::PropertyValueType::Float);
-  auto* p0 = static_cast<pagx::TypedProperty<float>*>(obj2->properties[0]);
+  ASSERT_EQ(obj2->channels[0]->valueType(), pagx::PropertyValueType::Float);
+  auto* p0 = static_cast<pagx::TypedChannel<float>*>(obj2->channels[0]);
   EXPECT_EQ(p0->channel, "alpha");
   ASSERT_EQ(p0->keyframes.size(), 2u);
   EXPECT_FLOAT_EQ(p0->keyframes[1].value, 1.0f);
 
-  ASSERT_EQ(obj2->properties[1]->valueType(), pagx::PropertyValueType::Bool);
-  auto* p1 = static_cast<pagx::TypedProperty<bool>*>(obj2->properties[1]);
+  ASSERT_EQ(obj2->channels[1]->valueType(), pagx::PropertyValueType::Bool);
+  auto* p1 = static_cast<pagx::TypedChannel<bool>*>(obj2->channels[1]);
   EXPECT_EQ(p1->keyframes[0].value, false);
   EXPECT_EQ(p1->keyframes[1].value, true);
 
-  ASSERT_EQ(obj2->properties[2]->valueType(), pagx::PropertyValueType::Int);
-  auto* p2 = static_cast<pagx::TypedProperty<int>*>(obj2->properties[2]);
+  ASSERT_EQ(obj2->channels[2]->valueType(), pagx::PropertyValueType::Int);
+  auto* p2 = static_cast<pagx::TypedChannel<int>*>(obj2->channels[2]);
   EXPECT_EQ(p2->keyframes[1].value, 4);
 
-  ASSERT_EQ(obj2->properties[3]->valueType(), pagx::PropertyValueType::String);
-  auto* p3 = static_cast<pagx::TypedProperty<std::string>*>(obj2->properties[3]);
+  ASSERT_EQ(obj2->channels[3]->valueType(), pagx::PropertyValueType::String);
+  auto* p3 = static_cast<pagx::TypedChannel<std::string>*>(obj2->channels[3]);
   EXPECT_EQ(p3->keyframes[1].value, "World");
 
-  ASSERT_EQ(obj2->properties[4]->valueType(), pagx::PropertyValueType::ImageRef);
-  auto* p4 = static_cast<pagx::TypedProperty<pagx::ImageRef>*>(obj2->properties[4]);
+  ASSERT_EQ(obj2->channels[4]->valueType(), pagx::PropertyValueType::ImageRef);
+  auto* p4 = static_cast<pagx::TypedChannel<pagx::ImageRef>*>(obj2->channels[4]);
   EXPECT_EQ(p4->keyframes[0].value.id, "imgA");
   EXPECT_EQ(p4->keyframes[1].value.id, "imgB");
 
-  ASSERT_EQ(obj2->properties[5]->valueType(), pagx::PropertyValueType::Color);
-  auto* p5 = static_cast<pagx::TypedProperty<pagx::Color>*>(obj2->properties[5]);
+  ASSERT_EQ(obj2->channels[5]->valueType(), pagx::PropertyValueType::Color);
+  auto* p5 = static_cast<pagx::TypedChannel<pagx::Color>*>(obj2->channels[5]);
   EXPECT_FLOAT_EQ(p5->keyframes[0].value.red, 1.0f);
   EXPECT_FLOAT_EQ(p5->keyframes[1].value.green, 1.0f);
 }
@@ -5436,7 +5436,7 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   object->target = "L";
   animation->objects.push_back(object);
 
-  auto prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->channel = "alpha";
   prop->keyframes.push_back(
       {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, pagx::Point{0.42f, 0.0f}, pagx::Point{}});
@@ -5444,7 +5444,7 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
       {30, 0.5f, pagx::KeyframeInterpolationType::Hold, pagx::Point{}, pagx::Point{0.58f, 1.0f}});
   prop->keyframes.push_back(
       {60, 1.0f, pagx::KeyframeInterpolationType::None, pagx::Point{}, pagx::Point{}});
-  object->properties.push_back(prop);
+  object->channels.push_back(prop);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   auto loaded = pagx::PAGXImporter::FromXML(xml);
@@ -5452,10 +5452,10 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   ASSERT_TRUE(loaded->errors.empty());
   ASSERT_EQ(loaded->animations.size(), 1u);
 
-  ASSERT_EQ(loaded->animations[0]->objects[0]->properties[0]->valueType(),
+  ASSERT_EQ(loaded->animations[0]->objects[0]->channels[0]->valueType(),
             pagx::PropertyValueType::Float);
   auto* prop2 =
-      static_cast<pagx::TypedProperty<float>*>(loaded->animations[0]->objects[0]->properties[0]);
+      static_cast<pagx::TypedChannel<float>*>(loaded->animations[0]->objects[0]->channels[0]);
   ASSERT_EQ(prop2->keyframes.size(), 3u);
 
   EXPECT_EQ(prop2->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
@@ -5522,12 +5522,12 @@ PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
 }
 
 /**
- * Test case: TypedProperty<T>::evaluateAt returns the keyframe value at or before the requested
+ * Test case: TypedChannel<T>::evaluateAt returns the keyframe value at or before the requested
  * frame (Hold-style staircase), validating the binary search baseline behavior.
  */
-PAGX_TEST(PAGXTest, TypedPropertyEvaluateAt) {
+PAGX_TEST(PAGXTest, TypedChannelEvaluateAt) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   prop->keyframes.push_back({30, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
@@ -5843,10 +5843,10 @@ PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
   auto* object = doc->makeNode<pagx::AnimationObject>();
   object->target = "L";
   anim->objects.push_back(object);
-  auto* alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
   alphaProp->channel = "alpha";
   alphaProp->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(alphaProp);
+  object->channels.push_back(alphaProp);
 
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
@@ -5890,10 +5890,10 @@ PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
   auto* object = doc->makeNode<pagx::AnimationObject>();
   object->target = "L";
   anim->objects.push_back(object);
-  auto* visProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  auto* visProp = doc->makeNode<pagx::TypedChannel<bool>>();
   visProp->channel = "visible";
   visProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(visProp);
+  object->channels.push_back(visProp);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -5928,10 +5928,10 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   auto* object = doc->makeNode<pagx::AnimationObject>();
   object->target = "L";
   anim->objects.push_back(object);
-  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* xProp = doc->makeNode<pagx::TypedChannel<float>>();
   xProp->channel = "x";
   xProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(xProp);
+  object->channels.push_back(xProp);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -5974,14 +5974,14 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   auto* object = doc->makeNode<pagx::AnimationObject>();
   object->target = "T";
   anim->objects.push_back(object);
-  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* xProp = doc->makeNode<pagx::TypedChannel<float>>();
   xProp->channel = "x";
   xProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(xProp);
-  auto* yProp = doc->makeNode<pagx::TypedProperty<float>>();
+  object->channels.push_back(xProp);
+  auto* yProp = doc->makeNode<pagx::TypedChannel<float>>();
   yProp->channel = "y";
   yProp->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  object->properties.push_back(yProp);
+  object->channels.push_back(yProp);
 
   pagx::FontConfig fontConfig;
   fontConfig.registerTypeface(typeface);
@@ -6026,11 +6026,11 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "S";
   anim->objects.push_back(obj);
-  auto* p = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto* p = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   p->channel = "color";
   pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
   p->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(p);
+  obj->channels.push_back(p);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -6086,15 +6086,15 @@ PAGX_TEST(PAGXTest, ChannelColorStop) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "Stop1";
   anim->objects.push_back(obj);
-  auto* colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto* colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   colorProp->channel = "color";
   pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
   colorProp->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(colorProp);
-  auto* offsetProp = doc->makeNode<pagx::TypedProperty<float>>();
+  obj->channels.push_back(colorProp);
+  auto* offsetProp = doc->makeNode<pagx::TypedChannel<float>>();
   offsetProp->channel = "offset";
   offsetProp->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(offsetProp);
+  obj->channels.push_back(offsetProp);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -6133,14 +6133,14 @@ PAGX_TEST(PAGXTest, ChannelBlurFilter) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "B";
   anim->objects.push_back(obj);
-  auto* xProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* xProp = doc->makeNode<pagx::TypedChannel<float>>();
   xProp->channel = "blurX";
   xProp->keyframes.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(xProp);
-  auto* yProp = doc->makeNode<pagx::TypedProperty<float>>();
+  obj->channels.push_back(xProp);
+  auto* yProp = doc->makeNode<pagx::TypedChannel<float>>();
   yProp->channel = "blurY";
   yProp->keyframes.push_back({0, 6.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(yProp);
+  obj->channels.push_back(yProp);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -6187,23 +6187,23 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   auto* fObj = doc->makeNode<pagx::AnimationObject>();
   fObj->target = "F";
   anim->objects.push_back(fObj);
-  auto* fx = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* fx = doc->makeNode<pagx::TypedChannel<float>>();
   fx->channel = "offsetX";
   fx->keyframes.push_back({0, 8.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  fObj->properties.push_back(fx);
-  auto* fcolor = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  fObj->channels.push_back(fx);
+  auto* fcolor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   fcolor->channel = "color";
   fcolor->keyframes.push_back(
       {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  fObj->properties.push_back(fcolor);
+  fObj->channels.push_back(fcolor);
 
   auto* sObj = doc->makeNode<pagx::AnimationObject>();
   sObj->target = "S";
   anim->objects.push_back(sObj);
-  auto* sblur = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* sblur = doc->makeNode<pagx::TypedChannel<float>>();
   sblur->channel = "blurY";
   sblur->keyframes.push_back({0, 12.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  sObj->properties.push_back(sblur);
+  sObj->channels.push_back(sblur);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -6245,11 +6245,11 @@ PAGX_TEST(PAGXTest, ChannelBlendFilter) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "BL";
   anim->objects.push_back(obj);
-  auto* colorProp = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto* colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   colorProp->channel = "color";
   colorProp->keyframes.push_back(
       {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(colorProp);
+  obj->channels.push_back(colorProp);
 
   auto file = pagx::PAGScene::Make(doc);
   auto& tree = *file->mutableBinding();
@@ -6272,10 +6272,10 @@ static pagx::Animation* MakeAlphaAnim(pagx::PAGXDocument* doc, const std::string
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "L";
   anim->objects.push_back(obj);
-  auto* p = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* p = doc->makeNode<pagx::TypedChannel<float>>();
   p->channel = "alpha";
   p->keyframes.push_back({0, value, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(p);
+  obj->channels.push_back(p);
   return anim;
 }
 }  // namespace
@@ -6338,11 +6338,11 @@ PAGX_TEST(PAGXTest, PAGSceneDrawAndReadPixels) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "S";
   anim->objects.push_back(obj);
-  auto* prop = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   prop->channel = "color";
   pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->properties.push_back(prop);
+  obj->channels.push_back(prop);
 
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
@@ -6398,11 +6398,11 @@ PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "L";
   anim->objects.push_back(obj);
-  auto* alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
   alphaProp->channel = "alpha";
   alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  obj->properties.push_back(alphaProp);
+  obj->channels.push_back(alphaProp);
 
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
@@ -6442,7 +6442,7 @@ PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
  */
 PAGX_TEST(PAGXTest, KeyframeLinearFloat) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
 
@@ -6458,7 +6458,7 @@ PAGX_TEST(PAGXTest, KeyframeLinearFloat) {
  */
 PAGX_TEST(PAGXTest, KeyframeHoldFloat) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Hold, {}, {}});
   prop->keyframes.push_back({60, 0.75f, pagx::KeyframeInterpolationType::Hold, {}, {}});
 
@@ -6474,7 +6474,7 @@ PAGX_TEST(PAGXTest, KeyframeHoldFloat) {
  */
 PAGX_TEST(PAGXTest, KeyframeBezierFloatStandardEase) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->keyframes.push_back(
       {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, pagx::Point{0.42f, 0.0f}, {}});
   prop->keyframes.push_back(
@@ -6502,7 +6502,7 @@ PAGX_TEST(PAGXTest, KeyframeBezierFloatStandardEase) {
  */
 PAGX_TEST(PAGXTest, KeyframeLinearColor) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto* prop = doc->makeNode<pagx::TypedProperty<pagx::Color>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
   prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Linear, {}, {}});
@@ -6522,19 +6522,19 @@ PAGX_TEST(PAGXTest, KeyframeLinearColor) {
 PAGX_TEST(PAGXTest, KeyframeDiscreteHold) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
 
-  auto* boolProp = doc->makeNode<pagx::TypedProperty<bool>>();
+  auto* boolProp = doc->makeNode<pagx::TypedChannel<bool>>();
   boolProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Linear, {}, {}});
   boolProp->keyframes.push_back({60, true, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_FALSE(std::get<bool>(boolProp->evaluateAt(500'000, 60.0f)));
   EXPECT_TRUE(std::get<bool>(boolProp->evaluateAt(1'000'000, 60.0f)));
 
-  auto* intProp = doc->makeNode<pagx::TypedProperty<int>>();
+  auto* intProp = doc->makeNode<pagx::TypedChannel<int>>();
   intProp->keyframes.push_back({0, 1, pagx::KeyframeInterpolationType::Linear, {}, {}});
   intProp->keyframes.push_back({60, 4, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_EQ(std::get<int>(intProp->evaluateAt(500'000, 60.0f)), 1);
   EXPECT_EQ(std::get<int>(intProp->evaluateAt(1'000'000, 60.0f)), 4);
 
-  auto* strProp = doc->makeNode<pagx::TypedProperty<std::string>>();
+  auto* strProp = doc->makeNode<pagx::TypedChannel<std::string>>();
   strProp->keyframes.push_back(
       {0, std::string("a"), pagx::KeyframeInterpolationType::Linear, {}, {}});
   strProp->keyframes.push_back(
@@ -6549,7 +6549,7 @@ PAGX_TEST(PAGXTest, KeyframeDiscreteHold) {
  */
 PAGX_TEST(PAGXTest, KeyframeMicrosVsFrameAlignment) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
-  auto* prop = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* prop = doc->makeNode<pagx::TypedChannel<float>>();
   prop->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   prop->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
 
@@ -6603,11 +6603,11 @@ NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::strin
   obj->target = childLayerId;
   anim->objects.push_back(obj);
 
-  auto* alphaProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
   alphaProp->channel = "alpha";
   alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  obj->properties.push_back(alphaProp);
+  obj->channels.push_back(alphaProp);
 
   return fx;
 }
@@ -6828,11 +6828,11 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   auto* mainObj = doc->makeNode<pagx::AnimationObject>();
   mainObj->target = "bg";
   mainAnim->objects.push_back(mainObj);
-  auto* mainProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* mainProp = doc->makeNode<pagx::TypedChannel<float>>();
   mainProp->channel = "alpha";
   mainProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   mainProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  mainObj->properties.push_back(mainProp);
+  mainObj->channels.push_back(mainProp);
 
   // Another top-level animation that must stay untouched by PAGScene::advance.
   auto hintAnim = doc->makeNode<pagx::Animation>("hint");
@@ -6842,11 +6842,11 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   auto* hintObj = doc->makeNode<pagx::AnimationObject>();
   hintObj->target = "bg";
   hintAnim->objects.push_back(hintObj);
-  auto* hintProp = doc->makeNode<pagx::TypedProperty<float>>();
+  auto* hintProp = doc->makeNode<pagx::TypedChannel<float>>();
   hintProp->channel = "alpha";
   hintProp->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   hintProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  hintObj->properties.push_back(hintProp);
+  hintObj->channels.push_back(hintProp);
 
   // Layer referencing a composition + an auto-play driver.
   auto compLayer = doc->makeNode<pagx::Layer>("compLayer");
@@ -6908,10 +6908,10 @@ std::string MakeExternalCompositionXML(const std::string& layerId, const std::st
   xml += "  <Animations>\n";
   xml += "    <Animation id=\"" + animationId + "\" duration=\"60\" frameRate=\"60\">\n";
   xml += "      <Object target=\"" + layerId + "\">\n";
-  xml += "        <Property channel=\"alpha\" type=\"float\">\n";
+  xml += "        <Channel channel=\"alpha\" type=\"float\">\n";
   xml += "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n";
   xml += "          <Key time=\"60\" value=\"1\"/>\n";
-  xml += "        </Property>\n";
+  xml += "        </Channel>\n";
   xml += "      </Object>\n";
   xml += "    </Animation>\n";
   xml += "  </Animations>\n";
@@ -7171,9 +7171,9 @@ PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
       "  <Animations>\n"
       "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
       "      <Object target=\"L\">\n"
-      "        <Property channel=\"alpha\" type=\"float\">\n"
+      "        <Channel channel=\"alpha\" type=\"float\">\n"
       "          <Key time=\"60abc\" value=\"1\"/>\n"
-      "        </Property>\n"
+      "        </Channel>\n"
       "      </Object>\n"
       "    </Animation>\n"
       "  </Animations>\n"
@@ -7196,9 +7196,9 @@ PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
       "  <Animations>\n"
       "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
       "      <Object target=\"L\">\n"
-      "        <Property channel=\"alpha\" type=\"float\">\n"
+      "        <Channel channel=\"alpha\" type=\"float\">\n"
       "          <Key time=\"99999999999999999999\" value=\"1\"/>\n"
-      "        </Property>\n"
+      "        </Channel>\n"
       "      </Object>\n"
       "    </Animation>\n"
       "  </Animations>\n"

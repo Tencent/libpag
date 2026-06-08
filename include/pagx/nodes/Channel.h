@@ -28,14 +28,14 @@
 namespace pagx {
 
 /**
- * KeyValue is the value carried by a Property's keyframes. Its std::variant alternatives are
+ * KeyValue is the value carried by a Channel's keyframes. Its std::variant alternatives are
  * ordered to match PropertyValueType, so the active alternative index equals the corresponding
  * PropertyValueType value.
  */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
 
 /**
- * Discriminator for the value type carried by a Property's keyframes. Aligned with the order of
+ * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
  * KeyValue's std::variant alternatives.
  */
 enum class PropertyValueType : uint8_t {
@@ -48,28 +48,28 @@ enum class PropertyValueType : uint8_t {
 };
 
 /**
- * Property is the abstract base for a single animated channel within an AnimationObject. Concrete
- * subclasses are TypedProperty<T> specializations, each binding a KeyValue alternative to a set of
- * keyframes. The base exposes type-erased evaluation so callers can sample a Property without
+ * Channel is the abstract base for a single animated channel within an AnimationObject. Concrete
+ * subclasses are TypedChannel<T> specializations, each binding a KeyValue alternative to a set of
+ * keyframes. The base exposes type-erased evaluation so callers can sample a Channel without
  * knowing its concrete value type.
  */
-class Property : public Node {
+class Channel : public Node {
  public:
   /**
-   * The channel this Property drives on the target node (for example a transform or color
+   * The channel this Channel drives on the target node (for example a transform or color
    * channel). Interpreted by the runtime when applying evaluated values to the layer tree.
    */
   std::string channel = {};
 
   /**
-   * Returns the value type of this Property's keyframes. Each TypedProperty<T> specialization
+   * Returns the value type of this Channel's keyframes. Each TypedChannel<T> specialization
    * reports a distinct PropertyValueType so callers can dispatch on the concrete type without
    * dynamic_cast or RTTI.
    */
   virtual PropertyValueType valueType() const = 0;
 
   /**
-   * Evaluates the property value at the given Frame index. Useful for unit tests and any caller
+   * Evaluates the channel value at the given Frame index. Useful for unit tests and any caller
    * operating in frame-discrete time.
    * @param frame the frame index to sample.
    * @return the interpolated value at the given frame.
@@ -79,7 +79,7 @@ class Property : public Node {
   }
 
   /**
-   * Evaluates the property value at the given time in microseconds, using the supplied frameRate
+   * Evaluates the channel value at the given time in microseconds, using the supplied frameRate
    * to convert microseconds to a continuous frame position. Implementations perform interpolation
    * in double precision to avoid losing precision when the timeline is driven by microsecond
    * deltas.
@@ -92,11 +92,11 @@ class Property : public Node {
   }
 
   NodeType nodeType() const override {
-    return NodeType::Property;
+    return NodeType::Channel;
   }
 
  protected:
-  Property() = default;
+  Channel() = default;
 
  private:
   virtual KeyValue onEvaluateAtFrame(Frame frame) const = 0;
@@ -106,15 +106,15 @@ class Property : public Node {
 };
 
 /**
- * TypedProperty binds a concrete KeyValue alternative T to an ordered list of keyframes. Each
+ * TypedChannel binds a concrete KeyValue alternative T to an ordered list of keyframes. Each
  * specialization reports a distinct PropertyValueType and provides interpolation for its value
  * type through the runtime KeyframeEvaluator.
  */
 template <typename T>
-class TypedProperty : public Property {
+class TypedChannel : public Channel {
  public:
   /**
-   * The keyframes driving this property, ordered by time. Interpolation between keyframes follows
+   * The keyframes driving this channel, ordered by time. Interpolation between keyframes follows
    * each keyframe's KeyframeInterpolationType.
    */
   std::vector<Keyframe<T>> keyframes = {};
@@ -122,7 +122,7 @@ class TypedProperty : public Property {
   PropertyValueType valueType() const override;
 
  private:
-  // Defined in src/pagx/animation/Property.cpp with explicit instantiations for each KeyValue
+  // Defined in src/pagx/animation/Channel.cpp with explicit instantiations for each KeyValue
   // alternative (float, bool, int, std::string, ImageRef, Color). The implementation runs through
   // the runtime KeyframeEvaluator helper so that bezier easing and Color/float lerp logic stay
   // out of this public header.

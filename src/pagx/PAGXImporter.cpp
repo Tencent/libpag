@@ -33,6 +33,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -54,7 +55,6 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
-#include "pagx/nodes/Property.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -1611,9 +1611,9 @@ Color ParseTypedValue<Color>(const std::string& value, PAGXDocument* doc, const 
 }
 
 template <typename T>
-static void ParseKeyframes(const DOMNode* propertyNode, TypedProperty<T>* property,
+static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
                            PAGXDocument* doc) {
-  auto child = propertyNode->firstChild;
+  auto child = channelNode->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
       if (child->name == "Key") {
@@ -1638,17 +1638,17 @@ static void ParseKeyframes(const DOMNode* propertyNode, TypedProperty<T>* proper
             ReportError(doc, child.get(), "Invalid bezier-in value '" + bezierIn + "'.");
           }
         }
-        property->keyframes.push_back(key);
+        channel->keyframes.push_back(key);
       } else {
         ReportError(doc, child.get(),
-                    "Element '" + child->name + "' is not allowed in 'Property'. Expected: Key.");
+                    "Element '" + child->name + "' is not allowed in 'Channel'. Expected: Key.");
       }
     }
     child = child->nextSibling;
   }
 }
 
-static Property* ParseProperty(const DOMNode* node, PAGXDocument* doc) {
+static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
   auto type = GetAttribute(node, "type");
   auto firstValue = EmptyString();
   auto child = node->firstChild;
@@ -1660,7 +1660,7 @@ static Property* ParseProperty(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
   if (type.empty()) {
-    // Infer the property type from the first keyframe value when no explicit type is given. Probes
+    // Infer the channel type from the first keyframe value when no explicit type is given. Probes
     // run most-specific to least-specific so a value that is valid for several types resolves to
     // the narrowest interpretation: color (#RGB / named) is checked before bool/int because some
     // color tokens could otherwise be misread; bool ("true"/"false") before image; image ("@id")
@@ -1685,39 +1685,39 @@ static Property* ParseProperty(const DOMNode* node, PAGXDocument* doc) {
     }
   }
 
-  Property* result = nullptr;
+  Channel* result = nullptr;
   if (type == "float" || type == "number") {
-    auto prop = makeNodeFromXML<TypedProperty<float>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<float>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else if (type == "bool") {
-    auto prop = makeNodeFromXML<TypedProperty<bool>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<bool>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else if (type == "int" || type == "enum") {
-    auto prop = makeNodeFromXML<TypedProperty<int>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<int>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else if (type == "string" || type == "text") {
-    auto prop = makeNodeFromXML<TypedProperty<std::string>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<std::string>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else if (type == "image" || type == "imageRef") {
-    auto prop = makeNodeFromXML<TypedProperty<ImageRef>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<ImageRef>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else if (type == "color") {
-    auto prop = makeNodeFromXML<TypedProperty<Color>>(node, doc);
-    ParseKeyframes(node, prop, doc);
-    result = prop;
+    auto ch = makeNodeFromXML<TypedChannel<Color>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
   } else {
-    ReportError(doc, node, "Invalid Property type '" + type + "'.");
+    ReportError(doc, node, "Invalid Channel type '" + type + "'.");
   }
 
   if (result != nullptr) {
     result->channel = GetAttribute(node, "channel");
     if (result->channel.empty()) {
-      ReportError(doc, node, "Property requires a non-empty 'channel' attribute.");
+      ReportError(doc, node, "Channel requires a non-empty 'channel' attribute.");
     }
   }
   return result;
@@ -1744,15 +1744,14 @@ static AnimationObject* ParseAnimationObject(const DOMNode* node, PAGXDocument* 
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      if (child->name == "Property") {
-        auto property = ParseProperty(child.get(), doc);
-        if (property != nullptr) {
-          object->properties.push_back(property);
+      if (child->name == "Channel") {
+        auto ch = ParseChannel(child.get(), doc);
+        if (ch != nullptr) {
+          object->channels.push_back(ch);
         }
       } else {
-        ReportError(
-            doc, child.get(),
-            "Element '" + child->name + "' is not allowed in 'Object'. Expected: Property.");
+        ReportError(doc, child.get(),
+                    "Element '" + child->name + "' is not allowed in 'Object'. Expected: Channel.");
       }
     }
     child = child->nextSibling;

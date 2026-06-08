@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <utility>
 #include "pagx/PAGXDocument.h"
-#include "pagx/nodes/Property.h"
+#include "pagx/nodes/Channel.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {

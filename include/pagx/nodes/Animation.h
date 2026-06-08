@@ -45,7 +45,7 @@ enum class LoopMode {
 };
 
 /**
- * Animation defines a named timeline composed of Object/Property/Keyframe entries. The animation
+ * Animation defines a named timeline composed of Object/Channel/Keyframe entries. The animation
  * is identified by Node::id, which must be unique within the owning PAGXDocument. References from
  * Layer.timelines drivers look up animations via this id.
  */

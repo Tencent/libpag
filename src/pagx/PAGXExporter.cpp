@@ -26,6 +26,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -46,7 +47,6 @@
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
-#include "pagx/nodes/Property.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -201,13 +201,13 @@ std::string KeyframeValueToString<Color>(const Color& value) {
 }
 
 template <typename T>
-static void WriteTypedProperty(XMLBuilder& xml, const TypedProperty<T>* property,
-                               const char* typeName) {
-  xml.openElement("Property");
-  xml.addRequiredAttribute("channel", property->channel);
+static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
+                              const char* typeName) {
+  xml.openElement("Channel");
+  xml.addRequiredAttribute("channel", channel->channel);
   xml.addAttribute("type", typeName);
   xml.closeElementStart();
-  for (const auto& key : property->keyframes) {
+  for (const auto& key : channel->keyframes) {
     xml.openElement("Key");
     xml.addRequiredAttribute("time", key.time);
     xml.addRequiredAttribute("value", KeyframeValueToString<T>(key.value));
@@ -225,25 +225,25 @@ static void WriteTypedProperty(XMLBuilder& xml, const TypedProperty<T>* property
   xml.closeElement();
 }
 
-static void WriteProperty(XMLBuilder& xml, const Property* property) {
-  switch (property->valueType()) {
+static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
+  switch (channel->valueType()) {
     case PropertyValueType::Float:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<float>*>(property), "float");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<float>*>(channel), "float");
       break;
     case PropertyValueType::Bool:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<bool>*>(property), "bool");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<bool>*>(channel), "bool");
       break;
     case PropertyValueType::Int:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<int>*>(property), "int");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<int>*>(channel), "int");
       break;
     case PropertyValueType::String:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<std::string>*>(property), "string");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<std::string>*>(channel), "string");
       break;
     case PropertyValueType::ImageRef:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<ImageRef>*>(property), "image");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<ImageRef>*>(channel), "image");
       break;
     case PropertyValueType::Color:
-      WriteTypedProperty(xml, static_cast<const TypedProperty<Color>*>(property), "color");
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Color>*>(channel), "color");
       break;
   }
 }
@@ -265,8 +265,8 @@ static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& anim
       xml.openElement("Object");
       xml.addRequiredAttribute("target", object->target);
       xml.closeElementStart();
-      for (const auto* property : object->properties) {
-        WriteProperty(xml, property);
+      for (const auto* ch : object->channels) {
+        WriteChannel(xml, ch);
       }
       xml.closeElement();
     }
@@ -1089,7 +1089,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 //==============================================================================
 
 // Mirrors the node types handled by WriteResource. Nodes outside this set (e.g. Animation,
-// AnimationObject, Property) produce no output and must not trigger a Resources block.
+// AnimationObject, Channel) produce no output and must not trigger a Resources block.
 static bool IsExportableResource(const Node* node) {
   switch (node->nodeType()) {
     case NodeType::Image:

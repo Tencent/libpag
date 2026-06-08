@@ -21,7 +21,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/Property.h"
+#include "pagx/nodes/Channel.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
@@ -39,19 +39,19 @@ static int64_t DurationMicros(const Animation* animation) {
 }
 
 // Evaluates the given animation at the given microsecond time and writes the results into the
-// supplied runtime binding, using the pre-resolved (target node, properties) pairs to avoid a
+// supplied runtime binding, using the pre-resolved (target node, channels) pairs to avoid a
 // per-frame node lookup. Stateless: depends only on its arguments.
 static void ApplyResolved(
-    const std::vector<std::pair<Node*, std::vector<Property*>>>& resolvedTargets,
+    const std::vector<std::pair<Node*, std::vector<Channel*>>>& resolvedTargets,
     Animation* animation, RuntimeBinding* binding, int64_t microseconds, float mix) {
   if (animation == nullptr || binding == nullptr) {
     return;
   }
   for (const auto& entry : resolvedTargets) {
     auto* targetNode = entry.first;
-    for (auto* property : entry.second) {
-      binding->apply(targetNode, property->channel,
-                     property->evaluateAt(microseconds, animation->frameRate), mix);
+    for (auto* channel : entry.second) {
+      binding->apply(targetNode, channel->channel,
+                     channel->evaluateAt(microseconds, animation->frameRate), mix);
     }
   }
 }
@@ -74,14 +74,14 @@ void PAGTimeline::resolveTargets() {
     if (targetNode == nullptr) {
       continue;
     }
-    std::vector<Property*> properties = {};
-    for (auto* property : object->properties) {
-      if (property != nullptr) {
-        properties.push_back(property);
+    std::vector<Channel*> channels = {};
+    for (auto* ch : object->channels) {
+      if (ch != nullptr) {
+        channels.push_back(ch);
       }
     }
-    if (!properties.empty()) {
-      resolvedTargets.emplace_back(targetNode, std::move(properties));
+    if (!channels.empty()) {
+      resolvedTargets.emplace_back(targetNode, std::move(channels));
     }
   }
 }

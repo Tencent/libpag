@@ -16,19 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/Property.h"
+#include "pagx/nodes/Channel.h"
 #include <string>
 #include "pagx/runtime/KeyframeEvaluator.h"
 
 namespace pagx {
 
 template <typename T>
-KeyValue TypedProperty<T>::onEvaluateAtFrame(Frame frame) const {
+KeyValue TypedChannel<T>::onEvaluateAtFrame(Frame frame) const {
   return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame));
 }
 
 template <typename T>
-KeyValue TypedProperty<T>::onEvaluateAtMicros(int64_t microseconds, float frameRate) const {
+KeyValue TypedChannel<T>::onEvaluateAtMicros(int64_t microseconds, float frameRate) const {
   double framePosition =
       frameRate > 0.0f ? static_cast<double>(microseconds) * static_cast<double>(frameRate) / 1.0e6
                        : 0.0;
@@ -36,41 +36,41 @@ KeyValue TypedProperty<T>::onEvaluateAtMicros(int64_t microseconds, float frameR
 }
 
 template <>
-PropertyValueType TypedProperty<float>::valueType() const {
+PropertyValueType TypedChannel<float>::valueType() const {
   return PropertyValueType::Float;
 }
 
 template <>
-PropertyValueType TypedProperty<bool>::valueType() const {
+PropertyValueType TypedChannel<bool>::valueType() const {
   return PropertyValueType::Bool;
 }
 
 template <>
-PropertyValueType TypedProperty<int>::valueType() const {
+PropertyValueType TypedChannel<int>::valueType() const {
   return PropertyValueType::Int;
 }
 
 template <>
-PropertyValueType TypedProperty<std::string>::valueType() const {
+PropertyValueType TypedChannel<std::string>::valueType() const {
   return PropertyValueType::String;
 }
 
 template <>
-PropertyValueType TypedProperty<ImageRef>::valueType() const {
+PropertyValueType TypedChannel<ImageRef>::valueType() const {
   return PropertyValueType::ImageRef;
 }
 
 template <>
-PropertyValueType TypedProperty<Color>::valueType() const {
+PropertyValueType TypedChannel<Color>::valueType() const {
   return PropertyValueType::Color;
 }
 
 // Explicit instantiations: must cover every alternative of KeyValue.
-template class TypedProperty<float>;
-template class TypedProperty<bool>;
-template class TypedProperty<int>;
-template class TypedProperty<std::string>;
-template class TypedProperty<ImageRef>;
-template class TypedProperty<Color>;
+template class TypedChannel<float>;
+template class TypedChannel<bool>;
+template class TypedChannel<int>;
+template class TypedChannel<std::string>;
+template class TypedChannel<ImageRef>;
+template class TypedChannel<Color>;
 
 }  // namespace pagx

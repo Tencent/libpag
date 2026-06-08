@@ -94,9 +94,9 @@ enum class NodeType {
    */
   AnimationObject,
   /**
-   * A keyed property in an animation object.
+   * A keyed channel in an animation object.
    */
-  Property,
+  Channel,
 
   // Layer
   /**
