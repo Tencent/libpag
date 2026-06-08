@@ -7755,4 +7755,70 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   std::ofstream file(outPath, std::ios::binary);
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
 }
+
+/**
+ * Test that MonoNoiseFilter and DropShadowFilter can coexist on the same layer
+ * with a large shadow offset that extends beyond the content bounds. Verifies
+ * that the filter region is correctly expanded to accommodate the shadow.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterWithDropShadow) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 400;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 120};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.5f, 0.9f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 0.6f;
+  noise->seed = 42;
+  noise->color = {0.0f, 0.0f, 0.0f, 0.8f};
+  layer->filters.push_back(noise);
+
+  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->offsetX = 30;
+  shadow->offsetY = 40;
+  shadow->blurX = 10;
+  shadow->blurY = 10;
+  shadow->color = {0.0f, 0.0f, 0.0f, 0.6f};
+  layer->filters.push_back(shadow);
+
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterWithDropShadow"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("feOffset"), std::string::npos);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterWithDropShadow.svg");
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
 }  // namespace pag
