@@ -7995,9 +7995,9 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
 }
 
 /**
- * Test SVG export for a single rectangle with Mono noise filter.
+ * Test SVG export for a single rectangle with Multi noise filter.
  */
-PAGX_TEST(PAGXTest, NoiseFilterSingleRectMono) {
+PAGX_TEST(PAGXTest, NoiseFilterSingleRectMulti) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
 
   auto layer = doc->makeNode<pagx::Layer>();
@@ -8011,13 +8011,13 @@ PAGX_TEST(PAGXTest, NoiseFilterSingleRectMono) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
 
-  auto mono = doc->makeNode<pagx::NoiseFilter>();
-  mono->mode = pagx::NoiseMode::Mono;
-  mono->size = 8;
-  mono->density = 0.5f;
-  mono->seed = 42;
-  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
-  layer->filters.push_back(mono);
+  auto multi = doc->makeNode<pagx::NoiseFilter>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer->filters.push_back(multi);
   doc->layers.push_back(layer);
 
   doc->applyLayout();
@@ -8026,7 +8026,7 @@ PAGX_TEST(PAGXTest, NoiseFilterSingleRectMono) {
   EXPECT_NE(svg.find("<svg"), std::string::npos);
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterSingleRectMono.svg");
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterSingleRectMulti.svg");
   auto dirPath = std::filesystem::path(outPath).parent_path();
   if (!std::filesystem::exists(dirPath)) {
     std::filesystem::create_directories(dirPath);
