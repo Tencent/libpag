@@ -8551,8 +8551,9 @@
         "AdvanceRendersDistinctFrames_1": "d7adf1ea8",
         "AdvanceRendersDistinctFrames_2": "d7adf1ea8",
         "LayerBuilderAPIConsistency": "f40e23b6",
-        "NoiseFilterAllElements": "bc58b86e",
-        "NoiseFilterModes": "bc58b86e",
+        "NoiseFilterAllElements": "798f40c4",
+        "NoiseFilterModes": "798f40c4",
+        "NoiseFilterWithDropShadowStyle": "798f40c4",
         "PrecomposedTextRender": "9b6dea6a",
         "html": {
             "blend_modes_showcase": "f94e413d",
