@@ -172,7 +172,7 @@ class PAGXView {
    * @return True if the request was queued for upload. The actual GPU upload happens at the
    *         next draw().
    */
-  bool attachNativeImage(const std::string& filePath, const emscripten::val& nativeImage,
+  bool attachNativeImage(const emscripten::val& filePathVal, const emscripten::val& nativeImage,
                          int qualityRaw);
 
   /**

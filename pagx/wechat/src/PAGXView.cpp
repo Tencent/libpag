@@ -427,9 +427,18 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   return ok;
 }
 
-bool PAGXView::attachNativeImage(const std::string& filePath, const val& nativeImage,
+bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
                                  int qualityRaw) {
-  if (!document || filePath.empty() || !nativeImage.as<bool>()) {
+  if (!document || !nativeImage.as<bool>()) {
+    return false;
+  }
+
+  // filePath is taken as val and converted locally instead of using `const std::string&`:
+  // eviction below may grow wasm memory, which detaches JS-side HEAP views; an embind-managed
+  // string parameter would then be freed on a stale view in onDone -> runDestructors and trap.
+  // Do not add new memory.grow-prone work here while keeping any embind-managed heap parameter.
+  std::string filePath = filePathVal.as<std::string>();
+  if (filePath.empty()) {
     return false;
   }
 
