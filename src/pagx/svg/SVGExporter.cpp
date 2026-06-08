@@ -106,257 +106,6 @@ static std::string ColorToDisplayP3String(const Color& color) {
          FloatToString(color.blue) + ")";
 }
 
-static void ExpandBounds(float& minX, float& minY, float& maxX, float& maxY, const Rect& bounds) {
-  if (bounds.isEmpty()) {
-    return;
-  }
-  minX = std::min(minX, bounds.x);
-  minY = std::min(minY, bounds.y);
-  maxX = std::max(maxX, bounds.x + bounds.width);
-  maxY = std::max(maxY, bounds.y + bounds.height);
-}
-
-static Rect IntersectRects(const Rect& a, const Rect& b) {
-  if (a.isEmpty() || b.isEmpty()) {
-    return {};
-  }
-  float left = std::max(a.x, b.x);
-  float top = std::max(a.y, b.y);
-  float right = std::min(a.x + a.width, b.x + b.width);
-  float bottom = std::min(a.y + a.height, b.y + b.height);
-  if (left >= right || top >= bottom) {
-    return {};
-  }
-  return {left, top, right - left, bottom - top};
-}
-
-static Rect ComputeElementBounds(const Element* element);
-
-// std::pow(negative, non-integer) returns NaN. Raise magnitude and reapply sign.
-static float SignedPow(float base, float exp) {
-  float sign = base < 0.0f ? -1.0f : 1.0f;
-  return sign * std::pow(std::abs(base), exp);
-}
-
-// Apply a 2D affine matrix to a Rect, returning the axis-aligned bounding box
-// of the transformed corners.
-static Rect MapRect(const Matrix& m, const Rect& r) {
-  if (r.isEmpty()) {
-    return {};
-  }
-  float x0 = r.x, y0 = r.y;
-  float x1 = r.x + r.width, y1 = r.y + r.height;
-  auto tl = m.mapPoint({x0, y0});
-  auto tr = m.mapPoint({x1, y0});
-  auto bl = m.mapPoint({x0, y1});
-  auto br = m.mapPoint({x1, y1});
-  float minX = std::min({tl.x, tr.x, bl.x, br.x});
-  float minY = std::min({tl.y, tr.y, bl.y, br.y});
-  float maxX = std::max({tl.x, tr.x, bl.x, br.x});
-  float maxY = std::max({tl.y, tr.y, bl.y, br.y});
-  return {minX, minY, maxX - minX, maxY - minY};
-}
-
-// Build the per-copy transform matrix for a Repeater copy, mirroring the logic
-// in ModifierResolver::MakeCopyGroup and BuildGroupMatrix.
-static Matrix BuildRepeaterCopyMatrix(const Repeater* rep, float progress) {
-  float tx = rep->position.x * progress;
-  float ty = rep->position.y * progress;
-  float sx = SignedPow(rep->scale.x, progress);
-  float sy = SignedPow(rep->scale.y, progress);
-  float rotation = rep->rotation * progress;
-  Matrix m = {};
-  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
-    m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
-  }
-  if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
-    m = Matrix::Scale(sx, sy) * m;
-  }
-  if (!FloatNearlyZero(rotation)) {
-    m = Matrix::Rotate(rotation) * m;
-  }
-  m = Matrix::Translate(tx + rep->anchor.x, ty + rep->anchor.y) * m;
-  return m;
-}
-
-static Rect ComputeLayerBounds(const Layer* layer, int depth = 0);
-
-static Rect ComputeElementsBounds(const std::vector<Element*>& elements) {
-  float minX = std::numeric_limits<float>::max();
-  float minY = std::numeric_limits<float>::max();
-  float maxX = -std::numeric_limits<float>::max();
-  float maxY = -std::numeric_limits<float>::max();
-  std::vector<Element*> preceding;
-
-  for (const auto* element : elements) {
-    if (element->nodeType() == NodeType::Repeater) {
-      auto rep = static_cast<const Repeater*>(element);
-      if (rep->copies < 0.0f) {
-        continue;
-      }
-      if (rep->copies == 0.0f) {
-        return {};
-      }
-      if (preceding.empty()) {
-        continue;
-      }
-      auto bodyBounds = ComputeElementsBounds(preceding);
-      constexpr float MAX_REPEATER_COPIES = 10000.0f;
-      float copiesF = std::min(rep->copies, MAX_REPEATER_COPIES);
-      int maxCount = static_cast<int>(std::ceil(copiesF));
-      for (int i = 0; i < maxCount; i++) {
-        float progress = static_cast<float>(i) + rep->offset;
-        auto copyMatrix = BuildRepeaterCopyMatrix(rep, progress);
-        auto copyBounds = MapRect(copyMatrix, bodyBounds);
-        ExpandBounds(minX, minY, maxX, maxY, copyBounds);
-      }
-      continue;
-    }
-    auto bounds = ComputeElementBounds(element);
-    if (bounds.width > 0 || bounds.height > 0) {
-      ExpandBounds(minX, minY, maxX, maxY, bounds);
-    }
-    preceding.push_back(const_cast<Element*>(element));
-  }
-  if (minX > maxX) {
-    return {};
-  }
-  return {minX, minY, maxX - minX, maxY - minY};
-}
-
-static Rect ComputeElementBounds(const Element* element) {
-  switch (element->nodeType()) {
-    case NodeType::Rectangle: {
-      auto rect = static_cast<const Rectangle*>(element);
-      auto pos = rect->renderPosition();
-      auto size = rect->renderSize();
-      return {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height};
-    }
-    case NodeType::Ellipse: {
-      auto ellipse = static_cast<const Ellipse*>(element);
-      auto pos = ellipse->renderPosition();
-      auto size = ellipse->renderSize();
-      return {pos.x - size.width * 0.5f, pos.y - size.height * 0.5f, size.width, size.height};
-    }
-    case NodeType::Path: {
-      auto pathNode = static_cast<const Path*>(element);
-      if (pathNode->data == nullptr || pathNode->data->isEmpty()) {
-        return {};
-      }
-      auto bounds = pathNode->data->getBounds();
-      auto scale = pathNode->renderScale();
-      bounds.x *= scale;
-      bounds.y *= scale;
-      bounds.width *= scale;
-      bounds.height *= scale;
-      auto pos = pathNode->renderPosition();
-      return {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height};
-    }
-    case NodeType::Polystar: {
-      auto polystar = static_cast<const Polystar*>(element);
-      auto pos = polystar->renderPosition();
-      auto outerRadius = polystar->renderOuterRadius();
-      return {pos.x - outerRadius, pos.y - outerRadius, outerRadius * 2, outerRadius * 2};
-    }
-    case NodeType::Group: {
-      auto group = static_cast<const Group*>(element);
-      auto childBounds = ComputeElementsBounds(group->elements);
-      auto groupMatrix = BuildGroupMatrix(group);
-      if (groupMatrix.isIdentity()) {
-        return childBounds;
-      }
-      return MapRect(groupMatrix, childBounds);
-    }
-    case NodeType::Text: {
-      auto text = static_cast<const Text*>(element);
-      return text->contentBounds();
-    }
-    case NodeType::TextPath: {
-      auto textPath = static_cast<const TextPath*>(element);
-      if (textPath->path == nullptr || textPath->path->isEmpty()) {
-        return textPath->layoutBounds();
-      }
-      auto bounds = textPath->path->getBounds();
-      auto scale = textPath->renderScale();
-      bounds.x *= scale;
-      bounds.y *= scale;
-      bounds.width *= scale;
-      bounds.height *= scale;
-      auto pos = textPath->renderPosition();
-      return {pos.x + bounds.x, pos.y + bounds.y, bounds.width, bounds.height};
-    }
-    case NodeType::TextBox: {
-      auto textBox = static_cast<const TextBox*>(element);
-      return textBox->contentBounds();
-    }
-    default:
-      return {};
-  }
-}
-
-static constexpr int MAX_LAYER_BOUNDS_DEPTH = 32;
-
-static Rect ComputeLayerBounds(const Layer* layer, int depth) {
-  if (depth >= MAX_LAYER_BOUNDS_DEPTH) {
-    return {};
-  }
-
-  float minX = std::numeric_limits<float>::max();
-  float minY = std::numeric_limits<float>::max();
-  float maxX = -std::numeric_limits<float>::max();
-  float maxY = -std::numeric_limits<float>::max();
-
-  auto contentsBounds = ComputeElementsBounds(layer->contents);
-  ExpandBounds(minX, minY, maxX, maxY, contentsBounds);
-
-  if (layer->composition != nullptr) {
-    for (const auto* compLayer : layer->composition->layers) {
-      if (!compLayer->visible) continue;
-      auto compBounds = ComputeLayerBounds(compLayer, depth + 1);
-      auto compMatrix = BuildLayerMatrix(compLayer);
-      auto mappedBounds = MapRect(compMatrix, compBounds);
-      if (compLayer->hasScrollRect) {
-        auto scrollRect = MapRect(compMatrix, compLayer->scrollRect);
-        mappedBounds = IntersectRects(mappedBounds, scrollRect);
-        if (mappedBounds.isEmpty()) continue;
-      }
-      if (compLayer->mask != nullptr) {
-        auto maskBounds = ComputeLayerBounds(compLayer->mask, depth + 1);
-        auto maskMatrix = BuildLayerMatrix(compLayer->mask);
-        auto mappedMask = MapRect(maskMatrix, maskBounds);
-        mappedBounds = IntersectRects(mappedBounds, mappedMask);
-        if (mappedBounds.isEmpty()) continue;
-      }
-      ExpandBounds(minX, minY, maxX, maxY, mappedBounds);
-    }
-  }
-
-  for (const auto* child : layer->children) {
-    if (!child->visible) continue;
-    auto childBounds = ComputeLayerBounds(child, depth + 1);
-    auto childMatrix = BuildLayerMatrix(child);
-    auto mappedBounds = MapRect(childMatrix, childBounds);
-    if (child->hasScrollRect) {
-      auto scrollRect = MapRect(childMatrix, child->scrollRect);
-      mappedBounds = IntersectRects(mappedBounds, scrollRect);
-      if (mappedBounds.isEmpty()) continue;
-    }
-    if (child->mask != nullptr) {
-      auto maskBounds = ComputeLayerBounds(child->mask, depth + 1);
-      auto maskMatrix = BuildLayerMatrix(child->mask);
-      auto mappedMask = MapRect(maskMatrix, maskBounds);
-      mappedBounds = IntersectRects(mappedBounds, mappedMask);
-      if (mappedBounds.isEmpty()) continue;
-    }
-    ExpandBounds(minX, minY, maxX, maxY, mappedBounds);
-  }
-
-  if (minX > maxX) {
-    return {};
-  }
-  return {minX, minY, maxX - minX, maxY - minY};
-}
-
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
 // Compare via the formatted strings so ULP-level differences from upstream transform
 // scaling don't emit redundant anisotropic stdDeviation that browsers would honour.
@@ -664,7 +413,7 @@ class SVGWriter {
   std::string writeNoiseBand(const NoiseFilter* noise, bool isDark, const std::string& label);
   std::string writeNoiseBand(const NoiseStyle* noise, bool isDark, const std::string& label);
   std::string writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
-                               std::string& currentSource, const Rect& contentBounds);
+                               std::string& currentSource);
   // Collected per-filter state fed into the final feMerge aggregation.
   struct ShadowAggregate {
     std::vector<std::string> dropShadowResults;
@@ -672,16 +421,14 @@ class SVGWriter {
     std::vector<std::string> innerShadowResults;
     bool needSourceGraphic = false;
   };
-  std::string writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex,
-                              const Rect& contentBounds);
+  std::string writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex);
   void writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                       ShadowAggregate& agg, std::string& currentSource, const Rect& contentBounds);
+                       ShadowAggregate& agg, std::string& currentSource);
   void writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
-                      ShadowAggregate& agg, const Rect& contentBounds);
+                      ShadowAggregate& agg);
   void writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource);
   std::string writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
-                                      const std::vector<LayerStyle*>& styles,
-                                      const Rect& contentBounds = {});
+                                      const std::vector<LayerStyle*>& styles);
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
@@ -1344,7 +1091,7 @@ std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
 }
 
 std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
-                                        std::string& currentSource, const Rect&) {
+                                        std::string& currentSource) {
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
@@ -1548,7 +1295,7 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   return resultName;
 }
 
-std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex, const Rect&) {
+std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex) {
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
@@ -1719,8 +1466,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
 }
 
 void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                                ShadowAggregate& agg, std::string& currentSource,
-                                const Rect& contentBounds) {
+                                ShadowAggregate& agg, std::string& currentSource) {
   int colorMatrixIndex = 0;
   int blurIndex = 0;
   int noiseIndex = 0;
@@ -1765,8 +1511,7 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
         writeBlendFilter(static_cast<const BlendFilter*>(filter), shadowIndex, currentSource);
         break;
       case NodeType::NoiseFilter:
-        writeNoiseFilter(static_cast<const NoiseFilter*>(filter), noiseIndex, currentSource,
-                         contentBounds);
+        writeNoiseFilter(static_cast<const NoiseFilter*>(filter), noiseIndex, currentSource);
         break;
       default:
         break;
@@ -1780,7 +1525,7 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
 // modern renderers). NoiseStyle emits its SVG primitives and adds the result name to
 // agg.aboveResults so it composites above the source in the final feMerge.
 void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
-                               ShadowAggregate& agg, const Rect& contentBounds) {
+                               ShadowAggregate& agg) {
   int noiseStyleIndex = 0;
   for (const auto* style : styles) {
     switch (style->nodeType()) {
@@ -1804,7 +1549,7 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
       }
       case NodeType::NoiseStyle: {
         auto noise = static_cast<const NoiseStyle*>(style);
-        auto result = writeNoiseStyle(noise, noiseStyleIndex, contentBounds);
+        auto result = writeNoiseStyle(noise, noiseStyleIndex);
         agg.aboveResults.push_back(result);
         agg.needSourceGraphic = true;
         break;
@@ -1862,8 +1607,7 @@ void SVGWriter::writeShadowMerge(const ShadowAggregate& agg, const std::string& 
 }
 
 std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
-                                               const std::vector<LayerStyle*>& styles,
-                                               const Rect& contentBounds) {
+                                               const std::vector<LayerStyle*>& styles) {
   if (filters.empty() && styles.empty()) {
     return {};
   }
@@ -1945,34 +1689,18 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   std::string filterId = generateId("filter");
   _defs->openElement("filter");
   _defs->addAttribute("id", filterId);
-  if (!contentBounds.isEmpty()) {
-    // Use filterUnits="userSpaceOnUse" with absolute pixel coordinates for filters
-    // with known content bounds. This decouples the filter region from the element's
-    // bounding box so effects like feTurbulence sample at absolute coordinates,
-    // producing position-dependent noise phase that matches tgfx behavior.
-    float filterX = contentBounds.x - marginLeft;
-    float filterY = contentBounds.y - marginTop;
-    float filterW = contentBounds.width + marginLeft + marginRight;
-    float filterH = contentBounds.height + marginTop + marginBottom;
-    _defs->addAttribute("filterUnits", "userSpaceOnUse");
-    _defs->addAttribute("x", FloatToString(filterX));
-    _defs->addAttribute("y", FloatToString(filterY));
-    _defs->addAttribute("width", FloatToString(filterW));
-    _defs->addAttribute("height", FloatToString(filterH));
-  } else {
-    _defs->addAttribute("x", "-" + FloatToString(pctLeft) + "%");
-    _defs->addAttribute("y", "-" + FloatToString(pctTop) + "%");
-    _defs->addAttribute("width", FloatToString(100.0f + pctLeft + pctRight) + "%");
-    _defs->addAttribute("height", FloatToString(100.0f + pctTop + pctBottom) + "%");
-  }
+  _defs->addAttribute("x", "-" + FloatToString(pctLeft) + "%");
+  _defs->addAttribute("y", "-" + FloatToString(pctTop) + "%");
+  _defs->addAttribute("width", FloatToString(100.0f + pctLeft + pctRight) + "%");
+  _defs->addAttribute("height", FloatToString(100.0f + pctTop + pctBottom) + "%");
   _defs->addAttribute("color-interpolation-filters", "sRGB");
   _defs->closeElementStart();
 
   int shadowIndex = 0;
   ShadowAggregate agg;
   std::string currentSource = "SourceGraphic";
-  writeFilterList(filters, shadowIndex, agg, currentSource, contentBounds);
-  writeStyleList(styles, shadowIndex, agg, contentBounds);
+  writeFilterList(filters, shadowIndex, agg, currentSource);
+  writeStyleList(styles, shadowIndex, agg);
   writeShadowMerge(agg, currentSource);
 
   _defs->closeElement();  // </filter>
@@ -3351,8 +3079,7 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
   }
 
   if (!layer->filters.empty() || !layer->styles.empty()) {
-    auto contentBounds = ComputeLayerBounds(layer);
-    auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles, contentBounds);
+    auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles);
     if (!filterId.empty()) {
       out.addAttribute("filter", "url(#" + filterId + ")");
     }
