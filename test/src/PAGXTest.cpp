@@ -7352,6 +7352,9 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.d, 2.0f);
   EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
+}
+
+/**
  * Test rendering with Mono, Duo, and Multi noise filters side by side.
  */
 PAGX_TEST(PAGXTest, NoiseFilterModes) {
@@ -7662,9 +7665,4 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
 }
 
-/**
- * Test DuoNoiseFilter and DropShadowStyle coexisting on a rectangle layer.
- * Verifies that noise filter and drop shadow style (layer style) produce
- * correct SVG output and rendering.
- */
 }  // namespace pag
