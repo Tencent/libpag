@@ -18,48 +18,19 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
-
 namespace pagx {
 
-class Animation;
-class Layer;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * Solves the cubic-bezier easing function defined by control points P1=(p1x,p1y) and P2=(p2x,p2y)
+ * with implicit endpoints P0=(0,0) and P3=(1,1).
+ *
+ * Given an input progress in [0,1] representing horizontal time progress, returns the eased
+ * progress (vertical) at that point. Implementation uses Newton-Raphson with bisection fallback;
+ * accuracy is well below the millisecond range needed for keyframe interpolation.
+ *
+ * Input progress outside [0,1] short-circuits to the curve endpoints: values <= 0 return 0 and
+ * values >= 1 return 1. The returned value is also clamped to [0,1].
  */
-class Composition : public Node {
- public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
-  }
-
- private:
-  Composition() = default;
-
-  friend class PAGXDocument;
-};
+double SolveBezierEasing(double p1x, double p1y, double p2x, double p2y, double input);
 
 }  // namespace pagx

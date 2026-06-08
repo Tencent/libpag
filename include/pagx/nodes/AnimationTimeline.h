@@ -18,48 +18,35 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include <string>
+#include "pagx/nodes/Timeline.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * AnimationTimeline attaches a referenced Animation to the owning Layer's runtime composition.
+ * The referenced Animation is looked up by animationId, which must match an Animation defined
+ * in the same document.
  */
-class Composition : public Node {
+class AnimationTimeline : public Timeline {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+  AnimationTimeline() = default;
 
   /**
-   * The height of the composition in pixels.
+   * The id of the referenced Animation. Resolved against the owning document's id table.
    */
-  float height = 0.0f;
+  std::string animationId = {};
 
   /**
-   * The layers contained in this composition.
+   * Initial playing state when the embedding PAGScene first builds the runtime tree. Setting this
+   * to false constructs the timeline in the paused state; callers can call play() later. Default
+   * is true.
    */
-  std::vector<Layer*> layers = {};
+  bool playing = true;
 
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  TimelineType timelineType() const override {
+    return TimelineType::Animation;
   }
-
- private:
-  Composition() = default;
-
-  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -18,48 +18,23 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "tgfx/core/Color.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+// Linear interpolation helpers used by continuous-channel writers. Discrete channels ignore mix
+// and overwrite directly, so they don't go through these helpers.
+inline float MixFloat(float current, float target, float mix) {
+  return current + (target - current) * mix;
+}
 
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
- public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
-  }
-
- private:
-  Composition() = default;
-
-  friend class PAGXDocument;
-};
+inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& target, float mix) {
+  tgfx::Color result = current;
+  result.red = MixFloat(current.red, target.red, mix);
+  result.green = MixFloat(current.green, target.green, mix);
+  result.blue = MixFloat(current.blue, target.blue, mix);
+  result.alpha = MixFloat(current.alpha, target.alpha, mix);
+  return result;
+}
 
 }  // namespace pagx

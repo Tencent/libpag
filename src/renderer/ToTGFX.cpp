@@ -18,6 +18,7 @@
 
 #include "ToTGFX.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
@@ -91,6 +92,10 @@ tgfx::Matrix ToTGFX(const Matrix& m) {
 
 tgfx::Rect ToTGFX(const Rect& r) {
   return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
+}
+
+Rect FromTGFX(const tgfx::Rect& r) {
+  return Rect::MakeXYWH(r.x(), r.y(), r.width(), r.height());
 }
 
 tgfx::LineCap ToTGFX(LineCap cap) {
@@ -314,6 +319,18 @@ tgfx::ScaleMode ToTGFX(ScaleMode mode) {
   return tgfx::ScaleMode::LetterBox;
 }
 
+tgfx::RenderMode ToTGFX(PAGRenderMode renderMode) {
+  switch (renderMode) {
+    case PAGRenderMode::Direct:
+      return tgfx::RenderMode::Direct;
+    case PAGRenderMode::Partial:
+      return tgfx::RenderMode::Partial;
+    case PAGRenderMode::Tiled:
+      return tgfx::RenderMode::Tiled;
+  }
+  return tgfx::RenderMode::Partial;
+}
+
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {
   tgfx::Matrix3D m = {};
   for (int r = 0; r < 4; r++) {
@@ -331,6 +348,11 @@ static void ReleasePagxData(const void*, void* context) {
 std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
   if (data == nullptr) {
     return nullptr;
+  }
+  // MakeAdopted returns a shared static empty singleton for zero-length input and discards the
+  // releaseProc/context, so the ctx below would leak. Handle the empty case before allocating it.
+  if (data->size() == 0) {
+    return tgfx::Data::MakeEmpty();
   }
   auto* ctx = new std::shared_ptr<Data>(data);
   auto result = tgfx::Data::MakeAdopted(data->data(), data->size(), ReleasePagxData, ctx);

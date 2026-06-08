@@ -16,50 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/runtime/OffscreenDrawable.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
-
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
- public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return nullptr;
   }
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<OffscreenDrawable>(
+      new OffscreenDrawable(width, height, std::move(device)));
+}
 
- private:
-  Composition() = default;
+OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)
+    : _width(width), _height(height), _device(std::move(device)) {
+}
 
-  friend class PAGXDocument;
-};
+std::shared_ptr<tgfx::Device> OffscreenDrawable::getDevice() {
+  return _device;
+}
+
+std::shared_ptr<tgfx::Surface> OffscreenDrawable::getSurface(tgfx::Context* context) {
+  if (surface != nullptr) {
+    return surface;
+  }
+  if (context == nullptr) {
+    return nullptr;
+  }
+  surface = tgfx::Surface::Make(context, _width, _height);
+  return surface;
+}
 
 }  // namespace pagx

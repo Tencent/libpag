@@ -28,6 +28,10 @@
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
+#ifdef PAG_BUILD_PAGX
+#include "pagx/PAGSurface.h"
+#include "platform/web/pagx/GPUDrawable.h"
+#endif
 
 using namespace emscripten;
 
@@ -671,6 +675,19 @@ bool PAGBindInit() {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");
+
+#ifdef PAG_BUILD_PAGX
+  class_<pagx::PAGSurface>("_PAGXSurface")
+      .smart_ptr<std::shared_ptr<pagx::PAGSurface>>("_PAGXSurface")
+      .class_function(
+          "_FromCanvas", optional_override([](const std::string& canvasID) {
+            return pagx::PAGSurface::MakeFrom(pagx::GPUDrawable::FromCanvasID(canvasID));
+          }))
+      .class_function("_MakeOffscreen", &pagx::PAGSurface::MakeOffscreen)
+      .function("_width", &pagx::PAGSurface::width)
+      .function("_height", &pagx::PAGSurface::height);
+#endif
+
   return true;
 }
 }  // namespace pag
