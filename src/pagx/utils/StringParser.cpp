@@ -247,6 +247,9 @@ DEFINE_ENUM_CONVERSION(Arrangement, Arrangement::Start, {Arrangement::Start, "st
                        {Arrangement::SpaceEvenly, "spaceEvenly"},
                        {Arrangement::SpaceAround, "spaceAround"})
 
+DEFINE_ENUM_CONVERSION(NoiseMode, NoiseMode::Mono, {NoiseMode::Mono, "mono"},
+                       {NoiseMode::Duo, "duo"}, {NoiseMode::Multi, "multi"})
+
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {
     case ColorSpace::SRGB:
