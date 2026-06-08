@@ -427,8 +427,8 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
                                    const std::vector<LayerFilter*>& filters,
                                    const std::vector<LayerStyle*>& styles,
                                    const TextBox* parentTextBox,
-                                   std::vector<AccumulatedGeometry>& accumulator,
-                                   size_t scopeStart) {
+                                   std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                                   LayerPlacement targetPlacement) {
   // The TextBox modifier-association rule is "first <TextBox> in this element
   // list applies to all sibling Text geometry"; we pre-scan once to mirror the
   // legacy CollectFillStroke().textBox behaviour, then fall back to the
@@ -444,10 +444,22 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
       case NodeType::Fill:
       case NodeType::Stroke: {
         FillStrokeInfo painterFs = {};
+        LayerPlacement painterPlacement = LayerPlacement::Background;
         if (type == NodeType::Fill) {
-          painterFs.fill = static_cast<const Fill*>(element);
+          auto* fill = static_cast<const Fill*>(element);
+          painterFs.fill = fill;
+          painterPlacement = fill->placement;
         } else {
-          painterFs.stroke = static_cast<const Stroke*>(element);
+          auto* stroke = static_cast<const Stroke*>(element);
+          painterFs.stroke = stroke;
+          painterPlacement = stroke->placement;
+        }
+        // Painters at a non-matching placement do not paint in this pass — geometry still
+        // accumulates from prior elements, and the matching pass (background or foreground)
+        // will visit this same painter and emit it then. Mirrors HTMLWriter::writeLayerInner
+        // and SVGWriter::writeLayerBody.
+        if (painterPlacement != targetPlacement) {
+          break;
         }
         // The painter's effective alpha is the alpha of THIS scope, not the
         // alpha that was in effect when each geometry was collected. A Group
@@ -490,7 +502,7 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
           const std::vector<Element*>& innerWalked =
               _resolveModifiers ? _resolver.resolve(tb->elements) : tb->elements;
           processVectorScope(out, innerWalked, tbMatrix, tbAlpha, filters, styles, tb, accumulator,
-                             accumulator.size());
+                             accumulator.size(), targetPlacement);
         } else {
           // Native PowerPoint text rendering still goes through the dedicated
           // multi-run text-box writer: PPTX represents multi-style text with
@@ -516,7 +528,7 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         const std::vector<Element*>& innerWalked =
             _resolveModifiers ? _resolver.resolve(group->elements) : group->elements;
         processVectorScope(out, innerWalked, groupMatrix, groupAlpha, filters, styles, localTextBox,
-                           accumulator, accumulator.size());
+                           accumulator, accumulator.size(), targetPlacement);
         break;
       }
       case NodeType::Repeater:
@@ -540,8 +552,8 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
 void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                               const Matrix& transform, float alpha,
                               const std::vector<LayerFilter*>& filters,
-                              const std::vector<LayerStyle*>& styles,
-                              const TextBox* parentTextBox) {
+                              const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox,
+                              LayerPlacement targetPlacement) {
   // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
   // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
   // (Fill / Stroke), Group, and text-related elements pass through unchanged
@@ -551,7 +563,7 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
   processVectorScope(out, walked, transform, alpha, filters, styles, parentTextBox, accumulator,
-                     /*scopeStart=*/0);
+                     /*scopeStart=*/0, targetPlacement);
 }
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
@@ -711,7 +723,27 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   auto effectiveFilters = MergeLayerLists(layer->filters, inheritedFilters);
   auto effectiveStyles = MergeLayerLists(layer->styles, inheritedStyles);
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+  // PAGX placement: Fill/Stroke with placement="foreground" paint AFTER child layers and
+  // composition layers, so they overlay child content. Mirror HTMLWriter::writeLayerInner's
+  // two-pass dispatch (Background → children → Foreground) so the slide matches the PAGX
+  // renderer and the HTML preview.
+  bool hasForeground = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    } else if (e->nodeType() == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    }
+  }
+
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles,
+                /*parentTextBox=*/nullptr, LayerPlacement::Background);
 
   // Descend into the matching tgfx subtree: LayerBuilder pushes one tgfx::Layer per child in the
   // order [composition->layers ..., layer->children ...] under tgfxLayer, so a positional walk
@@ -739,6 +771,11 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
     }
     ++tgfxChildIndex;
     writeLayer(out, child, childTgfx, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+  }
+
+  if (hasForeground) {
+    writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles,
+                  /*parentTextBox=*/nullptr, LayerPlacement::Foreground);
   }
 }
 

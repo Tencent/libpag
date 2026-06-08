@@ -725,14 +725,15 @@ class PPTWriter {
 
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha, const std::vector<LayerFilter*>& filters,
-                     const std::vector<LayerStyle*>& styles,
-                     const TextBox* parentTextBox = nullptr);
+                     const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox = nullptr,
+                     LayerPlacement targetPlacement = LayerPlacement::Background);
 
   void processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
                           const Matrix& transform, float alpha,
                           const std::vector<LayerFilter*>& filters,
                           const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox,
-                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
+                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                          LayerPlacement targetPlacement);
 
   void emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
                           const FillStrokeInfo& fs, float alpha,
