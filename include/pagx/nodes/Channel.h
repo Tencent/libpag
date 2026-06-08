@@ -56,10 +56,10 @@ enum class ChannelValueType : uint8_t {
 class Channel : public Node {
  public:
   /**
-   * The property name this Channel drives on the target node (for example a transform or color
-   * channel). Interpreted by the runtime when applying evaluated values to the layer tree.
+   * The name of the property this Channel drives on the target node (for example a transform or
+   * color channel). Interpreted by the runtime when applying evaluated values to the layer tree.
    */
-  std::string property = {};
+  std::string name = {};
 
   /**
    * Returns the value type of this Channel's keyframes. Each TypedChannel<T> specialization

@@ -204,7 +204,7 @@ template <typename T>
 static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
                               const char* typeName) {
   xml.openElement("Channel");
-  xml.addRequiredAttribute("channel", channel->property);
+  xml.addRequiredAttribute("name", channel->name);
   xml.addAttribute("type", typeName);
   xml.closeElementStart();
   for (const auto& key : channel->keyframes) {

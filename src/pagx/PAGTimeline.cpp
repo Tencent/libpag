@@ -51,7 +51,7 @@ static void ApplyResolved(
   for (const auto& entry : resolvedTargets) {
     auto* targetNode = entry.first;
     for (auto* channel : entry.second) {
-      binding->apply(targetNode, channel->property,
+      binding->apply(targetNode, channel->name,
                      channel->evaluateAt(microseconds, animation->frameRate), mix);
     }
   }
