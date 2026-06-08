@@ -1453,37 +1453,41 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   // shapePath->setPosition(renderPosition()) + path data is scaled by renderScale().
   // Without applying both, raw path data emits at its authored origin and authored
   // size, losing any flex / centerX / layoutBounds-driven centring and sizing.
+  //
+  // The placement is baked into the path data rather than emitted as a `transform`
+  // attribute so the path's user coordinate system equals the parent VectorLayer /
+  // VectorGroup space. SVG resolves `userSpaceOnUse` gradients (and ImagePattern
+  // `patternUnits="userSpaceOnUse"`) in the *referencing element's* user coordinate
+  // system; if a `transform` were emitted, the gradient endPoints — authored in
+  // parent space per PAGX semantics (tgfx Gradient with fitsToGeometry=false) — would
+  // be reinterpreted as path-local pre-scale coordinates and the gradient would only
+  // cover the unscaled fraction of the geometry. Baking keeps SVG and the PAGX
+  // renderer's coordinate-space contract identical for fills, strokes, and patterns.
+  // PAGX's renderer also keeps `setStrokeWidth(node->width)` on the original (non-scaled)
+  // value while geometry is scaled — baking matches that behaviour without further work
+  // because stroke-width on this <path> is already evaluated in the same coordinate
+  // space as the now-baked path data.
   auto renderPos = path->renderPosition();
   float scale = path->renderScale();
+  bool needsBaking = (renderPos.x != 0.0f || renderPos.y != 0.0f || scale != 1.0f);
+
+  PathData baked = PathDataFromSVGString("");
+  if (needsBaking) {
+    baked = *path->data;
+    Matrix bakeMatrix = Matrix::Translate(renderPos.x, renderPos.y) * Matrix::Scale(scale, scale);
+    baked.transform(bakeMatrix);
+  }
+
   out.openElement("path");
   std::string transform = MatrixToSVGTransform(m);
-  std::string localTransform;
-  if (renderPos.x != 0.0f || renderPos.y != 0.0f) {
-    localTransform =
-        "translate(" + FloatToString(renderPos.x) + "," + FloatToString(renderPos.y) + ")";
-  }
-  if (scale != 1.0f) {
-    if (!localTransform.empty()) {
-      localTransform += " ";
-    }
-    localTransform += "scale(" + FloatToString(scale) + ")";
-  }
-  if (!transform.empty() && !localTransform.empty()) {
-    out.addAttribute("transform", transform + " " + localTransform);
-  } else if (!transform.empty()) {
+  if (!transform.empty()) {
     out.addAttribute("transform", transform);
-  } else if (!localTransform.empty()) {
-    out.addAttribute("transform", localTransform);
   }
-  out.addAttribute("d", PathDataToSVGString(*path->data));
-  // shapeBounds must reflect the painted region in the parent coordinate space so
-  // gradient `fitsToGeometry` and image patterns sample the right rectangle. The path
-  // data sits in pre-scale space, so multiply the raw bounds by the scale factor and
-  // translate them by renderPosition to match the on-canvas extent.
-  Rect dataBounds = path->data->getBounds();
-  Rect bounds =
-      Rect::MakeXYWH(renderPos.x + dataBounds.x * scale, renderPos.y + dataBounds.y * scale,
-                     dataBounds.width * scale, dataBounds.height * scale);
+  out.addAttribute("d", PathDataToSVGString(needsBaking ? baked : *path->data));
+  // After baking, getBounds() returns the painted region directly in parent space —
+  // which is the contract `applyPainters` expects for fitsToGeometry gradients and
+  // ImagePattern shapeBounds. No additional translate / scale arithmetic needed.
+  Rect bounds = needsBaking ? baked.getBounds() : path->data->getBounds();
   applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }

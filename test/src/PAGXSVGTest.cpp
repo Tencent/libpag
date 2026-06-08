@@ -1820,8 +1820,11 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScaleFractionalOffset) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_PathWithRenderScale) {
-  // Path data driven by renderScale != 1 exercises the scale branch in
-  // PrimitiveToTGFXPath via the writer's path emission.
+  // renderScale != 1 must be baked into the emitted path data (not exposed as a
+  // transform="scale(...)") so that userSpaceOnUse gradients and patterns resolve
+  // in the same parent-container coordinate space the PAGX renderer uses. Here
+  // the 100x100 triangle is laid out into a 200x200 box (renderScale = 2.0), so
+  // the d attribute must carry coordinates up to 200 — not the authored 100.
   auto doc = pagx::PAGXDocument::Make(400, 400);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* path = doc->makeNode<pagx::Path>();
@@ -1837,7 +1840,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_PathWithRenderScale) {
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<path"), std::string::npos);
-  EXPECT_NE(svg.find("scale("), std::string::npos);
+  EXPECT_EQ(svg.find("scale("), std::string::npos);
+  EXPECT_NE(svg.find("L200"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_PathReversedTrim) {
