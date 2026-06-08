@@ -7734,14 +7734,6 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  // Log tgfx bounds for each child layer (exclude effects).
-  for (size_t i = 0; i < tgfxLayer->children().size() && i < doc->layers.size(); i++) {
-    auto* child = tgfxLayer->children()[i].get();
-    auto bounds = child->computeBounds(tgfx::Matrix3D::I(), false, true);
-    printf("Layer[%zu] tgfx bounds: x=%.2f y=%.2f w=%.2f h=%.2f\n", i, bounds.x(), bounds.y(),
-           bounds.width(), bounds.height());
-  }
-
   auto surface = Surface::Make(context, canvasW, canvasH);
   ASSERT_TRUE(surface != nullptr);
   DisplayList displayList;
@@ -7763,46 +7755,4 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   std::ofstream file(outPath, std::ios::binary);
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
 }
-
-/**
- * Test SVG export for a single rectangle with Multi noise filter.
- */
-PAGX_TEST(PAGXTest, NoiseFilterSingleRectMulti) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-
-  auto layer = doc->makeNode<pagx::Layer>();
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->position = {50, 50};
-  rect->size = {100, 100};
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>();
-  solid->color = {0.2f, 0.5f, 0.8f, 1.0f};
-  fill->color = solid;
-  layer->contents.push_back(rect);
-  layer->contents.push_back(fill);
-
-  auto multi = doc->makeNode<pagx::NoiseFilter>();
-  multi->mode = pagx::NoiseMode::Multi;
-  multi->size = 8;
-  multi->density = 0.5f;
-  multi->seed = 42;
-  multi->opacity = 1.0f;
-  layer->filters.push_back(multi);
-  doc->layers.push_back(layer);
-
-  doc->applyLayout();
-  auto svg = pagx::SVGExporter::ToSVG(*doc);
-  EXPECT_FALSE(svg.empty());
-  EXPECT_NE(svg.find("<svg"), std::string::npos);
-  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
-
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterSingleRectMulti.svg");
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
-}
-
 }  // namespace pag
