@@ -1452,23 +1452,15 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
     return resultName;
   }
 
-  // Multi mode: single feTurbulence with feComponentTransfer for contrast and density banding,
-  // matching Figma's approach. feFuncR/G/B apply contrast enhancement, feFuncA applies the
-  // density threshold band directly on the turbulence alpha channel.
+  // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
+  // luminance-based density band (alpha) — then masked and blended, aligned with tgfx's
+  // MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
   auto turbResult = writeNoiseTurbulence(noise, "n" + filterId, contentBounds);
 
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
-  int threshold = std::clamp(static_cast<int>(std::lround(d * 100.0f)), 0, 100);
-  std::string table;
-  table.reserve(300);
-  for (int i = 0; i < 100; i++) {
-    table += (i < threshold) ? "1 " : "0 ";
-  }
-  table.pop_back();
-
+  // Contrast branch: feFuncR/G/B linear applies slope=2 intercept=-0.5, keeping alpha unchanged.
   _defs->openElement("feComponentTransfer");
   _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("result", "colored" + filterId);
+  _defs->addAttribute("result", "contrast" + filterId);
   _defs->closeElementStart();
   _defs->openElement("feFuncR");
   _defs->addAttribute("type", "linear");
@@ -1485,6 +1477,30 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   _defs->addAttribute("slope", "2");
   _defs->addAttribute("intercept", "-0.5");
   _defs->closeElementSelfClosing();
+  _defs->closeElement();
+
+  // Density band branch: luminance-to-alpha then discrete band, matching MakeDarkDensityFilter
+  // which uses ComputeDarkBandBuckets, lumaMatrix + AlphaThreshold, and DstOut(lower, upper).
+  auto d = std::clamp(noise->density, 0.0f, 1.0f);
+  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
+  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
+  std::string table;
+  table.reserve(300);
+  for (int i = 0; i < 100; i++) {
+    table += (i >= lower && i <= upper) ? "1 " : "0 ";
+  }
+  table.pop_back();
+
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", turbResult);
+  _defs->addAttribute("type", "luminanceToAlpha");
+  _defs->addAttribute("result", "luma" + filterId);
+  _defs->closeElementSelfClosing();
+
+  _defs->openElement("feComponentTransfer");
+  _defs->addAttribute("in", "luma" + filterId);
+  _defs->addAttribute("result", "band" + filterId);
+  _defs->closeElementStart();
   _defs->openElement("feFuncA");
   _defs->addAttribute("type", "discrete");
   _defs->addAttribute("tableValues", table);
@@ -1492,7 +1508,25 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   _defs->closeElement();
 
   _defs->openElement("feComposite");
-  _defs->addAttribute("in", "colored" + filterId);
+  _defs->addAttribute("in", "contrast" + filterId);
+  _defs->addAttribute("in2", "band" + filterId);
+  _defs->addAttribute("operator", "in");
+  _defs->addAttribute("result", "masked" + filterId);
+  _defs->closeElementSelfClosing();
+
+  // Apply opacity scaling to the masked noise alpha channel.
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", "masked" + filterId);
+  _defs->addAttribute("type", "matrix");
+  std::string opacityValues = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ";
+  opacityValues += FloatToString(noise->opacity);
+  opacityValues += " 0";
+  _defs->addAttribute("values", opacityValues);
+  _defs->addAttribute("result", "final" + filterId);
+  _defs->closeElementSelfClosing();
+
+  _defs->openElement("feComposite");
+  _defs->addAttribute("in", "final" + filterId);
   _defs->addAttribute("in2", currentSource);
   _defs->addAttribute("operator", "in");
   _defs->addAttribute("result", "clipped" + filterId);
@@ -1601,22 +1635,15 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     return resultName;
   }
 
-  // Multi mode: single feTurbulence with feComponentTransfer for contrast and density banding,
-  // matching Figma's approach.
+  // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
+  // luminance-based density band (alpha) — then masked and clipped to SourceGraphic, aligned
+  // with tgfx's MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
   auto turbResult = writeNoiseTurbulence(noise, "n" + styleId, contentBounds);
 
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
-  int threshold = std::clamp(static_cast<int>(std::lround(d * 100.0f)), 0, 100);
-  std::string table;
-  table.reserve(300);
-  for (int i = 0; i < 100; i++) {
-    table += (i < threshold) ? "1 " : "0 ";
-  }
-  table.pop_back();
-
+  // Contrast branch.
   _defs->openElement("feComponentTransfer");
   _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("result", "colored" + styleId);
+  _defs->addAttribute("result", "contrast" + styleId);
   _defs->closeElementStart();
   _defs->openElement("feFuncR");
   _defs->addAttribute("type", "linear");
@@ -1633,15 +1660,56 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   _defs->addAttribute("slope", "2");
   _defs->addAttribute("intercept", "-0.5");
   _defs->closeElementSelfClosing();
+  _defs->closeElement();
+
+  // Density band branch.
+  auto d = std::clamp(noise->density, 0.0f, 1.0f);
+  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
+  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
+  std::string table;
+  table.reserve(300);
+  for (int i = 0; i < 100; i++) {
+    table += (i >= lower && i <= upper) ? "1 " : "0 ";
+  }
+  table.pop_back();
+
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", turbResult);
+  _defs->addAttribute("type", "luminanceToAlpha");
+  _defs->addAttribute("result", "luma" + styleId);
+  _defs->closeElementSelfClosing();
+
+  _defs->openElement("feComponentTransfer");
+  _defs->addAttribute("in", "luma" + styleId);
+  _defs->addAttribute("result", "band" + styleId);
+  _defs->closeElementStart();
   _defs->openElement("feFuncA");
   _defs->addAttribute("type", "discrete");
   _defs->addAttribute("tableValues", table);
   _defs->closeElementSelfClosing();
   _defs->closeElement();
 
+  _defs->openElement("feComposite");
+  _defs->addAttribute("in", "contrast" + styleId);
+  _defs->addAttribute("in2", "band" + styleId);
+  _defs->addAttribute("operator", "in");
+  _defs->addAttribute("result", "masked" + styleId);
+  _defs->closeElementSelfClosing();
+
+  // Apply opacity scaling.
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", "masked" + styleId);
+  _defs->addAttribute("type", "matrix");
+  std::string opacityValues = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ";
+  opacityValues += FloatToString(noise->opacity);
+  opacityValues += " 0";
+  _defs->addAttribute("values", opacityValues);
+  _defs->addAttribute("result", "final" + styleId);
+  _defs->closeElementSelfClosing();
+
   auto resultName = "noiseStyleOut" + styleId;
   _defs->openElement("feComposite");
-  _defs->addAttribute("in", "colored" + styleId);
+  _defs->addAttribute("in", "final" + styleId);
   _defs->addAttribute("in2", "SourceGraphic");
   _defs->addAttribute("operator", "in");
   _defs->addAttribute("result", resultName);
