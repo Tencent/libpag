@@ -455,12 +455,18 @@ class SVGWriter {
   // Writes the non-content attributes of a layer's <g> (id, data-*, transform,
   // opacity, style, filter, mask/clipPath, scrollRect clip). Geometry and child
   // layers are emitted separately after closeElementStart() in writeLayer.
-  // `emitScrollClipHere` is false when the caller will emit the scrollRect
-  // clip-path on a deferred middle <g> wrapper to avoid colliding with a
-  // contour-mask clip-path on the same element (both share the SVG `clip-path`
-  // attribute, so writing both onto the outer <g> drops the first).
-  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
-                                 bool emitScrollClipHere = true);
+  // Used for the no-mask path that emits a single <g>; with a mask the writer
+  // splits attributes across an outer/inner pair via the helpers below.
+  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer);
+  // Outer-<g> attributes (no transform). These are interpreted in the layer's
+  // *parent* coordinate space — crucial for mask/clip-path so the mask
+  // userSpaceOnUse coordinates land in the same space tgfx evaluates the
+  // mask in (Layer::getMaskData uses mask->getRelativeMatrix3D(owner), which
+  // resolves to the parent space when mask and owner share a parent).
+  void writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer);
+  // Inner-<g> attributes (transform + scrollRect clip). Applied below the
+  // outer <g> so the layer's own transform never reinterprets the mask.
+  void writeLayerInnerAttributes(SVGBuilder& out, const Layer* layer);
   // Emits contents + composition layers + child layers. Used both for the
   // needs-group path (inside the <g>) and for the bare-through path.
   void writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha = 1.0f);
@@ -1245,6 +1251,20 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
 }
 
 void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
+  // The <mask> element itself lives in the owner's parent space (we attach
+  // mask="url(...)" on the layer's outer <g>, which has no transform). PAGX
+  // semantics: the mask layer's own matrix participates in mask placement
+  // (Layer::getMaskData computes mask->getRelativeMatrix3D(owner), which
+  // when mask and owner share a parent reduces to mask->matrix). Wrap the
+  // mask body in a <g transform="..."> so the mask layer's own left/top/
+  // matrix moves the mask shape correctly without leaking onto the owner.
+  std::string transform = BuildLayerTransform(layer);
+  bool needsWrapper = !transform.empty();
+  if (needsWrapper) {
+    out.openElement("g");
+    out.addAttribute("transform", transform);
+    out.closeElementStart();
+  }
   // Masks/clipPaths consume the alpha union of every painter on the layer, regardless of
   // placement (placement only affects on-canvas paint order, not which shapes participate
   // in the mask). Emit both passes so foreground painters still contribute their geometry,
@@ -1253,6 +1273,9 @@ void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
   writeLayerContents(out, layer, {}, 1.0f, LayerPlacement::Foreground);
   for (const auto* child : layer->children) {
     writeLayer(out, child);
+  }
+  if (needsWrapper) {
+    out.closeElement();
   }
 }
 
@@ -2642,18 +2665,31 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     return;
   }
 
-  out.openElement("g");
-  bool needsContourClip = layer->mask != nullptr && layer->maskType == MaskType::Contour;
-  // The outer <g> already gets the contour-mask clip-path from
-  // writeLayerGroupAttributes. SVG only allows one `clip-path` value per
-  // element, so when both contour mask and scrollRect are present we defer the
-  // scrollRect clip to a middle <g> wrapper below; otherwise the second
-  // attribute would silently overwrite the first.
-  bool needsScrollMiddleWrapper = layer->hasScrollRect && needsContourClip;
-  writeLayerGroupAttributes(out, layer, /*emitScrollClipHere=*/!needsScrollMiddleWrapper);
-
   bool hasContent =
       !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
+
+  // PAGX/tgfx mask semantics: the mask is evaluated in the layer owner's
+  // *parent* coordinate space (Layer::getMaskData uses
+  // mask->getRelativeMatrix3D(owner), which excludes owner's own matrix). SVG
+  // resolves `mask` / `clip-path` (with userSpaceOnUse) in the *referencing
+  // element's* user coordinate system, so the layer's own transform must NOT
+  // sit on the same <g> as the mask attribute — otherwise the mask gets
+  // dragged along with `left`/`top` and any rotation/scale on the layer,
+  // visibly drifting away from where the renderer places it.
+  //
+  // Solution: when the layer has a mask (alpha/luminance/contour), split into
+  // an outer <g> (mask + filter + opacity + blend, NO transform) and an inner
+  // <g> (transform + scrollRect clip). For layers without a mask, both sets
+  // collapse onto a single <g> as before.
+  bool hasMask = layer->mask != nullptr;
+
+  out.openElement("g");
+  if (hasMask) {
+    writeLayerOuterAttributes(out, layer);
+  } else {
+    writeLayerGroupAttributes(out, layer);
+  }
+
   if (!hasContent) {
     out.closeElementSelfClosing();
     return;
@@ -2661,15 +2697,13 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 
   out.closeElementStart();
 
-  // Middle <g> for scrollRect when a contour-mask clip-path occupies the outer
-  // <g>'s clip-path slot. The middle <g> carries no transform — its local
-  // coordinate space equals the outer's (post layer-matrix), so the scroll
-  // clipPath rect (anchored at 0,0 with sr.width × sr.height) is interpreted
-  // identically to the un-collided case where it sat on the outer <g>.
-  if (needsScrollMiddleWrapper) {
-    auto scrollClipId = writeScrollRectClipDef(layer);
+  // Inner <g> carrying the layer's own transform + scrollRect clip. Only
+  // emitted when the outer <g> took the mask attribute; otherwise everything
+  // already lives on the outer <g>.
+  bool needsInnerWrapper = hasMask && (!BuildLayerTransform(layer).empty() || layer->hasScrollRect);
+  if (needsInnerWrapper) {
     out.openElement("g");
-    out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
+    writeLayerInnerAttributes(out, layer);
     out.closeElementStart();
   }
 
@@ -2691,7 +2725,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     out.closeElement();
   }
 
-  if (needsScrollMiddleWrapper) {
+  if (needsInnerWrapper) {
     out.closeElement();
   }
 
@@ -2748,19 +2782,13 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
   }
 }
 
-void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
-                                          bool emitScrollClipHere) {
+void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   if (!layer->id.empty()) {
     out.addAttribute("id", layer->id);
   }
 
   for (const auto& [key, value] : layer->customData) {
     out.addAttribute(("data-" + key).c_str(), value);
-  }
-
-  std::string transform = BuildLayerTransform(layer);
-  if (!transform.empty()) {
-    out.addAttribute("transform", transform);
   }
 
   if (layer->alpha < 1.0f && layer->groupOpacity) {
@@ -2792,17 +2820,31 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
       out.addAttribute("mask", "url(#" + maskId + ")");
     }
   }
+}
+
+void SVGWriter::writeLayerInnerAttributes(SVGBuilder& out, const Layer* layer) {
+  std::string transform = BuildLayerTransform(layer);
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
 
   // scrollRect clips the layer's content to a viewport rectangle and offsets
-  // the content by the scroll origin. Unlike PPT (which must bake to PNG),
-  // SVG natively supports <clipPath> so we emit a vector clip. When the layer
-  // also carries a contour mask, the contour mask owns this <g>'s `clip-path`
-  // and `emitScrollClipHere` is false — the caller emits the scroll clip on a
-  // deferred middle <g> wrapper instead so both clips can coexist.
-  if (emitScrollClipHere && layer->hasScrollRect) {
+  // the content by the scroll origin. SVG natively supports <clipPath> so we
+  // emit a vector clip rooted in the layer's own (post-transform) coordinate
+  // space — same as the renderer, where ClipScrollRect runs after concat'ing
+  // the layer matrix.
+  if (layer->hasScrollRect) {
     auto scrollClipId = writeScrollRectClipDef(layer);
     out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
   }
+}
+
+void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
+  // No mask path: outer and inner attributes collapse onto the same <g>. The
+  // contour-clip and scrollRect both want `clip-path`, but a no-mask layer
+  // never produces a contour clip, so there's no collision here.
+  writeLayerOuterAttributes(out, layer);
+  writeLayerInnerAttributes(out, layer);
 }
 
 std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
