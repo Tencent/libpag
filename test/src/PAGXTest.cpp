@@ -7683,11 +7683,11 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
 }
 
 /**
- * Test DuoNoiseStyle and DropShadowFilter coexisting on a rectangle layer.
- * Verifies that noise style (layer style) and drop shadow filter produce
+ * Test DuoNoiseFilter and DropShadowStyle coexisting on a rectangle layer.
+ * Verifies that noise filter and drop shadow style (layer style) produce
  * correct SVG output and rendering.
  */
-PAGX_TEST(PAGXTest, NoiseStyleWithDropShadow) {
+PAGX_TEST(PAGXTest, NoiseFilterWithDropShadowStyle) {
   constexpr int canvasW = 400;
   constexpr int canvasH = 400;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
@@ -7703,22 +7703,22 @@ PAGX_TEST(PAGXTest, NoiseStyleWithDropShadow) {
   layer->contents.push_back(rect);
   layer->contents.push_back(fill);
 
-  auto noiseStyle = doc->makeNode<pagx::NoiseStyle>();
-  noiseStyle->mode = pagx::NoiseMode::Duo;
-  noiseStyle->size = 10;
-  noiseStyle->density = 0.5f;
-  noiseStyle->seed = 42;
-  noiseStyle->firstColor = {1.0f, 0.9f, 0.0f, 1.0f};
-  noiseStyle->secondColor = {0.0f, 0.3f, 1.0f, 1.0f};
-  layer->styles.push_back(noiseStyle);
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 10;
+  noise->density = 0.5f;
+  noise->seed = 42;
+  noise->firstColor = {1.0f, 0.9f, 0.0f, 1.0f};
+  noise->secondColor = {0.0f, 0.3f, 1.0f, 1.0f};
+  layer->filters.push_back(noise);
 
-  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  auto shadow = doc->makeNode<pagx::DropShadowStyle>();
   shadow->offsetX = 20;
   shadow->offsetY = 25;
   shadow->blurX = 8;
   shadow->blurY = 8;
   shadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
-  layer->filters.push_back(shadow);
+  layer->styles.push_back(shadow);
 
   doc->layers.push_back(layer);
 
@@ -7732,7 +7732,7 @@ PAGX_TEST(PAGXTest, NoiseStyleWithDropShadow) {
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleWithDropShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterWithDropShadowStyle"));
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_FALSE(svg.empty());
@@ -7740,7 +7740,7 @@ PAGX_TEST(PAGXTest, NoiseStyleWithDropShadow) {
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
   EXPECT_NE(svg.find("feOffset"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseStyleWithDropShadow.svg");
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterWithDropShadowStyle.svg");
   auto dirPath = std::filesystem::path(outPath).parent_path();
   if (!std::filesystem::exists(dirPath)) {
     std::filesystem::create_directories(dirPath);
