@@ -210,6 +210,9 @@ Rect TextBox::contentBounds() const {
       if (tb > bottom) bottom = tb;
     }
   }
+  if (first) {
+    return {};
+  }
   return Rect::MakeLTRB(left, top, right, bottom);
 }
 

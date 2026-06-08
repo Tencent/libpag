@@ -179,7 +179,7 @@ static Matrix BuildRepeaterCopyMatrix(const Repeater* rep, float progress) {
   return m;
 }
 
-static Rect ComputeLayerBounds(const Layer* layer);
+static Rect ComputeLayerBounds(const Layer* layer, int depth = 0);
 
 static Rect ComputeElementsBounds(const std::vector<Element*>& elements) {
   float minX = std::numeric_limits<float>::max();
@@ -294,7 +294,13 @@ static Rect ComputeElementBounds(const Element* element) {
   }
 }
 
-static Rect ComputeLayerBounds(const Layer* layer) {
+static constexpr int MAX_LAYER_BOUNDS_DEPTH = 32;
+
+static Rect ComputeLayerBounds(const Layer* layer, int depth) {
+  if (depth >= MAX_LAYER_BOUNDS_DEPTH) {
+    return {};
+  }
+
   float minX = std::numeric_limits<float>::max();
   float minY = std::numeric_limits<float>::max();
   float maxX = -std::numeric_limits<float>::max();
@@ -306,7 +312,7 @@ static Rect ComputeLayerBounds(const Layer* layer) {
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
       if (!compLayer->visible) continue;
-      auto compBounds = ComputeLayerBounds(compLayer);
+      auto compBounds = ComputeLayerBounds(compLayer, depth + 1);
       auto compMatrix = BuildLayerMatrix(compLayer);
       auto mappedBounds = MapRect(compMatrix, compBounds);
       if (compLayer->hasScrollRect) {
@@ -315,7 +321,7 @@ static Rect ComputeLayerBounds(const Layer* layer) {
         if (mappedBounds.isEmpty()) continue;
       }
       if (compLayer->mask != nullptr) {
-        auto maskBounds = ComputeLayerBounds(compLayer->mask);
+        auto maskBounds = ComputeLayerBounds(compLayer->mask, depth + 1);
         auto maskMatrix = BuildLayerMatrix(compLayer->mask);
         auto mappedMask = MapRect(maskMatrix, maskBounds);
         mappedBounds = IntersectRects(mappedBounds, mappedMask);
@@ -327,7 +333,7 @@ static Rect ComputeLayerBounds(const Layer* layer) {
 
   for (const auto* child : layer->children) {
     if (!child->visible) continue;
-    auto childBounds = ComputeLayerBounds(child);
+    auto childBounds = ComputeLayerBounds(child, depth + 1);
     auto childMatrix = BuildLayerMatrix(child);
     auto mappedBounds = MapRect(childMatrix, childBounds);
     if (child->hasScrollRect) {
@@ -336,7 +342,7 @@ static Rect ComputeLayerBounds(const Layer* layer) {
       if (mappedBounds.isEmpty()) continue;
     }
     if (child->mask != nullptr) {
-      auto maskBounds = ComputeLayerBounds(child->mask);
+      auto maskBounds = ComputeLayerBounds(child->mask, depth + 1);
       auto maskMatrix = BuildLayerMatrix(child->mask);
       auto mappedMask = MapRect(maskMatrix, maskBounds);
       mappedBounds = IntersectRects(mappedBounds, mappedMask);
@@ -653,14 +659,10 @@ class SVGWriter {
   void writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMatrixIndex,
                               std::string& currentSource);
   void writeBlendFilter(const BlendFilter* blend, int& shadowIndex, std::string& currentSource);
-  std::string writeNoiseTurbulence(const NoiseFilter* noise, const std::string& resultName,
-                                   const Rect& contentBounds);
-  std::string writeNoiseTurbulence(const NoiseStyle* noise, const std::string& resultName,
-                                   const Rect& contentBounds);
-  std::string writeNoiseBand(const NoiseFilter* noise, bool isDark, const std::string& label,
-                             const Rect& contentBounds);
-  std::string writeNoiseBand(const NoiseStyle* noise, bool isDark, const std::string& label,
-                             const Rect& contentBounds);
+  std::string writeNoiseTurbulence(const NoiseFilter* noise, const std::string& resultName);
+  std::string writeNoiseTurbulence(const NoiseStyle* noise, const std::string& resultName);
+  std::string writeNoiseBand(const NoiseFilter* noise, bool isDark, const std::string& label);
+  std::string writeNoiseBand(const NoiseStyle* noise, bool isDark, const std::string& label);
   std::string writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
                                std::string& currentSource, const Rect& contentBounds);
   // Collected per-filter state fed into the final feMerge aggregation.
@@ -1235,8 +1237,8 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   currentSource = blendOut;
 }
 
-std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise, const std::string& resultName,
-                                            const Rect&) {
+std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise,
+                                            const std::string& resultName) {
   auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
   _defs->openElement("feTurbulence");
   _defs->addAttribute("type", "fractalNoise");
@@ -1250,8 +1252,8 @@ std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise, const std:
 }
 
 std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
-                                      const std::string& label, const Rect& contentBounds) {
-  auto turbResult = writeNoiseTurbulence(noise, "turb" + label, contentBounds);
+                                      const std::string& label) {
+  auto turbResult = writeNoiseTurbulence(noise, "turb" + label);
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
@@ -1288,8 +1290,8 @@ std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
   return "band" + label;
 }
 
-std::string SVGWriter::writeNoiseTurbulence(const NoiseStyle* noise, const std::string& resultName,
-                                            const Rect&) {
+std::string SVGWriter::writeNoiseTurbulence(const NoiseStyle* noise,
+                                            const std::string& resultName) {
   auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
   _defs->openElement("feTurbulence");
   _defs->addAttribute("type", "fractalNoise");
@@ -1303,8 +1305,8 @@ std::string SVGWriter::writeNoiseTurbulence(const NoiseStyle* noise, const std::
 }
 
 std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
-                                      const std::string& label, const Rect& contentBounds) {
-  auto turbResult = writeNoiseTurbulence(noise, "turb" + label, contentBounds);
+                                      const std::string& label) {
+  auto turbResult = writeNoiseTurbulence(noise, "turb" + label);
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
@@ -1342,11 +1344,11 @@ std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
 }
 
 std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
-                                        std::string& currentSource, const Rect& contentBounds) {
+                                        std::string& currentSource, const Rect&) {
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise, true, "Dark" + filterId, contentBounds);
+    auto band = writeNoiseBand(noise, true, "Dark" + filterId);
     _defs->openElement("feFlood");
     _defs->addAttribute("flood-color", ColorToSVGString(noise->color));
     if (noise->color.alpha < 1.0f) {
@@ -1384,8 +1386,8 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise, true, "Dark" + filterId, contentBounds);
-    auto bright = writeNoiseBand(noise, false, "Bright" + filterId, contentBounds);
+    auto dark = writeNoiseBand(noise, true, "Dark" + filterId);
+    auto bright = writeNoiseBand(noise, false, "Bright" + filterId);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1455,7 +1457,7 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
   // luminance-based density band (alpha) — then masked and blended, aligned with tgfx's
   // MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
-  auto turbResult = writeNoiseTurbulence(noise, "n" + filterId, contentBounds);
+  auto turbResult = writeNoiseTurbulence(noise, "n" + filterId);
 
   // Contrast branch: feFuncR/G/B linear applies slope=2 intercept=-0.5, keeping alpha unchanged.
   _defs->openElement("feComponentTransfer");
@@ -1547,11 +1549,11 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
 }
 
 std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex,
-                                       const Rect& contentBounds) {
+                                       const Rect&) {
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise, true, "Dark" + styleId, contentBounds);
+    auto band = writeNoiseBand(noise, true, "Dark" + styleId);
     _defs->openElement("feFlood");
     _defs->addAttribute("flood-color", ColorToSVGString(noise->color));
     if (noise->color.alpha < 1.0f) {
@@ -1578,8 +1580,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise, true, "Dark" + styleId, contentBounds);
-    auto bright = writeNoiseBand(noise, false, "Bright" + styleId, contentBounds);
+    auto dark = writeNoiseBand(noise, true, "Dark" + styleId);
+    auto bright = writeNoiseBand(noise, false, "Bright" + styleId);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1638,7 +1640,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
   // luminance-based density band (alpha) — then masked and clipped to SourceGraphic, aligned
   // with tgfx's MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
-  auto turbResult = writeNoiseTurbulence(noise, "n" + styleId, contentBounds);
+  auto turbResult = writeNoiseTurbulence(noise, "n" + styleId);
 
   // Contrast branch.
   _defs->openElement("feComponentTransfer");
