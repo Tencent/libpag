@@ -18,48 +18,35 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include <cstdint>
 
 namespace pagx {
 
-class Animation;
-class Layer;
+/**
+ * Discriminator for Timeline subclasses. Used by importers, exporters, and runtime layout to
+ * dispatch on the concrete timeline kind without dynamic_cast. Future timeline kinds (e.g. time
+ * machines, state machines) extend this enum.
+ */
+enum class TimelineType : uint8_t {
+  Animation = 0,
+};
 
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * Timeline is the abstract base for entries inside a Layer's <Timelines> XML element. Each entry
+ * describes a time-driven behavior to attach when the owning Layer references a Composition.
+ * v1 only ships AnimationTimeline; future versions may add other timeline kinds.
  */
-class Composition : public Node {
+class Timeline {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+  virtual ~Timeline() = default;
 
   /**
-   * The height of the composition in pixels.
+   * Returns the concrete timeline kind, used by importers/exporters and runtime dispatch.
    */
-  float height = 0.0f;
+  virtual TimelineType timelineType() const = 0;
 
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
-  }
-
- private:
-  Composition() = default;
-
-  friend class PAGXDocument;
+ protected:
+  Timeline() = default;
 };
 
 }  // namespace pagx

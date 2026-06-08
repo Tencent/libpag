@@ -18,48 +18,20 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/types/Color.h"
+#include "pagx/types/ColorSpace.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+// Converts a color into the target color space, applying the gamut transform between the source and
+// target gamuts. The alpha channel is preserved. Returns the input unchanged when it is already in
+// the target space. Used to bring two colors into a common space before component interpolation.
+Color ConvertColorSpace(const Color& color, ColorSpace target);
 
-/**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
- */
-class Composition : public Node {
- public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
-  }
-
- private:
-  Composition() = default;
-
-  friend class PAGXDocument;
-};
+// Linearly interpolates between two colors by fraction t, always converging onto the start color's
+// space: when the endpoints differ, b is converted into a's space before blending and the result
+// stays in a.colorSpace. Both the runtime keyframe evaluator and the HTML exporter route through
+// this single helper so animation and export agree on color-space convergence direction.
+Color LerpColor(const Color& a, const Color& b, double t);
 
 }  // namespace pagx

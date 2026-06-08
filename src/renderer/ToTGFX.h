@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "pagx/PAGDisplayOptions.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
@@ -56,6 +57,7 @@ enum class LayerPlacement;
 enum class StrokeAlign;
 enum class MergePathOp;
 enum class LayerMaskType;
+enum class RenderMode;
 enum class RepeaterOrder;
 enum class SelectorUnit;
 enum class SelectorShape;
@@ -72,6 +74,8 @@ tgfx::Color ToTGFX(const Color& color);
 tgfx::Matrix ToTGFX(const Matrix& matrix);
 
 tgfx::Rect ToTGFX(const Rect& rect);
+
+Rect FromTGFX(const tgfx::Rect& rect);
 
 tgfx::Path ToTGFX(const PathData& pathData);
 
@@ -106,6 +110,8 @@ tgfx::FilterMode ToTGFX(FilterMode mode);
 tgfx::MipmapMode ToTGFX(MipmapMode mode);
 
 tgfx::ScaleMode ToTGFX(ScaleMode mode);
+
+tgfx::RenderMode ToTGFX(PAGRenderMode renderMode);
 
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D);
 

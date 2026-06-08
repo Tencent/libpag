@@ -18,48 +18,36 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/runtime/Drawable.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * OffscreenDrawable backs PAGSurface::MakeOffscreen with a fresh OpenGL device and a transient
+ * tgfx::Surface sized to the requested pixel dimensions. It is the default Drawable used by
+ * unit tests and any caller that just needs to read pixels back via PAGSurface::readPixels.
  */
-class Composition : public Node {
+class OffscreenDrawable : public Drawable {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+  static std::shared_ptr<OffscreenDrawable> Make(int width, int height);
 
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  int width() const override {
+    return _width;
   }
 
- private:
-  Composition() = default;
+  int height() const override {
+    return _height;
+  }
 
-  friend class PAGXDocument;
+  std::shared_ptr<tgfx::Device> getDevice() override;
+  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
+
+ private:
+  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
+
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<tgfx::Device> _device = nullptr;
 };
 
 }  // namespace pagx

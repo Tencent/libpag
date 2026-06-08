@@ -18,46 +18,39 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
 
-class Animation;
-class Layer;
+class Channel;
 
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * AnimationObject groups the animated channels that target a single node within an Animation.
+ * Each AnimationObject binds to one node (identified by target) and carries the set of channels
+ * whose keyframes drive that node over time.
  */
-class Composition : public Node {
+class AnimationObject : public Node {
  public:
   /**
-   * The width of the composition in pixels.
+   * The id of the target node this AnimationObject drives. Resolved against the owning document's
+   * id table when the runtime timeline is built.
    */
-  float width = 0.0f;
+  std::string target = {};
 
   /**
-   * The height of the composition in pixels.
+   * The animated channels applied to the target node. Each Channel carries its own channel name
+   * and keyframes.
    */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
+  std::vector<Channel*> channels = {};
 
   NodeType nodeType() const override {
-    return NodeType::Composition;
+    return NodeType::AnimationObject;
   }
 
  private:
-  Composition() = default;
+  AnimationObject() = default;
 
   friend class PAGXDocument;
 };
