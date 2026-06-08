@@ -8558,7 +8558,8 @@
     },
     "PAGXTest": {
         "LayerBuilderAPIConsistency": "f40e23b6",
-        "NoiseFilterModes": "fa66a3ae",
+        "NoiseFilterAllElements": "bc58b86e",
+        "NoiseFilterModes": "bc58b86e",
         "PrecomposedTextRender": "9b6dea6a",
         "html": {
             "blend_modes_showcase": "f94e413d",
