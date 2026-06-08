@@ -93,9 +93,8 @@ Rect Text::contentBounds() const {
         GlyphRunRenderer::BuildTextBlobFromLayoutRuns(glyphData->layoutRuns, tgfx::Matrix::I());
   }
   if (textBlob) {
-    auto tightBounds = textBlob->getTightBounds();
-    return {pos.x + tightBounds.x(), pos.y + tightBounds.y(), tightBounds.width(),
-            tightBounds.height()};
+    auto bounds = textBlob->getBounds();
+    return {pos.x + bounds.x(), pos.y + bounds.y(), bounds.width(), bounds.height()};
   }
   return {pos.x + textBounds.x, pos.y + textBounds.y, textBounds.width, textBounds.height};
 }

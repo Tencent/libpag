@@ -116,6 +116,20 @@ static void ExpandBounds(float& minX, float& minY, float& maxX, float& maxY, con
   maxY = std::max(maxY, bounds.y + bounds.height);
 }
 
+static Rect IntersectRects(const Rect& a, const Rect& b) {
+  if (a.isEmpty() || b.isEmpty()) {
+    return {};
+  }
+  float left = std::max(a.x, b.x);
+  float top = std::max(a.y, b.y);
+  float right = std::min(a.x + a.width, b.x + b.width);
+  float bottom = std::min(a.y + a.height, b.y + b.height);
+  if (left >= right || top >= bottom) {
+    return {};
+  }
+  return {left, top, right - left, bottom - top};
+}
+
 static Rect ComputeElementBounds(const Element* element);
 
 // std::pow(negative, non-integer) returns NaN. Raise magnitude and reapply sign.
@@ -164,6 +178,8 @@ static Matrix BuildRepeaterCopyMatrix(const Repeater* rep, float progress) {
   m = Matrix::Translate(tx + rep->anchor.x, ty + rep->anchor.y) * m;
   return m;
 }
+
+static Rect ComputeLayerBounds(const Layer* layer);
 
 static Rect ComputeElementsBounds(const std::vector<Element*>& elements) {
   float minX = std::numeric_limits<float>::max();
@@ -271,11 +287,68 @@ static Rect ComputeElementBounds(const Element* element) {
     }
     case NodeType::TextBox: {
       auto textBox = static_cast<const TextBox*>(element);
-      return textBox->layoutBounds();
+      return textBox->contentBounds();
     }
     default:
       return {};
   }
+}
+
+static Rect ComputeLayerBounds(const Layer* layer) {
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = -std::numeric_limits<float>::max();
+  float maxY = -std::numeric_limits<float>::max();
+
+  auto contentsBounds = ComputeElementsBounds(layer->contents);
+  ExpandBounds(minX, minY, maxX, maxY, contentsBounds);
+
+  if (layer->composition != nullptr) {
+    for (const auto* compLayer : layer->composition->layers) {
+      if (!compLayer->visible) continue;
+      auto compBounds = ComputeLayerBounds(compLayer);
+      auto compMatrix = BuildLayerMatrix(compLayer);
+      auto mappedBounds = MapRect(compMatrix, compBounds);
+      if (compLayer->hasScrollRect) {
+        auto scrollRect = MapRect(compMatrix, compLayer->scrollRect);
+        mappedBounds = IntersectRects(mappedBounds, scrollRect);
+        if (mappedBounds.isEmpty()) continue;
+      }
+      if (compLayer->mask != nullptr) {
+        auto maskBounds = ComputeLayerBounds(compLayer->mask);
+        auto maskMatrix = BuildLayerMatrix(compLayer->mask);
+        auto mappedMask = MapRect(maskMatrix, maskBounds);
+        mappedBounds = IntersectRects(mappedBounds, mappedMask);
+        if (mappedBounds.isEmpty()) continue;
+      }
+      ExpandBounds(minX, minY, maxX, maxY, mappedBounds);
+    }
+  }
+
+  for (const auto* child : layer->children) {
+    if (!child->visible) continue;
+    auto childBounds = ComputeLayerBounds(child);
+    auto childMatrix = BuildLayerMatrix(child);
+    auto mappedBounds = MapRect(childMatrix, childBounds);
+    if (child->hasScrollRect) {
+      auto scrollRect = MapRect(childMatrix, child->scrollRect);
+      mappedBounds = IntersectRects(mappedBounds, scrollRect);
+      if (mappedBounds.isEmpty()) continue;
+    }
+    if (child->mask != nullptr) {
+      auto maskBounds = ComputeLayerBounds(child->mask);
+      auto maskMatrix = BuildLayerMatrix(child->mask);
+      auto mappedMask = MapRect(maskMatrix, maskBounds);
+      mappedBounds = IntersectRects(mappedBounds, mappedMask);
+      if (mappedBounds.isEmpty()) continue;
+    }
+    ExpandBounds(minX, minY, maxX, maxY, mappedBounds);
+  }
+
+  if (minX > maxX) {
+    return {};
+  }
+  return {minX, minY, maxX - minX, maxY - minY};
 }
 
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
@@ -1163,29 +1236,17 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
 }
 
 std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise, const std::string& resultName,
-                                            const Rect& contentBounds) {
+                                            const Rect&) {
   auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
-  std::string turbResult = resultName;
   _defs->openElement("feTurbulence");
   _defs->addAttribute("type", "fractalNoise");
   _defs->addAttribute("baseFrequency", FloatToString(freq));
-  _defs->addAttribute("stitchTiles", "noStitch");
+  _defs->addAttribute("stitchTiles", "stitch");
   _defs->addAttribute("numOctaves", "3");
   _defs->addAttribute("seed", FloatToString(noise->seed));
-  _defs->addAttribute("result", turbResult);
+  _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
-
-  if (!contentBounds.isEmpty()) {
-    auto shifted = "shift" + resultName;
-    _defs->openElement("feOffset");
-    _defs->addAttribute("in", turbResult);
-    _defs->addAttribute("dx", FloatToString(contentBounds.width * 0.5f));
-    _defs->addAttribute("dy", FloatToString(contentBounds.height * 0.5f));
-    _defs->addAttribute("result", shifted);
-    _defs->closeElementSelfClosing();
-    return shifted;
-  }
-  return turbResult;
+  return resultName;
 }
 
 std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
@@ -1194,12 +1255,7 @@ std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("type", "matrix");
-  _defs->addAttribute("values",
-                      "0 0 0 0 0 "
-                      "0 0 0 0 0 "
-                      "0 0 0 0 0 "
-                      "0.2126 0.7152 0.0722 0 0");
+  _defs->addAttribute("type", "luminanceToAlpha");
   _defs->addAttribute("result", "luma" + label);
   _defs->closeElementSelfClosing();
 
@@ -1233,29 +1289,17 @@ std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
 }
 
 std::string SVGWriter::writeNoiseTurbulence(const NoiseStyle* noise, const std::string& resultName,
-                                            const Rect& contentBounds) {
+                                            const Rect&) {
   auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
-  std::string turbResult = resultName;
   _defs->openElement("feTurbulence");
   _defs->addAttribute("type", "fractalNoise");
   _defs->addAttribute("baseFrequency", FloatToString(freq));
-  _defs->addAttribute("stitchTiles", "noStitch");
+  _defs->addAttribute("stitchTiles", "stitch");
   _defs->addAttribute("numOctaves", "3");
   _defs->addAttribute("seed", FloatToString(noise->seed));
-  _defs->addAttribute("result", turbResult);
+  _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
-
-  if (!contentBounds.isEmpty()) {
-    auto shifted = "shift" + resultName;
-    _defs->openElement("feOffset");
-    _defs->addAttribute("in", turbResult);
-    _defs->addAttribute("dx", FloatToString(contentBounds.width * 0.5f));
-    _defs->addAttribute("dy", FloatToString(contentBounds.height * 0.5f));
-    _defs->addAttribute("result", shifted);
-    _defs->closeElementSelfClosing();
-    return shifted;
-  }
-  return turbResult;
+  return resultName;
 }
 
 std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
@@ -1264,12 +1308,7 @@ std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("type", "matrix");
-  _defs->addAttribute("values",
-                      "0 0 0 0 0 "
-                      "0 0 0 0 0 "
-                      "0 0 0 0 0 "
-                      "0.2126 0.7152 0.0722 0 0");
+  _defs->addAttribute("type", "luminanceToAlpha");
   _defs->addAttribute("result", "luma" + label);
   _defs->closeElementSelfClosing();
 
@@ -1831,36 +1870,6 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     }
   }
 
-  // NoiseFilter/NoiseStyle uses feOffset to shift the turbulence pattern from (0,0) to
-  // contentBounds center, so the filter region must extend far enough to include both the
-  // source graphic and the pre-offset noise around the origin.
-  if (!contentBounds.isEmpty()) {
-    bool hasNoise = false;
-    for (const auto* filter : filters) {
-      if (filter->nodeType() == NodeType::NoiseFilter) {
-        hasNoise = true;
-        break;
-      }
-    }
-    if (!hasNoise) {
-      for (const auto* style : styles) {
-        if (style->nodeType() == NodeType::NoiseStyle) {
-          hasNoise = true;
-          break;
-        }
-      }
-    }
-    if (hasNoise) {
-      // feOffset shifts the noise by (width/2, height/2). The filter region must
-      // extend enough so feTurbulence covers the pre-offset area that maps to content.
-      // Add padding on all sides so SourceGraphic is not clipped at the filter boundary.
-      marginLeft = std::max(marginLeft, contentBounds.width * 0.5f);
-      marginTop = std::max(marginTop, contentBounds.height * 0.5f);
-      marginRight = std::max(marginRight, contentBounds.width * 0.5f);
-      marginBottom = std::max(marginBottom, contentBounds.height * 0.5f);
-    }
-  }
-
   // Convert pixel margins to percentages, with a minimum of 50% per side to
   // handle arbitrary element sizes gracefully.
   float pctLeft = std::max(50.0f, std::ceil(marginLeft));
@@ -1873,9 +1882,9 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   _defs->addAttribute("id", filterId);
   if (!contentBounds.isEmpty()) {
     // Use filterUnits="userSpaceOnUse" with absolute pixel coordinates for filters
-    // containing noise. This decouples the filter region from the bounding box so
-    // feTurbulence samples at absolute coordinates, producing position-dependent
-    // noise phase that matches tgfx behavior.
+    // with known content bounds. This decouples the filter region from the element's
+    // bounding box so effects like feTurbulence sample at absolute coordinates,
+    // producing position-dependent noise phase that matches tgfx behavior.
     float filterX = contentBounds.x - marginLeft;
     float filterY = contentBounds.y - marginTop;
     float filterW = contentBounds.width + marginLeft + marginRight;
@@ -3277,13 +3286,7 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
   }
 
   if (!layer->filters.empty() || !layer->styles.empty()) {
-    auto contentBounds = ComputeElementsBounds(layer->contents);
-    auto layerBounds = layer->layoutBounds();
-    printf(
-        "Layer[%s] SVG contentBounds: x=%.2f y=%.2f w=%.2f h=%.2f  |  layerBounds: x=%.2f y=%.2f "
-        "w=%.2f h=%.2f\n",
-        layer->id.c_str(), contentBounds.x, contentBounds.y, contentBounds.width,
-        contentBounds.height, layerBounds.x, layerBounds.y, layerBounds.width, layerBounds.height);
+    auto contentBounds = ComputeLayerBounds(layer);
     auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles, contentBounds);
     if (!filterId.empty()) {
       out.addAttribute("filter", "url(#" + filterId + ")");
