@@ -359,12 +359,15 @@ class SVGWriter {
 
   // Layer / element writing
   void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {},
-                          float alpha = 1.0f);
+                          float alpha = 1.0f,
+                          LayerPlacement targetPlacement = LayerPlacement::Background);
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr);
+                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr,
+                     LayerPlacement targetPlacement = LayerPlacement::Background);
   void processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
                           const Matrix& transform, float alpha, const TextBox* parentTextBox,
-                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
+                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                          LayerPlacement targetPlacement);
   void emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
                           const FillStrokeInfo& fs, float alpha);
 
@@ -1242,7 +1245,12 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
 }
 
 void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
-  writeLayerContents(out, layer);
+  // Masks/clipPaths consume the alpha union of every painter on the layer, regardless of
+  // placement (placement only affects on-canvas paint order, not which shapes participate
+  // in the mask). Emit both passes so foreground painters still contribute their geometry,
+  // matching the pre-placement-aware behavior of writeLayerContents.
+  writeLayerContents(out, layer, {}, 1.0f, LayerPlacement::Background);
+  writeLayerContents(out, layer, {}, 1.0f, LayerPlacement::Foreground);
   for (const auto* child : layer->children) {
     writeLayer(out, child);
   }
@@ -1257,7 +1265,11 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
   Matrix layerMatrix = BuildLayerMatrix(layer);
   Matrix combined = parentMatrix * layerMatrix;
 
-  writeLayerContents(out, layer, combined);
+  // ClipPaths only sample path geometry for inside/outside testing, but downstream code
+  // walks every painter to surface its accumulated shapes. Emit both placement passes so
+  // foreground painters still contribute, matching the prior unfiltered behavior.
+  writeLayerContents(out, layer, combined, 1.0f, LayerPlacement::Background);
+  writeLayerContents(out, layer, combined, 1.0f, LayerPlacement::Foreground);
   for (const auto* child : layer->children) {
     writeClipPathContentRecursive(out, child, combined);
   }
@@ -2462,8 +2474,8 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
 void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
                                    const Matrix& transform, float alpha,
                                    const TextBox* parentTextBox,
-                                   std::vector<AccumulatedGeometry>& accumulator,
-                                   size_t scopeStart) {
+                                   std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                                   LayerPlacement targetPlacement) {
   const TextBox* localTextBox = FindModifierTextBox(elements);
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
@@ -2475,10 +2487,22 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
       case NodeType::Fill:
       case NodeType::Stroke: {
         FillStrokeInfo painterFs = {};
+        LayerPlacement painterPlacement = LayerPlacement::Background;
         if (type == NodeType::Fill) {
-          painterFs.fill = static_cast<const Fill*>(element);
+          auto* fill = static_cast<const Fill*>(element);
+          painterFs.fill = fill;
+          painterPlacement = fill->placement;
         } else {
-          painterFs.stroke = static_cast<const Stroke*>(element);
+          auto* stroke = static_cast<const Stroke*>(element);
+          painterFs.stroke = stroke;
+          painterPlacement = stroke->placement;
+        }
+        // Painters at a non-matching placement do not paint in this pass — geometry still
+        // accumulates from prior elements, and the matching pass (background or foreground)
+        // will visit this same painter and emit it then. Mirrors the two-pass dispatch in
+        // HTMLWriter::writeLayerInner / writeGroup.
+        if (painterPlacement != targetPlacement) {
+          break;
         }
         // The painter's effective alpha is the alpha of THIS scope, not the
         // alpha that was in effect when each geometry was collected. A Group
@@ -2517,7 +2541,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // path modifiers nested inside the box before walking.
           const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
           processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
-                             accumulator.size());
+                             accumulator.size(), targetPlacement);
         } else {
           // Native text-box rendering: container TextBox owns its own paragraph
           // shaping and fill/stroke pairing. Don't add its child Text into the
@@ -2532,7 +2556,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         float groupAlpha = alpha * group->alpha;
         const std::vector<Element*> innerWalked = resolveIfEnabled(group->elements);
         processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
-                           accumulator.size());
+                           accumulator.size(), targetPlacement);
         break;
       }
       case NodeType::Repeater:
@@ -2549,7 +2573,8 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
 }
 
 void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                              const Matrix& transform, float alpha, const TextBox* parentTextBox) {
+                              const Matrix& transform, float alpha, const TextBox* parentTextBox,
+                              LayerPlacement targetPlacement) {
   // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
   // TrimPath / RoundCorner / MergePath -> editable Path). Painters, Group,
   // Text, and TextBox pass through unchanged so the accumulator walk below
@@ -2558,12 +2583,13 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
-  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0);
+  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0,
+                     targetPlacement);
 }
 
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform,
-                                   float alpha) {
-  writeElements(out, layer->contents, transform, alpha, nullptr);
+                                   float alpha, LayerPlacement targetPlacement) {
+  writeElements(out, layer->contents, transform, alpha, nullptr, targetPlacement);
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
@@ -2669,7 +2695,26 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha) {
-  writeLayerContents(out, layer, {}, perChildAlpha);
+  // PAGX placement: Fill/Stroke with placement="foreground" paint AFTER child layers and
+  // composition layers, so they overlay child content. Mirror HTMLWriter::writeLayerInner's
+  // two-pass dispatch (Background → children → Foreground) so the SVG output matches the
+  // PAGX renderer and the HTML preview.
+  bool hasForeground = false;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Fill) {
+      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    } else if (e->nodeType() == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
+        hasForeground = true;
+        break;
+      }
+    }
+  }
+
+  writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Background);
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
       if (perChildAlpha < 1.0f) {
@@ -2693,6 +2738,9 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
     } else {
       writeLayer(out, child);
     }
+  }
+  if (hasForeground) {
+    writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Foreground);
   }
 }
 
