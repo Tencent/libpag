@@ -400,26 +400,38 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   bool rtl = HasRTLParagraphBase(text->text);
 
   PPTRunStyle style = BuildRunStyle(text, fs.fill, fs.stroke, alpha);
-  // TextAnchor / TextAlign use logical "Start"/"End" names; resolve them to
-  // physical left/right based on the paragraph base direction so that an RTL
-  // paragraph aligns to the right edge of its frame for Start (the default) and
-  // to the left for End. Center / Justify are direction-symmetric.
-  if (text->textAnchor == TextAnchor::Center) {
-    style.algn = "ctr";
-  } else if (text->textAnchor == TextAnchor::Start) {
-    style.algn = rtl ? "r" : nullptr;
-  } else if (text->textAnchor == TextAnchor::End) {
-    style.algn = rtl ? "l" : "r";
+  // TextAnchor / TextAlign use logical "Start"/"End" names; resolve them to a
+  // physical edge based on the paragraph base direction so that an RTL
+  // paragraph aligns to the right edge of its frame for Start (the default)
+  // and to the left for End. Center / Justify are direction-symmetric.
+  // OOXML's default algn is "l", so we leave style.algn as nullptr for the
+  // physical-Start case and emit explicit "r" only for the physical-End case.
+  switch (ResolveLogicalAnchor(text->textAnchor, rtl)) {
+    case TextAnchor::Center:
+      style.algn = "ctr";
+      break;
+    case TextAnchor::End:
+      style.algn = "r";
+      break;
+    case TextAnchor::Start:
+    default:
+      break;
   }
   if (fs.textBox) {
-    if (fs.textBox->textAlign == TextAlign::Center) {
-      style.algn = "ctr";
-    } else if (fs.textBox->textAlign == TextAlign::Start) {
-      style.algn = rtl ? "r" : nullptr;
-    } else if (fs.textBox->textAlign == TextAlign::End) {
-      style.algn = rtl ? "l" : "r";
-    } else if (fs.textBox->textAlign == TextAlign::Justify) {
-      style.algn = "just";
+    switch (ResolveLogicalAlign(fs.textBox->textAlign, rtl)) {
+      case TextAlign::Center:
+        style.algn = "ctr";
+        break;
+      case TextAlign::End:
+        style.algn = "r";
+        break;
+      case TextAlign::Justify:
+        style.algn = "just";
+        break;
+      case TextAlign::Start:
+      default:
+        style.algn = nullptr;
+        break;
     }
   }
   // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes: in horizontal mode each
@@ -574,39 +586,8 @@ void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
 
 // ── TextBox group ──────────────────────────────────────────────────────────
 
-namespace {
-
-// Stable-sort comparator for PPTWriter::LineEntry. Defined as a named function
-// (not a lambda) per project convention.
-bool CompareLineEntryByBaselineY(const PPTWriter::LineEntry& a, const PPTWriter::LineEntry& b) {
-  return a.baselineY < b.baselineY;
-}
-
-// Walks the TextBox children in source order, pairing every Text with its
-// nearest enclosing Fill/Stroke. Direct Text children inherit `parentFill`
-// and `parentStroke`; Texts nested inside a Group use that Group's
-// locally-collected Fill/Stroke (falling back to the parent's when the Group
-// supplies none).
-void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                         const Stroke* parentStroke, std::vector<PPTWriter::RichTextRun>& outRuns) {
-  for (auto* element : elements) {
-    auto type = element->nodeType();
-    if (type == NodeType::Text) {
-      auto* t = static_cast<const Text*>(element);
-      if (!t->text.empty()) {
-        outRuns.push_back({t, parentFill, parentStroke});
-      }
-    } else if (type == NodeType::Group) {
-      auto* g = static_cast<const Group*>(element);
-      auto groupFs = CollectFillStroke(g->elements);
-      const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
-      const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
-      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, outRuns);
-    }
-  }
-}
-
-}  // namespace
+// CollectRichTextRuns and the line-entry stable-sort comparator are provided
+// by ExporterUtils.h (templated so SVG and PPT share the same walk and sort).
 
 void PPTWriter::ParagraphEmitter::writePPr() {
   WriteParagraphProperties(out, algn, lnSpcPts, rtl, defTabSzEMU);
@@ -708,7 +689,8 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
     // elements sharing the same visual line stay in source order (rich text
     // flows left-to-right within a baseline). Then group consecutive entries
     // with matching baselineY into one visual line.
-    std::stable_sort(lineEntries.begin(), lineEntries.end(), CompareLineEntryByBaselineY);
+    std::stable_sort(lineEntries.begin(), lineEntries.end(),
+                     LineEntryBaselineYLess<PPTWriter::LineEntry>);
     constexpr float baselineEpsilon = 0.5f;
 
     // Group entries by baseline into visual lines. Each visual line carries
@@ -901,17 +883,24 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     rtl = HasRTLParagraphBase(combined);
   }
 
+  // OOXML defaults to algn="l" when the attribute is absent, so leave `algn`
+  // null for the physical-Start case (whether logical-Start in LTR or
+  // logical-End in RTL after the swap) and emit explicit "r" only for the
+  // physical-End case.
   const char* algn = nullptr;
-  if (box->textAlign == TextAlign::Center) {
-    algn = "ctr";
-  } else if (box->textAlign == TextAlign::Start) {
-    // "Start" is the logical default: left in LTR, right in RTL. OOXML defaults
-    // to "l" when algn is absent, so only emit an explicit "r" when rtl is on.
-    algn = rtl ? "r" : nullptr;
-  } else if (box->textAlign == TextAlign::End) {
-    algn = rtl ? "l" : "r";
-  } else if (box->textAlign == TextAlign::Justify) {
-    algn = "just";
+  switch (ResolveLogicalAlign(box->textAlign, rtl)) {
+    case TextAlign::Center:
+      algn = "ctr";
+      break;
+    case TextAlign::End:
+      algn = "r";
+      break;
+    case TextAlign::Justify:
+      algn = "just";
+      break;
+    case TextAlign::Start:
+    default:
+      break;
   }
   // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes (see writeNativeText for the
   // full rationale): horizontal lnSpc drives row pitch, eaVert lnSpc drives column pitch.

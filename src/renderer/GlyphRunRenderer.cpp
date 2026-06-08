@@ -21,6 +21,7 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/FontRenderCache.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
@@ -98,8 +99,23 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
-std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Font* fontNode) {
-  if (fontNode == nullptr || fontNode->glyphs.empty()) {
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fontNode) {
+  if (fontNode == nullptr) {
+    return nullptr;
+  }
+  if (fontNode->renderCache == nullptr) {
+    fontNode->renderCache = std::make_unique<FontRenderCache>();
+  }
+  auto& cache = *fontNode->renderCache;
+  if (cache.built) {
+    return cache.typeface;
+  }
+
+  // Mark the build as attempted up-front so that pathological Fonts (empty glyphs, mixed
+  // path+image, or builders that fail to detach) are not retried on every render call.
+  cache.built = true;
+
+  if (fontNode->glyphs.empty()) {
     return nullptr;
   }
 
@@ -113,9 +129,12 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
       hasImage = true;
     }
   }
+  if (hasPath == hasImage) {
+    return nullptr;
+  }
 
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-  if (hasPath && !hasImage) {
+  if (hasPath) {
     tgfx::PathTypefaceBuilder builder;
     for (const auto& glyph : fontNode->glyphs) {
       if (glyph->path != nullptr) {
@@ -129,30 +148,32 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(const Fo
       }
     }
     typeface = builder.detach();
-  } else if (hasImage && !hasPath) {
+  } else {
     tgfx::ImageTypefaceBuilder builder;
     for (const auto& glyph : fontNode->glyphs) {
-      if (glyph->image != nullptr) {
-        std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
-        auto imageNode = glyph->image;
-        if (imageNode->data != nullptr) {
-          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
-        } else if (imageNode->filePath.find("data:") == 0) {
-          auto data = DecodeBase64DataURI(imageNode->filePath);
-          if (data) {
-            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
-          }
-        } else if (!imageNode->filePath.empty()) {
-          codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+      if (glyph->image == nullptr) {
+        continue;
+      }
+      std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
+      auto imageNode = glyph->image;
+      if (imageNode->data != nullptr) {
+        codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        auto data = DecodeBase64DataURI(imageNode->filePath);
+        if (data) {
+          codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
         }
-        if (codec) {
-          builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
-        }
+      } else if (!imageNode->filePath.empty()) {
+        codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+      }
+      if (codec) {
+        builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
       }
     }
     typeface = builder.detach();
   }
 
+  fontNode->renderCache->typeface = typeface;
   return typeface;
 }
 
