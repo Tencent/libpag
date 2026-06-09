@@ -2405,6 +2405,28 @@ function snapshotMain() {
   if (typeof window.scrollTo === 'function') {
     try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
   }
+  // Cancel every running CSS animation so the snapshot measures the element
+  // in its base (un-animated) state. Without this, `direction: reverse` and
+  // any other non-zero starting phase would shift the element away from its
+  // CSS-declared position by the time `getBoundingClientRect()` runs — and
+  // the same offset would also surface through `getComputedStyle(.).transform`,
+  // so both the `top/left` and the static `transform: matrix(...)` written
+  // into the subset would carry the animation offset twice (once baked into
+  // the rect, once forwarded as a static transform). The PAGX importer then
+  // adds the keyframe channel on top, tripling the offset. CSS animations
+  // surface as WAAPI `Animation` objects via `getAnimations()`; calling
+  // `cancel()` on each removes the effect from computed style without
+  // touching the stylesheet rules, so longhand reads (`animation-name`,
+  // `-direction`, `-duration`, …) still resolve correctly when the snapshot
+  // walker emits them.
+  try {
+    if (typeof document.getAnimations === 'function') {
+      const all = document.getAnimations();
+      for (let i = 0; i < all.length; i++) {
+        try { all[i].cancel(); } catch (_) { /* ignore per-anim failure */ }
+      }
+    }
+  } catch (_) { /* ignore */ }
   // Force layout flush.
   void body.offsetHeight;
 
