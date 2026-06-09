@@ -11,8 +11,9 @@
  * all surface there, so the same time points the snapshot captures are the time points we seek to.
  *
  * The sample grid is derived from a *global* timeline duration — the longest single-iteration
- * period (delay + duration) across the page's animations — so a page mixing a 2s and a 4s loop is
- * sampled over the full 4s and every animation is exercised. The chosen times (in seconds) are
+ * period (delay + duration) across the page's animations, including GSAP / anime.js timelines that
+ * never surface in `document.getAnimations()` — so a page mixing a 2s and a 4s loop is sampled over
+ * the full 4s and every animation is exercised. The chosen times (in seconds) are
  * written to `samples.json` so `run.js` can pass the identical values to `pagx render --time`,
  * keeping the baseline and the PAGX render on the same clock.
  *
@@ -99,15 +100,22 @@ async function captureBodyRect(page) {
 // Longest single-iteration period (delay + duration) in ms across every animation the page reports.
 // One period is enough: looping animations realign every period, so sampling [0, period] covers a
 // full visual cycle and matches how `pagx render --time` loops the imported timelines.
+//
+// WAAPI (CSS animations, Motion One, web-animations-js) surfaces via `document.getAnimations()`, but
+// rAF libraries like GSAP / anime.js drive their tweens off their own clock and never appear there —
+// the snapshot capture layer (lib/animation-capture.ts) reads them from `gsap.globalTimeline` /
+// `anime.running` instead. We mirror that here so a GSAP-only page reports a real duration rather
+// than 0 (which would otherwise collapse the sample grid to a single frame).
 async function measureGlobalDurationMs(page) {
   return page.evaluate(() => {
+    let maxMs = 0;
+
     let anims = [];
     try {
       anims = document.getAnimations ? document.getAnimations() : [];
     } catch (_) {
       anims = [];
     }
-    let maxMs = 0;
     for (const a of anims) {
       let ct = null;
       try {
@@ -122,13 +130,43 @@ async function measureGlobalDurationMs(page) {
       const end = delay + dur;
       if (end > maxMs) maxMs = end;
     }
+
+    // GSAP: the global timeline aggregates every active tween; its duration() is the period the
+    // capture layer samples over.
+    try {
+      const gsap = window.gsap;
+      if (gsap && gsap.globalTimeline) {
+        const total = gsap.globalTimeline.duration();
+        if (typeof total === 'number' && isFinite(total) && total * 1000 > maxMs) {
+          maxMs = total * 1000;
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    // anime.js: longest running instance.
+    try {
+      const anime = window.anime;
+      if (anime && anime.running) {
+        for (const inst of anime.running) {
+          const dur = inst && typeof inst.duration === 'number' ? inst.duration : 0;
+          if (isFinite(dur) && dur > maxMs) maxMs = dur;
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
     return maxMs;
   });
 }
 
 // Pause every animation and pin its playback time to `timeMs`. Setting `currentTime` on a WAAPI
 // animation honours its own delay / iteration / direction, so a single absolute time seeks all
-// animations to a consistent frame regardless of their individual periods.
+// animations to a consistent frame regardless of their individual periods. GSAP / anime.js tweens
+// are seeked on their own clocks (same as the capture layer) so the baseline frames line up with the
+// keyframes the importer derived from those libraries.
 async function seekToTime(page, timeMs) {
   await page.evaluate((t) => {
     let anims = [];
@@ -145,6 +183,39 @@ async function seekToTime(page, timeMs) {
         /* skip this animation */
       }
     }
+
+    // GSAP: seek the global timeline to the same absolute time. `time()` honours each tween's own
+    // repeat / yoyo / delay, matching how the capture layer ticked it via progress().
+    try {
+      const gsap = window.gsap;
+      if (gsap && gsap.globalTimeline) {
+        const tl = gsap.globalTimeline;
+        tl.pause();
+        tl.time(t / 1000, false);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    // anime.js: seek each running instance, clamped to its own duration.
+    try {
+      const anime = window.anime;
+      if (anime && anime.running) {
+        for (const inst of anime.running) {
+          try {
+            if (inst.pause) inst.pause();
+            const dur = typeof inst.duration === 'number' ? inst.duration : t;
+            inst.seek(Math.min(t, dur));
+          } catch (_) {
+            /* skip instance */
+          }
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    void document.body.offsetHeight;
   }, timeMs);
 }
 

@@ -580,9 +580,10 @@ ${cards}
 <script>
 const CASES = ${JSON.stringify(playerData)};
 
-// One flip-book player per case. Frames are sparse samples taken at CASES[i].times (seconds), so we
-// hold each frame for (next.time - this.time) and loop over the global timeline duration — the same
-// clock the baseline and pagx renders were sampled on.
+// One flip-book player per case. Frames are sparse samples taken at CASES[i].times (seconds) on the
+// captured timeline. Playback runs on a bounded wall-clock loop (this.playbackMs) and maps back onto
+// that captured timeline to pick each frame, so cases with a degenerate captured clock (e.g. GSAP's
+// ~1e10 s infinite-timeline sentinel) still flip through every frame at a watchable rate.
 class Player {
   constructor(root, data) {
     this.root = root;
@@ -606,12 +607,24 @@ class Player {
       ? data.globalDurationMs
       : (times.length ? times[times.length - 1] * 1000 : 0);
     if (!(this.durationMs > 0)) this.durationMs = Math.max(1, data.frames) * 1000;
+    // Show real seconds for normal clocks; fall back to progress % when the captured clock is
+    // degenerate (e.g. GSAP's infinite-timeline sentinel reports ~1e10 s, so there is no
+    // human-meaningful seconds value to display).
+    this.showSeconds = this.durationMs > 0 && this.durationMs <= 600000;
+    // Wall-clock loop length. Normal clocks play in real time (bounded so a slow loop stays
+    // watchable). A degenerate clock has no usable real duration, so we synthesise one from a fixed
+    // per-frame cadence — matching the ~50 ms/frame the real-clock cases run at — instead of letting
+    // the giant duration peg the loop to the 8 s ceiling (which made GSAP cases play far slower than
+    // the others). Samples are evenly spaced, so a constant cadence reproduces the motion faithfully.
+    this.playbackMs = this.showSeconds
+      ? Math.min(Math.max(this.durationMs, 600), 8000)
+      : Math.min(Math.max(Math.max(2, data.frames) * 50, 600), 8000);
 
     this.btn.addEventListener('click', () => this.toggle());
     this.scrub.addEventListener('input', () => {
       this.pause();
       this.setFrame(parseInt(this.scrub.value, 10) || 0);
-      this.elapsedMs = this.frameTimeMs(this.frame);
+      this.elapsedMs = this.progressForFrame(this.frame) * this.playbackMs;
     });
     this.setFrame(0);
   }
@@ -619,6 +632,13 @@ class Player {
   frameTimeMs(i) {
     if (this.times.length > i && typeof this.times[i] === 'number') return this.times[i] * 1000;
     if (this.data.frames > 1) return (i / (this.data.frames - 1)) * this.durationMs;
+    return 0;
+  }
+
+  // Normalised position (0..1) of frame i on the captured timeline.
+  progressForFrame(i) {
+    if (this.durationMs > 0) return this.frameTimeMs(i) / this.durationMs;
+    if (this.data.frames > 1) return i / (this.data.frames - 1);
     return 0;
   }
 
@@ -641,8 +661,13 @@ class Player {
       img.src = this.data.dir + '/' + sub + '/frame-' + idx + '.png';
     }
     this.scrub.value = String(this.frame);
-    const t = (this.frameTimeMs(this.frame) / 1000).toFixed(2);
-    this.timeLabel.textContent = 'frame ' + (this.frame + 1) + '/' + n + '  (' + t + 's)';
+    let suffix;
+    if (this.showSeconds) {
+      suffix = '(' + (this.frameTimeMs(this.frame) / 1000).toFixed(2) + 's)';
+    } else {
+      suffix = '(' + Math.round(this.progressForFrame(this.frame) * 100) + '%)';
+    }
+    this.timeLabel.textContent = 'frame ' + (this.frame + 1) + '/' + n + '  ' + suffix;
   }
 
   toggle() { this.playing ? this.pause() : this.play(); }
@@ -652,23 +677,24 @@ class Player {
     this.playing = true;
     this.btn.textContent = '❚❚ Pause';
     this.lastTs = performance.now();
-    if (this.elapsedMs >= this.durationMs) this.elapsedMs = 0;
+    if (this.elapsedMs >= this.playbackMs) this.elapsedMs = 0;
     const tick = (ts) => {
       if (!this.playing) return;
       const speed = parseFloat(this.speedSel.value) || 1;
       this.elapsedMs += (ts - this.lastTs) * speed;
       this.lastTs = ts;
-      if (this.elapsedMs >= this.durationMs) {
+      if (this.elapsedMs >= this.playbackMs) {
         if (this.loopChk.checked) {
-          this.elapsedMs = this.elapsedMs % this.durationMs;
+          this.elapsedMs = this.elapsedMs % this.playbackMs;
         } else {
-          this.elapsedMs = this.durationMs;
+          this.elapsedMs = this.playbackMs;
           this.setFrame(this.data.frames - 1);
           this.pause();
           return;
         }
       }
-      this.setFrame(this.frameForTimeMs(this.elapsedMs));
+      // Map wall-clock elapsed back onto the captured timeline to pick the frame.
+      this.setFrame(this.frameForTimeMs((this.elapsedMs / this.playbackMs) * this.durationMs));
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
