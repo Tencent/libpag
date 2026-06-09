@@ -277,13 +277,21 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
   anim->frameRate = 60;
   doc->animations.push_back(anim);
   auto* obj = doc->makeNode<pagx::AnimationObject>();
-  obj->target = "S";
+  obj->target = "L";
   anim->objects.push_back(obj);
-  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
-  prop->name = "color";
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(alphaProp);
+
+  auto* colorObj = doc->makeNode<pagx::AnimationObject>();
+  colorObj->target = "S";
+  anim->objects.push_back(colorObj);
+  auto* colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  colorProp->name = "color";
   pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
-  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->channels.push_back(prop);
+  colorProp->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  colorObj->channels.push_back(colorProp);
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -294,19 +302,20 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
   auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface != nullptr);
 
-  // Draw with autoClear=true (default): red square.
+  // Draw with autoClear=true: semi-transparent red square on cleared (black) surface.
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_red"));
 
-  // Change animation to green and draw with autoClear=true: green replaces red.
+  // Change animation to semi-transparent green and draw with autoClear=true: green replaces red.
   pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
-  prop->keyframes[0].value = green;
+  colorProp->keyframes[0].value = green;
   timeline->apply(1.0f);
   ASSERT_TRUE(scene->draw(surface, true));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_green"));
 
-  // Reset to red, draw with autoClear=false: red is composited (SrcOver) on top of green.
-  prop->keyframes[0].value = red;
+  // Reset to semi-transparent red, draw with autoClear=false: red is composited (SrcOver) on top
+  // of the green, producing a blended color (yellowish) that differs from both pure red and green.
+  colorProp->keyframes[0].value = red;
   timeline->apply(1.0f);
   ASSERT_TRUE(scene->draw(surface, false));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_overlay"));
