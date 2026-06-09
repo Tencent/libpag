@@ -1729,6 +1729,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   bool isFlexContainer = (layer->layout != LayoutMode::None);
+  bool needScrollRectWrapper = layer->hasScrollRect;
 
   std::string style;
   style.reserve(300);
@@ -1933,9 +1934,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  std::string scrollRectContentStyle;
   // Flex container properties
   if (isFlexContainer) {
-    emitFlexContainerStyle(style, layer, isFlexItem);
+    if (needScrollRectWrapper) {
+      emitFlexContainerStyle(scrollRectContentStyle, layer, isFlexItem);
+      auto bounds = layer->layoutBounds();
+      if (bounds.width > 0 && scrollRectContentStyle.find("width:") == std::string::npos) {
+        scrollRectContentStyle += ";width:" + CssFloatToString(bounds.width) + "px";
+      }
+      if (bounds.height > 0 && scrollRectContentStyle.find("height:") == std::string::npos) {
+        scrollRectContentStyle += ";height:" + CssFloatToString(bounds.height) + "px";
+      }
+    } else {
+      emitFlexContainerStyle(style, layer, isFlexItem);
+    }
   }
 
   if (layer->preserve3D) {
@@ -2119,8 +2132,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
-  bool needScrollRectWrapper = layer->hasScrollRect;
-
   if (layer->mask != nullptr) {
     if (layer->maskType == MaskType::Contour) {
       auto clipId = writeClipDef(layer->mask);
@@ -2297,8 +2308,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
                              "px;height:" + CssFloatToString(sr.height) + "px;overflow:hidden");
     out.closeTagStart();
     out.openTag("div");
-    out.addAttr("style", "position:relative;left:" + CssFloatToString(-sr.x) +
-                             "px;top:" + CssFloatToString(-sr.y) + "px");
+    std::string contentStyle = "position:relative;left:" + CssFloatToString(-sr.x) +
+                               "px;top:" + CssFloatToString(-sr.y) + "px";
+    contentStyle += scrollRectContentStyle;
+    out.addAttr("style", contentStyle);
     out.closeTagStart();
   }
 

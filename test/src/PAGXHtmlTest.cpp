@@ -42,6 +42,16 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
 }
 
+static std::string LoadXMLAndConvert(const std::string& xml,
+                                     const pagx::HTMLExportOptions& options = {}) {
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  if (doc == nullptr) {
+    return "";
+  }
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
+  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
+}
+
 static std::vector<std::string> GetHtmlTestFiles() {
   std::vector<std::string> files = {};
   auto dir = ProjectPath::Absolute("resources/pagx_to_html");
@@ -495,6 +505,42 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
   // Inline SVG elements in HTML5 should NOT have xmlns.
   EXPECT_EQ(html.find("<svg xmlns="), std::string::npos)
       << "Inline SVG elements should not have xmlns in HTML5";
+}
+
+CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="320" height="120">
+  <Layer id="clip" width="300" height="100" layout="horizontal" gap="12"
+         alignment="stretch" scrollRect="5,7,300,100">
+    <Layer id="first" width="80" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="second" width="90" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto offsetStylePos = html.find("style=\"position:relative;left:-5px;top:-7px");
+  ASSERT_NE(offsetStylePos, std::string::npos);
+  auto offsetStyleEnd = html.find('"', offsetStylePos + 7);
+  ASSERT_NE(offsetStyleEnd, std::string::npos);
+  auto offsetStyle = html.substr(offsetStylePos, offsetStyleEnd - offsetStylePos);
+  EXPECT_NE(offsetStyle.find("display:flex"), std::string::npos);
+  EXPECT_NE(offsetStyle.find("flex-direction:row"), std::string::npos);
+  EXPECT_NE(offsetStyle.find("gap:12px"), std::string::npos);
+
+  auto firstPos = html.find("id=\"first\"", offsetStyleEnd);
+  auto secondPos = html.find("id=\"second\"", offsetStyleEnd);
+  ASSERT_NE(firstPos, std::string::npos);
+  ASSERT_NE(secondPos, std::string::npos);
+  EXPECT_LT(firstPos, secondPos);
 }
 
 // =============================================================================
