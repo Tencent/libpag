@@ -196,7 +196,6 @@ async function getSystemInfoLegacy() {
 
 export async function getSystemInfo() {
   const sdkVersion = getSDKVersion();
-  console.log("sdkVersion:",sdkVersion);
   if (sdkVersion && gte(sdkVersion, '2.20.1')) {
     return getSystemInfoNew(sdkVersion);
   }
