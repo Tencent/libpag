@@ -984,6 +984,10 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   currentSource = blendOut;
 }
 
+//==============================================================================
+// SVGWriter – noise filter primitives
+//==============================================================================
+
 std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise,
                                             const std::string& resultName) {
   auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
