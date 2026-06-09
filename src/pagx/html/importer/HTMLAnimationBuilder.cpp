@@ -31,6 +31,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/SolidColor.h"
@@ -528,18 +529,43 @@ void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, 
 // background Fill may sit on the id'd wrapper itself or on a nested host (the importer's
 // "outer background + inner padded" / margin-wrapper splits), so the search descends a bounded
 // number of child levels. The wrapper's own contents are checked before descending.
+//
+// The text path keeps its Fill nested inside a Group container (e.g. a TextBox-emitted text
+// host whose `<Text>+<Fill>` pair sits in `Group.elements` rather than directly in
+// `Layer.contents`), so this also descends into Group/TextBox containers encountered while
+// scanning `Layer.contents`. NodeType is used in lieu of dynamic_cast (banned project-wide).
+SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int depth);
+
 SolidColor* FindSolidFill(Layer* layer, int depth = 0) {
   if (layer == nullptr || depth > 3) return nullptr;
-  for (auto* element : layer->contents) {
-    if (element == nullptr || element->nodeType() != NodeType::Fill) continue;
-    auto* fill = static_cast<Fill*>(element);
-    if (fill->color != nullptr && fill->color->nodeType() == NodeType::SolidColor) {
-      return static_cast<SolidColor*>(fill->color);
-    }
+  if (auto* found = FindSolidFillInElements(layer->contents, depth)) {
+    return found;
   }
   for (auto* child : layer->children) {
     if (auto* found = FindSolidFill(child, depth + 1)) {
       return found;
+    }
+  }
+  return nullptr;
+}
+
+SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int depth) {
+  if (depth > 3) return nullptr;
+  for (auto* element : elements) {
+    if (element == nullptr) continue;
+    NodeType type = element->nodeType();
+    if (type == NodeType::Fill) {
+      auto* fill = static_cast<Fill*>(element);
+      if (fill->color != nullptr && fill->color->nodeType() == NodeType::SolidColor) {
+        return static_cast<SolidColor*>(fill->color);
+      }
+      continue;
+    }
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<Group*>(element);
+      if (auto* found = FindSolidFillInElements(group->elements, depth + 1)) {
+        return found;
+      }
     }
   }
   return nullptr;
