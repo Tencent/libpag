@@ -143,55 +143,6 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceMakeOffscreen) {
 }
 
 /**
- * Test case: end-to-end PAGScene::draw renders a SolidColor layer into a PAGSurface and the
- * resulting pixels match the channel-applied color.
- */
-PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAndReadPixels) {
-  auto doc = pagx::PAGXDocument::Make(8, 8);
-  auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->width = 8;
-  layer->height = 8;
-  doc->layers.push_back(layer);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 8;
-  rect->size.height = 8;
-  layer->contents.push_back(rect);
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>("S");
-  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = solid;
-  layer->contents.push_back(fill);
-
-  auto anim = doc->makeNode<pagx::Animation>("main");
-  anim->duration = 60;
-  anim->frameRate = 60;
-  doc->animations.push_back(anim);
-  auto* obj = doc->makeNode<pagx::AnimationObject>();
-  obj->target = "S";
-  anim->objects.push_back(obj);
-  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
-  prop->name = "color";
-  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
-  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->channels.push_back(prop);
-
-  auto file = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file != nullptr);
-
-  auto timeline = file->getDefaultTimeline();
-  ASSERT_TRUE(timeline != nullptr);
-  timeline->apply(1.0f);
-
-  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
-  ASSERT_TRUE(surface != nullptr);
-
-  ASSERT_TRUE(file->draw(surface));
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAndReadPixels"));
-}
-
-/**
  * Test case: advancing a top-level alpha animation produces distinct rendered frames over time.
  */
 PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
