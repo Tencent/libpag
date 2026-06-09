@@ -85,18 +85,4 @@ float Text::renderFontSize() const {
   return fontSize * textScale;
 }
 
-Rect Text::contentBounds() const {
-  auto pos = renderPosition();
-  auto textBlob = glyphData->textBlob;
-  if (textBlob == nullptr && !glyphData->layoutRuns.empty()) {
-    textBlob =
-        GlyphRunRenderer::BuildTextBlobFromLayoutRuns(glyphData->layoutRuns, tgfx::Matrix::I());
-  }
-  if (textBlob) {
-    auto bounds = textBlob->getBounds();
-    return {pos.x + bounds.x(), pos.y + bounds.y(), bounds.width(), bounds.height()};
-  }
-  return {pos.x + textBounds.x, pos.y + textBounds.y, textBounds.width, textBounds.height};
-}
-
 }  // namespace pagx

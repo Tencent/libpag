@@ -109,13 +109,6 @@ class Text : public Element, public LayoutNode {
   /** Returns the effective font size after layout scaling. */
   float renderFontSize() const;
 
-  /**
-   * Returns the text content bounds in layer coordinates, computed from the shaped linebox bounds
-   * offset by renderPosition. This is the bounding rectangle of the rendered text content,
-   * aligned with how tgfx positions the TextBlob.
-   */
-  Rect contentBounds() const;
-
   NodeType nodeType() const override {
     return NodeType::Text;
   }
