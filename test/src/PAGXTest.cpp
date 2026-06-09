@@ -77,6 +77,14 @@
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
+#ifdef PAG_USE_SWIFTSHADER
+#include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
+#endif
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -7439,6 +7447,240 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.d, 2.0f);
   EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
+}
+
+/**
+ * Test case: PAGScene::draw() with autoClear=false overlays the scene content onto existing
+ * surface pixels instead of clearing the surface first.
+ */
+PAGX_TEST(PAGXTest, PAGSceneDrawAutoClearOverlay) {
+  auto doc = pagx::PAGXDocument::Make(8, 8);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 8;
+  layer->height = 8;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 8;
+  rect->size.height = 8;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
+  ASSERT_TRUE(surface != nullptr);
+
+  // First draw with autoClear=true: surface is cleared, then red layer is drawn.
+  ASSERT_TRUE(scene->draw(surface, true));
+  std::vector<uint8_t> pixels(8 * 8 * 4, 0);
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
+  size_t i = (4 * 8 + 4) * 4;
+  EXPECT_EQ(pixels[i + 0], 255);  // R
+  EXPECT_EQ(pixels[i + 1], 0);
+  EXPECT_EQ(pixels[i + 2], 0);
+  EXPECT_EQ(pixels[i + 3], 255);
+
+  // Change animation to green.
+  pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes[0].value = green;
+  timeline->apply(1.0f);
+
+  // Draw with autoClear=true: surface is cleared, green replaces red.
+  ASSERT_TRUE(scene->draw(surface, true));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
+  EXPECT_EQ(pixels[i + 0], 0);
+  EXPECT_EQ(pixels[i + 1], 255);  // G
+  EXPECT_EQ(pixels[i + 2], 0);
+  EXPECT_EQ(pixels[i + 3], 255);
+
+  // Reset to red, draw with autoClear=false: red overlays on top of green.
+  prop->keyframes[0].value = red;
+  timeline->apply(1.0f);
+  ASSERT_TRUE(scene->draw(surface, false));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
+  // With autoClear=false, red is composited (SrcOver) on top of green.
+  // Red (1,0,0,1) over green (0,1,0,1) with SrcOver = red wins (opaque).
+  EXPECT_EQ(pixels[i + 0], 255);  // R
+  EXPECT_EQ(pixels[i + 1], 0);
+  EXPECT_EQ(pixels[i + 2], 0);
+  EXPECT_EQ(pixels[i + 3], 255);
+}
+
+/**
+ * Test case: PAGSurface::MakeFrom(BackendTexture) creates a surface that can render PAGScene
+ * content and read pixels back correctly.
+ */
+PAGX_TEST(PAGXTest, PAGSurfaceFromBackendTexture) {
+  // context is already locked by PAGXTest::SetUp().
+  const int width = 8;
+  const int height = 8;
+
+  tgfx::GLTextureInfo textureInfo = {};
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+
+  auto surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), width);
+  EXPECT_EQ(surface->height(), height);
+
+  // Unlock so the PAGSurface can manage the context for drawing.
+  device->unlock();
+
+  auto doc = pagx::PAGXDocument::Make(width, height);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = width;
+  layer->height = height;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = width;
+  rect->size.height = height;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  ASSERT_TRUE(scene->draw(surface));
+
+  std::vector<uint8_t> pixels(width * height * 4, 0);
+  ASSERT_TRUE(surface->readPixels(pixels.data(), width * 4));
+  size_t i = (4 * width + 4) * 4;
+  EXPECT_EQ(pixels[i + 0], 0);
+  EXPECT_EQ(pixels[i + 1], 0);
+  EXPECT_EQ(pixels[i + 2], 255);  // B
+  EXPECT_EQ(pixels[i + 3], 255);
+
+  // Re-lock for GL cleanup.
+  context = device->lockContext();
+  glDeleteTextures(1, &textureInfo.id);
+}
+
+/**
+ * Test case: PAGSurface::MakeFrom(BackendRenderTarget) creates a surface that can render PAGScene
+ * content and read pixels back correctly.
+ */
+PAGX_TEST(PAGXTest, PAGSurfaceFromBackendRenderTarget) {
+  const int width = 8;
+  const int height = 8;
+
+  // Create a texture + FBO for the render target.
+  tgfx::GLTextureInfo textureInfo = {};
+  CreateGLTexture(context, width, height, &textureInfo);
+
+  GLuint fbo = 0;
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  pag::GLFrameBufferInfo fbInfo = {};
+  fbInfo.id = fbo;
+  fbInfo.format = GL_RGBA8;
+  pag::BackendRenderTarget backendRT(fbInfo, width, height);
+
+  auto surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), width);
+  EXPECT_EQ(surface->height(), height);
+
+  device->unlock();
+
+  auto doc = pagx::PAGXDocument::Make(width, height);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = width;
+  layer->height = height;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = width;
+  rect->size.height = height;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, green, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  ASSERT_TRUE(scene->draw(surface));
+
+  std::vector<uint8_t> pixels(width * height * 4, 0);
+  ASSERT_TRUE(surface->readPixels(pixels.data(), width * 4));
+  size_t i = (4 * width + 4) * 4;
+  EXPECT_EQ(pixels[i + 0], 0);
+  EXPECT_EQ(pixels[i + 1], 255);  // G
+  EXPECT_EQ(pixels[i + 2], 0);
+  EXPECT_EQ(pixels[i + 3], 255);
+
+  // Re-lock for GL cleanup.
+  context = device->lockContext();
+  glDeleteFramebuffers(1, &fbo);
+  glDeleteTextures(1, &textureInfo.id);
 }
 
 }  // namespace pag
