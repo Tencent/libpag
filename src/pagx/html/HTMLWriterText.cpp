@@ -651,10 +651,7 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
-  // GlyphRun nodes that reference an embedded Font resource (registered in woff2Fonts) should
-  // always render via the WOFF2 path, regardless of whether they also carry text/fontFamily
-  // (those are fallback metadata for design tools, not rendering instructions).
-  if (!text->glyphRuns.empty()) {
+  if (!text->glyphRuns.empty() && (text->text.empty() || text->fontFamily.empty())) {
     const Font* font = nullptr;
     for (auto* run : text->glyphRuns) {
       if (run->font) {
@@ -664,11 +661,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (font && _ctx->woff2Fonts.find(font) != _ctx->woff2Fonts.end()) {
       writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
-      return;
     }
-    if (text->text.empty() || text->fontFamily.empty()) {
-      return;
-    }
+    return;
   }
   if (text->text.empty()) {
     return;

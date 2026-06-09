@@ -458,6 +458,29 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
   EXPECT_EQ(html.find("<path"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="160" height="48">
+  <Resources>
+    <Font id="shapes" unitsPerEm="1000">
+      <Glyph advance="700" path="M 0,0 L 700,0 L 700,-700 L 0,-700 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="160" height="48">
+    <Text text="搜索" fontFamily="PingFang SC" fontSize="16">
+      <GlyphRun font="@shapes" fontSize="16" glyphs="1,1" x="10" y="24" xOffsets="0,18"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("搜索"), std::string::npos);
+  EXPECT_EQ(html.find("\xEE\x80\x80"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, TextRich) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_rich.pagx"));
   ASSERT_FALSE(html.empty());
