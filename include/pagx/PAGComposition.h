@@ -103,7 +103,7 @@ class PAGComposition : public PAGLayer {
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;
-  std::unique_ptr<RuntimeBinding> binding = nullptr;
+  std::shared_ptr<RuntimeBinding> binding = nullptr;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   // The full per-layer runtime node tree of this composition, one entry per source layer, mixing
   // plain PAGLayer leaves and PAGComposition children. Persistent for the PAGScene lifetime.
