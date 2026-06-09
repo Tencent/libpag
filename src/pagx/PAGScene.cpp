@@ -126,7 +126,7 @@ std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {
   return _rootComposition;
 }
 
-bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface) {
+bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) {
   if (surface == nullptr || surface->drawable == nullptr) {
     return false;
   }
@@ -147,7 +147,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface) {
     device->unlock();
     return false;
   }
-  displayList->render(tgfxSurface.get());
+  displayList->render(tgfxSurface.get(), autoClear);
   drawable->present(context);
   device->unlock();
   return true;
