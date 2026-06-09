@@ -453,6 +453,28 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
+  // The runtime `x` / `y` channels (WriteLayerX / WriteLayerY) set the layer matrix translation
+  // *absolutely*, overwriting the translation layout derives from the element's static
+  // `left` / `top`. CSS `transform: translate` is an offset on top of that static position, so the
+  // raw translate values alone would snap an animated element to the keyframe translate and discard
+  // where it was laid out (e.g. `top:40px` + `translate(240px,0)` would render at (240,0) instead
+  // of (260,40)). Bake the resolved static offset into the keyframe values so the laid-out position
+  // is preserved across the animation. Only channels that actually animate are adjusted; a static
+  // axis keeps its layout translation untouched. Percentage / missing offsets parse to NaN and are
+  // left alone (no reliable px baseline at import time).
+  if (!xKeys.empty()) {
+    float baseLeft = _valueParser.parseAbsoluteLengthPx(GetTrimmed(resolvedStyle, "left"));
+    if (!std::isnan(baseLeft)) {
+      for (auto& key : xKeys) key.value += baseLeft;
+    }
+  }
+  if (!yKeys.empty()) {
+    float baseTop = _valueParser.parseAbsoluteLengthPx(GetTrimmed(resolvedStyle, "top"));
+    if (!std::isnan(baseTop)) {
+      for (auto& key : yKeys) key.value += baseTop;
+    }
+  }
+
   // Apply bezier handles between consecutive keyframes for each channel.
   ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);

@@ -21,6 +21,7 @@
 #include <cerrno>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -29,7 +30,13 @@
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
@@ -59,6 +66,11 @@ struct RenderOptions {
   std::string xpath = {};
   std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
+  // When set, the document's animations are evaluated at this playback time (in seconds) and the
+  // resulting frame is rendered through the runtime animation path (PAGScene + PAGTimeline) rather
+  // than the static layer-tree path. Negative means "no time requested" (static render).
+  bool hasTime = false;
+  float timeSeconds = 0.0f;
 };
 
 static void PrintRenderUsage() {
@@ -70,6 +82,8 @@ static void PrintRenderUsage() {
          "extension)\n"
       << "  --format png|webp|jpg     Output format (default: png)\n"
       << "  --scale <float>           Scale factor (default: 1.0)\n"
+      << "  --time <seconds>          Evaluate animations at this playback time and render that "
+         "frame\n"
       << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
       << "  --id <id>                 Render only the Layer with the specified id\n"
       << "  --xpath <expr>            Render only the Layer matched by XPath expression\n"
@@ -155,6 +169,16 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         std::cerr << "pagx render: invalid scale '" << argv[i] << "'\n";
         return 1;
       }
+    } else if (arg == "--time" && i + 1 < argc) {
+      char* endPtr = nullptr;
+      options->timeSeconds = strtof(argv[++i], &endPtr);
+      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->timeSeconds) ||
+          options->timeSeconds < 0.0f) {
+        std::cerr << "pagx render: invalid time '" << argv[i] << "', must be a non-negative number "
+                  << "of seconds\n";
+        return 1;
+      }
+      options->hasTime = true;
     } else if (arg == "--crop" && i + 1 < argc) {
       options->hasCrop = true;
       if (!ParseCrop(argv[++i], &options->cropX, &options->cropY, &options->cropWidth,
@@ -201,6 +225,10 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     std::cerr << "pagx render: --id and --xpath are mutually exclusive\n";
     return 1;
   }
+  if (options->hasTime && (!options->id.empty() || !options->xpath.empty())) {
+    std::cerr << "pagx render: --time cannot be combined with --id / --xpath\n";
+    return 1;
+  }
   if (options->inputFile.empty()) {
     std::cerr << "pagx render: missing input file\n";
     return 1;
@@ -233,6 +261,67 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
   return written == data->size();
 }
 
+// Renders a single animation frame through the runtime animation path. The document's top-level
+// timelines are all seeked to `options.timeSeconds` and applied before drawing, so an animated
+// element's alpha / position / color reflect that playback time. Static documents (no animations)
+// fall through to a plain draw, which is equivalent to the layer-tree path at the default state.
+static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& document,
+                                        const RenderOptions& options) {
+  auto scene = PAGScene::Make(document);
+  if (scene == nullptr) {
+    std::cerr << "pagx render: failed to build animation scene\n";
+    return {};
+  }
+
+  auto timeUs = static_cast<int64_t>(llround(static_cast<double>(options.timeSeconds) * 1e6));
+  for (const auto& id : scene->getTimelineIds()) {
+    auto timeline = scene->getTimeline(id);
+    if (timeline == nullptr) {
+      continue;
+    }
+    timeline->setCurrentTime(timeUs);
+    timeline->apply(1.0f);
+  }
+
+  int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
+  int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
+  if (outputWidth <= 0 || outputHeight <= 0) {
+    std::cerr << "pagx render: output dimensions are zero\n";
+    return {};
+  }
+
+  auto surface = PAGSurface::MakeOffscreen(outputWidth, outputHeight);
+  if (surface == nullptr) {
+    std::cerr << "pagx render: failed to create surface (" << outputWidth << "x" << outputHeight
+              << ")\n";
+    return {};
+  }
+
+  auto* displayOptions = scene->getDisplayOptions();
+  displayOptions->setZoomScale(options.scale);
+  if (options.hasBackground) {
+    displayOptions->setBackgroundColor(
+        Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB});
+  }
+
+  if (!scene->draw(surface)) {
+    std::cerr << "pagx render: failed to draw animation scene\n";
+    return {};
+  }
+
+  tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
+  if (bitmap.isEmpty()) {
+    std::cerr << "pagx render: failed to allocate bitmap\n";
+    return {};
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
+    std::cerr << "pagx render: failed to read pixels from surface\n";
+    return {};
+  }
+  return bitmap;
+}
+
 static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   auto document = LoadDocument(options.inputFile, "pagx render");
   if (document == nullptr) {
@@ -248,6 +337,13 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
   document->applyLayout(&fontConfig);
+
+  // Animated frame requested: evaluate the timelines at the requested playback time and render
+  // through the runtime scene. PAGScene::Make() reuses the already-applied layout.
+  if (options.hasTime) {
+    return RenderAnimatedFrame(document, options);
+  }
+
   bool hasTarget = !options.id.empty() || !options.xpath.empty();
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
   std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;
