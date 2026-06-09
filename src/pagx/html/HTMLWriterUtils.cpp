@@ -442,16 +442,6 @@ const char* BlendModeToMixBlendMode(BlendMode mode) {
   return nullptr;
 }
 
-Color LerpColor(const Color& a, const Color& b, float t) {
-  Color result = {};
-  result.red = a.red + (b.red - a.red) * t;
-  result.green = a.green + (b.green - a.green) * t;
-  result.blue = a.blue + (b.blue - a.blue) * t;
-  result.alpha = a.alpha + (b.alpha - a.alpha) * t;
-  result.colorSpace = a.colorSpace;
-  return result;
-}
-
 std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);

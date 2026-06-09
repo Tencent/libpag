@@ -386,33 +386,42 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
       continue;
     }
 
-    if (plugin == "PAGExporter" && !aePaths.isEmpty()) {
+    if (plugin == "PAGExporter") {
       QString sourcePath = getPluginSourcePath("PAGExporter");
+      QString targetPath = getPluginInstallPath("PAGExporter");
       if (QFile::exists(sourcePath)) {
-        for (const QString& aePath : aePaths) {
-          QString pluginsDir = aePath + "/Plug-ins";
-          operations << FileOperation::createDirectory(pluginsDir);
-          operations << FileOperation::copyFile(sourcePath, pluginsDir + "/PAGExporter.aex");
-        }
+        QString targetDir = QFileInfo(targetPath).absolutePath();
+        operations << FileOperation::createDirectory(targetDir);
+        operations << FileOperation::copyFile(sourcePath, targetPath);
       }
 
-      QString appDir = getQtResourceDir();
-      QDir dir(appDir);
-      QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-      QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+      // Copy Qt DLLs to AE directories for DLL search path, and remove any legacy
+      // PAGExporter.aex left behind in <AE>/Plug-ins/ from earlier builds that installed
+      // the plugin there instead of Common/Plug-ins/.../MediaCore. Without this cleanup,
+      // upgrading users would end up with two copies of the plugin and AE may load the
+      // wrong one.
+      if (!aePaths.isEmpty()) {
+        QString appDir = getQtResourceDir();
+        QDir dir(appDir);
+        QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+        QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
-      for (const QString& aePath : aePaths) {
-        for (const QString& dllFile : dllFiles) {
-          if (shouldExcludeFile(dllFile)) {
-            continue;
+        for (const QString& aePath : aePaths) {
+          operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
+
+          for (const QString& dllFile : dllFiles) {
+            if (shouldExcludeFile(dllFile)) {
+              continue;
+            }
+            operations << FileOperation::copyFile(appDir + "/" + dllFile, aePath + "/" + dllFile);
           }
-          operations << FileOperation::copyFile(appDir + "/" + dllFile, aePath + "/" + dllFile);
-        }
-        for (const QString& subDir : subDirs) {
-          if (shouldExcludeDir(subDir)) {
-            continue;
+          for (const QString& subDir : subDirs) {
+            if (shouldExcludeDir(subDir)) {
+              continue;
+            }
+            operations << FileOperation::copyDirectory(appDir + "/" + subDir,
+                                                       aePath + "/" + subDir);
           }
-          operations << FileOperation::copyDirectory(appDir + "/" + subDir, aePath + "/" + subDir);
         }
       }
       continue;
@@ -459,28 +468,32 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
       continue;
     }
 
-    if (plugin == "PAGExporter" && !aePaths.isEmpty()) {
-      for (const QString& aePath : aePaths) {
-        operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
-      }
+    if (plugin == "PAGExporter") {
+      operations << FileOperation::deleteFile(getPluginInstallPath("PAGExporter"));
 
-      QString appDir = getQtResourceDir();
-      QDir dir(appDir);
-      QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-      QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+      // Remove Qt DLLs and legacy PAGExporter.aex from AE directories.
+      if (!aePaths.isEmpty()) {
+        QString appDir = getQtResourceDir();
+        QDir dir(appDir);
+        QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+        QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
-      for (const QString& aePath : aePaths) {
-        for (const QString& dllFile : dllFiles) {
-          if (shouldExcludeFile(dllFile)) {
-            continue;
+        for (const QString& aePath : aePaths) {
+          // Remove legacy PAGExporter.aex installed in AE directory.
+          operations << FileOperation::deleteFile(aePath + "/Plug-ins/PAGExporter.aex");
+
+          for (const QString& dllFile : dllFiles) {
+            if (shouldExcludeFile(dllFile)) {
+              continue;
+            }
+            operations << FileOperation::deleteFile(aePath + "/" + dllFile);
           }
-          operations << FileOperation::deleteFile(aePath + "/" + dllFile);
-        }
-        for (const QString& subDir : subDirs) {
-          if (shouldExcludeDir(subDir)) {
-            continue;
+          for (const QString& subDir : subDirs) {
+            if (shouldExcludeDir(subDir)) {
+              continue;
+            }
+            operations << FileOperation::deleteDirectory(aePath + "/" + subDir);
           }
-          operations << FileOperation::deleteDirectory(aePath + "/" + subDir);
         }
       }
       continue;

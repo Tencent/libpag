@@ -65,6 +65,7 @@ bool LayerNeedsKeeping(const Layer* layer, const std::unordered_set<const Layer*
 bool LayoutNodeHasConstraints(const LayoutNode* node);
 bool ElementHasConstraints(Element* element);
 bool IsDefaultTransformGroup(const Group* group);
+bool IsLayerStructurallyEmpty(const Layer* layer);
 
 void CollectMaskRefsFromLayer(const Layer* layer, std::unordered_set<const Layer*>& refs);
 void CollectMaskRefs(const std::vector<Layer*>& layers, std::unordered_set<const Layer*>& refs);
@@ -517,9 +518,16 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   }
   // tgfx's scrollRect uses (x,y) as a scroll offset (the rect's top-left maps to the layer's
   // local (0,0)). To preserve the original positioning we have to translate the layer by the
-  // same (left, top) — which we can only do safely when the user layer has no rotation/scale,
-  // no 3D matrix, and no constraint-based positioning.
-  if (!layer->matrix.isIdentity()) {
+  // same (left, top) — which we can only do safely when the user layer has no rotation/scale
+  // (any 2x2 distortion would warp that compensation vector), no 3D matrix, and no
+  // constraint-based positioning (where x/y are inputs to the layout solver rather than the
+  // final translation). A pure-translation matrix is fine: it commutes with the layer-local
+  // pre-translation the scrollRect introduces, so adding (left, top) to layer.x/y produces
+  // the same parent-space final transform whether the matrix translates first or not. This
+  // matters after a PAGX -> SVG -> PAGX round trip, which re-imports the translation we
+  // previously baked into x/y as a 2D matrix attribute.
+  if (layer->matrix.a != 1.0f || layer->matrix.b != 0.0f || layer->matrix.c != 0.0f ||
+      layer->matrix.d != 1.0f) {
     return false;
   }
   if (!layer->matrix3D.isIdentity()) {
@@ -745,6 +753,42 @@ bool PruneEmptyInGroup(Group* group) {
   return PruneEmptyInElements(group->elements);
 }
 
+// A Layer is "structurally empty" when it has no contents/children/composition AND no
+// size/percent-size/size-dependent constraint that would still let it occupy space (e.g.
+// as a backdrop-blur surface). On such a layer every other attribute — filters, styles,
+// mask, alpha, blendMode, hasScrollRect, clipToBounds, id, name, etc. — applies to a
+// region of zero area and produces no rendering, so dropping the layer is observably
+// equivalent. This matches verify's DetectEmptyLayer rule exactly; we intentionally do
+// NOT consult HasLayerOnlyFeatures here because that helper conservatively keeps layers
+// that carry purely-cosmetic attributes (filter on nothing, mask on nothing, ...) and
+// would let the optimizer disagree with verify after a PAGX <-> SVG round trip drops a
+// shape leaving behind a shell layer.
+bool IsLayerStructurallyEmpty(const Layer* layer) {
+  if (!layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr) {
+    return false;
+  }
+  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+    return false;
+  }
+  if (!std::isnan(layer->percentWidth) || !std::isnan(layer->percentHeight)) {
+    return false;
+  }
+  // Size-dependent constraints (right/bottom/centerX/centerY) still resolve to a finite
+  // box at layout time, so the layer can render via filters / background blur. left/top
+  // alone only translate, so an otherwise-empty layer with just left/top is still empty.
+  if (!std::isnan(layer->right) || !std::isnan(layer->bottom) || !std::isnan(layer->centerX) ||
+      !std::isnan(layer->centerY)) {
+    return false;
+  }
+  if (!layer->customData.empty()) {
+    return false;
+  }
+  if (HasUnresolvedImport(layer)) {
+    return false;
+  }
+  return true;
+}
+
 bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
   bool changed = false;
   changed |= PruneEmptyInElements(layer->contents);
@@ -754,13 +798,8 @@ bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& mas
   for (size_t i = 0; i < layer->children.size(); i++) {
     auto* child = layer->children[i];
     changed |= PruneEmptyInLayer(child, maskRefs);
-    bool empty = child->contents.empty() && child->children.empty() &&
-                 child->composition == nullptr && std::isnan(child->width) &&
-                 std::isnan(child->height) && !LayoutNodeHasConstraints(child) &&
-                 child->customData.empty() && !HasUnresolvedImport(child);
     bool inParentLayout = layerHasLayout && child->includeInLayout;
-    if (empty && !inParentLayout && !LayerNeedsKeeping(child, maskRefs) &&
-        !HasLayerOnlyFeatures(child)) {
+    if (IsLayerStructurallyEmpty(child) && !inParentLayout && !LayerNeedsKeeping(child, maskRefs)) {
       changed = true;
       continue;
     }
@@ -780,13 +819,8 @@ bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
   for (size_t i = 0; i < layers.size(); i++) {
     auto* layer = layers[i];
     changed |= PruneEmptyInLayer(layer, maskRefs);
-    bool empty = layer->contents.empty() && layer->children.empty() &&
-                 layer->composition == nullptr && std::isnan(layer->width) &&
-                 std::isnan(layer->height) && !LayoutNodeHasConstraints(layer) &&
-                 layer->customData.empty() && !HasUnresolvedImport(layer);
     bool inParentLayout = parentHasLayout && layer->includeInLayout;
-    if (empty && !inParentLayout && !LayerNeedsKeeping(layer, maskRefs) &&
-        !HasLayerOnlyFeatures(layer)) {
+    if (IsLayerStructurallyEmpty(layer) && !inParentLayout && !LayerNeedsKeeping(layer, maskRefs)) {
       changed = true;
       continue;
     }

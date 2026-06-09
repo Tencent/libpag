@@ -42,7 +42,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TrimType.h"
-#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "tgfx/core/UTF.h"
 

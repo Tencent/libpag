@@ -290,12 +290,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
         return {};
       }
     }
-    auto it = buildResult.layerMap.find(targetPagxLayer);
-    if (it == buildResult.layerMap.end()) {
+    targetTgfxLayer = buildResult.getLayer(targetPagxLayer);
+    if (targetTgfxLayer == nullptr) {
       std::cerr << "pagx render: target Layer has no rendered layer\n";
       return {};
     }
-    targetTgfxLayer = it->second;
   }
 
   float sourceWidth = 0;
