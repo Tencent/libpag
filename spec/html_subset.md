@@ -416,3 +416,114 @@ Resulting PAGX (after `PAGXOptimizer`):
   </Layer>
 </pagx>
 ```
+
+## 13. Animation
+
+The subset supports a single, declarative animation form: CSS `@keyframes` rules combined with
+the `animation` shorthand on elements. This is the canonical contract between the
+`tools/html-snapshot` capture layer and the importer: the snapshot tool normalizes animations
+from many sources (plain CSS `@keyframes`, the Web Animations API, and JS animation libraries
+such as GSAP / anime.js — see `tools/html-snapshot/README.md`) into this one form, and the
+importer maps it onto the PAGX animation model (`<Animations>` + `Animation` / `Object` /
+`Channel` / `Key`).
+
+### 13.1 Accepted form
+
+```html
+<head>
+  <style>
+    @keyframes fadeMove {
+      0%   { opacity: 0; transform: translateX(0px); }
+      100% { opacity: 1; transform: translateX(40px); }
+    }
+  </style>
+</head>
+<body style="width: 200px; height: 100px;">
+  <div id="card" style="animation: fadeMove 2s linear infinite;"></div>
+</body>
+```
+
+- A `@keyframes <name> { <stop> { … } … }` block defines a named timeline. Stops are
+  percentages (`0%` … `100%`) or the keywords `from` (= `0%`) / `to` (= `100%`); a single stop
+  may list several comma-separated selectors.
+- `@keyframes` blocks survive the `<style>`-inlining normalization (a `<style>` element carrying
+  only the surviving `@keyframes` is preserved so the importer can read them).
+- The `animation` shorthand attaches a `@keyframes` timeline to the element. The longhand
+  `animation-name` / `animation-duration` / `animation-timing-function` /
+  `animation-iteration-count` / `animation-direction` / `animation-delay` properties are also
+  accepted and folded into the shorthand during normalization.
+- One animation per element. Comma-separated animation lists keep only the first entry
+  (`subset:animation-multiple` warning).
+
+### 13.2 Channel mapping
+
+Only properties that map to a PAGX channel the runtime can actually play back are emitted.
+Everything else inside a `@keyframes` stop is warned and dropped
+(`subset:animation-unsupported-property`).
+
+| CSS animated property | PAGX channel | Target node | Value type |
+|-----------------------|--------------|-------------|------------|
+| `opacity` | `alpha` | the element's `Layer` | float |
+| `transform: translateX(N)` / `translate(N, …)` | `x` | the element's `Layer` | float |
+| `transform: translateY(N)` / `translate(…, N)` | `y` | the element's `Layer` | float |
+| `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
+
+`transform` is decomposed: only the translation component is honoured. A `@keyframes` stop whose
+`transform` contains `rotate` / `scale` / `skew` / `matrix` drops the non-translation part with
+`subset:animation-unsupported-property` (the runtime has no rotation/scale/matrix channel on a
+`Layer`). Layout-affecting properties (`width`, `height`, `margin`, `padding`, `gap`, `flex`, …)
+are never animatable (see §4.4) and are dropped the same way.
+
+The animated element's `Layer` is given a generated `id` (prefix `anim`) when it has no author
+`id`, so the emitted `<Object target="…">` can reference it. `color` animation requires the
+element to paint a solid `background-color` (or, for text, a solid `color`); when no `SolidColor`
+fill is present the `color` channel is dropped (`subset:animation-unsupported-property`).
+
+### 13.3 Timing mapping
+
+- Frame rate is fixed at 60 fps. `@keyframes` percentages are converted to frame times:
+  `time = round(percent / 100 * duration_seconds * 60)`. `animation-duration` accepts `s` and
+  `ms` units.
+- `animation-timing-function`: `linear` → `linear`; `ease` / `ease-in` / `ease-out` /
+  `ease-in-out` and `cubic-bezier(x1, y1, x2, y2)` → `bezier` (the easing is written onto the
+  keyframe's `bezier-out` / next keyframe's `bezier-in` handles); `steps(…)` / `step-start` /
+  `step-end` → `hold`.
+- `animation-iteration-count`: `infinite` → `Animation.loop="loop"`; any finite count → `once`
+  (PAGX has no finite repeat count — a finite count > 1 warns with `subset:animation-finite-count`).
+- `animation-direction`: `alternate` → `Animation.loop="pingPong"`; `reverse` reverses the
+  keyframe order; `normal` keeps source order.
+- `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
+  are clamped to 0.
+
+### 13.4 Resulting PAGX
+
+The example in §13.1 converts to:
+
+```xml
+<pagx width="200" height="100">
+  <Layer id="card" width="100%" height="100%"/>
+  <Animations>
+    <Animation id="card_anim" duration="120" frameRate="60" loop="loop">
+      <Object target="card">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="1"/>
+        </Channel>
+        <Channel name="x" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
+```
+
+### 13.5 Diagnostics
+
+| Code | Meaning |
+|------|---------|
+| `subset:animation-unsupported-property` | a `@keyframes` declaration targets a property/channel the runtime cannot play; dropped |
+| `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
+| `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
+| `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |

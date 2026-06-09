@@ -45,6 +45,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
+  _animationBuilder =
+      std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
   _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
@@ -161,6 +163,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
   _textFragmentBuilder->bindDocument(_document.get());
+  _animationBuilder->bindDocument(_document.get());
+  _animationBuilder->setKeyframes(&_styleCascade->keyframes());
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -182,6 +186,12 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   }
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
+  }
+  // Build PAGX animations for every recorded animated element now that the full layer tree
+  // (including background fills consumed by `color` channels) exists. See spec §13.
+  for (auto& entry : _pendingAnimations) {
+    const auto& style = getResolvedStyle(entry.first);
+    _animationBuilder->buildForElement(style, entry.second);
   }
   flushFontFallbacksToDocument();
   return _document;
@@ -275,6 +285,14 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
   _idAllocator->assign(layer, element);
+  // Record elements that declare an animation so PAGX animations can be emitted once the whole
+  // tree is built. Cheap lookup: the resolved style is cached by the cascade.
+  if (layer != nullptr && element != nullptr) {
+    const auto& style = getResolvedStyle(element);
+    if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+      _pendingAnimations.emplace_back(element, layer);
+    }
+  }
 }
 
 std::string HTMLParserContext::generateUniqueId(const std::string& prefix) {

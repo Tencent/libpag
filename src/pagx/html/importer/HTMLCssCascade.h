@@ -56,15 +56,55 @@ struct RawCssRule {
 };
 
 /**
- * Tokenises CSS text into top-level `(selectors, declarations)` rules. `@`-rules (`@media`,
- * `@font-face`, `@keyframes`, ...) are skipped: the matching brace is tracked so parsing stays
- * synchronised, but their body is not emitted (a single record describing the dropped at-rule
- * is appended to `droppedAtRules` so callers can surface diagnostics).
+ * A single stop inside a `@keyframes` block. `percent` is the resolved keyframe offset in the
+ * range [0, 100] (`from` resolves to 0, `to` to 100). `declarations` is the verbatim
+ * semicolon-separated property:value body. A stop selector that lists several comma-separated
+ * offsets is expanded into one `CssKeyframeStop` per offset, all sharing the same declarations.
+ */
+struct CssKeyframeStop {
+  float percent = 0.0f;
+  std::string declarations = {};
+};
+
+/**
+ * A parsed `@keyframes <name> { … }` rule. `name` is the keyframes identifier (verbatim, used to
+ * match the `animation-name` reference). `stops` are ordered by source order; callers sort by
+ * `percent` when building keyframe sequences. `-webkit-keyframes` is accepted as an alias.
+ */
+struct CssKeyframesRule {
+  std::string name = {};
+  std::vector<CssKeyframeStop> stops = {};
+};
+
+/**
+ * Tokenises CSS text into top-level `(selectors, declarations)` rules. Most `@`-rules (`@media`,
+ * `@font-face`, ...) are skipped: the matching brace is tracked so parsing stays synchronised,
+ * but their body is not emitted (a single record describing the dropped at-rule is appended to
+ * `droppedAtRules` so callers can surface diagnostics).
+ *
+ * `@keyframes` / `@-webkit-keyframes` rules are parsed into `keyframesRules` instead of being
+ * dropped, so the HTML animation subset (see `spec/html_subset.md` §13) can map them onto PAGX
+ * animations. Pass the no-keyframes overload when keyframes are not relevant.
  *
  * Block comments are stripped. The tokeniser is intentionally permissive: malformed
  * input causes the offending block to be skipped rather than raising an error.
  */
 std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
+                                           std::vector<std::string>& droppedAtRules,
+                                           std::vector<CssKeyframesRule>& keyframesRules);
+
+/**
+ * Convenience overload that discards any `@keyframes` rules (forwards to the three-argument form
+ * with a throwaway sink). Kept so call sites that do not care about animations stay terse.
+ */
+std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
                                            std::vector<std::string>& droppedAtRules);
+
+/**
+ * Serialises a list of `@keyframes` rules back into canonical CSS text (one rule per line). Used
+ * by the subset transformer to re-emit a `<style>` block that carries only the surviving
+ * keyframes so the importer can re-read them after the cascade has been inlined.
+ */
+std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRules);
 
 }  // namespace pagx::html

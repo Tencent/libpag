@@ -526,6 +526,32 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Emit the `animation-*` longhands for an element animated by the capture pass
+// (animation-capture.ts). Only `pagxAnim*` names are forwarded: those are the
+// canonical animations whose `@keyframes` the capture pass injected into the
+// `<style id="__pagx_anim_keyframes">` block (which snapshotMain copies into
+// the output <style>). Any other animation-name refers to a `@keyframes` that
+// only existed in the page's original stylesheet — which the snapshot rebuilds
+// from scratch and therefore does not carry — so emitting it would dangle.
+// The longhands are read straight from computed style; the importer folds them
+// back together (spec/html_subset.md §13).
+function appendAnimation(parts, computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  if (!name || name === 'none' || name.indexOf('pagxAnim') !== 0) return;
+  parts.push(`animation-name: ${name}`);
+  const longhands = [
+    'animation-duration',
+    'animation-timing-function',
+    'animation-iteration-count',
+    'animation-direction',
+    'animation-delay',
+  ];
+  for (const prop of longhands) {
+    const v = (computed.getPropertyValue(prop) || '').trim();
+    if (v) parts.push(`${prop}: ${v}`);
+  }
+}
+
 // Build the style string for a kept element. `opts.box` includes background/
 // border/shadow/etc.; `opts.text` includes color/font-*; `opts.positioned`
 // toggles the absolute-positioning header (off for inline text children that
@@ -630,6 +656,12 @@ function buildStyle(left, top, width, height, computed, opts) {
       parts.push(`transform-origin: ${opts.transform.transformOrigin}`);
     }
   }
+
+  // Forward a canonical `pagxAnim*` animation (set by animation-capture.ts) so
+  // the importer can map it onto a PAGX animation. Emitted for every element
+  // kind so animated containers, text leaves and replaced elements all carry
+  // their declaration.
+  appendAnimation(parts, computed);
 
   return parts.join('; ');
 }
@@ -2427,11 +2459,22 @@ function snapshotMain() {
   // Element selectors inside a single `<style>` block are inside the
   // subset (`spec/html_subset.md` §3.3); the pagx importer parses them,
   // applies the (no-op) declarations, and drops the `<style>` element.
-  const styleBlock =
+  let styleBlock =
     'div,span,img,svg,body{box-sizing:border-box}' +
     'html{min-height:100vh;display:flex;justify-content:center;' +
     'align-items:flex-start;padding:32px 0}' +
     'body{margin:0;padding:0;position:relative;flex-shrink:0}';
+
+  // animation-capture.ts (run before this snapshot) stashes the canonical
+  // `@keyframes` it synthesised in a dedicated <style id="__pagx_anim_keyframes">.
+  // Fold them into the single output <style> so the importer's
+  // StyleSheetCollectorPass picks them up alongside the `animation-*` longhands
+  // that appendAnimation() forwarded onto each element. The block is appended
+  // (not prepended) so element selectors above keep their precedence.
+  const animKeyframes = document.getElementById('__pagx_anim_keyframes');
+  if (animKeyframes && animKeyframes.textContent) {
+    styleBlock += animKeyframes.textContent.trim();
+  }
 
   return {
     html:
@@ -2581,6 +2624,7 @@ const HELPER_FNS = [
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
+  appendAnimation,
   buildStyle,
   borderOverlayHTML,
   colorAlpha,

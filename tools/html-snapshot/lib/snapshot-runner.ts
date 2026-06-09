@@ -14,6 +14,7 @@ import {
   inlineCanvases,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
+import { capturePagxAnimationsOnPage } from './animation-capture';
 import {
   makeFontCaptureListener,
   saveDownloadedFonts,
@@ -83,6 +84,7 @@ export interface RunSnapshotOptions {
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
   downloadImages?: boolean;
@@ -136,6 +138,7 @@ export async function runSnapshot(
     cookies = [],
     headers = [],
     inlineIconFonts = true,
+    captureAnimations = true,
     downloadFonts = false,
     fontDir = '',
     downloadImages = false,
@@ -226,6 +229,25 @@ export async function runSnapshot(
         // operator can decide whether to investigate, but never abort
         // the snapshot — the rest of the page still has to make it out.
         if (log) log(`inline-icon-fonts failed: ${errMessage(err)}`);
+      }
+    }
+
+    // Normalise any running animations (CSS @keyframes, WAAPI, GSAP, anime.js)
+    // into the canonical `@keyframes` + `animation` subset the importer plays
+    // back. Must run after the icon-font/image inlining (so it sees the final
+    // DOM) but before the snapshot is walked (so its injected keyframes block
+    // and inline `animation-*` longhands are captured). Best-effort: a failure
+    // degrades to a static frame.
+    if (captureAnimations) {
+      try {
+        const stats = await capturePagxAnimationsOnPage(page, {
+          logger: log || (() => {}),
+        });
+        if (log && stats.count > 0) {
+          log(`captured ${stats.count} animation(s)`);
+        }
+      } catch (err) {
+        if (log) log(`animation capture failed: ${errMessage(err)}`);
       }
     }
 

@@ -512,9 +512,20 @@ Babel-compiled at runtime.
 
 ## Limitations
 
-- Animations, hover states, and other dynamic effects are captured in whatever
-  state the page is in when the snapshot is taken. Use `--wait-ms` or
-  `--selector` to land on the desired frame.
+- Animations are normalised into the canonical `@keyframes` + `animation`
+  subset (`spec/html_subset.md` §13) so the importer can replay them. The
+  capture pass (`lib/animation-capture.ts`) reads running animations from CSS
+  `@keyframes`, the Web Animations API, GSAP, and anime.js, and rewrites them
+  as `@keyframes pagxAnim<N>` rules plus an inline `animation` shorthand. Only
+  runtime-playable channels survive: `opacity` (→ `alpha`),
+  `transform: translate[X|Y]` (→ `x`/`y`), and `color` / `background-color`
+  (→ a fill's `SolidColor.color`). Other animated properties (`rotate`,
+  `scale`, `width`/`height`, `filter`, `box-shadow`, …) are dropped, and the
+  element holds whatever value it had when the snapshot was taken — use
+  `--wait-ms` or `--selector` to land on the desired frame for those. Disable
+  the pass with `captureAnimations: false` if you want a purely static frame.
+- Hover states and other dynamic effects that are not expressed as animations
+  are captured in whatever state the page is in when the snapshot is taken.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,

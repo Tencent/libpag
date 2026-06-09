@@ -28,7 +28,10 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -124,6 +127,27 @@ inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
   if (!solid) return {};
   return solid->color;
+}
+
+// Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
+inline pagx::Channel* FindChannel(pagx::Animation* anim, const std::string& name) {
+  if (!anim) return nullptr;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch && ch->name == name) return ch;
+    }
+  }
+  return nullptr;
+}
+
+// Returns the AnimationObject whose `target` matches `targetId`, or nullptr.
+inline pagx::AnimationObject* FindObjectByTarget(pagx::Animation* anim,
+                                                 const std::string& targetId) {
+  if (!anim) return nullptr;
+  for (auto* obj : anim->objects) {
+    if (obj && obj->target == targetId) return obj;
+  }
+  return nullptr;
 }
 
 }  // namespace
@@ -3531,6 +3555,274 @@ PAG_TEST(PAGXHTMLImporterTest, DuplicateBodyIsMergedBySubsetTransformer) {
   EXPECT_FLOAT_EQ(doc->width, 50.0f);
   EXPECT_FLOAT_EQ(doc->height, 50.0f);
   EXPECT_EQ(doc->layers.front()->children.size(), 2u);
+}
+
+//==================================================================================================
+// Animation: @keyframes + animation -> PAGX <Animations> (spec/html_subset.md §13)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationOpacityProducesAlphaChannel) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_FLOAT_EQ(anim->frameRate, 60.0f);
+  // 2s at 60fps = 120 frames, no delay.
+  EXPECT_EQ(anim->duration, 120);
+  auto* obj = FindObjectByTarget(anim, "card");
+  ASSERT_NE(obj, nullptr);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes.front().value, 0.0f);
+  EXPECT_EQ(ch->keyframes.back().time, 120);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value, 1.0f);
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Linear);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes slide {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(40px, 20px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;
+                           animation:slide 1s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Once);
+  EXPECT_EQ(anim->duration, 60);
+  auto* xCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "x"));
+  auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
+  ASSERT_NE(xCh, nullptr);
+  ASSERT_NE(yCh, nullptr);
+  ASSERT_EQ(xCh->keyframes.size(), 2u);
+  ASSERT_EQ(yCh->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 40.0f);
+  EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 20.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes recolor {
+        0%   { background-color: #FF0000; }
+        100% { background-color: #0000FF; }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="swatch" style="width:50px;height:50px;background-color:#FF0000;
+                              animation:recolor 1s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* ch = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(FindChannel(anim, "color"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ColorNear(ch->keyframes.front().value, HexColor(0xFF0000)));
+  EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationAlternateDirectionIsPingPong) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear infinite alternate"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(doc->animations.front()->loop, pagx::LoopMode::PingPong);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationDelayShiftsKeyframeTimes) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.5s"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  // delay (0.5s = 30 frames) + duration (1s = 60 frames).
+  EXPECT_EQ(anim->duration, 90);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().time, 30);
+  EXPECT_EQ(ch->keyframes.back().time, 90);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s cubic-bezier(0.42, 0, 0.58, 1)"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch =
+      dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(doc->animations.front(), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.x, 0.42f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupportedTransformWarnsAndDrops) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:spin 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  // rotate maps to no runtime channel, so no animation is emitted.
+  EXPECT_TRUE(doc->animations.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationUnknownKeyframesWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:missing 1s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-unknown-keyframes") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  EXPECT_TRUE(doc->animations.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationFiniteCountWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 3"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-finite-count") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(doc->animations.front()->loop, pagx::LoopMode::Once);
+}
+
+// The default pipeline (autoNormalize = true) must preserve the `@keyframes` block and the
+// `animation` shorthand through the subset transformer so the builder still emits an animation.
+PAG_TEST(PAGXHTMLImporterTest, AnimationSurvivesDefaultNormalization) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch =
+      dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(doc->animations.front(), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  EXPECT_EQ(ch->keyframes.size(), 2u);
+}
+
+// A round-trip through the exporter must serialise the <Animations> block; importing the
+// emitted XML back reproduces the same channel.
+PAG_TEST(PAGXHTMLImporterTest, AnimationExportsToXML) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("Animation"), std::string::npos);
+  EXPECT_NE(xml.find("alpha"), std::string::npos);
 }
 
 //==================================================================================================

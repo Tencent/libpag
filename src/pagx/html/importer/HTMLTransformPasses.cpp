@@ -261,9 +261,10 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
     }
     child = next;
   }
+  std::vector<CssKeyframesRule> keyframesRules;
   if (!concatenated.empty()) {
     std::vector<std::string> droppedAt;
-    auto rules = TokenizeStyleSheet(concatenated, droppedAt);
+    auto rules = TokenizeStyleSheet(concatenated, droppedAt, keyframesRules);
     for (auto& dropped : droppedAt) {
       ctx.warn("subset:unsupported-at-rule",
                "html: at-rule '" + dropped + "' dropped (not in subset)", nullptr);
@@ -309,6 +310,29 @@ void StyleSheetCollectorPass::apply(const std::shared_ptr<DOMNode>& root,
         prev = child;
       }
       child = next;
+    }
+  }
+
+  // Re-emit a `<style>` block carrying only the surviving `@keyframes` rules. The cascade has been
+  // inlined onto every element, but `@keyframes` are global and have no inline home, so the
+  // importer relies on this preserved block to map them onto PAGX animations (see
+  // `spec/html_subset.md` §13). Skipped when the original `<style>` was preserved verbatim
+  // (`preserveStyleBlock`), since the keyframes already survive there.
+  if (!keyframesRules.empty() && !ctx.options().preserveStyleBlock) {
+    auto styleNode = std::make_shared<DOMNode>();
+    styleNode->name = "style";
+    styleNode->type = DOMNodeType::Element;
+    auto textNode = std::make_shared<DOMNode>();
+    textNode->name = SerializeKeyframes(keyframesRules);
+    textNode->type = DOMNodeType::Text;
+    styleNode->firstChild = textNode;
+    // Append as the last child of <head>.
+    if (!head->firstChild) {
+      head->firstChild = styleNode;
+    } else {
+      auto last = head->firstChild;
+      while (last->nextSibling) last = last->nextSibling;
+      last->nextSibling = styleNode;
     }
   }
 }

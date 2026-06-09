@@ -24,9 +24,11 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLAnimationBuilder.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -215,6 +217,15 @@ class HTMLParserContext {
   // Owns the CSS rule tables, the resolved-style cache, the inheritance walk, and the
   // box-attribute parser. Borrows `_diagnostics` and `_valueParser`.
   std::unique_ptr<HTMLStyleCascade> _styleCascade = nullptr;
+
+  // Maps the `@keyframes` + `animation` subset onto PAGX animations. Borrows `_diagnostics`,
+  // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
+  std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
+
+  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Recorded during `assignElementId` and processed after the whole tree is built (so background
+  // fills used by `color` channels already exist).
+  std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
 
   // Builds and mutates `Layer` instances from `HTMLBoxAttributes`. Borrows `_diagnostics`,
   // `_valueParser` and `_idAllocator`; document handle is bound after `PAGXDocument::Make`.
