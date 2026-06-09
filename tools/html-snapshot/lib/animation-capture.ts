@@ -223,6 +223,74 @@ export function pagxNormalizeTiming(t: string): string {
   return v;
 }
 
+// Paren-aware comma split for CSS list values such as
+// `cubic-bezier(0.42, 0, 0.58, 1), linear` — splitting on a naive `,` would
+// shatter `cubic-bezier(...)` into pieces.
+export function pagxSplitTopLevelCommas(value: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === ',' && depth === 0) {
+      out.push(value.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  out.push(value.slice(start).trim());
+  return out;
+}
+
+// Resolve the effective CSS-style timing-function for a WAAPI animation.
+//
+// `getAnimations()` returns three flavours:
+//   1. `CSSAnimation` — created by a stylesheet `@keyframes` + `animation-*`
+//      declarations. The active timing-function lives on the element's
+//      computed `animation-timing-function`; per-keyframe `easing` and
+//      `effect.getTiming().easing` both default to `linear` and would lose
+//      the author's `ease-in-out` / `cubic-bezier(...)` etc.
+//   2. WAAPI animations from `element.animate(...)` — the easing is on
+//      `effect.getTiming().easing` (effect-level) or per keyframe.
+//   3. Motion One / web-animations-js — also surface via WAAPI, easing is
+//      on `effect.getTiming().easing`.
+//
+// Priority: if `anim` is a `CSSAnimation` (carries `animationName`), trust
+// computed style for that name. Otherwise read effect-level easing, falling
+// back to `ct.easing` and finally `linear`. The function never throws —
+// callers (in-page IIFE) cannot afford to abort the whole capture if one
+// engine surfaces unexpectedly-shaped objects.
+export function pagxResolveWaapiEasing(
+  anim: unknown,
+  effect: unknown,
+  ct: { easing?: string },
+  target: HTMLElement,
+): string {
+  try {
+    const cssName = (anim as { animationName?: string }).animationName;
+    if (cssName) {
+      const cs = getComputedStyle(target);
+      const names = pagxSplitTopLevelCommas(cs.animationName || '');
+      const idx = names.indexOf(cssName);
+      if (idx >= 0) {
+        const timings = pagxSplitTopLevelCommas(cs.animationTimingFunction || '');
+        const picked = timings[idx] || timings[0] || '';
+        if (picked) return picked;
+      }
+    }
+  } catch (_) {
+    /* fall through to WAAPI-effect lookup */
+  }
+  try {
+    const effectTiming = (effect as { getTiming?: () => { easing?: string } }).getTiming;
+    const fromEffect = effectTiming ? effectTiming.call(effect).easing : '';
+    return fromEffect || (ct && ct.easing) || 'linear';
+  } catch (_) {
+    return 'linear';
+  }
+}
+
 // Pure: turn a captured descriptor into its canonical `@keyframes` body and the
 // matching `animation` shorthand value (named `<prefix><index>`). Returns null
 // when no subset declarations survive (so the caller can skip it). Shared by the
@@ -326,12 +394,7 @@ export function pagxCollectWAAPI(captured: unknown[], seen: Set<Element>): void 
       }
       if (norm.length === 0) continue;
       pagxFillOffsets(norm);
-      let easing = 'linear';
-      try {
-        easing = (effect.getTiming && effect.getTiming().easing) || ct.easing || 'linear';
-      } catch (_) {
-        /* keep linear */
-      }
+      const easing = pagxResolveWaapiEasing(anim, effect, ct, target as HTMLElement);
       captured.push({
         el: target as HTMLElement,
         keyframes: norm,
@@ -576,6 +639,8 @@ const PAGX_ANIM_FNS = [
   pagxWhichVary,
   pagxReduceKeyframes,
   pagxNormalizeTiming,
+  pagxSplitTopLevelCommas,
+  pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxCandidateElements,
   pagxBuildKeyframesIndex,

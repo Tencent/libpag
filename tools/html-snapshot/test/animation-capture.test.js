@@ -12,6 +12,7 @@ const {
   pagxWhichVary,
   pagxReduceKeyframes,
   pagxNormalizeTiming,
+  pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   buildAnimationCapturePayload,
   capturePagxAnimationsOnPage,
@@ -178,6 +179,59 @@ describe('pagxNormalizeTiming', () => {
   test('defaults empty to linear, passes others through', () => {
     expect(pagxNormalizeTiming('')).toBe('linear');
     expect(pagxNormalizeTiming('ease-in-out')).toBe('ease-in-out');
+  });
+});
+
+describe('pagxResolveWaapiEasing', () => {
+  // The function calls `getComputedStyle` in the page; in jest's node env we
+  // stub it so the CSS-name branch is exercised end-to-end.
+  const originalGetComputedStyle = global.getComputedStyle;
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('CSSAnimation: reads animation-timing-function from computed style', () => {
+    global.getComputedStyle = () => ({
+      animationName: 'runEase',
+      animationTimingFunction: 'ease-in-out',
+    });
+    const anim = { animationName: 'runEase' };
+    const effect = { getTiming: () => ({ easing: 'linear' }) };
+    const ct = { easing: 'linear' };
+    const target = {};
+    expect(pagxResolveWaapiEasing(anim, effect, ct, target)).toBe('ease-in-out');
+  });
+
+  test('CSSAnimation: picks the timing matching the animation-name index', () => {
+    global.getComputedStyle = () => ({
+      animationName: 'foo, runEase, bar',
+      animationTimingFunction: 'linear, cubic-bezier(0.42, 0, 0.58, 1), ease-out',
+    });
+    const anim = { animationName: 'runEase' };
+    const out = pagxResolveWaapiEasing(anim, {}, {}, {});
+    expect(out).toBe('cubic-bezier(0.42, 0, 0.58, 1)');
+  });
+
+  test('WAAPI animation (no animationName): uses effect-level easing', () => {
+    global.getComputedStyle = () => ({ animationName: '', animationTimingFunction: 'linear' });
+    const anim = {};
+    const effect = { getTiming: () => ({ easing: 'cubic-bezier(0.1, 0.2, 0.3, 0.4)' }) };
+    const ct = { easing: 'linear' };
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('cubic-bezier(0.1, 0.2, 0.3, 0.4)');
+  });
+
+  test('falls back to ct.easing when effect-level easing is empty', () => {
+    const anim = {};
+    const effect = { getTiming: () => ({ easing: '' }) };
+    const ct = { easing: 'ease-in' };
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('ease-in');
+  });
+
+  test('returns linear on any thrown lookup', () => {
+    const anim = {};
+    const effect = { getTiming: () => { throw new Error('boom'); } };
+    const ct = {};
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('linear');
   });
 });
 
