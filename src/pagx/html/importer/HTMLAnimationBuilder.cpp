@@ -64,8 +64,7 @@ struct BezierEasing {
 };
 
 // Trimmed lookup helper (hoisted out of a lambda to honour the project's no-lambda rule).
-std::string GetTrimmed(const std::unordered_map<std::string, std::string>& style,
-                       const char* key) {
+std::string GetTrimmed(const std::unordered_map<std::string, std::string>& style, const char* key) {
   auto it = style.find(key);
   return it == style.end() ? std::string() : Trim(it->second);
 }
@@ -302,8 +301,8 @@ bool KeyframeStopLess(const CssKeyframeStop& a, const CssKeyframeStop& b) {
 // Writes bezier control handles between consecutive keyframes of a channel. No-op unless the
 // channel uses bezier interpolation.
 template <typename T>
-void ApplyBezierHandles(std::vector<Keyframe<T>>& keys, KeyframeInterpolationType interp,
-                        float x1, float y1, float x2, float y2) {
+void ApplyBezierHandles(std::vector<Keyframe<T>>& keys, KeyframeInterpolationType interp, float x1,
+                        float y1, float x2, float y2) {
   if (interp != KeyframeInterpolationType::Bezier) return;
   for (size_t i = 0; i + 1 < keys.size(); i++) {
     keys[i].bezierOut = Point{x1, y1};
@@ -330,6 +329,86 @@ SolidColor* FindSolidFill(Layer* layer, int depth = 0) {
     }
   }
   return nullptr;
+}
+
+// Splits `outer` into a layout-only outer plus a fully-visual `inner` so a CSS `transform`
+// animation can target `inner` without disturbing the layout box. The runtime `x` / `y`
+// channels overwrite the matrix translation absolutely, which would otherwise clobber the
+// position layout has assigned to `outer` (e.g. a flex child's main-axis offset, or the
+// padding origin of a constraint-laid-out child). By moving every visual / container attribute
+// onto a child Layer that fills its parent (`percentWidth/Height = 100`, no positional
+// constraints, `includeInLayout = false`), `inner.layoutBounds` is guaranteed to be (0, 0) so
+// the CSS keyframe values can be written verbatim onto `inner.x` / `inner.y` without baking in
+// any static layout offset.
+//
+// `outer` keeps the parent-facing slot (width/height/percent/positional-constraints/flex,
+// `includeInLayout`) and the existing `id` used by alpha targets and external references.
+// All other state — internal layout (layout/gap/padding/alignment/arrangement),
+// transform / visibility / compositing (matrix/matrix3D/preserve3D/blendMode/visible/
+// antiAlias/groupOpacity/passThroughBackground), content/styles/filters/children/composition,
+// clip/mask state — is moved to `inner`. After the split, `outer.children` contains `inner`
+// only. `alpha` stays on `outer` because the alpha channel still targets the original id.
+Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
+                                  HTMLIdAllocator& idAllocator) {
+  auto* inner = document->makeNode<Layer>();
+  inner->id = idAllocator.generateUnique("anim");
+
+  inner->layout = outer->layout;
+  inner->gap = outer->gap;
+  inner->padding = outer->padding;
+  inner->alignment = outer->alignment;
+  inner->arrangement = outer->arrangement;
+  outer->layout = LayoutMode::None;
+  outer->gap = 0.0f;
+  outer->padding = {};
+  outer->alignment = Alignment::Stretch;
+  outer->arrangement = Arrangement::Start;
+
+  inner->matrix = outer->matrix;
+  inner->matrix3D = outer->matrix3D;
+  inner->preserve3D = outer->preserve3D;
+  inner->blendMode = outer->blendMode;
+  inner->visible = outer->visible;
+  inner->antiAlias = outer->antiAlias;
+  inner->groupOpacity = outer->groupOpacity;
+  inner->passThroughBackground = outer->passThroughBackground;
+  outer->matrix = {};
+  outer->matrix3D = {};
+  outer->preserve3D = false;
+  outer->blendMode = BlendMode::Normal;
+  outer->antiAlias = true;
+  outer->groupOpacity = true;
+  outer->passThroughBackground = true;
+
+  inner->scrollRect = outer->scrollRect;
+  inner->hasScrollRect = outer->hasScrollRect;
+  inner->clipToBounds = outer->clipToBounds;
+  inner->mask = outer->mask;
+  inner->maskType = outer->maskType;
+  outer->scrollRect = {};
+  outer->hasScrollRect = false;
+  outer->clipToBounds = false;
+  outer->mask = nullptr;
+  outer->maskType = MaskType::Alpha;
+
+  inner->composition = outer->composition;
+  outer->composition = nullptr;
+
+  inner->contents = std::move(outer->contents);
+  inner->styles = std::move(outer->styles);
+  inner->filters = std::move(outer->filters);
+  inner->children = std::move(outer->children);
+  outer->contents = {};
+  outer->styles = {};
+  outer->filters = {};
+  outer->children = {};
+
+  inner->percentWidth = 100.0f;
+  inner->percentHeight = 100.0f;
+  inner->includeInLayout = false;
+
+  outer->children.push_back(inner);
+  return inner;
 }
 
 }  // namespace
@@ -370,8 +449,9 @@ bool HTMLAnimationBuilder::buildForElement(
   }
   if (spec.name.empty()) return false;
   if (spec.durationSeconds <= 0.0f) {
-    _diagnostics.warn("html: animation '" + spec.name +
-                      "' has no positive duration; skipped [subset:animation-unsupported-property]");
+    _diagnostics.warn(
+        "html: animation '" + spec.name +
+        "' has no positive duration; skipped [subset:animation-unsupported-property]");
     return false;
   }
 
@@ -453,28 +533,6 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
-  // The runtime `x` / `y` channels (WriteLayerX / WriteLayerY) set the layer matrix translation
-  // *absolutely*, overwriting the translation layout derives from the element's static
-  // `left` / `top`. CSS `transform: translate` is an offset on top of that static position, so the
-  // raw translate values alone would snap an animated element to the keyframe translate and discard
-  // where it was laid out (e.g. `top:40px` + `translate(240px,0)` would render at (240,0) instead
-  // of (260,40)). Bake the resolved static offset into the keyframe values so the laid-out position
-  // is preserved across the animation. Only channels that actually animate are adjusted; a static
-  // axis keeps its layout translation untouched. Percentage / missing offsets parse to NaN and are
-  // left alone (no reliable px baseline at import time).
-  if (!xKeys.empty()) {
-    float baseLeft = _valueParser.parseAbsoluteLengthPx(GetTrimmed(resolvedStyle, "left"));
-    if (!std::isnan(baseLeft)) {
-      for (auto& key : xKeys) key.value += baseLeft;
-    }
-  }
-  if (!yKeys.empty()) {
-    float baseTop = _valueParser.parseAbsoluteLengthPx(GetTrimmed(resolvedStyle, "top"));
-    if (!std::isnan(baseTop)) {
-      for (auto& key : yKeys) key.value += baseTop;
-    }
-  }
-
   // Apply bezier handles between consecutive keyframes for each channel.
   ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
@@ -506,16 +564,33 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->loop = LoopMode::Once;
   }
 
-  // Layer-targeted channels (alpha / x / y).
-  if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty()) {
+  // CSS `transform: translate(...)` is an offset on top of the layout-assigned position, but
+  // the runtime `x` / `y` channels overwrite the matrix translation absolutely. To keep the
+  // CSS semantics under any positioning mode (absolute, flex child, padding-anchored child),
+  // wrap the layer once and route x/y onto a fully-visual inner layer whose layoutBounds are
+  // always (0, 0). Done lazily so layers without transform animations stay flat.
+  Layer* xyTarget = nullptr;
+  if (!xKeys.empty() || !yKeys.empty()) {
+    xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
+  }
+
+  // Layer-targeted alpha channel — stays on the original `layer` so the existing id keeps
+  // identifying the alpha-animated element.
+  if (!alphaKeys.empty()) {
     auto* object = _document->makeNode<AnimationObject>();
     object->target = layer->id;
-    if (!alphaKeys.empty()) {
-      auto* ch = _document->makeNode<TypedChannel<float>>();
-      ch->name = "alpha";
-      ch->keyframes = std::move(alphaKeys);
-      object->channels.push_back(ch);
-    }
+    auto* ch = _document->makeNode<TypedChannel<float>>();
+    ch->name = "alpha";
+    ch->keyframes = std::move(alphaKeys);
+    object->channels.push_back(ch);
+    animation->objects.push_back(object);
+  }
+
+  // Layer-targeted x / y channels — routed to the inner wrapper when present so the CSS
+  // translate values stack on top of the layout offset instead of overwriting it.
+  if (!xKeys.empty() || !yKeys.empty()) {
+    auto* object = _document->makeNode<AnimationObject>();
+    object->target = xyTarget != nullptr ? xyTarget->id : layer->id;
     if (!xKeys.empty()) {
       auto* ch = _document->makeNode<TypedChannel<float>>();
       ch->name = "x";
@@ -531,9 +606,11 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->objects.push_back(object);
   }
 
-  // SolidColor-targeted channel (color / background-color).
+  // SolidColor-targeted channel (color / background-color). The Fill carrying the SolidColor
+  // moved to the inner wrapper when one was created, so search starts from there.
   if (!colorKeys.empty()) {
-    SolidColor* solid = FindSolidFill(layer);
+    Layer* fillHost = xyTarget != nullptr ? xyTarget : layer;
+    SolidColor* solid = FindSolidFill(fillHost);
     if (solid == nullptr) {
       _diagnostics.warn(
           "html: 'color' animation requires a solid background-color/color fill; dropped "
