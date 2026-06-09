@@ -237,6 +237,10 @@ async function processCase(entry, outDir, opts) {
     animDropped: 0,
     width: 0,
     height: 0,
+    // Per-frame sample times (seconds) + the global timeline length, so the HTML report can play
+    // the captured frames back as an animation on the real timeline clock (dynamic playback mode).
+    times: [],
+    globalDurationMs: 0,
     error: '',
   };
 
@@ -270,6 +274,8 @@ async function processCase(entry, outDir, opts) {
   const samples = Array.isArray(samplesMeta.samples) ? samplesMeta.samples : [];
   row.width = samplesMeta.width || 0;
   row.height = samplesMeta.height || 0;
+  row.times = samples.map((s) => (typeof s.timeSec === 'number' ? s.timeSec : 0));
+  row.globalDurationMs = typeof samplesMeta.globalDurationMs === 'number' ? samplesMeta.globalDurationMs : 0;
   if (samples.length === 0) {
     row.error = 'no-samples';
     return row;
@@ -443,12 +449,48 @@ function ssimClass(v) {
 
 function writeIndexHtml(rows, outDir, label) {
   const s = summarize(rows);
-  const cards = rows.map((r) => {
+
+  // Per-case data the in-page player needs: where the frames live and the real sample times so the
+  // flip-book plays on the same clock the baseline / pagx render were sampled on.
+  const playerData = rows.map((r) => ({
+    name: r.name,
+    dir: encodeURIComponent(r.name),
+    frames: r.error ? 0 : r.frames,
+    times: Array.isArray(r.times) ? r.times : [],
+    globalDurationMs: r.globalDurationMs || 0,
+  }));
+
+  const cards = rows.map((r, ci) => {
     const dir = encodeURIComponent(r.name);
     const cls = ssimClass(r.ssimMean);
     const status = r.error ? `<span class="err">${r.error}</span>` : '';
-    let strips = '';
+    let body = '';
     if (!r.error && r.frames > 0) {
+      // Dynamic playback: one larger frame per channel that the JS swaps in time. The static strips
+      // stay below it (collapsed by default) for frame-by-frame inspection.
+      const player = `
+  <div class="player" data-case="${ci}">
+    <div class="stage">
+      <figure><figcaption>baseline</figcaption><img class="play-img" data-sub="baseline" src="${dir}/baseline/frame-000.png"/></figure>
+      <figure><figcaption>pagx</figcaption><img class="play-img" data-sub="render" src="${dir}/render/frame-000.png"/></figure>
+      <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${dir}/diff/frame-000.png"/></figure>
+    </div>
+    <div class="controls">
+      <button class="play-btn" type="button">▶ Play</button>
+      <input class="scrub" type="range" min="0" max="${r.frames - 1}" value="0" step="1"/>
+      <span class="time-label">frame 1/${r.frames}</span>
+      <label class="speed">speed
+        <select class="speed-sel">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </label>
+      <label class="loop"><input type="checkbox" class="loop-chk" checked/> loop</label>
+    </div>
+  </div>`;
       const rowFor = (sub, label2) => {
         let cells = '';
         for (let i = 0; i < r.frames; i++) {
@@ -457,7 +499,12 @@ function writeIndexHtml(rows, outDir, label) {
         }
         return `<div class="strip"><span class="strip-label">${label2}</span><div class="frames">${cells}</div></div>`;
       };
-      strips = rowFor('baseline', 'baseline') + rowFor('render', 'pagx') + rowFor('diff', 'diff');
+      const strips = rowFor('baseline', 'baseline') + rowFor('render', 'pagx') + rowFor('diff', 'diff');
+      body = `${player}
+  <details class="strips">
+    <summary>frame strip</summary>
+    ${strips}
+  </details>`;
     }
     return `
 <section class="case">
@@ -469,7 +516,7 @@ function writeIndexHtml(rows, outDir, label) {
     <span class="muted">(import warnings ${r.animWarnings}, dropped ${r.animDropped})</span>
     ${status}
   </p>
-  ${strips}
+  ${body}
 </section>`;
   }).join('\n');
 
@@ -483,6 +530,9 @@ function writeIndexHtml(rows, outDir, label) {
   h1 { margin-top: 0; }
   .summary { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 18px; margin: 12px 0 24px; }
   .summary ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; }
+  .toolbar button { font-size: 13px; padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
+  .toolbar button:hover { background: #f1f5f9; }
   .case { border-top: 1px solid #e5e7eb; padding-top: 18px; margin-top: 18px; }
   .case h2 { margin: 0 0 6px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
   .ssim-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
@@ -492,6 +542,19 @@ function writeIndexHtml(rows, outDir, label) {
   .ssim-tag.na   { background: #e5e7eb; color: #475569; }
   .err { color: #b00; font-weight: 600; }
   .muted { color: #94a3b8; font-size: 12px; }
+  .player { margin: 8px 0; }
+  .stage { display: flex; gap: 16px; flex-wrap: wrap; }
+  .stage figure { margin: 0; }
+  .stage figcaption { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .stage img { height: 260px; width: auto; max-width: 100%; background: #f1f5f9; border-radius: 6px; image-rendering: pixelated; display: block; }
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+  .controls .play-btn { font-size: 13px; padding: 5px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; min-width: 84px; }
+  .controls .play-btn:hover { background: #f1f5f9; }
+  .controls .scrub { flex: 1 1 220px; min-width: 160px; }
+  .controls .time-label { font-size: 12px; color: #475569; font-variant-numeric: tabular-nums; min-width: 110px; }
+  .controls .speed, .controls .loop { font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 4px; }
+  .strips { margin-top: 12px; }
+  .strips summary { font-size: 12px; color: #64748b; cursor: pointer; }
   .strip { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
   .strip-label { width: 64px; font-size: 12px; color: #64748b; flex: none; }
   .frames { display: flex; gap: 6px; overflow-x: auto; }
@@ -509,7 +572,130 @@ function writeIndexHtml(rows, outDir, label) {
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
   </ul>
 </div>
+<div class="toolbar">
+  <button id="play-all" type="button">▶ Play all</button>
+  <span class="muted">dynamic playback — frames flip on their captured timeline clock</span>
+</div>
 ${cards}
+<script>
+const CASES = ${JSON.stringify(playerData)};
+
+// One flip-book player per case. Frames are sparse samples taken at CASES[i].times (seconds), so we
+// hold each frame for (next.time - this.time) and loop over the global timeline duration — the same
+// clock the baseline and pagx renders were sampled on.
+class Player {
+  constructor(root, data) {
+    this.root = root;
+    this.data = data;
+    this.imgs = Array.from(root.querySelectorAll('.play-img'));
+    this.btn = root.querySelector('.play-btn');
+    this.scrub = root.querySelector('.scrub');
+    this.timeLabel = root.querySelector('.time-label');
+    this.speedSel = root.querySelector('.speed-sel');
+    this.loopChk = root.querySelector('.loop-chk');
+    this.frame = 0;
+    this.playing = false;
+    this.elapsedMs = 0;
+    this.lastTs = 0;
+    this.raf = 0;
+
+    const times = data.times && data.times.length ? data.times : [];
+    this.times = times;
+    // Duration of the loop in ms: prefer the captured global duration, else last sample time.
+    this.durationMs = data.globalDurationMs > 0
+      ? data.globalDurationMs
+      : (times.length ? times[times.length - 1] * 1000 : 0);
+    if (!(this.durationMs > 0)) this.durationMs = Math.max(1, data.frames) * 1000;
+
+    this.btn.addEventListener('click', () => this.toggle());
+    this.scrub.addEventListener('input', () => {
+      this.pause();
+      this.setFrame(parseInt(this.scrub.value, 10) || 0);
+      this.elapsedMs = this.frameTimeMs(this.frame);
+    });
+    this.setFrame(0);
+  }
+
+  frameTimeMs(i) {
+    if (this.times.length > i && typeof this.times[i] === 'number') return this.times[i] * 1000;
+    if (this.data.frames > 1) return (i / (this.data.frames - 1)) * this.durationMs;
+    return 0;
+  }
+
+  frameForTimeMs(ms) {
+    // Last frame whose sample time is <= ms.
+    let f = 0;
+    for (let i = 0; i < this.data.frames; i++) {
+      if (this.frameTimeMs(i) <= ms + 0.001) f = i; else break;
+    }
+    return f;
+  }
+
+  setFrame(i) {
+    const n = this.data.frames;
+    if (n <= 0) return;
+    this.frame = ((i % n) + n) % n;
+    const idx = String(this.frame).padStart(3, '0');
+    for (const img of this.imgs) {
+      const sub = img.getAttribute('data-sub');
+      img.src = this.data.dir + '/' + sub + '/frame-' + idx + '.png';
+    }
+    this.scrub.value = String(this.frame);
+    const t = (this.frameTimeMs(this.frame) / 1000).toFixed(2);
+    this.timeLabel.textContent = 'frame ' + (this.frame + 1) + '/' + n + '  (' + t + 's)';
+  }
+
+  toggle() { this.playing ? this.pause() : this.play(); }
+
+  play() {
+    if (this.playing || this.data.frames <= 1) return;
+    this.playing = true;
+    this.btn.textContent = '❚❚ Pause';
+    this.lastTs = performance.now();
+    if (this.elapsedMs >= this.durationMs) this.elapsedMs = 0;
+    const tick = (ts) => {
+      if (!this.playing) return;
+      const speed = parseFloat(this.speedSel.value) || 1;
+      this.elapsedMs += (ts - this.lastTs) * speed;
+      this.lastTs = ts;
+      if (this.elapsedMs >= this.durationMs) {
+        if (this.loopChk.checked) {
+          this.elapsedMs = this.elapsedMs % this.durationMs;
+        } else {
+          this.elapsedMs = this.durationMs;
+          this.setFrame(this.data.frames - 1);
+          this.pause();
+          return;
+        }
+      }
+      this.setFrame(this.frameForTimeMs(this.elapsedMs));
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+
+  pause() {
+    this.playing = false;
+    this.btn.textContent = '▶ Play';
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+}
+
+const players = [];
+document.querySelectorAll('.player').forEach((el) => {
+  const ci = parseInt(el.getAttribute('data-case'), 10);
+  if (CASES[ci] && CASES[ci].frames > 0) players.push(new Player(el, CASES[ci]));
+});
+
+const playAll = document.getElementById('play-all');
+let allPlaying = false;
+playAll.addEventListener('click', () => {
+  allPlaying = !allPlaying;
+  playAll.textContent = allPlaying ? '❚❚ Pause all' : '▶ Play all';
+  for (const p of players) allPlaying ? p.play() : p.pause();
+});
+</script>
 </body>
 </html>`;
   fs.writeFileSync(path.join(outDir, 'index.html'), html, 'utf8');
@@ -573,7 +759,11 @@ async function main() {
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'index.html')}`);
 }
 
-main().catch((err) => {
-  console.error(err && err.stack ? err.stack : err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err && err.stack ? err.stack : err);
+    process.exit(1);
+  });
+}
+
+module.exports = { writeIndexHtml, writeMarkdown, writeCsv, summarize };

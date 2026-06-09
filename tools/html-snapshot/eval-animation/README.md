@@ -76,8 +76,23 @@ Outputs land in `eval-animation/out/<label>/`:
 
 - `report.csv` — one row per case (means across frames).
 - `report.md` — markdown table with a corpus summary on top.
-- `index.html` — per-case `baseline / pagx / diff` frame strips; open in a browser.
+- `index.html` — per-case `baseline / pagx / diff` player; open in a browser.
 - `<case>/baseline/*.png`, `render/*.png`, `diff/*.png`, `subset.html`, `subset.pagx`, `*.stderr.txt`.
+
+### Dynamic playback (`index.html`)
+
+The report is not just a static contact sheet — each case has a flip-book **player** that animates the
+captured frames so you can watch the motion instead of eyeballing a strip:
+
+- `baseline / pagx / diff` play side by side, in sync, on the **same timeline clock** the frames were
+  sampled on (sparse samples are held for `next.time − this.time`, derived from `baseline/samples.json`).
+- Per-case controls: play / pause, a frame scrubber, a speed selector (0.25×–4×), and a loop toggle.
+- A **Play all** button at the top drives every case at once.
+- The old per-frame strip is still there under the collapsible *frame strip* `<details>` for
+  frame-by-frame inspection.
+
+Because the grid is sampled (default 5 frames), playback is a flip-book, not a 60fps render — raise
+`--samples` for smoother motion at the cost of more baseline screenshots and `pagx render --time` calls.
 
 ## Metrics
 
