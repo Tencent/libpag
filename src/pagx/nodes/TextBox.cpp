@@ -21,8 +21,6 @@
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
-#include "pagx/nodes/Text.h"
-#include "renderer/GlyphRunRenderer.h"
 
 namespace pagx {
 
