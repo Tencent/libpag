@@ -1562,12 +1562,12 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
 
 void SVGWriter::writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource) {
   bool hasShadows = !agg.dropShadowResults.empty() || !agg.innerShadowResults.empty();
-  if (!hasShadows) {
-    // No shadows but upstream filters may have reshaped the source (Blur,
-    // ColorMatrix, Blend). In that case the chain already terminates in
-    // `currentSource`, which is the default implicit output — nothing to
-    // merge. Only when no image-transforming filter ran does currentSource
-    // remain "SourceGraphic", and the <filter> would have been empty anyway.
+  bool hasAbove = !agg.aboveResults.empty();
+  if (!hasShadows && !hasAbove) {
+    // No shadows and no above-layer styles (e.g. NoiseStyle). Upstream filters
+    // may have reshaped the source (Blur, ColorMatrix, Blend). In that case the
+    // chain already terminates in `currentSource`, which is the default implicit
+    // output — nothing to merge.
     return;
   }
   bool multipleShadows = (agg.dropShadowResults.size() + agg.innerShadowResults.size()) > 1;
