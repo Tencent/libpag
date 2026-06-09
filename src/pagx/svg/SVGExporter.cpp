@@ -2199,18 +2199,11 @@ const LayerBuildResult& SVGWriter::ensureBuildResult() {
 
 bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
   auto& buildResult = ensureBuildResult();
-  auto it = buildResult.layerMap.find(layer);
-  if (it == buildResult.layerMap.end() || !buildResult.root) {
-    addWarning("rasterize skipped: layer '" +
-               (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-               "' has no entry in the LayerBuilder map; falling back to vector emission.");
-    return false;
-  }
-  auto tgfxLayer = it->second;
+  auto tgfxLayer = buildResult.getLayer(layer);
   if (!tgfxLayer) {
     addWarning("rasterize skipped: layer '" +
                (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-               "' resolved to a null tgfx::Layer; falling back to vector emission.");
+               "' has no entry in the LayerBuilder map; falling back to vector emission.");
     return false;
   }
   // The <image> is emitted into `out`, which is the parent <g>'s body — that <g>'s transform

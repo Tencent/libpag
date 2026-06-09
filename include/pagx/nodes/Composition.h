@@ -23,6 +23,7 @@
 
 namespace pagx {
 
+class Animation;
 class Layer;
 
 /**
@@ -45,6 +46,11 @@ class Composition : public Node {
    * The layers contained in this composition.
    */
   std::vector<Layer*> layers = {};
+
+  /**
+   * The animations contained in this composition.
+   */
+  std::vector<Animation*> animations = {};
 
   NodeType nodeType() const override {
     return NodeType::Composition;
