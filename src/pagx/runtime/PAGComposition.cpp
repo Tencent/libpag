@@ -33,10 +33,10 @@ namespace pagx {
 
 PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
                                const std::shared_ptr<PAGScene>& scene)
-    : PAGLayer(node, std::move(runtimeLayer), scene), binding(std::make_shared<RuntimeBinding>()) {
+    : PAGLayer(node, std::move(runtimeLayer), scene), binding(std::make_unique<RuntimeBinding>()) {
 }
 
-PAGComposition::~PAGComposition() = default;
+PAGComposition::~PAGComposition() {}
 
 LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
