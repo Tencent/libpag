@@ -8560,6 +8560,7 @@
         "LayerBuilderAPIConsistency": "f40e23b6",
         "NoiseFilterAllElements": "798f40c4",
         "NoiseFilterModes": "798f40c4",
+        "NoiseStyleModes": "1af07597",
         "PrecomposedTextRender": "9b6dea6a",
         "html": {
             "blend_modes_showcase": "f94e413d",
