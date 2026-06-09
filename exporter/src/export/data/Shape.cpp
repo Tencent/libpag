@@ -161,7 +161,7 @@ static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle) {
   auto reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
                            AEStreamParser::ShapeDirectionReversedParser);
   element->shapePath = GetProperty(streamHandle, "ADBE Vector Shape", AEStreamParser::PathParser);
-  if (reversed) {
+  if (reversed && element->shapePath != nullptr) {
     if (element->shapePath->animatable()) {
       auto property = static_cast<pag::AnimatableProperty<pag::PathHandle>*>(element->shapePath);
       for (auto& keyframe : property->keyframes) {

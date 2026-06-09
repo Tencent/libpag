@@ -447,6 +447,9 @@ std::vector<pag::Effect*> GetEffects(const AEGP_LayerH& layerHandle) {
 
 static void GetTextBackground(const AEGP_StreamRefH& streamHandle,
                               pag::Property<pag::TextDocumentHandle>* textDocument) {
+  if (textDocument == nullptr) {
+    return;
+  }
   auto backgroundColor =
       GetValue(streamHandle, "ADBE Text Background-0001", AEStreamParser::ColorParser);
   auto backgroundAlpha =
@@ -495,7 +498,7 @@ static pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle,
 
   if (!(type == AEEffectType::ImageFillRuleV2 &&
         tagLevel >= static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) &&
-      imageFillRule->timeRemap->animatable()) {
+      imageFillRule->timeRemap != nullptr && imageFillRule->timeRemap->animatable()) {
     auto timeRemap = imageFillRule->timeRemap;
     for (auto& keyFrame : static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
       keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;

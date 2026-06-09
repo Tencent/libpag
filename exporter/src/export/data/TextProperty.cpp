@@ -584,7 +584,7 @@ static void GetFirstBaseLineByPos(pag::TextDocumentHandle textDocument,
 
 static void GetFirstBaseLinesByPos(pag::Property<pag::TextDocumentHandle>* sourceText,
                                    std::vector<pag::TextAnimator*>* animators) {
-  if (animators == nullptr || animators->empty()) {
+  if (sourceText == nullptr || animators == nullptr || animators->empty()) {
     return;
   }
 
