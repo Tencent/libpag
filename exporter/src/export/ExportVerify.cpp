@@ -779,8 +779,7 @@ static void CheckTextLayerPathOption(std::shared_ptr<PAGExportSession> session,
       perpendicularToPath->value != true) {
     session->pushWarning(AlertInfoType::TextPathParamPerpendicularToPath);
   }
-  if (forceAlignment == nullptr || forceAlignment->animatable() ||
-      forceAlignment->value != false) {
+  if (forceAlignment == nullptr || forceAlignment->animatable() || forceAlignment->value != false) {
     session->pushWarning(AlertInfoType::TextPathParamForceAlignment);
   }
 

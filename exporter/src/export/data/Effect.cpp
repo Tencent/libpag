@@ -153,8 +153,7 @@ static pag::Effect* GetDisplacementMapEffect(const AEGP_StreamRefH& streamHandle
       GetProperty(streamHandle, "ADBE Displacement Map-0008", AEStreamParser::BooleanParser);
   if (effect->useForHorizontalDisplacement == nullptr ||
       effect->maxHorizontalDisplacement == nullptr ||
-      effect->useForVerticalDisplacement == nullptr ||
-      effect->maxVerticalDisplacement == nullptr ||
+      effect->useForVerticalDisplacement == nullptr || effect->maxVerticalDisplacement == nullptr ||
       effect->displacementMapBehavior == nullptr || effect->edgeBehavior == nullptr ||
       effect->expandOutput == nullptr) {
     delete effect->displacementMapLayer;
