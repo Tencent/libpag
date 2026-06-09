@@ -36,8 +36,7 @@ PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> r
     : PAGLayer(node, std::move(runtimeLayer), scene), binding(std::make_unique<RuntimeBinding>()) {
 }
 
-PAGComposition::~PAGComposition() {
-}
+PAGComposition::~PAGComposition() = default;
 
 LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
