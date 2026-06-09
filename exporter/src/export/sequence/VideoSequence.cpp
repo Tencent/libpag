@@ -421,6 +421,12 @@ static void AdjustMainCompositionParam(pag::VectorComposition* newComposition,
     transform->position->value.x *= factorSize;
     transform->position->value.y *= factorSize;
   }
+  if (transform->xPosition != nullptr) {
+    transform->xPosition->value *= factorSize;
+  }
+  if (transform->yPosition != nullptr) {
+    transform->yPosition->value *= factorSize;
+  }
 
   composition->width = sequence->width;
   composition->height = sequence->height;
