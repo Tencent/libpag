@@ -19,6 +19,7 @@
 #include "pagx/html/importer/HTMLAnimationBuilder.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <vector>
 #include "pagx/PAGXDocument.h"
@@ -53,14 +54,31 @@ struct AnimationSpec {
   std::string direction = "normal";
 };
 
-// One resolved bezier easing (CSS cubic-bezier control points).
-struct BezierEasing {
-  bool isBezier = false;  // false => Linear or Hold (see isHold)
-  bool isHold = false;
+// One resolved CSS animation timing-function. Exactly one shape is active per resolve, selected
+// by `kind`. Bezier control points are valid only when `kind == Bezier`; `steps` is valid only
+// when `kind == Steps`.
+struct ResolvedEasing {
+  enum class Kind : uint8_t { Linear, Bezier, Steps };
+
+  // CSS `steps(n, <jump-term>)`. Each variant moves the discontinuity within the [0,1] segment
+  // differently; see https://drafts.csswg.org/css-easing-1/#step-easing-functions for the
+  // canonical semantics.
+  enum class Jump : uint8_t {
+    End,    // steps(n) / steps(n, jump-end) / steps(n, end). Default per CSS.
+    Start,  // steps(n, jump-start) / steps(n, start).
+    None,   // steps(n, jump-none). Requires n >= 2; reaches both endpoints.
+    Both,   // steps(n, jump-both). Skips both endpoints.
+  };
+
+  Kind kind = Kind::Linear;
+  // Bezier control points (Kind::Bezier).
   float x1 = 0.0f;
   float y1 = 0.0f;
   float x2 = 0.0f;
   float y2 = 0.0f;
+  // Steps shape (Kind::Steps).
+  int stepCount = 1;
+  Jump stepJump = Jump::End;
 };
 
 // Trimmed lookup helper (hoisted out of a lambda to honour the project's no-lambda rule).
@@ -97,19 +115,30 @@ bool IsTimingKeyword(const std::string& lc) {
          lc.rfind("cubic-bezier(", 0) == 0 || lc.rfind("steps(", 0) == 0;
 }
 
-// Resolves a CSS timing-function string to a bezier/hold easing descriptor.
-BezierEasing ResolveTimingFunction(const std::string& value) {
-  BezierEasing e = {};
+// Resolves a CSS timing-function string to an easing descriptor. Unknown / malformed values
+// fall back to Linear.
+ResolvedEasing ResolveTimingFunction(const std::string& value) {
+  ResolvedEasing e = {};
   std::string lc = ToLower(Trim(value));
   if (lc.empty() || lc == "linear") {
     return e;  // Linear
   }
-  if (lc == "step-start" || lc == "step-end" || lc.rfind("steps(", 0) == 0) {
-    e.isHold = true;
+  // CSS `step-start` and `step-end` are exact aliases for `steps(1, jump-start)` and
+  // `steps(1, jump-end)` respectively, so funnel them through the steps path.
+  if (lc == "step-start") {
+    e.kind = ResolvedEasing::Kind::Steps;
+    e.stepCount = 1;
+    e.stepJump = ResolvedEasing::Jump::Start;
+    return e;
+  }
+  if (lc == "step-end") {
+    e.kind = ResolvedEasing::Kind::Steps;
+    e.stepCount = 1;
+    e.stepJump = ResolvedEasing::Jump::End;
     return e;
   }
   if (lc == "ease") {
-    e.isBezier = true;
+    e.kind = ResolvedEasing::Kind::Bezier;
     e.x1 = 0.25f;
     e.y1 = 0.1f;
     e.x2 = 0.25f;
@@ -117,7 +146,7 @@ BezierEasing ResolveTimingFunction(const std::string& value) {
     return e;
   }
   if (lc == "ease-in") {
-    e.isBezier = true;
+    e.kind = ResolvedEasing::Kind::Bezier;
     e.x1 = 0.42f;
     e.y1 = 0.0f;
     e.x2 = 1.0f;
@@ -125,7 +154,7 @@ BezierEasing ResolveTimingFunction(const std::string& value) {
     return e;
   }
   if (lc == "ease-out") {
-    e.isBezier = true;
+    e.kind = ResolvedEasing::Kind::Bezier;
     e.x1 = 0.0f;
     e.y1 = 0.0f;
     e.x2 = 0.58f;
@@ -133,7 +162,7 @@ BezierEasing ResolveTimingFunction(const std::string& value) {
     return e;
   }
   if (lc == "ease-in-out") {
-    e.isBezier = true;
+    e.kind = ResolvedEasing::Kind::Bezier;
     e.x1 = 0.42f;
     e.y1 = 0.0f;
     e.x2 = 0.58f;
@@ -142,15 +171,47 @@ BezierEasing ResolveTimingFunction(const std::string& value) {
   }
   std::string fn;
   std::string args;
-  if (ParseCssFunctionCall(lc, fn, args) && fn == "cubic-bezier") {
-    auto parts = SplitTopLevelCommas(args);
-    if (parts.size() == 4) {
-      e.isBezier = true;
-      e.x1 = std::strtof(Trim(parts[0]).c_str(), nullptr);
-      e.y1 = std::strtof(Trim(parts[1]).c_str(), nullptr);
-      e.x2 = std::strtof(Trim(parts[2]).c_str(), nullptr);
-      e.y2 = std::strtof(Trim(parts[3]).c_str(), nullptr);
-      return e;
+  if (ParseCssFunctionCall(lc, fn, args)) {
+    if (fn == "cubic-bezier") {
+      auto parts = SplitTopLevelCommas(args);
+      if (parts.size() == 4) {
+        e.kind = ResolvedEasing::Kind::Bezier;
+        e.x1 = std::strtof(Trim(parts[0]).c_str(), nullptr);
+        e.y1 = std::strtof(Trim(parts[1]).c_str(), nullptr);
+        e.x2 = std::strtof(Trim(parts[2]).c_str(), nullptr);
+        e.y2 = std::strtof(Trim(parts[3]).c_str(), nullptr);
+        return e;
+      }
+    } else if (fn == "steps") {
+      auto parts = SplitTopLevelCommas(args);
+      if (!parts.empty()) {
+        char* end = nullptr;
+        long n = std::strtol(Trim(parts[0]).c_str(), &end, 10);
+        if (end != parts[0].c_str() && n >= 1) {
+          ResolvedEasing::Jump jump = ResolvedEasing::Jump::End;  // CSS default
+          if (parts.size() >= 2) {
+            std::string mode = ToLower(Trim(parts[1]));
+            if (mode == "jump-end" || mode == "end") {
+              jump = ResolvedEasing::Jump::End;
+            } else if (mode == "jump-start" || mode == "start") {
+              jump = ResolvedEasing::Jump::Start;
+            } else if (mode == "jump-none") {
+              jump = ResolvedEasing::Jump::None;
+            } else if (mode == "jump-both") {
+              jump = ResolvedEasing::Jump::Both;
+            }
+          }
+          // `jump-none` is undefined for n == 1; fall back to `end` to keep producing a sane
+          // shape rather than dropping the timing entirely.
+          if (jump == ResolvedEasing::Jump::None && n < 2) {
+            jump = ResolvedEasing::Jump::End;
+          }
+          e.kind = ResolvedEasing::Kind::Steps;
+          e.stepCount = static_cast<int>(n);
+          e.stepJump = jump;
+          return e;
+        }
+      }
     }
   }
   return e;  // default Linear
@@ -308,6 +369,91 @@ void ApplyBezierHandles(std::vector<Keyframe<T>>& keys, KeyframeInterpolationTyp
     keys[i].bezierOut = Point{x1, y1};
     keys[i + 1].bezierIn = Point{x2, y2};
   }
+}
+
+// Component-wise linear interpolation helpers. Two specializations cover the channels the
+// builder emits — float (alpha/x/y) and Color (background-color/color). Color components are
+// blended in the source color space; CSS animations are author-defined in sRGB and the output
+// channel preserves that, so a per-component lerp matches what a browser would render.
+template <typename T>
+T LerpKeyframeValue(const T& a, const T& b, float t);
+
+template <>
+float LerpKeyframeValue<float>(const float& a, const float& b, float t) {
+  return a + (b - a) * t;
+}
+
+template <>
+Color LerpKeyframeValue<Color>(const Color& a, const Color& b, float t) {
+  Color out = a;
+  out.red = a.red + (b.red - a.red) * t;
+  out.green = a.green + (b.green - a.green) * t;
+  out.blue = a.blue + (b.blue - a.blue) * t;
+  out.alpha = a.alpha + (b.alpha - a.alpha) * t;
+  return out;
+}
+
+// Returns the [0, 1] output fraction for step `s` (0-indexed) of an n-step easing under the
+// given jump mode. The CSS easing-1 spec defines four jump variants that differ only in which
+// of the n+1 candidate output positions are used:
+//   jump-end:   { 0/n, 1/n, ..., (n-1)/n }   (default; "no jump at start")
+//   jump-start: { 1/n, 2/n, ..., n/n }       ("no jump at end")
+//   jump-none:  { 0/(n-1), 1/(n-1), ..., 1 } (n distinct values, n-1 jumps; needs n>=2)
+//   jump-both:  { 1/(n+1), 2/(n+1), ..., n/(n+1) } (jumps at both ends)
+float StepValueFraction(int s, int n, ResolvedEasing::Jump jump) {
+  switch (jump) {
+    case ResolvedEasing::Jump::End:
+      return static_cast<float>(s) / static_cast<float>(n);
+    case ResolvedEasing::Jump::Start:
+      return static_cast<float>(s + 1) / static_cast<float>(n);
+    case ResolvedEasing::Jump::None:
+      return static_cast<float>(s) / static_cast<float>(n - 1);
+    case ResolvedEasing::Jump::Both:
+      return static_cast<float>(s + 1) / static_cast<float>(n + 1);
+  }
+  return 0.0f;
+}
+
+// Expands every adjacent-keyframe segment in `keys` into n hold keyframes that reproduce a CSS
+// `steps(n, jump)` timing function. The original endpoints' times are preserved and the original
+// last keyframe is written verbatim with Hold interpolation; intermediate keyframes are
+// time-quantized to the runtime's integer Frame grid via std::llround. Trailing same-value
+// duplicates are harmless to the runtime (a Hold whose neighbour shares its value is a no-op).
+template <typename T>
+void ExpandSteps(std::vector<Keyframe<T>>& keys, int n, ResolvedEasing::Jump jump) {
+  if (keys.empty()) return;
+  if (keys.size() < 2 || n < 1) {
+    for (auto& k : keys) k.interpolation = KeyframeInterpolationType::Hold;
+    return;
+  }
+  std::vector<Keyframe<T>> out;
+  out.reserve(keys.size() + (keys.size() - 1) * static_cast<size_t>(n));
+  for (size_t i = 0; i + 1 < keys.size(); i++) {
+    Frame timeA = keys[i].time;
+    Frame timeB = keys[i + 1].time;
+    const T& valueA = keys[i].value;
+    const T& valueB = keys[i + 1].value;
+    long long dt = static_cast<long long>(timeB) - static_cast<long long>(timeA);
+    if (dt <= 0) {
+      Keyframe<T> k = keys[i];
+      k.interpolation = KeyframeInterpolationType::Hold;
+      out.push_back(k);
+      continue;
+    }
+    for (int s = 0; s < n; s++) {
+      float timeFrac = static_cast<float>(s) / static_cast<float>(n);
+      float valueFrac = StepValueFraction(s, n, jump);
+      Keyframe<T> k = {};
+      k.time = static_cast<Frame>(timeA + std::llround(timeFrac * static_cast<float>(dt)));
+      k.value = LerpKeyframeValue<T>(valueA, valueB, valueFrac);
+      k.interpolation = KeyframeInterpolationType::Hold;
+      out.push_back(k);
+    }
+  }
+  Keyframe<T> last = keys.back();
+  last.interpolation = KeyframeInterpolationType::Hold;
+  out.push_back(last);
+  keys = std::move(out);
 }
 
 // Returns the first SolidColor painted by a Fill in `layer`'s subtree, or nullptr. The element's
@@ -471,11 +617,13 @@ bool HTMLAnimationBuilder::buildForElement(
   std::sort(stops.begin(), stops.end(), KeyframeStopLess);
 
   // Timing -> per-segment easing (applied uniformly across the animation).
-  BezierEasing easing = ResolveTimingFunction(spec.timingFunction);
+  ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
   KeyframeInterpolationType interp = KeyframeInterpolationType::Linear;
-  if (easing.isHold) {
+  if (easing.kind == ResolvedEasing::Kind::Steps) {
+    // The per-segment shape is composed of n hold sub-keyframes. The keyframes initially carry
+    // Hold so the per-segment composition is well defined before ExpandSteps fans them out.
     interp = KeyframeInterpolationType::Hold;
-  } else if (easing.isBezier) {
+  } else if (easing.kind == ResolvedEasing::Kind::Bezier) {
     interp = KeyframeInterpolationType::Bezier;
   }
 
@@ -538,6 +686,16 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(colorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+
+  // CSS `steps()` / `step-start` / `step-end` are not a runtime interpolation type — they expand
+  // into n hold keyframes per @keyframes segment so the runtime can replay the staircase
+  // verbatim. Channels that received no values are no-ops here.
+  if (easing.kind == ResolvedEasing::Kind::Steps) {
+    ExpandSteps(alphaKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(colorKeys, easing.stepCount, easing.stepJump);
+  }
 
   if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && colorKeys.empty()) {
     return false;
