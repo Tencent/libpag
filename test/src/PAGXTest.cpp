@@ -7435,4 +7435,85 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
 }
 
+/**
+ * Test rendering with Mono, Duo, and Multi noise styles side by side.
+ * Covers writeNoiseStyle for all three modes.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleModes) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 180;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto makeLayer = [&](float x, float y) {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(x, y);
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {0, 0};
+    rect->size = {100, 100};
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+    fill->color = solid;
+    layer->contents.push_back(rect);
+    layer->contents.push_back(fill);
+    return layer;
+  };
+
+  auto layer1 = makeLayer(20, 40);
+  auto mono = doc->makeNode<pagx::NoiseStyle>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer1->styles.push_back(mono);
+  doc->layers.push_back(layer1);
+
+  auto layer2 = makeLayer(150, 40);
+  auto duo = doc->makeNode<pagx::NoiseStyle>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 8;
+  duo->density = 0.5f;
+  duo->seed = 42;
+  duo->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer2->styles.push_back(duo);
+  doc->layers.push_back(layer2);
+
+  auto layer3 = makeLayer(280, 40);
+  auto multi = doc->makeNode<pagx::NoiseStyle>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer3->styles.push_back(multi);
+  doc->layers.push_back(layer3);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleModes"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseStyleModes.svg");
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
+
 }  // namespace pag
