@@ -7454,15 +7454,15 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
  * surface pixels instead of clearing the surface first.
  */
 PAGX_TEST(PAGXTest, PAGSceneDrawAutoClearOverlay) {
-  auto doc = pagx::PAGXDocument::Make(8, 8);
+  auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->width = 8;
-  layer->height = 8;
+  layer->width = 100;
+  layer->height = 100;
   doc->layers.push_back(layer);
 
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 8;
-  rect->size.height = 8;
+  rect->size.width = 100;
+  rect->size.height = 100;
   layer->contents.push_back(rect);
 
   auto fill = doc->makeNode<pagx::Fill>();
@@ -7490,53 +7490,41 @@ PAGX_TEST(PAGXTest, PAGSceneDrawAutoClearOverlay) {
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(1.0f);
 
-  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface != nullptr);
 
-  // First draw with autoClear=true: surface is cleared, then red layer is drawn.
-  ASSERT_TRUE(scene->draw(surface, true));
-  std::vector<uint8_t> pixels(8 * 8 * 4, 0);
-  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
-  size_t i = (4 * 8 + 4) * 4;
-  EXPECT_EQ(pixels[i + 0], 255);  // R
-  EXPECT_EQ(pixels[i + 1], 0);
-  EXPECT_EQ(pixels[i + 2], 0);
-  EXPECT_EQ(pixels[i + 3], 255);
+  tgfx::Bitmap frame(100, 100, false, false);
+  tgfx::Pixmap framePixmap(frame);
 
-  // Change animation to green.
+  // Draw with autoClear=true (default): red square.
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
+  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/PAGSceneDrawAutoClearOverlay_red"));
+
+  // Change animation to green and draw with autoClear=true: green replaces red.
   pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   prop->keyframes[0].value = green;
   timeline->apply(1.0f);
-
-  // Draw with autoClear=true: surface is cleared, green replaces red.
   ASSERT_TRUE(scene->draw(surface, true));
-  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
-  EXPECT_EQ(pixels[i + 0], 0);
-  EXPECT_EQ(pixels[i + 1], 255);  // G
-  EXPECT_EQ(pixels[i + 2], 0);
-  EXPECT_EQ(pixels[i + 3], 255);
+  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
+  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/PAGSceneDrawAutoClearOverlay_green"));
 
-  // Reset to red, draw with autoClear=false: red overlays on top of green.
+  // Reset to red, draw with autoClear=false: red is composited (SrcOver) on top of green.
+  // Since both are fully opaque, red completely covers green.
   prop->keyframes[0].value = red;
   timeline->apply(1.0f);
   ASSERT_TRUE(scene->draw(surface, false));
-  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
-  // With autoClear=false, red is composited (SrcOver) on top of green.
-  // Red (1,0,0,1) over green (0,1,0,1) with SrcOver = red wins (opaque).
-  EXPECT_EQ(pixels[i + 0], 255);  // R
-  EXPECT_EQ(pixels[i + 1], 0);
-  EXPECT_EQ(pixels[i + 2], 0);
-  EXPECT_EQ(pixels[i + 3], 255);
+  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
+  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/PAGSceneDrawAutoClearOverlay_overlay"));
 }
 
 /**
  * Test case: PAGSurface::MakeFrom(BackendTexture) creates a surface that can render PAGScene
- * content and read pixels back correctly.
+ * content and produce a correct screenshot.
  */
 PAGX_TEST(PAGXTest, PAGSurfaceFromBackendTexture) {
-  // context is already locked by PAGXTest::SetUp().
-  const int width = 8;
-  const int height = 8;
+  const int width = 100;
+  const int height = 100;
 
   tgfx::GLTextureInfo textureInfo = {};
   CreateGLTexture(context, width, height, &textureInfo);
@@ -7547,7 +7535,6 @@ PAGX_TEST(PAGXTest, PAGSurfaceFromBackendTexture) {
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
 
-  // Unlock so the PAGSurface can manage the context for drawing.
   device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
@@ -7587,27 +7574,22 @@ PAGX_TEST(PAGXTest, PAGSurfaceFromBackendTexture) {
   timeline->apply(1.0f);
 
   ASSERT_TRUE(scene->draw(surface));
+  tgfx::Bitmap frame(width, height, false, false);
+  tgfx::Pixmap framePixmap(frame);
+  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
+  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/PAGSurfaceFromBackendTexture"));
 
-  std::vector<uint8_t> pixels(width * height * 4, 0);
-  ASSERT_TRUE(surface->readPixels(pixels.data(), width * 4));
-  size_t i = (4 * width + 4) * 4;
-  EXPECT_EQ(pixels[i + 0], 0);
-  EXPECT_EQ(pixels[i + 1], 0);
-  EXPECT_EQ(pixels[i + 2], 255);  // B
-  EXPECT_EQ(pixels[i + 3], 255);
-
-  // Re-lock for GL cleanup.
   context = device->lockContext();
   glDeleteTextures(1, &textureInfo.id);
 }
 
 /**
  * Test case: PAGSurface::MakeFrom(BackendRenderTarget) creates a surface that can render PAGScene
- * content and read pixels back correctly.
+ * content and produce a correct screenshot.
  */
 PAGX_TEST(PAGXTest, PAGSurfaceFromBackendRenderTarget) {
-  const int width = 8;
-  const int height = 8;
+  const int width = 100;
+  const int height = 100;
 
   // Create a texture + FBO for the render target.
   tgfx::GLTextureInfo textureInfo = {};
@@ -7668,16 +7650,11 @@ PAGX_TEST(PAGXTest, PAGSurfaceFromBackendRenderTarget) {
   timeline->apply(1.0f);
 
   ASSERT_TRUE(scene->draw(surface));
+  tgfx::Bitmap frame2(width, height, false, false);
+  tgfx::Pixmap framePixmap2(frame2);
+  ASSERT_TRUE(surface->readPixels(framePixmap2.writablePixels(), framePixmap2.rowBytes()));
+  EXPECT_TRUE(Baseline::Compare(framePixmap2, "PAGXTest/PAGSurfaceFromBackendRenderTarget"));
 
-  std::vector<uint8_t> pixels(width * height * 4, 0);
-  ASSERT_TRUE(surface->readPixels(pixels.data(), width * 4));
-  size_t i = (4 * width + 4) * 4;
-  EXPECT_EQ(pixels[i + 0], 0);
-  EXPECT_EQ(pixels[i + 1], 255);  // G
-  EXPECT_EQ(pixels[i + 2], 0);
-  EXPECT_EQ(pixels[i + 3], 255);
-
-  // Re-lock for GL cleanup.
   context = device->lockContext();
   glDeleteFramebuffers(1, &fbo);
   glDeleteTextures(1, &textureInfo.id);
