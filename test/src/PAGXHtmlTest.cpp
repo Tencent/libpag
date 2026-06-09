@@ -470,7 +470,8 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
   </Resources>
   <Layer width="160" height="48">
     <Text text="搜索" fontFamily="PingFang SC" fontSize="16">
-      <GlyphRun font="@shapes" fontSize="16" glyphs="1,1" x="10" y="24" xOffsets="0,18"/>
+      <GlyphRun font="@shapes" fontSize="16" glyphs="1,1" x="10" y="24"
+                xOffsets="0,18" bounds="0,0,32,22"/>
     </Text>
     <Fill color="#111111"/>
   </Layer>
@@ -478,6 +479,8 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
                                 options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("搜索"), std::string::npos);
+  EXPECT_NE(html.find("top:8px"), std::string::npos);
+  EXPECT_EQ(html.find("top:2px"), std::string::npos);
   EXPECT_EQ(html.find("\xEE\x80\x80"), std::string::npos);
 }
 

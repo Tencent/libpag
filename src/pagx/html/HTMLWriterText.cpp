@@ -729,29 +729,17 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";overflow:hidden";
     }
   } else {
-    // When the Text node carries GlyphRun data, the GlyphRun's x/y fields hold the pre-shaped
-    // pixel coordinates (baseline origin) produced by the tgfx layout engine. Use those directly
-    // instead of renderPosition(), which returns (0,0) for Text nodes without explicit left/top
-    // constraints — causing the span to pile up at the canvas origin.
     float posX, posY;
+    bool usesGlyphRunPosition = false;
     if (!text->glyphRuns.empty() && text->glyphRuns[0]) {
       auto* run0 = text->glyphRuns[0];
-      // GlyphRun.x is the overall run x offset. Per-glyph xOffsets (when present) encode the
-      // additional spacing, including any horizontal centering margin added by the tgfx layout
-      // engine. The actual left edge of the first glyph is run.x + xOffsets[0] (if xOffsets
-      // is non-empty) or simply run.x (when the glyphs are placed at the run origin).
+      usesGlyphRunPosition = true;
       if (!run0->xOffsets.empty()) {
         posX = run0->x + run0->xOffsets[0];
       } else {
         posX = run0->x;
       }
-      // GlyphRun.y is the alphabetic baseline. GlyphRun.bounds.height is the ascender height
-      // (distance from baseline to the top of the tallest glyph in this run). CSS `top` is the
-      // top of the line box, so subtract the ascender to convert baseline → line-box top.
-      // Note: CSS line-height:normal adds half-leading above the ascent; when the browser's
-      // half-leading differs from tgfx's, the vertical position will shift slightly. This is
-      // a tgfx alignment item — the exporter should not compensate.
-      posY = run0->y - run0->bounds.height;
+      posY = run0->y - run0->fontSize;
     } else {
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
@@ -853,7 +841,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       }
     }
     float ty = posY;
-    style += "position:absolute;top:" + CssFloatToString(ty) + "px;white-space:pre";
+    style += "position:absolute;top:" + CssFloatToString(ty) + "px";
+    if (usesGlyphRunPosition) {
+      style += ";line-height:1";
+    }
+    style += ";white-space:pre";
     // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
     // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
     // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
