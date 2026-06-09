@@ -191,11 +191,27 @@ function nonZero(rect) {
 // Centralised visibility check. CSS `display: contents` is intentionally NOT
 // considered hidden here — it generates no box of its own but its children
 // still render, and the snapshot walker handles the pass-through separately.
+//
+// `opacity: 0` is treated as hidden EXCEPT when the element is animated by the
+// capture pass (animation-capture.ts marks such elements with a `pagxAnim*`
+// `animation-name`). A faded-in element legitimately reads opacity=0 at the
+// animation's starting phase; dropping it here would erase the very subject of
+// the animation (e.g. a `0% { opacity: 0 } 100% { opacity: 1 }` fade-in dot),
+// taking its keyframes with it.
 function isVisible(computed) {
   if (computed.display === 'none') return false;
   if (computed.visibility === 'hidden') return false;
-  if (parseFloat(computed.opacity) === 0) return false;
+  if (parseFloat(computed.opacity) === 0 && !hasPagxAnimation(computed)) return false;
   return true;
+}
+
+// True when the element carries a canonical `pagxAnim*` animation injected by
+// animation-capture.ts. The capture pass owns the keyframes, so any zero-valued
+// channel on the element (opacity, transform out-of-frame) is part of the
+// animation's starting phase rather than a static-hidden state.
+function hasPagxAnimation(computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  return !!name && name !== 'none' && name.indexOf('pagxAnim') === 0;
 }
 
 // Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
@@ -2600,6 +2616,7 @@ const HELPER_FNS = [
   withNowrap,
   paddingShorthand,
   nonZero,
+  hasPagxAnimation,
   isVisible,
   readBox,
   readPadding,
