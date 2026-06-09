@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getSystemInfo } from './wx-system-info';
 declare const wx: any;
 
 /**
@@ -93,22 +94,10 @@ async function fetchDeviceInfoAsync(): Promise<DeviceInfoCache> {
   }
 
   try {
-    // 同步获取平台信息
-    const systemInfo = wx.getSystemInfoSync();
+    const systemInfo = await getSystemInfo();
     const rawPlatform = systemInfo.platform || 'android';
     const platform: Platform = rawPlatform === 'ios' ? 'ios' : rawPlatform === 'android' ? 'android' : 'other';
-
-    // 异步获取设备性能等级
-    const benchmarkLevel = await new Promise<number>((resolve) => {
-      wx.getDeviceBenchmarkInfo({
-        success(res: { benchmarkLevel: number }) {
-          resolve(res.benchmarkLevel);
-        },
-        fail() {
-          resolve(-1);
-        },
-      });
-    });
+    const benchmarkLevel = systemInfo.benchmarkLevel;
     const tier = getDeviceTier(benchmarkLevel, rawPlatform);
     cachedDeviceInfo = { tier, benchmarkLevel, platform };
   } catch {

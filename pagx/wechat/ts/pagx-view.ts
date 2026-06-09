@@ -27,6 +27,7 @@ import type {
   ImageMetadataEntry,
 } from './types';
 import type { wx } from './interfaces';
+import { getSystemInfo } from './wx-system-info';
 
 declare const wx: wx;
 
@@ -144,6 +145,14 @@ export class View {
     const view = new View(module, canvas);
     view.pagViewOptions = { ...view.pagViewOptions, ...options };
 
+    // Fetch device pixel ratio once via the version-adapted API.
+    try {
+      const sysInfo = await getSystemInfo();
+      view.dpr = sysInfo.pixelRatio || 1;
+    } catch (_) {
+      view.dpr = 1;
+    }
+
     // Create RenderCanvas
     view.renderCanvas = RenderCanvas.from(module, canvas);
     view.renderCanvas.retain();
@@ -199,6 +208,9 @@ export class View {
   // The zoom lower-bound and pan limits are computed against
   // (effectiveContent + 2 × paddingLogical × dpr).
   private paddingLogical = 0;
+
+  // Device pixel ratio, fetched once via getSystemInfo() during init().
+  private dpr = 1;
 
   // Pinch-zoom session snapshot. Set by beginPinchGesture(), cleared by
   // endPinchGesture(). When non-null, pinchBy() computes the new zoom/offset
@@ -591,7 +603,6 @@ export class View {
    */
   public setPadding(logicalPx: number): void {
     this.paddingLogical = Math.max(0, logicalPx);
-    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
   }
 
   /**
@@ -918,8 +929,7 @@ export class View {
     if (!this.canvas) {
       return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     }
-    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
-    const paddingPhysical = this.paddingLogical * dpr;
+    const paddingPhysical = this.paddingLogical * this.dpr;
     const canvasW = this.canvas.width;
     const canvasH = this.canvas.height;
     let minX = canvasW - (canvasW + paddingPhysical) * zoom;
@@ -949,8 +959,7 @@ export class View {
     if (!this.nativeView || !this.canvas) {
       return 0;
     }
-    const dpr = wx.getSystemInfoSync().pixelRatio || 1;
-    const paddingPhysical = this.paddingLogical * dpr;
+    const paddingPhysical = this.paddingLogical * this.dpr;
     const virtualW = this.canvas.width + 2 * paddingPhysical;
     const virtualH = this.canvas.height + 2 * paddingPhysical;
     return Math.min(
@@ -968,10 +977,9 @@ export class View {
     // Calculate display size for WeChat MiniProgram
     const displayWidth = (this.canvas as any).displayWidth || this.canvas.width;
     const displayHeight = (this.canvas as any).displayHeight || this.canvas.height;
-    const dpr = wx.getSystemInfoSync().pixelRatio;
 
-    this.canvas.width = displayWidth * dpr;
-    this.canvas.height = displayHeight * dpr;
+    this.canvas.width = displayWidth * this.dpr;
+    this.canvas.height = displayHeight * this.dpr;
   }
 
   private renderLoop(): void {
