@@ -76,12 +76,15 @@ static float LerpComponent(float a, float b, double t) {
 }
 
 Color LerpColor(const Color& a, const Color& b, double t) {
+  // Bezier easing factors may overshoot below 0 or above 1; Color components are defined in
+  // [0, 1], so clamp here rather than producing out-of-range channels.
+  double clamped = std::clamp(t, 0.0, 1.0);
   Color end = a.colorSpace == b.colorSpace ? b : ConvertColorSpace(b, a.colorSpace);
   Color result = {};
-  result.red = LerpComponent(a.red, end.red, t);
-  result.green = LerpComponent(a.green, end.green, t);
-  result.blue = LerpComponent(a.blue, end.blue, t);
-  result.alpha = LerpComponent(a.alpha, end.alpha, t);
+  result.red = LerpComponent(a.red, end.red, clamped);
+  result.green = LerpComponent(a.green, end.green, clamped);
+  result.blue = LerpComponent(a.blue, end.blue, clamped);
+  result.alpha = LerpComponent(a.alpha, end.alpha, clamped);
   result.colorSpace = a.colorSpace;
   return result;
 }
