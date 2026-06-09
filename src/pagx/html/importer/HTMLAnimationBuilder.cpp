@@ -52,6 +52,11 @@ struct AnimationSpec {
   bool iterationInfinite = false;
   float iterationCount = 1.0f;
   std::string direction = "normal";
+  // CSS `animation-fill-mode`: none (default) | forwards | backwards | both. Controls whether the
+  // first and/or last keyframe values are "filled" outside the active duration window. None means
+  // the element shows its non-animated baseline value before the delay ends and after the
+  // animation finishes.
+  std::string fillMode = "none";
 };
 
 // One resolved CSS animation timing-function. Exactly one shape is active per resolve, selected
@@ -107,6 +112,10 @@ bool ParseTimeSeconds(const std::string& token, float& outSeconds) {
 
 bool IsDirectionKeyword(const std::string& lc) {
   return lc == "normal" || lc == "reverse" || lc == "alternate" || lc == "alternate-reverse";
+}
+
+bool IsFillModeKeyword(const std::string& lc) {
+  return lc == "none" || lc == "forwards" || lc == "backwards" || lc == "both";
 }
 
 bool IsTimingKeyword(const std::string& lc) {
@@ -250,6 +259,10 @@ void ParseAnimationShorthand(const std::string& value, AnimationSpec& spec, bool
       spec.direction = lc;
       continue;
     }
+    if (IsFillModeKeyword(lc)) {
+      spec.fillMode = lc;
+      continue;
+    }
     // A bare number is the iteration-count.
     char* end = nullptr;
     float num = std::strtof(tok.c_str(), &end);
@@ -289,6 +302,11 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
   }
   std::string dir = GetTrimmed(style, "animation-direction");
   if (!dir.empty()) spec.direction = ToLower(dir);
+  std::string fillMode = GetTrimmed(style, "animation-fill-mode");
+  if (!fillMode.empty()) {
+    std::string lc = ToLower(fillMode);
+    if (IsFillModeKeyword(lc)) spec.fillMode = lc;
+  }
 }
 
 // Decomposed translate component of a single-function CSS `transform` value.
@@ -454,6 +472,56 @@ void ExpandSteps(std::vector<Keyframe<T>>& keys, int n, ResolvedEasing::Jump jum
   last.interpolation = KeyframeInterpolationType::Hold;
   out.push_back(last);
   keys = std::move(out);
+}
+
+// Applies CSS `animation-fill-mode` to a per-channel keyframe sequence by injecting baseline
+// hold keyframes outside the active duration window. The runtime evaluator clamps to the first /
+// last keyframe value when the position falls outside the keyframe range, which is wrong for
+// fill-mode `none`/`backwards`/`forwards` whenever the animation does not start at t=0 or does
+// not end at the keyframe's last value. Inserting a Hold keyframe carrying the layer's
+// non-animated baseline value at the boundaries forces the runtime to display that baseline.
+//
+// Boundary mapping (activeStart/activeEnd are the first and last existing keyframe times after
+// offsetting by delay; leading baseline is inserted when activeStart > 0):
+//
+//   fillMode | t < activeStart                     | t > activeEnd (Once only)
+//   ---------|-------------------------------------|------------------------------------------
+//   none     | insert Hold(baseline) at frame 0    | insert Hold(baseline) at activeEnd + 1
+//   forwards | insert Hold(baseline) at frame 0    | leave alone (last keyframe already holds)
+//   backwards| leave alone (extrapolates to first) | insert Hold(baseline) at activeEnd + 1
+//   both     | leave alone                         | leave alone
+//
+// `loopOnce` is true only when the animation will not repeat — for Loop/PingPong, the post-active
+// region is occupied by subsequent iterations so the trailing baseline must not be inserted.
+template <typename T>
+void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, const T& baseline,
+                   bool loopOnce) {
+  if (keys.empty()) return;
+  bool fillBackwards = (fillMode == "backwards" || fillMode == "both");
+  bool fillForwards = (fillMode == "forwards" || fillMode == "both");
+  // Pre-active baseline. CSS `none` and `forwards` both display the baseline before the animation
+  // starts; `backwards` and `both` extrapolate the first keyframe value backwards instead. Skipped
+  // when the first keyframe already lives at frame 0 (no gap to fill).
+  if (keys.front().time > ZeroFrame && !fillBackwards) {
+    Keyframe<T> hold = {};
+    hold.time = ZeroFrame;
+    hold.value = baseline;
+    hold.interpolation = KeyframeInterpolationType::Hold;
+    keys.insert(keys.begin(), hold);
+  }
+  // Post-active baseline. Only meaningful for finite (Once) playback: Loop/PingPong have no
+  // "after" region. CSS `none` and `backwards` both revert to the baseline once the animation
+  // finishes; `forwards` and `both` keep the last keyframe value. The previous-last keyframe must
+  // be promoted to Hold so its segment toward the baseline does not interpolate visibly.
+  if (loopOnce && !fillForwards) {
+    Frame lastTime = keys.back().time;
+    keys.back().interpolation = KeyframeInterpolationType::Hold;
+    Keyframe<T> hold = {};
+    hold.time = lastTime + 1;
+    hold.value = baseline;
+    hold.interpolation = KeyframeInterpolationType::Hold;
+    keys.push_back(hold);
+  }
 }
 
 // Returns the first SolidColor painted by a Fill in `layer`'s subtree, or nullptr. The element's
@@ -701,25 +769,66 @@ bool HTMLAnimationBuilder::buildForElement(
     return false;
   }
 
+  // Resolve the per-channel baseline values used by `animation-fill-mode` outside the active
+  // duration window. The baseline is the element's pre-animation static value, which is what CSS
+  // displays during the delay (when fill-mode is `none` or `forwards`) and after the animation
+  // ends (when fill-mode is `none` or `backwards`).
+  //   alpha: the layer's resolved opacity, already populated from CSS by the layer importer.
+  //   x / y: zero — translate-animated layers route their channels onto an inner wrapper whose
+  //          layoutBounds origin is (0, 0); the CSS keyframe values stack on top of that.
+  //   color: the SolidColor's current color, populated from CSS background-color/color before
+  //          this method runs. The fill must be located before SplitForTransformAnimation moves
+  //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
+  //          split and is reused later as the channel target.
+  float baselineAlpha = layer->alpha;
+  float baselineXY = 0.0f;
+  Color baselineColor = {};
+  SolidColor* baselineSolid = nullptr;
+  if (!colorKeys.empty()) {
+    baselineSolid = FindSolidFill(layer);
+    if (baselineSolid != nullptr) {
+      baselineColor = baselineSolid->color;
+    }
+  }
+
+  // Determine the loop mode upfront — fill-mode trailing baselines only apply to finite (Once)
+  // playback; Loop and PingPong have no "after" region to fill.
+  LoopMode loopMode = LoopMode::Once;
+  if (spec.direction == "alternate" || spec.direction == "alternate-reverse") {
+    loopMode = LoopMode::PingPong;
+  } else if (spec.iterationInfinite) {
+    loopMode = LoopMode::Loop;
+  }
+  bool loopOnce = (loopMode == LoopMode::Once);
+
+  // Inject baseline hold keyframes per CSS `animation-fill-mode`. ApplyFillMode operates
+  // independently on each channel and is a no-op for channels with no keyframes.
+  ApplyFillMode(alphaKeys, spec.fillMode, baselineAlpha, loopOnce);
+  ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce);
+  ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce);
+  ApplyFillMode(colorKeys, spec.fillMode, baselineColor, loopOnce);
+
   // Ensure the target layer has an id (mint one when the author supplied none).
   if (layer->id.empty()) {
     layer->id = _idAllocator.generateUnique("anim");
   }
 
+  // Trailing baselines are placed one frame past the active end (lastActiveTime + 1), so the
+  // animation duration must be extended by one frame for the runtime to actually sample them
+  // (LoopMode::Once clamps currentTime to `animation->duration` once playback ends). Mirrors the
+  // condition in ApplyFillMode that triggers the trailing-hold injection.
+  bool needsTrailingBaseline =
+      loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
+
   auto* animation = _document->makeNode<Animation>(layer->id + "_anim");
   animation->frameRate = kFrameRate;
-  animation->duration = static_cast<Frame>(durationFrames + delayFrames);
-  if (spec.direction == "alternate" || spec.direction == "alternate-reverse") {
-    animation->loop = LoopMode::PingPong;
-  } else if (spec.iterationInfinite) {
-    animation->loop = LoopMode::Loop;
-  } else {
-    if (spec.iterationCount > 1.0f) {
-      _diagnostics.warn(
-          "html: finite animation-iteration-count is not supported; played once "
-          "[subset:animation-finite-count]");
-    }
-    animation->loop = LoopMode::Once;
+  animation->duration =
+      static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
+  animation->loop = loopMode;
+  if (loopMode == LoopMode::Once && spec.iterationCount > 1.0f && !spec.iterationInfinite) {
+    _diagnostics.warn(
+        "html: finite animation-iteration-count is not supported; played once "
+        "[subset:animation-finite-count]");
   }
 
   // CSS `transform: translate(...)` is an offset on top of the layout-assigned position, but
@@ -764,21 +873,21 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->objects.push_back(object);
   }
 
-  // SolidColor-targeted channel (color / background-color). The Fill carrying the SolidColor
-  // moved to the inner wrapper when one was created, so search starts from there.
+  // SolidColor-targeted channel (color / background-color). The fill was located before
+  // SplitForTransformAnimation moved contents into the inner wrapper; the SolidColor pointer
+  // remains stable across the split so the cached `baselineSolid` is reused as the channel
+  // target without re-searching the (now-empty) outer layer.
   if (!colorKeys.empty()) {
-    Layer* fillHost = xyTarget != nullptr ? xyTarget : layer;
-    SolidColor* solid = FindSolidFill(fillHost);
-    if (solid == nullptr) {
+    if (baselineSolid == nullptr) {
       _diagnostics.warn(
           "html: 'color' animation requires a solid background-color/color fill; dropped "
           "[subset:animation-unsupported-property]");
     } else {
-      if (solid->id.empty()) {
-        solid->id = _idAllocator.generateUnique("anim");
+      if (baselineSolid->id.empty()) {
+        baselineSolid->id = _idAllocator.generateUnique("anim");
       }
       auto* object = _document->makeNode<AnimationObject>();
-      object->target = solid->id;
+      object->target = baselineSolid->id;
       auto* ch = _document->makeNode<TypedChannel<Color>>();
       ch->name = "color";
       ch->keyframes = std::move(colorKeys);
