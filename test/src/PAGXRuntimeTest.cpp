@@ -16,6 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
@@ -23,12 +27,6 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "pagx/PAGScene.h"
-#include "pagx/PAGSurface.h"
-#include "pagx/PAGTimeline.h"
-#include "pagx/PAGXDocument.h"
-#include "tgfx/core/Bitmap.h"
-#include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -42,6 +40,215 @@
 #endif
 
 namespace pag {
+
+/**
+ * Test case: PAGScene registers itself with the source document on creation and unregisters on
+ * destruction.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  EXPECT_TRUE(doc->liveScenes.empty());
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(doc->liveScenes.size(), 1u);
+  EXPECT_EQ(doc->liveScenes[0].lock().get(), file.get());
+
+  file.reset();
+  EXPECT_TRUE(doc->liveScenes.empty());
+
+  auto file2 = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file2 != nullptr);
+  EXPECT_EQ(file2->width(), 100.0f);
+  EXPECT_EQ(file2->height(), 100.0f);
+}
+
+/**
+ * Test case: PAGScene timeline lookup by name and identity sharing.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneTimelineLookup) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto main = doc->makeNode<pagx::Animation>("main");
+  main->duration = 60;
+  main->frameRate = 60;
+  doc->animations.push_back(main);
+
+  auto hint = doc->makeNode<pagx::Animation>("hint");
+  hint->duration = 30;
+  hint->frameRate = 60;
+  doc->animations.push_back(hint);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto ids = file->getTimelineIds();
+  ASSERT_EQ(ids.size(), 2u);
+  EXPECT_EQ(ids[0], "main");
+  EXPECT_EQ(ids[1], "hint");
+
+  auto t1 = file->getTimeline("main");
+  auto t1Again = file->getTimeline("main");
+  ASSERT_TRUE(t1 != nullptr);
+  EXPECT_EQ(t1.get(), t1Again.get());
+  EXPECT_EQ(t1->getId(), "main");
+  EXPECT_EQ(t1->duration(), 1'000'000);
+
+  auto t2 = file->getTimeline("hint");
+  ASSERT_TRUE(t2 != nullptr);
+  EXPECT_NE(t1.get(), t2.get());
+
+  EXPECT_EQ(file->getTimeline("missing"), nullptr);
+
+  auto def = file->getDefaultTimeline();
+  EXPECT_EQ(def.get(), t1.get());
+}
+
+/**
+ * Test case: PAGScene::Make refuses to build when applyLayout reported a cyclic external
+ * composition reference, since the partially laid-out tree is inconsistent.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneMakeNullOnLayoutCycle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("comp");
+  layer->width = 50;
+  layer->height = 50;
+  layer->externalDoc = doc;
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  EXPECT_EQ(scene, nullptr);
+  bool reportedCycle = false;
+  for (const auto& error : doc->errors) {
+    if (error.rfind("Cyclic external composition reference detected", 0) == 0) {
+      reportedCycle = true;
+    }
+  }
+  EXPECT_TRUE(reportedCycle);
+  layer->externalDoc = nullptr;
+}
+
+/**
+ * Test case: PAGSurface::MakeOffscreen creates a real GPU-backed surface with the requested size.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSurfaceMakeOffscreen) {
+  auto surface = pagx::PAGSurface::MakeOffscreen(64, 48);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), 64);
+  EXPECT_EQ(surface->height(), 48);
+
+  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(0, 48), nullptr);
+  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(64, -1), nullptr);
+}
+
+/**
+ * Test case: end-to-end PAGScene::draw renders a SolidColor layer into a PAGSurface and the
+ * resulting pixels match the channel-applied color.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAndReadPixels) {
+  auto doc = pagx::PAGXDocument::Make(8, 8);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 8;
+  layer->height = 8;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 8;
+  rect->size.height = 8;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
+  ASSERT_TRUE(surface != nullptr);
+
+  ASSERT_TRUE(file->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAndReadPixels"));
+}
+
+/**
+ * Test case: advancing a top-level alpha animation produces distinct rendered frames over time.
+ */
+PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 200;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("fade");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "L";
+  anim->objects.push_back(obj);
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  obj->channels.push_back(alphaProp);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->play();
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+
+  // Frame 0: t=0, alpha=0.
+  timeline->apply(1.0f);
+  ASSERT_TRUE(file->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AdvanceRendersDistinctFrames_0"));
+
+  // Frame 1: advance 0.5s -> alpha=0.5.
+  timeline->advanceAndApply(500'000);
+  ASSERT_TRUE(file->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AdvanceRendersDistinctFrames_1"));
+
+  // Frame 2: advance another 0.5s -> alpha=1.0.
+  timeline->advanceAndApply(500'000);
+  ASSERT_TRUE(file->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AdvanceRendersDistinctFrames_2"));
+}
 
 /**
  * Test case: PAGScene::draw() with autoClear=false overlays the scene content onto existing
@@ -87,31 +294,22 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
   auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface != nullptr);
 
-  tgfx::Bitmap frame(100, 100, false, false);
-  tgfx::Pixmap framePixmap(frame);
-
   // Draw with autoClear=true (default): red square.
   ASSERT_TRUE(scene->draw(surface));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_red"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_red"));
 
   // Change animation to green and draw with autoClear=true: green replaces red.
   pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   prop->keyframes[0].value = green;
   timeline->apply(1.0f);
   ASSERT_TRUE(scene->draw(surface, true));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(
-      Baseline::Compare(framePixmap, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_green"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_green"));
 
   // Reset to red, draw with autoClear=false: red is composited (SrcOver) on top of green.
-  // Since both are fully opaque, red completely covers green.
   prop->keyframes[0].value = red;
   timeline->apply(1.0f);
   ASSERT_TRUE(scene->draw(surface, false));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(
-      Baseline::Compare(framePixmap, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_overlay"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSceneDrawAutoClearOverlay_overlay"));
 }
 
 /**
@@ -170,10 +368,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   timeline->apply(1.0f);
 
   ASSERT_TRUE(scene->draw(surface));
-  tgfx::Bitmap frame(width, height, false, false);
-  tgfx::Pixmap framePixmap(frame);
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXRuntimeTest/PAGSurfaceFromBackendTexture"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendTexture"));
 
   context = device->lockContext();
   glDeleteTextures(1, &textureInfo.id);
@@ -187,7 +382,6 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   const int width = 100;
   const int height = 100;
 
-  // Create a texture + FBO for the render target.
   tgfx::GLTextureInfo textureInfo = {};
   CreateGLTexture(context, width, height, &textureInfo);
 
@@ -246,11 +440,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   timeline->apply(1.0f);
 
   ASSERT_TRUE(scene->draw(surface));
-  tgfx::Bitmap frame2(width, height, false, false);
-  tgfx::Pixmap framePixmap2(frame2);
-  ASSERT_TRUE(surface->readPixels(framePixmap2.writablePixels(), framePixmap2.rowBytes()));
-  EXPECT_TRUE(
-      Baseline::Compare(framePixmap2, "PAGXRuntimeTest/PAGSurfaceFromBackendRenderTarget"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendRenderTarget"));
 
   context = device->lockContext();
   glDeleteFramebuffers(1, &fbo);

@@ -24,6 +24,7 @@
 #include "nlohmann/json.hpp"
 #pragma clang diagnostic pop
 #include "pag/pag.h"
+#include "pagx/PAGSurface.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace pag {
@@ -37,6 +38,8 @@ class Baseline {
 
   static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
 
+  static bool Compare(const std::shared_ptr<pagx::PAGSurface>& surface, const std::string& key);
+
   static bool Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key);
 
   Baseline(const std::string& baselinePath, const std::string& cachePath,
@@ -49,6 +52,8 @@ class Baseline {
   bool compare(const tgfx::Pixmap& pixmap, const std::string& key);
 
   bool compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
+
+  bool compare(const std::shared_ptr<pagx::PAGSurface>& surface, const std::string& key);
 
   bool compare(const std::shared_ptr<ByteData>& byteData, const std::string& key);
 
