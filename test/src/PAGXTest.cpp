@@ -1215,6 +1215,7 @@ PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
 // =====================================================================================
 // Auto Layout - Container Layout - Basic
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutHorizontalEqualWidth) {
   auto doc = pagx::PAGXDocument::Make(920, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1350,6 +1351,7 @@ PAGX_TEST(PAGXTest, LayoutAlignmentCenter) {
 // =====================================================================================
 // Auto Layout - Container Layout - Arrangement End
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutArrangementEnd) {
   auto doc = pagx::PAGXDocument::Make(400, 100);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1379,6 +1381,7 @@ PAGX_TEST(PAGXTest, LayoutArrangementEnd) {
 // =====================================================================================
 // Auto Layout - Container Layout - Alignment End
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutAlignmentEnd) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1403,6 +1406,7 @@ PAGX_TEST(PAGXTest, LayoutAlignmentEnd) {
 // =====================================================================================
 // Auto Layout - Container Layout - Padding
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutPadding) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1456,6 +1460,7 @@ PAGX_TEST(PAGXTest, LayoutPaddingWithFlex) {
 // =====================================================================================
 // Auto Layout - Container Layout - Flex Distribution
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutFlexEqualDistribution) {
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1664,6 +1669,7 @@ PAGX_TEST(PAGXTest, LayoutFlexZeroNotExported) {
 // =====================================================================================
 // Auto Layout - Container Layout - Visibility
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutHiddenChildNotSkipped) {
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1698,6 +1704,7 @@ PAGX_TEST(PAGXTest, LayoutHiddenChildNotSkipped) {
 // =====================================================================================
 // Auto Layout - Container Layout - Edge Cases
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutEmptyContainer) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1774,6 +1781,7 @@ PAGX_TEST(PAGXTest, LayoutOverflow) {
 // =====================================================================================
 // Auto Layout - Container Layout - Nested
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutNested) {
   auto doc = pagx::PAGXDocument::Make(500, 200);
   auto outer = doc->makeNode<pagx::Layer>();
@@ -1814,6 +1822,7 @@ PAGX_TEST(PAGXTest, LayoutNested) {
 // =====================================================================================
 // Auto Layout - Container Layout - Measurement (bottom-up)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutMeasureFromChildren) {
   auto doc = pagx::PAGXDocument::Make(800, 600);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1840,6 +1849,7 @@ PAGX_TEST(PAGXTest, LayoutMeasureFromChildren) {
 // =====================================================================================
 // Auto Layout - Container Layout - Pixel Grid Snap
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutSnapToPixelGrid) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1877,6 +1887,7 @@ PAGX_TEST(PAGXTest, LayoutSnapToPixelGrid) {
 // =====================================================================================
 // Auto Layout - Container Layout - Measurement Cache
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutMeasureCacheIdempotent) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -1912,6 +1923,7 @@ PAGX_TEST(PAGXTest, LayoutMeasureCacheIdempotent) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Single Edge
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintLeft) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2047,6 +2059,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintCenterY) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Stretch (Ellipse)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipse) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2096,6 +2109,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchEllipseVertical) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Stretch (Rectangle, TextBox)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintStretchRectangle) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2151,6 +2165,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Proportional Scaling
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintScalePolystarHorizontal) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2446,6 +2461,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScalePathBothAxes) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Group
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutGroupDerivedSize) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2503,6 +2519,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintGroupRecursive) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Multiple Elements
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -2543,6 +2560,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintMultipleElements) {
 // =====================================================================================
 // Auto Layout - Constraint Positioning - Validation
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintConflictCenterXWithLeftRight) {
   // In the new layout system, conflicting constraints are resolved by priority:
   // centerX has higher priority than left/right. No error is generated.
@@ -2573,6 +2591,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintValidCombination) {
 // =====================================================================================
 // Auto Layout - Container Layout - includeInLayout
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutContainerIncludeInLayout) {
   auto doc = pagx::PAGXDocument::Make(600, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -2646,6 +2665,7 @@ PAGX_TEST(PAGXTest, LayoutContainerIncludeInLayoutMeasure) {
 // =====================================================================================
 // Auto Layout - Container Layout - Alignment::Stretch
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutContainerStretch) {
   auto doc = pagx::PAGXDocument::Make(600, 200);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -2831,6 +2851,7 @@ PAGX_TEST(PAGXTest, LayoutIncludeInLayoutMixedVisibility) {
 // =====================================================================================
 // Auto Layout - Container + Constraint combined
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
   auto doc = pagx::PAGXDocument::Make(600, 400);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -2870,6 +2891,7 @@ PAGX_TEST(PAGXTest, LayoutContainerWithConstraints) {
 // =====================================================================================
 // Auto Layout - Round-trip: Layout Attributes
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutRoundTripAttributes) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -3027,6 +3049,7 @@ PAGX_TEST(PAGXTest, LayoutRoundTripConstraints) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Single Edge
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintLeft) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3112,6 +3135,7 @@ PAGX_TEST(PAGXTest, LayerConstraintBottom) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Center
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintCenterX) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3181,6 +3205,7 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterXWithOffset) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Opposite Edges Derive Size
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintLeftRightDeriveWidth) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3280,6 +3305,7 @@ PAGX_TEST(PAGXTest, LayerConstraintLeftRightOverridesExplicitWidth) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Combined Axes
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintLeftAndTop) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3329,6 +3355,7 @@ PAGX_TEST(PAGXTest, LayerConstraintRightAndBottom) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - includeInLayout=false
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintWithIncludeInLayoutFalse) {
   auto doc = pagx::PAGXDocument::Make(600, 400);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3401,6 +3428,7 @@ PAGX_TEST(PAGXTest, LayerConstraintIncludeInLayoutFalseDeriveSize) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Priority (container layout wins)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintIgnoredInContainerLayout) {
   auto doc = pagx::PAGXDocument::Make(600, 400);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3436,6 +3464,7 @@ PAGX_TEST(PAGXTest, LayerConstraintIgnoredInContainerLayout) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - No constraint, no change
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3462,6 +3491,7 @@ PAGX_TEST(PAGXTest, LayerNoConstraintUnchanged) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Invisible child still gets layout
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildNotSkipped) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3491,6 +3521,7 @@ PAGX_TEST(PAGXTest, LayerConstraintInvisibleChildNotSkipped) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Multiple children
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintMultipleChildren) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3537,6 +3568,7 @@ PAGX_TEST(PAGXTest, LayerConstraintMultipleChildren) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Measured child size (no explicit width/height)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintMeasuredChildSize) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3569,6 +3601,7 @@ PAGX_TEST(PAGXTest, LayerConstraintMeasuredChildSize) {
 // =====================================================================================
 // Auto Layout - Layer Constraint Positioning - Round-trip XML
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3822,6 +3855,7 @@ PAGX_TEST(PAGXTest, ResourceCrossReferenceChain) {
 // =====================================================================================
 // Auto Layout - Constraint Priority (centerX/centerY highest priority)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayerConstraintCenterXOverridesLeft) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto parent = doc->makeNode<pagx::Layer>();
@@ -3895,6 +3929,7 @@ PAGX_TEST(PAGXTest, LayerConstraintCenterYMeasurementContribution) {
 // =====================================================================================
 // Auto Layout - Priority Combination Tests
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutContainerFlexVsExplicitSize) {
   // Priority: explicit main-axis size > flex distribution.
   // When a child has both flex>0 and explicit width, explicit width wins.
@@ -4124,6 +4159,7 @@ PAGX_TEST(PAGXTest, LayoutIncludeInLayoutFalseNotAffectingMeasurement) {
 // =====================================================================================
 // Auto Layout - Group Constraint Measurement
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, GroupChildConstraintAffectsMeasurement) {
   // When a Group has no explicit dimensions, its measured size should include
   // constraint offsets from child elements (e.g., left, top).
@@ -4461,6 +4497,7 @@ PAGX_TEST(PAGXTest, ClipToBoundsAutoMeasured) {
 // =====================================================================================
 // Auto Layout - Refactoring Correctness (P0)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutIdempotent) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -4546,6 +4583,7 @@ PAGX_TEST(PAGXTest, VerifyNestedFlexNoFalsePositive) {
 // =====================================================================================
 // Auto Layout - Edge Case Fixes (P2)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, DefaultSizeElementWithOppositeEdgeConstraint) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -4600,6 +4638,7 @@ PAGX_TEST(PAGXTest, FlexRoundingErrorPropagation) {
 // =====================================================================================
 // Auto Layout - Architectural Integrity (P3)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, TransformDoesNotAffectLayout) {
   auto doc = pagx::PAGXDocument::Make(400, 400);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -4674,6 +4713,7 @@ PAGX_TEST(PAGXTest, DeepNestingConstraintPropagation) {
 // =====================================================================================
 // Auto Layout - New Feature Tests (P1)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -4745,6 +4785,7 @@ PAGX_TEST(PAGXTest, LayoutTextPathMeasurement) {
 // =====================================================================================
 // Auto Layout - Edge Case Fixes (P2 continued)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutConstraintScalePathSingleAxis) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
@@ -4809,6 +4850,7 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
 // =====================================================================================
 // Auto Layout - Architectural Integrity (P3 continued)
 // =====================================================================================
+
 PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto layer = doc->makeNode<pagx::Layer>();
