@@ -62,6 +62,18 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
   positionSet = true;
 }
 
+static bool ContainsOnlyLineBreaks(const std::string& text) {
+  if (text.empty()) {
+    return false;
+  }
+  for (auto c : text) {
+    if (c != '\n') {
+      return false;
+    }
+  }
+  return true;
+}
+
 // CollectRichTextSpans pre-scans an element list to pull out every Group that should be hoisted
 // into the enclosing TextBox as a single <span> child instead of being rendered as a stand-alone
 // DOM wrapper. A Group qualifies when its children are exactly one Text plus at least one
@@ -1076,6 +1088,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       size_t leadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
       EmitBetweenSpanBreaks(out, prevTrailingBreaks, leadingBreaks, prevFontSize, spanFontSize,
                             isFirstSpan);
+      if (ContainsOnlyLineBreaks(span.text->text)) {
+        prevTrailingBreaks = 0;
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
       // Detect single-span horizontal justify-with-\n upfront — when true, we emit
       // a <div> per \n-segment instead of a single <span>...<br>... so each segment
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
@@ -1236,6 +1254,11 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
     EmitBetweenSpanBreaks(out, rtPrevTrailingBreaks, rtLeadingBreaks, rtPrevFontSize,
                           rtSpanFontSize, false);
+    if (ContainsOnlyLineBreaks(span.text->text)) {
+      rtPrevTrailingBreaks = 0;
+      rtPrevFontSize = rtSpanFontSize;
+      continue;
+    }
     out.openTag("span");
     out.addAttr("style", spanStyle);
     std::string rtSpanText = span.text->text;

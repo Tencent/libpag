@@ -47,6 +47,22 @@ static Point MapGradientPoint(const Point& p, bool fitsToGeometry, float boxLeft
   return {p.x * boxWidth + boxLeft, p.y * boxHeight + boxTop};
 }
 
+static bool ResolveUniformGradientColor(const Gradient* gradient, Color* color) {
+  if (!gradient || gradient->colorStops.empty() || !gradient->colorStops.front()) {
+    return false;
+  }
+  auto firstColor = gradient->colorStops.front()->color;
+  for (auto* stop : gradient->colorStops) {
+    if (!stop || stop->color != firstColor) {
+      return false;
+    }
+  }
+  if (color) {
+    *color = firstColor;
+  }
+  return true;
+}
+
 std::string HTMLWriter::buildLinearGradientCSS(const LinearGradient* g, float boxLeft, float boxTop,
                                                float boxWidth, float boxHeight) {
   if (!g->matrix.isIdentity()) {
@@ -249,11 +265,25 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       return ColorToHex(sc->color);
     }
     case NodeType::LinearGradient: {
+      auto gradient = static_cast<const LinearGradient*>(src);
+      auto css = buildLinearGradientCSS(gradient, boxLeft, boxTop, boxWidth, boxHeight);
+      if (!css.empty()) {
+        if (outAlpha) {
+          *outAlpha = 1.0f;
+        }
+        return css;
+      }
+      Color color;
+      if (ResolveUniformGradientColor(gradient, &color)) {
+        if (outAlpha) {
+          *outAlpha = color.alpha;
+        }
+        return ColorToHex(color);
+      }
       if (outAlpha) {
         *outAlpha = 1.0f;
       }
-      return buildLinearGradientCSS(static_cast<const LinearGradient*>(src), boxLeft, boxTop,
-                                    boxWidth, boxHeight);
+      return {};
     }
     case NodeType::RadialGradient: {
       if (outAlpha) {

@@ -514,6 +514,66 @@ CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
   EXPECT_EQ(html.find("line-height:1;white-space:pre\">abcdefgh"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="240" height="80">
+  <Layer width="240" height="80">
+    <Group>
+      <Text text="Title" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <Group>
+      <Text text="&#10;" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <Group>
+      <Text text="Option" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <TextBox width="200" lineHeight="24"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto titlePos = html.find("Title");
+  auto optionPos = html.find("Option");
+  ASSERT_NE(titlePos, std::string::npos);
+  ASSERT_NE(optionPos, std::string::npos);
+  ASSERT_LT(titlePos, optionPos);
+  auto firstBreak = html.find("<br>", titlePos);
+  ASSERT_NE(firstBreak, std::string::npos);
+  ASSERT_LT(firstBreak, optionPos);
+  auto secondBreak = html.find("<br>", firstBreak + 4);
+  EXPECT_TRUE(secondBreak == std::string::npos || secondBreak > optionPos);
+}
+
+CLI_TEST(PAGXHtmlTest, UniformGradientTextFallsBackToSolidColor) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="160" height="48">
+  <Layer width="160" height="48">
+    <Group>
+      <Text text="Done" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill>
+        <LinearGradient matrix="2,0,0,2,0,0">
+          <ColorStop offset="0" color="#999999"/>
+          <ColorStop offset="1" color="#999999"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <TextBox lineHeight="24"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("Done"), std::string::npos);
+  EXPECT_NE(html.find("#999999"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, TextRich) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_rich.pagx"));
   ASSERT_FALSE(html.empty());
