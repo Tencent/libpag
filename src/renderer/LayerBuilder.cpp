@@ -1069,6 +1069,8 @@ class LayerBuilderContext {
         if (tgfxStyle && node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        _result.binding.set(style, tgfxStyle);
+        bindNoiseStyleChannels(style);
         return tgfxStyle;
       }
       default:
@@ -1214,6 +1216,82 @@ class LayerBuilderContext {
   void bindBackgroundBlurStyleChannels(const BackgroundBlurStyle* node) {
     _result.binding.setWriter(node, "blurX", WriteBackgroundBlurStyleBlurX);
     _result.binding.setWriter(node, "blurY", WriteBackgroundBlurStyleBlurY);
+  }
+
+  static void WriteNoiseStyleSize(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::NoiseStyle*>(object);
+    style->setSize(MixFloat(style->size(), *v, mix));
+  }
+
+  static void WriteNoiseStyleDensity(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::NoiseStyle*>(object);
+    style->setDensity(MixFloat(style->density(), *v, mix));
+  }
+
+  static void WriteNoiseStyleSeed(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::NoiseStyle*>(object);
+    style->setSeed(MixFloat(style->seed(), *v, mix));
+  }
+
+  static void WriteNoiseStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::MonoNoiseStyle*>(object);
+    auto target = ToTGFX(*v);
+    style->setColor(MixTGFXColor(style->color(), target, mix));
+  }
+
+  static void WriteNoiseStyleFirstColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::DuoNoiseStyle*>(object);
+    auto target = ToTGFX(*v);
+    style->setFirstColor(MixTGFXColor(style->firstColor(), target, mix));
+  }
+
+  static void WriteNoiseStyleSecondColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::DuoNoiseStyle*>(object);
+    auto target = ToTGFX(*v);
+    style->setSecondColor(MixTGFXColor(style->secondColor(), target, mix));
+  }
+
+  static void WriteNoiseStyleOpacity(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* style = static_cast<tgfx::MultiNoiseStyle*>(object);
+    style->setOpacity(MixFloat(style->opacity(), *v, mix));
+  }
+
+  void bindNoiseStyleChannels(const pagx::NoiseStyle* node) {
+    _result.binding.setWriter(node, "size", WriteNoiseStyleSize);
+    _result.binding.setWriter(node, "density", WriteNoiseStyleDensity);
+    _result.binding.setWriter(node, "seed", WriteNoiseStyleSeed);
+    _result.binding.setWriter(node, "color", WriteNoiseStyleColor);
+    _result.binding.setWriter(node, "firstColor", WriteNoiseStyleFirstColor);
+    _result.binding.setWriter(node, "secondColor", WriteNoiseStyleSecondColor);
+    _result.binding.setWriter(node, "opacity", WriteNoiseStyleOpacity);
   }
 
   static void WriteBlurFilterX(void* object, const KeyValue& value, float mix) {
@@ -1379,6 +1457,82 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "color", WriteBlendFilterColor);
   }
 
+  static void WriteNoiseFilterSize(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::NoiseFilter*>(object);
+    filter->setSize(MixFloat(filter->size(), *v, mix));
+  }
+
+  static void WriteNoiseFilterDensity(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::NoiseFilter*>(object);
+    filter->setDensity(MixFloat(filter->density(), *v, mix));
+  }
+
+  static void WriteNoiseFilterSeed(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::NoiseFilter*>(object);
+    filter->setSeed(MixFloat(filter->seed(), *v, mix));
+  }
+
+  static void WriteNoiseFilterColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::MonoNoiseFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteNoiseFilterFirstColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::DuoNoiseFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setFirstColor(MixTGFXColor(filter->firstColor(), target, mix));
+  }
+
+  static void WriteNoiseFilterSecondColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::DuoNoiseFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setSecondColor(MixTGFXColor(filter->secondColor(), target, mix));
+  }
+
+  static void WriteNoiseFilterOpacity(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::MultiNoiseFilter*>(object);
+    filter->setOpacity(MixFloat(filter->opacity(), *v, mix));
+  }
+
+  void bindNoiseFilterChannels(const pagx::NoiseFilter* node) {
+    _result.binding.setWriter(node, "size", WriteNoiseFilterSize);
+    _result.binding.setWriter(node, "density", WriteNoiseFilterDensity);
+    _result.binding.setWriter(node, "seed", WriteNoiseFilterSeed);
+    _result.binding.setWriter(node, "color", WriteNoiseFilterColor);
+    _result.binding.setWriter(node, "firstColor", WriteNoiseFilterFirstColor);
+    _result.binding.setWriter(node, "secondColor", WriteNoiseFilterSecondColor);
+    _result.binding.setWriter(node, "opacity", WriteNoiseFilterOpacity);
+  }
+
   std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
@@ -1425,19 +1579,25 @@ class LayerBuilderContext {
       case NodeType::NoiseFilter: {
         auto filter = static_cast<const pagx::NoiseFilter*>(node);
         auto tgfxBlendMode = ToTGFX(filter->blendMode);
+        std::shared_ptr<tgfx::NoiseFilter> tgfxFilter;
         switch (filter->mode) {
           case NoiseMode::Mono:
-            return tgfx::NoiseFilter::MakeMono(filter->size, filter->density, ToTGFX(filter->color),
-                                               filter->seed, tgfxBlendMode);
+            tgfxFilter = tgfx::NoiseFilter::MakeMono(
+                filter->size, filter->density, ToTGFX(filter->color), filter->seed, tgfxBlendMode);
+            break;
           case NoiseMode::Duo:
-            return tgfx::NoiseFilter::MakeDuo(
+            tgfxFilter = tgfx::NoiseFilter::MakeDuo(
                 filter->size, filter->density, ToTGFX(filter->firstColor),
                 ToTGFX(filter->secondColor), filter->seed, tgfxBlendMode);
+            break;
           case NoiseMode::Multi:
-            return tgfx::NoiseFilter::MakeMulti(filter->size, filter->density, filter->opacity,
-                                                filter->seed, tgfxBlendMode);
+            tgfxFilter = tgfx::NoiseFilter::MakeMulti(filter->size, filter->density,
+                                                      filter->opacity, filter->seed, tgfxBlendMode);
+            break;
         }
-        return nullptr;
+        _result.binding.set(filter, tgfxFilter);
+        bindNoiseFilterChannels(filter);
+        return tgfxFilter;
       }
       default:
         return nullptr;
