@@ -52,6 +52,34 @@ enum class PAGRenderMode {
 };
 
 /**
+ * PAGTileUpdateMode defines how missing tiles are produced in tiled rendering mode when the
+ * zoomScale changes or when the viewport scrolls into uncached regions.
+ */
+enum class PAGTileUpdateMode {
+  /**
+   * Missing tiles are rasterized at the current zoomScale within the same frame, producing the
+   * highest visual fidelity at the cost of possible frame drops during heavy zoom or pan. This is
+   * the default mode.
+   */
+  Immediate,
+
+  /**
+   * Missing tiles first reuse a cached tile from another zoom scale as a temporary fallback
+   * (producing brief zoom blur), then are rasterized at the current zoomScale within the same
+   * frame to keep the result correct. Use this mode for smoother visual transitions during zoom.
+   */
+  Smooth,
+
+  /**
+   * The number of tiles rasterized per frame is capped by setMaxTilesRefinedPerFrame(). Tiles
+   * beyond the cap are filled with cached content from other zoom scales, or with the background
+   * color when no fallback is available. Keeps the frame rate stable at the cost of longer-lasting
+   * blur or background-colored regions.
+   */
+  Fast,
+};
+
+/**
  * PAGDisplayOptions exposes display-list rendering options owned by a PAGScene. Use
  * PAGScene::getDisplayOptions() to obtain the options and PAGScene::draw() to render with them.
  */
@@ -132,15 +160,16 @@ class PAGDisplayOptions {
   void setMaxTileCount(int count);
 
   /**
-   * Returns whether temporary blurred fallback tiles are allowed while zooming.
+   * Returns the current tile update mode used in tiled rendering mode.
    */
-  bool getAllowZoomBlur() const;
+  PAGTileUpdateMode getTileUpdateMode() const;
 
   /**
-   * Sets whether temporary blurred fallback tiles are allowed while zooming in tiled mode.
-   * @param allow true to allow fallback tiles from other zoom levels.
+   * Sets the tile update mode used in tiled rendering mode. This value is ignored by other render
+   * modes.
+   * @param mode the tile update mode to use for subsequent draws.
    */
-  void setAllowZoomBlur(bool allow);
+  void setTileUpdateMode(PAGTileUpdateMode mode);
 
   /**
    * Returns the maximum number of zoom-blur fallback tiles refined per frame.

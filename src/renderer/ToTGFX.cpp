@@ -331,6 +331,18 @@ tgfx::RenderMode ToTGFX(PAGRenderMode renderMode) {
   return tgfx::RenderMode::Partial;
 }
 
+tgfx::TileUpdateMode ToTGFX(PAGTileUpdateMode mode) {
+  switch (mode) {
+    case PAGTileUpdateMode::Immediate:
+      return tgfx::TileUpdateMode::Immediate;
+    case PAGTileUpdateMode::Smooth:
+      return tgfx::TileUpdateMode::Smooth;
+    case PAGTileUpdateMode::Fast:
+      return tgfx::TileUpdateMode::Fast;
+  }
+  return tgfx::TileUpdateMode::Immediate;
+}
+
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D) {
   tgfx::Matrix3D m = {};
   for (int r = 0; r < 4; r++) {
