@@ -2460,6 +2460,20 @@ function snapshotMain() {
   const body = document.body;
   body.style.margin = '0';
   body.style.padding = '0';
+  // Make <body> a containing block before any measurement runs. The output
+  // <style> block below pins `body{position:relative}` so that the emitted
+  // `position: absolute` children resolve against the body's box; without
+  // mirroring that on the LIVE document here, the source page (where <body>
+  // is `position: static` by default) resolves `right`/`bottom` anchors of
+  // absolute children against the initial containing block — i.e. the
+  // puppeteer viewport (typically 1400x900). `getBoundingClientRect()` then
+  // reports those viewport-anchored coordinates, the snapshot writes them
+  // into the subset as plain `left`/`top` px values, and the importer
+  // interprets them in the body's coordinate system — pushing every
+  // right/bottom-anchored element far off the captured canvas. Setting
+  // `position: relative` here re-anchors the live containing block to <body>
+  // so the live measurements and the emitted subset share one origin.
+  body.style.position = 'relative';
   // If the page (or the user) scrolled before snapshot, every
   // `getBoundingClientRect` call returns viewport-relative offsets shifted
   // by the scroll position. Reset to (0,0) so that the body's own rect
