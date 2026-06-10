@@ -149,12 +149,27 @@ export function makeResourceCacheListener(
       if (!url || !/^https?:\/\//i.test(url)) return;
       if (!resp.ok()) return;
       if (cache.has(url)) return;
+      // Coalesce concurrent listeners for the same URL onto a single body
+      // read; the second-comer just awaits the first one and skips the
+      // network/buffer cost.
+      const pending = cache.awaitInflight(url);
+      if (pending !== undefined) { await pending; return; }
+      const slot = cache.beginInflight(url);
+      if (slot === null) { return; }
       const headers = resp.headers() || {};
       const contentType = headers['content-type'] || 'application/octet-stream';
-      if (!isCacheableContentType(url, contentType)) return;
-      const buf = await responseBytes(resp, engine);
-      const entry: CachedResource = { status: 200, contentType, body: buf };
-      cache.set(url, entry);
+      if (!isCacheableContentType(url, contentType)) {
+        slot.settle(undefined);
+        return;
+      }
+      let entry: CachedResource | undefined;
+      try {
+        const buf = await responseBytes(resp, engine);
+        entry = { status: 200, contentType, body: buf };
+        cache.set(url, entry);
+      } finally {
+        slot.settle(entry);
+      }
     } catch (err) {
       if (log) log(`resource cache capture skipped: ${errMessage(err)}`);
     }

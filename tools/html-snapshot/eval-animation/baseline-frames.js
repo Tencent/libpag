@@ -31,6 +31,24 @@ const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/brows
 
 const fail = makeFail('baseline-frames');
 
+// Wait at least one display frame (≈ 16 ms at 60 Hz) plus a small margin for the
+// engine's compositor to flush before screenshotting. Headless Chromium's
+// `screenshot()` reads from the latest committed frame; without a settle the
+// shot would race the seek and intermittently capture the previous frame's
+// pixels. 60 ms is a comfortable two-frame budget that has held across the eval
+// corpus; keep it as a named constant so the rationale is obvious to future
+// edits.
+const SEEK_SETTLE_MS = 60;
+
+// Wait at least one display frame (≈ 16 ms at 60 Hz) plus a small margin for the
+// engine's compositor to flush before screenshotting. Headless Chromium's
+// `screenshot()` reads from the latest committed frame; without a settle the
+// shot would race the seek and intermittently capture the previous frame's
+// pixels. 60 ms is a comfortable two-frame budget that has held across the eval
+// corpus; keep it as a named constant so the rationale is obvious to future
+// edits.
+const SEEK_SETTLE_MS = 60;
+
 function parseArgs(argv) {
   const opts = {
     input: '',
@@ -329,7 +347,7 @@ async function main() {
     for (let i = 0; i < timesMs.length; i++) {
       await seekToTime(page, timesMs[i]);
       // Give the engine a frame to flush the seeked styles before the screenshot.
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, SEEK_SETTLE_MS));
       const framePath = path.join(opts.outDir, `frame-${String(i).padStart(3, '0')}.png`);
       await page.screenshot({
         path: framePath,

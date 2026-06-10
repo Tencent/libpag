@@ -2427,7 +2427,17 @@ function snapshotMain() {
     if (typeof document.getAnimations === 'function') {
       const all = document.getAnimations();
       for (let i = 0; i < all.length; i++) {
-        try { all[i].cancel(); } catch (_) { /* ignore per-anim failure */ }
+        try {
+          // Skip the canonical `pagxAnim*` animations the capture layer just
+          // installed: cancelling them here would erase the very channels we
+          // are about to serialize. Native CSS Animations expose
+          // `animationName` directly; non-CSS WAAPI animations have no name
+          // and fall through to the unconditional cancel.
+          const cssAnim = all[i] as Animation & { animationName?: string };
+          const name = typeof cssAnim.animationName === 'string' ? cssAnim.animationName : '';
+          if (name.indexOf('pagxAnim') === 0) continue;
+          all[i].cancel();
+        } catch (_) { /* ignore per-anim failure */ }
       }
     }
   } catch (_) { /* ignore */ }
