@@ -142,9 +142,26 @@ function parseArgs(argv) {
   return opts;
 }
 
-// Read the body rect that snapshot.js will use as the canvas (identical to eval/baseline.js).
-// Anything outside this rect is not addressable in the subset, so cropping the baseline frames to
-// it keeps the per-frame diff fair.
+// Read the body rect that snapshot.js will use as the canvas. Must match the canvas size
+// browser-snapshot.ts (snapshot.js) records, otherwise the baseline frames and the PAGX render
+// land on different-sized PNGs and the per-frame diff is shifted before comparison even starts.
+//
+// The snapshot path measures the body AFTER cancelling every running CSS / WAAPI animation
+// (browser-snapshot.ts → snapshotMain), so its rect reflects the "base" (un-animated) layout.
+// This path runs with BASELINE_PAUSE_INIT_SCRIPT installed, which keeps every animation paused
+// at its current playback time so the seek loop later can drive `currentTime` deterministically.
+// At t=0 that pause exposes the 0% keyframe state of every animation: an animation whose 0%
+// keyframe pushes a child off the body via `transform: translateY(...)` (or any other
+// position-shifting property) inflates `body.scrollHeight` by the offset. The PAGX side never
+// applies that offset to its canvas, so the two PNGs come out different sizes.
+//
+// Fix: temporarily suppress every animation / transition / transform via `!important` author
+// rules during measurement. Author-important rules outrank both CSS animations and WAAPI
+// `element.animate()` effects (cascade origin: author-important > animation > author), so a
+// WAAPI animation that wrote `transform: translateY(80px)` is overridden back to `none` for the
+// duration of the read, and `body.scrollHeight` reflects the base layout the snapshot path also
+// records. Removing the override afterwards restores the paused / WAAPI state untouched —
+// `currentTime` and the Animation objects survive — so the subsequent seek loop still works.
 async function captureBodyRect(page) {
   return page.evaluate(() => {
     const body = document.body;
@@ -153,10 +170,18 @@ async function captureBodyRect(page) {
     if (typeof window.scrollTo === 'function') {
       try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
     }
+    const measureStyle = document.createElement('style');
+    measureStyle.textContent =
+      '*, *::before, *::after { animation: none !important; ' +
+      'transition: none !important; transform: none !important; }';
+    const parent = document.head || document.documentElement;
+    if (parent) parent.appendChild(measureStyle);
     void body.offsetHeight;
     const rect = body.getBoundingClientRect();
     const width = Math.max(body.scrollWidth, Math.round(rect.width));
     const height = Math.max(body.scrollHeight, Math.round(rect.height));
+    if (measureStyle.parentNode) measureStyle.parentNode.removeChild(measureStyle);
+    void body.offsetHeight;
     return { width, height };
   });
 }
