@@ -463,6 +463,7 @@ export function pagxSampleTimeline(
   loopInfinite: boolean,
   sampleCount: number,
   maxElements: number,
+  direction: string,
 ): void {
   const candidates = pagxCandidateElements(maxElements);
   const series = new Map<HTMLElement, Array<Record<string, string | null>>>();
@@ -512,11 +513,82 @@ export function pagxSampleTimeline(
       durationMs,
       delayMs: 0,
       iterations: loopInfinite ? Infinity : 1,
-      direction: 'normal',
+      direction: direction || 'normal',
       timing: 'linear',
     });
     seen.add(el);
   }
+}
+
+// Compute the sampling window for GSAP's global timeline: one *forward iteration*
+// of the longest top-level child, plus whether the composition repeats forever
+// and whether any repeating child uses `yoyo`.
+//
+// `gsap.globalTimeline.duration()` is unusable here: when any tween repeats
+// forever (`repeat: -1`) GSAP reports the timeline duration as ~1e10 s, so
+// sampling evenly across it lands on random phases of the real loop (producing
+// keyframes that jump back and forth instead of progressing). Each child tween /
+// nested timeline instead exposes its single-iteration `duration()`, `startTime()`,
+// `repeat()` and `yoyo()`, from which the true loop period is reconstructed.
+//
+// A `yoyo` repeat maps to CSS `animation-direction: alternate`, so only the
+// forward half is sampled and the runtime mirrors it back — matching GSAP's
+// forward-then-reverse playback.
+export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
+  windowSec: number;
+  infinite: boolean;
+  yoyo: boolean;
+} {
+  const tl = gsap.globalTimeline as {
+    getChildren?: (nested: boolean, tweens: boolean, timelines: boolean) => unknown[];
+  };
+  let children: unknown[] = [];
+  try {
+    children = typeof tl.getChildren === 'function' ? tl.getChildren(false, true, true) : [];
+  } catch (_) {
+    children = [];
+  }
+  let windowSec = 0;
+  let infinite = false;
+  let yoyo = false;
+  for (const c of children) {
+    const child = c as {
+      startTime?: () => number;
+      duration?: () => number;
+      repeat?: () => number;
+      yoyo?: () => boolean;
+    };
+    let start = 0;
+    let iterDur = 0;
+    let rep = 0;
+    let cyoyo = false;
+    try {
+      start = typeof child.startTime === 'function' ? child.startTime() : 0;
+    } catch (_) {
+      start = 0;
+    }
+    try {
+      iterDur = typeof child.duration === 'function' ? child.duration() : 0;
+    } catch (_) {
+      iterDur = 0;
+    }
+    try {
+      rep = typeof child.repeat === 'function' ? child.repeat() || 0 : 0;
+    } catch (_) {
+      rep = 0;
+    }
+    try {
+      cyoyo = typeof child.yoyo === 'function' ? !!child.yoyo() : false;
+    } catch (_) {
+      cyoyo = false;
+    }
+    if (!isFinite(iterDur) || iterDur <= 0) continue;
+    if (rep < 0) infinite = true;
+    if (rep !== 0 && cyoyo) yoyo = true;
+    const end = (isFinite(start) ? start : 0) + iterDur;
+    if (end > windowSec) windowSec = end;
+  }
+  return { windowSec, infinite, yoyo };
 }
 
 export function pagxCollectGsap(
@@ -527,19 +599,21 @@ export function pagxCollectGsap(
 ): void {
   const gsap = (window as { gsap?: unknown }).gsap;
   if (!gsap || !gsap.globalTimeline) return;
-  let total = 0;
-  try {
-    total = gsap.globalTimeline.duration();
-  } catch (_) {
-    return;
-  }
-  if (!total || !isFinite(total) || total <= 0) return;
   const tl = gsap.globalTimeline;
+  const win = pagxGsapWindow(gsap);
+  if (!win.windowSec || !isFinite(win.windowSec) || win.windowSec <= 0) return;
+  try {
+    tl.pause();
+  } catch (_) {
+    /* ignore */
+  }
+  const direction = win.yoyo ? 'alternate' : 'normal';
   pagxSampleTimeline(
-    captured, seen, total * 1000, (p) => tl.progress(p, false), true, sampleCount, maxElements,
+    captured, seen, win.windowSec * 1000, (p) => tl.time(p * win.windowSec, false),
+    win.infinite, sampleCount, maxElements, direction,
   );
   try {
-    tl.progress(0, false);
+    tl.time(0, false);
     tl.pause();
   } catch (_) {
     /* ignore */
@@ -566,7 +640,8 @@ export function pagxCollectAnime(
       if (!dur || dur <= 0) continue;
       if (inst.pause) inst.pause();
       pagxSampleTimeline(
-        captured, seen, dur, (p) => inst.seek(p * dur), inst.loop === true, sampleCount, maxElements,
+        captured, seen, dur, (p) => inst.seek(p * dur), inst.loop === true, sampleCount,
+        maxElements, 'normal',
       );
       inst.seek(0);
     } catch (_) {
@@ -647,6 +722,7 @@ const PAGX_ANIM_FNS = [
   pagxCollectWAAPI,
   pagxCollectCSS,
   pagxSampleTimeline,
+  pagxGsapWindow,
   pagxCollectGsap,
   pagxCollectAnime,
   pagxAnimMain,

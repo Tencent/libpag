@@ -131,14 +131,33 @@ async function measureGlobalDurationMs(page) {
       if (end > maxMs) maxMs = end;
     }
 
-    // GSAP: the global timeline aggregates every active tween; its duration() is the period the
-    // capture layer samples over.
+    // GSAP: reconstruct one forward-iteration period from the global timeline's top-level children
+    // (the same window lib/animation-capture.ts samples over). `globalTimeline.duration()` is
+    // unusable when any tween repeats forever — GSAP reports it as ~1e10 s, which would scatter the
+    // baseline samples across random loop phases. Each child exposes its single-iteration
+    // `duration()` / `startTime()`, from which the true loop period is derived.
     try {
       const gsap = window.gsap;
       if (gsap && gsap.globalTimeline) {
-        const total = gsap.globalTimeline.duration();
-        if (typeof total === 'number' && isFinite(total) && total * 1000 > maxMs) {
-          maxMs = total * 1000;
+        const tl = gsap.globalTimeline;
+        let children = [];
+        try {
+          children = typeof tl.getChildren === 'function' ? tl.getChildren(false, true, true) : [];
+        } catch (_) {
+          children = [];
+        }
+        let windowSec = 0;
+        for (const c of children) {
+          let start = 0;
+          let iterDur = 0;
+          try { start = typeof c.startTime === 'function' ? c.startTime() : 0; } catch (_) { start = 0; }
+          try { iterDur = typeof c.duration === 'function' ? c.duration() : 0; } catch (_) { iterDur = 0; }
+          if (!isFinite(iterDur) || iterDur <= 0) continue;
+          const end = (isFinite(start) ? start : 0) + iterDur;
+          if (end > windowSec) windowSec = end;
+        }
+        if (windowSec > 0 && windowSec * 1000 > maxMs) {
+          maxMs = windowSec * 1000;
         }
       }
     } catch (_) {
