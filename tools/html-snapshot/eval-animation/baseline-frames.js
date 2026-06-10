@@ -40,15 +40,6 @@ const fail = makeFail('baseline-frames');
 // edits.
 const SEEK_SETTLE_MS = 60;
 
-// Wait at least one display frame (≈ 16 ms at 60 Hz) plus a small margin for the
-// engine's compositor to flush before screenshotting. Headless Chromium's
-// `screenshot()` reads from the latest committed frame; without a settle the
-// shot would race the seek and intermittently capture the previous frame's
-// pixels. 60 ms is a comfortable two-frame budget that has held across the eval
-// corpus; keep it as a named constant so the rationale is obvious to future
-// edits.
-const SEEK_SETTLE_MS = 60;
-
 function parseArgs(argv) {
   const opts = {
     input: '',
