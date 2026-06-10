@@ -69,7 +69,7 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
 
 // Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
 // text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
-// a TextBox with no inline elements but at least two qualifying sibling Groups).
+// a TextBox with no inline elements and at least one qualifying sibling Group).
 struct RichTextScanResult {
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
@@ -150,7 +150,7 @@ static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elem
       }
     }
   }
-  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 2;
+  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 1;
   return r;
 }
 

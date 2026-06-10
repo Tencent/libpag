@@ -484,6 +484,36 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
   EXPECT_EQ(html.find("\xEE\x80\x80"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="120" height="80">
+  <Resources>
+    <Font id="shapes" unitsPerEm="1000">
+      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="120" height="80">
+    <Group>
+      <Text text="abcdefgh" fontFamily="PingFang SC" fontSize="14">
+        <GlyphRun font="@shapes" fontSize="14" glyphs="1,1,1,1" y="17"
+                  xOffsets="0,14,28,42"/>
+        <GlyphRun font="@shapes" fontSize="14" glyphs="1,1,1,1" y="37"
+                  xOffsets="0,14,28,42"/>
+      </Text>
+      <Fill color="#111111"/>
+    </Group>
+    <TextBox width="56" lineHeight="20"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("word-wrap:break-word"), std::string::npos);
+  EXPECT_NE(html.find("line-height:20px"), std::string::npos);
+  EXPECT_EQ(html.find("line-height:1;white-space:pre\">abcdefgh"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, TextRich) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_rich.pagx"));
   ASSERT_FALSE(html.empty());
