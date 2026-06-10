@@ -229,6 +229,22 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     std::cerr << "pagx render: --time cannot be combined with --id / --xpath\n";
     return 1;
   }
+  if (options->hasTime && options->hasCrop) {
+    // The animated render path skips the crop pipeline (it samples the timeline at a single
+    // frame and writes the full document bounds), so combining these would silently ignore the
+    // crop region. Reject the combination so the user notices instead of getting a full-frame
+    // output.
+    std::cerr << "pagx render: --time cannot be combined with --crop\n";
+    return 1;
+  }
+  if (options->hasTime && options->hasCrop) {
+    // The animated render path skips the crop pipeline (it samples the timeline at a single
+    // frame and writes the full document bounds), so combining these would silently ignore the
+    // crop region. Reject the combination so the user notices instead of getting a full-frame
+    // output.
+    std::cerr << "pagx render: --time cannot be combined with --crop\n";
+    return 1;
+  }
   if (options->inputFile.empty()) {
     std::cerr << "pagx render: missing input file\n";
     return 1;
