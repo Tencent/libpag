@@ -40,6 +40,61 @@ const fail = makeFail('baseline-frames');
 // edits.
 const SEEK_SETTLE_MS = 60;
 
+// Init-script injected into the baseline page before any of its own scripts
+// run. Two pieces of work, both aimed at keeping animations *suspended* across
+// `openAndSettlePage`'s settle wait so we can measure and seek them later:
+//
+//   1. A `<style>` rule pinning `animation-play-state: paused` on every
+//      element. Without this, CSS animations with a finite iteration count
+//      (e.g. `animation: pop 0.8s ease-out 1`) tick through the 800 ms settle,
+//      finish, drop into the `idle` phase, and disappear from
+//      `document.getAnimations()` — at which point `measureGlobalDurationMs()`
+//      reads zero and `seekToTime()` has nothing to seek. Pausing all CSS
+//      animations holds them at their first-frame state, keeps them in
+//      `getAnimations()`, and still lets `seekToTime()` advance them via
+//      `currentTime` (WAAPI honours the playhead write regardless of CSS
+//      play-state).
+//
+//   2. An `Element.prototype.animate` wrapper that pauses every WAAPI
+//      animation immediately on creation. CSS `animation-play-state` does not
+//      apply to WAAPI animations (`element.animate(...)`), so a finite
+//      `element.animate(..., { duration: 500 })` would still play to
+//      completion during settle and the same disappearance happens.
+//
+// Both must be installed before any page script runs, so this is shipped via
+// `page-loader.ts`'s `initScripts` (puppeteer `evaluateOnNewDocument` /
+// playwright `addInitScript`). The pause stays on for the whole capture: the
+// seek path drives playback explicitly via `currentTime` / GSAP `time()` /
+// anime `seek()`, never via the natural timeline clock.
+const BASELINE_PAUSE_INIT_SCRIPT = `(function() {
+  var STYLE_ID = '__pagxBaselinePauseAnims';
+  var STYLE_TEXT = '*, *::before, *::after { animation-play-state: paused !important; }';
+  function inject() {
+    if (document.getElementById(STYLE_ID)) return;
+    var parent = document.head || document.documentElement;
+    if (!parent) return;
+    var s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = STYLE_TEXT;
+    parent.appendChild(s);
+  }
+  inject();
+  if (!document.getElementById(STYLE_ID)) {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
+  }
+  try {
+    var proto = window.Element && Element.prototype;
+    var orig = proto && proto.animate;
+    if (typeof orig === 'function') {
+      proto.animate = function() {
+        var anim = orig.apply(this, arguments);
+        try { if (anim && typeof anim.pause === 'function') anim.pause(); } catch (_) {}
+        return anim;
+      };
+    }
+  } catch (_) {}
+})();`;
+
 function parseArgs(argv) {
   const opts = {
     input: '',
@@ -322,6 +377,11 @@ async function main() {
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
+      // Pause every CSS / WAAPI animation as soon as it is created so finite
+      // animations cannot run to completion during settle (and thus disappear
+      // from `document.getAnimations()` before the seek loop sees them). See
+      // BASELINE_PAUSE_INIT_SCRIPT for the full rationale.
+      initScripts: [BASELINE_PAUSE_INIT_SCRIPT],
       onPageError: (err) => {
         console.error(`page exception: ${err.message}`);
       },
