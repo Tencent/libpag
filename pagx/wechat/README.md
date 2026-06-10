@@ -65,10 +65,6 @@ This single command runs the full pipeline:
    `lib/pagx-viewer.wasm.br` into `wx_demo/utils/` so the demo mini program
    picks up the fresh build.
 5. `tsc -p ./tsconfig.type.json` — emits `.d.ts` type definitions.
-6. `node script/copy-to-cocraft.js` — copies the built artifacts to an
-   external mini program project. **This step targets a hard-coded local
-   path and is intended for internal use only**; see
-   [Optional: External Copy Step](#optional-external-copy-step) below.
 
 ## Build Individual Steps
 
@@ -108,20 +104,6 @@ After a successful build, the distributable files are:
 Open the directory in WeChat Developer Tools (微信开发者工具) and click
 **Run**. Any time you rebuild with `npm run build:wechat`, the demo's
 `utils/` folder is refreshed automatically.
-
-## Optional: External Copy Step
-
-`script/copy-to-cocraft.js` contains a hard-coded absolute path pointing at
-an internal consumer project (`cocraft-wechat`). If you are not that
-consumer:
-
-- Either edit `targetDir` in `script/copy-to-cocraft.js` to your own path,
-- Or skip this step by running the sub-targets manually:
-  ```bash
-  node script/cmake.wx.js -a wasm
-  brotli -f ./lib/pagx-viewer.wasm
-  npm run build:wechat:js
-  ```
 
 ## Troubleshooting
 

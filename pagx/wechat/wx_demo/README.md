@@ -6,13 +6,9 @@
 
 ### 1. 构建项目
 
-在 `pagx` 目录下执行：
+在 `pagx/wechat` 目录下执行：
 
 ```bash
-# 快速构建（使用现有 WASM 文件）
-npm run build:wechat:quick
-
-# 或完整构建（重新编译 WASM）
 npm run build:wechat
 ```
 
@@ -20,7 +16,7 @@ npm run build:wechat
 
 1. 打开「微信开发者工具」
 2. 选择「导入项目」
-3. 项目目录选择：`pagx/wechat`
+3. 项目目录选择：`pagx/wechat/wx_demo`
 4. AppID 设置为 `touristappid`（测试）或你的 AppID
 
 ### 3. 编译运行

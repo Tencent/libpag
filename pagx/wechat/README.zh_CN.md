@@ -62,9 +62,6 @@ npm run build:wechat
    `lib/pagx-viewer.wasm.br` 拷贝到 `wx_demo/utils/`，让示例小程序用上
    最新产物。
 5. `tsc -p ./tsconfig.type.json` — 输出 `.d.ts` 类型声明。
-6. `node script/copy-to-cocraft.js` — 把产物拷贝到一个外部小程序工程。
-   **此步骤指向写死的本地路径，仅限内部使用**，详见下文
-   [可选：外部拷贝步骤](#可选外部拷贝步骤)。
 
 ## 分步构建
 
@@ -103,19 +100,6 @@ npm run clean
 `wx_demo/` 是使用该 viewer 的最小示例小程序。用微信开发者工具打开该
 目录并点击 **运行** 即可。每次执行 `npm run build:wechat` 都会自动刷新
 demo 的 `utils/` 目录。
-
-## 可选：外部拷贝步骤
-
-`script/copy-to-cocraft.js` 中写死了一个指向内部消费者工程
-（`cocraft-wechat`）的绝对路径。如果你不是该工程的使用者：
-
-- 可修改 `script/copy-to-cocraft.js` 中的 `targetDir` 为你自己的路径；
-- 或跳过这一步，手动执行前几个子任务：
-  ```bash
-  node script/cmake.wx.js -a wasm
-  brotli -f ./lib/pagx-viewer.wasm
-  npm run build:wechat:js
-  ```
 
 ## 常见问题
 

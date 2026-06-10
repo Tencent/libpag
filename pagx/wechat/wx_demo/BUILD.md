@@ -5,7 +5,7 @@
 ### 一键构建
 
 ```bash
-cd pagx
+cd pagx/wechat
 npm run build:wechat
 ```
 
@@ -46,7 +46,7 @@ emcc --version
 ### Step 2: 运行构建
 
 ```bash
-cd pagx
+cd pagx/wechat
 npm run build:wechat
 ```
 
@@ -155,7 +155,7 @@ SharedArrayBuffer is not defined
 构建成功后：
 
 1. 打开微信开发者工具
-2. 导入项目：`pagx/wechat`
+2. 导入项目：`pagx/wechat/wx_demo`
 3. 编译运行
 4. 测试功能
 
