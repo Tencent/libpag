@@ -185,11 +185,53 @@ export interface RunSnapshotOptions {
   headers?: Array<[string, string]>;
   inlineIconFonts?: boolean;
   captureAnimations?: boolean;
+  scrollReveal?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
   downloadImages?: boolean;
   imageDir?: string;
   log?: CaptureLogger | null;
+}
+
+// Step the page from top to bottom (and back) before the snapshot is walked so
+// that scroll-triggered reveal animations fire and lazy-loaded media is
+// fetched. Many marketing pages keep their below-the-fold sections at
+// `opacity: 0` until an IntersectionObserver flips them visible on scroll; the
+// snapshot is otherwise taken at scroll `(0,0)` where those sections are still
+// hidden (and therefore dropped). Walking the page once leaves those reveal
+// classes applied (reveal libraries unobserve after the first hit), and the
+// image `response` listener captures any `loading="lazy"` images that load
+// along the way. `takeSnapshot` scrolls back to `(0,0)` before measuring, so
+// the final geometry is unchanged — only the visibility/state is advanced.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: number): Promise<void> {
+  await page.evaluate(async (perStepMs: number) => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const docHeight = () =>
+      Math.max(
+        document.body ? document.body.scrollHeight : 0,
+        document.documentElement ? document.documentElement.scrollHeight : 0,
+      );
+    const viewport = window.innerHeight || 800;
+    const step = Math.max(1, Math.floor(viewport * 0.8));
+    // Cap the number of steps so a page that keeps growing (infinite scroll)
+    // cannot loop forever.
+    for (let i = 0; i < 200; i++) {
+      const prevY = window.scrollY;
+      const target = Math.min(prevY + step, docHeight());
+      window.scrollTo(0, target);
+      await sleep(perStepMs);
+      // No further progress (reached the bottom or scroll is pinned): stop.
+      if (window.scrollY <= prevY) break;
+    }
+    // Let the last batch of reveals/transitions settle at the bottom, then
+    // return to the top so geometry is measured from the natural origin.
+    await sleep(perStepMs);
+    window.scrollTo(0, 0);
+  }, settleMs);
+  if (finalWaitMs > 0) {
+    await new Promise((r) => setTimeout(r, finalWaitMs));
+  }
 }
 
 export interface RunSnapshotResult {
@@ -239,6 +281,7 @@ export async function runSnapshot(
     headers = [],
     inlineIconFonts = true,
     captureAnimations = true,
+    scrollReveal = false,
     downloadFonts = false,
     fontDir = '',
     downloadImages = false,
@@ -287,6 +330,20 @@ export async function runSnapshot(
   });
 
   try {
+    // Optionally walk the page top-to-bottom first so scroll-triggered reveal
+    // animations fire and lazy media is fetched (the image `response` listener
+    // is already attached, so anything loaded during the scroll lands in
+    // `imageBytesByUrl` below). Best-effort: a failure leaves the page at its
+    // settled, scroll-(0,0) state and the rest of the pipeline proceeds.
+    if (scrollReveal) {
+      try {
+        await scrollThroughPage(page, 250, Math.max(waitMs, 400));
+        if (log) log('scroll-reveal: walked page to trigger reveal animations / lazy media');
+      } catch (err) {
+        if (log) log(`scroll-reveal failed: ${errMessage(err)}`);
+      }
+    }
+
     // PAGX's renderer can read `data:` URIs and local files but not
     // `http(s)://` URLs, so every external image must be turned into one of
     // those before the snapshot is walked.

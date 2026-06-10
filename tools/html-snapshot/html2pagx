@@ -69,6 +69,10 @@ Options (any unknown flag is forwarded to snapshot.js):
                              that is removed after import); default keeps it
   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
                              → inline SVG conversion (default: enabled)
+  --scroll-reveal            Forwarded to snapshot.js: walk the page top-to-
+                             bottom before snapshotting so scroll-triggered
+                             reveal animations fire and lazy media loads
+                             (default: disabled)
   --download-fonts           Download the web fonts the page uses and register
                              them as render fallbacks so text in uninstalled
                              web fonts renders correctly. The fonts are not
@@ -123,6 +127,7 @@ function parseArgs(argv) {
     inferFlex: true,
     keepSubsetHtml: true,
     inlineIconFonts: true,
+    scrollReveal: false,
     downloadFonts: false,
     embedFonts: false,
     fontDir: '',
@@ -197,6 +202,9 @@ function parseArgs(argv) {
         break;
       case '--no-inline-icon-fonts':
         opts.inlineIconFonts = false;
+        break;
+      case '--scroll-reveal':
+        opts.scrollReveal = true;
         break;
       case '--download-fonts':
         opts.downloadFonts = true;
@@ -384,6 +392,7 @@ async function main() {
         imageDir: opts.imageDir,
         browserEngine: opts.browserEngine,
         inlineIconFonts: opts.inlineIconFonts,
+        scrollReveal: opts.scrollReveal,
         cookies: opts.cookies,
         headers: opts.headers,
         viewportWidth: opts.viewportWidth,
@@ -428,6 +437,7 @@ async function main() {
       imageDir: opts.imageDir,
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
+      scrollReveal: opts.scrollReveal,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,
