@@ -503,9 +503,8 @@ class HTMLWriter {
                          const TextBox* tb, float alpha);
   void writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const TextPath* textPath,
                      const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
-  // Renders a Text node whose glyphRuns hold embedded vector/bitmap shapes (not real text).
-  // Only call when text->text is empty or text->fontFamily is empty. Real text must go through
-  // the CSS span path in writeText to preserve gradient fills and layout semantics.
+  // Renders a Text node from its embedded GlyphRuns using generated WOFF2 glyphs. Prefer the
+  // normal CSS span path when text semantics/layout must stay browser-native.
   void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                 const Stroke* stroke, float alpha);
   // WOFF2 path: renders embedded vector glyphs as <span> elements referencing a generated

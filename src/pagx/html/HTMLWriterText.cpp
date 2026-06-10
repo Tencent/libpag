@@ -973,21 +973,13 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
 }
 
-// Renders a Text node whose glyphRuns reference an embedded Font resource (vector outlines or
-// bitmap images) that has no Unicode mapping. This is NOT a text-rendering path — the glyphs are
-// arbitrary vector/bitmap shapes that happen to be stored in a Font node for convenient
-// per-shape transform support (xOffsets, positions, anchors, rotations, scales, skews).
-//
-// Do NOT call this for Text nodes that have a non-empty `text` string and a `fontFamily`:
-// those are real text and must be rendered via the normal HTML/CSS span path in writeText so
-// that gradient fills, layout, and text semantics all work correctly.
-//
-// Correct call sites: writeText, only when text->text.empty() || text->fontFamily.empty().
+// Renders a Text node whose GlyphRuns reference an embedded Font resource. This path emits PUA
+// characters backed by generated WOFF2 fonts, so callers should use it when visual fidelity to the
+// pre-shaped GlyphRuns is more important than browser-native text shaping.
 void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                           const Stroke* stroke, float alpha) {
   // All embedded font glyphs (vector and bitmap) are rendered via WOFF2 @font-face with PUA
-  // characters. This preserves text semantics (selectable, animatable per-character) instead of
-  // converting to SVG <path>/<image> which would lose those capabilities.
+  // characters. This preserves glyph-level layout while using the exact embedded outlines.
   const Font* font = nullptr;
   for (auto* run : text->glyphRuns) {
     if (run->font) {

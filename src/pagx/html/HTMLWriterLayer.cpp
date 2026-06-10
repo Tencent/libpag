@@ -74,6 +74,18 @@ static bool ContainsOnlyLineBreaks(const std::string& text) {
   return true;
 }
 
+static bool CanWriteEmbeddedGlyphText(const Text* text, const HTMLWriterContext* context) {
+  if (text == nullptr || text->glyphRuns.empty()) {
+    return false;
+  }
+  for (auto* run : text->glyphRuns) {
+    if (run && run->font && context->woff2Fonts.find(run->font) != context->woff2Fonts.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // CollectRichTextSpans pre-scans an element list to pull out every Group that should be hoisted
 // into the enclosing TextBox as a single <span> child instead of being rendered as a stand-alone
 // DOM wrapper. A Group qualifies when its children are exactly one Text plus at least one
@@ -1110,6 +1122,13 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         isFirstSpan = false;
         continue;
       }
+      if (CanWriteEmbeddedGlyphText(span.text, _ctx)) {
+        writeEmbeddedShapeGlyphs(out, span.text, span.fill, span.stroke, 1.0f);
+        prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
       // Detect single-span horizontal justify-with-\n upfront — when true, we emit
       // a <div> per \n-segment instead of a single <span>...<br>... so each segment
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
@@ -1272,6 +1291,12 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
                           rtSpanFontSize, false);
     if (ContainsOnlyLineBreaks(span.text->text)) {
       rtPrevTrailingBreaks = 0;
+      rtPrevFontSize = rtSpanFontSize;
+      continue;
+    }
+    if (CanWriteEmbeddedGlyphText(span.text, _ctx)) {
+      writeEmbeddedShapeGlyphs(out, span.text, span.fill, span.stroke, 1.0f);
+      rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
       rtPrevFontSize = rtSpanFontSize;
       continue;
     }
