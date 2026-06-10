@@ -18,8 +18,6 @@
 
 #include "GlyphRunRenderer.h"
 #include <cmath>
-#include <mutex>
-#include <unordered_map>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
@@ -35,7 +33,6 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
-#include "tgfx/platform/Print.h"
 
 namespace pagx {
 

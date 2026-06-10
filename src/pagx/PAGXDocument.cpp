@@ -24,6 +24,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -55,7 +56,8 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
-      if (image->data == nullptr && image->decodedImage == nullptr && image->thumbnailImage == nullptr && IsExternalFilePath(image->filePath)) {
+      if (image->data == nullptr && image->decodedImage == nullptr &&
+          image->thumbnailImage == nullptr && IsExternalFilePath(image->filePath)) {
         paths->push_back(image->filePath);
       }
     } else if (node->nodeType() == NodeType::Layer) {

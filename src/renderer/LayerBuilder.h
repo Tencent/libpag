@@ -122,6 +122,9 @@ struct RuntimeBinding {
 struct LayerBuildResult {
   std::shared_ptr<tgfx::Layer> root = nullptr;
   RuntimeBinding binding = {};
+  // 1:1 pagx Layer -> tgfx Layer map, exposing only the first copy when a Composition is
+  // referenced by multiple Layers. Session users that need every copy use getTgfxLayers().
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
 
   /**
    * Returns the tgfx layer corresponding to the specified PAGX Layer node, or nullptr if the node
