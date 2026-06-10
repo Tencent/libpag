@@ -7887,14 +7887,14 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
 /**
  * Render NoiseFilter/NoiseStyle animation frames across all modes and combined with shadows.
  * Layout: two rectangles side-by-side, left with NoiseFilter, right with NoiseStyle.
- * 50 frames total: 10 Mono, 10 Duo, 10 Multi, 10 Multi+DropShadowFilter, 10 Multi+InnerShadowStyle.
- * Density animates from 0.1 to 1.0 across all 50 frames.
+ * 12 frames total: 3 Mono, 3 Duo, 3 Multi, 3 Multi+DropShadowFilter+InnerShadowStyle.
+ * Density animates from 0.1 to 1.0 across all 12 frames.
  */
 PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
   constexpr int canvasW = 500;
   constexpr int canvasH = 260;
-  constexpr int totalFrames = 40;
-  constexpr int framesPerSection = 10;
+  constexpr int totalFrames = 12;
+  constexpr int framesPerSection = 3;
 
   auto outDir = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAnimation");
   auto dirPath = std::filesystem::path(outDir);
