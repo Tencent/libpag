@@ -94,13 +94,6 @@ std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
                                            std::vector<CssKeyframesRule>& keyframesRules);
 
 /**
- * Convenience overload that discards any `@keyframes` rules (forwards to the three-argument form
- * with a throwaway sink). Kept so call sites that do not care about animations stay terse.
- */
-std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
-                                           std::vector<std::string>& droppedAtRules);
-
-/**
  * Serialises a list of `@keyframes` rules back into canonical CSS text (one rule per line). Used
  * by the subset transformer to re-emit a `<style>` block that carries only the surviving
  * keyframes so the importer can re-read them after the cascade has been inlined.

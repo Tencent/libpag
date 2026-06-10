@@ -274,12 +274,6 @@ std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
   return rules;
 }
 
-std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
-                                           std::vector<std::string>& droppedAtRules) {
-  std::vector<CssKeyframesRule> ignored;
-  return TokenizeStyleSheet(css, droppedAtRules, ignored);
-}
-
 std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRules) {
   std::string out;
   for (const auto& rule : keyframesRules) {

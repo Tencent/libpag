@@ -20,7 +20,6 @@
 
 #include <string>
 #include <unordered_map>
-#include "pagx/html/importer/HTMLCssCascade.h"
 
 namespace pagx {
 
@@ -29,6 +28,10 @@ class HTMLIdAllocator;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
+
+namespace html {
+struct CssKeyframesRule;
+}
 
 /**
  * Maps the HTML animation subset (`@keyframes` + the `animation` shorthand, see

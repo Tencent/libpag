@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <vector>
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -88,7 +89,8 @@ struct ResolvedEasing {
   Jump stepJump = Jump::End;
 };
 
-// Trimmed lookup helper (hoisted out of a lambda to honour the project's no-lambda rule).
+// Trimmed style-map lookup helper. Keeps the call sites tidy when many longhands need the same
+// `find + trim or empty` dance.
 std::string GetTrimmed(const std::unordered_map<std::string, std::string>& style, const char* key) {
   auto it = style.find(key);
   return it == style.end() ? std::string() : Trim(it->second);
@@ -805,7 +807,10 @@ bool HTMLAnimationBuilder::buildForElement(
   if (reversed) {
     for (auto& s : stops) s.percent = 100.0f - s.percent;
   }
-  std::sort(stops.begin(), stops.end(), KeyframeStopLess);
+  // stable_sort preserves authoring order between stops that share an offset (CSS allows
+  // duplicate `0%` / `100%` selectors), so the later declaration overrides the earlier one
+  // exactly the same way the browser would resolve it.
+  std::stable_sort(stops.begin(), stops.end(), KeyframeStopLess);
 
   // Timing -> per-segment easing (applied uniformly across the animation).
   ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
