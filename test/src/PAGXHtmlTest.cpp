@@ -533,6 +533,35 @@ CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
   EXPECT_EQ(html.find("line-height:1;white-space:pre\">abcdefgh"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="96" height="32">
+  <Resources>
+    <Font id="shapes" unitsPerEm="1000">
+      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="48" height="20" data-text-auto-resize="width-and-height">
+    <Group>
+      <Text text="智能模式" fontFamily="PingFang SC" fontSize="12">
+        <GlyphRun font="@shapes" fontSize="12" glyphs="1,1,1,1" y="14.32"
+                  xOffsets="0,12,24,36" bounds="0,0,48,20"/>
+      </Text>
+      <Fill color="#111111"/>
+    </Group>
+    <TextBox textAlign="center" paragraphAlign="middle" lineHeight="20" data-max-lines="1"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("智能模式"), std::string::npos);
+  EXPECT_NE(html.find("top:2.32px"), std::string::npos);
+  EXPECT_NE(html.find("line-height:1"), std::string::npos);
+  EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

@@ -80,8 +80,10 @@ static bool ContainsOnlyLineBreaks(const std::string& text) {
 // Fill/Stroke (and nothing else); see HTMLWriter.h for the RichTextSpan struct itself.
 
 // Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
-// text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
-// a TextBox with no inline elements and at least one qualifying sibling Group).
+// text spans pulled from sibling Groups, and the derived useRichText flag. Multiple qualifying
+// Groups indicate exporter-created rich text spans. A single Group is only rich text when the
+// TextBox carries an authored layout boundary; auto-size preshaped labels rely on GlyphRun
+// positions instead.
 struct RichTextScanResult {
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
@@ -129,6 +131,17 @@ struct GroupSpanCollector {
   }
 };
 
+static bool TextBoxHasAuthoredLayoutBoundary(const TextBox* textBox) {
+  if (!textBox) {
+    return false;
+  }
+  return !std::isnan(textBox->width) || !std::isnan(textBox->height) ||
+         textBox->overflow == Overflow::Hidden ||
+         textBox->customData.count("paragraph-spacing") > 0 ||
+         textBox->customData.count("line-types") > 0 ||
+         textBox->customData.count("text-truncation") > 0;
+}
+
 static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elements) {
   RichTextScanResult r;
   int richTextGroupCount = 0;
@@ -162,7 +175,10 @@ static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elem
       }
     }
   }
-  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 1;
+  r.useRichText =
+      r.preScannedTextBox != nullptr &&
+      (richTextGroupCount >= 2 ||
+       (richTextGroupCount == 1 && TextBoxHasAuthoredLayoutBoundary(r.preScannedTextBox)));
   return r;
 }
 
