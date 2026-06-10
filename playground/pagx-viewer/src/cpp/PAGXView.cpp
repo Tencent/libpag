@@ -259,7 +259,7 @@ void PAGXView::applySceneDisplayOptions() {
   }
   auto options = scene->getDisplayOptions();
   options->setRenderMode(PAGRenderMode::Tiled);
-  options->setAllowZoomBlur(true);
+  options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
   options->setMaxTileCount(512);
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
