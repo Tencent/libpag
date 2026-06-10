@@ -6570,8 +6570,12 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setMaxTileCount(64);
   EXPECT_EQ(options->getMaxTileCount(), 64);
 
-  options->setTileUpdateMode(pagx::PAGTileUpdateMode::Smooth);
-  EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Smooth);
+  EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Immediate);
+  for (auto mode : {pagx::PAGTileUpdateMode::Immediate, pagx::PAGTileUpdateMode::Smooth,
+                    pagx::PAGTileUpdateMode::Fast}) {
+    options->setTileUpdateMode(mode);
+    EXPECT_EQ(options->getTileUpdateMode(), mode);
+  }
 
   options->setMaxTilesRefinedPerFrame(8);
   EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);
