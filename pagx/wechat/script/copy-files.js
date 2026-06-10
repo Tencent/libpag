@@ -190,19 +190,3 @@ copyFiles('./lib/', './wx_demo/utils',
   overwrite: true,
   preserveStructure: true
 });
-
-
-copyFiles('./lib/', '/Users/billyjin/Desktop/project/cocraft-wechat/packages/frontend/miniprogram/dist/packageFile/utils',
-    ['*.js', '*.br'], {
-      recursive: true,
-      overwrite: true,
-      preserveStructure: true
-    });
-
-
-copyFiles('./lib/', '/Users/billyjin/Desktop/project/cocraft-wechat-cli/packages/frontend/miniprogram/dist/packageFile/utils',
-    ['*.js', '*.br'], {
-      recursive: true,
-      overwrite: true,
-      preserveStructure: true
-    });
