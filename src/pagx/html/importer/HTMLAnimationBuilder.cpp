@@ -610,23 +610,30 @@ void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, 
 // host whose `<Text>+<Fill>` pair sits in `Group.elements` rather than directly in
 // `Layer.contents`), so this also descends into Group/TextBox containers encountered while
 // scanning `Layer.contents`. NodeType is used in lieu of dynamic_cast (banned project-wide).
-SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int depth);
+//
+// Layer-vs-Element nesting is bounded with separate caps so a deeply Group-nested text fill
+// inside a margin-wrapped + transform-split layer does not silently exhaust a single shared
+// counter (the caller would see a misleading "no solid fill" warning).
+constexpr int kMaxLayerDepth = 4;
+constexpr int kMaxElementDepth = 4;
 
-SolidColor* FindSolidFill(Layer* layer, int depth = 0) {
-  if (layer == nullptr || depth > 3) return nullptr;
-  if (auto* found = FindSolidFillInElements(layer->contents, depth)) {
+SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int elementDepth);
+
+SolidColor* FindSolidFill(Layer* layer, int layerDepth = 0) {
+  if (layer == nullptr || layerDepth > kMaxLayerDepth) return nullptr;
+  if (auto* found = FindSolidFillInElements(layer->contents, 0)) {
     return found;
   }
   for (auto* child : layer->children) {
-    if (auto* found = FindSolidFill(child, depth + 1)) {
+    if (auto* found = FindSolidFill(child, layerDepth + 1)) {
       return found;
     }
   }
   return nullptr;
 }
 
-SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int depth) {
-  if (depth > 3) return nullptr;
+SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int elementDepth) {
+  if (elementDepth > kMaxElementDepth) return nullptr;
   for (auto* element : elements) {
     if (element == nullptr) continue;
     NodeType type = element->nodeType();
@@ -639,7 +646,7 @@ SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int d
     }
     if (type == NodeType::Group || type == NodeType::TextBox) {
       auto* group = static_cast<Group*>(element);
-      if (auto* found = FindSolidFillInElements(group->elements, depth + 1)) {
+      if (auto* found = FindSolidFillInElements(group->elements, elementDepth + 1)) {
         return found;
       }
     }
@@ -762,17 +769,6 @@ bool HTMLAnimationBuilder::buildForElement(
     _diagnostics.warn(
         "html: only the first animation in a comma-separated 'animation' list is imported "
         "[subset:animation-multiple]");
-  }
-  // CSS allows a comma-separated list of timing functions to pair with the comma-separated
-  // animation list; we only support a single animation per element, so a list-valued timing
-  // function would otherwise be silently misparsed by ResolveTimingFunction. Detect the comma
-  // and emit a diagnostic so authors aren't surprised that only the first easing is honoured.
-  if (spec.timingFunction.find(',') != std::string::npos) {
-    _diagnostics.warn(
-        "html: only the first animation-timing-function in a comma-separated list is imported "
-        "[subset:animation-multiple]");
-    auto commaPos = spec.timingFunction.find(',');
-    spec.timingFunction = Trim(spec.timingFunction.substr(0, commaPos));
   }
   // CSS allows a comma-separated list of timing functions to pair with the comma-separated
   // animation list; we only support a single animation per element, so a list-valued timing
