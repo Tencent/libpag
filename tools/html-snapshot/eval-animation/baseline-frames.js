@@ -197,18 +197,23 @@ async function seekToTime(page, timeMs) {
       /* ignore */
     }
 
-    // anime.js: seek each running instance, clamped to its own duration.
+    // anime.js: seek each instance captured up front by captureAnimeInstances(). anime.js removes
+    // *paused* instances from `anime.running` on its next rAF tick, so re-reading `anime.running`
+    // here would find an empty list after the first frame's settle wait and freeze every later
+    // frame at the t=0 state. Holding our own references keeps the seek working once the instances
+    // are paused. (Fall back to `anime.running` if the capture step found nothing.)
     try {
-      const anime = window.anime;
-      if (anime && anime.running) {
-        for (const inst of anime.running) {
-          try {
-            if (inst.pause) inst.pause();
-            const dur = typeof inst.duration === 'number' ? inst.duration : t;
-            inst.seek(Math.min(t, dur));
-          } catch (_) {
-            /* skip instance */
-          }
+      const captured = window.__pagxBaselineAnime;
+      const instances = (Array.isArray(captured) && captured.length)
+        ? captured
+        : (window.anime && window.anime.running ? window.anime.running : []);
+      for (const inst of instances) {
+        try {
+          if (inst.pause) inst.pause();
+          const dur = typeof inst.duration === 'number' ? inst.duration : t;
+          inst.seek(Math.min(t, dur));
+        } catch (_) {
+          /* skip instance */
         }
       }
     } catch (_) {
@@ -217,6 +222,21 @@ async function seekToTime(page, timeMs) {
 
     void document.body.offsetHeight;
   }, timeMs);
+}
+
+// Snapshot the rAF-driven anime.js instances *before* the seek loop pauses any of them. anime.js
+// removes paused instances from `anime.running` on its next tick, so once seekToTime() pauses the
+// first frame's instance, `anime.running` empties and every subsequent seek finds nothing — leaving
+// all frames frozen at t=0. We keep our own references on `window` and seek those instead.
+async function captureAnimeInstances(page) {
+  await page.evaluate(() => {
+    try {
+      const anime = window.anime;
+      window.__pagxBaselineAnime = (anime && anime.running) ? anime.running.slice() : [];
+    } catch (_) {
+      window.__pagxBaselineAnime = [];
+    }
+  });
 }
 
 function sampleTimesMs(globalMs, samples) {
@@ -252,6 +272,7 @@ async function main() {
     await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
 
     const globalDurationMs = await measureGlobalDurationMs(page);
+    await captureAnimeInstances(page);
     const timesMs = sampleTimesMs(globalDurationMs, opts.samples);
 
     const samples = [];
