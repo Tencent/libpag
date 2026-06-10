@@ -33,7 +33,8 @@ class JVideoSurface {
    * code when the C++ owner of the videoSurface jobject (typically HardwareDecoder) is about to be
    * destroyed; otherwise the SurfaceTexture and its underlying GPU resources stay alive until the
    * Java GC eventually reclaims the Java VideoSurface, which never happens while the native
-   * SurfaceTexture still holds a global reference to the Java SurfaceTexture that listens on it.
+   * SurfaceTexture still holds a global reference to the Java android.graphics.SurfaceTexture that
+   * has the Java VideoSurface registered as its OnFrameAvailableListener.
    */
   static void Release(JNIEnv* env, jobject videoSurface);
 
