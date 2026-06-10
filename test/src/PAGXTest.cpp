@@ -99,7 +99,9 @@
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/Text.h"
@@ -4371,6 +4373,7 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
 // =====================================================================================
 // ClipToBounds
 // =====================================================================================
+
 /**
  * Test that clipToBounds sets scrollRect during layout when the layer has resolved dimensions.
  */
@@ -4884,6 +4887,7 @@ PAGX_TEST(PAGXTest, LayoutTextInTextBoxSkipConstraint) {
 // =====================================================================================
 // Variable naming cleanup
 // =====================================================================================
+
 /**
  * Test case: TextLayoutGlyphRun data integrity after layout.
  * Verifies that layout produces non-empty glyph runs with correct glyph count and positions.
@@ -5114,6 +5118,7 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
 // =====================================================================================
 // Padding Unified Semantics — Round-Trip Tests
 // =====================================================================================
+
 // Group padding round-trip through export/import.
 PAGX_TEST(PAGXTest, GroupPaddingRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(200, 100);
@@ -7601,6 +7606,281 @@ PAGX_TEST(PAGXTest, NoiseStyleModes) {
   }
   std::ofstream file(outPath, std::ios::binary);
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
+
+/**
+ * Test animation channel binding for NoiseFilter (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoFilter = doc->makeNode<pagx::NoiseFilter>("NF_MONO");
+  monoFilter->mode = pagx::NoiseMode::Mono;
+  monoFilter->size = 4;
+  monoFilter->density = 0.2f;
+  monoFilter->seed = 10;
+  monoFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->filters.push_back(monoFilter);
+
+  auto duoFilter = doc->makeNode<pagx::NoiseFilter>("NF_DUO");
+  duoFilter->mode = pagx::NoiseMode::Duo;
+  duoFilter->size = 6;
+  duoFilter->density = 0.3f;
+  duoFilter->seed = 20;
+  duoFilter->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoFilter->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->filters.push_back(duoFilter);
+
+  auto multiFilter = doc->makeNode<pagx::NoiseFilter>("NF_MULTI");
+  multiFilter->mode = pagx::NoiseMode::Multi;
+  multiFilter->size = 8;
+  multiFilter->density = 0.4f;
+  multiFilter->seed = 30;
+  multiFilter->opacity = 0.5f;
+  layer->filters.push_back(multiFilter);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono filter channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NF_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 20.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.8f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo filter channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NF_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi filter channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NF_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseFilter>(monoFilter);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseFilter>(duoFilter);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseFilter>(multiFilter);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0: values fully overwritten by keyframe targets.
+  timeline->apply(1.0f);
+
+  // Mono: size 4→20, density 0.2→0.8, seed 10→100, color black→red
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 20.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.8f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 100.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseFilter>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 0.0f);
+
+  // Duo: firstColor red→green, secondColor blue→yellow
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseFilter>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().red, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseFilter>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial toward keyframe.
+  // Reset initial values by re-building.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseFilter>(monoFilter);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (20-4)*0.5 = 12
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 12.0f);
+  // density: 0.2 + (0.8-0.2)*0.5 = 0.5
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.5f);
+  // seed: 10 + (100-10)*0.5 = 55
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 55.0f);
+}
+
+/**
+ * Test animation channel binding for NoiseStyle (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoStyle = doc->makeNode<pagx::NoiseStyle>("NS_MONO");
+  monoStyle->mode = pagx::NoiseMode::Mono;
+  monoStyle->size = 4;
+  monoStyle->density = 0.2f;
+  monoStyle->seed = 10;
+  monoStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->styles.push_back(monoStyle);
+
+  auto duoStyle = doc->makeNode<pagx::NoiseStyle>("NS_DUO");
+  duoStyle->mode = pagx::NoiseMode::Duo;
+  duoStyle->size = 6;
+  duoStyle->density = 0.3f;
+  duoStyle->seed = 20;
+  duoStyle->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoStyle->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->styles.push_back(duoStyle);
+
+  auto multiStyle = doc->makeNode<pagx::NoiseStyle>("NS_MULTI");
+  multiStyle->mode = pagx::NoiseMode::Multi;
+  multiStyle->size = 8;
+  multiStyle->density = 0.4f;
+  multiStyle->seed = 30;
+  multiStyle->opacity = 0.5f;
+  layer->styles.push_back(multiStyle);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono style channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NS_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 16.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.9f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo style channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NS_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi style channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NS_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseStyle>(monoStyle);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseStyle>(duoStyle);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseStyle>(multiStyle);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0
+  timeline->apply(1.0f);
+
+  // Mono: size 4→16, density 0.2→0.9, seed 10→80, color black→green
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 16.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.9f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 80.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseStyle>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 0.0f);
+
+  // Duo: firstColor red→blue, secondColor blue→green
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseStyle>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().blue, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().blue, 0.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseStyle>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial values.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseStyle>(monoStyle);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (16-4)*0.5 = 10
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 10.0f);
+  // density: 0.2 + (0.9-0.2)*0.5 = 0.55
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.55f);
+  // seed: 10 + (80-10)*0.5 = 45
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 45.0f);
 }
 
 }  // namespace pag
