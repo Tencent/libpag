@@ -359,15 +359,32 @@ TranslateDecomp DecomposeTranslate(const std::string& transformValue, HTMLValueP
     float b = std::strtof(Trim(parts[1]).c_str(), nullptr);
     float c = std::strtof(Trim(parts[2]).c_str(), nullptr);
     float d = std::strtof(Trim(parts[3]).c_str(), nullptr);
-    // Only a pure translation matrix maps onto x/y; rotation/scale would need channels the
-    // runtime does not have.
-    if (a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f) {
-      out.x = std::strtof(Trim(parts[4]).c_str(), nullptr);
-      out.y = std::strtof(Trim(parts[5]).c_str(), nullptr);
-      out.hasX = true;
-      out.hasY = true;
-      return out;
+    // The translation lives in e/f regardless of the linear part, so keep it. The runtime has no
+    // scale/rotation/skew channel, so a non-identity linear part is dropped — flagged via
+    // hasUnsupported so the caller still warns about the lost component.
+    out.x = std::strtof(Trim(parts[4]).c_str(), nullptr);
+    out.y = std::strtof(Trim(parts[5]).c_str(), nullptr);
+    out.hasX = true;
+    out.hasY = true;
+    if (!(a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f)) out.hasUnsupported = true;
+    return out;
+  }
+  if (fn == "matrix3d" && parts.size() == 16) {
+    // Column-major 4×4: indices 12,13 are the x/y translation. Everything else (scale/rotation/
+    // skew/perspective) is dropped, mirroring the 2D matrix handling above.
+    bool pureTranslate = true;
+    for (int i = 0; i < 16 && pureTranslate; i++) {
+      if (i == 12 || i == 13) continue;
+      float v = std::strtof(Trim(parts[i]).c_str(), nullptr);
+      float identity = (i == 0 || i == 5 || i == 10 || i == 15) ? 1.0f : 0.0f;
+      if (v != identity) pureTranslate = false;
     }
+    out.x = std::strtof(Trim(parts[12]).c_str(), nullptr);
+    out.y = std::strtof(Trim(parts[13]).c_str(), nullptr);
+    out.hasX = true;
+    out.hasY = true;
+    if (!pureTranslate) out.hasUnsupported = true;
+    return out;
   }
   out.hasUnsupported = true;
   return out;

@@ -3740,6 +3740,47 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupportedTransformWarnsAndDrops) {
   EXPECT_TRUE(doc->animations.empty());
 }
 
+PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixKeepsTranslateDropsScale) {
+  // A `matrix(...)` that combines a scale with a translation (the common shape `getComputedStyle`
+  // reports for GSAP-style animations) must keep the translation on x/y while dropping the scale,
+  // warning that an unsupported component was lost.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes flyin {
+        0%   { transform: matrix(2, 0, 0, 2, 10, 200); }
+        100% { transform: matrix(1, 0, 0, 1, 30, 0); }
+      }
+    </style></head>
+    <body style="width:200px;height:300px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;
+                           animation:flyin 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* xCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "x"));
+  auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
+  ASSERT_NE(xCh, nullptr);
+  ASSERT_NE(yCh, nullptr);
+  // `fill-mode: forwards` avoids the trailing baseline keyframe, so x/y carry exactly the two
+  // authored stops with the translation extracted from each matrix (scale dropped).
+  ASSERT_EQ(xCh->keyframes.size(), 2u);
+  ASSERT_EQ(yCh->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(xCh->keyframes.front().value, 10.0f);
+  EXPECT_FLOAT_EQ(yCh->keyframes.front().value, 200.0f);
+  EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 30.0f);
+  EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 0.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnknownKeyframesWarns) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;

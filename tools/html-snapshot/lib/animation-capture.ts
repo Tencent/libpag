@@ -83,14 +83,22 @@ export interface PagxAnimDescriptor {
 
 // transform → translate-only normalisation. The runtime can only play
 // translation on a Layer (no rotation/scale/skew channel), so any
-// non-translation transform component is dropped (returns null).
+// non-translation transform component is dropped. The *translation* part is
+// still kept, however: a `matrix(...)` produced by e.g. GSAP that combines a
+// translate with a scale/rotation (the common case — `getComputedStyle`
+// always reports `matrix(...)`, never the authored `translate() scale()`)
+// still carries its net translation in the e/f components, and the importer's
+// own transform handling deliberately keeps that translate while dropping
+// scale/rotation. Returns null only when there is no translation to play.
 export function pagxExtractTranslate(transformStr: string): string | null {
   const s = (transformStr || '').trim().toLowerCase();
   if (!s || s === 'none') return null;
   let m = s.match(/^matrix\(([^)]+)\)$/);
   if (m) {
     const n = m[1].split(',').map((x) => parseFloat(x.trim()));
-    if (n.length === 6 && n[0] === 1 && n[1] === 0 && n[2] === 0 && n[3] === 1) {
+    // Affine 2D matrix: a,b,c,d carry scale/rotation/skew (dropped — no runtime
+    // channel), e,f carry the translation we keep.
+    if (n.length === 6 && n.every((v) => !isNaN(v))) {
       return 'translate(' + n[4] + 'px, ' + n[5] + 'px)';
     }
     return null;
@@ -98,11 +106,10 @@ export function pagxExtractTranslate(transformStr: string): string | null {
   m = s.match(/^matrix3d\(([^)]+)\)$/);
   if (m) {
     const n = m[1].split(',').map((x) => parseFloat(x.trim()));
-    const pureTranslate =
-      n.length === 16 && n[0] === 1 && n[5] === 1 && n[10] === 1 && n[15] === 1 &&
-      n[1] === 0 && n[2] === 0 && n[3] === 0 && n[4] === 0 && n[6] === 0 && n[7] === 0 &&
-      n[8] === 0 && n[9] === 0 && n[11] === 0 && n[14] === 0;
-    if (pureTranslate) return 'translate(' + n[12] + 'px, ' + n[13] + 'px)';
+    // 4×4 column-major matrix: indices 12,13 are the x/y translation.
+    if (n.length === 16 && n.every((v) => !isNaN(v))) {
+      return 'translate(' + n[12] + 'px, ' + n[13] + 'px)';
+    }
     return null;
   }
   let tx: string | null = null;

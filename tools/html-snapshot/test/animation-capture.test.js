@@ -37,8 +37,15 @@ describe('pagxExtractTranslate', () => {
     expect(pagxExtractTranslate('matrix(1, 0, 0, 1, 12, 34)')).toBe('translate(12px, 34px)');
   });
 
-  test('drops a matrix carrying rotation/scale', () => {
-    expect(pagxExtractTranslate('matrix(2, 0, 0, 2, 12, 34)')).toBeNull();
+  test('keeps the translate component of a matrix carrying rotation/scale', () => {
+    expect(pagxExtractTranslate('matrix(2, 0, 0, 2, 12, 34)')).toBe('translate(12px, 34px)');
+    expect(pagxExtractTranslate('matrix(0, 1, -1, 0, 5, 6)')).toBe('translate(5px, 6px)');
+  });
+
+  test('keeps the translate component of a matrix3d carrying scale', () => {
+    expect(
+      pagxExtractTranslate('matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 7, 8, 0, 1)'),
+    ).toBe('translate(7px, 8px)');
   });
 
   test('drops rotate / scale (no translate component)', () => {
