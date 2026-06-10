@@ -86,6 +86,10 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   return baseline->compare(surface, key);
 }
 
+bool Baseline::Compare(const std::shared_ptr<pagx::PAGSurface>& surface, const std::string& key) {
+  return baseline->compare(surface, key);
+}
+
 bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key) {
   return baseline->compare(byteData, key);
 }
@@ -185,6 +189,19 @@ bool Baseline::compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   Pixmap pixmap(bitmap);
   auto result = surface->readPixels(ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()),
                                     pixmap.writablePixels(), pixmap.rowBytes());
+  if (!result) {
+    return false;
+  }
+  return compare(pixmap, key);
+}
+
+bool Baseline::compare(const std::shared_ptr<pagx::PAGSurface>& surface, const std::string& key) {
+  if (surface == nullptr) {
+    return false;
+  }
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Pixmap pixmap(bitmap);
+  auto result = surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes());
   if (!result) {
     return false;
   }

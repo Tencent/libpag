@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <memory>
+#include "pag/gpu.h"
 
 namespace pagx {
 
@@ -52,6 +53,26 @@ class PAGSurface {
    * @param drawable the platform-specific render target adapter.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
+
+  /**
+   * Creates a PAGSurface from the specified backend texture. The texture must not be bound to any
+   * framebuffer. The PAGSurface uses the GPU context on the calling thread directly via
+   * GLDevice::Current(). Returns nullptr if the texture is invalid or no GPU context is available.
+   * @param texture the backend texture to render into.
+   * @param origin  the origin of the texture coordinate system.
+   */
+  static std::shared_ptr<PAGSurface> MakeFrom(const ::pag::BackendTexture& texture,
+                                              ::pag::ImageOrigin origin);
+
+  /**
+   * Creates a PAGSurface from the specified backend render target. The PAGSurface uses the GPU
+   * context on the calling thread directly via GLDevice::Current(). Returns nullptr if the render
+   * target is invalid or no GPU context is available.
+   * @param renderTarget the backend render target to render into.
+   * @param origin       the origin of the render target coordinate system.
+   */
+  static std::shared_ptr<PAGSurface> MakeFrom(const ::pag::BackendRenderTarget& renderTarget,
+                                              ::pag::ImageOrigin origin);
 
   ~PAGSurface();
 
