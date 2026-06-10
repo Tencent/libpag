@@ -125,6 +125,31 @@ bool IsTimingKeyword(const std::string& lc) {
          lc.rfind("cubic-bezier(", 0) == 0 || lc.rfind("steps(", 0) == 0;
 }
 
+// Reverses a resolved easing in place so it describes the same shape the browser would apply
+// when `animation-direction: reverse` (or `alternate-reverse`) flips the keyframes. CSS reverses
+// the easing along with the keyframe order — `B'(t) = 1 - B(1 - t)` — which for a cubic-bezier
+// maps `(x1, y1, x2, y2)` to `(1 - x2, 1 - y2, 1 - x1, 1 - y1)` (e.g. ease-in -> ease-out), and
+// for steps swaps Start and End jumps while leaving None / Both (already symmetric) unchanged.
+// Linear is its own reverse.
+void ReverseEasing(ResolvedEasing& easing) {
+  if (easing.kind == ResolvedEasing::Kind::Bezier) {
+    float nx1 = 1.0f - easing.x2;
+    float ny1 = 1.0f - easing.y2;
+    float nx2 = 1.0f - easing.x1;
+    float ny2 = 1.0f - easing.y1;
+    easing.x1 = nx1;
+    easing.y1 = ny1;
+    easing.x2 = nx2;
+    easing.y2 = ny2;
+  } else if (easing.kind == ResolvedEasing::Kind::Steps) {
+    if (easing.stepJump == ResolvedEasing::Jump::Start) {
+      easing.stepJump = ResolvedEasing::Jump::End;
+    } else if (easing.stepJump == ResolvedEasing::Jump::End) {
+      easing.stepJump = ResolvedEasing::Jump::Start;
+    }
+  }
+}
+
 // Resolves a CSS timing-function string to an easing descriptor. Unknown / malformed values
 // fall back to Linear.
 ResolvedEasing ResolveTimingFunction(const std::string& value) {
@@ -719,7 +744,10 @@ bool HTMLAnimationBuilder::buildForElement(
     return false;
   }
 
-  // Sorted copy of the keyframe stops. `reverse` direction flips the offsets.
+  // Sorted copy of the keyframe stops. `reverse` direction flips the offsets and the timing
+  // function (CSS reverses the easing alongside the keyframes — e.g. ease-in becomes ease-out).
+  // `alternate` keeps the forward easing on the first iteration; `alternate-reverse` starts in
+  // reverse, so the reversal applies to the same set of direction values.
   std::vector<CssKeyframeStop> stops = kfIt->second.stops;
   bool reversed = (spec.direction == "reverse" || spec.direction == "alternate-reverse");
   if (reversed) {
@@ -729,6 +757,9 @@ bool HTMLAnimationBuilder::buildForElement(
 
   // Timing -> per-segment easing (applied uniformly across the animation).
   ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
+  if (reversed) {
+    ReverseEasing(easing);
+  }
   KeyframeInterpolationType interp = KeyframeInterpolationType::Linear;
   if (easing.kind == ResolvedEasing::Kind::Steps) {
     // The per-segment shape is composed of n hold sub-keyframes. The keyframes initially carry

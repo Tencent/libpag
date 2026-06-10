@@ -3717,6 +3717,68 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
   EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
 }
 
+// CSS reverses the timing-function alongside the keyframes for `direction: reverse`. With the
+// keyframes already mirrored by the builder, the resolved easing must be reversed too — applying
+// `B'(t) = 1 - B(1 - t)` to the cubic-bezier control points (e.g. ease-in -> ease-out) so the
+// browser and the runtime sample the same shape.
+PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsCubicBezier) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s ease-in infinite reverse"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch =
+      dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(doc->animations.front(), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // ease-in is (0.42, 0, 1, 1); reversed it must become ease-out (0, 0, 0.58, 1).
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.x, 0.0f, kEps);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.y, 0.0f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.y, 1.0f, kEps);
+}
+
+// CSS `steps(n, jump-end)` reversed becomes `steps(n, jump-start)`: the discontinuity moves to
+// the opposite end of the segment. After ExpandSteps fans the timing function out into hold
+// keyframes, jump-start places the first jump at fraction 1/n (rather than 0/n for jump-end), so
+// the very first sub-keyframe carries a non-zero output value.
+PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s steps(4, jump-end) infinite reverse"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch =
+      dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(doc->animations.front(), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  // 4 steps + the trailing endpoint = 5 hold keyframes.
+  ASSERT_EQ(ch->keyframes.size(), 5u);
+  // Reversed keyframes go 1 -> 0; combined with jump-start (effective after reversal), the first
+  // hold lands on 1 - 1/4 = 0.75, and the last hold reaches 0.0.
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Hold);
+  EXPECT_NEAR(ch->keyframes.front().value, 0.75f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().value, 0.0f, kEps);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupportedTransformWarnsAndDrops) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
