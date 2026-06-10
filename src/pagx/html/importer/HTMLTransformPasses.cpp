@@ -1131,6 +1131,44 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
                            crossContentLow, crossContentHigh)) {
     return;
   }
+  // When the parent has no explicit cross dimension, ResolveContentRange anchored the content
+  // range at the children's bounding extents — which hides any leading/trailing inset shared
+  // by every child (e.g. the symmetric `padding: 28px` on the parent that the absolutize pass
+  // pushed onto each child's `left`). Re-anchor at `crossPadLow` so the inset becomes visible
+  // and can be folded into padding below, mirroring how `InferMainAxisSpacing` handles the
+  // main axis.
+  float childCrossLoMin = std::numeric_limits<float>::infinity();
+  float childCrossLoMax = -std::numeric_limits<float>::infinity();
+  float childCrossHiMin = std::numeric_limits<float>::infinity();
+  float childCrossHiMax = -std::numeric_limits<float>::infinity();
+  for (const auto& c : boxes) {
+    float lo = (crossAxis == FlexAxis::Row) ? c.left : c.top;
+    float size = (crossAxis == FlexAxis::Row) ? c.width : c.height;
+    childCrossLoMin = std::min(childCrossLoMin, lo);
+    childCrossLoMax = std::max(childCrossLoMax, lo);
+    childCrossHiMin = std::min(childCrossHiMin, lo + size);
+    childCrossHiMax = std::max(childCrossHiMax, lo + size);
+  }
+  if (crossContentLow > crossPadLow + tol) {
+    // Fallback path raised the content low above the parent's padding edge; pull it back so
+    // shared insets surface as `extraCrossLeading` rather than getting silently absorbed.
+    crossContentLow = crossPadLow;
+  }
+  // Lift any inset that every child shares on the cross axis into extra padding. This is the
+  // symmetric analogue of `InferMainAxisSpacing` on the main axis, and keeps the recovered
+  // alignment honest: `InferCrossAlign` then sees the children flush against the (reduced)
+  // content box.
+  float extraCrossLeading = 0.0f;
+  float extraCrossTrailing = 0.0f;
+  if (childCrossLoMax - childCrossLoMin <= tol && childCrossLoMin - crossContentLow > tol) {
+    extraCrossLeading = childCrossLoMin - crossContentLow;
+    crossContentLow = childCrossLoMin;
+  }
+  if (childCrossHiMax - childCrossHiMin <= tol && crossContentHigh - childCrossHiMax > tol) {
+    extraCrossTrailing = crossContentHigh - childCrossHiMax;
+    crossContentHigh = childCrossHiMax;
+  }
+  if (crossContentHigh <= crossContentLow) return;
 
   CrossAlign align = InferCrossAlign(boxes, axis, crossContentLow, crossContentHigh, tol);
   if (align == CrossAlign::Mixed) {
@@ -1149,11 +1187,14 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     return;
   }
 
-  // Combine inherited cross-axis padding (kept verbatim) with the inferred main-axis padding.
-  float padTop = axis == FlexAxis::Row ? padTopExisting : fit.paddingLeading;
-  float padBottom = axis == FlexAxis::Row ? padBottomExisting : fit.paddingTrailing;
-  float padLeft = axis == FlexAxis::Row ? fit.paddingLeading : padLeftExisting;
-  float padRight = axis == FlexAxis::Row ? fit.paddingTrailing : padRightExisting;
+  // Combine inherited cross-axis padding (plus any inset lifted from shared child offsets)
+  // with the inferred main-axis padding.
+  float padTop = axis == FlexAxis::Row ? padTopExisting + extraCrossLeading : fit.paddingLeading;
+  float padBottom =
+      axis == FlexAxis::Row ? padBottomExisting + extraCrossTrailing : fit.paddingTrailing;
+  float padLeft = axis == FlexAxis::Row ? fit.paddingLeading : padLeftExisting + extraCrossLeading;
+  float padRight =
+      axis == FlexAxis::Row ? fit.paddingTrailing : padRightExisting + extraCrossTrailing;
 
   // Commit the rewrite to the parent's resolved property map. PropertyFilter has already
   // populated this; the InlineStyleEmitter will serialise it back to `style="…"`.
