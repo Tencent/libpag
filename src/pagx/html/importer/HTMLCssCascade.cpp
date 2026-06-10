@@ -85,6 +85,10 @@ bool ParseKeyframeOffset(const std::string& token, float& outPercent) {
   char* end = nullptr;
   float v = std::strtof(t.c_str(), &end);
   if (end == t.c_str()) return false;
+  // The trailing `%` must immediately follow the parsed number; otherwise tokens like `12px%`
+  // would be silently accepted as 12%. `strtof` leaves `end` on the first non-numeric character,
+  // which must be the final `%` of the trimmed token.
+  if (end != t.c_str() + t.size() - 1) return false;
   if (v < 0.0f) v = 0.0f;
   if (v > 100.0f) v = 100.0f;
   outPercent = v;

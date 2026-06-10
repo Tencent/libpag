@@ -35,6 +35,7 @@
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/runtime/KeyframeEvaluator.h"
 
 namespace pagx {
 
@@ -289,11 +290,14 @@ void ParseAnimationShorthand(const std::string& value, AnimationSpec& spec, bool
       spec.fillMode = lc;
       continue;
     }
-    // A bare number is the iteration-count.
+    // A bare number is the iteration-count. Numeric values override any earlier `infinite`
+    // keyword in the same shorthand declaration (CSS shorthand parsing is order-dependent and
+    // the numeric token assigns iteration-count, which is mutually exclusive with infinite).
     char* end = nullptr;
     float num = std::strtof(tok.c_str(), &end);
     if (end != tok.c_str() && Trim(end).empty()) {
       spec.iterationCount = num;
+      spec.iterationInfinite = false;
       continue;
     }
     // `none`/`initial` keep the default empty name; anything else is the keyframes name.
@@ -323,7 +327,10 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
     } else {
       char* end = nullptr;
       float n = std::strtof(iter.c_str(), &end);
-      if (end != iter.c_str()) spec.iterationCount = n;
+      if (end != iter.c_str()) {
+        spec.iterationCount = n;
+        spec.iterationInfinite = false;
+      }
     }
   }
   std::string dir = GetTrimmed(style, "animation-direction");
@@ -343,6 +350,21 @@ struct TranslateDecomp {
   float x = 0.0f;
   float y = 0.0f;
 };
+
+// Parses a single finite float from a token (whitespace tolerated). Returns true and writes the
+// result on success; on failure (non-numeric, NaN, infinity) leaves the output untouched. Used to
+// validate matrix/matrix3d arguments before their components are emitted as translation values
+// — without this guard, `strtof`'s 0-on-failure behavior would silently produce (0, 0) translates
+// for malformed transforms.
+bool ParseFiniteFloat(const std::string& token, float& outValue) {
+  std::string t = Trim(token);
+  const char* begin = t.c_str();
+  char* end = nullptr;
+  float v = std::strtof(begin, &end);
+  if (end == begin || !std::isfinite(v)) return false;
+  outValue = v;
+  return true;
+}
 
 TranslateDecomp DecomposeTranslate(const std::string& transformValue, HTMLValueParser& parser) {
   TranslateDecomp out = {};
@@ -380,15 +402,19 @@ TranslateDecomp DecomposeTranslate(const std::string& transformValue, HTMLValueP
     return out;
   }
   if (fn == "matrix" && parts.size() == 6) {
-    float a = std::strtof(Trim(parts[0]).c_str(), nullptr);
-    float b = std::strtof(Trim(parts[1]).c_str(), nullptr);
-    float c = std::strtof(Trim(parts[2]).c_str(), nullptr);
-    float d = std::strtof(Trim(parts[3]).c_str(), nullptr);
-    // The translation lives in e/f regardless of the linear part, so keep it. The runtime has no
-    // scale/rotation/skew channel, so a non-identity linear part is dropped — flagged via
-    // hasUnsupported so the caller still warns about the lost component.
-    out.x = std::strtof(Trim(parts[4]).c_str(), nullptr);
-    out.y = std::strtof(Trim(parts[5]).c_str(), nullptr);
+    // Parse the linear part (a, b, c, d) for an identity check; tx/ty (e, f) carry the
+    // translation. `strtof` returns 0 with an unmoved end pointer for non-numeric input, which
+    // would silently turn malformed `matrix(...)` values into a (0, 0) translation. Validate
+    // that each component actually parsed and is finite before using its value, otherwise flag
+    // the whole transform as unsupported and skip the channel.
+    float a = 0.0f, b = 0.0f, c = 0.0f, d = 0.0f;
+    if (!ParseFiniteFloat(parts[0], a) || !ParseFiniteFloat(parts[1], b) ||
+        !ParseFiniteFloat(parts[2], c) || !ParseFiniteFloat(parts[3], d) ||
+        !ParseFiniteFloat(parts[4], out.x) || !ParseFiniteFloat(parts[5], out.y)) {
+      out = {};
+      out.hasUnsupported = true;
+      return out;
+    }
     out.hasX = true;
     out.hasY = true;
     if (!(a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f)) out.hasUnsupported = true;
@@ -396,16 +422,26 @@ TranslateDecomp DecomposeTranslate(const std::string& transformValue, HTMLValueP
   }
   if (fn == "matrix3d" && parts.size() == 16) {
     // Column-major 4×4: indices 12,13 are the x/y translation. Everything else (scale/rotation/
-    // skew/perspective) is dropped, mirroring the 2D matrix handling above.
+    // skew/perspective and the unsupported tz at index 14) is dropped, mirroring the 2D matrix
+    // handling above. Validate every component to avoid silently emitting (0, 0) translations
+    // when the matrix3d args are malformed.
     bool pureTranslate = true;
     for (int i = 0; i < 16 && pureTranslate; i++) {
       if (i == 12 || i == 13) continue;
-      float v = std::strtof(Trim(parts[i]).c_str(), nullptr);
+      float v = 0.0f;
+      if (!ParseFiniteFloat(parts[i], v)) {
+        out = {};
+        out.hasUnsupported = true;
+        return out;
+      }
       float identity = (i == 0 || i == 5 || i == 10 || i == 15) ? 1.0f : 0.0f;
       if (v != identity) pureTranslate = false;
     }
-    out.x = std::strtof(Trim(parts[12]).c_str(), nullptr);
-    out.y = std::strtof(Trim(parts[13]).c_str(), nullptr);
+    if (!ParseFiniteFloat(parts[12], out.x) || !ParseFiniteFloat(parts[13], out.y)) {
+      out = {};
+      out.hasUnsupported = true;
+      return out;
+    }
     out.hasX = true;
     out.hasY = true;
     if (!pureTranslate) out.hasUnsupported = true;
@@ -432,27 +468,10 @@ void ApplyBezierHandles(std::vector<Keyframe<T>>& keys, KeyframeInterpolationTyp
   }
 }
 
-// Component-wise linear interpolation helpers. Two specializations cover the channels the
-// builder emits — float (alpha/x/y) and Color (background-color/color). Color components are
-// blended in the source color space; CSS animations are author-defined in sRGB and the output
-// channel preserves that, so a per-component lerp matches what a browser would render.
-template <typename T>
-T LerpKeyframeValue(const T& a, const T& b, float t);
-
-template <>
-float LerpKeyframeValue<float>(const float& a, const float& b, float t) {
-  return a + (b - a) * t;
-}
-
-template <>
-Color LerpKeyframeValue<Color>(const Color& a, const Color& b, float t) {
-  Color out = a;
-  out.red = a.red + (b.red - a.red) * t;
-  out.green = a.green + (b.green - a.green) * t;
-  out.blue = a.blue + (b.blue - a.blue) * t;
-  out.alpha = a.alpha + (b.alpha - a.alpha) * t;
-  return out;
-}
+// Component-wise lerp for the channels the builder emits is provided by the runtime
+// `LerpKeyframeValue` template (KeyframeEvaluator.h). Color goes through `LerpColor`, which
+// handles per-channel clamping for back-style overshoot easings; reusing that template keeps
+// importer-time and runtime semantics identical.
 
 // Returns the [0, 1] output fraction for step `s` (0-indexed) of an n-step easing under the
 // given jump mode. The CSS easing-1 spec defines four jump variants that differ only in which
@@ -506,7 +525,7 @@ void ExpandSteps(std::vector<Keyframe<T>>& keys, int n, ResolvedEasing::Jump jum
       float valueFrac = StepValueFraction(s, n, jump);
       Keyframe<T> k = {};
       k.time = static_cast<Frame>(timeA + std::llround(timeFrac * static_cast<float>(dt)));
-      k.value = LerpKeyframeValue<T>(valueA, valueB, valueFrac);
+      k.value = LerpKeyframeValue<T>(valueA, valueB, static_cast<double>(valueFrac));
       k.interpolation = KeyframeInterpolationType::Hold;
       out.push_back(k);
     }
@@ -536,9 +555,15 @@ void ExpandSteps(std::vector<Keyframe<T>>& keys, int n, ResolvedEasing::Jump jum
 //
 // `loopOnce` is true only when the animation will not repeat — for Loop/PingPong, the post-active
 // region is occupied by subsequent iterations so the trailing baseline must not be inserted.
+//
+// `activeEnd` is the last frame of the active duration window (delayFrames + durationFrames).
+// Using the keyframe's own back time would shrink the playback window when @keyframes omits
+// the 100% terminal stop (e.g. only 0% or 0%+50%): everything past the last authored keyframe
+// would be clamped to the baseline instead of holding the last value across the rest of the
+// active duration.
 template <typename T>
 void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, const T& baseline,
-                   bool loopOnce) {
+                   bool loopOnce, Frame activeEnd) {
   if (keys.empty()) return;
   bool fillBackwards = (fillMode == "backwards" || fillMode == "both");
   bool fillForwards = (fillMode == "forwards" || fillMode == "both");
@@ -555,15 +580,24 @@ void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, 
   // Post-active baseline. Only meaningful for finite (Once) playback: Loop/PingPong have no
   // "after" region. CSS `none` and `backwards` both revert to the baseline once the animation
   // finishes; `forwards` and `both` keep the last keyframe value. The previous-last keyframe must
-  // be promoted to Hold so its segment toward the baseline does not interpolate visibly.
+  // be promoted to Hold so its segment toward the baseline does not interpolate visibly. The
+  // baseline is anchored at `activeEnd + 1`; if the keyframes' last time is earlier than the
+  // active end, the previous-last value is held across the gap up to that anchor.
   if (loopOnce && !fillForwards) {
-    Frame lastTime = keys.back().time;
+    Frame lastKeyTime = keys.back().time;
     keys.back().interpolation = KeyframeInterpolationType::Hold;
-    Keyframe<T> hold = {};
-    hold.time = lastTime + 1;
-    hold.value = baseline;
-    hold.interpolation = KeyframeInterpolationType::Hold;
-    keys.push_back(hold);
+    if (lastKeyTime < activeEnd) {
+      Keyframe<T> hold = {};
+      hold.time = activeEnd;
+      hold.value = keys.back().value;
+      hold.interpolation = KeyframeInterpolationType::Hold;
+      keys.push_back(hold);
+    }
+    Keyframe<T> baselineHold = {};
+    baselineHold.time = activeEnd + 1;
+    baselineHold.value = baseline;
+    baselineHold.interpolation = KeyframeInterpolationType::Hold;
+    keys.push_back(baselineHold);
   }
 }
 
@@ -729,6 +763,28 @@ bool HTMLAnimationBuilder::buildForElement(
         "html: only the first animation in a comma-separated 'animation' list is imported "
         "[subset:animation-multiple]");
   }
+  // CSS allows a comma-separated list of timing functions to pair with the comma-separated
+  // animation list; we only support a single animation per element, so a list-valued timing
+  // function would otherwise be silently misparsed by ResolveTimingFunction. Detect the comma
+  // and emit a diagnostic so authors aren't surprised that only the first easing is honoured.
+  if (spec.timingFunction.find(',') != std::string::npos) {
+    _diagnostics.warn(
+        "html: only the first animation-timing-function in a comma-separated list is imported "
+        "[subset:animation-multiple]");
+    auto commaPos = spec.timingFunction.find(',');
+    spec.timingFunction = Trim(spec.timingFunction.substr(0, commaPos));
+  }
+  // CSS allows a comma-separated list of timing functions to pair with the comma-separated
+  // animation list; we only support a single animation per element, so a list-valued timing
+  // function would otherwise be silently misparsed by ResolveTimingFunction. Detect the comma
+  // and emit a diagnostic so authors aren't surprised that only the first easing is honoured.
+  if (spec.timingFunction.find(',') != std::string::npos) {
+    _diagnostics.warn(
+        "html: only the first animation-timing-function in a comma-separated list is imported "
+        "[subset:animation-multiple]");
+    auto commaPos = spec.timingFunction.find(',');
+    spec.timingFunction = Trim(spec.timingFunction.substr(0, commaPos));
+  }
   if (spec.name.empty()) return false;
   if (spec.durationSeconds <= 0.0f) {
     _diagnostics.warn(
@@ -800,6 +856,9 @@ bool HTMLAnimationBuilder::buildForElement(
         float v = std::strtof(trimmedVal.c_str(), &end);
         if (end == trimmedVal.c_str()) continue;
         std::string unit = Trim(end);
+        // CSS opacity accepts a unitless number or a percentage; reject everything else so a
+        // typo like "0.5px" no longer slips through as 0.5.
+        if (!unit.empty() && unit != "%") continue;
         if (unit == "%") v /= 100.0f;
         v = std::max(0.0f, std::min(1.0f, v));
         alphaKeys.push_back({time, v, interp, {}, {}});
@@ -865,10 +924,24 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
+  // CSS `animation-iteration-count: 0` (or any non-positive value) suppresses playback entirely.
+  // Negative values are invalid per spec; reject them upfront so the rest of the pipeline does
+  // not have to reason about empty playback windows.
+  if (!spec.iterationInfinite && spec.iterationCount <= 0.0f) {
+    _diagnostics.warn(
+        "html: animation-iteration-count <= 0 suppresses playback; dropped "
+        "[subset:animation-finite-count]");
+    return false;
+  }
+
   // Determine the loop mode upfront — fill-mode trailing baselines only apply to finite (Once)
-  // playback; Loop and PingPong have no "after" region to fill.
+  // playback; Loop and PingPong have no "after" region to fill. CSS `alternate` requires a
+  // finite count to mean "play forward then reverse N-1 more times and stop"; the runtime has
+  // only the tri-state Once/Loop/PingPong, so finite alternation is downgraded to Once with a
+  // diagnostic. PingPong is reserved for genuinely infinite alternation.
   LoopMode loopMode = LoopMode::Once;
-  if (spec.direction == "alternate" || spec.direction == "alternate-reverse") {
+  bool isAlternate = (spec.direction == "alternate" || spec.direction == "alternate-reverse");
+  if (isAlternate && spec.iterationInfinite) {
     loopMode = LoopMode::PingPong;
   } else if (spec.iterationInfinite) {
     loopMode = LoopMode::Loop;
@@ -876,11 +949,20 @@ bool HTMLAnimationBuilder::buildForElement(
   bool loopOnce = (loopMode == LoopMode::Once);
 
   // Inject baseline hold keyframes per CSS `animation-fill-mode`. ApplyFillMode operates
-  // independently on each channel and is a no-op for channels with no keyframes.
-  ApplyFillMode(alphaKeys, spec.fillMode, baselineAlpha, loopOnce);
-  ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce);
-  ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce);
-  ApplyFillMode(colorKeys, spec.fillMode, baselineColor, loopOnce);
+  // independently on each channel and is a no-op for channels with no keyframes. The active end
+  // anchor is the last frame of the active duration window — using `delay + duration` keeps the
+  // last authored keyframe held across any gap between it and the duration boundary, which
+  // matters when @keyframes omits a 100% terminal stop.
+  Frame activeEnd = static_cast<Frame>(delayFrames + durationFrames);
+  ApplyFillMode(alphaKeys, spec.fillMode, baselineAlpha, loopOnce, activeEnd);
+  ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
+  ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
+  // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
+  // the channel is dropped below, so the fill-mode mutation would be wasted work and the
+  // diagnostic message would be misleading.
+  if (!colorKeys.empty() && baselineSolid != nullptr) {
+    ApplyFillMode(colorKeys, spec.fillMode, baselineColor, loopOnce, activeEnd);
+  }
 
   // Ensure the target layer has an id (mint one when the author supplied none).
   if (layer->id.empty()) {
@@ -896,12 +978,25 @@ bool HTMLAnimationBuilder::buildForElement(
 
   auto* animation = _document->makeNode<Animation>(layer->id + "_anim");
   animation->frameRate = kFrameRate;
-  animation->duration =
-      static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
+  // Loop/PingPong: CSS animation-delay only delays the first iteration, so the looped duration
+  // must not include delayFrames (the runtime would otherwise re-play the delay gap each cycle).
+  // Once: include delayFrames to keep the baseline visible during the gap, and extend by one
+  // frame when fill-mode requires a trailing baseline sample (LoopMode::Once clamps currentTime
+  // to `animation->duration` once playback ends, so the trailing hold needs to live within it).
+  if (loopOnce) {
+    animation->duration =
+        static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
+  } else {
+    animation->duration = static_cast<Frame>(durationFrames);
+  }
   animation->loop = loopMode;
-  if (loopMode == LoopMode::Once && spec.iterationCount > 1.0f && !spec.iterationInfinite) {
+  if (!spec.iterationInfinite && spec.iterationCount != 1.0f) {
     _diagnostics.warn(
         "html: finite animation-iteration-count is not supported; played once "
+        "[subset:animation-finite-count]");
+  } else if (isAlternate && !spec.iterationInfinite) {
+    _diagnostics.warn(
+        "html: finite alternate animation-direction is not supported; played once "
         "[subset:animation-finite-count]");
   }
 
