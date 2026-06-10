@@ -48,10 +48,12 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/ppt/PPTContourUtils.h"
 #include "pagx/ppt/PPTGeomEmitter.h"
-#include "pagx/ppt/PPTModifierResolver.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
+#include "pagx/utils/RasterUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -111,54 +113,6 @@ inline size_t CountUTF8Characters(const std::string& str) {
     }
   }
   return count;
-}
-
-//==============================================================================
-// Stroke-alignment geometry compensation
-//==============================================================================
-
-// PowerPoint's <a:ln> always centres the stroke on the path geometry, so the
-// only way to emulate StrokeAlign::Inside / StrokeAlign::Outside is to inset
-// (or outset) the geometry that backs the stroke painter by half the stroke
-// width before emitting it.  Returns the per-side offset to apply: positive
-// shrinks the geometry (Inside), negative grows it (Outside), and zero leaves
-// the geometry unchanged (Center, no stroke, or zero width).
-inline float StrokeAlignInset(const Stroke* stroke) {
-  if (stroke == nullptr || stroke->width <= 0) {
-    return 0.0f;
-  }
-  switch (stroke->align) {
-    case StrokeAlign::Inside:
-      return stroke->width / 2.0f;
-    case StrokeAlign::Outside:
-      return -stroke->width / 2.0f;
-    case StrokeAlign::Center:
-    default:
-      return 0.0f;
-  }
-}
-
-// Applies the stroke-inset to an axis-aligned shape rect. Clamps the inset so
-// the geometry never collapses past the centre (the OOXML stroke would draw
-// against zero-extent geometry otherwise). `roundness` is also reduced so
-// rounded-rectangle corners stay visually consistent after the inset.
-inline void ApplyStrokeBoxInset(const Stroke* stroke, float& x, float& y, float& w, float& h,
-                                float* roundness = nullptr) {
-  float inset = StrokeAlignInset(stroke);
-  if (inset == 0.0f) {
-    return;
-  }
-  float maxInset = std::min(w, h) / 2.0f;
-  if (inset > maxInset) {
-    inset = maxInset;
-  }
-  x += inset;
-  y += inset;
-  w -= inset * 2.0f;
-  h -= inset * 2.0f;
-  if (roundness) {
-    *roundness = std::max(0.0f, *roundness - inset);
-  }
 }
 
 //==============================================================================
@@ -446,8 +400,6 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   // to a substitute font and lose the bold weight. This was the reason for
   // the previous bare-family approach; the call here is that PowerPoint
   // visual fidelity matters more than LibreOffice fallback behaviour.
-  bool hasRealBold = text->fontStyle.find("Bold") != std::string::npos;
-  bool hasRealItalic = text->fontStyle.find("Italic") != std::string::npos;
   style.hasBold = text->fauxBold;
   style.hasItalic = text->fauxItalic;
   // Use the layout-resolved font size. PAGX layout may shrink a Text internally
@@ -474,18 +426,7 @@ inline PPTRunStyle BuildRunStyle(const Text* text, const Fill* fill, const Strok
   // regular face here — the same face would have been picked if we had
   // emitted "Arial Light" as the typeface name and the renderer failed to
   // resolve it.
-  if (text->fontFamily.empty()) {
-    style.typeface = std::string();
-  } else {
-    style.typeface = StripQuotes(text->fontFamily);
-    if (hasRealBold && hasRealItalic) {
-      style.typeface += " Bold Italic";
-    } else if (hasRealBold) {
-      style.typeface += " Bold";
-    } else if (hasRealItalic) {
-      style.typeface += " Italic";
-    }
-  }
+  style.typeface = BuildStyledTypeface(text->fontFamily, text->fontStyle);
   style.stroke = stroke;
   style.strokeAlpha = alpha;
   return style;
@@ -718,8 +659,9 @@ class PPTWriter {
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
-        _bakeUnsupported(options.bakeUnsupported), _rasterDPI(options.rasterDPI),
-        _layoutContext(layoutContext), _resolver(doc) {
+        _bakeUnsupported(options.bakeUnsupported),
+        _rasterScale(std::clamp(options.rasterScale, 0.01f, 4.0f)), _layoutContext(layoutContext),
+        _resolver(doc) {
   }
 
   // Top-level entry: walks every layer in `_doc->layers`, pairing each with its corresponding
@@ -751,17 +693,17 @@ class PPTWriter {
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _bakeUnsupported = true;
-  // Ratio of raster DPI to the 96 DPI logical coordinate space. Drives the
-  // off-screen Surface size of every PNG bake (masked layer, scrollRect bake,
-  // blend/wide-gamut fallback, tiled pattern). The placed <p:pic>/<a:blipFill>
-  // keeps using logical EMU dimensions so the consumer stretches the denser
-  // bitmap over the same visible extent, yielding a crisper result.
-  int _rasterDPI = 192;
+  // Oversampling factor applied to every PNG bake (masked layer, scrollRect bake,
+  // blend/wide-gamut fallback, tiled pattern). Drives the off-screen Surface size:
+  // physical pixels = ceil(logicalSize * rasterScale). The placed <p:pic>/<a:blipFill>
+  // keeps using logical EMU dimensions so the consumer stretches the denser bitmap
+  // over the same visible extent, yielding a crisper result.
+  float _rasterScale = 2.0f;
   LayoutContext* _layoutContext = nullptr;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
-  PPTModifierResolver _resolver;
+  ModifierResolver _resolver;
 
   const LayerBuildResult& ensureBuildResult();
 

@@ -40,16 +40,15 @@ bool PluginInstaller::hasUpdate() const {
       continue;
     }
 
-    // Only flag an update when we can actually compare versions and the source is strictly
-    // newer. A zero result from getPluginVersion() means either the file is missing or the
-    // version string is unparseable (e.g. dev builds that ship a placeholder like ".." in
-    // Info.plist) — in both cases we skip rather than risk spamming the user.
-    auto sourceVersion = getPluginVersion(sourcePath);
-    auto installedVersion = getPluginVersion(installPath);
-    if (sourceVersion == 0 || installedVersion == 0) {
+    // Flag an update when the source version is strictly newer, or when the installed version
+    // is unparseable (returns 0) but the source version is valid — this handles upgrading from
+    // old builds that lacked embedded version resources.
+    int64_t sourceVersion = getPluginVersion(sourcePath);
+    int64_t installedVersion = getPluginVersion(installPath);
+    if (sourceVersion == 0) {
       continue;
     }
-    if (sourceVersion > installedVersion) {
+    if (installedVersion == 0 || sourceVersion > installedVersion) {
       return true;
     }
   }

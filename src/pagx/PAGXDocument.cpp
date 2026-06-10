@@ -17,22 +17,143 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
+#include <algorithm>
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Stroke.h"
 #include "renderer/FontEmbedder.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/core/Image.h"
 
 namespace pagx {
 
+static bool IsExternalFilePath(const std::string& filePath) {
+  return !filePath.empty() && filePath.find("data:") != 0;
+}
+
+static bool IsExpiredScene(const std::weak_ptr<PAGScene>& scene) {
+  return scene.expired();
+}
+
+static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
+  scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
+}
+
+static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
+  if (document == nullptr || paths == nullptr) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->data == nullptr && image->decodedImage == nullptr && image->thumbnailImage == nullptr && IsExternalFilePath(image->filePath)) {
+        paths->push_back(image->filePath);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
+        paths->push_back(layer->compositionFilePath);
+      } else if (layer->externalDoc != nullptr) {
+        AppendExternalFilePaths(layer->externalDoc.get(), paths);
+      }
+    }
+  }
+}
+
+static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, Layer* layer,
+                                    const std::string& filePath, std::shared_ptr<Data> data,
+                                    const std::unordered_set<std::string>& chain) {
+  if (document == nullptr || layer == nullptr || data == nullptr ||
+      layer->compositionFilePath != filePath || layer->composition != nullptr) {
+    return false;
+  }
+  // Cycle guard: if this file path already appears among the ancestor origins on the load chain,
+  // resolving it would nest externalDocs without end across repeated host load passes. Clear the
+  // layer's compositionFilePath so getExternalFilePaths() stops returning it and the host loop
+  // converges, then report the cycle on the root document.
+  if (chain.find(filePath) != chain.end()) {
+    root->errors.push_back("Cyclic external composition reference detected: '" + filePath + "'.");
+    layer->compositionFilePath = {};
+    return false;
+  }
+  auto externalDoc = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (externalDoc == nullptr) {
+    return false;
+  }
+  for (const auto& error : externalDoc->errors) {
+    document->errors.push_back("[" + filePath + "] " + error);
+  }
+  auto* wrapper = document->makeNode<Composition>();
+  wrapper->width = externalDoc->width;
+  wrapper->height = externalDoc->height;
+  wrapper->layers = externalDoc->layers;
+  wrapper->animations = externalDoc->animations;
+  layer->composition = wrapper;
+  layer->externalDoc = externalDoc;
+  // compositionFilePath is retained as the origin path of this externalDoc: it identifies the
+  // ancestor source on the load chain for cycle detection, and lets the exporter round-trip the
+  // external reference when the wrapper composition has no id.
+  return true;
+}
+
+static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
+                                const std::string& filePath, std::shared_ptr<Data> data,
+                                std::unordered_set<std::string>& chain) {
+  bool found = false;
+  // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
+  // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
+  // makeNode<Composition>(), which push_back()s into nodes and would invalidate this iterator.
+  std::vector<Layer*> layers = {};
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->filePath == filePath) {
+        image->data = data;
+        image->filePath = {};
+        found = true;
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      layers.push_back(static_cast<Layer*>(node.get()));
+    }
+  }
+  for (auto* layer : layers) {
+    bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
+    found = loadedComposition || found;
+    if (!loadedComposition && layer->externalDoc != nullptr) {
+      // Descend into an already-resolved externalDoc, recording its origin path so a reference back
+      // to any ancestor origin (a cycle) is detected. Only erase the entry this frame inserted:
+      // sibling externalDocs that legitimately share the same downstream file would otherwise drop
+      // an ancestor's marker. insert().second is true exactly when this frame added the path.
+      bool inserted = chain.insert(layer->compositionFilePath).second;
+      found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain) || found;
+      if (inserted) {
+        chain.erase(layer->compositionFilePath);
+      }
+    }
+  }
+  return found;
+}
+
 void PAGXDocument::applyLayout(const FontConfig* config) {
+  std::unordered_set<const PAGXDocument*> visited = {};
+  applyLayout(config, visited);
+}
+
+void PAGXDocument::applyLayout(const FontConfig* config,
+                               std::unordered_set<const PAGXDocument*>& visited) {
+  if (!visited.insert(this).second) {
+    errors.push_back("Cyclic external composition reference detected during layout.");
+    return;
+  }
   if (config != nullptr) {
     fontConfig = *config;
   }
@@ -45,7 +166,23 @@ void PAGXDocument::applyLayout(const FontConfig* config) {
     }
   }
   layoutLayers(layers, width, height, &context);
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        // Recurse so the externalDoc lays out its own layers (and any deeper externalDocs); it sets
+        // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
+        // so external compositions are measured and rendered with the host's fonts, keeping text
+        // consistent across the embedded boundary rather than using the external doc's own config.
+        layer->externalDoc->applyLayout(&fontConfig, visited);
+      }
+    }
+  }
+  // Mark layout complete only after all external subtrees have finished. Setting it earlier would
+  // leave the document flagged as laid out even when a downstream cycle aborts the recursion,
+  // letting PAGScene::Make build from an inconsistent tree.
   layoutApplied = true;
+  visited.erase(this);
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
@@ -110,32 +247,7 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->data != nullptr || image->filePath.empty()) {
-      continue;
-    }
-    if (image->decodedImage != nullptr) {
-      continue;
-    }
-    // Skip nodes that already carry a thumbnail (or any backend-texture preview). The host
-    // typically responds to getExternalFilePaths() by downloading + attaching a thumbnail; once
-    // that attachment lands, the path is considered "primed" and the host is expected to
-    // schedule the full-quality upload through its own progressive logic, not through another
-    // pass over getExternalFilePaths(). The eventual full-quality miss is signalled separately
-    // via onTextureRequest, which only fires after eviction or for paths that never received a
-    // thumbnail in the first place.
-    if (image->thumbnailImage != nullptr) {
-      continue;
-    }
-    if (image->filePath.find("data:") == 0) {
-      continue;
-    }
-    paths.push_back(image->filePath);
-  }
+  AppendExternalFilePaths(this, &paths);
   return paths;
 }
 
@@ -143,20 +255,18 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
-  bool found = false;
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->data = data;
-    image->filePath = {};
-    found = true;
+  // loadFileData must run before any PAGScene is built from this document: PAGScene::Make()
+  // snapshots the layer/composition tree once, so external compositions resolved here afterwards
+  // would never reach the already-built runtime tree. A non-empty liveScenes means at least one
+  // scene already exists, so warn that the freshly loaded content will not be visible.
+  if (!liveScenes.empty()) {
+    LOGE(
+        "PAGXDocument::loadFileData() called after a PAGScene was created from this document. "
+        "Load all external file data before PAGScene::Make(); the loaded content will not appear "
+        "in existing scenes.");
   }
-  return found;
+  std::unordered_set<std::string> chain = {};
+  return LoadFileDataInChain(this, this, filePath, data, chain);
 }
 
 bool PAGXDocument::embed() {
@@ -170,6 +280,49 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
+  // The Font nodes themselves remain in `nodes`, but they are no longer reachable from any
+  // Text->glyphRuns and will not be touched by the next embed/render cycle. Drop their cached
+  // tgfx typefaces here so the typeface memory is reclaimed promptly instead of being held
+  // until the document is destroyed.
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      static_cast<Font*>(node.get())->resetRenderCache();
+    }
+  }
+}
+
+void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
+  if (dirtyNodes.empty()) {
+    return;
+  }
+  // Prune expired weak_ptr entries to keep liveScenes bounded.
+  PruneExpiredScenes(&liveScenes);
+  // Dispatch to PAGScene::onNodesChanged by iterating liveScenes; each scene decides which dirty
+  // nodes are relevant using its own runtime binding. Implementation lives in PAGScene.cpp to avoid
+  // pulling PAGScene.h into the document header.
+  // TODO(PR11): wire to PAGScene::onNodesChanged once that method is implemented.
+  (void)dirtyNodes;
+}
+
+void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {
+  if (scene == nullptr) {
+    return;
+  }
+  liveScenes.emplace_back(scene);
+}
+
+void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
+  if (scene == nullptr) {
+    return;
+  }
+  PruneExpiredScenes(&liveScenes);
+  for (auto it = liveScenes.begin(); it != liveScenes.end();) {
+    if (it->lock().get() == scene) {
+      it = liveScenes.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
