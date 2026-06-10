@@ -275,6 +275,25 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
   EXPECT_NE(html.find("width: 80px"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, RectangleStrokeRoundnessIsClampedToBounds) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="240" height="60">
+  <Layer width="224" height="36">
+    <Rectangle position="112,18" size="224,36" roundness="80"/>
+    <Fill color="#FFFFFF"/>
+    <Stroke color="#EDEDED" width="2" align="inside" placement="foreground"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("rx=\"18\""), std::string::npos);
+  EXPECT_NE(html.find("ry=\"18\""), std::string::npos);
+  EXPECT_EQ(html.find("rx=\"80\""), std::string::npos);
+  EXPECT_EQ(html.find("ry=\"80\""), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_ellipse.pagx"));
   ASSERT_FALSE(html.empty());

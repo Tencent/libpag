@@ -48,6 +48,10 @@ static const char* TileModeToRepeatCss(TileMode m) {
   return m == TileMode::Repeat ? "repeat" : "no-repeat";
 }
 
+static float ClampedRectangleRoundness(const Rectangle* rect, const Size& size) {
+  return std::min(rect->roundness, std::min(size.width / 2, size.height / 2));
+}
+
 bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                         bool useModifiedPathData, float& outX, float& outY,
                                         float& outW, float& outH) {
@@ -1321,7 +1325,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     top = pos.y - size.height / 2;
     w = size.width;
     h = size.height;
-    roundness = std::min(rect->roundness, std::min(w / 2, h / 2));
+    roundness = ClampedRectangleRoundness(rect, size);
   } else {
     auto el = static_cast<const Ellipse*>(geo.element);
     auto pos = el->renderPosition();
@@ -1593,8 +1597,9 @@ void HTMLWriter::renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInf
         out.addAttr("y", CssFloatToString(ry));
         out.addAttr("width", CssFloatToString(size.width));
         out.addAttr("height", CssFloatToString(size.height));
-        if (r->roundness > 0) {
-          out.addAttr("rx", CssFloatToString(r->roundness));
+        auto roundness = ClampedRectangleRoundness(r, size);
+        if (roundness > 0) {
+          out.addAttr("rx", CssFloatToString(roundness));
         }
         out.addAttr("fill", "none");
         out.addAttr("stroke", "white");
@@ -1706,8 +1711,9 @@ void HTMLWriter::emitStrokeClipDefs(HTMLBuilder& out, const std::vector<GeoInfo>
           }
           out.addAttr("width", CssFloatToString(size.width));
           out.addAttr("height", CssFloatToString(size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", CssFloatToString(r->roundness));
+          auto roundness = ClampedRectangleRoundness(r, size);
+          if (roundness > 0) {
+            out.addAttr("rx", CssFloatToString(roundness));
           }
           out.closeTagSelfClosing();
           break;
@@ -1874,9 +1880,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           }
           out.addAttr("width", CssFloatToString(size.width));
           out.addAttr("height", CssFloatToString(size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", CssFloatToString(r->roundness));
-            out.addAttr("ry", CssFloatToString(r->roundness));
+          auto roundness = ClampedRectangleRoundness(r, size);
+          if (roundness > 0) {
+            out.addAttr("rx", CssFloatToString(roundness));
+            out.addAttr("ry", CssFloatToString(roundness));
           }
         }
         applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
