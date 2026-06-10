@@ -490,9 +490,13 @@ void SelectLayer(const AEGP_ItemH& itemHandle, const AEGP_LayerH& layerHandle) {
   if (hasLayer) {
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(PluginID, layerHandle,
                                                                 &streamHandle);
-    collectionItem.type = AEGP_CollectionItemType_LAYER;
-    collectionItem.u.layer.layerH = layerHandle;
-    collectionItem.stream_refH = streamHandle;
+    if (streamHandle == nullptr) {
+      hasLayer = false;
+    } else {
+      collectionItem.type = AEGP_CollectionItemType_LAYER;
+      collectionItem.u.layer.layerH = layerHandle;
+      collectionItem.stream_refH = streamHandle;
+    }
   }
 
   Suites->ItemSuite6()->AEGP_SelectItem(itemHandle, true, true);

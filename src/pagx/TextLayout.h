@@ -78,6 +78,7 @@ struct VerticalPositionedGlyph {
 struct TextLayoutLineInfo {
   float baselineY = 0;
   float startX = 0;
+  float lineWidth = 0;
   uint32_t byteStart = 0;
   uint32_t byteEnd = 0;
 };
@@ -110,10 +111,14 @@ class TextLayoutResult {
   * line of text with baseline position, alignment offset, and byte range in the source string.
   *
   * For horizontal writing mode each entry is a visual line, with baselineY in ascending order
-  * matching top-to-bottom source order. For vertical writing mode each entry is a column;
-  * baselineY stores -columnX so that ascending order maps to right-to-left source order and
-  * the PPT exporter can keep its single sort path. Columns dropped by overflow="hidden" are
-  * excluded (the layout filter runs before recording).
+  * matching top-to-bottom source order, and lineWidth being the visual line width.
+  * For vertical writing mode each entry is a column; baselineY stores -columnX (the column's
+  * left-edge X in content coordinates) so that ascending order maps to right-to-left source order
+  * and the PPT exporter can keep its single sort path. lineWidth stores the column's allocated
+  * width (column.maxColumnWidth, derived from font line height) and startX stores the column's
+  * inline-axis extent (column.height), so writers can position each column on its true horizontal
+  * centre and apply per-column inline-axis alignment without re-running the shaper. Columns
+  * dropped by overflow="hidden" are excluded (the layout filter runs before recording).
   *
   * Returns nullptr if no line info is available for this text (e.g. embedded glyph runs).
   */

@@ -53,6 +53,9 @@ std::vector<pag::MaskData*> GetMasks(const AEGP_LayerH& layerHandle) {
   for (int i = 0; i < numMask; i++) {
     AEGP_MaskRefH maskHandle = nullptr;
     Suites->MaskSuite6()->AEGP_GetLayerMaskByIndex(layerHandle, i, &maskHandle);
+    if (maskHandle == nullptr) {
+      continue;
+    }
     auto mask = GetMask(maskHandle);
     masks.push_back(mask);
     Suites->MaskSuite6()->AEGP_DisposeMask(maskHandle);

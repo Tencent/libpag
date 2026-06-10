@@ -29,21 +29,27 @@ pag::Transform2D* GetTransform2D(const AEGP_LayerH& layerHandle, float frameRate
   AEGP_StreamRefH streamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewLayerStream(PluginID, layerHandle, AEGP_LayerStream_POSITION,
                                                  &streamHandle);
-  A_Boolean dimensionSeparated = 0;
-  Suites->DynamicStreamSuite4()->AEGP_AreDimensionsSeparated(streamHandle, &dimensionSeparated);
-  if (dimensionSeparated != 0) {
-    AEGP_StreamRefH xPosition = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 0, &xPosition);
-    transform->xPosition = GetProperty(xPosition, AEStreamParser::FloatParser);
-    Suites->StreamSuite4()->AEGP_DisposeStream(xPosition);
-    AEGP_StreamRefH yPosition = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 1, &yPosition);
-    transform->yPosition = GetProperty(yPosition, AEStreamParser::FloatParser);
-    Suites->StreamSuite4()->AEGP_DisposeStream(yPosition);
-  } else {
-    transform->position = GetProperty(streamHandle, AEStreamParser::PointParser);
+  if (streamHandle != nullptr) {
+    A_Boolean dimensionSeparated = 0;
+    Suites->DynamicStreamSuite4()->AEGP_AreDimensionsSeparated(streamHandle, &dimensionSeparated);
+    if (dimensionSeparated != 0) {
+      AEGP_StreamRefH xPosition = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 0, &xPosition);
+      if (xPosition != nullptr) {
+        transform->xPosition = GetProperty(xPosition, AEStreamParser::FloatParser);
+        Suites->StreamSuite4()->AEGP_DisposeStream(xPosition);
+      }
+      AEGP_StreamRefH yPosition = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 1, &yPosition);
+      if (yPosition != nullptr) {
+        transform->yPosition = GetProperty(yPosition, AEStreamParser::FloatParser);
+        Suites->StreamSuite4()->AEGP_DisposeStream(yPosition);
+      }
+    } else {
+      transform->position = GetProperty(streamHandle, AEStreamParser::PointParser);
+    }
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
   }
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
   transform->anchorPoint =
       GetProperty(layerHandle, AEGP_LayerStream_ANCHORPOINT, AEStreamParser::PointParser);
   QVariantMap map;
