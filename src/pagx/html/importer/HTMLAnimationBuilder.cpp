@@ -774,14 +774,28 @@ bool HTMLAnimationBuilder::buildForElement(
   }
   // CSS allows a comma-separated list of timing functions to pair with the comma-separated
   // animation list; we only support a single animation per element, so a list-valued timing
-  // function would otherwise be silently misparsed by ResolveTimingFunction. Detect the comma
-  // and emit a diagnostic so authors aren't surprised that only the first easing is honoured.
-  if (spec.timingFunction.find(',') != std::string::npos) {
-    _diagnostics.warn(
-        "html: only the first animation-timing-function in a comma-separated list is imported "
-        "[subset:animation-multiple]");
-    auto commaPos = spec.timingFunction.find(',');
-    spec.timingFunction = Trim(spec.timingFunction.substr(0, commaPos));
+  // function would otherwise be silently misparsed by ResolveTimingFunction. Detect a *top-level*
+  // comma (commas inside `cubic-bezier(...)` / `steps(...)` arguments do not count) and emit a
+  // diagnostic so authors aren't surprised that only the first easing is honoured.
+  {
+    int parenDepth = 0;
+    size_t topComma = std::string::npos;
+    for (size_t i = 0; i < spec.timingFunction.size(); i++) {
+      char c = spec.timingFunction[i];
+      if (c == '(') parenDepth++;
+      else if (c == ')') {
+        if (parenDepth > 0) parenDepth--;
+      } else if (c == ',' && parenDepth == 0) {
+        topComma = i;
+        break;
+      }
+    }
+    if (topComma != std::string::npos) {
+      _diagnostics.warn(
+          "html: only the first animation-timing-function in a comma-separated list is imported "
+          "[subset:animation-multiple]");
+      spec.timingFunction = Trim(spec.timingFunction.substr(0, topComma));
+    }
   }
   if (spec.name.empty()) return false;
   if (spec.durationSeconds <= 0.0f) {

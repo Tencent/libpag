@@ -3605,7 +3605,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
     </style></head>
     <body style="width:200px;height:100px">
       <div id="box" style="width:50px;height:50px;background-color:#000;
-                           animation:slide 1s linear"></div>
+                           animation:slide 1s linear forwards"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -3618,6 +3618,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
   auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
   ASSERT_NE(xCh, nullptr);
   ASSERT_NE(yCh, nullptr);
+  // animation-fill-mode: forwards keeps the last value; no trailing baseline keyframe is inserted.
   ASSERT_EQ(xCh->keyframes.size(), 2u);
   ASSERT_EQ(yCh->keyframes.size(), 2u);
   EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 40.0f);
@@ -3636,7 +3637,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
     </style></head>
     <body style="width:200px;height:100px">
       <div id="swatch" style="width:50px;height:50px;background-color:#FF0000;
-                              animation:recolor 1s linear"></div>
+                              animation:recolor 1s linear forwards"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -3645,6 +3646,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
   auto* anim = doc->animations.front();
   auto* ch = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(FindChannel(anim, "color"));
   ASSERT_NE(ch, nullptr);
+  // forwards fill-mode keeps the last value; no trailing baseline keyframe is inserted.
   ASSERT_EQ(ch->keyframes.size(), 2u);
   EXPECT_TRUE(ColorNear(ch->keyframes.front().value, HexColor(0xFF0000)));
   EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
@@ -3677,7 +3679,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationDelayShiftsKeyframeTimes) {
     </style></head>
     <body style="width:100px;height:100px">
       <div id="d" style="width:10px;height:10px;background-color:#000;
-                         animation:fade 1s linear 0.5s"></div>
+                         animation:fade 1s linear 0.5s forwards"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -3688,8 +3690,12 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationDelayShiftsKeyframeTimes) {
   EXPECT_EQ(anim->duration, 90);
   auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "alpha"));
   ASSERT_NE(ch, nullptr);
-  ASSERT_EQ(ch->keyframes.size(), 2u);
-  EXPECT_EQ(ch->keyframes.front().time, 30);
+  // forwards fill-mode keeps the last value past the active end (no trailing baseline). The pre-
+  // active region between t=0 and the delayed first keyframe is filled with the layer's baseline
+  // value, so the channel emits 3 keyframes: baseline at frame 0 + the two authored stops.
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_EQ(ch->keyframes[1].time, 30);
   EXPECT_EQ(ch->keyframes.back().time, 90);
 }
 
@@ -3702,7 +3708,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
     </style></head>
     <body style="width:100px;height:100px">
       <div id="d" style="width:10px;height:10px;background-color:#000;
-                         animation:fade 1s cubic-bezier(0.42, 0, 0.58, 1)"></div>
+                         animation:fade 1s cubic-bezier(0.42, 0, 0.58, 1) forwards"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -3711,6 +3717,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
   auto* ch =
       dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(doc->animations.front(), "alpha"));
   ASSERT_NE(ch, nullptr);
+  // forwards fill-mode keeps the last value; no trailing baseline keyframe is inserted.
   ASSERT_EQ(ch->keyframes.size(), 2u);
   EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Bezier);
   EXPECT_NEAR(ch->keyframes.front().bezierOut.x, 0.42f, kEps);
