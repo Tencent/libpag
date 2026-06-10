@@ -31,9 +31,31 @@ const { unwrap, newPage, mapWaitUntil } = require('../dist/lib/browser-engine');
 const pixelmatchMod = require('pixelmatch');
 const pixelmatch = typeof pixelmatchMod === 'function' ? pixelmatchMod : pixelmatchMod.default;
 
+// Composite every pixel over an opaque white background, in place. The baseline
+// is a Chromium screenshot (opaque, white page background); `pagx render`
+// preserves transparency, so any region the page left unpainted comes back as
+// (0,0,0,0). Without this step the downstream metrics read those transparent
+// pixels as pure *black* (alpha is ignored by imageMetrics and not blended by
+// pixelmatch here), which turns a faithful render into a huge false diff —
+// e.g. a static page with a transparent body reads as ~21% pixel diff / SSIM
+// below zero. Flattening over white makes both images apples-to-apples.
+function flattenOverWhite(img) {
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (a === 255) continue;
+    const inv = 255 - a;
+    d[i] = Math.round((d[i] * a + 255 * inv) / 255);
+    d[i + 1] = Math.round((d[i + 1] * a + 255 * inv) / 255);
+    d[i + 2] = Math.round((d[i + 2] * a + 255 * inv) / 255);
+    d[i + 3] = 255;
+  }
+  return img;
+}
+
 function loadPng(filePath) {
   const data = fs.readFileSync(filePath);
-  return PNG.sync.read(data);
+  return flattenOverWhite(PNG.sync.read(data));
 }
 
 // Pad to common size with white pixels. We never resample because that would
