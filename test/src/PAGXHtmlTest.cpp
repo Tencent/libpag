@@ -707,6 +707,43 @@ CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   EXPECT_LT(firstPos, secondPos);
 }
 
+CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="260" height="160">
+  <Layer id="stack" width="220" layout="vertical" gap="8" alignment="start">
+    <Layer id="title" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EEEEEE"/>
+    </Layer>
+    <Layer id="description" width="220" flex="1" data-text-auto-resize="none">
+      <Group>
+        <Text text="Line one&#10;Line two" fontFamily="PingFang SC" fontSize="14"/>
+        <Fill color="#111111"/>
+      </Group>
+      <TextBox width="220" height="48" lineHeight="24"/>
+    </Layer>
+    <Layer id="footer" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#DDDDDD"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"description\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("height:48px"), std::string::npos);
+  EXPECT_EQ(tag.find("flex:1"), std::string::npos);
+}
+
 // =============================================================================
 // Layer styles
 // =============================================================================

@@ -1789,14 +1789,24 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else if (parentLayout == LayoutMode::Vertical) {
       mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
     }
-    if (layer->flex > 0 && !mainAxisDeclared) {
-      style += "flex:" + CssFloatToString(layer->flex);
-    }
     // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
     // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
-    // to layout-resolved size. Skip the main-axis dimension when flex > 0 to let flex work.
+    // to layout-resolved size.
     bool needsSize = !layer->contents.empty() || !layer->styles.empty();
     auto bounds = needsSize ? layer->layoutBounds() : Rect{};
+    float resolvedMainSize = NAN;
+    if (parentLayout == LayoutMode::Horizontal) {
+      resolvedMainSize = bounds.width;
+    } else if (parentLayout == LayoutMode::Vertical) {
+      resolvedMainSize = bounds.height;
+    }
+    bool mainAxisResolved = !std::isnan(resolvedMainSize) && resolvedMainSize > 0;
+    // PAGX can resolve a flex child's main-axis size from its TextBox/content even when the raw
+    // width/height attribute is unset. CSS `flex:N` uses a 0% flex-basis and can collapse that
+    // resolved size inside auto-sized flex parents, so keep such children at their resolved size.
+    if (layer->flex > 0 && !mainAxisDeclared && !mainAxisResolved) {
+      style += "flex:" + CssFloatToString(layer->flex);
+    }
     float outputW = !std::isnan(layer->width) ? layer->width : (needsSize ? bounds.width : NAN);
     float outputH = !std::isnan(layer->height) ? layer->height : (needsSize ? bounds.height : NAN);
     if (!std::isnan(outputW) && outputW > 0) {
