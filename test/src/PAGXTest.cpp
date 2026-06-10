@@ -6570,8 +6570,8 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setMaxTileCount(64);
   EXPECT_EQ(options->getMaxTileCount(), 64);
 
-  options->setAllowZoomBlur(true);
-  EXPECT_TRUE(options->getAllowZoomBlur());
+  options->setTileUpdateMode(pagx::PAGTileUpdateMode::Smooth);
+  EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Smooth);
 
   options->setMaxTilesRefinedPerFrame(8);
   EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);

@@ -58,6 +58,7 @@ enum class StrokeAlign;
 enum class MergePathOp;
 enum class LayerMaskType;
 enum class RenderMode;
+enum class TileUpdateMode;
 enum class RepeaterOrder;
 enum class SelectorUnit;
 enum class SelectorShape;
@@ -112,6 +113,8 @@ tgfx::MipmapMode ToTGFX(MipmapMode mode);
 tgfx::ScaleMode ToTGFX(ScaleMode mode);
 
 tgfx::RenderMode ToTGFX(PAGRenderMode renderMode);
+
+tgfx::TileUpdateMode ToTGFX(PAGTileUpdateMode mode);
 
 tgfx::Matrix3D ToTGFX3D(const Matrix3D& matrix3D);
 
