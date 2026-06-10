@@ -8559,6 +8559,20 @@
     "PAGXTest": {
         "LayerBuilderAPIConsistency": "f40e23b6",
         "NoiseFilterAllElements": "798f40c4",
+        "NoiseFilterAnimation": {
+            "frame_0": "8d43445d",
+            "frame_1": "8d43445d",
+            "frame_10": "8d43445d",
+            "frame_11": "8d43445d",
+            "frame_2": "8d43445d",
+            "frame_3": "8d43445d",
+            "frame_4": "8d43445d",
+            "frame_5": "8d43445d",
+            "frame_6": "8d43445d",
+            "frame_7": "8d43445d",
+            "frame_8": "8d43445d",
+            "frame_9": "8d43445d"
+        },
         "NoiseFilterModes": "798f40c4",
         "NoiseStyleModes": "1af07597",
         "PrecomposedTextRender": "9b6dea6a",
