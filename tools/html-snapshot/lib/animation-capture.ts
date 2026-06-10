@@ -467,13 +467,17 @@ export function pagxSampleTimeline(
   seen: Set<Element>,
   durationMs: number,
   seekFn: (progress: number) => void,
-  loopInfinite: boolean,
+  iterations: number,
   sampleCount: number,
   maxElements: number,
   direction: string,
+  delayMs: number,
 ): void {
   const candidates = pagxCandidateElements(maxElements);
   const series = new Map<HTMLElement, Array<Record<string, string | null>>>();
+  // Guard sampleCount === 1 so the offset math (i / (sampleCount - 1)) does not divide by zero.
+  // Callers normally pass >= 2, but the function is exported and unit-tested as a pure helper.
+  if (sampleCount < 2) sampleCount = 2;
   for (let i = 0; i < sampleCount; i++) {
     const p = i / (sampleCount - 1);
     try {
@@ -518,8 +522,8 @@ export function pagxSampleTimeline(
       el,
       keyframes: norm,
       durationMs,
-      delayMs: 0,
-      iterations: loopInfinite ? Infinity : 1,
+      delayMs,
+      iterations,
       direction: direction || 'normal',
       timing: 'linear',
     });
@@ -529,7 +533,10 @@ export function pagxSampleTimeline(
 
 // Compute the sampling window for GSAP's global timeline: one *forward iteration*
 // of the longest top-level child, plus whether the composition repeats forever
-// and whether any repeating child uses `yoyo`.
+// and whether any repeating child uses `yoyo`. Also returns the maximum finite
+// repeat count seen across children and the maximum start delay, so finite
+// repeats and staggered entrances survive into the captured `iterations` /
+// `delayMs` instead of being collapsed.
 //
 // `gsap.globalTimeline.duration()` is unusable here: when any tween repeats
 // forever (`repeat: -1`) GSAP reports the timeline duration as ~1e10 s, so
@@ -545,6 +552,8 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
   windowSec: number;
   infinite: boolean;
   yoyo: boolean;
+  iterations: number;
+  delaySec: number;
 } {
   const tl = gsap.globalTimeline as {
     getChildren?: (nested: boolean, tweens: boolean, timelines: boolean) => unknown[];
@@ -558,6 +567,8 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
   let windowSec = 0;
   let infinite = false;
   let yoyo = false;
+  let iterations = 1;
+  let delaySec = 0;
   for (const c of children) {
     const child = c as {
       startTime?: () => number;
@@ -590,12 +601,20 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
       cyoyo = false;
     }
     if (!isFinite(iterDur) || iterDur <= 0) continue;
-    if (rep < 0) infinite = true;
+    if (rep < 0) {
+      infinite = true;
+    } else if (rep + 1 > iterations) {
+      // GSAP's `repeat()` is the number of *additional* plays after the first; the user-visible
+      // iteration count is rep + 1.
+      iterations = rep + 1;
+    }
     if (rep !== 0 && cyoyo) yoyo = true;
-    const end = (isFinite(start) ? start : 0) + iterDur;
+    const startFinite = isFinite(start) ? start : 0;
+    if (startFinite > delaySec) delaySec = startFinite;
+    const end = startFinite + iterDur;
     if (end > windowSec) windowSec = end;
   }
-  return { windowSec, infinite, yoyo };
+  return { windowSec, infinite, yoyo, iterations, delaySec };
 }
 
 export function pagxCollectGsap(
@@ -615,6 +634,10 @@ export function pagxCollectGsap(
     /* ignore */
   }
   const direction = win.yoyo ? 'alternate' : 'normal';
+  // `iterations` matches CSS animation-iteration-count semantics: Infinity for repeat: -1,
+  // otherwise the maximum repeat+1 across children. yoyo's forward-half-only sampling pairs
+  // with `direction: alternate` so the runtime mirrors the captured forward window.
+  const iterations = win.infinite ? Infinity : win.iterations;
   // Seek with `suppressEvents = true`. GSAP's event-firing seek path (the
   // `false` default) renders lazily and mishandles a zero-duration `.set()`
   // pinned to a timeline boundary (e.g. a wrapper's `autoAlpha: 1` placed at
@@ -625,7 +648,7 @@ export function pagxCollectGsap(
   // wants — and matches the seek baseline-frames.js uses for the ground truth.
   pagxSampleTimeline(
     captured, seen, win.windowSec * 1000, (p) => tl.time(p * win.windowSec, true),
-    win.infinite, sampleCount, maxElements, direction,
+    iterations, sampleCount, maxElements, direction, win.delaySec * 1000,
   );
   try {
     tl.time(0, true);
@@ -654,9 +677,23 @@ export function pagxCollectAnime(
       const dur = inst.duration;
       if (!dur || dur <= 0) continue;
       if (inst.pause) inst.pause();
+      // anime.js `loop` is tri-state: true = infinite, a positive number = explicit count, any
+      // other falsy value = single iteration. `direction` mirrors CSS animation-direction.
+      let iterations = 1;
+      if (inst.loop === true) {
+        iterations = Infinity;
+      } else if (typeof inst.loop === 'number' && inst.loop > 0) {
+        iterations = inst.loop;
+      }
+      const direction = (inst.direction === 'alternate' || inst.direction === 'reverse')
+        ? inst.direction
+        : 'normal';
+      const delayMs = (typeof inst.delay === 'number' && isFinite(inst.delay) && inst.delay > 0)
+        ? inst.delay
+        : 0;
       pagxSampleTimeline(
-        captured, seen, dur, (p) => inst.seek(p * dur), inst.loop === true, sampleCount,
-        maxElements, 'normal',
+        captured, seen, dur, (p) => inst.seek(p * dur), iterations, sampleCount,
+        maxElements, direction, delayMs,
       );
       inst.seek(0);
     } catch (_) {

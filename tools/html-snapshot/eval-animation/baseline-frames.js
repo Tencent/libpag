@@ -237,7 +237,31 @@ async function seekToTime(page, timeMs) {
         try {
           if (inst.pause) inst.pause();
           const dur = typeof inst.duration === 'number' ? inst.duration : t;
-          inst.seek(Math.min(t, dur));
+          if (!isFinite(dur) || dur <= 0) continue;
+          // Match the capture layer's iteration math: anime.js loop is tri-state (true |
+          // number | falsy) and direction may be 'alternate' or 'reverse'. Translate the
+          // global frame time into the active iteration's local time so the ground-truth
+          // sample matches what the importer's keyframes will replay.
+          let iterations = 1;
+          if (inst.loop === true) iterations = Infinity;
+          else if (typeof inst.loop === 'number' && inst.loop > 0) iterations = inst.loop;
+          const totalDur = isFinite(iterations) ? dur * iterations : Infinity;
+          let local = t;
+          if (isFinite(totalDur) && local >= totalDur) {
+            local = totalDur;
+          }
+          let iterIndex = Math.floor(local / dur);
+          if (!isFinite(iterations) || iterIndex >= iterations) {
+            iterIndex = isFinite(iterations) ? Math.max(0, iterations - 1) : 0;
+          }
+          let phase = local - iterIndex * dur;
+          if (phase > dur) phase = dur;
+          if (inst.direction === 'reverse') {
+            phase = dur - phase;
+          } else if (inst.direction === 'alternate' && (iterIndex % 2) === 1) {
+            phase = dur - phase;
+          }
+          inst.seek(Math.max(0, Math.min(phase, dur)));
         } catch (_) {
           /* skip instance */
         }
