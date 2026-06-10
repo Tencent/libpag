@@ -192,15 +192,19 @@ function nonZero(rect) {
 // considered hidden here — it generates no box of its own but its children
 // still render, and the snapshot walker handles the pass-through separately.
 //
-// `opacity: 0` is treated as hidden EXCEPT when the element is animated by the
-// capture pass (animation-capture.ts marks such elements with a `pagxAnim*`
-// `animation-name`). A faded-in element legitimately reads opacity=0 at the
-// animation's starting phase; dropping it here would erase the very subject of
-// the animation (e.g. a `0% { opacity: 0 } 100% { opacity: 1 }` fade-in dot),
-// taking its keyframes with it.
+// `opacity: 0` and `visibility: hidden` are treated as hidden EXCEPT when the
+// element is animated by the capture pass (animation-capture.ts marks such
+// elements with a `pagxAnim*` `animation-name`). An element legitimately reads
+// opacity=0 / visibility=hidden at the animation's starting phase; dropping it
+// here would erase the very subject of the animation (e.g. a
+// `0% { opacity: 0 } 100% { opacity: 1 }` fade-in dot), taking its keyframes
+// with it. This is the common shape of JS-driven entrances — GSAP's
+// `autoAlpha: 0`, for instance, sets BOTH `opacity: 0` and `visibility: hidden`
+// on every element waiting to fly in, so the capture-reset frame (timeline at
+// t=0) reports the not-yet-entered text as `visibility: hidden`.
 function isVisible(computed) {
   if (computed.display === 'none') return false;
-  if (computed.visibility === 'hidden') return false;
+  if (computed.visibility === 'hidden' && !hasPagxAnimation(computed)) return false;
   if (parseFloat(computed.opacity) === 0 && !hasPagxAnimation(computed)) return false;
   return true;
 }

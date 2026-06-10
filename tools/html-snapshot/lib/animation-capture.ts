@@ -608,12 +608,20 @@ export function pagxCollectGsap(
     /* ignore */
   }
   const direction = win.yoyo ? 'alternate' : 'normal';
+  // Seek with `suppressEvents = true`. GSAP's event-firing seek path (the
+  // `false` default) renders lazily and mishandles a zero-duration `.set()`
+  // pinned to a timeline boundary (e.g. a wrapper's `autoAlpha: 1` placed at
+  // position 0): the value never re-applies when the playhead jumps onto that
+  // boundary, so the element samples as its pre-set state (opacity 0) for the
+  // whole window and its animated channel is lost. Suppressing events forces a
+  // full state render at each sample time — exactly what a static frame capture
+  // wants — and matches the seek baseline-frames.js uses for the ground truth.
   pagxSampleTimeline(
-    captured, seen, win.windowSec * 1000, (p) => tl.time(p * win.windowSec, false),
+    captured, seen, win.windowSec * 1000, (p) => tl.time(p * win.windowSec, true),
     win.infinite, sampleCount, maxElements, direction,
   );
   try {
-    tl.time(0, false);
+    tl.time(0, true);
     tl.pause();
   } catch (_) {
     /* ignore */

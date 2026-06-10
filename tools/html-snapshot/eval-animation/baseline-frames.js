@@ -210,7 +210,14 @@ async function seekToTime(page, timeMs) {
       if (gsap && gsap.globalTimeline) {
         const tl = gsap.globalTimeline;
         tl.pause();
-        tl.time(t / 1000, false);
+        // suppressEvents = true: render the exact frame state without firing the
+        // timeline's events. GSAP's event-firing seek (the `false` default)
+        // renders lazily and drops zero-duration `.set()` values pinned to a
+        // timeline boundary (e.g. a wrapper's `autoAlpha: 1` at position 0),
+        // which would otherwise leave that element invisible for its whole
+        // window. Mirrors the capture layer (lib/animation-capture.ts) so the
+        // baseline and the PAGX render stay on one clock AND one render path.
+        tl.time(t / 1000, true);
       }
     } catch (_) {
       /* ignore */
