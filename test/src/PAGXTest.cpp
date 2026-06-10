@@ -57,6 +57,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/NoiseFilter.h"
@@ -7881,6 +7882,160 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
   EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.55f);
   // seed: 10 + (80-10)*0.5 = 45
   EXPECT_FLOAT_EQ(tgfxMono2->seed(), 45.0f);
+}
+
+/**
+ * Render NoiseFilter/NoiseStyle animation frames across all modes and combined with shadows.
+ * Layout: two rectangles side-by-side, left with NoiseFilter, right with NoiseStyle.
+ * 50 frames total: 10 Mono, 10 Duo, 10 Multi, 10 Multi+DropShadowFilter, 10 Multi+InnerShadowStyle.
+ * Density animates from 0.1 to 1.0 across all 50 frames.
+ */
+PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
+  constexpr int canvasW = 500;
+  constexpr int canvasH = 260;
+  constexpr int totalFrames = 40;
+  constexpr int framesPerSection = 10;
+
+  auto outDir = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAnimation");
+  auto dirPath = std::filesystem::path(outDir);
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+
+  for (int i = 0; i < totalFrames; i++) {
+    float density = 0.1f + 0.9f * (static_cast<float>(i) / (totalFrames - 1));
+    int section = i / framesPerSection;
+
+    auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+    // Left rectangle with NoiseFilter
+    auto layerL = doc->makeNode<pagx::Layer>("LL");
+    layerL->width = 220;
+    layerL->height = 220;
+    layerL->matrix = pagx::Matrix::Translate(10, 20);
+    auto rectL = doc->makeNode<pagx::Rectangle>();
+    rectL->position = {110, 110};
+    rectL->size = {220, 220};
+    rectL->roundness = 12;
+    auto fillL = doc->makeNode<pagx::Fill>();
+    auto solidL = doc->makeNode<pagx::SolidColor>();
+    solidL->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillL->color = solidL;
+    layerL->contents.push_back(rectL);
+    layerL->contents.push_back(fillL);
+
+    auto noiseFilter = doc->makeNode<pagx::NoiseFilter>("NF");
+    noiseFilter->size = 8;
+    noiseFilter->density = density;
+    noiseFilter->seed = 42;
+    switch (section) {
+      case 0:
+        noiseFilter->mode = pagx::NoiseMode::Mono;
+        noiseFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseFilter->mode = pagx::NoiseMode::Duo;
+        noiseFilter->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseFilter->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseFilter->mode = pagx::NoiseMode::Multi;
+        noiseFilter->opacity = 0.8f;
+        break;
+    }
+    layerL->filters.push_back(noiseFilter);
+
+    if (section == 3) {
+      auto shadowL = doc->makeNode<pagx::DropShadowFilter>();
+      shadowL->offsetX = 4;
+      shadowL->offsetY = 4;
+      shadowL->blurX = 6;
+      shadowL->blurY = 6;
+      shadowL->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerL->filters.push_back(shadowL);
+
+      auto innerShadowL = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowL->offsetX = 3;
+      innerShadowL->offsetY = 3;
+      innerShadowL->blurX = 8;
+      innerShadowL->blurY = 8;
+      innerShadowL->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerL->styles.push_back(innerShadowL);
+    }
+
+    doc->layers.push_back(layerL);
+
+    // Right rectangle with NoiseStyle
+    auto layerR = doc->makeNode<pagx::Layer>("LR");
+    layerR->width = 220;
+    layerR->height = 220;
+    layerR->matrix = pagx::Matrix::Translate(270, 20);
+    auto rectR = doc->makeNode<pagx::Rectangle>();
+    rectR->position = {110, 110};
+    rectR->size = {220, 220};
+    rectR->roundness = 12;
+    auto fillR = doc->makeNode<pagx::Fill>();
+    auto solidR = doc->makeNode<pagx::SolidColor>();
+    solidR->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillR->color = solidR;
+    layerR->contents.push_back(rectR);
+    layerR->contents.push_back(fillR);
+
+    auto noiseStyle = doc->makeNode<pagx::NoiseStyle>("NS");
+    noiseStyle->size = 8;
+    noiseStyle->density = density;
+    noiseStyle->seed = 42;
+    switch (section) {
+      case 0:
+        noiseStyle->mode = pagx::NoiseMode::Mono;
+        noiseStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseStyle->mode = pagx::NoiseMode::Duo;
+        noiseStyle->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseStyle->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseStyle->mode = pagx::NoiseMode::Multi;
+        noiseStyle->opacity = 0.8f;
+        break;
+    }
+    layerR->styles.push_back(noiseStyle);
+
+    if (section == 3) {
+      auto shadowR = doc->makeNode<pagx::DropShadowFilter>();
+      shadowR->offsetX = 4;
+      shadowR->offsetY = 4;
+      shadowR->blurX = 6;
+      shadowR->blurY = 6;
+      shadowR->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerR->filters.push_back(shadowR);
+
+      auto innerShadowR = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowR->offsetX = 3;
+      innerShadowR->offsetY = 3;
+      innerShadowR->blurX = 8;
+      innerShadowR->blurY = 8;
+      innerShadowR->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerR->styles.push_back(innerShadowR);
+    }
+
+    doc->layers.push_back(layerR);
+
+    doc->applyLayout();
+    auto tgfxRoot = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxRoot != nullptr);
+
+    tgfx::DisplayList displayList;
+    displayList.root()->addChild(tgfxRoot);
+    displayList.render(surface.get(), false);
+
+    auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
+    EXPECT_TRUE(Baseline::Compare(surface, key));
+  }
 }
 
 }  // namespace pag
