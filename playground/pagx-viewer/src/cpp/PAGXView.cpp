@@ -86,7 +86,7 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 
 PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
   displayList.setMaxTileCount(512);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }

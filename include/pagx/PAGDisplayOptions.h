@@ -52,6 +52,36 @@ enum class PAGRenderMode {
 };
 
 /**
+ * PAGTileUpdateMode defines how missing tiles are produced in tiled rendering mode when the
+ * zoomScale changes or when the viewport scrolls into uncached regions.
+ */
+enum class PAGTileUpdateMode {
+  /**
+   * Missing tiles are rasterized at the current zoomScale within the same frame. Cached tiles from
+   * other zoom scales are never reused. This produces the highest visual fidelity but may cause
+   * frame drops during heavy zoom or pan. This is the default mode.
+   */
+  Immediate,
+
+  /**
+   * For each missing tile, the display list first tries to reuse a cached tile from another zoom
+   * scale as a temporary fallback (producing brief zoom blur). When no such cache is available, the
+   * tile is rasterized at the current zoomScale within the same frame to keep the result correct.
+   * Use this mode for a smoother visual transition during zoom while still guaranteeing visible
+   * content on every frame.
+   */
+  Smooth,
+
+  /**
+   * The number of tiles rasterized per frame is capped by setMaxTilesRefinedPerFrame(). Tiles
+   * beyond the cap are filled with cached content from other zoom scales, or with the background
+   * color when no fallback is available. This keeps the frame rate stable during heavy zoom or pan
+   * at the cost of longer-lasting blur or background-colored regions.
+   */
+  Fast,
+};
+
+/**
  * PAGDisplayOptions exposes display-list rendering options owned by a PAGScene. Use
  * PAGScene::getDisplayOptions() to obtain the options and PAGScene::draw() to render with them.
  */
@@ -132,23 +162,25 @@ class PAGDisplayOptions {
   void setMaxTileCount(int count);
 
   /**
-   * Returns whether temporary blurred fallback tiles are allowed while zooming.
+   * Returns the tile update mode used in tiled rendering mode.
    */
-  bool getAllowZoomBlur() const;
+  PAGTileUpdateMode getTileUpdateMode() const;
 
   /**
-   * Sets whether temporary blurred fallback tiles are allowed while zooming in tiled mode.
-   * @param allow true to allow fallback tiles from other zoom levels.
+   * Sets the tile update mode used in tiled rendering mode. This setting only applies in tiled
+   * rendering mode and controls how missing tiles are produced when the zoomScale changes. The
+   * default is PAGTileUpdateMode::Immediate.
+   * @param mode the tile update strategy to use.
    */
-  void setAllowZoomBlur(bool allow);
+  void setTileUpdateMode(PAGTileUpdateMode mode);
 
   /**
-   * Returns the maximum number of zoom-blur fallback tiles refined per frame.
+   * Returns the maximum number of tiles refined per frame in tiled rendering mode.
    */
   int getMaxTilesRefinedPerFrame() const;
 
   /**
-   * Sets the maximum number of zoom-blur fallback tiles refined per frame.
+   * Sets the maximum number of tiles refined per frame in tiled rendering mode.
    * @param count maximum number of tiles to refine each frame.
    */
   void setMaxTilesRefinedPerFrame(int count);
