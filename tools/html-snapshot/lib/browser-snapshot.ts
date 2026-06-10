@@ -141,6 +141,17 @@ function px(n) {
   return `${roundPx(n)}px`;
 }
 
+// Format a numeric `flex-grow` for the subset HTML's `flex: <N>` shorthand.
+// Integers stay integer-shaped (`flex: 1`) so the imported PAGX renders the
+// canonical form; non-integers keep up to three decimals to round-trip the
+// rare `flex: 0.5` / `flex: 2.5` values without leaking float noise (e.g.
+// `1.0000001`) into the snapshot.
+function formatFlexGrow(n) {
+  if (!isFinite(n) || n <= 0) return '0';
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(3).replace(/\.?0+$/, '');
+}
+
 function escapeHtml(s) {
   return s
     .replace(/&/g, '&amp;')
@@ -565,9 +576,35 @@ function buildStyle(left, top, width, height, computed, opts) {
   const parts = [];
   if (opts.flexItem) {
     parts.push(`position: relative`);
-    parts.push(`width: ${px(width)}`);
-    parts.push(`height: ${px(height)}`);
-    parts.push(`flex-shrink: 0`);
+    // `flex-grow` on the source flex item means CSS distributes the parent
+    // container's leftover main-axis space into this item. Forward it as the
+    // PAGX subset's `flex: <grow>` shorthand so the importer maps it onto
+    // `Layer.flex` (HTMLLayerBuilder::applySizeAndPosition). When grow is
+    // active, also drop the explicit main-axis dimension: PAGX ignores
+    // `flex` whenever an explicit width/height is set on the same axis
+    // (Layer.h doc), so emitting `width: Npx` alongside `flex: 1` would
+    // pin the item to its measured size and silently negate the grow.
+    // The cross-axis size still goes through verbatim. The parent's main
+    // axis is forwarded via `opts.flexMainAxis` from `renderFlexContainer`;
+    // a missing axis (e.g. flex item created outside the dedicated
+    // container path) falls back to the conservative previous behaviour
+    // — emit both dimensions and let `flex-shrink: 0` plus the measured
+    // size pin the layout.
+    const grow = parseFloat(computed.getPropertyValue('flex-grow')) || 0;
+    const mainAxis = opts.flexMainAxis;
+    const growActive = grow > 0 && (mainAxis === 'row' || mainAxis === 'column');
+    if (growActive) {
+      if (mainAxis === 'row') {
+        parts.push(`height: ${px(height)}`);
+      } else {
+        parts.push(`width: ${px(width)}`);
+      }
+      parts.push(`flex: ${formatFlexGrow(grow)}`);
+    } else {
+      parts.push(`width: ${px(width)}`);
+      parts.push(`height: ${px(height)}`);
+      parts.push(`flex-shrink: 0`);
+    }
     // CSS `margin` on a flex item shifts where its outer box sits inside the flex
     // container's main + cross axes (e.g. `mt-[8px]` on a 6×6 dot to align it with
     // text baseline). The PAGX HTML subset honours margin via padding-wrapper /
@@ -1921,8 +1958,24 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     // width as its main-axis size when no explicit width is authored.
     const isPure = isPureInlineTextLeaf(el, computed);
     if (isPure) {
-      const parts = [textStyle, 'flex-shrink: 0'].filter(Boolean);
-      return `<span style="${parts.join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
+      // Pure-inline branch sidesteps `buildStyle`'s flexItem header (no
+      // `position: relative`, no `width/height`), so the parent loop's
+      // `flex-grow` forwarding doesn't reach this <span>. Read it again
+      // here and append `flex: <grow>` directly. This catches the common
+      // `.sym { flex: 1 }` shape on text-only flex items (a label that
+      // pushes its siblings to the row's far edge); without it, PAGX
+      // would see a bare-width <span> and pack everything to the start.
+      // `flex-shrink: 0` is dropped when grow is active — `flex: <N>`
+      // already implies `1 1 0%`, and stacking `flex-shrink: 0` after
+      // would re-pin the item to its content width on the main axis.
+      const grow = parseFloat(computed.getPropertyValue('flex-grow')) || 0;
+      const parts = [textStyle];
+      if (grow > 0) {
+        parts.push(`flex: ${formatFlexGrow(grow)}`);
+      } else {
+        parts.push('flex-shrink: 0');
+      }
+      return `<span style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
     }
     // Mirror the source's own flex / padding declaration onto the wrapper
     // so the inline span lands where the browser painted it. A text-only
@@ -2104,6 +2157,12 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
   });
   const flexStyle = collectFlexProps(computed, flexChildren.length > 1);
   const style = joinStyles(wrapperBase, flexStyle);
+  // Resolve the parent's main axis once and forward it to every child so
+  // `buildStyle`'s flex-grow branch can drop the right (main-axis) dimension
+  // when a child's `flex-grow > 0`. Reading `flex-direction` here keeps the
+  // child path purely state-less.
+  const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
+  const mainAxis = direction === 'column' || direction === 'column-reverse' ? 'column' : 'row';
   const childParts = [];
   for (const child of flexChildren) {
     if (child.kind === 'text') {
@@ -2111,7 +2170,7 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
     } else {
       // Pass the cached computed style so render() does not have to ask
       // the engine again for the same node.
-      childParts.push(render(child.node, rect, { flexItem: true }, child.computed));
+      childParts.push(render(child.node, rect, { flexItem: true, flexMainAxis: mainAxis }, child.computed));
     }
   }
   return `<div style="${style}">${childParts.join('')}</div>`;
@@ -2552,6 +2611,7 @@ const HELPER_FNS = [
   normalizeWritingMode,
   roundPx,
   px,
+  formatFlexGrow,
   escapeHtml,
   joinStyles,
   withNowrap,
