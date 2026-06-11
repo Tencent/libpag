@@ -48,7 +48,7 @@
   // not be created.
   [animator setSync:YES];
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(AsyncSurfacePrepared:)
+                                           selector:@selector(onAsyncSurfacePrepared:)
                                                name:pag::kAsyncSurfacePreparedNotification
                                              object:self];
 }
@@ -287,7 +287,7 @@
   return CGRectNull;
 }
 
-- (void)AsyncSurfacePrepared:(NSNotification*)notification {
+- (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
 @end
