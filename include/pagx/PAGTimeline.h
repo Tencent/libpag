@@ -161,7 +161,7 @@ class PAGTimeline {
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;
-  bool playing = false;
+  bool playing = true;
 
   friend class PAGScene;
   friend class PAGComposition;
