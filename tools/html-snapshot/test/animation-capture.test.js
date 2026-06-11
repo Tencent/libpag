@@ -11,6 +11,11 @@ const {
   pagxParseTimeMs,
   pagxWhichVary,
   pagxReduceKeyframes,
+  pagxParseColorChannels,
+  pagxParseTranslateXY,
+  pagxStopScalarSeries,
+  pagxRdpKeep,
+  pagxDecimateStops,
   pagxNormalizeTiming,
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
@@ -179,6 +184,111 @@ describe('pagxReduceKeyframes', () => {
     expect(out.length).toBeLessThan(4);
     expect(out[0].offset).toBe(0);
     expect(out[out.length - 1].offset).toBe(1);
+  });
+});
+
+describe('pagxParseColorChannels', () => {
+  test('parses rgb and rgba', () => {
+    expect(pagxParseColorChannels('rgb(255, 0, 128)')).toEqual([255, 0, 128, 1]);
+    expect(pagxParseColorChannels('rgba(10, 20, 30, 0.5)')).toEqual([10, 20, 30, 0.5]);
+  });
+  test('returns null for non-rgb values', () => {
+    expect(pagxParseColorChannels('red')).toBeNull();
+    expect(pagxParseColorChannels('#fff')).toBeNull();
+    expect(pagxParseColorChannels('')).toBeNull();
+  });
+});
+
+describe('pagxParseTranslateXY', () => {
+  test('parses x and y px', () => {
+    expect(pagxParseTranslateXY('translate(12px, -4px)')).toEqual([12, -4]);
+  });
+  test('defaults missing y to 0', () => {
+    expect(pagxParseTranslateXY('translate(8px)')).toEqual([8, 0]);
+  });
+  test('returns null when no x parses', () => {
+    expect(pagxParseTranslateXY('none')).toBeNull();
+    expect(pagxParseTranslateXY('')).toBeNull();
+  });
+});
+
+describe('pagxStopScalarSeries', () => {
+  test('decomposes tracked props into per-channel scalar series', () => {
+    const stops = [
+      { offset: 0, props: { opacity: '0', transform: 'translate(0px, 0px)' } },
+      { offset: 1, props: { opacity: '1', transform: 'translate(40px, 10px)' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.opacity).toEqual([0, 1]);
+    expect(series.tx).toEqual([0, 40]);
+    expect(series.ty).toEqual([0, 10]);
+  });
+});
+
+describe('pagxRdpKeep', () => {
+  test('collapses a perfectly linear ramp to its endpoints', () => {
+    const offsets = [0, 0.25, 0.5, 0.75, 1];
+    const values = [0, 25, 50, 75, 100];
+    const keep = pagxRdpKeep(offsets, values, 0.02);
+    expect(keep).toEqual([true, false, false, false, true]);
+  });
+
+  test('keeps the apex of a sharply curved series', () => {
+    // A spike at the middle deviates far from the 0→0 chord.
+    const offsets = [0, 0.5, 1];
+    const values = [0, 100, 0];
+    const keep = pagxRdpKeep(offsets, values, 0.02);
+    expect(keep).toEqual([true, true, true]);
+  });
+
+  test('a flat channel keeps only endpoints', () => {
+    const offsets = [0, 0.5, 1];
+    const values = [7, 7, 7];
+    expect(pagxRdpKeep(offsets, values, 0.02)).toEqual([true, false, true]);
+  });
+});
+
+describe('pagxDecimateStops', () => {
+  test('collapses a linear opacity ramp to two keyframes', () => {
+    const stops = [];
+    for (let i = 0; i <= 10; i++) {
+      stops.push({ offset: i / 10, props: { opacity: String(i / 10) } });
+    }
+    const out = pagxDecimateStops(stops);
+    expect(out.map((s) => s.offset)).toEqual([0, 1]);
+  });
+
+  test('keeps interior points of an eased (non-linear) curve', () => {
+    // ease-out-ish: fast then slow → bows away from the chord.
+    const stops = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      stops.push({ offset: t, props: { opacity: String(Math.sqrt(t)) } });
+    }
+    const out = pagxDecimateStops(stops);
+    expect(out.length).toBeGreaterThan(2);
+    expect(out.length).toBeLessThan(stops.length);
+    expect(out[0].offset).toBe(0);
+    expect(out[out.length - 1].offset).toBe(1);
+  });
+
+  test('unions keep-points across independent channels', () => {
+    // opacity is linear (collapses) but x has a mid-curve kink → that index survives.
+    const stops = [
+      { offset: 0, props: { opacity: '0', transform: 'translate(0px, 0px)' } },
+      { offset: 0.5, props: { opacity: '0.5', transform: 'translate(80px, 0px)' } },
+      { offset: 1, props: { opacity: '1', transform: 'translate(100px, 0px)' } },
+    ];
+    const out = pagxDecimateStops(stops);
+    expect(out.map((s) => s.offset)).toContain(0.5);
+  });
+
+  test('returns input unchanged for <= 2 stops', () => {
+    const stops = [
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ];
+    expect(pagxDecimateStops(stops)).toHaveLength(2);
   });
 });
 

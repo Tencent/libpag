@@ -48,7 +48,9 @@ export const PAGX_ANIM_PREFIX = 'pagxAnim';
 export const PAGX_ANIM_STYLE_ID = '__pagx_anim_keyframes';
 
 export interface CaptureAnimationsOptions {
-  // Number of samples taken across a library timeline (GSAP / anime.js).
+  // Number of samples taken across a library timeline (GSAP / anime.js) before
+  // per-channel RDP decimation. Higher is denser/more faithful; RDP keeps the
+  // emitted keyframe count proportional to curve complexity, not this value.
   sampleCount?: number;
   // Upper bound on elements probed during library sampling (keeps pathological
   // pages from blowing up the O(samples × elements) probe).
@@ -221,6 +223,181 @@ export function pagxReduceKeyframes(norm: PagxAnimStop[]): PagxAnimStop[] {
     out.push(norm[i]);
   }
   out.push(norm[norm.length - 1]);
+  return out;
+}
+
+// ===== Keyframe decimation (Ramer–Douglas–Peucker) =====
+//
+// The rAF sampler (GSAP / anime.js) seeks the timeline at many evenly-spaced
+// points and reads `getComputedStyle`, producing one keyframe per sample with
+// *linear* interpolation between them. Two opposing pressures:
+//   - too few samples → an eased curve becomes a visibly faceted polyline;
+//   - too many samples → every channel carries a keyframe per frame, bloating
+//     the PAGX file (a page with dozens of simple tweens explodes).
+// RDP resolves both generically: sample densely, then drop every interior
+// keyframe that lies within `eps` of the straight chord its neighbours already
+// describe. A constant-velocity slide collapses to its two endpoints; an eased
+// curve keeps only the few points needed to stay within tolerance; the cost is
+// bounded by the curve's actual complexity, not the sample count or the page's
+// animation count. This keeps linear interpolation (no importer change) and
+// only ever runs on the lossy sampled path — the declarative WAAPI / CSS paths
+// keep their authored keyframes + easing untouched.
+
+// Parse the r/g/b/a components of an `rgb()` / `rgba()` string. Returns null for
+// any other shape (named colors, hex — `getComputedStyle` always serialises to
+// rgb/rgba, so those are the only cases that reach the sampler).
+export function pagxParseColorChannels(value: string): number[] | null {
+  const m = (value || '').match(/rgba?\(([^)]+)\)/i);
+  if (!m) return null;
+  const parts = m[1].split(',').map((s) => parseFloat(s.trim()));
+  if (parts.length < 3 || parts.slice(0, 3).some((x) => isNaN(x))) return null;
+  const a = parts.length >= 4 && !isNaN(parts[3]) ? parts[3] : 1;
+  return [parts[0], parts[1], parts[2], a];
+}
+
+// Parse the x/y pixels of a normalised `translate(xpx, ypx)` string (the shape
+// `pagxExtractTranslate` emits). Returns null when no x value parses.
+export function pagxParseTranslateXY(value: string): number[] | null {
+  const m = (value || '').match(/translate\(([^)]+)\)/i);
+  if (!m) return null;
+  const parts = m[1].split(',').map((s) => parseFloat(s.trim()));
+  if (parts.length === 0 || isNaN(parts[0])) return null;
+  const y = parts.length >= 2 && !isNaN(parts[1]) ? parts[1] : 0;
+  return [parts[0], y];
+}
+
+// Decompose the tracked props of every stop into scalar channel series (one
+// number per stop). opacity → 1 dim, transform → tx/ty, color/background-color
+// → r/g/b/a. Missing samples are left as NaN and carried by the caller.
+export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, number[]> {
+  const series: Record<string, number[]> = {};
+  const put = (key: string, i: number, v: number): void => {
+    if (!series[key]) series[key] = new Array(stops.length).fill(NaN);
+    series[key][i] = v;
+  };
+  for (let i = 0; i < stops.length; i++) {
+    const p = stops[i].props || {};
+    if (p['opacity'] != null) {
+      const o = parseFloat(p['opacity']);
+      if (!isNaN(o)) put('opacity', i, o);
+    }
+    if (p['transform'] != null) {
+      const t = pagxParseTranslateXY(p['transform']);
+      if (t) {
+        put('tx', i, t[0]);
+        put('ty', i, t[1]);
+      }
+    }
+    if (p['color'] != null) {
+      const c = pagxParseColorChannels(p['color']);
+      if (c) {
+        put('cr', i, c[0]);
+        put('cg', i, c[1]);
+        put('cb', i, c[2]);
+        put('ca', i, c[3]);
+      }
+    }
+    if (p['background-color'] != null) {
+      const c = pagxParseColorChannels(p['background-color']);
+      if (c) {
+        put('br', i, c[0]);
+        put('bg', i, c[1]);
+        put('bb', i, c[2]);
+        put('ba', i, c[3]);
+      }
+    }
+  }
+  return series;
+}
+
+// RDP on one scalar channel. `offsets` and `values` are parallel; values are
+// normalised to their own [0,1] travel so `eps` is a scale-free fraction of the
+// channel's total motion (a 2px wiggle and a 200px slide are simplified to the
+// same relative tolerance). Returns a per-index keep mask. A flat channel
+// (zero travel) keeps only its endpoints.
+export function pagxRdpKeep(offsets: number[], values: number[], eps: number): boolean[] {
+  const n = values.length;
+  const keep = new Array(n).fill(false);
+  if (n === 0) return keep;
+  keep[0] = true;
+  keep[n - 1] = true;
+  if (n <= 2) return keep;
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of values) {
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  const range = hi - lo;
+  if (!(range > 0)) return keep; // flat channel — endpoints only
+  const norm = values.map((v) => (v - lo) / range);
+  const stack: number[][] = [[0, n - 1]];
+  while (stack.length) {
+    const seg = stack.pop() as number[];
+    const a = seg[0];
+    const b = seg[1];
+    if (b <= a + 1) continue;
+    const x1 = offsets[a];
+    const y1 = norm[a];
+    const dx = offsets[b] - x1;
+    const dy = norm[b] - y1;
+    const denom = Math.sqrt(dx * dx + dy * dy) || 1;
+    let maxD = -1;
+    let idx = -1;
+    for (let i = a + 1; i < b; i++) {
+      const d = Math.abs(dy * (offsets[i] - x1) - dx * (norm[i] - y1)) / denom;
+      if (d > maxD) {
+        maxD = d;
+        idx = i;
+      }
+    }
+    if (maxD > eps && idx > a && idx < b) {
+      keep[idx] = true;
+      stack.push([a, idx]);
+      stack.push([idx, b]);
+    }
+  }
+  return keep;
+}
+
+// Decimate sampled stops: run RDP independently per scalar channel and keep the
+// union of the points any channel needs (plus both endpoints). `eps` defaults
+// to 1% of each channel's travel — tight enough to preserve eased curvature
+// (looser values visibly under-fit fast counters / slides) while still
+// collapsing constant-velocity runs to their endpoints. The literal default
+// travels with the function source when it is serialised into the page. No-op
+// for <= 2 stops.
+export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimStop[] {
+  if (stops.length <= 2) return stops;
+  const offsets = stops.map((s) => s.offset);
+  const series = pagxStopScalarSeries(stops);
+  const keep = new Array(stops.length).fill(false);
+  keep[0] = true;
+  keep[stops.length - 1] = true;
+  for (const key of Object.keys(series)) {
+    const vals = series[key];
+    // Defensive NaN fill (dense sampling is normally hole-free): carry the last
+    // seen value forward, then backfill any leading gap, so RDP sees a complete
+    // series.
+    let last = NaN;
+    for (let i = 0; i < vals.length; i++) {
+      if (isNaN(vals[i])) vals[i] = last;
+      else last = vals[i];
+    }
+    let next = NaN;
+    for (let i = vals.length - 1; i >= 0; i--) {
+      if (isNaN(vals[i])) vals[i] = next;
+      else next = vals[i];
+    }
+    const k = pagxRdpKeep(offsets, vals, eps);
+    for (let i = 0; i < k.length; i++) {
+      if (k[i]) keep[i] = true;
+    }
+  }
+  const out: PagxAnimStop[] = [];
+  for (let i = 0; i < stops.length; i++) {
+    if (keep[i]) out.push(stops[i]);
+  }
   return out;
 }
 
@@ -517,7 +694,10 @@ export function pagxSampleTimeline(
       if (Object.keys(props).length > 0) norm.push({ offset, props });
     }
     if (norm.length < 2) continue;
-    norm = pagxReduceKeyframes(norm);
+    // Dense linear samples → minimal keyframe set via per-channel RDP. Replaces
+    // the old flat-run-only reducer: RDP additionally collapses collinear
+    // (constant-velocity) runs, so a denser sample grid does not bloat the file.
+    norm = pagxDecimateStops(norm);
     captured.push({
       el,
       keyframes: norm,
@@ -713,7 +893,7 @@ export function pagxAnimMain(opts: {
   prefix: string;
   styleId: string;
 }): { count: number; names: string[] } {
-  const sampleCount = Math.max(2, opts.sampleCount || 8);
+  const sampleCount = Math.max(2, opts.sampleCount || 24);
   const maxElements = opts.maxElements || 4000;
   const prefix = opts.prefix || 'pagxAnim';
   const styleId = opts.styleId || '__pagx_anim_keyframes';
@@ -765,6 +945,11 @@ const PAGX_ANIM_FNS = [
   pagxParseTimeMs,
   pagxWhichVary,
   pagxReduceKeyframes,
+  pagxParseColorChannels,
+  pagxParseTranslateXY,
+  pagxStopScalarSeries,
+  pagxRdpKeep,
+  pagxDecimateStops,
   pagxNormalizeTiming,
   pagxSplitTopLevelCommas,
   pagxResolveWaapiEasing,
@@ -807,7 +992,10 @@ export async function capturePagxAnimationsOnPage(
   const logger = typeof options.logger === 'function' ? options.logger : () => {};
   try {
     const payload = buildAnimationCapturePayload({
-      sampleCount: options.sampleCount || 8,
+      // Sample densely; per-channel RDP (pagxDecimateStops) collapses the grid
+      // back down to the few keyframes each channel actually needs, so a high
+      // count buys fidelity without bloating the output.
+      sampleCount: options.sampleCount || 24,
       maxElements: options.maxElements || 4000,
     });
     const result = (await page.evaluate(payload)) as CaptureAnimationsResult;
