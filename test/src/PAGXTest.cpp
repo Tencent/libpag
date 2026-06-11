@@ -68,12 +68,15 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -8321,6 +8324,67 @@ PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
   EXPECT_FLOAT_EQ(m.getScaleX(), 2.0f);
   EXPECT_FLOAT_EQ(m.getScaleY(), 2.0f);
   EXPECT_FLOAT_EQ(m.getTranslateX(), 10.0f);
+}
+
+/**
+ * Test case: every channel the reflection registry marks Animatable for a built node type has a
+ * matching runtime writer, so animations cannot target a channel that silently does nothing.
+ */
+PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // A vector layer carrying one of each geometry / paint / modifier element.
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {40, 40};
+  layer->contents.push_back(ellipse);
+  auto polystar = doc->makeNode<pagx::Polystar>();
+  layer->contents.push_back(polystar);
+  auto trim = doc->makeNode<pagx::TrimPath>();
+  layer->contents.push_back(trim);
+  auto roundCorner = doc->makeNode<pagx::RoundCorner>();
+  layer->contents.push_back(roundCorner);
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  layer->contents.push_back(repeater);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto strokeColor = doc->makeNode<pagx::SolidColor>();
+  stroke->color = strokeColor;
+  layer->contents.push_back(stroke);
+
+  // A drop shadow style and a blur filter on the layer.
+  auto dropStyle = doc->makeNode<pagx::DropShadowStyle>();
+  layer->styles.push_back(dropStyle);
+  auto blurFilter = doc->makeNode<pagx::BlurFilter>();
+  layer->filters.push_back(blurFilter);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+
+  // For each built node, every Animatable channel in the registry must have a runtime writer.
+  pagx::Node* nodes[] = {layer,    rect, ellipse, polystar, trim,      roundCorner,
+                         repeater, fill, stroke,  solid,    dropStyle, blurFilter};
+  for (auto* node : nodes) {
+    for (const auto& field : pagx::NodeFieldsFor(node->nodeType())) {
+      if (field.animClass != pagx::AnimClass::Animatable) {
+        continue;
+      }
+      EXPECT_TRUE(binding->hasWriter(node, field.channel))
+          << "node type " << static_cast<int>(node->nodeType()) << " channel '" << field.channel
+          << "' is Animatable but has no runtime writer";
+    }
+  }
 }
 
 }  // namespace pag

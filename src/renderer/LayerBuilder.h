@@ -70,6 +70,13 @@ struct RuntimeTarget {
     }
   }
 
+  // Returns true if this target can apply the given channel. Virtual so a subclass that intercepts
+  // channels in apply() (LayerRuntimeTarget's x / y / matrix) reports them as handled even though
+  // they are not in the writers map.
+  virtual bool hasWriter(const std::string& channel) const {
+    return writers.find(channel) != writers.end();
+  }
+
   // Applies an evaluated channel value. Virtual so a subclass (LayerRuntimeTarget) can intercept
   // channels that need shared state across writers (the Layer transform: x / y / matrix).
   virtual bool apply(const std::string& channel, const KeyValue& value, float mix) {
@@ -117,6 +124,16 @@ struct RuntimeBinding {
       return false;
     }
     return it->second->apply(channel, value, mix);
+  }
+
+  // Returns true if the node has a target that can apply the given channel. Used by tests to verify
+  // every Animatable channel in the reflection registry has a matching runtime writer.
+  bool hasWriter(const Node* node, const std::string& channel) const {
+    auto it = targets.find(node);
+    if (it == targets.end()) {
+      return false;
+    }
+    return it->second->hasWriter(channel);
   }
 
   // Installs a specific RuntimeTarget subclass for a node (e.g. LayerRuntimeTarget). Replaces any

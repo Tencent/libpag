@@ -384,8 +384,8 @@ static std::vector<NodeFieldDef> BuildPathFields() {
 static std::vector<NodeFieldDef> BuildTextFields() {
   std::vector<NodeFieldDef> table = {
       FIELD_STRING(Text, "text", text, AnimClass::LayoutInput),
-      FIELD_POINT_X(Text, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Text, "position.y", position, AnimClass::Animatable),
+      FIELD_POINT_X(Text, "x", position, AnimClass::Animatable),
+      FIELD_POINT_Y(Text, "y", position, AnimClass::Animatable),
       FIELD_STRING(Text, "fontFamily", fontFamily, AnimClass::LayoutInput),
       FIELD_STRING(Text, "fontStyle", fontStyle, AnimClass::LayoutInput),
       FIELD_FLOAT(Text, "fontSize", fontSize, AnimClass::LayoutInput),

@@ -160,6 +160,13 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return RuntimeTarget::apply(channel, value, mix);
   }
 
+  bool hasWriter(const std::string& channel) const override {
+    if (channel == "x" || channel == "y" || channel == "matrix") {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+
   // Seeds the decomposed transform from the node's authored values so the first animated frame
   // mixes against the static baseline rather than an identity.
   void initTransform(float x, float y, const tgfx::Matrix& matrix) {
@@ -471,7 +478,7 @@ class LayerBuilderContext {
 
   // Templated writer for the common "scalar float channel = setter(Mix(getter, value, mix))"
   // pattern, eliminating one near-identical writer per animatable float property.
-  template <typename T, float (T::*Getter)() const, void (T::*Setter)(float)>
+  template <typename T, auto Getter, auto Setter>
   static void WriteMixedFloat(void* object, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -482,8 +489,7 @@ class LayerBuilderContext {
   }
 
   // Templated writer for tgfx Color channels (setter takes const Color&).
-  template <typename T, const tgfx::Color& (T::*Getter)() const,
-            void (T::*Setter)(const tgfx::Color&)>
+  template <typename T, auto Getter, auto Setter>
   static void WriteMixedColor(void* object, const KeyValue& value, float mix) {
     const auto* v = std::get_if<Color>(&value);
     if (v == nullptr) {
@@ -495,8 +501,7 @@ class LayerBuilderContext {
 
   // Templated writer for a width/height component of a tgfx Size-valued property. WidthAxis selects
   // which component the channel drives; the other component is preserved.
-  template <typename T, const tgfx::Size& (T::*Getter)() const,
-            void (T::*Setter)(const tgfx::Size&), bool WidthAxis>
+  template <typename T, auto Getter, auto Setter, bool WidthAxis>
   static void WriteSizeAxis(void* object, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -513,8 +518,7 @@ class LayerBuilderContext {
   }
 
   // Templated writer for an x/y component of a tgfx Point-valued property.
-  template <typename T, const tgfx::Point& (T::*Getter)() const,
-            void (T::*Setter)(const tgfx::Point&), bool XAxis>
+  template <typename T, auto Getter, auto Setter, bool XAxis>
   static void WritePointAxis(void* object, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -719,6 +723,9 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
+      _result.binding.setWriter(
+          node, "alpha",
+          WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>);
     }
     return fill;
   }
@@ -756,6 +763,18 @@ class LayerBuilderContext {
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
     }
+    _result.binding.setWriter(node, "width",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
+                                              &tgfx::StrokeStyle::setStrokeWidth>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha,
+                                              &tgfx::StrokeStyle::setAlpha>);
+    _result.binding.setWriter(node, "miterLimit",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit,
+                                              &tgfx::StrokeStyle::setMiterLimit>);
+    _result.binding.setWriter(node, "dashOffset",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::dashOffset,
+                                              &tgfx::StrokeStyle::setDashOffset>);
 
     return stroke;
   }
@@ -888,37 +907,100 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
         node, node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(
+          node, "startPoint.x",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
+                         &tgfx::LinearGradient::setStartPoint, true>);
+      _result.binding.setWriter(
+          node, "startPoint.y",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
+                         &tgfx::LinearGradient::setStartPoint, false>);
+      _result.binding.setWriter(
+          node, "endPoint.x",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
+                         &tgfx::LinearGradient::setEndPoint, true>);
+      _result.binding.setWriter(
+          node, "endPoint.y",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
+                         &tgfx::LinearGradient::setEndPoint, false>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(node, "center.x",
+                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                                               &tgfx::RadialGradient::setCenter, true>);
+      _result.binding.setWriter(node, "center.y",
+                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                                               &tgfx::RadialGradient::setCenter, false>);
+      _result.binding.setWriter(node, "radius",
+                                WriteMixedFloat<tgfx::RadialGradient, &tgfx::RadialGradient::radius,
+                                                &tgfx::RadialGradient::setRadius>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
-                                                             node->endAngle, colors, positions),
-                                   node, node->colorStops);
+    auto result =
+        applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                          node->endAngle, colors, positions),
+                                node, node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(node, "center.x",
+                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                                               &tgfx::ConicGradient::setCenter, true>);
+      _result.binding.setWriter(node, "center.y",
+                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                                               &tgfx::ConicGradient::setCenter, false>);
+      _result.binding.setWriter(
+          node, "startAngle",
+          WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::startAngle,
+                          &tgfx::ConicGradient::setStartAngle>);
+      _result.binding.setWriter(node, "endAngle",
+                                WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::endAngle,
+                                                &tgfx::ConicGradient::setEndAngle>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(
+          node, "center.x",
+          WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
+                         &tgfx::DiamondGradient::setCenter, true>);
+      _result.binding.setWriter(
+          node, "center.y",
+          WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
+                         &tgfx::DiamondGradient::setCenter, false>);
+      _result.binding.setWriter(
+          node, "radius",
+          WriteMixedFloat<tgfx::DiamondGradient, &tgfx::DiamondGradient::radius,
+                          &tgfx::DiamondGradient::setRadius>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -967,6 +1049,16 @@ class LayerBuilderContext {
     if (node->type == TrimType::Continuous) {
       trim->setTrimType(tgfx::TrimPathType::Continuous);
     }
+    _result.binding.set(node, trim);
+    _result.binding.setWriter(
+        node, "start",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::start, &tgfx::TrimPath::setStart>);
+    _result.binding.setWriter(
+        node, "end",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::end, &tgfx::TrimPath::setEnd>);
+    _result.binding.setWriter(
+        node, "offset",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::offset, &tgfx::TrimPath::setOffset>);
     return trim;
   }
 
@@ -993,6 +1085,10 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCorner* node) {
     auto round = tgfx::RoundCorner::Make();
     round->setRadius(node->radius);
+    _result.binding.set(node, round);
+    _result.binding.setWriter(node, "radius",
+                              WriteMixedFloat<tgfx::RoundCorner, &tgfx::RoundCorner::radius,
+                                              &tgfx::RoundCorner::setRadius>);
     return round;
   }
 
@@ -1015,7 +1111,75 @@ class LayerBuilderContext {
     repeater->setScale(ToTGFX(node->scale));
     repeater->setStartAlpha(node->startAlpha);
     repeater->setEndAlpha(node->endAlpha);
+    _result.binding.set(node, repeater);
+    _result.binding.setWriter(
+        node, "copies",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::copies, &tgfx::Repeater::setCopies>);
+    _result.binding.setWriter(
+        node, "offset",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::offset, &tgfx::Repeater::setOffset>);
+    _result.binding.setWriter(
+        node, "rotation",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::rotation, &tgfx::Repeater::setRotation>);
+    _result.binding.setWriter(node, "startAlpha",
+                              WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::startAlpha,
+                                              &tgfx::Repeater::setStartAlpha>);
+    _result.binding.setWriter(
+        node, "endAlpha",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::endAlpha, &tgfx::Repeater::setEndAlpha>);
+    _result.binding.setWriter(
+        node, "anchor.x",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, true>);
+    _result.binding.setWriter(
+        node, "anchor.y",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                             &tgfx::Repeater::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                             &tgfx::Repeater::setPosition, false>);
+    _result.binding.setWriter(
+        node, "scale.x",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, true>);
+    _result.binding.setWriter(
+        node, "scale.y",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, false>);
     return repeater;
+  }
+
+  // TextModifier optional paint channels: animating sets the optional to the mixed value, blending
+  // against the current value when present and against the target alone when unset.
+  static void WriteTextModifierFillColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto target = ToTGFX(*v);
+    auto current = modifier->fillColor();
+    modifier->setFillColor(current.has_value() ? MixTGFXColor(*current, target, mix) : target);
+  }
+
+  static void WriteTextModifierStrokeColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto target = ToTGFX(*v);
+    auto current = modifier->strokeColor();
+    modifier->setStrokeColor(current.has_value() ? MixTGFXColor(*current, target, mix) : target);
+  }
+
+  static void WriteTextModifierStrokeWidth(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto current = modifier->strokeWidth();
+    modifier->setStrokeWidth(current.has_value() ? MixFloat(*current, *v, mix) : *v);
   }
 
   std::shared_ptr<tgfx::TextModifier> convertTextModifier(const TextModifier* node) {
@@ -1041,6 +1205,41 @@ class LayerBuilderContext {
       modifier->setStrokeWidth(node->strokeWidth.value());
     }
 
+    _result.binding.set(node, modifier);
+    _result.binding.setWriter(node, "rotation",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::rotation,
+                                              &tgfx::TextModifier::setRotation>);
+    _result.binding.setWriter(node, "skew",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skew,
+                                              &tgfx::TextModifier::setSkew>);
+    _result.binding.setWriter(node, "skewAxis",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skewAxis,
+                                              &tgfx::TextModifier::setSkewAxis>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::alpha,
+                                              &tgfx::TextModifier::setAlpha>);
+    _result.binding.setWriter(node, "anchor.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                                             &tgfx::TextModifier::setAnchor, true>);
+    _result.binding.setWriter(node, "anchor.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                                             &tgfx::TextModifier::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                                             &tgfx::TextModifier::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                                             &tgfx::TextModifier::setPosition, false>);
+    _result.binding.setWriter(node, "scale.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                                             &tgfx::TextModifier::setScale, true>);
+    _result.binding.setWriter(node, "scale.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                                             &tgfx::TextModifier::setScale, false>);
+    _result.binding.setWriter(node, "fillColor", WriteTextModifierFillColor);
+    _result.binding.setWriter(node, "strokeColor", WriteTextModifierStrokeColor);
+    _result.binding.setWriter(node, "strokeWidth", WriteTextModifierStrokeWidth);
+
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
     tgfxSelectors.reserve(node->selectors.size());
@@ -1059,6 +1258,26 @@ class LayerBuilderContext {
         tgfxSelector->setWeight(rangeSelector->weight);
         tgfxSelector->setRandomOrder(rangeSelector->randomOrder);
         tgfxSelector->setRandomSeed(static_cast<uint16_t>(rangeSelector->randomSeed));
+        _result.binding.set(rangeSelector, tgfxSelector);
+        _result.binding.setWriter(rangeSelector, "start",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::start,
+                                                  &tgfx::RangeSelector::setStart>);
+        _result.binding.setWriter(rangeSelector, "end",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::end,
+                                                  &tgfx::RangeSelector::setEnd>);
+        _result.binding.setWriter(rangeSelector, "offset",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::offset,
+                                                  &tgfx::RangeSelector::setOffset>);
+        _result.binding.setWriter(rangeSelector, "easeIn",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeIn,
+                                                  &tgfx::RangeSelector::setEaseIn>);
+        _result.binding.setWriter(
+            rangeSelector, "easeOut",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeOut,
+                            &tgfx::RangeSelector::setEaseOut>);
+        _result.binding.setWriter(rangeSelector, "weight",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::weight,
+                                                  &tgfx::RangeSelector::setWeight>);
         tgfxSelectors.push_back(tgfxSelector);
       }
     }
@@ -1113,6 +1332,40 @@ class LayerBuilderContext {
     if (node->skewAxis != 0) {
       group->setSkewAxis(node->skewAxis);
     }
+
+    // Register transform channels. Group and TextBox share these; the node pointer is the source
+    // node passed in (TextBox passes itself), so animation targets resolve to the right binding.
+    _result.binding.set(node, group);
+    _result.binding.setWriter(node, "rotation",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::rotation,
+                                              &tgfx::VectorGroup::setRotation>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::alpha,
+                                              &tgfx::VectorGroup::setAlpha>);
+    _result.binding.setWriter(
+        node, "skew",
+        WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skew, &tgfx::VectorGroup::setSkew>);
+    _result.binding.setWriter(node, "skewAxis",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skewAxis,
+                                              &tgfx::VectorGroup::setSkewAxis>);
+    _result.binding.setWriter(node, "anchor.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
+                                             &tgfx::VectorGroup::setAnchor, true>);
+    _result.binding.setWriter(node, "anchor.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
+                                             &tgfx::VectorGroup::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                                             &tgfx::VectorGroup::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                                             &tgfx::VectorGroup::setPosition, false>);
+    _result.binding.setWriter(node, "scale.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                             &tgfx::VectorGroup::setScale, true>);
+    _result.binding.setWriter(node, "scale.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                             &tgfx::VectorGroup::setScale, false>);
 
     return group;
   }
