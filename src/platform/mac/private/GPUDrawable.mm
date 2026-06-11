@@ -85,6 +85,10 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   }
   bufferPreparing = true;
   auto strongThis = weakThis.lock();
+  if (strongThis == nullptr) {
+    bufferPreparing = false;
+    return nullptr;
+  }
   [view retain];
   dispatch_async(dispatch_get_main_queue(), ^{
     auto context = strongThis->window->getDevice()->lockContext();
