@@ -26,30 +26,28 @@
 
 @optional
 /**
- * Notifies the beginning of the animation. It can be called from either the UI thread or the thread
- * that calls the play method.
+ * Notifies the beginning of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationStart:(PAGView*)pagView;
 
 /**
- * Notifies the end of the animation. It can only be called from the UI thread.
+ * Notifies the end of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationEnd:(PAGView*)pagView;
 
 /**
- * Notifies the cancellation of the animation. It can be called from either the UI thread or the
- * thread that calls the stop method.
+ * Notifies the cancellation of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationCancel:(PAGView*)pagView;
 
 /**
- * Notifies the repetition of the animation. It can only be called from the UI thread.
+ * Notifies the repetition of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationRepeat:(PAGView*)pagView;
 
 /**
- * Notifies another frame of the animation has occurred. It may be called from an arbitrary
- * thread if the animation is running asynchronously.
+ * Notifies another frame of the animation has occurred. This will only be called from the UI
+ * thread.
  */
 - (void)onAnimationUpdate:(PAGView*)pagView;
 
