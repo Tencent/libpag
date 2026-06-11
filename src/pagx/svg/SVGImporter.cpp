@@ -1817,6 +1817,15 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     auto strokeNode = _document->makeNode<Stroke>();
 
+    // Determine effective stroke-opacity. Applies to both url() and solid color strokes.
+    std::string strokeOpacity = getAttribute(element, "stroke-opacity");
+    if (strokeOpacity.empty()) {
+      strokeOpacity = inheritedStyle.strokeOpacity;
+    }
+    if (!strokeOpacity.empty()) {
+      strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
+    }
+
     if (stroke.compare(0, 4, "url(") == 0) {
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
@@ -1826,15 +1835,6 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       }
       strokeNode->color = getColorSourceForRef(refId, shapeBounds);
     } else {
-      // Determine effective stroke-opacity.
-      std::string strokeOpacity = getAttribute(element, "stroke-opacity");
-      if (strokeOpacity.empty()) {
-        strokeOpacity = inheritedStyle.strokeOpacity;
-      }
-      if (!strokeOpacity.empty()) {
-        strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
-      }
-
       // Convert color to SolidColor for PAGX compatibility.
       // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(stroke);
