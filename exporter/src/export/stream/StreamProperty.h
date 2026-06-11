@@ -194,7 +194,9 @@ pag::Property<T>* GetProperty(AEGP_StreamRefH groupStreamHandle, int index, Stre
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, groupStreamHandle, index,
                                                              &streamHandle);
   auto result = GetProperty(streamHandle, parser, map, dimensionality);
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 
@@ -209,7 +211,9 @@ pag::Property<T>* GetProperty(AEGP_StreamRefH groupStreamHandle, const A_char* k
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(PluginID, groupStreamHandle, key,
                                                                  &streamHandle);
   auto result = GetProperty(streamHandle, parser, map, dimensionality);
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 
@@ -223,7 +227,9 @@ pag::Property<T>* GetProperty(const AEGP_LayerH& layerHandle, AEGP_LayerStream l
   AEGP_StreamRefH streamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewLayerStream(PluginID, layerHandle, layerStream, &streamHandle);
   auto result = GetProperty(streamHandle, parser, map, dimensionality);
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 
@@ -237,7 +243,9 @@ pag::Property<T>* GetProperty(const AEGP_MaskRefH& maskHandle, AEGP_MaskStream m
   AEGP_StreamRefH streamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewMaskStream(PluginID, maskHandle, maskStream, &streamHandle);
   auto result = GetProperty(streamHandle, parser, map, dimensionality);
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 

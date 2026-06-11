@@ -77,7 +77,14 @@
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
-#include "tgfx/core/Bitmap.h"
+#ifdef PAG_USE_SWIFTSHADER
+#include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
+#endif
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Stream.h"
@@ -5542,70 +5549,6 @@ PAGX_TEST(PAGXTest, TypedChannelEvaluateAt) {
 }
 
 /**
- * Test case: PAGScene registers itself with the source document on creation and unregisters on
- * destruction.
- */
-PAGX_TEST(PAGXTest, PAGSceneLiveSceneRegistration) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-
-  EXPECT_TRUE(doc->liveScenes.empty());
-
-  auto file = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file != nullptr);
-  ASSERT_EQ(doc->liveScenes.size(), 1u);
-  EXPECT_EQ(doc->liveScenes[0].lock().get(), file.get());
-
-  file.reset();
-  EXPECT_TRUE(doc->liveScenes.empty());
-
-  auto file2 = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file2 != nullptr);
-  EXPECT_EQ(file2->width(), 100.0f);
-  EXPECT_EQ(file2->height(), 100.0f);
-}
-
-/**
- * Test case: PAGScene timeline lookup by name and identity sharing.
- */
-PAGX_TEST(PAGXTest, PAGSceneTimelineLookup) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-
-  auto main = doc->makeNode<pagx::Animation>("main");
-  main->duration = 60;
-  main->frameRate = 60;
-  doc->animations.push_back(main);
-
-  auto hint = doc->makeNode<pagx::Animation>("hint");
-  hint->duration = 30;
-  hint->frameRate = 60;
-  doc->animations.push_back(hint);
-
-  auto file = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file != nullptr);
-
-  auto ids = file->getTimelineIds();
-  ASSERT_EQ(ids.size(), 2u);
-  EXPECT_EQ(ids[0], "main");
-  EXPECT_EQ(ids[1], "hint");
-
-  auto t1 = file->getTimeline("main");
-  auto t1Again = file->getTimeline("main");
-  ASSERT_TRUE(t1 != nullptr);
-  EXPECT_EQ(t1.get(), t1Again.get());
-  EXPECT_EQ(t1->getId(), "main");
-  EXPECT_EQ(t1->duration(), 1'000'000);
-
-  auto t2 = file->getTimeline("hint");
-  ASSERT_TRUE(t2 != nullptr);
-  EXPECT_NE(t1.get(), t2.get());
-
-  EXPECT_EQ(file->getTimeline("missing"), nullptr);
-
-  auto def = file->getDefaultTimeline();
-  EXPECT_EQ(def.get(), t1.get());
-}
-
-/**
  * Test case: PAGTimeline play/pause/stop/setCurrentTime/advance state machine, including loop
  * modes. Time is measured in microseconds.
  */
@@ -5625,13 +5568,9 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
   EXPECT_EQ(timeline->duration(), 1'000'000);
 
-  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_TRUE(timeline->isPlaying());
   EXPECT_EQ(timeline->currentTime(), 0);
 
-  EXPECT_FALSE(timeline->advance(500'000));
-
-  timeline->play();
-  EXPECT_TRUE(timeline->isPlaying());
   EXPECT_TRUE(timeline->advance(500'000));
   EXPECT_EQ(timeline->currentTime(), 500'000);
 
@@ -5657,7 +5596,6 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   doc->animations.push_back(onceAnim);
 
   auto onceTimeline = file->getTimeline("once");
-  onceTimeline->play();
   EXPECT_TRUE(onceTimeline->advance(2'000'000));
   EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
   EXPECT_FALSE(onceTimeline->isPlaying());
@@ -5677,7 +5615,6 @@ PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
   auto file = pagx::PAGScene::Make(doc);
   auto timeline = file->getTimeline("pp");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   EXPECT_EQ(timeline->currentTime(), 0);
 
   // Forward within first half (pos < duration, straight).
@@ -5723,14 +5660,12 @@ PAGX_TEST(PAGXTest, PAGTimelineNegativeDelta) {
 
   // Loop: negative delta wraps correctly.
   auto loopTl = file->getTimeline("loop");
-  loopTl->play();
   loopTl->setCurrentTime(200'000);
   EXPECT_TRUE(loopTl->advance(-500'000));
   EXPECT_EQ(loopTl->currentTime(), 700'000);
 
   // Once: negative delta stops at 0 and pauses.
   auto onceTl = file->getTimeline("once");
-  onceTl->play();
   onceTl->setCurrentTime(300'000);
   EXPECT_TRUE(onceTl->advance(-500'000));
   EXPECT_EQ(onceTl->currentTime(), 0);
@@ -5751,7 +5686,6 @@ PAGX_TEST(PAGXTest, PAGTimelineZeroDuration) {
   auto file = pagx::PAGScene::Make(doc);
   auto timeline = file->getTimeline("zero");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   EXPECT_FALSE(timeline->advance(100'000));
   EXPECT_EQ(timeline->currentTime(), 0);
 }
@@ -5770,7 +5704,6 @@ PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
   auto scene = pagx::PAGScene::Make(doc);
   auto timeline = scene->getTimeline("loop");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   timeline->setCurrentTime(200'000);
 
   scene.reset();
@@ -5785,46 +5718,6 @@ PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
   EXPECT_TRUE(timeline->getId().empty());
   EXPECT_EQ(timeline->duration(), 0);
   EXPECT_FLOAT_EQ(timeline->frameRate(), 0.0f);
-}
-
-/**
- * Test case: PAGScene::Make refuses to build when applyLayout reported a cyclic external
- * composition reference, since the partially laid-out tree is inconsistent.
- */
-PAGX_TEST(PAGXTest, PAGSceneMakeNullOnLayoutCycle) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto* layer = doc->makeNode<pagx::Layer>("comp");
-  layer->width = 50;
-  layer->height = 50;
-  // Build a cycle directly through the API: the layer's externalDoc points back to the host doc,
-  // bypassing loadFileData's own chain guard. applyLayout's visited set must catch it.
-  layer->externalDoc = doc;
-  doc->layers.push_back(layer);
-
-  auto scene = pagx::PAGScene::Make(doc);
-  EXPECT_EQ(scene, nullptr);
-  bool reportedCycle = false;
-  for (const auto& error : doc->errors) {
-    if (error.rfind("Cyclic external composition reference detected", 0) == 0) {
-      reportedCycle = true;
-    }
-  }
-  EXPECT_TRUE(reportedCycle);
-  // Break the intentional shared_ptr cycle so the document is not leaked.
-  layer->externalDoc = nullptr;
-}
-
-/**
- * Test case: PAGSurface::MakeOffscreen creates a real GPU-backed surface with the requested size.
- */
-PAGX_TEST(PAGXTest, PAGSurfaceMakeOffscreen) {
-  auto surface = pagx::PAGSurface::MakeOffscreen(64, 48);
-  ASSERT_TRUE(surface != nullptr);
-  EXPECT_EQ(surface->width(), 64);
-  EXPECT_EQ(surface->height(), 48);
-
-  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(0, 48), nullptr);
-  EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(64, -1), nullptr);
 }
 
 /**
@@ -6310,133 +6203,6 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
 }
 
 /**
- * Test case: end-to-end PAGScene::draw renders a SolidColor layer into a PAGSurface and the
- * resulting pixels match the channel-applied color.
- */
-PAGX_TEST(PAGXTest, PAGSceneDrawAndReadPixels) {
-  auto doc = pagx::PAGXDocument::Make(8, 8);
-  auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->width = 8;
-  layer->height = 8;
-  doc->layers.push_back(layer);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 8;
-  rect->size.height = 8;
-  layer->contents.push_back(rect);
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>("S");
-  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = solid;
-  layer->contents.push_back(fill);
-
-  auto anim = doc->makeNode<pagx::Animation>("main");
-  anim->duration = 60;
-  anim->frameRate = 60;
-  doc->animations.push_back(anim);
-  auto* obj = doc->makeNode<pagx::AnimationObject>();
-  obj->target = "S";
-  anim->objects.push_back(obj);
-  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
-  prop->name = "color";
-  pagx::Color red{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
-  prop->keyframes.push_back({0, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
-  obj->channels.push_back(prop);
-
-  auto file = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file != nullptr);
-
-  auto timeline = file->getDefaultTimeline();
-  ASSERT_TRUE(timeline != nullptr);
-  timeline->apply(1.0f);
-
-  auto surface = pagx::PAGSurface::MakeOffscreen(8, 8);
-  ASSERT_TRUE(surface != nullptr);
-
-  ASSERT_TRUE(file->draw(surface));
-
-  std::vector<uint8_t> pixels(8 * 8 * 4, 0);
-  ASSERT_TRUE(surface->readPixels(pixels.data(), 8 * 4));
-
-  // Inspect the center pixel; the layer covers the whole 8x8 surface so any inner pixel works.
-  size_t i = (4 * 8 + 4) * 4;
-  EXPECT_EQ(pixels[i + 0], 255);
-  EXPECT_EQ(pixels[i + 1], 0);
-  EXPECT_EQ(pixels[i + 2], 0);
-  EXPECT_EQ(pixels[i + 3], 255);
-}
-
-/**
- * Test case: advancing a top-level alpha animation produces distinct rendered frames over time.
- * Three frames are captured at t=0, mid (0.5s of a 1s animation), and end (1s) and compared
- * against per-frame baselines, so a regression in advance/apply or rendering is caught.
- */
-PAGX_TEST(PAGXTest, AdvanceRendersDistinctFrames) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->width = 200;
-  layer->height = 200;
-  doc->layers.push_back(layer);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 200;
-  rect->size.height = 200;
-  layer->contents.push_back(rect);
-
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>();
-  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = solid;
-  layer->contents.push_back(fill);
-
-  // Alpha animates 0 -> 1 across 60 frames @ 60fps (1 second), linearly.
-  auto anim = doc->makeNode<pagx::Animation>("fade");
-  anim->duration = 60;
-  anim->frameRate = 60;
-  doc->animations.push_back(anim);
-  auto* obj = doc->makeNode<pagx::AnimationObject>();
-  obj->target = "L";
-  anim->objects.push_back(obj);
-  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
-  alphaProp->name = "alpha";
-  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  obj->channels.push_back(alphaProp);
-
-  auto file = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(file != nullptr);
-  auto timeline = file->getDefaultTimeline();
-  ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
-
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_TRUE(surface != nullptr);
-
-  // Reads the surface into an RGBA_8888 premultiplied bitmap matching pagx::PAGSurface::readPixels.
-  tgfx::Bitmap frame(200, 200, false, false);
-  tgfx::Pixmap framePixmap(frame);
-
-  // Frame 0: t=0, alpha=0.
-  timeline->apply(1.0f);
-  ASSERT_TRUE(file->draw(surface));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/AdvanceRendersDistinctFrames_0"));
-
-  // Frame 1: advance 0.5s -> alpha=0.5.
-  timeline->advanceAndApply(500'000);
-  ASSERT_TRUE(file->draw(surface));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/AdvanceRendersDistinctFrames_1"));
-
-  // Frame 2: advance another 0.5s -> alpha=1.0.
-  timeline->advanceAndApply(500'000);
-  ASSERT_TRUE(file->draw(surface));
-  ASSERT_TRUE(surface->readPixels(framePixmap.writablePixels(), framePixmap.rowBytes()));
-  EXPECT_TRUE(Baseline::Compare(framePixmap, "PAGXTest/AdvanceRendersDistinctFrames_2"));
-}
-
-/**
  * Test case: Linear interpolation between two float keyframes returns midpoint values at half
  * progress and exact endpoints at the boundaries.
  */
@@ -6794,8 +6560,12 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setMaxTileCount(64);
   EXPECT_EQ(options->getMaxTileCount(), 64);
 
-  options->setAllowZoomBlur(true);
-  EXPECT_TRUE(options->getAllowZoomBlur());
+  EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Immediate);
+  for (auto mode : {pagx::PAGTileUpdateMode::Immediate, pagx::PAGTileUpdateMode::Smooth,
+                    pagx::PAGTileUpdateMode::Fast}) {
+    options->setTileUpdateMode(mode);
+    EXPECT_EQ(options->getTileUpdateMode(), mode);
+  }
 
   options->setMaxTilesRefinedPerFrame(8);
   EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);

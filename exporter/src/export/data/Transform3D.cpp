@@ -119,7 +119,7 @@ static pag::Property<pag::Point3D>* GetOrientationKeyframe(const AEGP_LayerH& la
                                                            float frameRate) {
   auto orientation =
       GetProperty(layerHandle, AEGP_LayerStream_ORIENTATION, AEStreamParser::Point3DParser);
-  if (!orientation->animatable()) {
+  if (orientation == nullptr || !orientation->animatable()) {
     return orientation;
   }
 
@@ -129,6 +129,9 @@ static pag::Property<pag::Point3D>* GetOrientationKeyframe(const AEGP_LayerH& la
   AEGP_StreamRefH streamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewLayerStream(PluginID, layerHandle,
                                                  AEGP_LayerStream_ORIENTATION, &streamHandle);
+  if (streamHandle == nullptr) {
+    return orientation;
+  }
   std::vector<AEGP_KeyframeIndex> list = {};
   for (auto keyframe :
        static_cast<pag::AnimatableProperty<pag::Point3D>*>(orientation)->keyframes) {
@@ -164,27 +167,35 @@ pag::Transform3D* GetTransform3D(const AEGP_LayerH& layerHandle, float frameRate
   AEGP_StreamRefH streamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewLayerStream(PluginID, layerHandle, AEGP_LayerStream_POSITION,
                                                  &streamHandle);
-  A_Boolean dimensionSeparated = 0;
-  Suites->DynamicStreamSuite4()->AEGP_AreDimensionsSeparated(streamHandle, &dimensionSeparated);
-  if (dimensionSeparated != 0) {
-    AEGP_StreamRefH xPosition = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 0, &xPosition);
-    transform->xPosition = GetProperty(xPosition, AEStreamParser::FloatParser);
-    Suites->StreamSuite4()->AEGP_DisposeStream(xPosition);
+  if (streamHandle != nullptr) {
+    A_Boolean dimensionSeparated = 0;
+    Suites->DynamicStreamSuite4()->AEGP_AreDimensionsSeparated(streamHandle, &dimensionSeparated);
+    if (dimensionSeparated != 0) {
+      AEGP_StreamRefH xPosition = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 0, &xPosition);
+      if (xPosition != nullptr) {
+        transform->xPosition = GetProperty(xPosition, AEStreamParser::FloatParser);
+        Suites->StreamSuite4()->AEGP_DisposeStream(xPosition);
+      }
 
-    AEGP_StreamRefH yPosition = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 1, &yPosition);
-    transform->yPosition = GetProperty(yPosition, AEStreamParser::FloatParser);
-    Suites->StreamSuite4()->AEGP_DisposeStream(yPosition);
+      AEGP_StreamRefH yPosition = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 1, &yPosition);
+      if (yPosition != nullptr) {
+        transform->yPosition = GetProperty(yPosition, AEStreamParser::FloatParser);
+        Suites->StreamSuite4()->AEGP_DisposeStream(yPosition);
+      }
 
-    AEGP_StreamRefH zPosition = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 1, &zPosition);
-    transform->zPosition = GetProperty(zPosition, AEStreamParser::FloatParser);
-    Suites->StreamSuite4()->AEGP_DisposeStream(zPosition);
-  } else {
-    transform->position = GetProperty(streamHandle, AEStreamParser::Point3DParser);
+      AEGP_StreamRefH zPosition = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetSeparationFollower(streamHandle, 2, &zPosition);
+      if (zPosition != nullptr) {
+        transform->zPosition = GetProperty(zPosition, AEStreamParser::FloatParser);
+        Suites->StreamSuite4()->AEGP_DisposeStream(zPosition);
+      }
+    } else {
+      transform->position = GetProperty(streamHandle, AEStreamParser::Point3DParser);
+    }
+    Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
   }
-  Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
   transform->anchorPoint =
       GetProperty(layerHandle, AEGP_LayerStream_ANCHORPOINT, AEStreamParser::Point3DParser);
   transform->scale =
