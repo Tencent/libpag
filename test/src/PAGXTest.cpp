@@ -35,6 +35,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
@@ -8121,6 +8122,123 @@ PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
     auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
     EXPECT_TRUE(Baseline::Compare(surface, key));
   }
+/**
+ * Test case: GetNodeChannel/SetNodeChannel round-trip scalar fields across node types.
+ */
+PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.4f)));
+  EXPECT_FLOAT_EQ(layer->alpha, 0.4f);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(layer, "alpha", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), 0.4f);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "visible", pagx::KeyValue(false)));
+  EXPECT_FALSE(layer->visible);
+
+  // LayoutNode shared field via the derived type.
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "width", pagx::KeyValue(120.0f)));
+  EXPECT_FLOAT_EQ(layer->width, 120.0f);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "roundness", pagx::KeyValue(8.0f)));
+  EXPECT_FLOAT_EQ(rect->roundness, 8.0f);
+
+  auto selector = doc->makeNode<pagx::RangeSelector>();
+  EXPECT_TRUE(pagx::SetNodeChannel(selector, "randomSeed", pagx::KeyValue(7)));
+  EXPECT_EQ(selector->randomSeed, 7);
+}
+
+/**
+ * Test case: enum channels use the string enum name; invalid strings and wrong types are rejected.
+ */
+PAGX_TEST(PAGXTest, NodeChannelEnumRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("multiply"))));
+  EXPECT_EQ(layer->blendMode, pagx::BlendMode::Multiply);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(layer, "blendMode", &out));
+  EXPECT_EQ(std::get<std::string>(out), "multiply");
+
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("notamode"))));
+  EXPECT_EQ(layer->blendMode, pagx::BlendMode::Multiply);
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(1.0f)));
+}
+
+/**
+ * Test case: Point/Size/Padding fields are addressed by suffixed channels.
+ */
+PAGX_TEST(PAGXTest, NodeChannelCompositeSuffixes) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.x", pagx::KeyValue(10.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.y", pagx::KeyValue(20.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.width", pagx::KeyValue(30.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.height", pagx::KeyValue(40.0f)));
+  EXPECT_FLOAT_EQ(rect->position.x, 10.0f);
+  EXPECT_FLOAT_EQ(rect->position.y, 20.0f);
+  EXPECT_FLOAT_EQ(rect->size.width, 30.0f);
+  EXPECT_FLOAT_EQ(rect->size.height, 40.0f);
+
+  auto group = doc->makeNode<pagx::Group>();
+  EXPECT_TRUE(pagx::SetNodeChannel(group, "padding.left", pagx::KeyValue(5.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(group, "padding.bottom", pagx::KeyValue(6.0f)));
+  EXPECT_FLOAT_EQ(group->padding.left, 5.0f);
+  EXPECT_FLOAT_EQ(group->padding.bottom, 6.0f);
+}
+
+/**
+ * Test case: Color channels round-trip; id-based lookup feeds SetNodeChannel.
+ */
+PAGX_TEST(PAGXTest, NodeChannelColorAndIdLookup) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  doc->makeNode<pagx::SolidColor>("fillColor");
+
+  auto* solid = doc->findNode<pagx::SolidColor>("fillColor");
+  ASSERT_TRUE(solid != nullptr);
+  pagx::Color green = {0.0f, 1.0f, 0.0f, 1.0f};
+  EXPECT_TRUE(pagx::SetNodeChannel(solid, "color", pagx::KeyValue(green)));
+  EXPECT_EQ(solid->color, green);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(solid, "color", &out));
+  EXPECT_EQ(std::get<pagx::Color>(out), green);
+}
+
+/**
+ * Test case: unknown channel, type mismatch, and null node return false.
+ */
+PAGX_TEST(PAGXTest, NodeChannelRejectsUnsupported) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "nosuchchannel", pagx::KeyValue(1.0f)));
+  pagx::KeyValue out;
+  EXPECT_FALSE(pagx::GetNodeChannel(layer, "nosuchchannel", &out));
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(std::string("x"))));
+  EXPECT_FALSE(pagx::SetNodeChannel(nullptr, "alpha", pagx::KeyValue(1.0f)));
+}
+
+/**
+ * Test case: IsAnimatableChannel reflects the field's animation class. Render outputs are
+ * animatable; auto-layout inputs (width, padding) and the layer name are not.
+ */
+PAGX_TEST(PAGXTest, NodeChannelAnimatableClass) {
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "alpha"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "x"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "width"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "padding.left"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "name"));
+
+  // Geometry outputs are animatable.
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "size.width"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Polystar, "outerRadius"));
+  // Unknown channel is not animatable.
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "nope"));
 }
 
 }  // namespace pag
