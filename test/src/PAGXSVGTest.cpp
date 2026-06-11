@@ -3030,7 +3030,11 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_Default) {
   EXPECT_NE(svg.find("data:font/woff2;base64,"), std::string::npos);
   EXPECT_NE(svg.find("pagx-font-"), std::string::npos);
   EXPECT_NE(svg.find("<text"), std::string::npos);
-  EXPECT_NE(svg.find("font-family=\"&apos;pagx-font-"), std::string::npos);
+  // Generator-controlled family names follow the "pagx-font-<id>" pattern, which is a valid
+  // unquoted CSS <custom-ident>. SVGExporter emits the bare identifier so the XMLBuilder does
+  // not turn `'` into `&apos;` (a common source of cross-renderer quirks).
+  EXPECT_NE(svg.find("font-family=\"pagx-font-"), std::string::npos);
+  EXPECT_EQ(svg.find("&apos;"), std::string::npos);
   EXPECT_NE(svg.find("format('woff2')"), std::string::npos);
   EXPECT_EQ(svg.find("<path"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_default.svg");
@@ -3176,6 +3180,135 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_GradientFillFallback) {
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_gradient_fallback.svg");
 }
 
+/**
+ * Multiple distinct vector Fonts must each produce a unique @font-face declaration with a
+ * unique family-name. The pre-pass assigns IDs sequentially ("f0", "f1", ...) and stores the
+ * mapping by Font*; a regression that switched to a hash-keyed dictionary or that reused a
+ * single counter across documents would either collapse two fonts onto one family or leak the
+ * second font's family back to the first run, both of which break <text> rendering.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_MultipleFontsUnique) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+
+  auto buildFont = [&](float advance) {
+    auto* font = doc->makeNode<pagx::Font>();
+    font->unitsPerEm = 1000;
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+    glyph->advance = advance;
+    font->glyphs.push_back(glyph);
+    return font;
+  };
+
+  auto* fontA = buildFont(700);
+  auto* fontB = buildFont(800);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto buildText = [&](pagx::Font* font, float y) {
+    auto* text = doc->makeNode<pagx::Text>();
+    text->fontSize = 50;
+    auto* run = doc->makeNode<pagx::GlyphRun>();
+    run->font = font;
+    run->fontSize = 50;
+    run->glyphs = {1};
+    run->y = y;
+    run->xOffsets = {0};
+    text->glyphRuns.push_back(run);
+    layer->contents.push_back(text);
+  };
+  buildText(fontA, 50);
+  buildText(fontB, 50);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.1f, 0.1f, 0.1f));
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Two @font-face rules must appear, with distinct generated family-names. fontId is assigned
+  // by `"f" + std::to_string(woff2Fonts.size())`, so the first registered font yields
+  // `pagx-font-f0` and the second yields `pagx-font-f1`. Iteration order over the underlying
+  // hash map is not stable, so assert presence of both names instead of expecting them in any
+  // particular order.
+  size_t fontFaceCount = 0;
+  for (size_t pos = svg.find("@font-face"); pos != std::string::npos;
+       pos = svg.find("@font-face", pos + 1)) {
+    ++fontFaceCount;
+  }
+  EXPECT_EQ(fontFaceCount, 2u);
+  EXPECT_NE(svg.find("pagx-font-f0"), std::string::npos);
+  EXPECT_NE(svg.find("pagx-font-f1"), std::string::npos);
+  // Each generated <text> must carry one of the two family-names so glyph-to-font wiring is
+  // intact. A regression that emitted both <text> blocks under the same family would leave one
+  // of them visually empty (the wrong cmap returns GID 0 for the PUA codepoints).
+  size_t textCount = 0;
+  for (size_t pos = svg.find("<text"); pos != std::string::npos; pos = svg.find("<text", pos + 1)) {
+    ++textCount;
+  }
+  EXPECT_EQ(textCount, 2u);
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_multiple_unique.svg");
+}
+
+/**
+ * writeTextAsFont must apply TextBox.padding to renderPosition before computing absolute glyph
+ * x/y. The padding offset reaches the run via `fs.textBox->padding.left/.top`. A regression that
+ * dropped that branch would emit the <text x="..." y="..."> at the un-padded origin, putting
+ * the glyphs on top of the box edge instead of inside the padded content area.
+ *
+ * The TextBox here participates as a *modifier* (empty `elements`) sharing the parent group's
+ * scope. processVectorScope's `FindModifierTextBox` picks it up and threads it onto the
+ * accumulated geometry so the padding reaches writeTextAsFont via FillStrokeInfo.textBox.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_TextBoxPaddingOffset) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->fontSize = 50;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  // Choose y inside the box so the glyph sits at a position that is provably shifted by padding.
+  // The glyph's authored x is 0 (no xOffsets / positions / run.x).
+  run->y = 30;
+  run->xOffsets = {0};
+  text->glyphRuns.push_back(run);
+
+  // Modifier-only TextBox: empty `elements`, lives next to the Text in the same container scope.
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  // Non-zero padding on every side. Only `left` and `top` participate in writeTextAsFont's
+  // renderPos translation (the right/bottom edges only constrain layout, not paint position).
+  textBox->padding.left = 12;
+  textBox->padding.top = 17;
+  textBox->padding.right = 5;
+  textBox->padding.bottom = 5;
+
+  layer->contents.push_back(textBox);
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.1f, 0.1f, 0.1f));
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // Save first so the artifact is available for inspection regardless of assertion outcomes.
+  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_textbox_padding.svg");
+  // Ensure the <text> took the WOFF2 path (otherwise padding would land inside the per-glyph
+  // path matrices instead of the <text x/y> attributes and the assertion would not be probing
+  // the intended branch).
+  ASSERT_NE(svg.find("@font-face"), std::string::npos);
+  ASSERT_NE(svg.find("<text"), std::string::npos);
+  // Our authored padding contributes 12 to the absolute x and 17 + 30 = 47 to the absolute y.
+  // The serializer omits the trailing `.0` on whole numbers; assert on the integer literals.
+  EXPECT_NE(svg.find(" x=\"12\""), std::string::npos);
+  EXPECT_NE(svg.find(" y=\"47\""), std::string::npos);
+}
+
 // ===========================================================================
 // ModifierResolver — additional edge branches reachable through SVG export.
 // ===========================================================================
@@ -3254,6 +3387,14 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousReversed) {
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<svg"), std::string::npos);
+  // Reversed start/end (start=0.8, end=0.2) keeps the interval outside [start,end]: roughly
+  // 60% of the combined path length stays painted, distributed across both shapes. Assert at
+  // least two <path> elements survive so a regression that drops one shape is caught.
+  size_t pathCount = 0;
+  for (size_t pos = svg.find("<path"); pos != std::string::npos; pos = svg.find("<path", pos + 1)) {
+    ++pathCount;
+  }
+  EXPECT_GE(pathCount, 2u);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousFullRange) {
@@ -3281,6 +3422,19 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousFullRange) {
   doc->layers.push_back(layer);
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<path"), std::string::npos);
+  // Full-range trim (PathEffect::MakeTrim returns nullptr) should leave the rectangle intact:
+  // exactly one <path> with full extent. Without these checks, a regression that silently
+  // dropped the geometry or split it into multiple sub-paths would still pass the loose
+  // "<path exists" assertion.
+  size_t pathCount = 0;
+  for (size_t pos = svg.find("<path"); pos != std::string::npos; pos = svg.find("<path", pos + 1)) {
+    ++pathCount;
+  }
+  EXPECT_EQ(pathCount, 1u);
+  // The rectangle author width is 80, centred at (200, 100) → corners at x=160 and x=240. The
+  // serializer emits absolute LineTo segments (`L<x> <y>`), so look for either x corner — the
+  // far x in particular catches a regression that silently truncated the rectangle's extent.
+  EXPECT_TRUE(svg.find("L240") != std::string::npos || svg.find("L 240") != std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousWrapAround) {
@@ -3312,6 +3466,15 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathContinuousWrapAround) {
   doc->layers.push_back(layer);
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<svg"), std::string::npos);
+  // Wrap-around (end > 1) keeps two segments: the tail [0.7, 1.0] and the head [0.0, 0.2]. Both
+  // should land on the same shape (r1) — but the implementation distributes per shape so the
+  // segments may be split into two <path> elements. Either way, at least one <path> must remain;
+  // verifying ≥1 distinguishes "trim fired" from a regression that drops every shape.
+  size_t pathCount = 0;
+  for (size_t pos = svg.find("<path"); pos != std::string::npos; pos = svg.find("<path", pos + 1)) {
+    ++pathCount;
+  }
+  EXPECT_GE(pathCount, 1u);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterClampsExcessiveCopies) {

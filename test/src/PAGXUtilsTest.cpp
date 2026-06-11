@@ -2195,15 +2195,33 @@ PAGX_TEST(PAGXUtilsTest, SVGPathParser_InvalidNumberRecovers) {
   // Garbage between commands triggers the recovery path that skips to the
   // next letter without erroring.
   auto path = pagx::PathDataFromSVGString("M0 0 garbage L10 10");
-  ASSERT_GE(path.verbs().size(), 2u);
+  // Recovery must keep both commands intact: the Move at (0,0) and the LineTo at (10,10). Without
+  // the count + endpoint assertions, a regression that drops the L command (or that consumes the
+  // garbage as a malformed coordinate and corrupts the next number) would silently still satisfy
+  // the original "verbs >= 2 and first is Move" check.
+  ASSERT_EQ(path.verbs().size(), 2u);
   EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  ASSERT_GE(path.points().size(), 2u);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 0.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 0.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 10.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 10.0f);
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGPathParser_UnknownCommandSkipped) {
   // Unknown letter triggers the default branch and the parser advances past it.
-  auto path = pagx::PathDataFromSVGString("X M5 5");
-  ASSERT_EQ(path.verbs().size(), 1u);
+  auto path = pagx::PathDataFromSVGString("X M5 5 L20 30");
+  // The recovery skips X and then consumes both M and L. Asserting the second endpoint guards
+  // against a regression that re-eats the unknown command's bytes and corrupts the L payload.
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  ASSERT_GE(path.points().size(), 2u);
   EXPECT_FLOAT_EQ(path.points()[0].x, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 30.0f);
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGPathParser_ZAfterLineKeepsCurrent) {

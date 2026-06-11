@@ -58,20 +58,10 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   out.closeTagStart();
   const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
   writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background, groupPadding);
-  bool hasForegroundPainter = false;
-  for (auto* e : group->elements) {
-    if (e->nodeType() == NodeType::Fill) {
-      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
-        hasForegroundPainter = true;
-        break;
-      }
-    } else if (e->nodeType() == NodeType::Stroke) {
-      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
-        hasForegroundPainter = true;
-        break;
-      }
-    }
-  }
+  // Recurse through nested Group / TextBox containers so a foreground painter inside a child
+  // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
+  // suppressed by both passes' filters.
+  bool hasForegroundPainter = HasForegroundPainter(group->elements);
   if (hasForegroundPainter) {
     writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
   }

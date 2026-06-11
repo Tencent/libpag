@@ -726,21 +726,10 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // PAGX placement: Fill/Stroke with placement="foreground" paint AFTER child layers and
   // composition layers, so they overlay child content. Mirror HTMLWriter::writeLayerInner's
   // two-pass dispatch (Background → children → Foreground) so the slide matches the PAGX
-  // renderer and the HTML preview.
-  bool hasForeground = false;
-  for (auto* e : layer->contents) {
-    if (e->nodeType() == NodeType::Fill) {
-      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
-      }
-    } else if (e->nodeType() == NodeType::Stroke) {
-      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
-      }
-    }
-  }
+  // renderer and the HTML preview. The check recurses through Group / TextBox containers so
+  // a foreground painter buried inside a nested Group still triggers the second pass — the
+  // shallow flat-list scan would otherwise leave it suppressed by both passes' filters.
+  bool hasForeground = HasForegroundPainter(layer->contents);
 
   writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles,
                 /*parentTextBox=*/nullptr, LayerPlacement::Background);

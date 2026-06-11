@@ -42,6 +42,51 @@ FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents) {
   return info;
 }
 
+bool HasForegroundPainter(const std::vector<Element*>& contents) {
+  for (const auto* element : contents) {
+    auto type = element->nodeType();
+    if (type == NodeType::Fill) {
+      if (static_cast<const Fill*>(element)->placement == LayerPlacement::Foreground) {
+        return true;
+      }
+    } else if (type == NodeType::Stroke) {
+      if (static_cast<const Stroke*>(element)->placement == LayerPlacement::Foreground) {
+        return true;
+      }
+    } else if (type == NodeType::TextBox) {
+      // TextBox derives from Group; check its child elements before treating it as a leaf.
+      auto* tb = static_cast<const TextBox*>(element);
+      if (HasForegroundPainter(tb->elements)) {
+        return true;
+      }
+    } else if (type == NodeType::Group) {
+      auto* group = static_cast<const Group*>(element);
+      if (HasForegroundPainter(group->elements)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+std::string EscapeCssFontFamily(const std::string& family) {
+  std::string out;
+  out.reserve(family.size());
+  for (char c : family) {
+    // Drop control characters (including NUL, \n, \r, \t) and the characters that would let an
+    // attacker escape the single-quoted font-family value into the surrounding CSS context.
+    auto uc = static_cast<unsigned char>(c);
+    if (uc < 0x20 || c == ';' || c == '}' || c == '{' || c == '<' || c == '>') {
+      continue;
+    }
+    if (c == '\\' || c == '\'') {
+      out += '\\';
+    }
+    out += c;
+  }
+  return out;
+}
+
 Matrix BuildLayerMatrix(const Layer* layer) {
   // matrix3D > matrix > renderPosition. When matrix3D is non-identity it overrides
   // both matrix and renderPosition. We project it onto the z=0 plane to get the

@@ -2477,20 +2477,10 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
   float childOffX = _ctx->savedChildLayerOffsetX;
   float childOffY = _ctx->savedChildLayerOffsetY;
 
-  bool hasForeground = false;
-  for (auto* e : layer->contents) {
-    if (e->nodeType() == NodeType::Fill) {
-      if (static_cast<const Fill*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
-      }
-    } else if (e->nodeType() == NodeType::Stroke) {
-      if (static_cast<const Stroke*>(e)->placement == LayerPlacement::Foreground) {
-        hasForeground = true;
-        break;
-      }
-    }
-  }
+  // Recurses through Group / TextBox containers so a foreground painter buried inside a nested
+  // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
+  // suppressed by both passes' filters.
+  bool hasForeground = HasForegroundPainter(layer->contents);
 
   writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
