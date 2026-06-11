@@ -29,13 +29,13 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromView(NSView* view) {
   }
   auto drawable = std::shared_ptr<GPUDrawable>(new GPUDrawable(view));
   drawable->weakThis = drawable;
+  drawable->tryCreateSurface();
   return drawable;
 }
 
 GPUDrawable::GPUDrawable(NSView* view) : view(view) {
   // do not retain view here, otherwise it can cause circular reference.
   updateSize();
-  tryCreateSurface();
 }
 
 void GPUDrawable::tryCreateSurface() {
