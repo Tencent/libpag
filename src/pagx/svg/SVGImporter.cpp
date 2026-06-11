@@ -443,8 +443,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
       auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
       if (maskLayer) {
         layer->mask = maskLayer;
-        // SVG masks use luminance by default.
-        layer->maskType = MaskType::Luminance;
+        // SVG mask-type property determines how the mask is computed.
+        // Default is "luminance" (uses luminance of mask content); "alpha" uses alpha channel.
+        std::string maskTypeStr = getAttribute(maskIt->second, "mask-type");
+        layer->maskType = (maskTypeStr == "alpha") ? MaskType::Alpha : MaskType::Luminance;
         // Add mask layer as invisible layer to the document.
         _maskLayers.push_back(maskLayer);
       }
