@@ -1829,8 +1829,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     // PAGX can resolve a flex child's main-axis size from its TextBox/content even when the raw
     // width/height attribute is unset. CSS `flex:N` uses a 0% flex-basis and can collapse that
     // resolved size inside auto-sized flex parents, so keep such children at their resolved size.
-    if (layer->flex > 0 && !mainAxisDeclared && !mainAxisResolved) {
+    bool emitFlexGrow = layer->flex > 0 && !mainAxisDeclared && !mainAxisResolved;
+    if (emitFlexGrow) {
       style += "flex:" + CssFloatToString(layer->flex);
+    } else {
+      // PAGX has no negative free-space shrink pass. Fixed/measured flex children keep their
+      // main-axis size and may overflow into the parent's scrollRect clip, while CSS flex items
+      // default to flex-shrink:1 and would compress those children back into the visible area.
+      style += "flex-shrink:0";
     }
     float outputW = !std::isnan(layer->width) ? layer->width : (needsSize ? bounds.width : NAN);
     float outputH = !std::isnan(layer->height) ? layer->height : (needsSize ? bounds.height : NAN);
