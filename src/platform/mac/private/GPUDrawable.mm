@@ -21,16 +21,40 @@
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
 namespace pag {
+NSString* const kAsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
+
 std::shared_ptr<GPUDrawable> GPUDrawable::FromView(NSView* view) {
   if (view == nil) {
     return nullptr;
   }
-  return std::shared_ptr<GPUDrawable>(new GPUDrawable(view));
+  auto drawable = std::shared_ptr<GPUDrawable>(new GPUDrawable(view));
+  drawable->weakThis = drawable;
+  return drawable;
 }
 
 GPUDrawable::GPUDrawable(NSView* view) : view(view) {
   // do not retain view here, otherwise it can cause circular reference.
   updateSize();
+  tryCreateSurface();
+}
+
+void GPUDrawable::tryCreateSurface() {
+  // try to create the surface if the view is ready, because CGLWindow needs to access the NSView
+  // geometry on the main thread.
+  if (!NSThread.isMainThread || _width <= 0 || _height <= 0) {
+    return;
+  }
+  if (window == nullptr) {
+    window = tgfx::CGLWindow::MakeFrom(view);
+  }
+  if (window != nullptr) {
+    auto device = window->getDevice();
+    auto context = device->lockContext();
+    if (context != nullptr) {
+      surface = tgfx::Surface::MakeFrom(context, window);
+      device->unlock();
+    }
+  }
 }
 
 void GPUDrawable::updateSize() {
@@ -50,10 +74,40 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  if (window == nullptr) {
+  if (window == nullptr || bufferPreparing) {
     return nullptr;
   }
-  return tgfx::Surface::MakeFrom(context, window);
+  if (surface) {
+    return surface;
+  }
+  // https://github.com/Tencent/libpag/issues/1870
+  // Creating a surface in a non-main thread may lead to a crash because CGLWindow needs to access
+  // the NSView geometry on the main thread.
+  if (NSThread.isMainThread) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+    return surface;
+  }
+  bufferPreparing = true;
+  auto strongThis = weakThis.lock();
+  [view retain];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    auto context = strongThis->window->getDevice()->lockContext();
+    if (context == nullptr) {
+      strongThis->bufferPreparing = false;
+      [strongThis->view release];
+      return;
+    }
+    strongThis->surface = tgfx::Surface::MakeFrom(context, strongThis->window);
+    strongThis->bufferPreparing = false;
+    strongThis->window->getDevice()->unlock();
+    if (strongThis->surface) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:kAsyncSurfacePreparedNotification
+                                                          object:strongThis->view
+                                                        userInfo:nil];
+    }
+    [strongThis->view release];
+  });
+  return nullptr;
 }
 
 void GPUDrawable::onFreeSurface() {

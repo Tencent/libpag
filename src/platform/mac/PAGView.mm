@@ -19,6 +19,7 @@
 #import "PAGView.h"
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/mac/private/GPUDrawable.h"
 
 @implementation PAGView {
   PAGPlayer* pagPlayer;
@@ -46,6 +47,10 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(AsyncSurfacePrepared:)
+                                               name:pag::kAsyncSurfacePreparedNotification
+                                             object:self];
 }
 
 - (void)dealloc {
@@ -55,6 +60,7 @@
   [pagSurface release];
   [pagFile release];
   [filePath release];
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
 }
 
@@ -279,5 +285,9 @@
     return [pagPlayer getBounds:pagLayer];
   }
   return CGRectNull;
+}
+
+- (void)AsyncSurfacePrepared:(NSNotification*)notification {
+  [animator update];
 }
 @end

@@ -22,6 +22,9 @@
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
 namespace pag {
+
+extern NSString* const kAsyncSurfacePreparedNotification;
+
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromView(NSView* view);
@@ -46,11 +49,15 @@ class GPUDrawable : public Drawable {
   void onFreeSurface() override;
 
  private:
+  std::weak_ptr<GPUDrawable> weakThis;
   int _width = 0;
   int _height = 0;
   NSView* view = nil;
   std::shared_ptr<tgfx::CGLWindow> window = nullptr;
+  std::atomic<bool> bufferPreparing = false;
 
   explicit GPUDrawable(NSView* view);
+
+  void tryCreateSurface();
 };
 }  // namespace pag
