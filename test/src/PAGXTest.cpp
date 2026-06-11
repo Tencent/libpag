@@ -105,6 +105,7 @@
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/Rectangle.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/Text.h"
 #include "utils/Baseline.h"
@@ -5837,13 +5838,11 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   auto& tree = *file->mutableBinding();
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
 
-  auto matrix = tgfxLayer->matrix();
-  matrix.setTranslateX(20.0f);
-  tgfxLayer->setMatrix(matrix);
-
+  // The layer transform is held as decomposed state on the runtime target, seeded from the node's
+  // authored x (0 here). apply(0.5) mixes that baseline toward the keyframe value 100.
   auto timeline = file->getDefaultTimeline();
   timeline->apply(0.5f);
-  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 60.0f);  // 20 + (100-20)*0.5
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);  // 0 + (100-0)*0.5
 }
 
 /**
@@ -8239,6 +8238,89 @@ PAGX_TEST(PAGXTest, NodeChannelAnimatableClass) {
   EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Polystar, "outerRadius"));
   // Unknown channel is not animatable.
   EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "nope"));
+}
+
+/**
+ * Test case: a Rectangle's size.width channel drives the tgfx Rectangle size in place.
+ */
+PAGX_TEST(PAGXTest, ChannelRectangleSize) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "R";
+  anim->objects.push_back(object);
+  auto* widthProp = doc->makeNode<pagx::TypedChannel<float>>();
+  widthProp->name = "size.width";
+  widthProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(widthProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxRect = scene->mutableBinding()->get<tgfx::Rectangle>(rect);
+  ASSERT_TRUE(tgfxRect != nullptr);
+  EXPECT_FLOAT_EQ(tgfxRect->size().width, 40.0f);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // mix=0.5 from 40 toward 100 = 70; height untouched.
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxRect->size().width, 70.0f);
+  EXPECT_FLOAT_EQ(tgfxRect->size().height, 40.0f);
+}
+
+/**
+ * Test case: a Layer's matrix channel drives the tgfx layer transform via TRS-decomposed mixing,
+ * and stacks with the layer's authored x/y translation.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 10;
+  layer->y = 0;
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* matrixProp = doc->makeNode<pagx::TypedChannel<pagx::Matrix>>();
+  matrixProp->name = "matrix";
+  // Target matrix is a pure 2x scale; baseline is identity.
+  pagx::Matrix scaled = pagx::Matrix::Scale(2.0f, 2.0f);
+  matrixProp->keyframes.push_back({0, scaled, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(matrixProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // mix=1: matrix becomes 2x scale, composed with the authored x translation (10).
+  timeline->apply(1.0f);
+  auto m = tgfxLayer->matrix();
+  EXPECT_FLOAT_EQ(m.getScaleX(), 2.0f);
+  EXPECT_FLOAT_EQ(m.getScaleY(), 2.0f);
+  EXPECT_FLOAT_EQ(m.getTranslateX(), 10.0f);
 }
 
 }  // namespace pag

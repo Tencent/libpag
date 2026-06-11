@@ -118,6 +118,70 @@
 
 namespace pagx {
 
+// Runtime target for a Layer's tgfx::Layer that keeps the layer transform decomposed into its
+// animatable sources (x, y translation and the 2D matrix). The final tgfx matrix is recomposed as
+// Translate(x, y) * matrix, mirroring applyLayerAttributes so x/y and matrix animations stack
+// correctly instead of overwriting each other's setMatrix. Channels other than the transform fall
+// through to the base RuntimeTarget writer table.
+struct LayerRuntimeTarget : RuntimeTarget {
+  float animX = 0;
+  float animY = 0;
+  tgfx::Matrix animMatrix = tgfx::Matrix::I();
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (channel == "x") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      animX = MixFloat(animX, *v, mix);
+      recompose();
+      return true;
+    }
+    if (channel == "y") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      animY = MixFloat(animY, *v, mix);
+      recompose();
+      return true;
+    }
+    if (channel == "matrix") {
+      const auto* v = std::get_if<Matrix>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      auto target = ToTGFX(*v);
+      animMatrix = MixTGFXMatrix(animMatrix, target, mix);
+      recompose();
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  // Seeds the decomposed transform from the node's authored values so the first animated frame
+  // mixes against the static baseline rather than an identity.
+  void initTransform(float x, float y, const tgfx::Matrix& matrix) {
+    animX = x;
+    animY = y;
+    animMatrix = matrix;
+  }
+
+ private:
+  void recompose() {
+    auto* layer = static_cast<tgfx::Layer*>(const_cast<void*>(rawObject()));
+    if (layer == nullptr) {
+      return;
+    }
+    auto result = animMatrix;
+    if (animX != 0 || animY != 0) {
+      result = tgfx::Matrix::MakeTrans(animX, animY) * animMatrix;
+    }
+    layer->setMatrix(result);
+  }
+};
+
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
@@ -208,11 +272,22 @@ class LayerBuilderContext {
     }
 
     if (layer) {
+      // Install a transform-aware target so the Layer's x / y / matrix channels share one
+      // recomposed tgfx matrix. set() preserves any existing object, so install before set().
+      auto target = std::unique_ptr<RuntimeTarget>(new LayerRuntimeTarget());
+      auto* layerTarget =
+          static_cast<LayerRuntimeTarget*>(_result.binding.setTarget(node, std::move(target)));
       // Register layer for mask lookups and animation writers.
       _result.binding.set(node, layer);
       bindLayerChannels(node);
 
       applyLayerAttributes(node, layer.get());
+      // Seed the decomposed transform from the authored values so the first animated frame mixes
+      // against the static baseline. applyLayerAttributes has already composed them into the layer.
+      if (layerTarget != nullptr) {
+        auto layerPos = node->renderPosition();
+        layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+      }
 
       // Queue mask to be applied in second pass.
       if (node->mask != nullptr) {
@@ -256,36 +331,12 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
   }
 
-  static void WriteLayerX(void* object, const KeyValue& value, float mix) {
-    auto* v = std::get_if<float>(&value);
-    if (v == nullptr) {
-      return;
-    }
-    auto* layer = static_cast<tgfx::Layer*>(object);
-    auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateX(), *v, mix);
-    matrix.setTranslateX(mixed);
-    layer->setMatrix(matrix);
-  }
-
-  static void WriteLayerY(void* object, const KeyValue& value, float mix) {
-    auto* v = std::get_if<float>(&value);
-    if (v == nullptr) {
-      return;
-    }
-    auto* layer = static_cast<tgfx::Layer*>(object);
-    auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateY(), *v, mix);
-    matrix.setTranslateY(mixed);
-    layer->setMatrix(matrix);
-  }
-
+  // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
+  // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
     _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
     _result.binding.setWriter(node, "visible", WriteLayerVisible);
     _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
-    _result.binding.setWriter(node, "x", WriteLayerX);
-    _result.binding.setWriter(node, "y", WriteLayerY);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
@@ -418,6 +469,79 @@ class LayerBuilderContext {
     return result;
   }
 
+  // Templated writer for the common "scalar float channel = setter(Mix(getter, value, mix))"
+  // pattern, eliminating one near-identical writer per animatable float property.
+  template <typename T, float (T::*Getter)() const, void (T::*Setter)(float)>
+  static void WriteMixedFloat(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    (obj->*Setter)(MixFloat((obj->*Getter)(), *v, mix));
+  }
+
+  // Templated writer for tgfx Color channels (setter takes const Color&).
+  template <typename T, const tgfx::Color& (T::*Getter)() const,
+            void (T::*Setter)(const tgfx::Color&)>
+  static void WriteMixedColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    (obj->*Setter)(MixTGFXColor((obj->*Getter)(), ToTGFX(*v), mix));
+  }
+
+  // Templated writer for a width/height component of a tgfx Size-valued property. WidthAxis selects
+  // which component the channel drives; the other component is preserved.
+  template <typename T, const tgfx::Size& (T::*Getter)() const,
+            void (T::*Setter)(const tgfx::Size&), bool WidthAxis>
+  static void WriteSizeAxis(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    auto size = (obj->*Getter)();
+    if (WidthAxis) {
+      size.width = MixFloat(size.width, *v, mix);
+    } else {
+      size.height = MixFloat(size.height, *v, mix);
+    }
+    (obj->*Setter)(size);
+  }
+
+  // Templated writer for an x/y component of a tgfx Point-valued property.
+  template <typename T, const tgfx::Point& (T::*Getter)() const,
+            void (T::*Setter)(const tgfx::Point&), bool XAxis>
+  static void WritePointAxis(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    auto point = (obj->*Getter)();
+    if (XAxis) {
+      point.x = MixFloat(point.x, *v, mix);
+    } else {
+      point.y = MixFloat(point.y, *v, mix);
+    }
+    (obj->*Setter)(point);
+  }
+
+  // Rectangle roundness: the PAGX node carries a single float but tgfx exposes a 4-corner array, so
+  // this cannot use WriteMixedFloat. Mix against the first corner and apply uniformly.
+  static void WriteRectangleRoundness(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* rect = static_cast<tgfx::Rectangle*>(object);
+    float current = rect->roundness()[0];
+    rect->setRoundness(MixFloat(current, *v, mix));
+  }
+
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
     rect->setPosition(ToTGFX(node->renderPosition()));
@@ -425,6 +549,20 @@ class LayerBuilderContext {
     rect->setSize({size.width, size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
+    _result.binding.set(node, rect);
+    _result.binding.setWriter(
+        node, "size.width",
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, true>);
+    _result.binding.setWriter(
+        node, "size.height",
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                             &tgfx::Rectangle::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                             &tgfx::Rectangle::setPosition, false>);
+    _result.binding.setWriter(node, "roundness", WriteRectangleRoundness);
     return rect;
   }
 
@@ -434,6 +572,19 @@ class LayerBuilderContext {
     auto size = node->renderSize();
     ellipse->setSize({size.width, size.height});
     ellipse->setReversed(node->reversed);
+    _result.binding.set(node, ellipse);
+    _result.binding.setWriter(
+        node, "size.width",
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, true>);
+    _result.binding.setWriter(
+        node, "size.height",
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, false>);
+    _result.binding.setWriter(
+        node, "position.x",
+        WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, &tgfx::Ellipse::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position,
+                                             &tgfx::Ellipse::setPosition, false>);
     return ellipse;
   }
 
@@ -452,6 +603,31 @@ class LayerBuilderContext {
     } else {
       polystar->setPolystarType(tgfx::PolystarType::Star);
     }
+    _result.binding.set(node, polystar);
+    _result.binding.setWriter(node, "pointCount",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::pointCount,
+                                              &tgfx::Polystar::setPointCount>);
+    _result.binding.setWriter(node, "outerRadius",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRadius,
+                                              &tgfx::Polystar::setOuterRadius>);
+    _result.binding.setWriter(node, "innerRadius",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRadius,
+                                              &tgfx::Polystar::setInnerRadius>);
+    _result.binding.setWriter(node, "outerRoundness",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRoundness,
+                                              &tgfx::Polystar::setOuterRoundness>);
+    _result.binding.setWriter(node, "innerRoundness",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRoundness,
+                                              &tgfx::Polystar::setInnerRoundness>);
+    _result.binding.setWriter(
+        node, "rotation",
+        WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::rotation, &tgfx::Polystar::setRotation>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                             &tgfx::Polystar::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                             &tgfx::Polystar::setPosition, false>);
     return polystar;
   }
 

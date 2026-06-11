@@ -48,6 +48,8 @@ struct RuntimeColorStop {
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
 struct RuntimeTarget {
+  virtual ~RuntimeTarget() = default;
+
   void setObject(std::shared_ptr<void> object) {
     this->object = std::move(object);
   }
@@ -57,13 +59,20 @@ struct RuntimeTarget {
     return std::static_pointer_cast<T>(object);
   }
 
+  // Raw bound object pointer for reverse lookup, without changing ownership.
+  const void* rawObject() const {
+    return object.get();
+  }
+
   void setWriter(const std::string& channel, RuntimeWriter writer) {
     if (!channel.empty() && writer != nullptr) {
       writers[channel] = writer;
     }
   }
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix) const {
+  // Applies an evaluated channel value. Virtual so a subclass (LayerRuntimeTarget) can intercept
+  // channels that need shared state across writers (the Layer transform: x / y / matrix).
+  virtual bool apply(const std::string& channel, const KeyValue& value, float mix) {
     auto it = writers.find(channel);
     if (it == writers.end() || object == nullptr) {
       return false;
@@ -72,7 +81,7 @@ struct RuntimeTarget {
     return true;
   }
 
- private:
+ protected:
   std::shared_ptr<void> object = nullptr;
   std::unordered_map<std::string, RuntimeWriter> writers = {};
 };
@@ -83,15 +92,14 @@ struct RuntimeBinding {
     if (node == nullptr || object == nullptr) {
       return;
     }
-    auto& target = targets[node];
-    target.setObject(std::move(object));
+    ensureTarget(node)->setObject(std::move(object));
   }
 
   void setWriter(const Node* node, const std::string& channel, RuntimeWriter writer) {
     if (node == nullptr) {
       return;
     }
-    targets[node].setWriter(channel, std::move(writer));
+    ensureTarget(node)->setWriter(channel, std::move(writer));
   }
 
   template <typename T>
@@ -100,7 +108,7 @@ struct RuntimeBinding {
     if (it == targets.end()) {
       return nullptr;
     }
-    return it->second.getObject<T>();
+    return it->second->getObject<T>();
   }
 
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
@@ -108,11 +116,34 @@ struct RuntimeBinding {
     if (it == targets.end()) {
       return false;
     }
-    return it->second.apply(channel, value, mix);
+    return it->second->apply(channel, value, mix);
+  }
+
+  // Installs a specific RuntimeTarget subclass for a node (e.g. LayerRuntimeTarget). Replaces any
+  // existing target for the node. Returns the installed target for further setup.
+  RuntimeTarget* setTarget(const Node* node, std::unique_ptr<RuntimeTarget> target) {
+    if (node == nullptr || target == nullptr) {
+      return nullptr;
+    }
+    auto* raw = target.get();
+    targets[node] = std::move(target);
+    return raw;
   }
 
  private:
-  std::unordered_map<const Node*, RuntimeTarget> targets = {};
+  // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
+  RuntimeTarget* ensureTarget(const Node* node) {
+    auto it = targets.find(node);
+    if (it != targets.end()) {
+      return it->second.get();
+    }
+    auto target = std::unique_ptr<RuntimeTarget>(new RuntimeTarget());
+    auto* raw = target.get();
+    targets[node] = std::move(target);
+    return raw;
+  }
+
+  std::unordered_map<const Node*, std::unique_ptr<RuntimeTarget>> targets = {};
 };
 
 /**
