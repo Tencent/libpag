@@ -81,7 +81,6 @@ std::string MatrixToCSS(const Matrix& m);
 std::string MatrixTransformToCSS(const Matrix& m);
 std::string Matrix3DToCSS(const Matrix3D& m);
 const char* BlendModeToMixBlendMode(BlendMode mode);
-Color LerpColor(const Color& a, const Color& b, float t);
 
 std::string LayerTransformCSS(const Layer* layer);
 

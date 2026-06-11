@@ -122,7 +122,9 @@ T GetValue(AEGP_StreamRefH groupStreamHandle, int index, StreamParser<T> parser,
   GetSuites()->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(GetPluginID(), groupStreamHandle,
                                                                   index, &streamHandle);
   auto result = GetValue(streamHandle, parser, map);
-  GetSuites()->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    GetSuites()->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 
@@ -136,7 +138,9 @@ T GetValue(AEGP_StreamRefH groupStreamHandle, const A_char* key, StreamParser<T>
   GetSuites()->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       GetPluginID(), groupStreamHandle, key, &streamHandle);
   auto result = GetValue(streamHandle, parser, map);
-  GetSuites()->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  if (streamHandle != nullptr) {
+    GetSuites()->StreamSuite4()->AEGP_DisposeStream(streamHandle);
+  }
   return result;
 }
 

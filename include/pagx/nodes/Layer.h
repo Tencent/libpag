@@ -19,13 +19,16 @@
 #pragma once
 
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/Timeline.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/BlendMode.h"
@@ -39,7 +42,7 @@
 
 namespace pagx {
 
-class Composition;
+class PAGXDocument;
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
@@ -139,6 +142,28 @@ class Layer : public Node, public LayoutNode {
    * A reference to a composition used as the layer content.
    */
   Composition* composition = nullptr;
+
+  /**
+   * External PAGX file path for the composition content. This is populated when the `composition`
+   * attribute points to a file path instead of an in-document resource reference, and is resolved by
+   * PAGXDocument::loadFileData().
+   */
+  std::string compositionFilePath = {};
+
+  /**
+   * Externally loaded PAGX document used as this layer's composition content. When set, the
+   * composition's layers and animations point into this document, and runtime timeline target lookup
+   * is resolved against this document instead of the owner document.
+   */
+  std::shared_ptr<PAGXDocument> externalDoc = nullptr;
+
+  /**
+   * Timeline entries to activate when this layer references a Composition. Each entry is a
+   * polymorphic Timeline subclass (AnimationTimeline in v1) describing a time-driven behavior to
+   * attach to the runtime sub-tree. An empty list means the composition is rendered statically
+   * with no timeline running.
+   */
+  std::vector<std::unique_ptr<Timeline>> timelines = {};
 
   /**
    * The vector elements contained in this layer (geometry, painters, modifiers, etc.).
