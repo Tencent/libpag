@@ -714,9 +714,8 @@ export function pagxSampleTimeline(
 // Compute the sampling window for GSAP's global timeline: one *forward iteration*
 // of the longest top-level child, plus whether the composition repeats forever
 // and whether any repeating child uses `yoyo`. Also returns the maximum finite
-// repeat count seen across children and the maximum start delay, so finite
-// repeats and staggered entrances survive into the captured `iterations` /
-// `delayMs` instead of being collapsed.
+// repeat count seen across children so finite repeats survive into the captured
+// `iterations` instead of being collapsed.
 //
 // `gsap.globalTimeline.duration()` is unusable here: when any tween repeats
 // forever (`repeat: -1`) GSAP reports the timeline duration as ~1e10 s, so
@@ -724,6 +723,12 @@ export function pagxSampleTimeline(
 // keyframes that jump back and forth instead of progressing). Each child tween /
 // nested timeline instead exposes its single-iteration `duration()`, `startTime()`,
 // `repeat()` and `yoyo()`, from which the true loop period is reconstructed.
+//
+// Children whose `startTime()` is non-zero (staggered entrances) are folded into
+// the window via `windowSec = max(start + iterDur)`, so the leading hold while
+// they wait is captured as flat keyframes inside the canonical `@keyframes`. The
+// shorthand's `animation-delay` stays at `0s`; otherwise the importer would
+// offset playback by that delay a second time on top of the already-baked hold.
 //
 // A `yoyo` repeat maps to CSS `animation-direction: alternate`, so only the
 // forward half is sampled and the runtime mirrors it back — matching GSAP's
@@ -733,7 +738,6 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
   infinite: boolean;
   yoyo: boolean;
   iterations: number;
-  delaySec: number;
 } {
   const tl = gsap.globalTimeline as {
     getChildren?: (nested: boolean, tweens: boolean, timelines: boolean) => unknown[];
@@ -748,7 +752,6 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
   let infinite = false;
   let yoyo = false;
   let iterations = 1;
-  let delaySec = 0;
   for (const c of children) {
     const child = c as {
       startTime?: () => number;
@@ -790,11 +793,10 @@ export function pagxGsapWindow(gsap: { globalTimeline: unknown }): {
     }
     if (rep !== 0 && cyoyo) yoyo = true;
     const startFinite = isFinite(start) ? start : 0;
-    if (startFinite > delaySec) delaySec = startFinite;
     const end = startFinite + iterDur;
     if (end > windowSec) windowSec = end;
   }
-  return { windowSec, infinite, yoyo, iterations, delaySec };
+  return { windowSec, infinite, yoyo, iterations };
 }
 
 export function pagxCollectGsap(
@@ -826,9 +828,16 @@ export function pagxCollectGsap(
   // whole window and its animated channel is lost. Suppressing events forces a
   // full state render at each sample time — exactly what a static frame capture
   // wants — and matches the seek baseline-frames.js uses for the ground truth.
+  // delayMs is forced to 0: the sampling window already spans [0, windowSec],
+  // so any pre-animation hold (a child whose startTime > 0) is encoded directly
+  // as leading flat keyframes inside the canonical `@keyframes`. Forwarding
+  // `win.delaySec` here would write the same delay a second time into the
+  // `animation-delay` part of the shorthand, doubling the offset and pushing
+  // the visible motion past the loop window when the importer plays the
+  // animation back.
   pagxSampleTimeline(
     captured, seen, win.windowSec * 1000, (p) => tl.time(p * win.windowSec, true),
-    iterations, sampleCount, maxElements, direction, win.delaySec * 1000,
+    iterations, sampleCount, maxElements, direction, 0,
   );
   try {
     tl.time(0, true);
@@ -868,12 +877,16 @@ export function pagxCollectAnime(
       const direction = (inst.direction === 'alternate' || inst.direction === 'reverse')
         ? inst.direction
         : 'normal';
-      const delayMs = (typeof inst.delay === 'number' && isFinite(inst.delay) && inst.delay > 0)
-        ? inst.delay
-        : 0;
+      // delayMs is forced to 0: anime.js's `inst.duration` includes the
+      // configured `delay`, so `inst.seek(p * dur)` samples the entire
+      // [0, dur] window — including the pre-delay hold where the element
+      // sits at its starting state. That hold is already captured as the
+      // leading flat keyframes in `@keyframes`, so writing `inst.delay`
+      // into the shorthand's `animation-delay` would offset playback by
+      // delay a second time, masking the visible motion.
       pagxSampleTimeline(
         captured, seen, dur, (p) => inst.seek(p * dur), iterations, sampleCount,
-        maxElements, direction, delayMs,
+        maxElements, direction, 0,
       );
       inst.seek(0);
     } catch (_) {
