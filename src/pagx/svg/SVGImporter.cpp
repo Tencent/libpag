@@ -2792,6 +2792,12 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   if (!layer || layer->contents.size() != 2) {
     return false;
   }
+  // Invisible layers (e.g., mask reference layers) must not be merged with visible layers,
+  // even when they share the same geometry. Otherwise the visible layer's painter would be
+  // pulled into the invisible layer and disappear from the final output.
+  if (!layer->visible) {
+    return false;
+  }
   if (!layer->children.empty() || !layer->filters.empty() || !layer->styles.empty()) {
     return false;
   }
