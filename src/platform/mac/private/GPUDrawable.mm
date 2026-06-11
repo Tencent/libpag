@@ -77,15 +77,11 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   if (window == nullptr || bufferPreparing) {
     return nullptr;
   }
-  if (surface) {
-    return surface;
-  }
   // https://github.com/Tencent/libpag/issues/1870
   // Creating a surface in a non-main thread may lead to a crash because CGLWindow needs to access
   // the NSView geometry on the main thread.
   if (NSThread.isMainThread) {
-    surface = tgfx::Surface::MakeFrom(context, window);
-    return surface;
+    return tgfx::Surface::MakeFrom(context, window);
   }
   bufferPreparing = true;
   auto strongThis = weakThis.lock();
