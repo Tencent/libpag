@@ -35,6 +35,17 @@ std::shared_ptr<tgfx::SurfaceTextureReader> JVideoSurface::GetImageReader(JNIEnv
   return reader->get();
 }
 
+void JVideoSurface::Release(JNIEnv* env, jobject videoSurface) {
+  if (videoSurface == nullptr) {
+    return;
+  }
+  auto reader =
+      reinterpret_cast<JVideoSurface*>(env->GetLongField(videoSurface, VideoSurface_nativeContext));
+  if (reader != nullptr) {
+    reader->clear();
+  }
+}
+
 static Global<jclass> VideoSurfaceClass;
 
 static jmethodID VideoSurface_Make;

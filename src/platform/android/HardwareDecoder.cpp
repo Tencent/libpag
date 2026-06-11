@@ -53,6 +53,13 @@ HardwareDecoder::~HardwareDecoder() {
     delete bufferInfo;
     bufferInfo = nullptr;
   }
+  if (videoSurface.get() != nullptr) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env != nullptr) {
+      JVideoSurface::Release(env, videoSurface.get());
+    }
+  }
 }
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
@@ -105,15 +112,17 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
-  auto videoSurface = JVideoSurface::Make(env, format.width, format.height);
-  if (videoSurface == nullptr) {
+  auto videoSurfaceLocal = JVideoSurface::Make(env, format.width, format.height);
+  if (videoSurfaceLocal == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
   }
+  videoSurface = videoSurfaceLocal;
+  env->DeleteLocalRef(videoSurfaceLocal);
 
-  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  imageReader = JVideoSurface::GetImageReader(env, videoSurface.get());
   if (imageReader == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
