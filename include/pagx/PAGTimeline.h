@@ -147,8 +147,10 @@ class PAGTimeline {
   // advance() and apply() bail out once the scene is gone to avoid dereferencing freed memory.
   std::weak_ptr<PAGScene> owner;
   Animation* animation = nullptr;
-  // Runtime binding the channel writers should target. Top-level timelines use the owning
-  // PAGScene's binding; composition timelines use the binding built for that composition.
+  // Runtime binding the channel writers should target. A null binding marks a top-level timeline:
+  // the owning scene's current root binding is resolved lazily at apply time, so the timeline keeps
+  // working after the scene rebuilds its runtime tree (which frees and replaces that binding). A
+  // non-null binding is a fixed composition binding co-owned with that composition.
   RuntimeBinding* binding = nullptr;
   // Document used to resolve channel target IDs at apply time. Top-level timelines use the scene's
   // primary document; timelines spawned by external composition layers use the layer's externalDoc

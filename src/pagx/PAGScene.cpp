@@ -115,8 +115,11 @@ std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
   if (it != timelinesByAnimation.end()) {
     return it->second;
   }
+  // Construct with a null binding so the timeline resolves the scene's current root binding lazily
+  // at apply time. A user-cached handle then survives a runtime-tree rebuild (foreign external-doc
+  // edit) that replaces _rootComposition and frees the old binding, instead of dangling.
   auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+      new PAGTimeline(matched, nullptr, document.get(), weak_from_this()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }

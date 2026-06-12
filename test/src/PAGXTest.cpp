@@ -6765,25 +6765,88 @@ PAGX_TEST(PAGXTest, ExternalPAGXChildEditSyncsToParentScene) {
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
   auto* childDoc = slotLayer->externalDoc.get();
-  auto* childSolid = childDoc->findNode<pagx::Layer>("childLayer");
-  ASSERT_TRUE(childSolid != nullptr);
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
   {
     auto& slotTree =
         *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
-    ASSERT_TRUE(slotTree.get<tgfx::Layer>(childSolid) != nullptr);
-    EXPECT_FLOAT_EQ(slotTree.get<tgfx::Layer>(childSolid)->alpha(), 1.0f);
+    ASSERT_TRUE(slotTree.get<tgfx::Layer>(childLayerNode) != nullptr);
+    EXPECT_FLOAT_EQ(slotTree.get<tgfx::Layer>(childLayerNode)->alpha(), 1.0f);
   }
 
   // Edit a node owned by the CHILD document and notify through the CHILD document. The parent scene
   // is reverse-registered, so it rebuilds its runtime tree and reflects the new value.
-  childSolid->alpha = 0.4f;
-  childDoc->notifyChange({childSolid}, /*layoutChanged=*/false);
+  childLayerNode->alpha = 0.4f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
 
   auto& rebuiltTree =
       *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
-  auto refreshed = rebuiltTree.get<tgfx::Layer>(childSolid);
+  auto refreshed = rebuiltTree.get<tgfx::Layer>(childLayerNode);
   ASSERT_TRUE(refreshed != nullptr);
   EXPECT_FLOAT_EQ(refreshed->alpha(), 0.4f);
+}
+
+/**
+ * Test case: a top-level timeline cached by the caller keeps driving correctly after the scene
+ * rebuilds its runtime tree (triggered by editing an embedded external child document). The
+ * timeline resolves the scene's current root binding lazily at apply time, so the cached handle
+ * does not dangle when the old binding is freed by the rebuild.
+ */
+PAGX_TEST(PAGXTest, TopLevelTimelineSurvivesExternalChildRebuild) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"mainLayer\" width=\"100\" height=\"100\">\n"
+      "    <Rectangle width=\"100\" height=\"100\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#00FF00\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"spin\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"mainLayer\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto* mainLayer = doc->findNode<pagx::Layer>("mainLayer");
+  ASSERT_TRUE(mainLayer != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Cache the top-level timeline handle BEFORE the rebuild, like a caller that keeps it per frame.
+  // Drive to a mid value (0.5) distinct from the layer's default alpha (1.0) so the assertion proves
+  // the timeline actually wrote through the binding, not that the value happened to match.
+  auto cachedTimeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(cachedTimeline != nullptr);
+  cachedTimeline->setCurrentTime(500'000);  // frame 30 of a 60-frame, 60fps animation
+  cachedTimeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Layer>(mainLayer)->alpha(), 0.5f);
+
+  // Edit the CHILD document and notify through it: the parent scene rebuilds its runtime tree, which
+  // frees the old root binding the cached timeline was originally built against.
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+  childLayerNode->alpha = 0.3f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  // Applying the CACHED handle must re-resolve the new binding and drive the value, not crash.
+  cachedTimeline->setCurrentTime(500'000);
+  cachedTimeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Layer>(mainLayer)->alpha(), 0.5f);
 }
 
 /**
