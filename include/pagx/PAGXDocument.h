@@ -176,30 +176,19 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Reflects post-build edits to the given nodes in every live PAGScene created from this document.
-   * Refreshes each affected node's runtime content in place, preserving existing layer handles.
-   * Render-only edits (alpha, color, blendMode) are reflected without re-running layout.
-   * Adding or removing child layers of a node is supported by passing the parent (container) node:
-   * its child list is reconciled, building newly added layers and removing deleted ones while
-   * reusing unchanged children.
+   * Reflects post-build edits to the given nodes in every live PAGScene created from this document,
+   * refreshing each affected node's runtime content in place while preserving existing layer
+   * handles. Pass a container node to reconcile its child layer list; editing a timeline node
+   * (Animation, AnimationObject, or Channel) rebuilds all timelines.
    *
-   * Timelines: when any dirty node is a timeline node (Animation, AnimationObject, or Channel), all
-   * timelines are rebuilt from the document, so adding, removing, or editing an animation takes
-   * effect (a removed animation simply stops driving). Edits that do not touch a timeline node leave
-   * in-progress playback undisturbed.
+   * When an edit changes a node's "@id" reference (e.g. AnimationObject.target, Fill.color), mark
+   * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
+   * refreshes the nodes it is given and does not re-resolve references elsewhere.
    *
-   * Reference edits: nodes reference each other by "@id" (e.g. AnimationObject.target, Fill.color,
-   * Layer.mask). When an edit changes such a relationship, the caller must mark every node on the
-   * affected reference chain dirty, not only the node it directly mutated, so the runtime re-resolves
-   * the reference. For example, renaming a node's id, or deleting a node that an animation targets,
-   * must also pass the referencing AnimationObject so its timeline is rebuilt; repointing a
-   * Fill.color must pass the owning layer so its contents are regenerated. notifyChange only
-   * refreshes the dirty nodes it is given; it does not scan the document for other referrers.
-   *
-   * Not supported: cross-PAGX edits. A layer that references an external composition document (via
-   * externalDoc / a "@id" composition file reference) is built into the runtime tree once at scene
-   * creation. Editing nodes inside an external document, or changing which external document a layer
-   * references, is not reflected by notifyChange — rebuild the scene with PAGScene::Make instead.
+   * Editing an external composition: call notifyChange on the document that owns the edited nodes.
+   * Every scene that embeds this document as an external composition is refreshed too. A node may
+   * only be notified through its owning document; passing a node owned by a different (e.g. parent)
+   * document is rejected with no effect.
    * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
    * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
@@ -241,6 +230,7 @@ class PAGXDocument : public Node {
   friend class PAGXExporter;
   friend class TextLayoutContext;
   friend class PAGScene;
+  friend class PAGComposition;
 };
 
 }  // namespace pagx

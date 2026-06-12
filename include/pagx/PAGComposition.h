@@ -101,11 +101,8 @@ class PAGComposition : public PAGLayer {
   // Returns nullptr if no persistent node owns the layer (internal sub-layer).
   std::shared_ptr<PAGLayer> findChildForLayer(const tgfx::Layer* hitLayer);
 
-  // Refreshes this composition after edits: reconciles its child layer list (adding, removing, and
-  // reordering children to match the source layers when the container node is dirty), refreshes the
-  // content of any dirty leaf layers in place, then recurses into child compositions so each
-  // refreshes only the nodes in its own binding. Timelines are not touched here; PAGScene resets the
-  // whole timeline tree separately when a timeline node changed. Called by PAGScene::onNodesChanged.
+  // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
+  // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
   void refreshNodes(const std::vector<Node*>& dirtyNodes);
 
   // Reconciles this composition's runtime children with the given source layer list: reuses
@@ -114,17 +111,13 @@ class PAGComposition : public PAGLayer {
   // parent's tgfx children to match the document order.
   void syncChildren(const std::vector<Layer*>& sourceLayers);
 
-  // Rebuilds this composition's timelines from the owner layer's AnimationTimeline drivers,
-  // resolving each driver's animation id against the document. Discards any existing timelines
-  // first, so a removed driver or animation simply produces no timeline and a removed animation node
-  // (findNode returns null) leaves nothing to drive. Used at build time and to reset timelines when
-  // a timeline node changes. The root composition has no owner layer and spawns no timelines.
+  // Rebuilds this composition's timelines from the owner layer's animation drivers, discarding any
+  // existing ones first so removed drivers or animations simply stop driving. Used at build time and
+  // when a timeline node changes. The root composition has no owner layer and spawns no timelines.
   void spawnTimelines(const std::shared_ptr<PAGScene>& scene);
 
-  // Recursively resets the timelines of this composition and all descendant compositions. Called
-  // when an edit touches a timeline node (Animation / AnimationObject / Channel), since timelines
-  // may share targets and cross-reference, so the whole timeline tree is rebuilt rather than patched
-  // in place.
+  // Resets the timelines of this composition and all descendant compositions. Called when an edit
+  // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a

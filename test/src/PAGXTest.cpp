@@ -6745,6 +6745,78 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 }
 
 /**
+ * Test case: editing a child (external) document and calling its own notifyChange refreshes the
+ * embedded subtree inside a parent scene that references it. The parent's tgfx layer instances are
+ * preserved (same handle), proving the host scene was reverse-registered with the child document.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXChildEditSyncsToParentScene) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childSolid = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childSolid != nullptr);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto childTgfx = slotTree.get<tgfx::Layer>(childSolid);
+  ASSERT_TRUE(childTgfx != nullptr);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+
+  // Edit a node owned by the CHILD document and notify through the CHILD document. The parent scene
+  // is reverse-registered, so its embedded subtree refreshes; the tgfx layer instance is preserved.
+  childSolid->alpha = 0.4f;
+  childDoc->notifyChange({childSolid}, /*layoutChanged=*/false);
+
+  EXPECT_EQ(slotTree.get<tgfx::Layer>(childSolid).get(), childTgfx.get());
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 0.4f);
+}
+
+/**
+ * Test case: a parent document must not notify a node owned by a child (external) document. Such a
+ * node is not in the parent's node list, so notifyChange rejects the call and changes nothing.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXParentCannotNotifyChildNode) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayer = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayer != nullptr);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto childTgfx = slotTree.get<tgfx::Layer>(childLayer);
+  ASSERT_TRUE(childTgfx != nullptr);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+
+  // The parent document does not own the child layer, so notifying it through the parent is rejected
+  // (logs an error) and the embedded value stays unchanged.
+  childLayer->alpha = 0.2f;
+  doc->notifyChange({childLayer}, /*layoutChanged=*/false);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+}
+
+/**
  * Test case: external file enumeration continues through loaded external PAGX documents.
  */
 PAGX_TEST(PAGXTest, ExternalPAGXCompositionNestedFiles) {

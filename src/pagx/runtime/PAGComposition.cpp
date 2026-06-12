@@ -71,6 +71,12 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   *composition->binding = std::move(buildResult.binding);
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
+  // Register this host scene with the external document so that editing the external (child)
+  // document and calling its own notifyChange refreshes this scene's embedded subtree. The child
+  // document keeps only a weak reference, so it never keeps the scene alive.
+  if (externalDoc != nullptr) {
+    externalDoc->registerLiveScene(parentScene);
+  }
   // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
   // document, then build the persistent per-layer runtime node tree for the composition content.
   composition->spawnTimelines(parentScene);

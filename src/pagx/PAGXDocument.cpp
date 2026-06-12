@@ -320,6 +320,28 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (dirtyNodes.empty()) {
     return;
   }
+  // A node referenced by an external (child) document is owned by that child document, not this one,
+  // so it must be notified through its own document. Reject foreign nodes: a parent must not notify
+  // a child document's nodes. Child document nodes are simply not in this document's node list.
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    bool owned = false;
+    for (auto& ownedNode : nodes) {
+      if (ownedNode.get() == node) {
+        owned = true;
+        break;
+      }
+    }
+    if (!owned) {
+      LOGE(
+          "PAGXDocument::notifyChange: node not found in this document; a node owned by an "
+          "external "
+          "child document must be notified through that document.");
+      return;
+    }
+  }
   PruneExpiredScenes(&liveScenes);
   // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
   // list changes require a full re-layout, since layout is resolved top-down and a single node
