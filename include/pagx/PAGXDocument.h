@@ -188,10 +188,18 @@ class PAGXDocument : public Node {
    * effect (a removed animation simply stops driving). Edits that do not touch a timeline node leave
    * in-progress playback undisturbed.
    *
-   * Not supported by this incremental path (require rebuilding the scene with PAGScene::Make):
-   * cross-node structural changes such as deleting a node that an animation targets, or repointing
-   * an AnimationObject.target / a "@id" reference to a different node. notifyChange refreshes the
-   * passed dirty nodes in place; it does not re-resolve every reference across the document.
+   * Reference edits: nodes reference each other by "@id" (e.g. AnimationObject.target, Fill.color,
+   * Layer.mask). When an edit changes such a relationship, the caller must mark every node on the
+   * affected reference chain dirty, not only the node it directly mutated, so the runtime re-resolves
+   * the reference. For example, renaming a node's id, or deleting a node that an animation targets,
+   * must also pass the referencing AnimationObject so its timeline is rebuilt; repointing a
+   * Fill.color must pass the owning layer so its contents are regenerated. notifyChange only
+   * refreshes the dirty nodes it is given; it does not scan the document for other referrers.
+   *
+   * Not supported: cross-PAGX edits. A layer that references an external composition document (via
+   * externalDoc / a "@id" composition file reference) is built into the runtime tree once at scene
+   * creation. Editing nodes inside an external document, or changing which external document a layer
+   * references, is not reflected by notifyChange — rebuild the scene with PAGScene::Make instead.
    * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
    * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,

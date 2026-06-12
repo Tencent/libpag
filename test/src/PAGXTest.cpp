@@ -8406,6 +8406,54 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
 }
 
 /**
+ * Test case: a reference edit (repointing AnimationObject.target to a different node) takes effect
+ * when the caller marks the referencing timeline node dirty, since the timeline is rebuilt and
+ * re-resolves its targets. Demonstrates the "mark every node on the reference chain dirty" rule.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRetargetAnimationObject) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layerA = doc->makeNode<pagx::Layer>("A");
+  layerA->width = 50;
+  layerA->height = 50;
+  doc->layers.push_back(layerA);
+  auto layerB = doc->makeNode<pagx::Layer>("B");
+  layerB->width = 50;
+  layerB->height = 50;
+  doc->layers.push_back(layerB);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "A";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxA = binding->get<tgfx::Layer>(layerA);
+  auto tgfxB = binding->get<tgfx::Layer>(layerB);
+  ASSERT_TRUE(tgfxA != nullptr);
+  ASSERT_TRUE(tgfxB != nullptr);
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxA->alpha(), 0.5f);
+
+  // Repoint the target from A to B and mark the referencing AnimationObject dirty: the timeline is
+  // rebuilt and re-resolves to B.
+  object->target = "B";
+  tgfxA->setAlpha(1.0f);
+  tgfxB->setAlpha(1.0f);
+  doc->notifyChange({object});
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxB->alpha(), 0.5f);
+  EXPECT_FLOAT_EQ(tgfxA->alpha(), 1.0f);
+}
+
+/**
  * Test case: removing the animation driver from a layer and notifying with the animation node dirty
  * stops it driving. The composition timeline is rebuilt from the owner layer's now-empty driver
  * list, so no timeline drives the target and advancing no longer changes it.
