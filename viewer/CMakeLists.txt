@@ -224,3 +224,64 @@ endif ()
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
 target_include_directories(PAGViewer SYSTEM PRIVATE ${PAG_VIEWER_SYSTEM_INCLUDES})
 target_link_libraries(PAGViewer ${PAG_VIEWER_PLATFORM_LIBS} ${VIEWER_VENDOR_LIBRARIES})
+
+if (APPLE)
+    # Find macdeployqt next to the Qt bin directory
+    find_program(DEPLOYQT_EXECUTABLE macdeployqt
+            PATHS ${CMAKE_PREFIX_PATH}/../../bin
+            REQUIRED)
+
+    set_target_properties(PAGViewer PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME "PAGViewer"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "im.pag.viewer"
+            BUILD_RPATH "@executable_path/../Frameworks"
+            INSTALL_RPATH "@executable_path/../Frameworks"
+    )
+
+    set(VIEWER_BUNDLE_DIR "$<TARGET_BUNDLE_DIR:PAGViewer>")
+    set(VIEWER_FRAMEWORKS_DIR "${VIEWER_BUNDLE_DIR}/Contents/Frameworks")
+    set(VIEWER_RESOURCES_DIR "${VIEWER_BUNDLE_DIR}/Contents/Resources")
+    set(VIEWER_FFMOVIE_SRC "${CMAKE_SOURCE_DIR}/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib")
+    set(VIEWER_SPARKLE_SRC "${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework")
+
+    add_custom_command(TARGET PAGViewer POST_BUILD
+            # Copy libffmovie.dylib
+            COMMAND /bin/sh -c "mkdir -p '${VIEWER_FRAMEWORKS_DIR}' && [ -f '${VIEWER_FRAMEWORKS_DIR}/libffmovie.dylib' ] || cp '${VIEWER_FFMOVIE_SRC}' '${VIEWER_FRAMEWORKS_DIR}/'"
+            # Copy Sparkle.framework
+            COMMAND /bin/sh -c "[ -d '${VIEWER_FRAMEWORKS_DIR}/Sparkle.framework' ] || cp -R '${VIEWER_SPARKLE_SRC}' '${VIEWER_FRAMEWORKS_DIR}/'"
+            # Copy resources
+            COMMAND /bin/sh -c "mkdir -p '${VIEWER_RESOURCES_DIR}' && cp -f '${CMAKE_SOURCE_DIR}/assets/images/appIcon.icns' '${VIEWER_RESOURCES_DIR}/' && cp -f '${CMAKE_SOURCE_DIR}/assets/images/pagIcon.icns' '${VIEWER_RESOURCES_DIR}/'"
+            # Copy Info.plist
+            COMMAND /bin/sh -c "cp -f '${CMAKE_SOURCE_DIR}/package/templates/Info.plist' '${VIEWER_BUNDLE_DIR}/Contents/'"
+            # Deploy Qt (skip if already deployed)
+            COMMAND /bin/sh -c "[ -d '${VIEWER_FRAMEWORKS_DIR}/QtCore.framework' ] || '${DEPLOYQT_EXECUTABLE}' '${VIEWER_BUNDLE_DIR}' -qmldir='${CMAKE_SOURCE_DIR}/assets/qml'"
+            COMMENT "Deploying runtime dependencies into PAGViewer.app"
+            VERBATIM
+    )
+elseif (WIN32)
+    get_target_property(qmake_executable Qt6::qmake IMPORTED_LOCATION)
+    if (NOT qmake_executable)
+        message(FATAL_ERROR "qmake executable not found")
+    endif ()
+    get_filename_component(qt_bin_dir "${qmake_executable}" DIRECTORY)
+    find_program(DEPLOYQT_EXECUTABLE windeployqt HINTS "${qt_bin_dir}")
+    if (NOT DEPLOYQT_EXECUTABLE)
+        message(FATAL_ERROR "windeployqt.exe not found in ${qt_bin_dir}")
+    endif ()
+
+    set(VIEWER_OUTPUT_DIR "$<TARGET_FILE_DIR:PAGViewer>")
+    set(VIEWER_WINSPARKLE_DLL "${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.dll")
+    set(VIEWER_FFMOVIE_DLL "${CMAKE_SOURCE_DIR}/vendor/ffmovie/win/${ARCH}/ffmovie.dll")
+
+    add_custom_command(TARGET PAGViewer POST_BUILD
+            # Copy WinSparkle.dll
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_WINSPARKLE_DLL}" "${VIEWER_OUTPUT_DIR}/"
+            # Copy ffmovie.dll
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_FFMOVIE_DLL}" "${VIEWER_OUTPUT_DIR}/"
+            # Deploy Qt (skip if already deployed)
+            COMMAND cmd /c "if not exist \"${VIEWER_OUTPUT_DIR}\\Qt6Core.dll\" \"${DEPLOYQT_EXECUTABLE}\" \"$<TARGET_FILE:PAGViewer>\" --qmldir=\"${CMAKE_SOURCE_DIR}/assets/qml\""
+            COMMENT "Deploying runtime dependencies for PAGViewer"
+            VERBATIM
+    )
+endif ()

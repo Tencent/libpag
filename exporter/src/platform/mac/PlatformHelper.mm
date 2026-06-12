@@ -23,6 +23,7 @@
 #include <dlfcn.h>
 #include <QDir>
 #include <QFileInfo>
+#include <filesystem>
 #include <string>
 #include "platform/PAGViewerCheck.h"
 #include "platform/PAGViewerInstaller.h"
@@ -79,9 +80,14 @@ bool IsAEWindowActive() {
 }
 
 std::string GetQmlPath() {
-  // Use shared Qt resources directory to avoid modifying plugin bundle (which would break code
-  // signature)
-  return "/Library/Application Support/PAGExporter/Resources/qml";
+  Dl_info info;
+  if (dladdr((void*)GetQmlPath, &info) && info.dli_fname) {
+    std::filesystem::path exePath(info.dli_fname);
+    auto pluginContents = exePath.parent_path().parent_path();
+    return (pluginContents / "Resources" / "qml").string();
+  }
+  return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/PAGExporter.plugin/"
+         "Contents/Resources/qml";
 }
 
 std::string GetDownloadsPath() {

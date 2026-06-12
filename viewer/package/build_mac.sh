@@ -111,12 +111,49 @@ function generateUniversalDsym() {
 
 function cleanAbsoluteRpaths() {
     local binary="$1"
-    otool -l "${binary}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.*path \(.*\) (offset.*/\1/' | while IFS= read -r rpath; do
+    local tmpfile
+    tmpfile=$(mktemp)
+    otool -l "${binary}" | grep -A2 "LC_RPATH" | grep "path " | sed 's/.*path \(.*\) (offset.*/\1/' > "${tmpfile}"
+    while IFS= read -r rpath; do
         case "${rpath}" in
             @*|/Library/*) ;;
             *) install_name_tool -delete_rpath "${rpath}" "${binary}" 2>/dev/null || true ;;
         esac
-    done
+    done < "${tmpfile}"
+    rm -f "${tmpfile}"
+}
+
+function mergeUniversalBundle() {
+    local x86Dir="$1"
+    local armDir="$2"
+    local outDir="$3"
+    local label="$4"
+
+    cp -a "${armDir}" "${outDir}"
+
+    local mergedCount=0
+    local skippedCount=0
+    while IFS= read -r -d '' f; do
+        local relPath="${f#${outDir}/}"
+        local x86File="${x86Dir}/${relPath}"
+        if [ -f "${x86File}" ] && file "${f}" | grep -q "Mach-O"; then
+            local outArch
+            local x86Arch
+            outArch=$(lipo -info "${f}" 2>/dev/null | awk -F': ' '{print $NF}')
+            x86Arch=$(lipo -info "${x86File}" 2>/dev/null | awk -F': ' '{print $NF}')
+            # Skip if already fat, or both files are single-arch with the same architecture
+            if lipo -info "${f}" 2>/dev/null | grep -q "Architectures in the fat file" || [ "${outArch}" = "${x86Arch}" ]; then
+                skippedCount=$((skippedCount + 1))
+                continue
+            fi
+            lipo -create "${x86File}" "${f}" -output "${f}.universal" \
+                || exitWithError "Failed to lipo merge: ${relPath}"
+            mv "${f}.universal" "${f}"
+            mergedCount=$((mergedCount + 1))
+        fi
+    done < <(find "${outDir}" -type f -print0)
+
+    logSuccess "${label}: ${mergedCount} merged, ${skippedCount} skipped (already universal or same arch)"
 }
 
 function createDmg()
@@ -246,66 +283,83 @@ then
 fi
 
 # 3 Organize resources
-# 3.1 Merge PAGViewer
 printSection 3 "Organize resources"
+
+# Clean absolute build rpaths from single-arch binaries before merging
+printStep "Clean absolute rpaths"
+
+cleanAbsoluteRpaths "${x86_64BuildDir}/PAGViewer.app/Contents/MacOS/PAGViewer"
+cleanAbsoluteRpaths "${arm64BuildDir}/PAGViewer.app/Contents/MacOS/PAGViewer"
+cleanAbsoluteRpaths "${x86_64BuildDirForPlugin}/PAGExporter.plugin/Contents/MacOS/PAGExporter"
+cleanAbsoluteRpaths "${arm64BuildDirForPlugin}/PAGExporter.plugin/Contents/MacOS/PAGExporter"
+
+# 3.1 Merge PAGViewer universal app bundle
 printStep "Merge PAGViewer"
 AppDir="${BuildDir}/PAGViewer.app"
-ExeDir="${AppDir}/Contents/MacOS"
-ExePath="${ExeDir}/PAGViewer"
-x86_64ExePath="${x86_64BuildDir}/PAGViewer"
-arm64ExePath="${arm64BuildDir}/PAGViewer"
+x86_64AppDir="${x86_64BuildDir}/PAGViewer.app"
+arm64AppDir="${arm64BuildDir}/PAGViewer.app"
 
-# Clean previous app bundle to avoid incremental build issues
 rm -rf "${AppDir}"
+mergeUniversalBundle "${x86_64AppDir}" "${arm64AppDir}" "${AppDir}" "PAGViewer"
 
-install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" "${x86_64ExePath}" 2>/dev/null || true
-install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" "${arm64ExePath}" 2>/dev/null || true
-
-mkdir -p "${ExeDir}"
-lipo -create "${x86_64ExePath}" "${arm64ExePath}" -output "${ExePath}"
-if [ $? -ne 0 ];
-then
-    exitWithError "Failed to merge PAGViewer universal binary at ${ExePath}"
-fi
+ExePath="${AppDir}/Contents/MacOS/PAGViewer"
+FrameworkDir="${AppDir}/Contents/Frameworks"
+ContentsDir="${AppDir}/Contents"
+ResourcesDir="${AppDir}/Contents/Resources"
 
 # 3.1.1 Generate dSYM files for PAGViewer
 printStep "Generate dSYM for PAGViewer"
+x86_64ExePath="${x86_64AppDir}/Contents/MacOS/PAGViewer"
+arm64ExePath="${arm64AppDir}/Contents/MacOS/PAGViewer"
 generateUniversalDsym "PAGViewer" "${x86_64BuildDir}" "${arm64BuildDir}" "${BuildDir}" "${x86_64ExePath}" "${arm64ExePath}"
 
-# 3.2 Obtain the dependencies of PAGViewer
-printStep "Deploy Qt dependencies"
-"${Deployqt}" "${AppDir}" -qmldir="${SourceDir}/assets/qml"
-if [ $? -ne 0 ];
+# 3.2 Merge PAGExporter universal plugin bundle
+printStep "Merge PAGExporter"
+x86_64PluginPath="${x86_64BuildDirForPlugin}/PAGExporter.plugin"
+arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
+PluginPath="${ResourcesDir}/PAGExporter.plugin"
+
+mergeUniversalBundle "${x86_64PluginPath}" "${arm64PluginPath}" "${PluginPath}" "PAGExporter"
+
+PluginExePath="${PluginPath}/Contents/MacOS/PAGExporter"
+
+# 3.2.1 Generate dSYM files for PAGExporter
+printStep "Generate dSYM for PAGExporter"
+x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
+arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
+generateUniversalDsym "PAGExporter" "${x86_64BuildDirForPlugin}" "${arm64BuildDirForPlugin}" "${BuildDir}" "${x86_64PluginExePath}" "${arm64PluginExePath}"
+
+# 3.3 Move Qt dependencies from Viewer into PAGExporter plugin
+printStep "Consolidate Qt dependencies into PAGExporter"
+PluginFrameworkDir="${PluginPath}/Contents/Frameworks"
+PluginPluginsDir="${PluginPath}/Contents/Plugins"
+PluginQmlDir="${PluginPath}/Contents/Resources/qml"
+
+# Move all Viewer frameworks into plugin, then move Sparkle back to Viewer
+cp -fRP "${FrameworkDir}/"* "${PluginFrameworkDir}/"
+rm -rf "${FrameworkDir}"
+mkdir -p "${FrameworkDir}"
+mv "${PluginFrameworkDir}/Sparkle.framework" "${FrameworkDir}/"
+
+# Move Viewer Qt plugins into plugin
+if [ -d "${AppDir}/Contents/Plugins" ];
 then
-    exitWithError "Deploy Qt dependencies (viewer qml) failed"
-fi
-"${Deployqt}" "${AppDir}" -qmldir="${PluginSourceDir}/assets/qml"
-if [ $? -ne 0 ];
-then
-    exitWithError "Deploy Qt dependencies (exporter qml) failed"
+    mkdir -p "${PluginPluginsDir}"
+    cp -fRP "${AppDir}/Contents/Plugins/"* "${PluginPluginsDir}/"
+    rm -rf "${AppDir}/Contents/Plugins"
 fi
 
-# 3.2.1 Copy Sparkle
-printStep "Copy Sparkle.framework"
-FrameworkDir="${AppDir}/Contents/Frameworks"
-SparklePath="${SourceDir}/vendor/sparkle/mac/Sparkle.framework"
-cp -f -R -P "${SparklePath}" "${FrameworkDir}"
-
-# 3.2.2 Merge and copy ffmovie
-printStep "Merge ffmovie.dylib"
-x64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/x64/libffmovie.dylib"
-arm64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/arm64/libffmovie.dylib"
-FfmoviePath="${FrameworkDir}/libffmovie.dylib"
-lipo -create "${x64FfmoviePath}" "${arm64FfmoviePath}" -output "${FfmoviePath}"
-if [ $? -ne 0 ];
+# Move Viewer QML resources into plugin
+if [ -d "${ResourcesDir}/qml" ];
 then
-    exitWithError "Failed to merge ffmovie universal dylib at ${FfmoviePath}"
+    mkdir -p "${PluginQmlDir}"
+    cp -fRP "${ResourcesDir}/qml/"* "${PluginQmlDir}/"
+    rm -rf "${ResourcesDir}/qml"
 fi
 
-# 3.3 Obtain public and private keys
+# 3.4 Obtain public and private keys
 printStep "Obtain signing keys"
 
-# 3.3.1 Obtain DSA public and private keys
 SignForUpdate=false
 DSAPublicKey=""
 DSAPrivateKey=""
@@ -321,7 +375,6 @@ then
     logInfo "Get DSAPrivateKey: ${DSAPrivateKey}"
 fi
 
-# 3.3.2 Obtain EDDSA public and private keys
 EDDSAPublicKey=""
 EDDSAPrivateKey=""
 if declare -F GetEDDSAPublicKeyPath > /dev/null;
@@ -341,90 +394,37 @@ then
     SignForUpdate=true
 fi
 
-# 3.4 Copy resources
+# 3.5 Copy resources
 printStep "Copy resources"
-ContentsDir="${AppDir}/Contents"
-PlistPath="${SourceDir}/package/templates/Info.plist"
-cp -f "${PlistPath}" "${ContentsDir}"
-
-ResourcesDir="${AppDir}/Contents/Resources"
-cp -f "${SourceDir}/assets/images/appIcon.icns" "${ResourcesDir}"
-cp -f "${SourceDir}/assets/images/pagIcon.icns" "${ResourcesDir}"
 if [ -n "${DSAPublicKey}" ] && [ -f "${DSAPublicKey}" ];
 then
     cp -f "${DSAPublicKey}" "${ResourcesDir}"
 fi
 
-# 3.5 Merge PAGExporter and copy related tools
-printStep "Merge PAGExporter"
-
-# 3.5.1 Merge PAGExporter
-PluginPath="${ResourcesDir}/PAGExporter.plugin"
-PluginExePath="${PluginPath}/Contents/MacOS/PAGExporter"
-x86_64PluginPath="${x86_64BuildDirForPlugin}/PAGExporter.plugin"
-arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
-x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
-arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
-
-# Remove absolute build rpaths from each architecture before merging
-cleanAbsoluteRpaths "${x86_64PluginExePath}"
-cleanAbsoluteRpaths "${arm64PluginExePath}"
-
-cp -fr "${x86_64PluginPath}" "${PluginPath}"
-lipo -create "${x86_64PluginExePath}" "${arm64PluginExePath}" -output "${PluginExePath}"
-
-# 3.5.1.1 Generate dSYM files for PAGExporter
-printStep "Generate dSYM for PAGExporter"
-generateUniversalDsym "PAGExporter" "${x86_64BuildDirForPlugin}" "${arm64BuildDirForPlugin}" "${BuildDir}" "${x86_64PluginExePath}" "${arm64PluginExePath}"
-
-# 3.5.2 Obtain the dependencies of PAGExporter
-printStep "Deploy PAGExporter Qt dependencies"
-"${Deployqt}" "${PluginPath}" -qmldir="${PluginSourceDir}/assets/qml"
-if [ $? -ne 0 ];
-then
-    exitWithError "Obtain the dependencies of PAGExporter failed"
-fi
-# Remove libraries from plugin that already exist in the main app (to avoid overwriting universal with single-arch)
-if [ -d "${PluginPath}/Contents/Frameworks" ];
-then
-    for existingLib in "${FrameworkDir}"/*.dylib; do
-        libName=$(basename "${existingLib}")
-        rm -f "${PluginPath}/Contents/Frameworks/${libName}"
-    done
-    # Copy remaining plugin Frameworks into the main app.
-    # Use process substitution so exitWithError aborts the whole script;
-    # find -exec swallows cp failures and a piped while runs in a subshell.
-    while IFS= read -r -d '' Item; do
-        if ! cp -fRP "${Item}" "${AppDir}/Contents/Frameworks/";
-        then
-            exitWithError "Failed to copy plugin framework item: ${Item}"
-        fi
-    done < <(find "${PluginPath}/Contents/Frameworks" -mindepth 1 -maxdepth 1 -print0)
-fi
-if [ -d "${PluginPath}/Contents/Plugins" ];
-then
-    cp -fRP "${PluginPath}/Contents/Plugins/"* "${AppDir}/Contents/Plugins/"
-fi
-rm -rf "${PluginPath}/Contents/Frameworks"
-rm -rf "${PluginPath}/Contents/Plugins"
-rm -rf "${PluginPath}/Contents/Resources/qml"
-
-# 3.5.3 Copy related tools
-printStep "Copy tools and scripts"
+# 3.5.1 Copy tools
+printStep "Copy tools"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f "${EncoderToolsPath}" "${ResourcesDir}"
-cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/delete_qt_resource.sh" "${ResourcesDir}/"
-cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
 
-# 3.5.5 Generate qt.conf for PAGExporter plugin
-printStep "Generate qt.conf for PAGExporter"
-PLUGIN_RESOURCES_DIR="${ResourcesDir}/PAGExporter.plugin/Contents/Resources"
+# 3.5.2 Generate qt.conf for PAGExporter plugin
+printStep "Generate qt.conf"
+PLUGIN_RESOURCES_DIR="${PluginPath}/Contents/Resources"
 PLUGIN_QT_CONF="${PLUGIN_RESOURCES_DIR}/qt.conf"
 mkdir -p "${PLUGIN_RESOURCES_DIR}"
 cat > "${PLUGIN_QT_CONF}" << 'EOF'
 [Paths]
-Prefix = /Library/Application Support/PAGExporter
+Plugins = PlugIns
+Imports = Resources/qml
+QmlImports = Resources/qml
+EOF
+
+# Generate qt.conf for PAGViewer (points to PAGExporter plugin for Qt resources)
+# Plugins/Imports/QmlImports are relative to the Prefix directory.
+VIEWER_QT_CONF="${ResourcesDir}/qt.conf"
+cat > "${VIEWER_QT_CONF}" << 'EOF'
+[Paths]
+Prefix = Resources/PAGExporter.plugin/Contents
 Plugins = PlugIns
 Imports = Resources/qml
 QmlImports = Resources/qml
@@ -447,8 +447,11 @@ then
     /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist" \
         || exitWithError "Failed to update SUPublicDSAKeyFile in ${ContentsDir}/Info.plist"
 fi
-/usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist" \
-    || exitWithError "Failed to update SUPublicEDKey in ${ContentsDir}/Info.plist"
+if [ -n "${SUPublicEDKey}" ];
+then
+    /usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist" \
+        || exitWithError "Failed to update SUPublicEDKey in ${ContentsDir}/Info.plist"
+fi
 
 /usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist" \
     || exitWithError "Failed to update CFBundleVersion in ${PluginPath}/Contents/Info.plist"
@@ -459,14 +462,12 @@ fi
 
 # 3.7 Set rpath
 printStep "Set rpath"
-install_name_tool -delete_rpath "${QtPath}/lib" "${ExePath}" 2>/dev/null || true
-install_name_tool -delete_rpath "${SourceDir}/vendor/sparkle/mac" "${ExePath}" 2>/dev/null || true
+cleanAbsoluteRpaths "${ExePath}"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "${ExePath}" 2>/dev/null || true
+install_name_tool -add_rpath "@executable_path/../Resources/PAGExporter.plugin/Contents/Frameworks" "${ExePath}" 2>/dev/null || true
 
-install_name_tool -delete_rpath "${QtPath}/lib" "${PluginExePath}" 2>/dev/null || true
-install_name_tool -add_rpath "@executable_path/../Frameworks" "${PluginExePath}" 2>/dev/null || true
+cleanAbsoluteRpaths "${PluginExePath}"
 install_name_tool -add_rpath "@loader_path/../Frameworks" "${PluginExePath}" 2>/dev/null || true
-install_name_tool -add_rpath "/Library/Application Support/PAGExporter/Frameworks" "${PluginExePath}" 2>/dev/null || true
 
 # 4 Sign & Notarize
 printSection 4 "Sign & Notarize"
@@ -492,10 +493,8 @@ then
     xattr -rc "${AppDir}"
     xattr -rc "${PluginPath}"
 
-    # Sign all dylibs in Frameworks/ directory first.
-    # Use process substitution so exitWithError aborts the whole script;
-    # a piped `while` would only exit the subshell.
-    logInfo "Signing all libraries in Frameworks/..."
+    # Sign all dylibs in Viewer Frameworks and PAGExporter plugin.
+    logInfo "Signing all libraries..."
     while IFS= read -r dylib; do
         SIGN_OUTPUT=$(codesign --force --timestamp --options "runtime" --sign "${SignCertName}" "${dylib}" 2>&1)
         SIGN_STATUS=$?
@@ -504,7 +503,7 @@ then
             echo "${SIGN_OUTPUT}"
             exitWithError "Failed to sign dylib: ${dylib}"
         fi
-    done < <(find "${FrameworkDir}" -name "*.dylib" -type f)
+    done < <(find "${FrameworkDir}" "${PluginPath}/Contents/Frameworks" -name "*.dylib" -type f 2>/dev/null)
 
     # Sign standalone executables not inside a bundle
     logInfo "Signing: ${ResourcesDir}/H264EncoderTools"
