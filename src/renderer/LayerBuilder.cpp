@@ -19,6 +19,7 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include "ToTGFX.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
