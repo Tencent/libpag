@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include "pagx/runtime/MatrixDecompose.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 
@@ -40,67 +41,32 @@ inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& t
 }
 
 // Interpolates two 2D affine matrices by decomposing each into translate / rotation / scale / skew,
-// mixing the components, and recomposing. This keeps rotation angular and scale uniform so a matrix
-// tween follows the natural transform path instead of shearing through non-orthogonal states.
+// mixing the components, and recomposing (see MatrixDecompose.h for the shared component math).
 //
-// Limitation: the rotation recovered via atan2 is confined to (-pi, pi], so winding (full turns) is
-// lost and the mix takes the literal path between the two recovered angles rather than the shortest
-// arc. A tween that should sweep across the +/-pi boundary (e.g. 170 deg to 190 deg) instead spins
-// the long way through 0. This is inherent to interpolating baked matrices: the source angle cannot
-// be reconstructed from the matrix alone. Animations that need precise multi-turn or boundary-
-// crossing rotation should drive a scalar rotation channel (e.g. Group::rotation) rather than a
-// Layer matrix channel.
+// Limitation: rotation is recovered via atan2, so winding (full turns) is lost and the mix takes
+// the literal path between the recovered angles rather than the shortest arc. A tween crossing the
+// +/-pi boundary (e.g. 170 deg to 190 deg) spins the long way through 0. Animations that need
+// precise multi-turn or boundary-crossing rotation should drive a scalar rotation channel (e.g.
+// Group::rotation) rather than a Layer matrix channel.
 inline tgfx::Matrix MixTGFXMatrix(const tgfx::Matrix& current, const tgfx::Matrix& target,
                                   float mix) {
   float c[9];
   float t[9];
   current.get9(c);
   target.get9(t);
-  // tgfx Matrix get9 layout: [scaleX skewX transX; skewY scaleY transY; 0 0 1].
-  float ca = c[0];  // scaleX
-  float cc = c[1];  // skewX
-  float ctx = c[2];
-  float cb = c[3];  // skewY
-  float cd = c[4];  // scaleY
-  float cty = c[5];
-  float ta = t[0];
-  float tc = t[1];
-  float ttx = t[2];
-  float tb = t[3];
-  float td = t[4];
-  float tty = t[5];
-
-  float cScaleX = std::sqrt(ca * ca + cb * cb);
-  float cRot = std::atan2(cb, ca);
-  float cCos = std::cos(cRot);
-  float cSin = std::sin(cRot);
-  float cShearC = cCos * cc + cSin * cd;
-  float cScaleY = -cSin * cc + cCos * cd;
-  float cSkew = cScaleY != 0.0f ? std::atan(cShearC / cScaleY) : 0.0f;
-
-  float tScaleX = std::sqrt(ta * ta + tb * tb);
-  float tRot = std::atan2(tb, ta);
-  float tCos = std::cos(tRot);
-  float tSin = std::sin(tRot);
-  float tShearC = tCos * tc + tSin * td;
-  float tScaleY = -tSin * tc + tCos * td;
-  float tSkew = tScaleY != 0.0f ? std::atan(tShearC / tScaleY) : 0.0f;
-
-  float mScaleX = MixFloat(cScaleX, tScaleX, mix);
-  float mScaleY = MixFloat(cScaleY, tScaleY, mix);
-  float mRot = MixFloat(cRot, tRot, mix);
-  float mSkew = MixFloat(cSkew, tSkew, mix);
-  float mTx = MixFloat(ctx, ttx, mix);
-  float mTy = MixFloat(cty, tty, mix);
-
-  float mCos = std::cos(mRot);
-  float mSin = std::sin(mRot);
-  float mTan = std::tan(mSkew);
-  float ra = mCos * mScaleX;
-  float rb = mSin * mScaleX;
-  float rc = (mCos * mTan - mSin) * mScaleY;
-  float rd = (mSin * mTan + mCos) * mScaleY;
-  return tgfx::Matrix::MakeAll(ra, rc, mTx, rb, rd, mTy);
+  // tgfx Matrix get9 layout: [scaleX skewX transX; skewY scaleY transY; 0 0 1]. DecomposeAffine
+  // expects the row-major affine [a c tx; b d ty], i.e. a=scaleX, b=skewY, c=skewX, d=scaleY.
+  auto dCurrent = DecomposeAffine(c[0], c[3], c[1], c[4], c[2], c[5]);
+  auto dTarget = DecomposeAffine(t[0], t[3], t[1], t[4], t[2], t[5]);
+  auto mixed = MixDecomposed(dCurrent, dTarget, mix);
+  float ra = 0;
+  float rb = 0;
+  float rc = 0;
+  float rd = 0;
+  float rtx = 0;
+  float rty = 0;
+  RecomposeAffine(mixed, &ra, &rb, &rc, &rd, &rtx, &rty);
+  return tgfx::Matrix::MakeAll(ra, rc, rtx, rb, rd, rty);
 }
 
 }  // namespace pagx

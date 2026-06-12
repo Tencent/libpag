@@ -23,6 +23,7 @@
 #include <string>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/utils/ColorSpaceUtils.h"
@@ -67,80 +68,17 @@ inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /
   return a;
 }
 
-// Decomposed form of a 2D affine matrix used for interpolation. Interpolating these components
-// independently (rather than the raw matrix entries) keeps rotation angular and scale uniform so a
-// matrix tween follows the natural translate/rotate/scale/skew path instead of shearing through
-// intermediate non-orthogonal states.
-struct DecomposedMatrix {
-  float translateX = 0;
-  float translateY = 0;
-  float rotation = 0;  // radians
-  float scaleX = 1;
-  float scaleY = 1;
-  float skew = 0;  // radians, horizontal shear after rotation
-};
-
-// Decomposes a 2D affine matrix into translate / rotation / scale / skew. Uses the standard QR-like
-// decomposition of the [a c; b d] linear part: the first basis column gives rotation and scaleX,
-// the shear of the second column gives skew, and the remaining magnitude gives scaleY.
-inline DecomposedMatrix DecomposeMatrix(const Matrix& m) {
-  DecomposedMatrix out = {};
-  out.translateX = m.tx;
-  out.translateY = m.ty;
-  float scaleX = std::sqrt(m.a * m.a + m.b * m.b);
-  float rotation = std::atan2(m.b, m.a);
-  // Remove rotation from the second column to expose shear and scaleY.
-  float cosR = std::cos(rotation);
-  float sinR = std::sin(rotation);
-  float shearedC = cosR * m.c + sinR * m.d;
-  float shearedD = -sinR * m.c + cosR * m.d;
-  float scaleY = shearedD;
-  float skew = scaleY != 0.0f ? (shearedC / scaleY) : 0.0f;
-  out.rotation = rotation;
-  out.scaleX = scaleX;
-  out.scaleY = scaleY;
-  out.skew = std::atan(skew);
-  return out;
-}
-
-// Recomposes a 2D affine matrix from decomposed components, inverting DecomposeMatrix.
-inline Matrix RecomposeMatrix(const DecomposedMatrix& d) {
-  float cosR = std::cos(d.rotation);
-  float sinR = std::sin(d.rotation);
-  float tanSkew = std::tan(d.skew);
-  // Linear part = Rotation * Skew * Scale, matching the decomposition order.
-  float a = cosR * d.scaleX;
-  float b = sinR * d.scaleX;
-  float c = (cosR * tanSkew - sinR) * d.scaleY;
-  float dd = (sinR * tanSkew + cosR) * d.scaleY;
-  Matrix m = {};
-  m.a = a;
-  m.b = b;
-  m.c = c;
-  m.d = dd;
-  m.tx = d.translateX;
-  m.ty = d.translateY;
-  return m;
-}
-
 template <>
 inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double t) {
-  // Limitation: rotation is recovered via atan2 in DecomposeMatrix, so it is confined to (-pi, pi]
-  // and winding (full turns) is lost. The lerp takes the literal path between the two recovered
-  // angles rather than the shortest arc, so a keyframe pair crossing the +/-pi boundary spins the
-  // long way. This is inherent to interpolating baked matrices: the authored angle cannot be
-  // reconstructed from the matrix alone. Keyframes needing precise multi-turn or boundary-crossing
-  // rotation should target a scalar rotation channel (e.g. Group::rotation) instead of a Matrix.
-  auto da = DecomposeMatrix(a);
-  auto db = DecomposeMatrix(b);
-  DecomposedMatrix mixed = {};
-  mixed.translateX = static_cast<float>(da.translateX + (db.translateX - da.translateX) * t);
-  mixed.translateY = static_cast<float>(da.translateY + (db.translateY - da.translateY) * t);
-  mixed.rotation = static_cast<float>(da.rotation + (db.rotation - da.rotation) * t);
-  mixed.scaleX = static_cast<float>(da.scaleX + (db.scaleX - da.scaleX) * t);
-  mixed.scaleY = static_cast<float>(da.scaleY + (db.scaleY - da.scaleY) * t);
-  mixed.skew = static_cast<float>(da.skew + (db.skew - da.skew) * t);
-  return RecomposeMatrix(mixed);
+  // See MatrixDecompose.h for the winding limitation: matrix rotation interpolation cannot recover
+  // full turns, so keyframes needing precise multi-turn or +/-pi-boundary rotation should target a
+  // scalar rotation channel (e.g. Group::rotation) instead of a Matrix.
+  auto da = DecomposeAffine(a.a, a.b, a.c, a.d, a.tx, a.ty);
+  auto db = DecomposeAffine(b.a, b.b, b.c, b.d, b.tx, b.ty);
+  auto mixed = MixDecomposed(da, db, static_cast<float>(t));
+  Matrix result = {};
+  RecomposeAffine(mixed, &result.a, &result.b, &result.c, &result.d, &result.tx, &result.ty);
+  return result;
 }
 
 // Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.
