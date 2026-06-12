@@ -383,8 +383,8 @@ static std::vector<ChannelDef> BuildPolystarFields() {
 
 static std::vector<ChannelDef> BuildPathFields() {
   std::vector<ChannelDef> table = {
-      FIELD_POINT_X(Path, "position.x", position, Anim),
-      FIELD_POINT_Y(Path, "position.y", position, Anim),
+      FIELD_POINT_X(Path, "position.x", position, Layout),
+      FIELD_POINT_Y(Path, "position.y", position, Layout),
       FIELD_BOOL(Path, "reversed", reversed, NoFlags),
   };
   AppendLayoutNodeFields<Path>(table);
