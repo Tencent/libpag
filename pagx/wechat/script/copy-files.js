@@ -190,3 +190,4 @@ copyFiles('./lib/', './wx_demo/utils',
   overwrite: true,
   preserveStructure: true
 });
+

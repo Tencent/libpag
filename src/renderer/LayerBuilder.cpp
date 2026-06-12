@@ -181,8 +181,10 @@ class LayerBuilderContext {
       }
       resolvePendingMasks();
     }
-    _result.root = root;
-    return std::move(_result);
+    LayerBuildResult result = std::move(_result);
+    _result = {};
+    result.root = root;
+    return result;
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
@@ -962,14 +964,12 @@ class LayerBuilderContext {
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (!pattern) {
-      return pattern;
+      return nullptr;
     }
-    if (pattern) {
-      _result.binding.set(node, pattern);
-      pattern->setScaleMode(ToTGFX(node->scaleMode));
-      if (!node->matrix.isIdentity()) {
-        pattern->setMatrix(ToTGFX(node->matrix));
-      }
+    _result.binding.set(node, pattern);
+    pattern->setScaleMode(ToTGFX(node->scaleMode));
+    if (!node->matrix.isIdentity()) {
+      pattern->setMatrix(ToTGFX(node->matrix));
     }
 
     return pattern;

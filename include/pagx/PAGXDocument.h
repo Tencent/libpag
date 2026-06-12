@@ -131,7 +131,7 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded.Image nodes whose decoded image has
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes whose decoded image has
    * already been supplied (via loadDecodedImage) are also excluded so the same resource is not
    * fetched twice.
    */
@@ -201,7 +201,7 @@ class PAGXDocument : public Node {
   /**
    * Clears the thumbnailImage field on every Image node matching the given file path. Used by
    * the thumbnail budget eviction path. As with clearDecodedImage(), the filePath is preserved
-   * so a new thumbnail can be attached on a later attachNativeImage() call.
+   * so a new thumbnail can be attached via loadDecodedImageAsThumbnail().
    *
    * @param filePath the external file path to match against Image nodes
    * @return the first matching Image node, or nullptr if no match was found.
