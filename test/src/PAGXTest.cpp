@@ -6999,7 +6999,7 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
 
-  auto layer = doc->makeNode<pagx::Layer>();
+  auto layer = doc->makeNode<pagx::Layer>("hitLayerId");
   layer->name = "HitLayer";
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->position = {50, 40};
@@ -7018,6 +7018,8 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto hits = file->getLayersUnderPoint(50, 40);
   ASSERT_FALSE(hits.empty());
   EXPECT_EQ(hits[0]->name(), "HitLayer");
+  // The handle also exposes the source node's id (the "@id" used for document references).
+  EXPECT_EQ(hits[0]->id(), "hitLayerId");
 
   auto miss = file->getLayersUnderPoint(180, 180);
   EXPECT_TRUE(miss.empty());
