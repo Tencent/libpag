@@ -49,7 +49,7 @@ From this directory (`pagx/wechat/`):
 
 ```bash
 npm install
-npm run build:wechat
+npm run build
 ```
 
 This single command runs the full pipeline:
@@ -77,7 +77,7 @@ node script/cmake.wx.js -a wasm
 Only rebuild the JS bundle (no wasm):
 
 ```bash
-npm run build:wechat:js
+npm run build:js
 ```
 
 Clean wasm build cache (forces a full rebuild next time):
@@ -102,7 +102,7 @@ After a successful build, the distributable files are:
 
 `wx_demo/` is a minimal WeChat Mini Program that consumes the built viewer.
 Open the directory in WeChat Developer Tools (微信开发者工具) and click
-**Run**. Any time you rebuild with `npm run build:wechat`, the demo's
+**Run**. Any time you rebuild with `npm run build`, the demo's
 `utils/` folder is refreshed automatically.
 
 ## Troubleshooting

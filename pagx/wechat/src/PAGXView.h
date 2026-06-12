@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <deque>
-#include <emscripten/bind.h>
+#include <emscripten/val.h>
 #include <memory>
 #include <string>
 #include <unordered_map>

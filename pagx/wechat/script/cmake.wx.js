@@ -42,4 +42,9 @@ if (!fs.existsSync("../lib")) {
     fs.mkdirSync("../lib", {recursive: true});
 }
 
-fs.copyFileSync("../wasm/pagx-viewer.wasm", "../lib/pagx-viewer.wasm")
+const wasmFile = "../wasm/pagx-viewer.wasm";
+if (!fs.existsSync(wasmFile)) {
+    console.error("WASM file not found. CMake build may have failed:", wasmFile);
+    process.exit(1);
+}
+fs.copyFileSync(wasmFile, "../lib/pagx-viewer.wasm")

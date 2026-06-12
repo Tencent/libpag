@@ -46,7 +46,7 @@ cd /path/to/libpag
 
 ```bash
 npm install
-npm run build:wechat
+npm run build
 ```
 
 这条命令会依次执行完整流水线：

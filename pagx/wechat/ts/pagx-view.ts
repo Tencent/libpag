@@ -975,8 +975,8 @@ export class View {
     }
 
     // Calculate display size for WeChat MiniProgram
-    const displayWidth = (this.canvas as any).displayWidth || this.canvas.width;
-    const displayHeight = (this.canvas as any).displayHeight || this.canvas.height;
+    const displayWidth = (this.canvas as any).displayWidth !== undefined ? (this.canvas as any).displayWidth : this.canvas.width;
+    const displayHeight = (this.canvas as any).displayHeight !== undefined ? (this.canvas as any).displayHeight : this.canvas.height;
 
     this.canvas.width = displayWidth * this.dpr;
     this.canvas.height = displayHeight * this.dpr;
@@ -996,7 +996,11 @@ export class View {
     }
 
     this.backendContext.makeCurrent(this.module);
-    this.nativeView!.draw();
+    try {
+      this.nativeView!.draw();
+    } catch (e) {
+      // Draw failure should not kill the render loop. Log and continue.
+    }
     this.backendContext.clearCurrent(this.module);
 
     if (!this.firstFrameCallbackFired && this.nativeView!.firstFrameRendered()) {
@@ -1097,7 +1101,7 @@ export class View {
       .toString(36)
       .slice(2, 8)}`;
     const tempPath = `${base}/${unique}`;
-    const buffer = bytes instanceof Uint8Array ? bytes.buffer : bytes;
+    const buffer = bytes instanceof Uint8Array ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes;
     (fs as any).writeFileSync(tempPath, buffer);
     try {
       return await View.decodeImageFromPath(tempPath);

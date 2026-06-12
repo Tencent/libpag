@@ -1,7 +1,6 @@
 {
   "pages": [
-    "pages/viewer/viewer",
-    "pages/image-decode-poc/poc"
+    "pages/viewer/viewer"
   ],
   "window": {
     "navigationBarTitleText": "PAGX Viewer",

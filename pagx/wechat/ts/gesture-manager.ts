@@ -57,6 +57,7 @@ export class WXGestureManager {
   private lastZoomChangeTime: number = 0;
   private zoomStableCheckTimer: number | null = null;
   private isZooming: boolean = false;
+  private isDestroyed: boolean = false;
   
   // Event listeners
   private listeners: Record<string, EventListener[]> = {};
@@ -270,6 +271,7 @@ export class WXGestureManager {
         
         // Start new timer to check stability
         this.zoomStableCheckTimer = setTimeout(() => {
+          if (this.isDestroyed) return;
           this.checkZoomStability();
         }, ZOOM_STABLE_THRESHOLD_MS) as any;
       }
@@ -385,6 +387,7 @@ export class WXGestureManager {
    * Cleanup resources and remove all listeners.
    */
   public destroy(): void {
+    this.isDestroyed = true;
     this.clearZoomStableTimer();
     this.listeners = {};
   }

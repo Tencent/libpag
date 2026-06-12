@@ -134,7 +134,7 @@ export const replaceFunctionConfig = [
     name: 'replace craftInvokerFunction',
     start: 'function craftInvokerFunction(humanName, argTypes, classType, cppInvokerFunc, cppTargetFunc)',
     end: 'function heap32VectorToArray(count, firstElement)',
-    type: 'funtcion',
+    type: 'function',
     replaceStr: function craftInvokerFunction(humanName, argTypes, classType, cppInvokerFunc, cppTargetFunc) {
       var createOption = {};
       createOption.argCount = argTypes.length;

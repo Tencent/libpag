@@ -38,14 +38,14 @@ export class BackendContext {
    */
   public static from(module: PAGX, gl: WebGL2RenderingContext): BackendContext {
     const { GL } = module;
-    let id = 0;
+    let id = -1;
 
     // Check if context is already registered
     if (GL.contexts.length > 0) {
       id = GL.contexts.findIndex((context: any) => context?.GLctx === gl);
     }
 
-    if (id < 1) {
+    if (id < 0) {
       // Register new context to Emscripten (WebGL 2 only)
       id = GL.registerContext(gl, {
         majorVersion: 2,
