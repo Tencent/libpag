@@ -115,6 +115,12 @@ else ()
     add_library(pagx-viewer SHARED ${PAGX_VIEWER_FILES})
 endif ()
 
+target_include_directories(pagx-viewer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+
+if (NO_LOG)
+    target_compile_definitions(pagx-viewer PRIVATE NO_LOG)
+endif()
+
 target_compile_options(pagx-viewer PUBLIC ${PAGX_VIEWER_COMPILE_OPTIONS})
 target_link_options(pagx-viewer PUBLIC ${PAGX_VIEWER_LINK_OPTIONS})
 target_link_libraries(pagx-viewer pagx-renderer)

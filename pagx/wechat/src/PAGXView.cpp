@@ -40,43 +40,25 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "utils/ImagePatternMatrixCalculator.h"
+#include "base/utils/Log.h"
 
 using namespace emscripten;
 
 namespace pagx {
 
-// Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Each wasm page is 64 KiB.
-// Returns -1 on non-wasm platforms so the same probe can stay in cross-platform code.
-static int64_t SampleWasmHeap() {
-#if defined(__EMSCRIPTEN__) || defined(__wasm__)
-  return static_cast<int64_t>(__builtin_wasm_memory_size(0)) * 65536;
-#else
-  return -1;
-#endif
-}
-
-// One-shot wasm heap log. Format kept simple so it can be grepped from the miniprogram console.
-static void LogMemProbe(const char* tag) {
-  tgfx::PrintLog("[MemProbe] tag=%s wasmHeap=%lld", tag,
-                 static_cast<long long>(SampleWasmHeap()));
-}
-
-// Bucket index for an image's pixel area. Boundaries align with the [Img] log analysis: tiny
-// icons cluster in bucket 0, thumbnail-grade photos in 1-2, full-resolution stuff in 3-5.
-static int ImageSizeBucket(uint64_t pixels) {
-  if (pixels < 10000ULL) return 0;
-  if (pixels < 100000ULL) return 1;
-  if (pixels < 500000ULL) return 2;
-  if (pixels < 1000000ULL) return 3;
-  if (pixels < 2000000ULL) return 4;
-  return 5;
-}
-
+// RGBA bytes per pixel.
+constexpr uint32_t RGBA_BYTES_PER_PIXEL = 4;
+// Byte unit conversions.
+constexpr size_t BYTES_PER_KB = 1024;
+constexpr size_t BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB;
+// Mipmap overhead factor for GPU footprint estimation (4/3 ≈ 1.33x).
+constexpr uint64_t MIPMAP_FACTOR_NUM = 4;
+constexpr uint64_t MIPMAP_FACTOR_DEN = 3;
 // GPU resource cache limit. Capped at 512MB on iOS WeChat: 1GB and 768MB both led to the
 // mini-program being terminated under memory pressure (observed in production logs).
 // 512MB causes more eviction churn during pan/zoom on image-heavy PAGX, but a brief
 // retexture is preferable to losing the entire session.
-constexpr size_t MAX_CACHE_LIMIT = 512U * 1024 * 1024;
+constexpr size_t MAX_CACHE_LIMIT = 512U * BYTES_PER_MB;
 // GPU resource expiration in frames. Matches the tgfx default; the byte-capacity path above
 // remains the primary cap.
 constexpr size_t EXPIRATION_FRAMES = 120;
@@ -103,6 +85,79 @@ constexpr double SLOW_FRAME_LOG_THRESHOLD_MS = 200.0;
 // when investigating a frame-pacing regression. `if constexpr` lets the compiler fully strip the
 // log branches when disabled, so there is zero runtime cost in the default configuration.
 constexpr bool DRAW_LOG_ENABLED = false;
+// Wasm page size in bytes (64 KiB per page).
+constexpr size_t WASM_PAGE_SIZE = 65536;
+// Image size bucket thresholds in pixels.
+constexpr uint64_t TINY_BUCKET_MAX = 10000ULL;
+constexpr uint64_t SMALL_BUCKET_MAX = 100000ULL;
+constexpr uint64_t MID_BUCKET_MAX = 500000ULL;
+constexpr uint64_t LARGE_BUCKET_MAX = 1000000ULL;
+constexpr uint64_t XL_BUCKET_MAX = 2000000ULL;
+// Number of image size buckets.
+constexpr size_t IMAGE_SIZE_BUCKET_COUNT = 6;
+// Pixel threshold for [BigImg] log marker (1 MPx).
+constexpr uint64_t BIG_IMG_THRESHOLD = 1000000ULL;
+// Log throttling interval for image load/upgrade logs.
+constexpr uint32_t IMAGE_LOG_THROTTLE = 32;
+// Default background color.
+const auto DEFAULT_BG_COLOR = tgfx::Color::FromRGBA(245, 245, 245);
+// Display list tile and subtree cache configuration.
+constexpr size_t DEFAULT_MAX_TILE_COUNT = 256;
+constexpr size_t DEFAULT_SUBTREE_CACHE_SIZE = 2048;
+// Subtree cache size when zoomed out.
+constexpr size_t ZOOMED_OUT_SUBTREE_CACHE_SIZE = 1024;
+// Zoom drift margin to absorb float imprecision.
+constexpr float ZOOM_DRIFT_MARGIN = 1.02f;
+// Fit content scale threshold for high-resolution offscreen capture.
+constexpr float HIGH_RES_FIT_SCALE_THRESHOLD = 0.15f;
+// High-resolution pixel scale for offscreen capture.
+constexpr float HIGH_RES_PIXEL_SCALE = 2.0f;
+// Default pixel scale.
+constexpr float DEFAULT_PIXEL_SCALE = 1.0f;
+// Post-zoom-end delay before retrying tile refinement upgrade (ms).
+constexpr double POST_ZOOM_UPGRADE_DELAY_MS = 200.0;
+// Default ImagePattern scale factor (matches ImagePatternMatrixCalculator default).
+constexpr float DEFAULT_IMAGE_SCALE_FACTOR = 0.5f;
+// Tile refinement zoom divisor for zoomed-out content.
+constexpr float TILE_REFINEMENT_ZOOM_DIVISOR = 0.33f;
+// Max tile refinement count per frame.
+constexpr int MAX_TILE_REFINEMENT = 3;
+// CoCraft business-enum scale mode values.
+constexpr int SCALE_MODE_FILL = 0;
+constexpr int SCALE_MODE_FIT = 1;
+constexpr int SCALE_MODE_STRETCH = 2;
+constexpr int SCALE_MODE_TILE = 3;
+// GPU probe log interval in frames.
+constexpr int GPU_PROBE_INTERVAL = 60;
+
+
+
+// Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Each wasm page is 64 KiB.
+// Returns -1 on non-wasm platforms so the same probe can stay in cross-platform code.
+static int64_t SampleWasmHeap() {
+#if defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return static_cast<int64_t>(__builtin_wasm_memory_size(0)) * WASM_PAGE_SIZE;
+#else
+  return -1;
+#endif
+}
+
+// One-shot wasm heap log. Format kept simple so it can be grepped from the miniprogram console.
+static void LogMemProbe(const char* tag) {
+  LOGI("[MemProbe] tag=%s wasmHeap=%lld", tag,
+                 static_cast<long long>(SampleWasmHeap()));
+}
+
+// Bucket index for an image's pixel area. Boundaries align with the [Img] log analysis: tiny
+// icons cluster in bucket 0, thumbnail-grade photos in 1-2, full-resolution stuff in 3-5.
+static int ImageSizeBucket(uint64_t pixels) {
+  if (pixels < TINY_BUCKET_MAX) return 0;
+  if (pixels < SMALL_BUCKET_MAX) return 1;
+  if (pixels < MID_BUCKET_MAX) return 2;
+  if (pixels < LARGE_BUCKET_MAX) return 3;
+  if (pixels < XL_BUCKET_MAX) return 4;
+  return 5;
+}
 
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   if (width <= 0 || height <= 0) {
@@ -164,11 +219,11 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
   // that produced visible stair-stepping without fixing the underlying shape-rasterize cost.
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Fast);
-  displayList.setMaxTileCount(256);
+  displayList.setMaxTileCount(DEFAULT_MAX_TILE_COUNT);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
   // Subtree cache: caches static layers as textures to avoid per-layer shape retriangulation,
   // the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton shapes).
-  displayList.setSubtreeCacheMaxSize(2048);
+  displayList.setSubtreeCacheMaxSize(DEFAULT_SUBTREE_CACHE_SIZE);
 }
 
 PAGXView::~PAGXView() {
@@ -228,7 +283,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   fitSnapshot = nullptr;
   cachedVersion++;
   fitVersion = 0;
-  fitSnapshotPixelScale = 1.0f;
+  fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   gestureActive = false;
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
@@ -287,7 +342,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   document = PAGXImporter::FromXML(data->bytes(), data->size());
   if (document) {
     auto paths = document->getExternalFilePaths();
-    tgfx::PrintLog(
+    LOGI(
         "[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
         static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
   } else {
@@ -338,23 +393,23 @@ bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val&
   // Always log size for each loaded image, plus a [BigImg] marker when a single image is
   // unusually large (≥ 1 MPx). 1280×1280 = 1.64 MPx is the imageMogr2 default cap; anything
   // bigger means CDN side did not honor the thumbnail params for this asset.
-  tgfx::PrintLog("[Img] load path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
+  LOGI("[Img] load path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
                  tgfxImage->width(), tgfxImage->height(),
                  static_cast<double>(pixels) / 1e6);
-  if (pixels >= 1000000ULL) {
-    tgfx::PrintLog("[BigImg] LOAD path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
+  if (pixels >= BIG_IMG_THRESHOLD) {
+    LOGI("[BigImg] LOAD path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
                    filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
                    static_cast<double>(pixels) / 1e6,
-                   static_cast<unsigned long long>(pixels * 4 / 1024));
+                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
   }
-  // Throttled probe: every 32 images log a roll-up to keep the console readable on
+  // Throttled probe: every IMAGE_LOG_THROTTLE images log a roll-up to keep the console readable on
   // image-heavy documents.
-  if ((imageDecodedCount % 32) == 0) {
-    tgfx::PrintLog(
+  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
+    LOGI(
         "[MemProbe] tag=loadImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
         static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
         static_cast<unsigned long long>(imageDecodedPixelTotal),
-        static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024));
+        static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
   }
 
   auto* imageNode = document->loadDecodedImage(filePath, tgfxImage);
@@ -380,22 +435,22 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
                     static_cast<uint64_t>(tgfxImage->height());
   imageDecodedPixelTotal += pixels;
   imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
-  tgfx::PrintLog("[Img] upgrade path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
+  LOGI("[Img] upgrade path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
                  tgfxImage->width(), tgfxImage->height(),
                  static_cast<double>(pixels) / 1e6);
-  if (pixels >= 1000000ULL) {
-    tgfx::PrintLog("[BigImg] UPGRADE path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
+  if (pixels >= BIG_IMG_THRESHOLD) {
+    LOGI("[BigImg] UPGRADE path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
                    filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
                    static_cast<double>(pixels) / 1e6,
-                   static_cast<unsigned long long>(pixels * 4 / 1024));
+                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
   }
-  if ((imageDecodedCount % 32) == 0) {
-    tgfx::PrintLog(
+  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
+    LOGI(
         "[MemProbe] tag=upgradeImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA) "
         "buckets=[%u,%u,%u,%u,%u,%u]",
         static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
         static_cast<unsigned long long>(imageDecodedPixelTotal),
-        static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024),
+        static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB),
         imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
         imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
   }
@@ -451,7 +506,8 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
     return false;
   }
   uint64_t bytes =
-      static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4ULL * 4ULL / 3ULL;
+      static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * static_cast<uint64_t>(RGBA_BYTES_PER_PIXEL)
+      * MIPMAP_FACTOR_NUM / MIPMAP_FACTOR_DEN;
 
   // Thumbnail budget enforcement: estimate the upload's GPU footprint up front so we can run a
   // silent LRU eviction before queuing. The estimate must match flushPendingUploads' bytes
@@ -470,7 +526,7 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
       projected = thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes;
     }
     if (projected > thumbnailBudget) {
-      tgfx::PrintLog("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d",
+      LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d",
                      filePath.c_str(), width, height);
       return false;
     }
@@ -590,7 +646,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     int textureId = val::module_property("tgfx").call<int>(
         "createBackendTexture", val::module_property("GL"), p.nativeImage);
     if (textureId <= 0) {
-      tgfx::PrintLog("[PAGX] attachNativeImage: createBackendTexture failed path=%s",
+      LOGI("[PAGX] attachNativeImage: createBackendTexture failed path=%s",
                      p.filePath.c_str());
       continue;
     }
@@ -606,7 +662,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     // is released in the same frame the entry is dropped.
     auto tgfxImage = tgfx::Image::MakeFrom(context, backendTex, tgfx::ImageOrigin::TopLeft);
     if (!tgfxImage) {
-      tgfx::PrintLog("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
+      LOGI("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
       // The GL texture was created successfully but tgfx refused to wrap it. Reclaim the
       // texture immediately so we don't leak the GPU memory; queueing into
       // pendingTextureDeletes keeps the actual gl.deleteTexture call inside the same
@@ -776,11 +832,11 @@ void PAGXView::enforceFullBudget() {
   // under handleTextureRequest, oscillating between full and thumbnail at the user's focal
   // point). Throttle the warning so a sustained overflow does not flood the log.
   if (externalTexturesTotalBytes > fullBudget &&
-      currentFrameIndex - lastFullBudgetOverflowWarnFrame >= 60) {
+      currentFrameIndex - lastFullBudgetOverflowWarnFrame >= GPU_PROBE_INTERVAL) {
     lastFullBudgetOverflowWarnFrame = currentFrameIndex;
-    tgfx::PrintLog(
+    LOGI(
         "[PAGX] fullBudget exceeded by %lluMB; %zu visible paths protected from eviction",
-        static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / 1024 / 1024),
+        static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / BYTES_PER_MB),
         visibleCount);
   }
   // Notify the host once per draw with the full batch so JS only takes a single trip across
@@ -1132,20 +1188,20 @@ val PAGXView::getImageMetadata() const {
     if (data.find("image-scale-mode") != data.end()) {
       scaleMode = parseIntAttr(data, "image-scale-mode", 0);
     } else if (pattern->tileModeX == TileMode::Repeat) {
-      scaleMode = 3;  // TILE
+      scaleMode = SCALE_MODE_TILE;
     } else if (pattern->scaleMode == ScaleMode::Zoom) {
-      scaleMode = 0;  // FILL
+      scaleMode = SCALE_MODE_FILL;
     } else if (pattern->scaleMode == ScaleMode::LetterBox) {
-      scaleMode = 1;  // FIT
+      scaleMode = SCALE_MODE_FIT;
     } else {
       // Stretch / None both fall through here. None is only emitted by SVGImporter for
       // absolute-coordinate fills which the WeChat host never feeds through this metadata
       // path, so treating it as STRETCH is a safe fallback for the edge case.
-      scaleMode = 2;  // STRETCH
+      scaleMode = SCALE_MODE_STRETCH;
     }
-    // 0.5 matches the default used by ImagePatternMatrixCalculator so TILE patterns that omit
-    // the attribute behave identically in C++ and JS.
-    float scaleFactor = parseFloatAttr(data, "scale-factor", 0.5f);
+    // DEFAULT_IMAGE_SCALE_FACTOR matches the default used by ImagePatternMatrixCalculator so TILE
+    // patterns that omit the attribute behave identically in C++ and JS.
+    float scaleFactor = parseFloatAttr(data, "scale-factor", DEFAULT_IMAGE_SCALE_FACTOR);
 
     if (pathIndex.find(filePath) == pathIndex.end()) {
       pathIndex[filePath] = static_cast<int>(orderedPaths.size());
@@ -1189,12 +1245,12 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  tgfx::PrintLog(
+  LOGI(
       "[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
       static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
       static_cast<unsigned long long>(imageDecodedPixelTotal),
-      static_cast<unsigned long long>(imageDecodedPixelTotal * 4 / 1024 / 1024));
-  tgfx::PrintLog(
+      static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
+  LOGI(
       "[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
       imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
       imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
@@ -1231,7 +1287,7 @@ void PAGXView::buildLayers() {
 
 void PAGXView::applyDocumentCustomData() {
   backgroundVisible = false;
-  backgroundTGFXColor = tgfx::Color::FromRGBA(245, 245, 245);
+  backgroundTGFXColor = DEFAULT_BG_COLOR;
   auto& customData = document->customData;
   auto visibleIt = customData.find("bg-visible");
   if (visibleIt != customData.end()) {
@@ -1284,7 +1340,7 @@ void PAGXView::updateSize(int width, int height) {
   fitSnapshot = nullptr;
   cachedVersion++;
   fitVersion = 0;
-  fitSnapshotPixelScale = 1.0f;
+  fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   gestureActive = false;
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
@@ -1365,7 +1421,7 @@ void PAGXView::setSnapshotEnabled(bool enabled) {
     // (the caller's gesture lifecycle is independent), but with no snapshot the fast path
     // in draw() naturally falls through to the full-render branch.
     fitSnapshot = nullptr;
-    fitSnapshotPixelScale = 1.0f;
+    fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
     fitVersion++;
     zoomedOutFrameSettled = false;
   }
@@ -1433,7 +1489,7 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   // View changed, invalidate the zoom-out idle token so the next draw() re-evaluates.
   zoomedOutFrameSettled = false;
   if (zoom <= 1.0f) {
-    displayList.setSubtreeCacheMaxSize(1024);
+    displayList.setSubtreeCacheMaxSize(ZOOMED_OUT_SUBTREE_CACHE_SIZE);
   } else {
     displayList.setSubtreeCacheMaxSize(0);
   }
@@ -1470,7 +1526,7 @@ void PAGXView::onZoomEnd() {
   currentMaxTilesRefinedPerFrame = 1;
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 
-  tryUpgradeTimestampMs = emscripten_get_now() + 200.0;
+  tryUpgradeTimestampMs = emscripten_get_now() + POST_ZOOM_UPGRADE_DELAY_MS;
 }
 
 bool PAGXView::draw() {
@@ -1493,7 +1549,7 @@ bool PAGXView::draw() {
   // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
   // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
   // those post-first-render content changes would be silently dropped.
-  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && liveZoom <= 1.02f &&
+  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && liveZoom <= ZOOM_DRIFT_MARGIN &&
       !displayList.hasContentChanged()) {
     return true;
   }
@@ -1511,7 +1567,7 @@ bool PAGXView::draw() {
   // pan/zoom feedback even when async upgrades land mid-gesture; the snapshot will be
   // refreshed on the next non-gesture frame.
   bool fitOnly = snapshotEnabled && !gestureActive && fitSnapshot != nullptr &&
-                 liveZoom <= 1.02f && !displayList.hasContentChanged();
+                 liveZoom <= ZOOM_DRIFT_MARGIN && !displayList.hasContentChanged();
   if (snapshotEnabled && (gestureActive || fitOnly) && surface != nullptr &&
       fitSnapshot != nullptr) {
     auto context = device->lockContext();
@@ -1634,21 +1690,21 @@ bool PAGXView::draw() {
     // legacy: it counts only wasm-decoded loads via loadFileDataAsNativeImage, so the
     // attachNativeImage path does not increment it; expect imageCount=0 in cocraft scenarios.
     static int gpuProbeCounter = 0;
-    if ((gpuProbeCounter++ % 60) == 0) {
-      tgfx::PrintLog(
+    if ((gpuProbeCounter++ % GPU_PROBE_INTERVAL) == 0) {
+      LOGI(
           "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
           "imageCount=%u externalFull=%zu/%lluMB(budget=%lluMB) "
           "thumb=%zu/%lluMB(budget=%lluMB) pendingUploads=%zu",
-          static_cast<unsigned long long>(context->memoryUsage() / 1024 / 1024),
-          static_cast<unsigned long long>(context->purgeableBytes() / 1024 / 1024),
-          static_cast<unsigned long long>(context->cacheLimit() / 1024 / 1024),
+          static_cast<unsigned long long>(context->memoryUsage() / BYTES_PER_MB),
+          static_cast<unsigned long long>(context->purgeableBytes() / BYTES_PER_MB),
+          static_cast<unsigned long long>(context->cacheLimit() / BYTES_PER_MB),
           imageDecodedCount,
           externalTextures.size(),
-          static_cast<unsigned long long>(externalTexturesTotalBytes / 1024 / 1024),
-          static_cast<unsigned long long>(fullBudget / 1024 / 1024),
+          static_cast<unsigned long long>(externalTexturesTotalBytes / BYTES_PER_MB),
+          static_cast<unsigned long long>(fullBudget / BYTES_PER_MB),
           thumbnailTextures.size(),
-          static_cast<unsigned long long>(thumbnailTexturesTotalBytes / 1024 / 1024),
-          static_cast<unsigned long long>(thumbnailBudget / 1024 / 1024),
+          static_cast<unsigned long long>(thumbnailTexturesTotalBytes / BYTES_PER_MB),
+          static_cast<unsigned long long>(thumbnailBudget / BYTES_PER_MB),
           pendingUploads.size());
     }
 
@@ -1665,9 +1721,9 @@ bool PAGXView::draw() {
       if (snapshotEnabled && hasContent && fitMissing) {
         float fitContentScale = computeFitScale();
         // 内存按 N² 增长（2x≈57MB, 4x≈230MB），iOS 512MB 限制下封顶 2x。
-        float pixelScale = fitContentScale < 0.15f ? 2.0f : 1.0f;
+        float pixelScale = fitContentScale < HIGH_RES_FIT_SCALE_THRESHOLD ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
 
-        if (pixelScale > 1.0f) {
+        if (pixelScale > DEFAULT_PIXEL_SCALE) {
           int offW = static_cast<int>(_width * pixelScale);
           int offH = static_cast<int>(_height * pixelScale);
           auto offscreen = tgfx::Surface::Make(context, offW, offH);
@@ -1701,11 +1757,11 @@ bool PAGXView::draw() {
             displayList.setContentOffset(savedOffset.x, savedOffset.y);
           } else {
             fitSnapshot = surface->makeImageSnapshot();
-            fitSnapshotPixelScale = 1.0f;
+            fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
           }
         } else {
           fitSnapshot = surface->makeImageSnapshot();
-          fitSnapshotPixelScale = 1.0f;
+          fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
           // makeImageSnapshot 在 externallyOwned surface（小程序 main canvas）上会创建
           // 一个异步 copy 任务。如果不立刻 flush，这个 copy 会延迟到下次 draw 时执行，
           // 那时 surface 上的像素可能已被新一次 render 覆盖，导致快照拿到错误内容。
@@ -1749,7 +1805,7 @@ bool PAGXView::draw() {
       // larger than the canvas itself means most fragment work is wasted off-screen.
       float drawWidthPx = pagxWidth * effectiveScale;
       float drawHeightPx = pagxHeight * effectiveScale;
-      tgfx::PrintLog(
+      LOGI(
           "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
           "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
           "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
@@ -1763,7 +1819,7 @@ bool PAGXView::draw() {
   // First-frame breakdown for telemetry.
   if constexpr (DRAW_LOG_ENABLED) {
     if (wasFirstFrame && hasRenderedFirstFrame) {
-      tgfx::PrintLog(
+      LOGI(
           "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
           "flush=%.2fms submit=%.2fms unlock=%.2fms",
           frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs);
@@ -1828,7 +1884,7 @@ void PAGXView::resetForFreshCapture() {
   fitSnapshot = nullptr;
   cachedVersion++;
   fitVersion = 0;
-  fitSnapshotPixelScale = 1.0f;
+  fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   hasRenderedFirstFrame = false;
   zoomedOutFrameSettled = false;
 }
@@ -1881,11 +1937,11 @@ int PAGXView::calculateTargetTileRefinement(float zoom) const {
   }
 
   if (zoom < 1.0f) {
-    int count = static_cast<int>(zoom / 0.33f) + 1;
-    return std::clamp(count, 1, 3);
+    int count = static_cast<int>(zoom / TILE_REFINEMENT_ZOOM_DIVISOR) + 1;
+    return std::clamp(count, 1, MAX_TILE_REFINEMENT);
   }
 
-  return 3;
+  return MAX_TILE_REFINEMENT;
 }
 
 void PAGXView::updateAdaptiveTileRefinement() {
