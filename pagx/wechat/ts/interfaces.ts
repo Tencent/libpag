@@ -36,7 +36,7 @@ export interface wx {
 export interface FileSystemManager {
   accessSync: (path: string) => void;
   mkdirSync: (path: string) => void;
-  writeFileSync: (path: string, data: string | ArrayBuffer, encoding: string) => void;
+  writeFileSync: (path: string, data: string | ArrayBuffer, encoding?: string) => void;
   unlinkSync: (path: string) => void;
   readdirSync: (path: string) => string[];
 }

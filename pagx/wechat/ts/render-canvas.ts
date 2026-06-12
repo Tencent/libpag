@@ -89,7 +89,7 @@ export class RenderCanvas {
    */
   public release(): void {
     this.retainCount -= 1;
-    if (this.retainCount === 0) {
+    if (this.retainCount <= 0) {
       // Remove from global list
       const index = renderCanvasList.indexOf(this);
       if (index >= 0) {

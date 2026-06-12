@@ -690,17 +690,29 @@ function scoreBgBlurAreaRadius(value: number): number {
   );
 }
 
+// Empirical calibration weights for the image runtime-risk heuristic, mirroring the Python
+// reference scorer. Each divisor normalizes a raw count/area into the formula's unit scale.
+const RUNTIME_RISK_DOWNSCALE_BASELINE_MP = 10;
+const RUNTIME_RISK_LAYER_COMPLEXITY_DIVISOR = 1500;
+const RUNTIME_RISK_TEXT_COMPLEXITY_DIVISOR = 400;
+const RUNTIME_RISK_INNER_SHADOW_COMPLEXITY_DIVISOR = 10;
+const RUNTIME_RISK_BG_BLUR_RADIUS_DIVISOR = 60;
+const RUNTIME_RISK_LAYOUT_LAYER_DIVISOR = 6000;
+const RUNTIME_RISK_LAYOUT_DOC_MP_DIVISOR = 100;
+
 function getImageRuntimeRisk(raw: LocalRiskRaw): number {
-  const effectiveDownscaleMP = Math.max(0, raw.imageDownscaleMP - 10);
+  const effectiveDownscaleMP = Math.max(0, raw.imageDownscaleMP - RUNTIME_RISK_DOWNSCALE_BASELINE_MP);
   if (effectiveDownscaleMP <= 0) return 0;
 
-  const contentComplexity = raw.layerCount / 1500 + raw.textCount / 400 + raw.innerShadowCount / 10;
+  const contentComplexity = raw.layerCount / RUNTIME_RISK_LAYER_COMPLEXITY_DIVISOR
+    + raw.textCount / RUNTIME_RISK_TEXT_COMPLEXITY_DIVISOR
+    + raw.innerShadowCount / RUNTIME_RISK_INNER_SHADOW_COMPLEXITY_DIVISOR;
   const bgBlurInteraction = raw.bgBlurAreaRadius > 0
     && raw.bgBlurAreaRadius <= LOCAL_RISK_PATHS.bgBlurAreaRadius.red
-    ? (raw.bgBlurAreaRadius / 60) * contentComplexity
+    ? (raw.bgBlurAreaRadius / RUNTIME_RISK_BG_BLUR_RADIUS_DIVISOR) * contentComplexity
     : 0;
   const layoutInteraction = raw.imageDownscaleMP >= LOCAL_RISK_PATHS.imageLoadMP.yellow
-    ? raw.layerCount / 6000 + raw.docMP / 100
+    ? raw.layerCount / RUNTIME_RISK_LAYOUT_LAYER_DIVISOR + raw.docMP / RUNTIME_RISK_LAYOUT_DOC_MP_DIVISOR
     : 0;
   return effectiveDownscaleMP * (bgBlurInteraction + layoutInteraction);
 }
@@ -824,9 +836,9 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   // 根据设备档位和平台调整阈值
   const riskPaths = getAdjustedRiskPaths(deviceInfo.tier, deviceInfo.platform);
 
-  // 获取文档尺寸
-  const docWidth = parseFloat(root.attribs.width || '0') || 0;
-  const docHeight = parseFloat(root.attribs.height || '0') || 0;
+  // 获取文档尺寸（与 scanLocalRisk 统一走 readNumericAttr，避免 Number/parseFloat 解析分歧）
+  const docWidth = readNumericAttr(root.attribs, 'width');
+  const docHeight = readNumericAttr(root.attribs, 'height');
 
   // 统计 XML 原始标签数量（不展开，用于 layer_xml 风险路径）
   const rawTagCounts = countTagsRaw(root);

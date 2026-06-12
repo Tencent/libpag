@@ -28,7 +28,7 @@ process.env.PATH = process.platform === 'win32'
     : `${emsdkPath}:${emscriptenPath}:${process.env.PATH}`;
 Utils.exec("emsdk install 3.1.20", emsdkPath);
 Utils.exec("emsdk activate 3.1.20", emsdkPath);
-const emsdkEnv = process.platform === 'win32' ? "emsdk_env.bat" : "source emsdk_env.sh";
+const emsdkEnv = process.platform === 'win32' ? "emsdk_env.bat" : ". emsdk_env.sh";
 let result = Utils.execSafe(emsdkEnv, emsdkPath);
 let lines = result.split("\n");
 for (let line of lines) {

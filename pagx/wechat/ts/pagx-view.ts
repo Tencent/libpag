@@ -1000,6 +1000,7 @@ export class View {
       this.nativeView!.draw();
     } catch (e) {
       // Draw failure should not kill the render loop. Log and continue.
+      console.error('[PAGXView] draw failed in render loop:', e);
     }
     this.backendContext.clearCurrent(this.module);
 
@@ -1102,7 +1103,7 @@ export class View {
       .slice(2, 8)}`;
     const tempPath = `${base}/${unique}`;
     const buffer = bytes instanceof Uint8Array ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes;
-    (fs as any).writeFileSync(tempPath, buffer);
+    fs.writeFileSync(tempPath, buffer);
     try {
       return await View.decodeImageFromPath(tempPath);
     } finally {

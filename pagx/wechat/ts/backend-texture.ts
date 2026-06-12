@@ -79,20 +79,32 @@ export const createBackendTexture = (
   if (wxCanvas.isOffscreenCanvas) {
     // WeChat's 2d OffscreenCanvas cannot be used as a TexImageSource directly on iOS. Read
     // back via getImageData; the resulting Uint8ClampedArray is wrapped (no copy) into a
-    // Uint8Array view that texImage2D accepts.
-    const canvasCtx = wxCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
-    const imageData = canvasCtx.getImageData(0, 0, width, height);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      width,
-      height,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength),
-    );
+    // Uint8Array view that texImage2D accepts. If the 2d context is unavailable or the
+    // read-back throws, delete and unregister the texture so its GL.textures id is not leaked.
+    const canvasCtx = wxCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+    if (!canvasCtx) {
+      gl.deleteTexture(tex);
+      GL.textures[id] = null;
+      return 0;
+    }
+    try {
+      const imageData = canvasCtx.getImageData(0, 0, width, height);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        width,
+        height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength),
+      );
+    } catch (e) {
+      gl.deleteTexture(tex);
+      GL.textures[id] = null;
+      return 0;
+    }
   } else {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
   }
