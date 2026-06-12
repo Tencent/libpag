@@ -39,8 +39,21 @@ design" and "the PAGX file", not pipeline internals.
 
 ## Step 0: One-time setup
 
-Before the first conversion, make sure the tools are ready. Run the setup script from anywhere
-inside the repository:
+Before the first conversion, make sure the tools are ready. There are two cases.
+
+**Case A — no repository (regular user, the common case).** Install the published CLI globally;
+the snapshot tool is bundled inside it:
+
+```bash
+npm install -g @libpag/pagx
+```
+
+This stays light — the ~150 MB headless browser is **not** downloaded now. It installs itself
+automatically the first time you run a conversion that needs it (Step 3), into a per-user cache,
+with progress shown on screen. Requires `node` on PATH.
+
+**Case B — inside the libpag repository (contributor).** Run the setup script from anywhere
+inside the repo:
 
 ```bash
 bash .codebuddy/skills/html-to-pagx/scripts/setup.sh
@@ -48,9 +61,10 @@ bash .codebuddy/skills/html-to-pagx/scripts/setup.sh
 
 Expected output ends with `setup: ready`. It checks `node` and `pagx`, installs the snapshot
 tool's dependencies and headless browser if missing, and builds it. If it reports a missing
-headless browser, follow the exact install command it prints, then re-run it. Skip this step on
-later runs unless a conversion fails with a setup-related error (see `references/pipeline.md`
-§Troubleshooting).
+headless browser, follow the exact install command it prints, then re-run it.
+
+Skip this step on later runs unless a conversion fails with a setup-related error (see
+`references/pipeline.md` §Troubleshooting).
 
 ---
 
@@ -92,8 +106,8 @@ Save it as `<name>.html` in the working directory (choose a short, descriptive `
 
 ## Step 3: Convert to PAGX
 
-Run the one-shot converter. It snapshots the page in a browser, imports it to PAGX, resolves it,
-and renders a preview PNG:
+**Inside the libpag repo (Case B):** run the one-shot converter. It snapshots the page in a
+browser, imports it to PAGX, resolves it, and renders a preview PNG:
 
 ```bash
 tools/html-snapshot/html2pagx <name>.html --embed-fonts
@@ -110,6 +124,20 @@ tools/html-snapshot/html2pagx <name>.html --embed-fonts
 Expected: the command prints each step and exits `0`. Warnings about skipped/downgraded CSS are
 normal and usually harmless — see `references/pipeline.md` for what they mean. A hard failure or an
 empty/blank PNG means the design needs a fix (Step 4) or setup is incomplete (Step 0).
+
+**Installed via npm, no repo (Case A):** the one-shot `html2pagx` wrapper is not on PATH, so run
+the built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically (the first call
+triggers the one-time browser download):
+
+```bash
+pagx import --html-snapshot --html-infer-flex --input <name>.html --output <name>.pagx
+pagx resolve <name>.pagx
+pagx render <name>.pagx -o <name>.png   # preview; add --scale 2 for a crisp image
+```
+
+A public URL works the same way (`--input https://… --output <name>.pagx`). Note: this path does
+not auto-embed web fonts — if text renders in the wrong typeface, either install that font on the
+machine, or use the in-repo `html2pagx --embed-fonts` path. See `references/pipeline.md` §Fonts.
 
 See `references/pipeline.md` for all flags (URL inputs, `--download-images`, custom `pagx` binary,
 the warm HTTP server for fast iteration, and a manual step-by-step path for debugging).

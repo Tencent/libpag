@@ -38,7 +38,16 @@ browser actually captured.
 
 ## Setup details
 
-`scripts/setup.sh` automates this; run it once. Manually, the requirements are:
+**Installed via npm (no repo).** `npm install -g @libpag/pagx` ships the snapshot tool bundled
+inside the package, so `tools/html-snapshot/` is not needed. The wrapper points the native binary's
+`--html-snapshot` bridge (`PAGX_HTML_SNAPSHOT_BIN`) at the bundled launcher automatically. Puppeteer
+and its Chromium build are **not** installed by `npm install`; the launcher installs them on the
+first snapshot run into a per-user cache (`~/.cache/libpag-pagx/html-snapshot`, or `%LOCALAPPDATA%`
+on Windows; override with `PAGX_HTML_SNAPSHOT_CACHE`). Set `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL=1` to
+disable the auto-install and have the launcher print the manual command instead. The one-shot
+`html2pagx` wrapper and the warm HTTP server below require the repo (Case B).
+
+**Inside the repo.** `scripts/setup.sh` automates this; run it once. Manually, the requirements are:
 
 - **node** on `PATH`.
 - **pagx** CLI: `npm install -g @libpag/pagx` (or build the repo's `cmake-build-debug/pagx` and
@@ -198,6 +207,8 @@ usually-harmless ones:
 
 | Symptom | Cause / fix |
 |---------|-------------|
+| First `pagx import --html-snapshot` is slow / downloads ~150 MB | Expected one-time install of the bundled headless browser into the per-user cache. Subsequent runs are fast. To pre-install or relocate it, see §Setup details (`PAGX_HTML_SNAPSHOT_CACHE`, `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL`). |
+| `pagx html-snapshot: error: failed to install puppeteer` (npm path) | The launcher could not auto-install the browser (no network / no `npm` on PATH). Run the exact command it printed, then retry; or use a machine with the repo (Case B). |
 | `pagx binary not found or not executable` | Install `pagx` (`npm install -g @libpag/pagx`) or pass `--pagx-bin <path>`. |
 | `'puppeteer' is not installed` / `bundled Chrome is missing` | Run `npm install` in `tools/html-snapshot`, then the `puppeteer browsers install chrome` command the tool prints. |
 | `cannot find module './dist/...'` | The tool was not built. Run `npm run build` in `tools/html-snapshot`. |

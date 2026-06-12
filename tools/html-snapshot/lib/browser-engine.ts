@@ -76,9 +76,12 @@ function loadEngine(engine: EngineName): EngineLauncher {
     mod = require(pkg);
   } catch (err) {
     const hint = engine === 'playwright'
-      ? `Run \`npm install --prefix tools/html-snapshot playwright\` and then\n`
-        + `\`npx --prefix tools/html-snapshot playwright install chromium\` to fetch the browser binary.`
-      : `Run \`npm install --prefix tools/html-snapshot\` to install puppeteer.`;
+      ? `Install playwright + its browser: in the libpag repo run\n`
+        + `\`npm install --prefix tools/html-snapshot playwright\` then\n`
+        + `\`npx --prefix tools/html-snapshot playwright install chromium\`.`
+      : `Install puppeteer: in the libpag repo run \`npm install --prefix tools/html-snapshot\`.\n`
+        + `If you installed @libpag/pagx via npm, the bundled launcher installs it automatically `
+        + `on first use — re-run your pagx command (or unset PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL).`;
     const e = new Error(
       `failed to load '${pkg}' for browser engine '${engine}': `
       + `${err && (err as Error).message ? (err as Error).message : err}\n${hint}`,
@@ -343,6 +346,9 @@ export function formatLaunchHint(err: unknown, engine: EngineName): string[] | n
   if (engine === 'playwright') {
     lines.push(`  npx --prefix tools/html-snapshot playwright install chromium`);
   } else {
+    // In the libpag repo the `--prefix tools/html-snapshot` form resolves the
+    // bundled puppeteer; when installed via @libpag/pagx the bundled launcher
+    // normally installs Chromium for you, so this is the explicit fallback.
     lines.push(`  PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer" \\`);
     lines.push(`    npx --prefix tools/html-snapshot puppeteer browsers install chrome`);
   }

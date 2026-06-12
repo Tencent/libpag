@@ -25,7 +25,6 @@ if [ -z "$REPO_ROOT" ]; then
   REPO_ROOT="$d"
 fi
 TOOL_DIR="$REPO_ROOT/tools/html-snapshot"
-[ -d "$TOOL_DIR" ] || die "could not find tools/html-snapshot under $REPO_ROOT"
 
 # --- node -----------------------------------------------------------------
 command -v node >/dev/null 2>&1 || die "node is not installed. Install Node.js (https://nodejs.org) and re-run."
@@ -37,6 +36,17 @@ if ! command -v pagx >/dev/null 2>&1; then
   npm install -g @libpag/pagx || die "failed to install pagx. Install it manually: npm install -g @libpag/pagx"
 fi
 say "pagx $(pagx -v 2>/dev/null | awk '{print $NF}')"
+
+# --- no repository: the snapshot tool is bundled inside @libpag/pagx -------
+# When tools/html-snapshot is absent (a user who only `npm install`-ed the
+# package), there is nothing to build here: `pagx` carries the snapshot tool
+# and installs the headless browser lazily on first use.
+if [ ! -d "$TOOL_DIR" ]; then
+  say "tools/html-snapshot not present; using the snapshot tool bundled in @libpag/pagx"
+  say "the headless browser installs automatically on the first conversion (~150 MB, one-time)"
+  say "ready"
+  exit 0
+fi
 
 # --- snapshot tool: dependencies ------------------------------------------
 if [ ! -d "$TOOL_DIR/node_modules" ]; then
