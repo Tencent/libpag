@@ -5568,13 +5568,9 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
   EXPECT_EQ(timeline->duration(), 1'000'000);
 
-  EXPECT_FALSE(timeline->isPlaying());
+  EXPECT_TRUE(timeline->isPlaying());
   EXPECT_EQ(timeline->currentTime(), 0);
 
-  EXPECT_FALSE(timeline->advance(500'000));
-
-  timeline->play();
-  EXPECT_TRUE(timeline->isPlaying());
   EXPECT_TRUE(timeline->advance(500'000));
   EXPECT_EQ(timeline->currentTime(), 500'000);
 
@@ -5600,7 +5596,6 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   doc->animations.push_back(onceAnim);
 
   auto onceTimeline = file->getTimeline("once");
-  onceTimeline->play();
   EXPECT_TRUE(onceTimeline->advance(2'000'000));
   EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
   EXPECT_FALSE(onceTimeline->isPlaying());
@@ -5620,7 +5615,6 @@ PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
   auto file = pagx::PAGScene::Make(doc);
   auto timeline = file->getTimeline("pp");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   EXPECT_EQ(timeline->currentTime(), 0);
 
   // Forward within first half (pos < duration, straight).
@@ -5666,14 +5660,12 @@ PAGX_TEST(PAGXTest, PAGTimelineNegativeDelta) {
 
   // Loop: negative delta wraps correctly.
   auto loopTl = file->getTimeline("loop");
-  loopTl->play();
   loopTl->setCurrentTime(200'000);
   EXPECT_TRUE(loopTl->advance(-500'000));
   EXPECT_EQ(loopTl->currentTime(), 700'000);
 
   // Once: negative delta stops at 0 and pauses.
   auto onceTl = file->getTimeline("once");
-  onceTl->play();
   onceTl->setCurrentTime(300'000);
   EXPECT_TRUE(onceTl->advance(-500'000));
   EXPECT_EQ(onceTl->currentTime(), 0);
@@ -5694,7 +5686,6 @@ PAGX_TEST(PAGXTest, PAGTimelineZeroDuration) {
   auto file = pagx::PAGScene::Make(doc);
   auto timeline = file->getTimeline("zero");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   EXPECT_FALSE(timeline->advance(100'000));
   EXPECT_EQ(timeline->currentTime(), 0);
 }
@@ -5713,7 +5704,6 @@ PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
   auto scene = pagx::PAGScene::Make(doc);
   auto timeline = scene->getTimeline("loop");
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
   timeline->setCurrentTime(200'000);
 
   scene.reset();
@@ -6570,8 +6560,12 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setMaxTileCount(64);
   EXPECT_EQ(options->getMaxTileCount(), 64);
 
-  options->setAllowZoomBlur(true);
-  EXPECT_TRUE(options->getAllowZoomBlur());
+  EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Immediate);
+  for (auto mode : {pagx::PAGTileUpdateMode::Immediate, pagx::PAGTileUpdateMode::Smooth,
+                    pagx::PAGTileUpdateMode::Fast}) {
+    options->setTileUpdateMode(mode);
+    EXPECT_EQ(options->getTileUpdateMode(), mode);
+  }
 
   options->setMaxTilesRefinedPerFrame(8);
   EXPECT_EQ(options->getMaxTilesRefinedPerFrame(), 8);

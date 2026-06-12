@@ -40,6 +40,17 @@ PAGRenderMode ToPAGX(tgfx::RenderMode renderMode) {
   }
 }
 
+PAGTileUpdateMode ToPAGX(tgfx::TileUpdateMode mode) {
+  switch (mode) {
+    case tgfx::TileUpdateMode::Immediate:
+      return PAGTileUpdateMode::Immediate;
+    case tgfx::TileUpdateMode::Smooth:
+      return PAGTileUpdateMode::Smooth;
+    case tgfx::TileUpdateMode::Fast:
+      return PAGTileUpdateMode::Fast;
+  }
+}
+
 Color ToPAGX(const tgfx::Color& color) {
   return {color.red, color.green, color.blue, color.alpha, ColorSpace::SRGB};
 }
@@ -131,15 +142,16 @@ void PAGDisplayOptions::setMaxTileCount(int count) {
   }
 }
 
-bool PAGDisplayOptions::getAllowZoomBlur() const {
+PAGTileUpdateMode PAGDisplayOptions::getTileUpdateMode() const {
   auto displayList = getDisplayList();
-  return displayList != nullptr ? displayList->allowZoomBlur() : false;
+  return displayList != nullptr ? ToPAGX(displayList->tileUpdateMode())
+                                : PAGTileUpdateMode::Immediate;
 }
 
-void PAGDisplayOptions::setAllowZoomBlur(bool allow) {
+void PAGDisplayOptions::setTileUpdateMode(PAGTileUpdateMode mode) {
   auto displayList = getDisplayList();
   if (displayList != nullptr) {
-    displayList->setAllowZoomBlur(allow);
+    displayList->setTileUpdateMode(ToTGFX(mode));
   }
 }
 
