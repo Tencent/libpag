@@ -413,6 +413,21 @@ Image* PAGXDocument::clearThumbnailImage(const std::string& filePath) {
   return firstMatch;
 }
 
+// Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
+// `index`, scoped to the owning `layer`.
+static void RecordImagePattern(
+    const ColorSource* color, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!color || color->nodeType() != NodeType::ImagePattern) {
+    return;
+  }
+  const auto* pattern = static_cast<const ImagePattern*>(color);
+  if (!pattern->image || pattern->image->filePath.empty()) {
+    return;
+  }
+  (*index)[pattern->image->filePath].insert(layer);
+}
+
 // Records into `index` every Image node filePath referenced by an ImagePattern inside
 // `element`, scoped to the owning `layer`. The inner unordered_set deduplicates layers that
 // have multiple fills or strokes pointing at the same filePath so the resulting index keeps
@@ -423,23 +438,12 @@ static void CollectImageFilePathsFromElement(
   if (!element || !layer) {
     return;
   }
-  auto recordPattern = [&](const ColorSource* color) {
-    if (!color || color->nodeType() != NodeType::ImagePattern) {
-      return;
-    }
-    const auto* pattern = static_cast<const ImagePattern*>(color);
-    if (!pattern->image || pattern->image->filePath.empty()) {
-      return;
-    }
-    (*index)[pattern->image->filePath].insert(layer);
-  };
-
   switch (element->nodeType()) {
     case NodeType::Fill:
-      recordPattern(static_cast<const Fill*>(element)->color);
+      RecordImagePattern(static_cast<const Fill*>(element)->color, layer, index);
       break;
     case NodeType::Stroke:
-      recordPattern(static_cast<const Stroke*>(element)->color);
+      RecordImagePattern(static_cast<const Stroke*>(element)->color, layer, index);
       break;
     case NodeType::Group:
     case NodeType::TextBox: {

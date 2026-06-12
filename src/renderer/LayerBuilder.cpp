@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerBuilder.h"
-#include <chrono>
 #include <tuple>
 #include <unordered_map>
 #include "ToTGFX.h"
@@ -134,17 +133,6 @@ namespace pagx {
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
-// Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Returns -1 on non-wasm
-// platforms so the same probe can stay in cross-platform code without #ifdef noise at call
-// sites. Each wasm page is 64 KiB.
-static int64_t SampleWasmHeap() {
-#if defined(__EMSCRIPTEN__) || defined(__wasm__)
-  return static_cast<int64_t>(__builtin_wasm_memory_size(0)) * 65536;
-#else
-  return -1;
-#endif
-}
-
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
@@ -205,8 +193,6 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
-    tgfx::PrintLog("[MemProbe] tag=LayerBuilder.build.enter wasmHeap=%lld",
-                   static_cast<long long>(SampleWasmHeap()));
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
@@ -269,6 +255,21 @@ class LayerBuilderContext {
     return cleared;
   }
 
+  // Builds the tgfx VectorElement list for a pagx Layer's contents, skipping elements that
+  // convert to null. Shared by convertVectorLayer() (initial build) and rebuildVectorContents()
+  // (progressive image refresh) so the two paths cannot drift.
+  std::vector<std::shared_ptr<tgfx::VectorElement>> buildVectorContents(const Layer* node) {
+    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(node->contents.size());
+    for (const auto& element : node->contents) {
+      auto tgfxElement = convertVectorElement(element);
+      if (tgfxElement) {
+        contents.push_back(tgfxElement);
+      }
+    }
+    return contents;
+  }
+
   // Regenerates the contents of a VectorLayer by walking the original pagx Layer's contents
   // list through convertVectorElement(). Non-VectorLayer targets are skipped because they do
   // not own a setContents()-style slot (Composition container layers etc).
@@ -277,15 +278,7 @@ class LayerBuilderContext {
       return false;
     }
     auto* vectorLayer = static_cast<tgfx::VectorLayer*>(tgfxLayer);
-    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    contents.reserve(pagxLayer->contents.size());
-    for (const auto& element : pagxLayer->contents) {
-      auto tgfxElement = convertVectorElement(element);
-      if (tgfxElement) {
-        contents.push_back(tgfxElement);
-      }
-    }
-    vectorLayer->setContents(std::move(contents));
+    vectorLayer->setContents(buildVectorContents(pagxLayer));
     return true;
   }
 
@@ -415,15 +408,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
-    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    contents.reserve(node->contents.size());
-    for (const auto& element : node->contents) {
-      auto tgfxElement = convertVectorElement(element);
-      if (tgfxElement) {
-        contents.push_back(tgfxElement);
-      }
-    }
-    layer->setContents(contents);
+    layer->setContents(buildVectorContents(node));
     return layer;
   }
 
@@ -439,6 +424,27 @@ class LayerBuilderContext {
     }
   }
 
+  // FNV-1a 64-bit mixing step over a raw byte range. Kept as an explicit helper (no lambda)
+  // so ComputeTextBlobFingerprint stays readable while honoring the no-lambda project rule.
+  static void FnvMix(uint64_t* h, const void* data, size_t bytes) {
+    constexpr uint64_t FNV_PRIME = 0x100000001b3ULL;
+    const uint8_t* p = static_cast<const uint8_t*>(data);
+    for (size_t i = 0; i < bytes; ++i) {
+      *h ^= p[i];
+      *h *= FNV_PRIME;
+    }
+  }
+
+  // Mixes a contiguous container (size prefix + element bytes) into the running FNV hash.
+  template <typename Vec>
+  static void FnvMixVector(uint64_t* h, const Vec& vec) {
+    size_t n = vec.size();
+    FnvMix(h, &n, sizeof(n));
+    if (n > 0) {
+      FnvMix(h, vec.data(), n * sizeof(vec[0]));
+    }
+  }
+
   // Fingerprint over every input GlyphRunRenderer::BuildTextBlob consumes. When BuildTextBlob is
   // changed to read a new field, that field MUST be mixed in here — otherwise the cache may serve
   // stale glyphs.
@@ -446,51 +452,36 @@ class LayerBuilderContext {
     // FNV-1a 64-bit. Collision probability for ~5K entries is ~10^-12, and the glyphSum secondary
     // check guards the rare miss.
     constexpr uint64_t FNV_OFFSET = 0xcbf29ce484222325ULL;
-    constexpr uint64_t FNV_PRIME = 0x100000001b3ULL;
     uint64_t h = FNV_OFFSET;
-    auto mix = [&](const void* data, size_t bytes) {
-      const uint8_t* p = static_cast<const uint8_t*>(data);
-      for (size_t i = 0; i < bytes; ++i) {
-        h ^= p[i];
-        h *= FNV_PRIME;
-      }
-    };
     // 1. Inverse matrix (6 floats).
     float matrixValues[6] = {0};
     inverseMatrix.get6(matrixValues);
-    mix(matrixValues, sizeof(matrixValues));
+    FnvMix(&h, matrixValues, sizeof(matrixValues));
     // 2. Faux bold / italic flags
     bool fauxFlags[2] = {text->fauxBold, text->fauxItalic};
-    mix(fauxFlags, sizeof(fauxFlags));
+    FnvMix(&h, fauxFlags, sizeof(fauxFlags));
     // 3. GlyphRun count
     size_t runCount = text->glyphRuns.size();
-    mix(&runCount, sizeof(runCount));
+    FnvMix(&h, &runCount, sizeof(runCount));
     // 4. Per-run geometry.
     for (const auto* run : text->glyphRuns) {
       if (!run) {
         uint8_t nullMarker = 0;
-        mix(&nullMarker, sizeof(nullMarker));
+        FnvMix(&h, &nullMarker, sizeof(nullMarker));
         continue;
       }
       const Font* fontPtr = run->font;
-      mix(&fontPtr, sizeof(fontPtr));
-      mix(&run->fontSize, sizeof(run->fontSize));
-      mix(&run->x, sizeof(run->x));
-      mix(&run->y, sizeof(run->y));
-      auto mixVec = [&](const auto& vec) {
-        size_t n = vec.size();
-        mix(&n, sizeof(n));
-        if (n > 0) {
-          mix(vec.data(), n * sizeof(vec[0]));
-        }
-      };
-      mixVec(run->glyphs);
-      mixVec(run->positions);
-      mixVec(run->xOffsets);
-      mixVec(run->scales);
-      mixVec(run->rotations);
-      mixVec(run->skews);
-      mixVec(run->anchors);
+      FnvMix(&h, &fontPtr, sizeof(fontPtr));
+      FnvMix(&h, &run->fontSize, sizeof(run->fontSize));
+      FnvMix(&h, &run->x, sizeof(run->x));
+      FnvMix(&h, &run->y, sizeof(run->y));
+      FnvMixVector(&h, run->glyphs);
+      FnvMixVector(&h, run->positions);
+      FnvMixVector(&h, run->xOffsets);
+      FnvMixVector(&h, run->scales);
+      FnvMixVector(&h, run->rotations);
+      FnvMixVector(&h, run->skews);
+      FnvMixVector(&h, run->anchors);
     }
     return h;
   }
@@ -1682,7 +1673,7 @@ class LayerBuilderContext {
   // Sharing the same TextBlob shared_ptr across many Text nodes is what reclaims the bulk of
   // the per-Text glyph-path memory cost we observed at 0% reuse before the cache was added.
   struct TextBlobCacheEntry {
-    size_t glyphSum;
+    size_t glyphSum = 0;
     std::shared_ptr<tgfx::TextBlob> textBlob;
     std::vector<tgfx::Point> anchors;
   };
