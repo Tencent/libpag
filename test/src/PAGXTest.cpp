@@ -102,6 +102,7 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
@@ -8184,6 +8185,54 @@ PAGX_TEST(PAGXTest, NotifyChangeVectorContentColor) {
   auto refreshedSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
   ASSERT_TRUE(refreshedSolid != nullptr);
   EXPECT_EQ(refreshedSolid->color(), tgfx::Color({0.0f, 1.0f, 0.0f, 1.0f}));
+}
+
+/**
+ * Test case: notifyChange promotes a layer that was built empty (a plain tgfx::Layer) to a
+ * VectorLayer once it gains contents, so the added content renders. The owning PAGLayer's
+ * runtimeLayer is re-synced to the new instance and existing nested children are preserved.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeEmptyLayerGainsContents) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  // A nested child layer so we can verify it survives the promotion.
+  auto child = doc->makeNode<pagx::Layer>("C");
+  child->width = 10;
+  child->height = 10;
+  layer->children.push_back(child);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  // Built with empty contents: the live layer is a plain tgfx::Layer, not a VectorLayer.
+  auto built = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(built != nullptr);
+  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+  auto childBuilt = binding->get<tgfx::Layer>(child);
+  ASSERT_TRUE(childBuilt != nullptr);
+
+  // Add a rectangle + fill, then notify. The layer must be promoted to a VectorLayer.
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+  doc->notifyChange({layer});
+
+  // The node is now bound to a VectorLayer, the added content is bound, and the nested child layer
+  // instance is preserved (its handle stays valid).
+  auto promoted = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(promoted != nullptr);
+  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+  EXPECT_EQ(binding->get<tgfx::Layer>(child).get(), childBuilt.get());
 }
 
 /**

@@ -247,6 +247,14 @@ class LayerBuilderContext {
       return false;
     }
     _result.binding = std::move(*binding);
+    // A plain (non-composition) node that gained contents since it was built as a plain tgfx::Layer
+    // must be promoted to a VectorLayer, the only layer kind that can hold contents. Swap in a new
+    // VectorLayer in the same parent slot, move the existing child layers over, and rebind the node;
+    // child layers and their own bindings are preserved (only this node's tgfx instance changes).
+    if (node->composition == nullptr && !node->contents.empty() &&
+        layer->type() != tgfx::LayerType::Vector) {
+      layer = promoteToVectorLayer(node, layer);
+    }
     // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
     // and the mask is only re-applied when node->mask is set, so reset them first; otherwise an
     // edit that cleared a matrix / blendMode / scrollRect / style / filter / mask would keep the
@@ -262,13 +270,10 @@ class LayerBuilderContext {
     layer->setFilters({});
     layer->setMask(nullptr);
     // Regenerate vector contents in place; composition slot layers carry no contents and keep their
-    // runtime-populated children untouched. Only a tgfx::VectorLayer can hold contents: convertLayer
-    // builds a plain tgfx::Layer when the node had no contents at build time and a VectorLayer
-    // otherwise. Guard the cast on the live layer's concrete type so a static_cast to VectorLayer* is
-    // never performed on a plain layer, and so a layer whose contents were cleared (now empty, but
-    // still a VectorLayer) drops its stale elements via setContents({}). The empty -> vector case
-    // (an edit adds contents to a layer built empty) cannot be handled here: it needs a new
-    // VectorLayer instance, which would break the tgfx::Layer identity that handles depend on.
+    // runtime-populated children untouched. Only a tgfx::VectorLayer can hold contents. A node that
+    // gained contents was promoted above, and one whose contents were cleared (now empty, but still
+    // a VectorLayer) drops its stale elements via setContents({}). The type guard keeps the cast
+    // safe for plain layers that never had contents.
     if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
       std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
@@ -294,6 +299,23 @@ class LayerBuilderContext {
     }
     *binding = std::move(_result.binding);
     return true;
+  }
+
+  // Replaces a plain tgfx::Layer that has gained contents with a new VectorLayer in the same parent
+  // slot, and rebinds the node to the new instance. The node's child layers are not moved here: the
+  // subsequent reconcileChildLayers re-attaches each still-bound child onto the new layer. set()
+  // keeps the node's existing LayerRuntimeTarget and channel writers, only swapping its object
+  // pointer. Returns the new layer (or the original if it has no parent to swap within).
+  std::shared_ptr<tgfx::Layer> promoteToVectorLayer(const Layer* node,
+                                                    const std::shared_ptr<tgfx::Layer>& oldLayer) {
+    auto* parent = oldLayer->parent();
+    if (parent == nullptr) {
+      return oldLayer;
+    }
+    auto vectorLayer = tgfx::VectorLayer::Make();
+    parent->replaceChild(oldLayer, vectorLayer);
+    _result.binding.set(node, vectorLayer);
+    return vectorLayer;
   }
 
   // Reconciles the direct child tgfx layers of a plain (non-composition) Layer node against its

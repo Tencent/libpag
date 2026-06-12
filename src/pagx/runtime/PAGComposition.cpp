@@ -157,6 +157,17 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
       }
     }
+    // RefreshLayerInPlace may swap a child's tgfx layer instance (a plain layer promoted to a
+    // VectorLayer once it gains contents). Re-sync each top-level child's cached runtimeLayer from
+    // the binding so handles and hit-testing keep pointing at the live layer.
+    for (auto& child : children) {
+      if (child != nullptr && child->node != nullptr) {
+        auto refreshed = binding->get<tgfx::Layer>(child->node);
+        if (refreshed != nullptr && refreshed != child->runtimeLayer) {
+          child->runtimeLayer = refreshed;
+        }
+      }
+    }
   }
   // A mutated node may change which targets a timeline resolves to, so drop the cached resolution.
   for (auto& timeline : timelines) {
