@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "tgfx/layers/Layer.h"
@@ -134,6 +135,23 @@ struct RuntimeBinding {
       }
     }
     return nullptr;
+  }
+
+  // Returns true if the node currently has a binding entry.
+  bool contains(const Node* node) const {
+    return targets.find(node) != targets.end();
+  }
+
+  // Collects every node that currently has a binding entry. Used by removal to scan for surviving
+  // references to a shared resource (e.g. a color source referenced by multiple fills) before
+  // unbinding it.
+  std::vector<const Node*> boundNodes() const {
+    std::vector<const Node*> nodes = {};
+    nodes.reserve(targets.size());
+    for (const auto& entry : targets) {
+      nodes.push_back(entry.first);
+    }
+    return nodes;
   }
 
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {

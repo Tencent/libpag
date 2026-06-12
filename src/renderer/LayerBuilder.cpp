@@ -352,7 +352,9 @@ class LayerBuilderContext {
   }
 
   // Drops binding entries for a list of vector content-element nodes, recursing into nested element
-  // containers (Group / TextBox) so the whole element subtree of a removed layer is unbound.
+  // containers (Group / TextBox) so the whole element subtree of a removed layer is unbound. A
+  // Fill/Stroke's color source (and a gradient's ColorStops) is bound separately and may be shared
+  // via an "@id" reference, so it is unbound only when no surviving Fill/Stroke still references it.
   void unbindContentElements(const std::vector<Element*>& elements) {
     for (auto* element : elements) {
       if (element == nullptr) {
@@ -361,9 +363,44 @@ class LayerBuilderContext {
       auto type = element->nodeType();
       if (type == NodeType::Group || type == NodeType::TextBox) {
         unbindContentElements(static_cast<const Group*>(element)->elements);
+      } else if (type == NodeType::Fill) {
+        unbindColorSourceIfUnreferenced(static_cast<const Fill*>(element)->color, element);
+      } else if (type == NodeType::Stroke) {
+        unbindColorSourceIfUnreferenced(static_cast<const Stroke*>(element)->color, element);
       }
       _result.binding.remove(element);
     }
+  }
+
+  // Unbinds a Fill/Stroke color source, but only if no Fill/Stroke other than excludedOwner still
+  // points at it. Shared color sources (referenced by several painters via "@id") stay bound as long
+  // as any referencing painter survives. A gradient's ColorStop bindings are dropped together with
+  // the gradient. excludedOwner is the painter currently being removed; its own binding is dropped by
+  // the caller, so it must not count as a surviving reference.
+  void unbindColorSourceIfUnreferenced(const ColorSource* color, const Element* excludedOwner) {
+    if (color == nullptr || !_result.binding.contains(color)) {
+      return;
+    }
+    for (const auto* node : _result.binding.boundNodes()) {
+      if (node == excludedOwner) {
+        continue;
+      }
+      const ColorSource* other = nullptr;
+      if (node->nodeType() == NodeType::Fill) {
+        other = static_cast<const Fill*>(node)->color;
+      } else if (node->nodeType() == NodeType::Stroke) {
+        other = static_cast<const Stroke*>(node)->color;
+      }
+      if (other == color) {
+        return;
+      }
+    }
+    if (color->nodeType() != NodeType::SolidColor && color->nodeType() != NodeType::ImagePattern) {
+      for (const auto* stop : static_cast<const Gradient*>(color)->colorStops) {
+        _result.binding.remove(stop);
+      }
+    }
+    _result.binding.remove(color);
   }
 
   // Builds a single Layer node into the supplied binding and returns its new tgfx::Layer. Mirrors
