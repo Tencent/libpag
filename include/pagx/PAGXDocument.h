@@ -178,7 +178,7 @@ class PAGXDocument : public Node {
   /**
    * Reflects post-build edits to the given nodes in every live PAGScene created from this document.
    * Refreshes each affected node's runtime content in place, preserving existing layer handles.
-   * Render-only edits (alpha, color, blendMode, transform) are reflected without re-running layout.
+   * Render-only edits (alpha, color, blendMode) are reflected without re-running layout.
    * Adding or removing child layers of a node is supported by passing the parent (container) node:
    * its child list is reconciled, building newly added layers and removing deleted ones while
    * reusing unchanged children.
