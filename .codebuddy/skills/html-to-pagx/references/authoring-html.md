@@ -14,6 +14,8 @@ the authoritative subset reference is `spec/html_subset.md`.
 - [ ] Icons are inline `<svg>` or an icon webfont — never typed glyphs.
 - [ ] Real, selectable text for all copy (not text baked into images).
 - [ ] No interactive widgets, no scrolling content, no video/iframe.
+- [ ] Any motion auto-plays and animates only `opacity` / `translate` / `color` /
+      `background-color` (see §8 + `references/animation.md`).
 
 ---
 
@@ -90,6 +92,16 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 - SVG-based charts (many D3 setups) convert as vectors, which is sharper — prefer them when
   available.
 
+## 8. Animation
+
+Motion is captured, not flattened: animations the page runs (CSS `@keyframes` + `animation`, GSAP,
+anime.js, the Web Animations API) become a real PAGX animation timeline, automatically. Keep it
+faithful by animating only the channels the runtime can play — `opacity`, `transform: translate`,
+`color`, `background-color` — and by making the animation auto-play and `infinite`. Scale, rotate,
+skew, and size/layout changes are not animatable and convert to a static element. Full rules,
+playable-channel table, preview instructions, and warnings live in `references/animation.md` — read
+it before authoring any animation.
+
 ## What to avoid
 
 These either drop out or convert poorly. Design around them:
@@ -101,8 +113,9 @@ These either drop out or convert poorly. Design around them:
   instead of relying on a real control.
 - **Scrolling regions**: only the visible frame is captured. Lay content out to fit the canvas;
   don't rely on overflow scrolling to reveal more.
-- **Motion**: animations and hover states are captured in whatever frame the snapshot lands on.
-  Design the static end-state.
+- **Interaction-triggered motion**: hover, focus, and click states are captured in whatever frame
+  the snapshot lands on (no interaction fires), so don't depend on them. Auto-playing animations
+  *are* captured, though — see §Animation below.
 - **No static visual**: `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`, `<map>` are
   dropped. Use a poster image (`<img>`) instead of a `<video>`.
 - **Tainted/WebGL canvas**: a `<canvas>` drawn from a cross-origin image without CORS, or a WebGL

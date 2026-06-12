@@ -2,12 +2,14 @@
 name: html-to-pagx
 description: >-
   Creates a PAGX file for non-technical users by first designing a normal HTML page (poster,
-  card, banner, social post, dashboard, web layout) and then converting it to PAGX, so the user
-  never has to write PAGX by hand. Use when the user describes a visual they want and asks to
-  "生成一个 PAGX", "做一张海报/卡片/封面/banner", "用 AI 生成 HTML 再转成 PAGX", "把这个网页/HTML/链接转成 PAGX",
-  "design a poster and turn it into PAGX", "create a PAGX from a description", or "convert this
-  webpage to PAGX". Prefer this over authoring PAGX directly when the user is a regular user, has
-  no PAGX knowledge, or already has an HTML page or URL to convert.
+  card, banner, social post, dashboard, web layout) — static or animated — and then converting it
+  to PAGX, so the user never has to write PAGX by hand. Captured motion (CSS @keyframes, GSAP,
+  anime.js, Web Animations) becomes a real PAGX animation timeline. Use when the user describes a
+  visual they want and asks to "生成一个 PAGX", "做一张海报/卡片/封面/banner", "做一个动画 PAGX",
+  "带动画的 PAGX", "用 AI 生成 HTML 再转成 PAGX", "把这个网页/HTML/链接转成 PAGX", "design a poster and
+  turn it into PAGX", "create an animated PAGX", "make a loading animation", "create a PAGX from a
+  description", or "convert this webpage to PAGX". Prefer this over authoring PAGX directly when the
+  user is a regular user, has no PAGX knowledge, or already has an HTML page or URL to convert.
 ---
 
 # HTML to PAGX
@@ -16,12 +18,16 @@ Help regular users (no design-tool or PAGX experience) produce a PAGX file. The 
 is two steps: **design a beautiful, ordinary HTML page**, then **convert that HTML to PAGX with a
 single command**. The converter renders the page in a real headless browser, so any modern
 HTML/CSS the design uses (flexbox, gradients, web fonts, Tailwind, inline SVG icons, charts on
-`<canvas>`) is flattened automatically into clean PAGX.
+`<canvas>`) is flattened automatically into clean PAGX. **Motion is captured too**: animations the
+page runs (CSS `@keyframes`, GSAP, anime.js, Web Animations) are baked into the PAGX as a real
+animation timeline, automatically — so the skill produces animated PAGX, not just still frames.
 
 ## When to use this skill
 
 Use this skill when the goal is a finished PAGX and the user is approaching it visually:
 - describes what they want in plain language ("一张活动海报", "a product card with price and button"),
+- wants the result to **move** ("做一个动画", "an animated banner", "a loading animation") — motion
+  is captured into the PAGX automatically (see Step 2 and `references/animation.md`),
 - already has an `.html` file or a public URL to convert,
 - is a non-developer who should not be asked PAGX-specific questions.
 
@@ -100,6 +106,14 @@ Core rules to honor while writing:
 - Build the layout with normal CSS (flexbox, gradients, shadows, rounded corners). Use inline
   `<svg>` or an icon webfont for icons — never typed glyphs like `+`, `×`, `→`.
 
+**If the design should move** (loader, animated banner, ambient motion, kinetic text), add the
+animation in the HTML — the converter captures it automatically into the PAGX timeline. Author it
+with CSS `@keyframes` + `animation` (or GSAP / anime.js / the Web Animations API), make it
+auto-play and `infinite`, and animate only `opacity`, `transform: translate`, `color`, or
+`background-color` — those are the channels the PAGX runtime can play back. **Read
+`references/animation.md` before writing any animation** for the full capture rules, the playable
+channels, and how to preview the motion.
+
 Save it as `<name>.html` in the working directory (choose a short, descriptive `<name>`).
 
 ---
@@ -147,6 +161,10 @@ the warm HTTP server for fast iteration, and a manual step-by-step path for debu
 ## Step 4: Review and iterate
 
 1. Open `<name>.png` and compare it against the user's intent. Show it to the user.
+   - **For animated designs**, the preview PNG is only the static base frame. Render a few frames
+     across one loop to check the motion: `pagx render <name>.pagx -o frame_05.png --time 0.5`
+     (repeat at e.g. `--time 0`, `0.5`, `1.0`). Show the user the frame sequence. See
+     `references/animation.md` §Previewing the motion.
 2. If something is wrong, **edit the `<name>.html`** (not the PAGX) and re-run Step 3. The HTML is
    the source of truth; treat the `.pagx` as a build artifact.
 3. Common fixes:
@@ -154,6 +172,8 @@ the warm HTTP server for fast iteration, and a manual step-by-step path for debu
    - Content clipped or off-canvas → match `--viewport-width`/`--viewport-height` to the `body` size.
    - An element missing from the PNG → it was hidden, an unsupported widget, or a tainted
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
+   - Motion missing or wrong → the animation was hover/scroll-triggered, finished before the
+     snapshot, or used a non-playable property (scale/rotate); see `references/animation.md`.
 4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
    it contains. Do not commit generated `.png` / `.subset.html` files.
 
@@ -166,6 +186,8 @@ hand off to the **pagx** skill, which edits the `.pagx` directly.
 
 - `references/authoring-html.md` — how to write HTML that converts cleanly, plus design-quality
   tips and what to avoid.
+- `references/animation.md` — how to author motion that converts (playable channels, capture
+  rules), how to preview frames with `pagx render --time`, and the animation warnings.
 - `references/pipeline.md` — full converter usage, setup details, fonts/images, URL input, the
   warm HTTP server for fast iteration, and troubleshooting.
 - `scripts/setup.sh` — one-time environment setup and health check.
