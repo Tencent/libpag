@@ -163,15 +163,9 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   // Keep zoomScalePrecision at tgfx's default (1000, i.e. 0.001 step) so pinch gestures feel
   // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
   // that produced visible stair-stepping without fixing the underlying shape-rasterize cost.
-  displayList.setAllowZoomBlur(true);
+  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Fast);
   displayList.setMaxTileCount(256);
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
-  // Per-frame tile rasterization throttle that applies on non-zoom-in frames (zoom-out and
-  // idle). Zoom-in frames bypass the throttle automatically inside tgfx so any cache-missing
-  // tile is rasterized in the current frame -- short-term zoom-blur fallback is acceptable,
-  // blank holes from texture-invalidation are not. The direction is inferred by tgfx itself
-  // from accumulated zoom-scale deltas (with a built-in deadband to filter gesture jitter).
-  displayList.setZoomOutTileThrottlePerFrame(3);
   // Subtree cache: caches static layers as textures to avoid per-layer shape retriangulation,
   // the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton shapes).
   displayList.setSubtreeCacheMaxSize(2048);
