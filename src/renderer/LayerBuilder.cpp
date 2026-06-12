@@ -247,8 +247,9 @@ class LayerBuilderContext {
     }
     _result.binding = std::move(*binding);
     // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
-    // so reset them first; otherwise an edit that cleared a matrix / blendMode / scrollRect / style
-    // / filter would keep the previously built value instead of reverting to the default.
+    // and the mask is only re-applied when node->mask is set, so reset them first; otherwise an
+    // edit that cleared a matrix / blendMode / scrollRect / style / filter / mask would keep the
+    // previously built value instead of reverting to the default.
     layer->setMatrix(tgfx::Matrix::I());
     layer->setMatrix3D(tgfx::Matrix3D::I());
     layer->setPreserve3D(false);
@@ -258,6 +259,7 @@ class LayerBuilderContext {
     layer->setScrollRect(tgfx::Rect::MakeEmpty());
     layer->setLayerStyles({});
     layer->setFilters({});
+    layer->setMask(nullptr);
     // Regenerate vector contents in place; composition slot layers carry no contents and keep their
     // runtime-populated children untouched.
     if (node->composition == nullptr && !node->contents.empty()) {
