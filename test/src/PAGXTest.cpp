@@ -45,11 +45,14 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -59,6 +62,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -67,6 +71,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
@@ -9273,20 +9278,73 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   stroke->color = strokeColor;
   layer->contents.push_back(stroke);
 
-  // A drop shadow style and a blur filter on the layer.
+  // A group with transform channels, plus a fill backed by each gradient kind so the gradient point
+  // writers and their ColorStop writers are exercised.
+  auto group = doc->makeNode<pagx::Group>();
+  auto groupRect = doc->makeNode<pagx::Rectangle>();
+  groupRect->size = {20, 20};
+  group->elements.push_back(groupRect);
+  layer->contents.push_back(group);
+
+  auto linear = doc->makeNode<pagx::LinearGradient>();
+  auto linearStop = doc->makeNode<pagx::ColorStop>();
+  linearStop->color = {1, 0, 0, 1};
+  linear->colorStops.push_back(linearStop);
+  auto linearFill = doc->makeNode<pagx::Fill>();
+  linearFill->color = linear;
+  layer->contents.push_back(linearFill);
+
+  auto radial = doc->makeNode<pagx::RadialGradient>();
+  auto radialFill = doc->makeNode<pagx::Fill>();
+  radialFill->color = radial;
+  layer->contents.push_back(radialFill);
+
+  auto conic = doc->makeNode<pagx::ConicGradient>();
+  auto conicFill = doc->makeNode<pagx::Fill>();
+  conicFill->color = conic;
+  layer->contents.push_back(conicFill);
+
+  auto diamond = doc->makeNode<pagx::DiamondGradient>();
+  auto diamondFill = doc->makeNode<pagx::Fill>();
+  diamondFill->color = diamond;
+  layer->contents.push_back(diamondFill);
+
+  // A text modifier carrying a range selector exercises the modifier transform/color writers and
+  // the selector writers.
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+  auto selector = doc->makeNode<pagx::RangeSelector>();
+  modifier->selectors.push_back(selector);
+  layer->contents.push_back(modifier);
+
+  // One of each layer style and filter kind so their animatable writers are covered.
   auto dropStyle = doc->makeNode<pagx::DropShadowStyle>();
   layer->styles.push_back(dropStyle);
+  auto innerStyle = doc->makeNode<pagx::InnerShadowStyle>();
+  layer->styles.push_back(innerStyle);
+  auto backgroundBlurStyle = doc->makeNode<pagx::BackgroundBlurStyle>();
+  layer->styles.push_back(backgroundBlurStyle);
   auto blurFilter = doc->makeNode<pagx::BlurFilter>();
   layer->filters.push_back(blurFilter);
+  auto dropFilter = doc->makeNode<pagx::DropShadowFilter>();
+  layer->filters.push_back(dropFilter);
+  auto innerFilter = doc->makeNode<pagx::InnerShadowFilter>();
+  layer->filters.push_back(innerFilter);
+  auto blendFilter = doc->makeNode<pagx::BlendFilter>();
+  layer->filters.push_back(blendFilter);
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto* binding = scene->mutableBinding();
   ASSERT_TRUE(binding != nullptr);
 
-  // For each built node, every Animatable channel in the registry must have a runtime writer.
-  pagx::Node* nodes[] = {layer,    rect, ellipse, polystar, trim,      roundCorner,
-                         repeater, fill, stroke,  solid,    dropStyle, blurFilter};
+  // For each built node, every Animatable channel in the registry must have a runtime writer. Text
+  // and TextBox are intentionally omitted: they require a registered font to build, while every
+  // other node type with animatable channels is covered here.
+  pagx::Node* nodes[] = {
+      layer,      rect,       ellipse,     polystar,   trim,      roundCorner, repeater,
+      fill,       stroke,     solid,       group,      linear,    linearStop,  radial,
+      conic,      diamond,    modifier,    selector,   dropStyle, innerStyle,  backgroundBlurStyle,
+      blurFilter, dropFilter, innerFilter, blendFilter};
   for (auto* node : nodes) {
     for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
       if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {

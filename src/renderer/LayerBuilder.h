@@ -183,6 +183,13 @@ struct RuntimeBinding {
     return raw;
   }
 
+  // Returns the node's installed RuntimeTarget, or nullptr if none. Used to re-seed a layer's
+  // transform baseline on an in-place refresh.
+  RuntimeTarget* getTarget(const Node* node) const {
+    auto it = targets.find(node);
+    return it != targets.end() ? it->second.get() : nullptr;
+  }
+
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
   RuntimeTarget* ensureTarget(const Node* node) {

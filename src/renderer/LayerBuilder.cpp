@@ -287,6 +287,16 @@ class LayerBuilderContext {
       vectorLayer->setContents(contents);
     }
     applyLayerAttributes(node, layer.get());
+    // Re-seed the decomposed transform baseline from the node's current authored values, mirroring
+    // the initial build (see convertLayer). The Layer's x / y / matrix channels are AnimLayout, so a
+    // document edit to them must update the LayerRuntimeTarget baseline; otherwise a concurrent
+    // transform animation would mix against the stale baseline. The target installed for a Layer
+    // node is always a LayerRuntimeTarget (convertLayer), so the static_cast is safe.
+    auto* layerTarget = static_cast<LayerRuntimeTarget*>(_result.binding.getTarget(node));
+    if (layerTarget != nullptr) {
+      auto layerPos = node->renderPosition();
+      layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+    }
     if (node->mask != nullptr) {
       _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
       resolvePendingMasks();
