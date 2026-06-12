@@ -1,6 +1,6 @@
 {
   "name": "@libpag/pagx",
-  "version": "0.3.22",
+  "version": "0.3.24",
   "description": "PAGX command-line tool for validation, rendering, optimization and formatting",
   "license": "Apache-2.0",
   "repository": {
@@ -10,6 +10,10 @@
   "homepage": "https://github.com/Tencent/libpag#readme",
   "bin": {
     "pagx": "bin/pagx.js"
+  },
+  "scripts": {
+    "build:html-snapshot": "node scripts/build-html-snapshot.js",
+    "prepack": "node scripts/build-html-snapshot.js"
   },
   "os": [
     "darwin",
@@ -22,6 +26,7 @@
   ],
   "files": [
     "bin/",
+    "html-snapshot/",
     "README.md"
   ]
 }

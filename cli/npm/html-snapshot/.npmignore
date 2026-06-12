@@ -1,0 +1,7 @@
+# The presence of this file makes npm ignore the sibling .gitignore when
+# packing this directory. Without it, npm falls back to .gitignore and strips
+# the prepack-generated runtime (dist/, node_modules/, snapshot.js,
+# package.json), shipping a broken html-snapshot tool (launch.js only).
+#
+# Keep this list to genuine build junk only — everything else here must ship.
+.DS_Store

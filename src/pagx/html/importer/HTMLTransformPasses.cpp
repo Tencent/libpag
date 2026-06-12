@@ -920,12 +920,17 @@ MainAxisFit InferMainAxisSpacing(const std::vector<ChildBox>& sorted, FlexAxis a
 
 // Looks up the parent's content box (inside-padding rectangle) along a single axis. When the
 // parent has no explicit dimension, falls back to the children's bounding extents so that the
-// inference still works on layout-only wrapper containers. Returns true on success.
+// inference still works on layout-only wrapper containers. `outFromExplicit` reports whether
+// the returned range came from the parent's declared dimension (true) or from the children
+// bbox fallback (false); callers use this to decide whether shared child insets should be
+// folded into padding (only safe in the fallback path — an explicit dimension already accounts
+// for them via the child's offset, so re-attributing them to padding would double-count).
 bool ResolveContentRange(const PropertyMap* parentProps, const std::vector<ChildBox>& children,
                          float padLow, float padHigh, FlexAxis axis, float& contentLow,
-                         float& contentHigh) {
+                         float& contentHigh, bool& outFromExplicit) {
   contentLow = padLow;
   contentHigh = std::numeric_limits<float>::quiet_NaN();
+  outFromExplicit = false;
   float dim = std::numeric_limits<float>::quiet_NaN();
   if (parentProps) {
     const std::string& key = axis == FlexAxis::Row ? "width" : "height";
@@ -937,6 +942,7 @@ bool ResolveContentRange(const PropertyMap* parentProps, const std::vector<Child
   }
   if (std::isfinite(dim)) {
     contentHigh = dim - padHigh;
+    outFromExplicit = true;
     return contentHigh > contentLow;
   }
   // Fallback: bounding extent of children (allows inference on parents without explicit size).
@@ -1122,51 +1128,53 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   float mainPadHigh = axis == FlexAxis::Row ? padRightExisting : padBottomExisting;
   float crossPadLow = axis == FlexAxis::Row ? padTopExisting : padLeftExisting;
   float crossPadHigh = axis == FlexAxis::Row ? padBottomExisting : padRightExisting;
+  bool mainFromExplicit = false;
+  bool crossFromExplicit = false;
   if (!ResolveContentRange(parentResolved, boxes, mainPadLow, mainPadHigh, axis, mainContentLow,
-                           mainContentHigh)) {
+                           mainContentHigh, mainFromExplicit)) {
     return;
   }
   FlexAxis crossAxis = axis == FlexAxis::Row ? FlexAxis::Column : FlexAxis::Row;
   if (!ResolveContentRange(parentResolved, boxes, crossPadLow, crossPadHigh, crossAxis,
-                           crossContentLow, crossContentHigh)) {
+                           crossContentLow, crossContentHigh, crossFromExplicit)) {
     return;
   }
-  // When the parent has no explicit cross dimension, ResolveContentRange anchored the content
-  // range at the children's bounding extents — which hides any leading/trailing inset shared
-  // by every child (e.g. the symmetric `padding: 28px` on the parent that the absolutize pass
-  // pushed onto each child's `left`). Re-anchor at `crossPadLow` so the inset becomes visible
-  // and can be folded into padding below, mirroring how `InferMainAxisSpacing` handles the
-  // main axis.
-  float childCrossLoMin = std::numeric_limits<float>::infinity();
-  float childCrossLoMax = -std::numeric_limits<float>::infinity();
-  float childCrossHiMin = std::numeric_limits<float>::infinity();
-  float childCrossHiMax = -std::numeric_limits<float>::infinity();
-  for (const auto& c : boxes) {
-    float lo = (crossAxis == FlexAxis::Row) ? c.left : c.top;
-    float size = (crossAxis == FlexAxis::Row) ? c.width : c.height;
-    childCrossLoMin = std::min(childCrossLoMin, lo);
-    childCrossLoMax = std::max(childCrossLoMax, lo);
-    childCrossHiMin = std::min(childCrossHiMin, lo + size);
-    childCrossHiMax = std::max(childCrossHiMax, lo + size);
-  }
-  if (crossContentLow > crossPadLow + tol) {
-    // Fallback path raised the content low above the parent's padding edge; pull it back so
-    // shared insets surface as `extraCrossLeading` rather than getting silently absorbed.
-    crossContentLow = crossPadLow;
-  }
   // Lift any inset that every child shares on the cross axis into extra padding. This is the
-  // symmetric analogue of `InferMainAxisSpacing` on the main axis, and keeps the recovered
-  // alignment honest: `InferCrossAlign` then sees the children flush against the (reduced)
-  // content box.
+  // symmetric analogue of `InferMainAxisSpacing` on the main axis, and is only applied when
+  // the cross dimension came from the children-bbox fallback: an explicit parent dimension
+  // already reserves the inset (e.g. a 60px parent with children at `top:18` is plain
+  // `align-items: center`, not `padding-top: 18` + stretch). Doing the lift unconditionally
+  // would double-count the inset and drag the cross alignment toward stretch in cases like
+  // the snapshot.js → pagx pipeline where the parent has a real height.
   float extraCrossLeading = 0.0f;
   float extraCrossTrailing = 0.0f;
-  if (childCrossLoMax - childCrossLoMin <= tol && childCrossLoMin - crossContentLow > tol) {
-    extraCrossLeading = childCrossLoMin - crossContentLow;
-    crossContentLow = childCrossLoMin;
-  }
-  if (childCrossHiMax - childCrossHiMin <= tol && crossContentHigh - childCrossHiMax > tol) {
-    extraCrossTrailing = crossContentHigh - childCrossHiMax;
-    crossContentHigh = childCrossHiMax;
+  if (!crossFromExplicit) {
+    float childCrossLoMin = std::numeric_limits<float>::infinity();
+    float childCrossLoMax = -std::numeric_limits<float>::infinity();
+    float childCrossHiMin = std::numeric_limits<float>::infinity();
+    float childCrossHiMax = -std::numeric_limits<float>::infinity();
+    for (const auto& c : boxes) {
+      float lo = (crossAxis == FlexAxis::Row) ? c.left : c.top;
+      float size = (crossAxis == FlexAxis::Row) ? c.width : c.height;
+      childCrossLoMin = std::min(childCrossLoMin, lo);
+      childCrossLoMax = std::max(childCrossLoMax, lo);
+      childCrossHiMin = std::min(childCrossHiMin, lo + size);
+      childCrossHiMax = std::max(childCrossHiMax, lo + size);
+    }
+    // Fallback path anchored the content range at the children's bounding extents; pull the
+    // low edge back to the parent's padding edge so a shared leading inset surfaces as
+    // `extraCrossLeading` rather than getting silently absorbed.
+    if (crossContentLow > crossPadLow + tol) {
+      crossContentLow = crossPadLow;
+    }
+    if (childCrossLoMax - childCrossLoMin <= tol && childCrossLoMin - crossContentLow > tol) {
+      extraCrossLeading = childCrossLoMin - crossContentLow;
+      crossContentLow = childCrossLoMin;
+    }
+    if (childCrossHiMax - childCrossHiMin <= tol && crossContentHigh - childCrossHiMax > tol) {
+      extraCrossTrailing = crossContentHigh - childCrossHiMax;
+      crossContentHigh = childCrossHiMax;
+    }
   }
   if (crossContentHigh <= crossContentLow) return;
 

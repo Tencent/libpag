@@ -56,6 +56,7 @@ class HardwareDecoder : public VideoDecoder {
   bool disableFlush = true;
 
   std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+  Global<jobject> videoSurface = {};
   AMediaCodec* videoDecoder = nullptr;
   ANativeWindow* nativeWindow = nullptr;
   ssize_t lastOutputBufferIndex = -1;
