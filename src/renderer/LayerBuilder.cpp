@@ -331,17 +331,38 @@ class LayerBuilderContext {
   }
 
   // Recursively drops binding entries for a detached tgfx layer subtree so removed nodes leave no
-  // stale node->object mapping behind.
+  // stale node->object mapping behind. A Layer's vector content elements are bound as their own
+  // entries keyed by the Element node (not as tgfx layer children), so they are unbound explicitly
+  // when the owning Layer node is found; otherwise removing a layer subtree would leak those
+  // element bindings and leave dangling Node* keys.
   void unbindSubtree(const tgfx::Layer* layer) {
     if (layer == nullptr) {
       return;
     }
     const Node* owner = _result.binding.findNode(layer);
     if (owner != nullptr) {
+      if (owner->nodeType() == NodeType::Layer) {
+        unbindContentElements(static_cast<const Layer*>(owner)->contents);
+      }
       _result.binding.remove(owner);
     }
     for (const auto& child : layer->children()) {
       unbindSubtree(child.get());
+    }
+  }
+
+  // Drops binding entries for a list of vector content-element nodes, recursing into nested element
+  // containers (Group / TextBox) so the whole element subtree of a removed layer is unbound.
+  void unbindContentElements(const std::vector<Element*>& elements) {
+    for (auto* element : elements) {
+      if (element == nullptr) {
+        continue;
+      }
+      auto type = element->nodeType();
+      if (type == NodeType::Group || type == NodeType::TextBox) {
+        unbindContentElements(static_cast<const Group*>(element)->elements);
+      }
+      _result.binding.remove(element);
     }
   }
 
