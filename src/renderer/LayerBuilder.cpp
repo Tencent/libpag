@@ -262,8 +262,14 @@ class LayerBuilderContext {
     layer->setFilters({});
     layer->setMask(nullptr);
     // Regenerate vector contents in place; composition slot layers carry no contents and keep their
-    // runtime-populated children untouched.
-    if (node->composition == nullptr && !node->contents.empty()) {
+    // runtime-populated children untouched. Only a tgfx::VectorLayer can hold contents: convertLayer
+    // builds a plain tgfx::Layer when the node had no contents at build time and a VectorLayer
+    // otherwise. Guard the cast on the live layer's concrete type so a static_cast to VectorLayer* is
+    // never performed on a plain layer, and so a layer whose contents were cleared (now empty, but
+    // still a VectorLayer) drops its stale elements via setContents({}). The empty -> vector case
+    // (an edit adds contents to a layer built empty) cannot be handled here: it needs a new
+    // VectorLayer instance, which would break the tgfx::Layer identity that handles depend on.
+    if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
       std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
       contents.reserve(node->contents.size());
