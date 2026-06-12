@@ -182,6 +182,16 @@ class PAGXDocument : public Node {
    * Adding or removing child layers of a node is supported by passing the parent (container) node:
    * its child list is reconciled, building newly added layers and removing deleted ones while
    * reusing unchanged children.
+   *
+   * Timelines: when any dirty node is a timeline node (Animation, AnimationObject, or Channel), all
+   * timelines are rebuilt from the document, so adding, removing, or editing an animation takes
+   * effect (a removed animation simply stops driving). Edits that do not touch a timeline node leave
+   * in-progress playback undisturbed.
+   *
+   * Not supported by this incremental path (require rebuilding the scene with PAGScene::Make):
+   * cross-node structural changes such as deleting a node that an animation targets, or repointing
+   * an AnimationObject.target / a "@id" reference to a different node. notifyChange refreshes the
+   * passed dirty nodes in place; it does not re-resolve every reference across the document.
    * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
    * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,

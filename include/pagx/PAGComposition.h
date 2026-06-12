@@ -103,9 +103,9 @@ class PAGComposition : public PAGLayer {
 
   // Refreshes this composition after edits: reconciles its child layer list (adding, removing, and
   // reordering children to match the source layers when the container node is dirty), refreshes the
-  // content of any dirty leaf layers in place, resets timeline target caches, then recurses into
-  // child compositions so each refreshes only the nodes in its own binding. Called by
-  // PAGScene::onNodesChanged.
+  // content of any dirty leaf layers in place, then recurses into child compositions so each
+  // refreshes only the nodes in its own binding. Timelines are not touched here; PAGScene resets the
+  // whole timeline tree separately when a timeline node changed. Called by PAGScene::onNodesChanged.
   void refreshNodes(const std::vector<Node*>& dirtyNodes);
 
   // Reconciles this composition's runtime children with the given source layer list: reuses
@@ -113,6 +113,19 @@ class PAGComposition : public PAGLayer {
   // layers into the binding, removes runtime children whose source layer is gone, and reorders the
   // parent's tgfx children to match the document order.
   void syncChildren(const std::vector<Layer*>& sourceLayers);
+
+  // Rebuilds this composition's timelines from the owner layer's AnimationTimeline drivers,
+  // resolving each driver's animation id against the document. Discards any existing timelines
+  // first, so a removed driver or animation simply produces no timeline and a removed animation node
+  // (findNode returns null) leaves nothing to drive. Used at build time and to reset timelines when
+  // a timeline node changes. The root composition has no owner layer and spawns no timelines.
+  void spawnTimelines(const std::shared_ptr<PAGScene>& scene);
+
+  // Recursively resets the timelines of this composition and all descendant compositions. Called
+  // when an edit touches a timeline node (Animation / AnimationObject / Channel), since timelines
+  // may share targets and cross-reference, so the whole timeline tree is rebuilt rather than patched
+  // in place.
+  void resetTimelines();
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.

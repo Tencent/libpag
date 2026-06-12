@@ -73,28 +73,50 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
   // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
   // document, then build the persistent per-layer runtime node tree for the composition content.
-  for (const auto& driver : ownerLayer->timelines) {
-    if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
-      continue;
-    }
-    auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation = composition->document != nullptr
-                          ? composition->document->findNode<Animation>(animationDriver->animationId)
-                          : nullptr;
-    if (animation == nullptr) {
-      continue;
-    }
-    auto timeline = std::shared_ptr<PAGTimeline>(
-        new PAGTimeline(animation, composition->binding.get(), composition->document, parentScene));
-    if (!animationDriver->playing) {
-      timeline->pause();
-    }
-    composition->timelines.push_back(std::move(timeline));
-  }
+  composition->spawnTimelines(parentScene);
   visited.insert(sourceComposition);
   composition->buildChildren(ownerLayer->composition->layers, visited);
   visited.erase(sourceComposition);
   return composition;
+}
+
+void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
+  // Discard any existing timelines first so a removed driver or animation produces no timeline and a
+  // removed animation node (findNode returns null below) simply leaves nothing to drive.
+  timelines.clear();
+  // The root composition (node == nullptr) has no owner layer and therefore no drivers.
+  if (node == nullptr) {
+    return;
+  }
+  for (const auto& driver : node->timelines) {
+    if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
+      continue;
+    }
+    auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
+    auto* animation =
+        document != nullptr ? document->findNode<Animation>(animationDriver->animationId) : nullptr;
+    if (animation == nullptr) {
+      continue;
+    }
+    auto timeline =
+        std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding.get(), document, scene));
+    if (!animationDriver->playing) {
+      timeline->pause();
+    }
+    timelines.push_back(std::move(timeline));
+  }
+}
+
+void PAGComposition::resetTimelines() {
+  auto scene = rootScene.lock();
+  if (scene != nullptr) {
+    spawnTimelines(scene);
+  }
+  for (auto& child : children) {
+    if (child != nullptr && child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->resetTimelines();
+    }
+  }
 }
 
 void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
@@ -171,13 +193,9 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
       }
     }
   }
-  // A mutated node may change which targets a timeline resolves to, so drop the cached resolution.
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->resolved = false;
-      timeline->resolvedTargets.clear();
-    }
-  }
+  // Timelines are intentionally left untouched here: they are reset as a whole tree by PAGScene
+  // (resetTimelines) only when a timeline node changed, so a plain attribute or structural edit does
+  // not disturb in-progress playback.
   for (auto& child : children) {
     if (child != nullptr && child->layerType() != LayerType::Layer) {
       static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes);

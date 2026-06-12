@@ -229,13 +229,30 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
   if (_rootComposition != nullptr) {
     _rootComposition->refreshNodes(dirtyNodes);
   }
-  // Top-level timelines are owned here, not by the root composition, so reset their cached target
-  // resolution as well: a mutated node may change which targets they resolve to.
-  for (auto& entry : timelinesByAnimation) {
-    if (entry.second != nullptr) {
-      entry.second->resolved = false;
-      entry.second->resolvedTargets.clear();
+  // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
+  // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather
+  // than patched in place; a removed animation node then simply produces no timeline. Edits that do
+  // not touch a timeline node leave playback untouched. NOTE: editing a node that an animation
+  // *targets* (e.g. deleting the target, or changing an id an AnimationObject.target points at) is a
+  // cross-node structural change that is NOT handled incrementally here — it requires rebuilding the
+  // scene from the document.
+  bool timelineDirty = false;
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr) {
+      continue;
     }
+    auto type = node->nodeType();
+    if (type == NodeType::Animation || type == NodeType::AnimationObject ||
+        type == NodeType::Channel) {
+      timelineDirty = true;
+      break;
+    }
+  }
+  if (timelineDirty) {
+    if (_rootComposition != nullptr) {
+      _rootComposition->resetTimelines();
+    }
+    timelinesByAnimation.clear();
   }
 }
 

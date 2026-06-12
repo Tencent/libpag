@@ -8323,9 +8323,11 @@ PAGX_TEST(PAGXTest, NotifyChangeLayoutWidth) {
 }
 
 /**
- * Test case: notifyChange resets a timeline's resolved-target cache so a subsequent apply re-binds.
+ * Test case: a non-timeline edit (a plain layer attribute) does NOT disturb timelines — the
+ * timeline keeps its resolved cache and in-progress playback. Only timeline-node edits reset
+ * timelines.
  */
-PAGX_TEST(PAGXTest, NotifyChangeResetsTimelineCache) {
+PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineWhenNoTimelineNodeDirty) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>("L");
   layer->width = 50;
@@ -8350,15 +8352,111 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelineCache) {
   timeline->apply(1.0f);
   EXPECT_TRUE(timeline->resolved);
 
+  // A plain layer edit is not a timeline node, so the timeline is left untouched (cache preserved).
   doc->notifyChange({layer});
-  EXPECT_FALSE(timeline->resolved);
+  EXPECT_TRUE(timeline->resolved);
 
-  // Re-resolving on the next apply still drives the channel correctly.
+  // Playback still drives the channel correctly.
   auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
   tgfxLayer->setAlpha(1.0f);
   timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+}
+
+/**
+ * Test case: editing a timeline node (a Channel keyframe) resets the scene's timelines so the new
+ * keyframe value takes effect on the next apply.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+
+  // Edit the keyframe value and mark the Channel node dirty: timelines are rebuilt.
+  alphaChannel->keyframes[0].value = 0.25f;
+  doc->notifyChange({alphaChannel});
+
+  // A freshly rebuilt timeline applies the new value.
+  auto rebuilt = scene->getDefaultTimeline();
+  ASSERT_TRUE(rebuilt != nullptr);
+  tgfxLayer->setAlpha(1.0f);
+  rebuilt->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.25f);
+}
+
+/**
+ * Test case: removing the animation driver from a layer and notifying with the animation node dirty
+ * stops it driving. The composition timeline is rebuilt from the owner layer's now-empty driver
+ * list, so no timeline drives the target and advancing no longer changes it.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemovedAnimationStopsDriving) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 50;
+  comp->height = 50;
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 50;
+  child->height = 50;
+  comp->layers.push_back(child);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "child";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto compLayer = doc->makeNode<pagx::Layer>("compLayer");
+  compLayer->composition = comp;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "anim";
+  driver->playing = true;
+  compLayer->timelines.push_back(std::move(driver));
+  doc->layers.push_back(compLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get())
+                      ->binding.get();
+  auto tgfxChild = binding->get<tgfx::Layer>(child);
+  ASSERT_TRUE(tgfxChild != nullptr);
+  scene->advanceAndApply(0);
+  EXPECT_FLOAT_EQ(tgfxChild->alpha(), 0.5f);
+
+  // Remove the driver from the layer and notify with the animation node dirty: timelines are rebuilt
+  // from the now-empty driver list, so nothing drives the child.
+  compLayer->timelines.clear();
+  doc->notifyChange({anim});
+
+  tgfxChild->setAlpha(1.0f);
+  scene->advanceAndApply(500'000);
+  EXPECT_FLOAT_EQ(tgfxChild->alpha(), 1.0f);
 }
 
 /**
