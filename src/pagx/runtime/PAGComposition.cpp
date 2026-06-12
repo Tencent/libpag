@@ -157,11 +157,13 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
       }
     }
-    // RefreshLayerInPlace may swap a child's tgfx layer instance (a plain layer promoted to a
-    // VectorLayer once it gains contents). Re-sync each top-level child's cached runtimeLayer from
-    // the binding so handles and hit-testing keep pointing at the live layer.
+    // RefreshLayerInPlace may swap a plain child's tgfx layer instance (a plain layer promoted to a
+    // VectorLayer once it gains contents). Re-sync only plain children: for them the binding entry
+    // is the runtimeLayer itself. A composition child is skipped because its binding entry is the
+    // empty slot while its runtimeLayer is the nested subtree root, so re-syncing from the binding
+    // would overwrite runtimeLayer with the slot and break hit-testing, bounds and nested re-attach.
     for (auto& child : children) {
-      if (child != nullptr && child->node != nullptr) {
+      if (child != nullptr && child->node != nullptr && child->layerType() == LayerType::Layer) {
         auto refreshed = binding->get<tgfx::Layer>(child->node);
         if (refreshed != nullptr && refreshed != child->runtimeLayer) {
           child->runtimeLayer = refreshed;
