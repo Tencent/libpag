@@ -6850,6 +6850,113 @@ PAGX_TEST(PAGXTest, TopLevelTimelineSurvivesExternalChildRebuild) {
 }
 
 /**
+ * Test case: the scene's display options (zoom scale and content offset) persist across a runtime
+ * tree rebuild triggered by an external-child edit. buildRuntimeTree only swaps the root layer on
+ * the persistent displayList, so the zoom/offset stored on that displayList must survive untouched.
+ */
+PAGX_TEST(PAGXTest, DisplayOptionsSurviveExternalChildRebuild) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* options = scene->getDisplayOptions();
+  ASSERT_TRUE(options != nullptr);
+  options->setZoomScale(2.0f);
+  options->setContentOffset(30.0f, 40.0f);
+
+  // Edit the CHILD document and notify through it to force the parent scene to rebuild its tree.
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+  childLayerNode->alpha = 0.5f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  // Zoom and offset live on the persistent displayList, so the rebuild must leave them unchanged.
+  EXPECT_FLOAT_EQ(options->getZoomScale(), 2.0f);
+  EXPECT_FLOAT_EQ(options->getContentOffset().x, 30.0f);
+  EXPECT_FLOAT_EQ(options->getContentOffset().y, 40.0f);
+}
+
+/**
+ * Test case: deep (A->B->C) reverse-registration. Document A embeds child B.pagx, which embeds
+ * grandchild C.pagx. Editing a node in the grandchild document C and notifying through C must
+ * refresh A's embedded subtree, proving the root scene reverse-registered all the way down (C's
+ * liveScenes contains A's scene), not just one level.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXGrandchildEditSyncsToRootScene) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slotB\" composition=\"b.pagx\"/>\n"
+      "</pagx>\n";
+  // B embeds C through a layer whose composition points at c.pagx.
+  std::string childBXML =
+      "<pagx width=\"60\" height=\"60\">\n"
+      "  <Layer id=\"slotC\" composition=\"c.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("b.pagx", MakePAGXData(childBXML)));
+  // After B is loaded its own external file (c.pagx) becomes enumerable; load it too.
+  EXPECT_TRUE(
+      doc->loadFileData("c.pagx", MakePAGXData(MakeExternalCompositionXML("grandLayer", "fade"))));
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  auto* slotB = doc->findNode<pagx::Layer>("slotB");
+  ASSERT_TRUE(slotB != nullptr);
+  ASSERT_TRUE(slotB->externalDoc != nullptr);
+  auto* bDoc = slotB->externalDoc.get();
+  auto* slotC = bDoc->findNode<pagx::Layer>("slotC");
+  ASSERT_TRUE(slotC != nullptr);
+  ASSERT_TRUE(slotC->externalDoc != nullptr);
+  auto* cDoc = slotC->externalDoc.get();
+  auto* grandLayer = cDoc->findNode<pagx::Layer>("grandLayer");
+  ASSERT_TRUE(grandLayer != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // The root scene must have reverse-registered into the GRANDCHILD document, otherwise notifying
+  // through cDoc would be a silent no-op (a missing deep-registration bug).
+  ASSERT_FALSE(cDoc->liveScenes.empty());
+  bool rootRegistered = false;
+  for (auto& weakScene : cDoc->liveScenes) {
+    if (weakScene.lock() == scene) {
+      rootRegistered = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(rootRegistered);
+
+  // Locate the grandchild's runtime layer through A's tree: root -> B composition -> C composition.
+  auto* bComposition =
+      static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  auto* cComposition = static_cast<pagx::PAGComposition*>(bComposition->children[0].get());
+  ASSERT_TRUE(cComposition->binding->get<tgfx::Layer>(grandLayer) != nullptr);
+  EXPECT_FLOAT_EQ(cComposition->binding->get<tgfx::Layer>(grandLayer)->alpha(), 1.0f);
+
+  // Edit the grandchild node and notify through the grandchild document: A's scene rebuilds and the
+  // deeply embedded subtree reflects the new value.
+  grandLayer->alpha = 0.25f;
+  cDoc->notifyChange({grandLayer}, /*layoutChanged=*/false);
+
+  auto* rebuiltB = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  auto* rebuiltC = static_cast<pagx::PAGComposition*>(rebuiltB->children[0].get());
+  auto refreshed = rebuiltC->binding->get<tgfx::Layer>(grandLayer);
+  ASSERT_TRUE(refreshed != nullptr);
+  EXPECT_FLOAT_EQ(refreshed->alpha(), 0.25f);
+}
+
+/**
  * Test case: a parent document must not notify a node owned by a child (external) document. Such a
  * node is not in the parent's node list, so notifyChange rejects the call and changes nothing.
  */
