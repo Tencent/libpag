@@ -34,10 +34,9 @@ namespace pagx {
  *
  * Value encoding (KeyValue alternatives): scalars map directly (float/bool/int/string/Color);
  * enums are passed as their string name (e.g. blendMode = "multiply"); Point/Size fields are
- * addressed component-wise via suffixed channels ("position.x", "size.width"); Matrix uses the
- * Matrix alternative. Multi-component fields without a component channel are not exposed. The set of
- * channels available for each node type is documented in the PAGX schema reference rather than
- * enumerated through this API.
+ * addressed component-wise via suffixed channels ("position.x", "size.width"). Multi-component
+ * fields without a component channel are not exposed. The set of channels available for each node
+ * type is documented in the PAGX schema reference rather than enumerated through this API.
  */
 
 /**
