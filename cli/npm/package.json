@@ -11,6 +11,10 @@
   "bin": {
     "pagx": "bin/pagx.js"
   },
+  "scripts": {
+    "build:html-snapshot": "node scripts/build-html-snapshot.js",
+    "prepack": "node scripts/build-html-snapshot.js"
+  },
   "os": [
     "darwin",
     "linux",
@@ -22,6 +26,7 @@
   ],
   "files": [
     "bin/",
+    "html-snapshot/",
     "README.md"
   ]
 }
