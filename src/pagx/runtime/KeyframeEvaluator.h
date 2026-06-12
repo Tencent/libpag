@@ -125,6 +125,12 @@ inline Matrix RecomposeMatrix(const DecomposedMatrix& d) {
 
 template <>
 inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double t) {
+  // Limitation: rotation is recovered via atan2 in DecomposeMatrix, so it is confined to (-pi, pi]
+  // and winding (full turns) is lost. The lerp takes the literal path between the two recovered
+  // angles rather than the shortest arc, so a keyframe pair crossing the +/-pi boundary spins the
+  // long way. This is inherent to interpolating baked matrices: the authored angle cannot be
+  // reconstructed from the matrix alone. Keyframes needing precise multi-turn or boundary-crossing
+  // rotation should target a scalar rotation channel (e.g. Group::rotation) instead of a Matrix.
   auto da = DecomposeMatrix(a);
   auto db = DecomposeMatrix(b);
   DecomposedMatrix mixed = {};

@@ -42,6 +42,14 @@ inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& t
 // Interpolates two 2D affine matrices by decomposing each into translate / rotation / scale / skew,
 // mixing the components, and recomposing. This keeps rotation angular and scale uniform so a matrix
 // tween follows the natural transform path instead of shearing through non-orthogonal states.
+//
+// Limitation: the rotation recovered via atan2 is confined to (-pi, pi], so winding (full turns) is
+// lost and the mix takes the literal path between the two recovered angles rather than the shortest
+// arc. A tween that should sweep across the +/-pi boundary (e.g. 170 deg to 190 deg) instead spins
+// the long way through 0. This is inherent to interpolating baked matrices: the source angle cannot
+// be reconstructed from the matrix alone. Animations that need precise multi-turn or boundary-
+// crossing rotation should drive a scalar rotation channel (e.g. Group::rotation) rather than a
+// Layer matrix channel.
 inline tgfx::Matrix MixTGFXMatrix(const tgfx::Matrix& current, const tgfx::Matrix& target,
                                   float mix) {
   float c[9];
