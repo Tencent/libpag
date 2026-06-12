@@ -143,9 +143,10 @@ class PAGXDocument : public Node {
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
-   * constraints. Must be called before rendering or font embedding. This method should only
-   * be called once per document — repeated calls may produce incorrect results because
-   * measurement data is cached and some layout operations permanently modify source geometry.
+   * constraints. Must be called before rendering or font embedding. Re-running layout on an
+   * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
+   * reset branch discards the cached layout outputs first so nodes are re-measured from their
+   * current fields.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
