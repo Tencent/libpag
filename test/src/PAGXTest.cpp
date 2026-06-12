@@ -33,6 +33,7 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXChannelTable.h"
+#include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -8988,6 +8989,49 @@ PAGX_TEST(PAGXTest, NodeChannelOptionalFields) {
 
   // Wrong value type on an optional is still rejected.
   EXPECT_FALSE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(std::string("x"))));
+}
+
+/**
+ * Test case: ResetNodeChannel restores a channel to its node type's default value. Covers scalars,
+ * enums, component-wise channels (only the addressed axis is reset), and optionals (reset clears the
+ * value), plus rejection of null nodes and unknown channels.
+ */
+PAGX_TEST(PAGXTest, NodeChannelReset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+
+  // Scalar: edit then reset returns to the default carried by a fresh node.
+  float defaultAlpha = pagx::Default<pagx::Layer>().alpha;
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.3f)));
+  EXPECT_TRUE(pagx::ResetNodeChannel(layer, "alpha"));
+  EXPECT_FLOAT_EQ(layer->alpha, defaultAlpha);
+
+  // Enum: reset returns to the default blend mode.
+  pagx::BlendMode defaultBlend = pagx::Default<pagx::Layer>().blendMode;
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("multiply"))));
+  EXPECT_TRUE(pagx::ResetNodeChannel(layer, "blendMode"));
+  EXPECT_EQ(layer->blendMode, defaultBlend);
+
+  // Component-wise: resetting position.x leaves position.y untouched. Rectangle's default position
+  // is NaN (the auto-layout sentinel), so the reset is checked via isnan rather than equality.
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.x", pagx::KeyValue(10.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.y", pagx::KeyValue(20.0f)));
+  EXPECT_TRUE(pagx::ResetNodeChannel(rect, "position.x"));
+  EXPECT_TRUE(std::isnan(rect->position.x));
+  EXPECT_TRUE(std::isnan(pagx::Default<pagx::Rectangle>().position.x));
+  EXPECT_FLOAT_EQ(rect->position.y, 20.0f);
+
+  // Optional: reset clears a previously written value.
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(3.0f)));
+  EXPECT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_TRUE(pagx::ResetNodeChannel(modifier, "strokeWidth"));
+  EXPECT_FALSE(modifier->strokeWidth.has_value());
+
+  // Rejection: null node and unknown channel.
+  EXPECT_FALSE(pagx::ResetNodeChannel(nullptr, "alpha"));
+  EXPECT_FALSE(pagx::ResetNodeChannel(layer, "nosuchchannel"));
 }
 
 /**

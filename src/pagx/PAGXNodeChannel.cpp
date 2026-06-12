@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include "base/utils/Log.h"
 #include "pagx/PAGXChannelTable.h"
+#include "pagx/PAGXDefaults.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -70,12 +71,18 @@ static constexpr ChannelFlags NoFlags = ChannelFlags::None;
 
 // The access generators below turn a member pointer (and, for enums, the StringParser converters)
 // into a uniform ChannelAccessor. A read copies the field into *getOut; a write validates the KeyValue
-// alternative (or enum string) and copies into the field. Routing both directions through one
-// generated function keeps reads and writes symmetric and removes the per-field if/else boilerplate.
+// alternative (or enum string) and copies into the field; a reset (both getOut and setIn null) copies
+// the corresponding field of a default-constructed node of type T back into the field. Routing all
+// three directions through one generated function keeps them symmetric and removes the per-field
+// if/else boilerplate.
 
 template <typename T, auto Field>
 static bool AccessFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = self->*Field;
     return true;
@@ -91,6 +98,10 @@ static bool AccessFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T, auto Field>
 static bool AccessBool(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = self->*Field;
     return true;
@@ -106,6 +117,10 @@ static bool AccessBool(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T, auto Field>
 static bool AccessInt(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = self->*Field;
     return true;
@@ -121,6 +136,10 @@ static bool AccessInt(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T, auto Field>
 static bool AccessString(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = self->*Field;
     return true;
@@ -136,6 +155,10 @@ static bool AccessString(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T, auto Field>
 static bool AccessColor(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = self->*Field;
     return true;
@@ -153,6 +176,11 @@ template <typename T, auto Field, bool XAxis>
 static bool AccessPointAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
   float& component = XAxis ? (self->*Field).x : (self->*Field).y;
+  if (getOut == nullptr && setIn == nullptr) {
+    const auto& def = Default<T>().*Field;
+    component = XAxis ? def.x : def.y;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = component;
     return true;
@@ -170,6 +198,11 @@ template <typename T, auto Field, bool WidthAxis>
 static bool AccessSizeAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
   float& component = WidthAxis ? (self->*Field).width : (self->*Field).height;
+  if (getOut == nullptr && setIn == nullptr) {
+    const auto& def = Default<T>().*Field;
+    component = WidthAxis ? def.width : def.height;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = component;
     return true;
@@ -190,6 +223,12 @@ static bool AccessPaddingComp(Node* node, KeyValue* getOut, const KeyValue* setI
   float* component =
       Which == 0 ? &padding.left
                  : (Which == 1 ? &padding.top : (Which == 2 ? &padding.right : &padding.bottom));
+  if (getOut == nullptr && setIn == nullptr) {
+    const Padding& def = Default<T>().*Field;
+    *component =
+        Which == 0 ? def.left : (Which == 1 ? def.top : (Which == 2 ? def.right : def.bottom));
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = *component;
     return true;
@@ -205,6 +244,10 @@ static bool AccessPaddingComp(Node* node, KeyValue* getOut, const KeyValue* setI
 template <typename T, auto Field>
 static bool AccessOptionalFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     if (!(self->*Field).has_value()) {
       return false;
@@ -223,6 +266,10 @@ static bool AccessOptionalFloat(Node* node, KeyValue* getOut, const KeyValue* se
 template <typename T, auto Field>
 static bool AccessOptionalColor(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     if (!(self->*Field).has_value()) {
       return false;
@@ -244,6 +291,10 @@ template <typename T, typename E, auto Field, std::string (*ToString)(E),
           E (*FromString)(const std::string&), bool (*IsValid)(const std::string&)>
 static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
   if (getOut != nullptr) {
     *getOut = ToString(self->*Field);
     return true;
@@ -860,6 +911,19 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
   if (field == nullptr || !field->access(node, nullptr, &value)) {
     LOGE("SetNodeChannel: unhandled channel '%s' or value type mismatch for node type %d.",
          channel.c_str(), static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
+}
+
+bool ResetNodeChannel(Node* node, const std::string& channel) {
+  if (node == nullptr) {
+    return false;
+  }
+  const auto* field = FindChannel(node->nodeType(), channel);
+  if (field == nullptr || !field->access(node, nullptr, nullptr)) {
+    LOGE("ResetNodeChannel: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
     return false;
   }
   return true;

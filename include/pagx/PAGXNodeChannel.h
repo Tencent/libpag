@@ -61,6 +61,19 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value);
 
 /**
+ * Resets the node field identified by channel to the default value of its node type, i.e. the value
+ * a freshly created node of that type carries. This is the way to "clear" a previously edited
+ * channel: for optional fields (e.g. a TextModifier's strokeWidth) the default is the unset state,
+ * so resetting removes the value. Only the addressed component is reset for component-wise channels
+ * ("position.x" resets x but leaves y). The node is the source of truth; callers refresh any live
+ * scene separately via PAGXDocument::notifyChange.
+ * @param node  the node to reset; must not be null.
+ * @param channel  the channel name (see the encoding notes above).
+ * @return true on success; false if node is null or the channel is unknown for the node type.
+ */
+bool ResetNodeChannel(Node* node, const std::string& channel);
+
+/**
  * Returns true if the given channel exists on the node type and can be driven by an animation
  * channel, i.e. it has a lightweight runtime writer that updates the live layer in place. Returns
  * false for channels that only take effect through a layout/content rebuild and for unknown

@@ -48,9 +48,11 @@ inline constexpr bool HasFlag(ChannelFlags value, ChannelFlags flag) {
   return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
 }
 
-// Function that reads or writes one node channel. Exactly one of getOut / setIn is non-null: getOut
-// for a read (copies the field into *getOut), setIn for a write (validates and copies into the
-// field). Returns false on a type mismatch or an invalid enum string.
+// Function that reads, writes, or resets one node channel. At most one of getOut / setIn is
+// non-null: getOut for a read (copies the field into *getOut), setIn for a write (validates and
+// copies into the field), and both null for a reset (copies the corresponding field of a
+// default-constructed node back into the field). Returns false on a type mismatch or an invalid
+// enum string.
 using ChannelAccessor = bool (*)(Node* node, KeyValue* getOut, const KeyValue* setIn);
 
 // One reflective channel of a node type, addressed by channel name.
