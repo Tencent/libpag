@@ -222,13 +222,18 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers) {
     }
   }
   // Remove runtime children whose source layer is gone: detach their tgfx layer from this parent
-  // and drop their binding entries so no stale mapping survives.
+  // and drop their binding entries so no stale mapping survives. Detach the slot (the binding
+  // entry, which is this composition's direct child), not child->runtimeLayer: for a composition
+  // child the latter is the subtree root nested under the slot, so detaching it would orphan the
+  // empty slot container. Removing the slot detaches it together with its nested subtree. The slot
+  // must be looked up before binding->remove() erases the mapping.
   for (auto& child : children) {
     if (child == nullptr || child->node == nullptr || kept.find(child->node) != kept.end()) {
       continue;
     }
-    if (child->runtimeLayer != nullptr) {
-      child->runtimeLayer->removeFromParent();
+    auto slot = binding->get<tgfx::Layer>(child->node);
+    if (slot != nullptr) {
+      slot->removeFromParent();
     }
     binding->remove(child->node);
   }
