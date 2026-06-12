@@ -118,6 +118,24 @@ struct RuntimeBinding {
     return it->second->getObject<T>();
   }
 
+  // Drops the mapping for the given node, including its tgfx object and channel writers. Used when
+  // a node is removed from the document so the binding does not keep a stale entry alive.
+  void remove(const Node* node) {
+    targets.erase(node);
+  }
+
+  // Returns the node whose bound tgfx object is the given pointer, or nullptr if none. Linear scan;
+  // used by in-place refresh to map a tgfx child layer back to its source node when reconciling
+  // child lists.
+  const Node* findNode(const void* object) const {
+    for (const auto& entry : targets) {
+      if (entry.second->rawObject() == object) {
+        return entry.first;
+      }
+    }
+    return nullptr;
+  }
+
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
     auto it = targets.find(node);
     if (it == targets.end()) {
@@ -226,6 +244,31 @@ class LayerBuilder {
    *                    had applyLayout() called.
    */
   static LayerBuildResult BuildCompositionSubtree(const Composition* composition);
+
+  /**
+   * Re-applies the current state of a single Layer node onto its existing tgfx::Layer in place,
+   * reusing the supplied binding. The tgfx::Layer object identity is preserved so handles that
+   * hold it stay valid; only its vector contents, transform/render attributes, styles and filters
+   * are regenerated from the node's current fields. The document must have had applyLayout() called
+   * (re-run it first when layout-affecting fields changed). Used by PAGScene to reflect post-build
+   * edits without rebuilding the layer tree.
+   * @param node The Layer node to refresh.
+   * @param binding The runtime binding that maps the node to its tgfx::Layer.
+   * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
+   */
+  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding);
+
+  /**
+   * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
+   * existing binding, returning the new tgfx::Layer. Layers referencing a composition produce an
+   * empty container layer (the runtime PAGComposition slot is populated separately), matching the
+   * runtime build path. Used to add a newly inserted child layer to a live scene without rebuilding
+   * the whole tree.
+   * @param node The Layer node to build.
+   * @param binding The runtime binding to populate with the node's mapping.
+   * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
+   */
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding);
 };
 
 }  // namespace pagx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGComposition.h"
+#include <unordered_map>
 #include <unordered_set>
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
@@ -26,6 +27,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 
@@ -117,6 +119,131 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
       children.push_back(std::move(childComposition));
     } else {
       children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
+    }
+  }
+}
+
+void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
+  std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
+  // Reconcile the child layer list first. A dirty container node means its child list may have
+  // gained or lost layers. The root composition (node == nullptr) reconciles against the document's
+  // top-level layers; a child composition reconciles against its source composition's layers.
+  const std::vector<Layer*>* sourceLayers = nullptr;
+  if (node == nullptr) {
+    auto scene = rootScene.lock();
+    if (scene != nullptr && scene->document != nullptr) {
+      sourceLayers = &scene->document->layers;
+    }
+  } else if (node->composition != nullptr) {
+    sourceLayers = &node->composition->layers;
+  }
+  bool containerDirty = node == nullptr || dirtySet.find(node) != dirtySet.end();
+  if (sourceLayers != nullptr && containerDirty) {
+    syncChildren(*sourceLayers);
+  }
+
+  // Refresh the attributes/contents of any dirty layer nodes owned by this composition's binding.
+  // Iterate the dirty set rather than the top-level children so nested child layers (Layer.children
+  // built into the same binding) are refreshed too. RefreshLayerInPlace also reconciles each dirty
+  // layer's own child list, so adding or removing nested children takes effect when the parent layer
+  // is marked dirty.
+  if (binding != nullptr) {
+    for (auto* dirty : dirtyNodes) {
+      if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
+        continue;
+      }
+      auto* dirtyLayer = static_cast<Layer*>(dirty);
+      if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
+        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
+      }
+    }
+  }
+  // A mutated node may change which targets a timeline resolves to, so drop the cached resolution.
+  for (auto& timeline : timelines) {
+    if (timeline != nullptr) {
+      timeline->resolved = false;
+      timeline->resolvedTargets.clear();
+    }
+  }
+  for (auto& child : children) {
+    if (child != nullptr && child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes);
+    }
+  }
+}
+
+void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers) {
+  auto scene = rootScene.lock();
+  if (!scene || binding == nullptr || runtimeLayer == nullptr) {
+    return;
+  }
+  // Index existing runtime children by their source layer node so layers that still exist are
+  // reused unchanged (their tgfx layers and handles remain valid).
+  std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};
+  for (auto& child : children) {
+    if (child != nullptr && child->node != nullptr) {
+      existing.emplace(child->node, child);
+    }
+  }
+  std::unordered_set<const Layer*> kept = {};
+  std::vector<std::shared_ptr<PAGLayer>> newChildren = {};
+  newChildren.reserve(sourceLayers.size());
+  for (auto* layer : sourceLayers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    auto it = existing.find(layer);
+    if (it != existing.end()) {
+      newChildren.push_back(it->second);
+      kept.insert(layer);
+      continue;
+    }
+    // Newly added layer: build its tgfx subtree into this binding and wrap it in a runtime node.
+    if (layer->composition != nullptr) {
+      std::unordered_set<const Composition*> visited = {};
+      auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
+      if (childComposition == nullptr) {
+        continue;
+      }
+      auto slot = binding->get<tgfx::Layer>(layer);
+      if (slot == nullptr) {
+        slot = LayerBuilder::BuildLayerInto(layer, binding.get());
+      }
+      if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
+        slot->addChild(childComposition->runtimeLayer);
+      }
+      newChildren.push_back(std::move(childComposition));
+    } else {
+      auto layerRuntime = LayerBuilder::BuildLayerInto(layer, binding.get());
+      if (layerRuntime == nullptr) {
+        continue;
+      }
+      newChildren.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
+    }
+  }
+  // Remove runtime children whose source layer is gone: detach their tgfx layer from this parent
+  // and drop their binding entries so no stale mapping survives.
+  for (auto& child : children) {
+    if (child == nullptr || child->node == nullptr || kept.find(child->node) != kept.end()) {
+      continue;
+    }
+    if (child->runtimeLayer != nullptr) {
+      child->runtimeLayer->removeFromParent();
+    }
+    binding->remove(child->node);
+  }
+  children = std::move(newChildren);
+  // Reorder this parent's direct child tgfx layers to match the document order. The direct child of
+  // this composition's runtimeLayer is the layer's slot (binding entry), not child->runtimeLayer: a
+  // composition child's runtimeLayer is the subtree root nested under its slot. addChild on a layer
+  // already parented here moves it to the top, so appending in source order yields document order.
+  for (auto& child : children) {
+    if (child == nullptr || child->node == nullptr) {
+      continue;
+    }
+    auto slot = binding->get<tgfx::Layer>(child->node);
+    if (slot != nullptr) {
+      runtimeLayer->addChild(slot);
     }
   }
 }

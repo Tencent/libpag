@@ -225,8 +225,18 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   return true;
 }
 
-void PAGScene::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
-  // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
+void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
+  if (_rootComposition != nullptr) {
+    _rootComposition->refreshNodes(dirtyNodes);
+  }
+  // Top-level timelines are owned here, not by the root composition, so reset their cached target
+  // resolution as well: a mutated node may change which targets they resolve to.
+  for (auto& entry : timelinesByAnimation) {
+    if (entry.second != nullptr) {
+      entry.second->resolved = false;
+      entry.second->resolvedTargets.clear();
+    }
+  }
 }
 
 RuntimeBinding* PAGScene::mutableBinding() {

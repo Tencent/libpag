@@ -175,14 +175,21 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Performs internal bookkeeping for live PAGScene instances created from this document after the
-   * given nodes have been mutated. Currently this only prunes expired live-scene references; it
-   * does not yet rebuild or refresh any rendered content. Runtime rebuild dispatch to live scenes
-   * is not implemented yet.
-   * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
-   * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
+   * Reflects post-build edits to the given nodes in every live PAGScene created from this document.
+   * Refreshes each affected node's runtime content in place, preserving existing layer handles.
+   * Render-only edits (alpha, color, blendMode, transform) are reflected without re-running layout.
+   * Adding or removing child layers of a node is supported by passing the parent (container) node:
+   * its child list is reconciled, building newly added layers and removing deleted ones while
+   * reusing unchanged children.
+   * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
+   * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
+   * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
+   * fonts, text, geometry) or a child list changed. When true, the full layout pass is re-run before
+   * refreshing so the edited values take effect; when false, layout is skipped for a cheaper
+   * render-only refresh. Defaults to true. Callers that mutate via SetNodeChannel can derive this
+   * from RequiresLayout; structural add/remove must pass true.
    */
-  void notifyChange(const std::vector<Node*>& dirtyNodes);
+  void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged = true);
 
   NodeType nodeType() const override {
     return NodeType::Document;

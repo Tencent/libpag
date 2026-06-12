@@ -105,6 +105,14 @@ class LayoutNode {
   bool hasConstraints() const;
 
   /**
+   * Clears the layout-computed outputs (preferred and resolved position/size) so that a subsequent
+   * updateSize() / PerformConstraintLayout() pass re-measures and re-resolves from the current
+   * authored fields. Authored inputs (width/height, constraints, percent sizes) are not touched.
+   * Used when re-running layout on an already-laid-out document after edits.
+   */
+  void resetLayout();
+
+  /**
    * Returns the layout-resolved bounds of this node in its parent's coordinate space.
    * Only valid after applyLayout() has been called. Before layout, returns an empty Rect.
    */

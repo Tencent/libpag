@@ -32,6 +32,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGXChannelTable.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -8125,6 +8126,245 @@ PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
     EXPECT_TRUE(Baseline::Compare(surface, key));
   }
 /**
+ * Test case: notifyChange reflects a render-attribute edit (alpha) on the live tgfx layer in place,
+ * preserving the existing tgfx::Layer instance so handles stay valid.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRenderAttributeInPlace) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 1.0f);
+
+  layer->alpha = 0.3f;
+  doc->notifyChange({layer});
+
+  // Same tgfx::Layer instance is reused (in place), and the new alpha is reflected.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+}
+
+/**
+ * Test case: notifyChange regenerates vector contents so a SolidColor edit is reflected after the
+ * refresh.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeVectorContentColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
+  ASSERT_TRUE(tgfxSolid != nullptr);
+  EXPECT_EQ(tgfxSolid->color(), tgfx::Color({1.0f, 0.0f, 0.0f, 1.0f}));
+
+  solid->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  doc->notifyChange({layer});
+
+  // Contents are regenerated, so the binding now points at a fresh tgfx SolidColor with the edit.
+  auto refreshedSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
+  ASSERT_TRUE(refreshedSolid != nullptr);
+  EXPECT_EQ(refreshedSolid->color(), tgfx::Color({0.0f, 1.0f, 0.0f, 1.0f}));
+}
+
+/**
+ * Test case: notifyChange re-runs layout so a geometry edit is reflected in the layer's content
+ * bounds, while keeping the layer handle valid (the tgfx::Layer instance is preserved).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeLayoutWidth) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {50, 50};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(10, 10);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_FLOAT_EQ(hits[0]->getBounds().width, 50);
+
+  rect->size = {120, 50};
+  doc->notifyChange({layer});
+
+  // The same tgfx::Layer instance is kept and the regenerated content reflects the new width.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
+  auto hitsAfter = scene->getLayersUnderPoint(10, 10);
+  ASSERT_FALSE(hitsAfter.empty());
+  EXPECT_FLOAT_EQ(hitsAfter[0]->getBounds().width, 120);
+}
+
+/**
+ * Test case: notifyChange resets a timeline's resolved-target cache so a subsequent apply re-binds.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeResetsTimelineCache) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+  EXPECT_TRUE(timeline->resolved);
+
+  doc->notifyChange({layer});
+  EXPECT_FALSE(timeline->resolved);
+
+  // Re-resolving on the next apply still drives the channel correctly.
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  tgfxLayer->setAlpha(1.0f);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+}
+
+/**
+ * Test case: notifyChange adds a newly inserted top-level layer to the live scene while keeping the
+ * existing sibling's tgfx layer (and handle) unchanged.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeAddLayer) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto first = doc->makeNode<pagx::Layer>("A");
+  first->width = 50;
+  first->height = 50;
+  doc->layers.push_back(first);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto firstTgfx = scene->mutableBinding()->get<tgfx::Layer>(first);
+  ASSERT_TRUE(firstTgfx != nullptr);
+
+  auto second = doc->makeNode<pagx::Layer>("B");
+  second->width = 30;
+  second->height = 30;
+  doc->layers.push_back(second);
+  doc->notifyChange({second});
+
+  // The new layer now has a tgfx mapping, and the existing one is untouched (same instance).
+  auto secondTgfx = scene->mutableBinding()->get<tgfx::Layer>(second);
+  ASSERT_TRUE(secondTgfx != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(first).get(), firstTgfx.get());
+  EXPECT_NE(secondTgfx.get(), firstTgfx.get());
+}
+
+/**
+ * Test case: notifyChange removes a deleted layer from the live scene and drops its binding, while
+ * the surviving sibling's tgfx layer (and handle) stays valid.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemoveLayer) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto first = doc->makeNode<pagx::Layer>("A");
+  first->width = 50;
+  first->height = 50;
+  doc->layers.push_back(first);
+  auto second = doc->makeNode<pagx::Layer>("B");
+  second->width = 30;
+  second->height = 30;
+  doc->layers.push_back(second);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto firstTgfx = scene->mutableBinding()->get<tgfx::Layer>(first);
+  ASSERT_TRUE(firstTgfx != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(second) != nullptr);
+
+  // Remove the second layer from the document and notify.
+  doc->layers.pop_back();
+  doc->notifyChange({second});
+
+  // The removed layer's binding is dropped; the surviving layer keeps its instance.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(second), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(first).get(), firstTgfx.get());
+}
+
+/**
+ * Test case: notifyChange reconciles a plain layer's nested children (Layer.children): adding and
+ * removing a nested child is reflected, while the parent and surviving children keep their handles.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeNestedChildAddRemove) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto parent = doc->makeNode<pagx::Layer>("P");
+  parent->width = 100;
+  parent->height = 100;
+  doc->layers.push_back(parent);
+  auto childA = doc->makeNode<pagx::Layer>("A");
+  childA->width = 40;
+  childA->height = 40;
+  parent->children.push_back(childA);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto parentTgfx = scene->mutableBinding()->get<tgfx::Layer>(parent);
+  auto childATgfx = scene->mutableBinding()->get<tgfx::Layer>(childA);
+  ASSERT_TRUE(parentTgfx != nullptr);
+  ASSERT_TRUE(childATgfx != nullptr);
+
+  // Add a nested child B under the parent and notify with the parent (container) node.
+  auto childB = doc->makeNode<pagx::Layer>("B");
+  childB->width = 20;
+  childB->height = 20;
+  parent->children.push_back(childB);
+  doc->notifyChange({parent});
+
+  // B is built and bound; A and the parent keep their original tgfx instances.
+  auto childBTgfx = scene->mutableBinding()->get<tgfx::Layer>(childB);
+  ASSERT_TRUE(childBTgfx != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(parent).get(), parentTgfx.get());
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childA).get(), childATgfx.get());
+
+  // Remove the nested child A and notify; its binding is dropped, B and parent stay valid.
+  parent->children.erase(parent->children.begin());
+  doc->notifyChange({parent});
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childA), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childB).get(), childBTgfx.get());
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(parent).get(), parentTgfx.get());
+}
+
+/**
  * Test case: GetNodeChannel/SetNodeChannel round-trip scalar fields across node types.
  */
 PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
@@ -8226,8 +8466,78 @@ PAGX_TEST(PAGXTest, NodeChannelRejectsUnsupported) {
 }
 
 /**
- * Test case: IsAnimatableChannel reflects the field's animation class. Render outputs are
- * animatable; auto-layout inputs (width, padding) and the layer name are not.
+ * Test case: optional fields read false while unset, then round-trip after a write.
+ */
+PAGX_TEST(PAGXTest, NodeChannelOptionalFields) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+
+  // Unset optionals report no value on read.
+  pagx::KeyValue out;
+  EXPECT_FALSE(pagx::GetNodeChannel(modifier, "strokeWidth", &out));
+  EXPECT_FALSE(pagx::GetNodeChannel(modifier, "fillColor", &out));
+
+  // Writing populates the optional, and the value reads back.
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(3.0f)));
+  EXPECT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_FLOAT_EQ(*modifier->strokeWidth, 3.0f);
+  EXPECT_TRUE(pagx::GetNodeChannel(modifier, "strokeWidth", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), 3.0f);
+
+  pagx::Color red = {1.0f, 0.0f, 0.0f, 1.0f};
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "fillColor", pagx::KeyValue(red)));
+  EXPECT_TRUE(modifier->fillColor.has_value());
+  EXPECT_TRUE(pagx::GetNodeChannel(modifier, "fillColor", &out));
+  EXPECT_EQ(std::get<pagx::Color>(out), red);
+
+  // Wrong value type on an optional is still rejected.
+  EXPECT_FALSE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(std::string("x"))));
+}
+
+/**
+ * Test case: ChannelsFor exposes every channel of a node type, each with a working accessor and
+ * flags that match the IsAnimatableChannel/RequiresLayout queries.
+ */
+PAGX_TEST(PAGXTest, NodeChannelTableConsistency) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  const auto& channels = pagx::ChannelsFor(pagx::NodeType::Layer);
+  ASSERT_FALSE(channels.empty());
+  bool sawAnimatable = false;
+  bool sawRequiresLayout = false;
+  bool sawNoFlags = false;
+  for (const auto& channel : channels) {
+    // The flags reported by the table must agree with the by-name query helpers.
+    EXPECT_EQ(pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable),
+              pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel.channel));
+    EXPECT_EQ(pagx::HasFlag(channel.flags, pagx::ChannelFlags::RequiresLayout),
+              pagx::RequiresLayout(pagx::NodeType::Layer, channel.channel));
+    // Every listed channel must be readable on a freshly built node.
+    pagx::KeyValue out;
+    EXPECT_TRUE(pagx::GetNodeChannel(layer, channel.channel, &out))
+        << "channel '" << channel.channel << "' is listed but not readable";
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+      sawAnimatable = true;
+    }
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::RequiresLayout)) {
+      sawRequiresLayout = true;
+    }
+    if (channel.flags == pagx::ChannelFlags::None) {
+      sawNoFlags = true;
+    }
+  }
+  EXPECT_TRUE(sawAnimatable);
+  EXPECT_TRUE(sawRequiresLayout);
+  EXPECT_TRUE(sawNoFlags);
+
+  // A node type with no reflectable channels yields an empty table.
+  EXPECT_TRUE(pagx::ChannelsFor(pagx::NodeType::Document).empty());
+}
+
+/**
+ * Test case: IsAnimatableChannel marks channels that have a runtime writer. Pure render outputs and
+ * in-place geometry are animatable; auto-layout inputs (width, padding) and the layer name are not.
  */
 PAGX_TEST(PAGXTest, NodeChannelAnimatableClass) {
   EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "alpha"));
@@ -8236,11 +8546,122 @@ PAGX_TEST(PAGXTest, NodeChannelAnimatableClass) {
   EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "padding.left"));
   EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "name"));
 
-  // Geometry outputs are animatable.
+  // Geometry outputs are animatable (driven in place during playback).
   EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "size.width"));
   EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Polystar, "outerRadius"));
   // Unknown channel is not animatable.
   EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "nope"));
+}
+
+/**
+ * Test case: RequiresLayout marks channels whose document edit only takes effect after a layout
+ * pass. This covers both auto-layout inputs and layout-derived geometry, so a channel can be both
+ * animatable and layout-requiring (e.g. a shape's size / position, or a layer's x / y).
+ */
+PAGX_TEST(PAGXTest, NodeChannelRequiresLayout) {
+  // Auto-layout inputs require layout.
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "width"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "padding.left"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Text, "fontSize"));
+  // Layout-derived geometry requires layout even though it is also animatable.
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "size.width"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "position.x"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Polystar, "outerRadius"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "x"));
+  // Pure render channels refresh without layout.
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Layer, "alpha"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "roundness"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Fill, "alpha"));
+  // Unknown channel does not require layout.
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Layer, "nope"));
+}
+
+/**
+ * Test case: notifyChange with layoutChanged=false skips the layout pass — a render edit still
+ * takes effect, while a layout edit made in the same call is intentionally NOT reflected (proving
+ * layout was skipped).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRenderOnlySkipsLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Rectangle>(rect) != nullptr);
+
+  // Edit a render field (alpha) and a layout field (rect size) together, but notify as render-only.
+  // dirty is the host layer: geometry size is refreshed via the layer's RefreshLayerInPlace, which
+  // rebuilds vector contents from renderSize(). With layout skipped, renderSize() keeps the stale
+  // value, so the size edit is intentionally not reflected.
+  layer->alpha = 0.3f;
+  rect->size = {120, 40};
+  doc->notifyChange({layer}, /*layoutChanged=*/false);
+
+  // Render edit reflected; layout edit NOT reflected because layout was skipped (size stays 40).
+  // Re-fetch the tgfx Rectangle since RefreshLayerInPlace rebuilds vector contents.
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 40.0f);
+
+  // Now notify with layoutChanged=true: re-layout updates renderSize and the edit takes effect.
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 120.0f);
+}
+
+/**
+ * Test case: the documented edit workflow end to end — mutate a channel via SetNodeChannel, derive
+ * the layoutChanged flag from RequiresLayout, then call notifyChange. A render channel (alpha)
+ * refreshes with layout skipped; a layout-affecting channel (rect width via size.width) only takes
+ * effect once RequiresLayout routes it through a layout pass.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeFromSetNodeChannel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Rectangle>(rect) != nullptr);
+
+  // Render channel: alpha does not require layout, so the caller-derived flag skips layout. The
+  // edit still reaches the live layer.
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.3f)));
+  bool alphaLayout = pagx::RequiresLayout(layer->nodeType(), "alpha");
+  EXPECT_FALSE(alphaLayout);
+  doc->notifyChange({layer}, alphaLayout);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+
+  // Layout-affecting channel: size.width requires layout, so the derived flag re-runs layout and
+  // the new width is reflected. Re-fetch the tgfx Rectangle since refresh rebuilds vector contents.
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.width", pagx::KeyValue(120.0f)));
+  bool widthLayout = pagx::RequiresLayout(rect->nodeType(), "size.width");
+  EXPECT_TRUE(widthLayout);
+  doc->notifyChange({layer}, widthLayout);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 120.0f);
 }
 
 /**
@@ -8376,12 +8797,12 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   pagx::Node* nodes[] = {layer,    rect, ellipse, polystar, trim,      roundCorner,
                          repeater, fill, stroke,  solid,    dropStyle, blurFilter};
   for (auto* node : nodes) {
-    for (const auto& field : pagx::NodeFieldsFor(node->nodeType())) {
-      if (field.animClass != pagx::AnimClass::Animatable) {
+    for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
+      if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
         continue;
       }
-      EXPECT_TRUE(binding->hasWriter(node, field.channel))
-          << "node type " << static_cast<int>(node->nodeType()) << " channel '" << field.channel
+      EXPECT_TRUE(binding->hasWriter(node, channel.channel))
+          << "node type " << static_cast<int>(node->nodeType()) << " channel '" << channel.channel
           << "' is Animatable but has no runtime writer";
     }
   }

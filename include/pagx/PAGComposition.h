@@ -30,6 +30,7 @@ class PAGTimeline;
 class PAGScene;
 class PAGXDocument;
 class Composition;
+class Node;
 struct RuntimeBinding;
 
 /**
@@ -99,6 +100,19 @@ class PAGComposition : public PAGLayer {
   // searching this composition's children and recursing into descendant composition children.
   // Returns nullptr if no persistent node owns the layer (internal sub-layer).
   std::shared_ptr<PAGLayer> findChildForLayer(const tgfx::Layer* hitLayer);
+
+  // Refreshes this composition after edits: reconciles its child layer list (adding, removing, and
+  // reordering children to match the source layers when the container node is dirty), refreshes the
+  // content of any dirty leaf layers in place, resets timeline target caches, then recurses into
+  // child compositions so each refreshes only the nodes in its own binding. Called by
+  // PAGScene::onNodesChanged.
+  void refreshNodes(const std::vector<Node*>& dirtyNodes);
+
+  // Reconciles this composition's runtime children with the given source layer list: reuses
+  // children whose source layer still maps to a tgfx layer (handles stay valid), builds newly added
+  // layers into the binding, removes runtime children whose source layer is gone, and reorders the
+  // parent's tgfx children to match the document order.
+  void syncChildren(const std::vector<Layer*>& sourceLayers);
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.

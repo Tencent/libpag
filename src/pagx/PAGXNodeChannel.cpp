@@ -20,6 +20,7 @@
 #include <optional>
 #include <unordered_map>
 #include "base/utils/Log.h"
+#include "pagx/PAGXChannelTable.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -58,8 +59,17 @@
 
 namespace pagx {
 
+// Short aliases for the channel flag combinations used by the tables below. Anim: has a runtime
+// writer (animatable in place). Layout: editing it on the document needs a layout pass to show up.
+// AnimLayout: both (e.g. a shape's size, which is animated in place but, when edited, must re-run
+// layout because the rendered size is read through a layout-derived accessor). NoFlags: neither.
+static constexpr ChannelFlags Anim = ChannelFlags::Animatable;
+static constexpr ChannelFlags Layout = ChannelFlags::RequiresLayout;
+static constexpr ChannelFlags AnimLayout = ChannelFlags::Animatable | ChannelFlags::RequiresLayout;
+static constexpr ChannelFlags NoFlags = ChannelFlags::None;
+
 // The access generators below turn a member pointer (and, for enums, the StringParser converters)
-// into a uniform NodeAccessFn. A read copies the field into *getOut; a write validates the KeyValue
+// into a uniform ChannelAccessor. A read copies the field into *getOut; a write validates the KeyValue
 // alternative (or enum string) and copies into the field. Routing both directions through one
 // generated function keeps reads and writes symmetric and removes the per-field if/else boilerplate.
 
@@ -246,7 +256,7 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   return true;
 }
 
-// Convenience macros that turn a (channel, member) pair into a NodeFieldDef row. They only build the
+// Convenience macros that turn a (channel, member) pair into a ChannelDef row. They only build the
 // table entries; all access logic lives in the templated generators above.
 #define FIELD_FLOAT(T, name, member, cls) \
   { name, cls, &AccessFloat<T, &T::member> }
@@ -284,194 +294,194 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
 template <typename T>
-static void AppendLayoutNodeFields(std::vector<NodeFieldDef>& table) {
-  std::vector<NodeFieldDef> shared = {
-      FIELD_FLOAT(T, "width", width, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "height", height, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "percentWidth", percentWidth, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "percentHeight", percentHeight, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "left", left, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "right", right, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "top", top, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "bottom", bottom, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "centerX", centerX, AnimClass::LayoutInput),
-      FIELD_FLOAT(T, "centerY", centerY, AnimClass::LayoutInput),
+static void AppendLayoutNodeFields(std::vector<ChannelDef>& table) {
+  std::vector<ChannelDef> shared = {
+      FIELD_FLOAT(T, "width", width, Layout),
+      FIELD_FLOAT(T, "height", height, Layout),
+      FIELD_FLOAT(T, "percentWidth", percentWidth, Layout),
+      FIELD_FLOAT(T, "percentHeight", percentHeight, Layout),
+      FIELD_FLOAT(T, "left", left, Layout),
+      FIELD_FLOAT(T, "right", right, Layout),
+      FIELD_FLOAT(T, "top", top, Layout),
+      FIELD_FLOAT(T, "bottom", bottom, Layout),
+      FIELD_FLOAT(T, "centerX", centerX, Layout),
+      FIELD_FLOAT(T, "centerY", centerY, Layout),
   };
   table.insert(table.end(), shared.begin(), shared.end());
 }
 
-static std::vector<NodeFieldDef> BuildLayerFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_STRING(Layer, "name", name, AnimClass::LayoutInput),
-      FIELD_BOOL(Layer, "visible", visible, AnimClass::Animatable),
-      FIELD_FLOAT(Layer, "alpha", alpha, AnimClass::Animatable),
-      FIELD_ENUM(Layer, "blendMode", blendMode, AnimClass::Animatable, BlendMode),
-      FIELD_FLOAT(Layer, "x", x, AnimClass::Animatable),
-      FIELD_FLOAT(Layer, "y", y, AnimClass::Animatable),
-      FIELD_BOOL(Layer, "preserve3D", preserve3D, AnimClass::Static),
-      FIELD_BOOL(Layer, "antiAlias", antiAlias, AnimClass::Static),
-      FIELD_BOOL(Layer, "groupOpacity", groupOpacity, AnimClass::Static),
-      FIELD_BOOL(Layer, "passThroughBackground", passThroughBackground, AnimClass::Static),
-      FIELD_BOOL(Layer, "clipToBounds", clipToBounds, AnimClass::LayoutInput),
-      FIELD_ENUM(Layer, "maskType", maskType, AnimClass::Static, MaskType),
-      FIELD_ENUM(Layer, "layout", layout, AnimClass::LayoutInput, LayoutMode),
-      FIELD_FLOAT(Layer, "gap", gap, AnimClass::LayoutInput),
-      FIELD_FLOAT(Layer, "flex", flex, AnimClass::LayoutInput),
-      FIELD_ENUM(Layer, "alignment", alignment, AnimClass::LayoutInput, Alignment),
-      FIELD_ENUM(Layer, "arrangement", arrangement, AnimClass::LayoutInput, Arrangement),
-      FIELD_BOOL(Layer, "includeInLayout", includeInLayout, AnimClass::LayoutInput),
-      FIELD_PADDING_L(Layer, "padding.left", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_T(Layer, "padding.top", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_R(Layer, "padding.right", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_B(Layer, "padding.bottom", padding, AnimClass::LayoutInput),
+static std::vector<ChannelDef> BuildLayerFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_STRING(Layer, "name", name, NoFlags),
+      FIELD_BOOL(Layer, "visible", visible, Anim),
+      FIELD_FLOAT(Layer, "alpha", alpha, Anim),
+      FIELD_ENUM(Layer, "blendMode", blendMode, Anim, BlendMode),
+      FIELD_FLOAT(Layer, "x", x, AnimLayout),
+      FIELD_FLOAT(Layer, "y", y, AnimLayout),
+      FIELD_BOOL(Layer, "preserve3D", preserve3D, NoFlags),
+      FIELD_BOOL(Layer, "antiAlias", antiAlias, NoFlags),
+      FIELD_BOOL(Layer, "groupOpacity", groupOpacity, NoFlags),
+      FIELD_BOOL(Layer, "passThroughBackground", passThroughBackground, NoFlags),
+      FIELD_BOOL(Layer, "clipToBounds", clipToBounds, Layout),
+      FIELD_ENUM(Layer, "maskType", maskType, NoFlags, MaskType),
+      FIELD_ENUM(Layer, "layout", layout, Layout, LayoutMode),
+      FIELD_FLOAT(Layer, "gap", gap, Layout),
+      FIELD_FLOAT(Layer, "flex", flex, Layout),
+      FIELD_ENUM(Layer, "alignment", alignment, Layout, Alignment),
+      FIELD_ENUM(Layer, "arrangement", arrangement, Layout, Arrangement),
+      FIELD_BOOL(Layer, "includeInLayout", includeInLayout, Layout),
+      FIELD_PADDING_L(Layer, "padding.left", padding, Layout),
+      FIELD_PADDING_T(Layer, "padding.top", padding, Layout),
+      FIELD_PADDING_R(Layer, "padding.right", padding, Layout),
+      FIELD_PADDING_B(Layer, "padding.bottom", padding, Layout),
   };
   AppendLayoutNodeFields<Layer>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildRectangleFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_POINT_X(Rectangle, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Rectangle, "position.y", position, AnimClass::Animatable),
-      FIELD_SIZE_W(Rectangle, "size.width", size, AnimClass::Animatable),
-      FIELD_SIZE_H(Rectangle, "size.height", size, AnimClass::Animatable),
-      FIELD_FLOAT(Rectangle, "roundness", roundness, AnimClass::Animatable),
-      FIELD_BOOL(Rectangle, "reversed", reversed, AnimClass::Static),
+static std::vector<ChannelDef> BuildRectangleFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_POINT_X(Rectangle, "position.x", position, AnimLayout),
+      FIELD_POINT_Y(Rectangle, "position.y", position, AnimLayout),
+      FIELD_SIZE_W(Rectangle, "size.width", size, AnimLayout),
+      FIELD_SIZE_H(Rectangle, "size.height", size, AnimLayout),
+      FIELD_FLOAT(Rectangle, "roundness", roundness, Anim),
+      FIELD_BOOL(Rectangle, "reversed", reversed, NoFlags),
   };
   AppendLayoutNodeFields<Rectangle>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildEllipseFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_POINT_X(Ellipse, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Ellipse, "position.y", position, AnimClass::Animatable),
-      FIELD_SIZE_W(Ellipse, "size.width", size, AnimClass::Animatable),
-      FIELD_SIZE_H(Ellipse, "size.height", size, AnimClass::Animatable),
-      FIELD_BOOL(Ellipse, "reversed", reversed, AnimClass::Static),
+static std::vector<ChannelDef> BuildEllipseFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_POINT_X(Ellipse, "position.x", position, AnimLayout),
+      FIELD_POINT_Y(Ellipse, "position.y", position, AnimLayout),
+      FIELD_SIZE_W(Ellipse, "size.width", size, AnimLayout),
+      FIELD_SIZE_H(Ellipse, "size.height", size, AnimLayout),
+      FIELD_BOOL(Ellipse, "reversed", reversed, NoFlags),
   };
   AppendLayoutNodeFields<Ellipse>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildPolystarFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_POINT_X(Polystar, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Polystar, "position.y", position, AnimClass::Animatable),
-      FIELD_ENUM(Polystar, "type", type, AnimClass::Static, PolystarType),
-      FIELD_FLOAT(Polystar, "pointCount", pointCount, AnimClass::Animatable),
-      FIELD_FLOAT(Polystar, "outerRadius", outerRadius, AnimClass::Animatable),
-      FIELD_FLOAT(Polystar, "innerRadius", innerRadius, AnimClass::Animatable),
-      FIELD_FLOAT(Polystar, "rotation", rotation, AnimClass::Animatable),
-      FIELD_FLOAT(Polystar, "outerRoundness", outerRoundness, AnimClass::Animatable),
-      FIELD_FLOAT(Polystar, "innerRoundness", innerRoundness, AnimClass::Animatable),
-      FIELD_BOOL(Polystar, "reversed", reversed, AnimClass::Static),
+static std::vector<ChannelDef> BuildPolystarFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_POINT_X(Polystar, "position.x", position, AnimLayout),
+      FIELD_POINT_Y(Polystar, "position.y", position, AnimLayout),
+      FIELD_ENUM(Polystar, "type", type, Layout, PolystarType),
+      FIELD_FLOAT(Polystar, "pointCount", pointCount, AnimLayout),
+      FIELD_FLOAT(Polystar, "outerRadius", outerRadius, AnimLayout),
+      FIELD_FLOAT(Polystar, "innerRadius", innerRadius, AnimLayout),
+      FIELD_FLOAT(Polystar, "rotation", rotation, AnimLayout),
+      FIELD_FLOAT(Polystar, "outerRoundness", outerRoundness, Anim),
+      FIELD_FLOAT(Polystar, "innerRoundness", innerRoundness, Anim),
+      FIELD_BOOL(Polystar, "reversed", reversed, NoFlags),
   };
   AppendLayoutNodeFields<Polystar>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildPathFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_POINT_X(Path, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Path, "position.y", position, AnimClass::Animatable),
-      FIELD_BOOL(Path, "reversed", reversed, AnimClass::Static),
+static std::vector<ChannelDef> BuildPathFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_POINT_X(Path, "position.x", position, Anim),
+      FIELD_POINT_Y(Path, "position.y", position, Anim),
+      FIELD_BOOL(Path, "reversed", reversed, NoFlags),
   };
   AppendLayoutNodeFields<Path>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildTextFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_STRING(Text, "text", text, AnimClass::LayoutInput),
-      FIELD_POINT_X(Text, "x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Text, "y", position, AnimClass::Animatable),
-      FIELD_STRING(Text, "fontFamily", fontFamily, AnimClass::LayoutInput),
-      FIELD_STRING(Text, "fontStyle", fontStyle, AnimClass::LayoutInput),
-      FIELD_FLOAT(Text, "fontSize", fontSize, AnimClass::LayoutInput),
-      FIELD_FLOAT(Text, "letterSpacing", letterSpacing, AnimClass::LayoutInput),
-      FIELD_BOOL(Text, "fauxBold", fauxBold, AnimClass::LayoutInput),
-      FIELD_BOOL(Text, "fauxItalic", fauxItalic, AnimClass::LayoutInput),
-      FIELD_ENUM(Text, "textAnchor", textAnchor, AnimClass::LayoutInput, TextAnchor),
-      FIELD_ENUM(Text, "baseline", baseline, AnimClass::LayoutInput, TextBaseline),
+static std::vector<ChannelDef> BuildTextFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_STRING(Text, "text", text, Layout),
+      FIELD_POINT_X(Text, "x", position, Anim),
+      FIELD_POINT_Y(Text, "y", position, Anim),
+      FIELD_STRING(Text, "fontFamily", fontFamily, Layout),
+      FIELD_STRING(Text, "fontStyle", fontStyle, Layout),
+      FIELD_FLOAT(Text, "fontSize", fontSize, Layout),
+      FIELD_FLOAT(Text, "letterSpacing", letterSpacing, Layout),
+      FIELD_BOOL(Text, "fauxBold", fauxBold, Layout),
+      FIELD_BOOL(Text, "fauxItalic", fauxItalic, Layout),
+      FIELD_ENUM(Text, "textAnchor", textAnchor, Layout, TextAnchor),
+      FIELD_ENUM(Text, "baseline", baseline, Layout, TextBaseline),
   };
   AppendLayoutNodeFields<Text>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildFillFields() {
+static std::vector<ChannelDef> BuildFillFields() {
   return {
-      FIELD_FLOAT(Fill, "alpha", alpha, AnimClass::Animatable),
-      FIELD_ENUM(Fill, "blendMode", blendMode, AnimClass::Static, BlendMode),
-      FIELD_ENUM(Fill, "fillRule", fillRule, AnimClass::Static, FillRule),
-      FIELD_ENUM(Fill, "placement", placement, AnimClass::Static, LayerPlacement),
+      FIELD_FLOAT(Fill, "alpha", alpha, Anim),
+      FIELD_ENUM(Fill, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_ENUM(Fill, "fillRule", fillRule, NoFlags, FillRule),
+      FIELD_ENUM(Fill, "placement", placement, NoFlags, LayerPlacement),
   };
 }
 
-static std::vector<NodeFieldDef> BuildStrokeFields() {
+static std::vector<ChannelDef> BuildStrokeFields() {
   return {
-      FIELD_FLOAT(Stroke, "width", width, AnimClass::Animatable),
-      FIELD_FLOAT(Stroke, "alpha", alpha, AnimClass::Animatable),
-      FIELD_ENUM(Stroke, "blendMode", blendMode, AnimClass::Static, BlendMode),
-      FIELD_ENUM(Stroke, "cap", cap, AnimClass::Static, LineCap),
-      FIELD_ENUM(Stroke, "join", join, AnimClass::Static, LineJoin),
-      FIELD_FLOAT(Stroke, "miterLimit", miterLimit, AnimClass::Animatable),
-      FIELD_FLOAT(Stroke, "dashOffset", dashOffset, AnimClass::Animatable),
-      FIELD_BOOL(Stroke, "dashAdaptive", dashAdaptive, AnimClass::Static),
-      FIELD_ENUM(Stroke, "align", align, AnimClass::Static, StrokeAlign),
-      FIELD_ENUM(Stroke, "placement", placement, AnimClass::Static, LayerPlacement),
+      FIELD_FLOAT(Stroke, "width", width, Anim),
+      FIELD_FLOAT(Stroke, "alpha", alpha, Anim),
+      FIELD_ENUM(Stroke, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_ENUM(Stroke, "cap", cap, NoFlags, LineCap),
+      FIELD_ENUM(Stroke, "join", join, NoFlags, LineJoin),
+      FIELD_FLOAT(Stroke, "miterLimit", miterLimit, Anim),
+      FIELD_FLOAT(Stroke, "dashOffset", dashOffset, Anim),
+      FIELD_BOOL(Stroke, "dashAdaptive", dashAdaptive, NoFlags),
+      FIELD_ENUM(Stroke, "align", align, NoFlags, StrokeAlign),
+      FIELD_ENUM(Stroke, "placement", placement, NoFlags, LayerPlacement),
   };
 }
 
-static std::vector<NodeFieldDef> BuildTrimPathFields() {
+static std::vector<ChannelDef> BuildTrimPathFields() {
   return {
-      FIELD_FLOAT(TrimPath, "start", start, AnimClass::Animatable),
-      FIELD_FLOAT(TrimPath, "end", end, AnimClass::Animatable),
-      FIELD_FLOAT(TrimPath, "offset", offset, AnimClass::Animatable),
-      FIELD_ENUM(TrimPath, "type", type, AnimClass::Static, TrimType),
+      FIELD_FLOAT(TrimPath, "start", start, Anim),
+      FIELD_FLOAT(TrimPath, "end", end, Anim),
+      FIELD_FLOAT(TrimPath, "offset", offset, Anim),
+      FIELD_ENUM(TrimPath, "type", type, NoFlags, TrimType),
   };
 }
 
-static std::vector<NodeFieldDef> BuildRoundCornerFields() {
+static std::vector<ChannelDef> BuildRoundCornerFields() {
   return {
-      FIELD_FLOAT(RoundCorner, "radius", radius, AnimClass::Animatable),
+      FIELD_FLOAT(RoundCorner, "radius", radius, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildMergePathFields() {
+static std::vector<ChannelDef> BuildMergePathFields() {
   return {
-      FIELD_ENUM(MergePath, "mode", mode, AnimClass::Static, MergePathMode),
+      FIELD_ENUM(MergePath, "mode", mode, NoFlags, MergePathMode),
   };
 }
 
-static std::vector<NodeFieldDef> BuildTextModifierFields() {
+static std::vector<ChannelDef> BuildTextModifierFields() {
   return {
-      FIELD_POINT_X(TextModifier, "anchor.x", anchor, AnimClass::Animatable),
-      FIELD_POINT_Y(TextModifier, "anchor.y", anchor, AnimClass::Animatable),
-      FIELD_POINT_X(TextModifier, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(TextModifier, "position.y", position, AnimClass::Animatable),
-      FIELD_FLOAT(TextModifier, "rotation", rotation, AnimClass::Animatable),
-      FIELD_POINT_X(TextModifier, "scale.x", scale, AnimClass::Animatable),
-      FIELD_POINT_Y(TextModifier, "scale.y", scale, AnimClass::Animatable),
-      FIELD_FLOAT(TextModifier, "skew", skew, AnimClass::Animatable),
-      FIELD_FLOAT(TextModifier, "skewAxis", skewAxis, AnimClass::Animatable),
-      FIELD_FLOAT(TextModifier, "alpha", alpha, AnimClass::Animatable),
-      FIELD_OPT_COLOR(TextModifier, "fillColor", fillColor, AnimClass::Animatable),
-      FIELD_OPT_COLOR(TextModifier, "strokeColor", strokeColor, AnimClass::Animatable),
-      FIELD_OPT_FLOAT(TextModifier, "strokeWidth", strokeWidth, AnimClass::Animatable),
+      FIELD_POINT_X(TextModifier, "anchor.x", anchor, Anim),
+      FIELD_POINT_Y(TextModifier, "anchor.y", anchor, Anim),
+      FIELD_POINT_X(TextModifier, "position.x", position, Anim),
+      FIELD_POINT_Y(TextModifier, "position.y", position, Anim),
+      FIELD_FLOAT(TextModifier, "rotation", rotation, Anim),
+      FIELD_POINT_X(TextModifier, "scale.x", scale, Anim),
+      FIELD_POINT_Y(TextModifier, "scale.y", scale, Anim),
+      FIELD_FLOAT(TextModifier, "skew", skew, Anim),
+      FIELD_FLOAT(TextModifier, "skewAxis", skewAxis, Anim),
+      FIELD_FLOAT(TextModifier, "alpha", alpha, Anim),
+      FIELD_OPT_COLOR(TextModifier, "fillColor", fillColor, Anim),
+      FIELD_OPT_COLOR(TextModifier, "strokeColor", strokeColor, Anim),
+      FIELD_OPT_FLOAT(TextModifier, "strokeWidth", strokeWidth, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildTextPathFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_POINT_X(TextPath, "baselineOrigin.x", baselineOrigin, AnimClass::LayoutInput),
-      FIELD_POINT_Y(TextPath, "baselineOrigin.y", baselineOrigin, AnimClass::LayoutInput),
-      FIELD_FLOAT(TextPath, "baselineAngle", baselineAngle, AnimClass::LayoutInput),
-      FIELD_FLOAT(TextPath, "firstMargin", firstMargin, AnimClass::LayoutInput),
-      FIELD_FLOAT(TextPath, "lastMargin", lastMargin, AnimClass::LayoutInput),
-      FIELD_BOOL(TextPath, "perpendicular", perpendicular, AnimClass::LayoutInput),
-      FIELD_BOOL(TextPath, "reversed", reversed, AnimClass::Static),
-      FIELD_BOOL(TextPath, "forceAlignment", forceAlignment, AnimClass::LayoutInput),
+static std::vector<ChannelDef> BuildTextPathFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_POINT_X(TextPath, "baselineOrigin.x", baselineOrigin, Layout),
+      FIELD_POINT_Y(TextPath, "baselineOrigin.y", baselineOrigin, Layout),
+      FIELD_FLOAT(TextPath, "baselineAngle", baselineAngle, Layout),
+      FIELD_FLOAT(TextPath, "firstMargin", firstMargin, Layout),
+      FIELD_FLOAT(TextPath, "lastMargin", lastMargin, Layout),
+      FIELD_BOOL(TextPath, "perpendicular", perpendicular, Layout),
+      FIELD_BOOL(TextPath, "reversed", reversed, NoFlags),
+      FIELD_BOOL(TextPath, "forceAlignment", forceAlignment, Layout),
   };
   AppendLayoutNodeFields<TextPath>(table);
   return table;
@@ -479,340 +489,339 @@ static std::vector<NodeFieldDef> BuildTextPathFields() {
 
 // Shared Group transform/layout fields, also used by TextBox which derives from Group.
 template <typename T>
-static void AppendGroupCommonFields(std::vector<NodeFieldDef>& table) {
-  std::vector<NodeFieldDef> shared = {
-      FIELD_POINT_X(T, "anchor.x", anchor, AnimClass::Animatable),
-      FIELD_POINT_Y(T, "anchor.y", anchor, AnimClass::Animatable),
-      FIELD_POINT_X(T, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(T, "position.y", position, AnimClass::Animatable),
-      FIELD_FLOAT(T, "rotation", rotation, AnimClass::Animatable),
-      FIELD_POINT_X(T, "scale.x", scale, AnimClass::Animatable),
-      FIELD_POINT_Y(T, "scale.y", scale, AnimClass::Animatable),
-      FIELD_FLOAT(T, "skew", skew, AnimClass::Animatable),
-      FIELD_FLOAT(T, "skewAxis", skewAxis, AnimClass::Animatable),
-      FIELD_FLOAT(T, "alpha", alpha, AnimClass::Animatable),
-      FIELD_PADDING_L(T, "padding.left", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_T(T, "padding.top", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_R(T, "padding.right", padding, AnimClass::LayoutInput),
-      FIELD_PADDING_B(T, "padding.bottom", padding, AnimClass::LayoutInput),
+static void AppendGroupCommonFields(std::vector<ChannelDef>& table) {
+  std::vector<ChannelDef> shared = {
+      FIELD_POINT_X(T, "anchor.x", anchor, Anim),
+      FIELD_POINT_Y(T, "anchor.y", anchor, Anim),
+      FIELD_POINT_X(T, "position.x", position, AnimLayout),
+      FIELD_POINT_Y(T, "position.y", position, AnimLayout),
+      FIELD_FLOAT(T, "rotation", rotation, Anim),
+      FIELD_POINT_X(T, "scale.x", scale, Anim),
+      FIELD_POINT_Y(T, "scale.y", scale, Anim),
+      FIELD_FLOAT(T, "skew", skew, Anim),
+      FIELD_FLOAT(T, "skewAxis", skewAxis, Anim),
+      FIELD_FLOAT(T, "alpha", alpha, Anim),
+      FIELD_PADDING_L(T, "padding.left", padding, Layout),
+      FIELD_PADDING_T(T, "padding.top", padding, Layout),
+      FIELD_PADDING_R(T, "padding.right", padding, Layout),
+      FIELD_PADDING_B(T, "padding.bottom", padding, Layout),
   };
   table.insert(table.end(), shared.begin(), shared.end());
   AppendLayoutNodeFields<T>(table);
 }
 
-static std::vector<NodeFieldDef> BuildGroupFields() {
-  std::vector<NodeFieldDef> table = {};
+static std::vector<ChannelDef> BuildGroupFields() {
+  std::vector<ChannelDef> table = {};
   AppendGroupCommonFields<Group>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildTextBoxFields() {
-  std::vector<NodeFieldDef> table = {
-      FIELD_ENUM(TextBox, "textAlign", textAlign, AnimClass::LayoutInput, TextAlign),
-      FIELD_ENUM(TextBox, "paragraphAlign", paragraphAlign, AnimClass::LayoutInput, ParagraphAlign),
-      FIELD_ENUM(TextBox, "writingMode", writingMode, AnimClass::LayoutInput, WritingMode),
-      FIELD_FLOAT(TextBox, "lineHeight", lineHeight, AnimClass::LayoutInput),
-      FIELD_BOOL(TextBox, "wordWrap", wordWrap, AnimClass::LayoutInput),
-      FIELD_ENUM(TextBox, "overflow", overflow, AnimClass::LayoutInput, Overflow),
+static std::vector<ChannelDef> BuildTextBoxFields() {
+  std::vector<ChannelDef> table = {
+      FIELD_ENUM(TextBox, "textAlign", textAlign, Layout, TextAlign),
+      FIELD_ENUM(TextBox, "paragraphAlign", paragraphAlign, Layout, ParagraphAlign),
+      FIELD_ENUM(TextBox, "writingMode", writingMode, Layout, WritingMode),
+      FIELD_FLOAT(TextBox, "lineHeight", lineHeight, Layout),
+      FIELD_BOOL(TextBox, "wordWrap", wordWrap, Layout),
+      FIELD_ENUM(TextBox, "overflow", overflow, Layout, Overflow),
   };
   AppendGroupCommonFields<TextBox>(table);
   return table;
 }
 
-static std::vector<NodeFieldDef> BuildRepeaterFields() {
+static std::vector<ChannelDef> BuildRepeaterFields() {
   return {
-      FIELD_FLOAT(Repeater, "copies", copies, AnimClass::Animatable),
-      FIELD_FLOAT(Repeater, "offset", offset, AnimClass::Animatable),
-      FIELD_ENUM(Repeater, "order", order, AnimClass::Static, RepeaterOrder),
-      FIELD_POINT_X(Repeater, "anchor.x", anchor, AnimClass::Animatable),
-      FIELD_POINT_Y(Repeater, "anchor.y", anchor, AnimClass::Animatable),
-      FIELD_POINT_X(Repeater, "position.x", position, AnimClass::Animatable),
-      FIELD_POINT_Y(Repeater, "position.y", position, AnimClass::Animatable),
-      FIELD_FLOAT(Repeater, "rotation", rotation, AnimClass::Animatable),
-      FIELD_POINT_X(Repeater, "scale.x", scale, AnimClass::Animatable),
-      FIELD_POINT_Y(Repeater, "scale.y", scale, AnimClass::Animatable),
-      FIELD_FLOAT(Repeater, "startAlpha", startAlpha, AnimClass::Animatable),
-      FIELD_FLOAT(Repeater, "endAlpha", endAlpha, AnimClass::Animatable),
+      FIELD_FLOAT(Repeater, "copies", copies, Anim),
+      FIELD_FLOAT(Repeater, "offset", offset, Anim),
+      FIELD_ENUM(Repeater, "order", order, NoFlags, RepeaterOrder),
+      FIELD_POINT_X(Repeater, "anchor.x", anchor, Anim),
+      FIELD_POINT_Y(Repeater, "anchor.y", anchor, Anim),
+      FIELD_POINT_X(Repeater, "position.x", position, Anim),
+      FIELD_POINT_Y(Repeater, "position.y", position, Anim),
+      FIELD_FLOAT(Repeater, "rotation", rotation, Anim),
+      FIELD_POINT_X(Repeater, "scale.x", scale, Anim),
+      FIELD_POINT_Y(Repeater, "scale.y", scale, Anim),
+      FIELD_FLOAT(Repeater, "startAlpha", startAlpha, Anim),
+      FIELD_FLOAT(Repeater, "endAlpha", endAlpha, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildRangeSelectorFields() {
+static std::vector<ChannelDef> BuildRangeSelectorFields() {
   return {
-      FIELD_FLOAT(RangeSelector, "start", start, AnimClass::Animatable),
-      FIELD_FLOAT(RangeSelector, "end", end, AnimClass::Animatable),
-      FIELD_FLOAT(RangeSelector, "offset", offset, AnimClass::Animatable),
-      FIELD_ENUM(RangeSelector, "unit", unit, AnimClass::Static, SelectorUnit),
-      FIELD_ENUM(RangeSelector, "shape", shape, AnimClass::Static, SelectorShape),
-      FIELD_FLOAT(RangeSelector, "easeIn", easeIn, AnimClass::Animatable),
-      FIELD_FLOAT(RangeSelector, "easeOut", easeOut, AnimClass::Animatable),
-      FIELD_ENUM(RangeSelector, "mode", mode, AnimClass::Static, SelectorMode),
-      FIELD_FLOAT(RangeSelector, "weight", weight, AnimClass::Animatable),
-      FIELD_BOOL(RangeSelector, "randomOrder", randomOrder, AnimClass::Static),
-      FIELD_INT(RangeSelector, "randomSeed", randomSeed, AnimClass::Static),
+      FIELD_FLOAT(RangeSelector, "start", start, Anim),
+      FIELD_FLOAT(RangeSelector, "end", end, Anim),
+      FIELD_FLOAT(RangeSelector, "offset", offset, Anim),
+      FIELD_ENUM(RangeSelector, "unit", unit, NoFlags, SelectorUnit),
+      FIELD_ENUM(RangeSelector, "shape", shape, NoFlags, SelectorShape),
+      FIELD_FLOAT(RangeSelector, "easeIn", easeIn, Anim),
+      FIELD_FLOAT(RangeSelector, "easeOut", easeOut, Anim),
+      FIELD_ENUM(RangeSelector, "mode", mode, NoFlags, SelectorMode),
+      FIELD_FLOAT(RangeSelector, "weight", weight, Anim),
+      FIELD_BOOL(RangeSelector, "randomOrder", randomOrder, NoFlags),
+      FIELD_INT(RangeSelector, "randomSeed", randomSeed, NoFlags),
   };
 }
 
-static std::vector<NodeFieldDef> BuildSolidColorFields() {
+static std::vector<ChannelDef> BuildSolidColorFields() {
   return {
-      FIELD_COLOR(SolidColor, "color", color, AnimClass::Animatable),
+      FIELD_COLOR(SolidColor, "color", color, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildLinearGradientFields() {
+static std::vector<ChannelDef> BuildLinearGradientFields() {
   return {
-      FIELD_POINT_X(LinearGradient, "startPoint.x", startPoint, AnimClass::Animatable),
-      FIELD_POINT_Y(LinearGradient, "startPoint.y", startPoint, AnimClass::Animatable),
-      FIELD_POINT_X(LinearGradient, "endPoint.x", endPoint, AnimClass::Animatable),
-      FIELD_POINT_Y(LinearGradient, "endPoint.y", endPoint, AnimClass::Animatable),
-      FIELD_BOOL(LinearGradient, "fitsToGeometry", fitsToGeometry, AnimClass::Static),
+      FIELD_POINT_X(LinearGradient, "startPoint.x", startPoint, Anim),
+      FIELD_POINT_Y(LinearGradient, "startPoint.y", startPoint, Anim),
+      FIELD_POINT_X(LinearGradient, "endPoint.x", endPoint, Anim),
+      FIELD_POINT_Y(LinearGradient, "endPoint.y", endPoint, Anim),
+      FIELD_BOOL(LinearGradient, "fitsToGeometry", fitsToGeometry, NoFlags),
   };
 }
 
-static std::vector<NodeFieldDef> BuildRadialGradientFields() {
+static std::vector<ChannelDef> BuildRadialGradientFields() {
   return {
-      FIELD_POINT_X(RadialGradient, "center.x", center, AnimClass::Animatable),
-      FIELD_POINT_Y(RadialGradient, "center.y", center, AnimClass::Animatable),
-      FIELD_FLOAT(RadialGradient, "radius", radius, AnimClass::Animatable),
-      FIELD_BOOL(RadialGradient, "fitsToGeometry", fitsToGeometry, AnimClass::Static),
+      FIELD_POINT_X(RadialGradient, "center.x", center, Anim),
+      FIELD_POINT_Y(RadialGradient, "center.y", center, Anim),
+      FIELD_FLOAT(RadialGradient, "radius", radius, Anim),
+      FIELD_BOOL(RadialGradient, "fitsToGeometry", fitsToGeometry, NoFlags),
   };
 }
 
-static std::vector<NodeFieldDef> BuildConicGradientFields() {
+static std::vector<ChannelDef> BuildConicGradientFields() {
   return {
-      FIELD_POINT_X(ConicGradient, "center.x", center, AnimClass::Animatable),
-      FIELD_POINT_Y(ConicGradient, "center.y", center, AnimClass::Animatable),
-      FIELD_FLOAT(ConicGradient, "startAngle", startAngle, AnimClass::Animatable),
-      FIELD_FLOAT(ConicGradient, "endAngle", endAngle, AnimClass::Animatable),
-      FIELD_BOOL(ConicGradient, "fitsToGeometry", fitsToGeometry, AnimClass::Static),
+      FIELD_POINT_X(ConicGradient, "center.x", center, Anim),
+      FIELD_POINT_Y(ConicGradient, "center.y", center, Anim),
+      FIELD_FLOAT(ConicGradient, "startAngle", startAngle, Anim),
+      FIELD_FLOAT(ConicGradient, "endAngle", endAngle, Anim),
+      FIELD_BOOL(ConicGradient, "fitsToGeometry", fitsToGeometry, NoFlags),
   };
 }
 
-static std::vector<NodeFieldDef> BuildDiamondGradientFields() {
+static std::vector<ChannelDef> BuildDiamondGradientFields() {
   return {
-      FIELD_POINT_X(DiamondGradient, "center.x", center, AnimClass::Animatable),
-      FIELD_POINT_Y(DiamondGradient, "center.y", center, AnimClass::Animatable),
-      FIELD_FLOAT(DiamondGradient, "radius", radius, AnimClass::Animatable),
-      FIELD_BOOL(DiamondGradient, "fitsToGeometry", fitsToGeometry, AnimClass::Static),
+      FIELD_POINT_X(DiamondGradient, "center.x", center, Anim),
+      FIELD_POINT_Y(DiamondGradient, "center.y", center, Anim),
+      FIELD_FLOAT(DiamondGradient, "radius", radius, Anim),
+      FIELD_BOOL(DiamondGradient, "fitsToGeometry", fitsToGeometry, NoFlags),
   };
 }
 
-static std::vector<NodeFieldDef> BuildColorStopFields() {
+static std::vector<ChannelDef> BuildColorStopFields() {
   return {
-      FIELD_FLOAT(ColorStop, "offset", offset, AnimClass::Animatable),
-      FIELD_COLOR(ColorStop, "color", color, AnimClass::Animatable),
+      FIELD_FLOAT(ColorStop, "offset", offset, Anim),
+      FIELD_COLOR(ColorStop, "color", color, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildImagePatternFields() {
+static std::vector<ChannelDef> BuildImagePatternFields() {
   return {
-      FIELD_ENUM(ImagePattern, "tileModeX", tileModeX, AnimClass::Static, TileMode),
-      FIELD_ENUM(ImagePattern, "tileModeY", tileModeY, AnimClass::Static, TileMode),
-      FIELD_ENUM(ImagePattern, "filterMode", filterMode, AnimClass::Static, FilterMode),
-      FIELD_ENUM(ImagePattern, "mipmapMode", mipmapMode, AnimClass::Static, MipmapMode),
-      FIELD_ENUM(ImagePattern, "scaleMode", scaleMode, AnimClass::Static, ScaleMode),
+      FIELD_ENUM(ImagePattern, "tileModeX", tileModeX, NoFlags, TileMode),
+      FIELD_ENUM(ImagePattern, "tileModeY", tileModeY, NoFlags, TileMode),
+      FIELD_ENUM(ImagePattern, "filterMode", filterMode, NoFlags, FilterMode),
+      FIELD_ENUM(ImagePattern, "mipmapMode", mipmapMode, NoFlags, MipmapMode),
+      FIELD_ENUM(ImagePattern, "scaleMode", scaleMode, NoFlags, ScaleMode),
   };
 }
 
-static std::vector<NodeFieldDef> BuildDropShadowStyleFields() {
+static std::vector<ChannelDef> BuildDropShadowStyleFields() {
   return {
-      FIELD_ENUM(DropShadowStyle, "blendMode", blendMode, AnimClass::Static, BlendMode),
-      FIELD_BOOL(DropShadowStyle, "excludeChildEffects", excludeChildEffects, AnimClass::Static),
-      FIELD_FLOAT(DropShadowStyle, "offsetX", offsetX, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowStyle, "offsetY", offsetY, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowStyle, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowStyle, "blurY", blurY, AnimClass::Animatable),
-      FIELD_COLOR(DropShadowStyle, "color", color, AnimClass::Animatable),
-      FIELD_BOOL(DropShadowStyle, "showBehindLayer", showBehindLayer, AnimClass::Animatable),
+      FIELD_ENUM(DropShadowStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(DropShadowStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_FLOAT(DropShadowStyle, "offsetX", offsetX, Anim),
+      FIELD_FLOAT(DropShadowStyle, "offsetY", offsetY, Anim),
+      FIELD_FLOAT(DropShadowStyle, "blurX", blurX, Anim),
+      FIELD_FLOAT(DropShadowStyle, "blurY", blurY, Anim),
+      FIELD_COLOR(DropShadowStyle, "color", color, Anim),
+      FIELD_BOOL(DropShadowStyle, "showBehindLayer", showBehindLayer, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildInnerShadowStyleFields() {
+static std::vector<ChannelDef> BuildInnerShadowStyleFields() {
   return {
-      FIELD_ENUM(InnerShadowStyle, "blendMode", blendMode, AnimClass::Static, BlendMode),
-      FIELD_BOOL(InnerShadowStyle, "excludeChildEffects", excludeChildEffects, AnimClass::Static),
-      FIELD_FLOAT(InnerShadowStyle, "offsetX", offsetX, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowStyle, "offsetY", offsetY, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowStyle, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowStyle, "blurY", blurY, AnimClass::Animatable),
-      FIELD_COLOR(InnerShadowStyle, "color", color, AnimClass::Animatable),
+      FIELD_ENUM(InnerShadowStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(InnerShadowStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_FLOAT(InnerShadowStyle, "offsetX", offsetX, Anim),
+      FIELD_FLOAT(InnerShadowStyle, "offsetY", offsetY, Anim),
+      FIELD_FLOAT(InnerShadowStyle, "blurX", blurX, Anim),
+      FIELD_FLOAT(InnerShadowStyle, "blurY", blurY, Anim),
+      FIELD_COLOR(InnerShadowStyle, "color", color, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildBackgroundBlurStyleFields() {
+static std::vector<ChannelDef> BuildBackgroundBlurStyleFields() {
   return {
-      FIELD_ENUM(BackgroundBlurStyle, "blendMode", blendMode, AnimClass::Static, BlendMode),
-      FIELD_BOOL(BackgroundBlurStyle, "excludeChildEffects", excludeChildEffects,
-                 AnimClass::Static),
-      FIELD_FLOAT(BackgroundBlurStyle, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(BackgroundBlurStyle, "blurY", blurY, AnimClass::Animatable),
-      FIELD_ENUM(BackgroundBlurStyle, "tileMode", tileMode, AnimClass::Static, TileMode),
+      FIELD_ENUM(BackgroundBlurStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(BackgroundBlurStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_FLOAT(BackgroundBlurStyle, "blurX", blurX, Anim),
+      FIELD_FLOAT(BackgroundBlurStyle, "blurY", blurY, Anim),
+      FIELD_ENUM(BackgroundBlurStyle, "tileMode", tileMode, NoFlags, TileMode),
   };
 }
 
-static std::vector<NodeFieldDef> BuildBlurFilterFields() {
+static std::vector<ChannelDef> BuildBlurFilterFields() {
   return {
-      FIELD_FLOAT(BlurFilter, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(BlurFilter, "blurY", blurY, AnimClass::Animatable),
-      FIELD_ENUM(BlurFilter, "tileMode", tileMode, AnimClass::Static, TileMode),
+      FIELD_FLOAT(BlurFilter, "blurX", blurX, Anim),
+      FIELD_FLOAT(BlurFilter, "blurY", blurY, Anim),
+      FIELD_ENUM(BlurFilter, "tileMode", tileMode, NoFlags, TileMode),
   };
 }
 
-static std::vector<NodeFieldDef> BuildDropShadowFilterFields() {
+static std::vector<ChannelDef> BuildDropShadowFilterFields() {
   return {
-      FIELD_FLOAT(DropShadowFilter, "offsetX", offsetX, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowFilter, "offsetY", offsetY, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowFilter, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(DropShadowFilter, "blurY", blurY, AnimClass::Animatable),
-      FIELD_COLOR(DropShadowFilter, "color", color, AnimClass::Animatable),
-      FIELD_BOOL(DropShadowFilter, "shadowOnly", shadowOnly, AnimClass::Animatable),
+      FIELD_FLOAT(DropShadowFilter, "offsetX", offsetX, Anim),
+      FIELD_FLOAT(DropShadowFilter, "offsetY", offsetY, Anim),
+      FIELD_FLOAT(DropShadowFilter, "blurX", blurX, Anim),
+      FIELD_FLOAT(DropShadowFilter, "blurY", blurY, Anim),
+      FIELD_COLOR(DropShadowFilter, "color", color, Anim),
+      FIELD_BOOL(DropShadowFilter, "shadowOnly", shadowOnly, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildInnerShadowFilterFields() {
+static std::vector<ChannelDef> BuildInnerShadowFilterFields() {
   return {
-      FIELD_FLOAT(InnerShadowFilter, "offsetX", offsetX, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowFilter, "offsetY", offsetY, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowFilter, "blurX", blurX, AnimClass::Animatable),
-      FIELD_FLOAT(InnerShadowFilter, "blurY", blurY, AnimClass::Animatable),
-      FIELD_COLOR(InnerShadowFilter, "color", color, AnimClass::Animatable),
-      FIELD_BOOL(InnerShadowFilter, "shadowOnly", shadowOnly, AnimClass::Animatable),
+      FIELD_FLOAT(InnerShadowFilter, "offsetX", offsetX, Anim),
+      FIELD_FLOAT(InnerShadowFilter, "offsetY", offsetY, Anim),
+      FIELD_FLOAT(InnerShadowFilter, "blurX", blurX, Anim),
+      FIELD_FLOAT(InnerShadowFilter, "blurY", blurY, Anim),
+      FIELD_COLOR(InnerShadowFilter, "color", color, Anim),
+      FIELD_BOOL(InnerShadowFilter, "shadowOnly", shadowOnly, Anim),
   };
 }
 
-static std::vector<NodeFieldDef> BuildBlendFilterFields() {
+static std::vector<ChannelDef> BuildBlendFilterFields() {
   return {
-      FIELD_COLOR(BlendFilter, "color", color, AnimClass::Animatable),
-      FIELD_ENUM(BlendFilter, "blendMode", blendMode, AnimClass::Static, BlendMode),
+      FIELD_COLOR(BlendFilter, "color", color, Anim),
+      FIELD_ENUM(BlendFilter, "blendMode", blendMode, NoFlags, BlendMode),
   };
 }
 
-const std::vector<NodeFieldDef>& NodeFieldsFor(NodeType type) {
-  static const std::vector<NodeFieldDef> empty = {};
+const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
+  static const std::vector<ChannelDef> empty = {};
   // Each table is built once on first use. Static locals keep the member-pointer-generated access
   // functions and channel rows alive for the process lifetime.
   switch (type) {
     case NodeType::Layer: {
-      static const std::vector<NodeFieldDef> table = BuildLayerFields();
+      static const std::vector<ChannelDef> table = BuildLayerFields();
       return table;
     }
     case NodeType::Rectangle: {
-      static const std::vector<NodeFieldDef> table = BuildRectangleFields();
+      static const std::vector<ChannelDef> table = BuildRectangleFields();
       return table;
     }
     case NodeType::Ellipse: {
-      static const std::vector<NodeFieldDef> table = BuildEllipseFields();
+      static const std::vector<ChannelDef> table = BuildEllipseFields();
       return table;
     }
     case NodeType::Polystar: {
-      static const std::vector<NodeFieldDef> table = BuildPolystarFields();
+      static const std::vector<ChannelDef> table = BuildPolystarFields();
       return table;
     }
     case NodeType::Path: {
-      static const std::vector<NodeFieldDef> table = BuildPathFields();
+      static const std::vector<ChannelDef> table = BuildPathFields();
       return table;
     }
     case NodeType::Text: {
-      static const std::vector<NodeFieldDef> table = BuildTextFields();
+      static const std::vector<ChannelDef> table = BuildTextFields();
       return table;
     }
     case NodeType::Fill: {
-      static const std::vector<NodeFieldDef> table = BuildFillFields();
+      static const std::vector<ChannelDef> table = BuildFillFields();
       return table;
     }
     case NodeType::Stroke: {
-      static const std::vector<NodeFieldDef> table = BuildStrokeFields();
+      static const std::vector<ChannelDef> table = BuildStrokeFields();
       return table;
     }
     case NodeType::TrimPath: {
-      static const std::vector<NodeFieldDef> table = BuildTrimPathFields();
+      static const std::vector<ChannelDef> table = BuildTrimPathFields();
       return table;
     }
     case NodeType::RoundCorner: {
-      static const std::vector<NodeFieldDef> table = BuildRoundCornerFields();
+      static const std::vector<ChannelDef> table = BuildRoundCornerFields();
       return table;
     }
     case NodeType::MergePath: {
-      static const std::vector<NodeFieldDef> table = BuildMergePathFields();
+      static const std::vector<ChannelDef> table = BuildMergePathFields();
       return table;
     }
     case NodeType::TextModifier: {
-      static const std::vector<NodeFieldDef> table = BuildTextModifierFields();
+      static const std::vector<ChannelDef> table = BuildTextModifierFields();
       return table;
     }
     case NodeType::TextPath: {
-      static const std::vector<NodeFieldDef> table = BuildTextPathFields();
+      static const std::vector<ChannelDef> table = BuildTextPathFields();
       return table;
     }
     case NodeType::TextBox: {
-      static const std::vector<NodeFieldDef> table = BuildTextBoxFields();
+      static const std::vector<ChannelDef> table = BuildTextBoxFields();
       return table;
     }
     case NodeType::Group: {
-      static const std::vector<NodeFieldDef> table = BuildGroupFields();
+      static const std::vector<ChannelDef> table = BuildGroupFields();
       return table;
     }
     case NodeType::Repeater: {
-      static const std::vector<NodeFieldDef> table = BuildRepeaterFields();
+      static const std::vector<ChannelDef> table = BuildRepeaterFields();
       return table;
     }
     case NodeType::RangeSelector: {
-      static const std::vector<NodeFieldDef> table = BuildRangeSelectorFields();
+      static const std::vector<ChannelDef> table = BuildRangeSelectorFields();
       return table;
     }
     case NodeType::SolidColor: {
-      static const std::vector<NodeFieldDef> table = BuildSolidColorFields();
+      static const std::vector<ChannelDef> table = BuildSolidColorFields();
       return table;
     }
     case NodeType::LinearGradient: {
-      static const std::vector<NodeFieldDef> table = BuildLinearGradientFields();
+      static const std::vector<ChannelDef> table = BuildLinearGradientFields();
       return table;
     }
     case NodeType::RadialGradient: {
-      static const std::vector<NodeFieldDef> table = BuildRadialGradientFields();
+      static const std::vector<ChannelDef> table = BuildRadialGradientFields();
       return table;
     }
     case NodeType::ConicGradient: {
-      static const std::vector<NodeFieldDef> table = BuildConicGradientFields();
+      static const std::vector<ChannelDef> table = BuildConicGradientFields();
       return table;
     }
     case NodeType::DiamondGradient: {
-      static const std::vector<NodeFieldDef> table = BuildDiamondGradientFields();
+      static const std::vector<ChannelDef> table = BuildDiamondGradientFields();
       return table;
     }
     case NodeType::ColorStop: {
-      static const std::vector<NodeFieldDef> table = BuildColorStopFields();
+      static const std::vector<ChannelDef> table = BuildColorStopFields();
       return table;
     }
     case NodeType::ImagePattern: {
-      static const std::vector<NodeFieldDef> table = BuildImagePatternFields();
+      static const std::vector<ChannelDef> table = BuildImagePatternFields();
       return table;
     }
     case NodeType::DropShadowStyle: {
-      static const std::vector<NodeFieldDef> table = BuildDropShadowStyleFields();
+      static const std::vector<ChannelDef> table = BuildDropShadowStyleFields();
       return table;
     }
     case NodeType::InnerShadowStyle: {
-      static const std::vector<NodeFieldDef> table = BuildInnerShadowStyleFields();
+      static const std::vector<ChannelDef> table = BuildInnerShadowStyleFields();
       return table;
     }
     case NodeType::BackgroundBlurStyle: {
-      static const std::vector<NodeFieldDef> table = BuildBackgroundBlurStyleFields();
+      static const std::vector<ChannelDef> table = BuildBackgroundBlurStyleFields();
       return table;
     }
     case NodeType::BlurFilter: {
-      static const std::vector<NodeFieldDef> table = BuildBlurFilterFields();
+      static const std::vector<ChannelDef> table = BuildBlurFilterFields();
       return table;
     }
     case NodeType::DropShadowFilter: {
-      static const std::vector<NodeFieldDef> table = BuildDropShadowFilterFields();
+      static const std::vector<ChannelDef> table = BuildDropShadowFilterFields();
       return table;
     }
     case NodeType::InnerShadowFilter: {
-      static const std::vector<NodeFieldDef> table = BuildInnerShadowFilterFields();
+      static const std::vector<ChannelDef> table = BuildInnerShadowFilterFields();
       return table;
     }
     case NodeType::BlendFilter: {
-      static const std::vector<NodeFieldDef> table = BuildBlendFilterFields();
+      static const std::vector<ChannelDef> table = BuildBlendFilterFields();
       return table;
     }
     default:
@@ -820,8 +829,8 @@ const std::vector<NodeFieldDef>& NodeFieldsFor(NodeType type) {
   }
 }
 
-static const NodeFieldDef* FindField(NodeType type, const std::string& channel) {
-  const auto& table = NodeFieldsFor(type);
+static const ChannelDef* FindChannel(NodeType type, const std::string& channel) {
+  const auto& table = ChannelsFor(type);
   for (const auto& field : table) {
     if (channel == field.channel) {
       return &field;
@@ -834,7 +843,7 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
   if (node == nullptr || out == nullptr) {
     return false;
   }
-  const auto* field = FindField(node->nodeType(), channel);
+  const auto* field = FindChannel(node->nodeType(), channel);
   if (field == nullptr) {
     return false;
   }
@@ -847,7 +856,7 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
   if (node == nullptr) {
     return false;
   }
-  const auto* field = FindField(node->nodeType(), channel);
+  const auto* field = FindChannel(node->nodeType(), channel);
   if (field == nullptr || !field->access(node, nullptr, &value)) {
     LOGE("SetNodeChannel: unhandled channel '%s' or value type mismatch for node type %d.",
          channel.c_str(), static_cast<int>(node->nodeType()));
@@ -857,8 +866,13 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
 }
 
 bool IsAnimatableChannel(NodeType type, const std::string& channel) {
-  const auto* field = FindField(type, channel);
-  return field != nullptr && field->animClass == AnimClass::Animatable;
+  const auto* field = FindChannel(type, channel);
+  return field != nullptr && HasFlag(field->flags, ChannelFlags::Animatable);
+}
+
+bool RequiresLayout(NodeType type, const std::string& channel) {
+  const auto* field = FindChannel(type, channel);
+  return field != nullptr && HasFlag(field->flags, ChannelFlags::RequiresLayout);
 }
 
 }  // namespace pagx

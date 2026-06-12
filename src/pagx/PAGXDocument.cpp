@@ -24,6 +24,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -152,6 +153,34 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   }
   if (config != nullptr) {
     fontConfig = *config;
+  }
+  // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
+  // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
+  // size is already set, so without this a size/constraint edit would keep the stale geometry.
+  if (layoutApplied) {
+    for (auto& node : nodes) {
+      switch (node->nodeType()) {
+        case NodeType::Layer:
+          static_cast<Layer*>(node.get())->resetLayout();
+          break;
+        case NodeType::Rectangle:
+        case NodeType::Ellipse:
+        case NodeType::Path:
+        case NodeType::Polystar:
+        case NodeType::Text:
+        case NodeType::TextPath:
+        case NodeType::Group:
+        case NodeType::TextBox: {
+          auto* layoutNode = LayoutNode::AsLayoutNode(static_cast<Element*>(node.get()));
+          if (layoutNode != nullptr) {
+            layoutNode->resetLayout();
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
   }
   LayoutContext context(&fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.
@@ -287,17 +316,24 @@ void PAGXDocument::clearEmbed() {
   }
 }
 
-void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
+void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged) {
   if (dirtyNodes.empty()) {
     return;
   }
-  // Prune expired weak_ptr entries to keep liveScenes bounded.
   PruneExpiredScenes(&liveScenes);
-  // Dispatch to PAGScene::onNodesChanged by iterating liveScenes; each scene decides which dirty
-  // nodes are relevant using its own runtime binding. Implementation lives in PAGScene.cpp to avoid
-  // pulling PAGScene.h into the document header.
-  // TODO(PR11): wire to PAGScene::onNodesChanged once that method is implemented.
-  (void)dirtyNodes;
+  // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
+  // list changes require a full re-layout, since layout is resolved top-down and a single node
+  // cannot be re-measured in isolation. applyLayout() discards the cached layout outputs first when
+  // the document is already laid out (see its reset branch). Pure render edits skip this entirely.
+  if (layoutChanged) {
+    applyLayout();
+  }
+  for (auto& weakScene : liveScenes) {
+    auto scene = weakScene.lock();
+    if (scene != nullptr) {
+      scene->onNodesChanged(dirtyNodes);
+    }
+  }
 }
 
 void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {

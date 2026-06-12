@@ -232,6 +232,121 @@ class LayerBuilderContext {
     return std::move(_result);
   }
 
+  // Rewrites the current state of a single Layer node onto its existing tgfx::Layer, preserving the
+  // tgfx::Layer object identity so handles holding it stay valid. Reuses the supplied binding both
+  // to look up the existing layer and to refresh masks. Vector contents, layer attributes, styles
+  // and filters are regenerated from the node's current fields. Returns false if the node has no
+  // tgfx::Layer in the binding (e.g. it was never built or belongs to another composition slot).
+  bool refreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+    if (node == nullptr || binding == nullptr) {
+      return false;
+    }
+    auto layer = binding->get<tgfx::Layer>(node);
+    if (layer == nullptr) {
+      return false;
+    }
+    _result.binding = std::move(*binding);
+    // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
+    // so reset them first; otherwise an edit that cleared a matrix / blendMode / scrollRect / style
+    // / filter would keep the previously built value instead of reverting to the default.
+    layer->setMatrix(tgfx::Matrix::I());
+    layer->setMatrix3D(tgfx::Matrix3D::I());
+    layer->setPreserve3D(false);
+    layer->setBlendMode(ToTGFX(BlendMode::Normal));
+    layer->setAllowsEdgeAntialiasing(true);
+    layer->setPassThroughBackground(true);
+    layer->setScrollRect(tgfx::Rect::MakeEmpty());
+    layer->setLayerStyles({});
+    layer->setFilters({});
+    // Regenerate vector contents in place; composition slot layers carry no contents and keep their
+    // runtime-populated children untouched.
+    if (node->composition == nullptr && !node->contents.empty()) {
+      auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
+      std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
+      contents.reserve(node->contents.size());
+      for (const auto& element : node->contents) {
+        auto tgfxElement = convertVectorElement(element);
+        if (tgfxElement) {
+          contents.push_back(tgfxElement);
+        }
+      }
+      vectorLayer->setContents(contents);
+    }
+    applyLayerAttributes(node, layer.get());
+    if (node->mask != nullptr) {
+      _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
+      resolvePendingMasks();
+    }
+    // Reconcile nested child layers (Layer.children) so additions and removals are reflected.
+    // Composition slot layers are skipped: their children come from the runtime composition slot,
+    // not from convertLayer's child recursion.
+    if (node->composition == nullptr) {
+      reconcileChildLayers(node, layer.get());
+    }
+    *binding = std::move(_result.binding);
+    return true;
+  }
+
+  // Reconciles the direct child tgfx layers of a plain (non-composition) Layer node against its
+  // current node->children list. Child nodes that still map to a tgfx layer are reused (handles stay
+  // valid); newly added child nodes are built into the binding; removed children are detached and
+  // unbound (recursively, including their descendants). Surviving children are reordered to match
+  // the document order.
+  void reconcileChildLayers(const Layer* node, tgfx::Layer* parentLayer) {
+    std::unordered_set<const tgfx::Layer*> kept = {};
+    for (const auto& child : node->children) {
+      if (child == nullptr) {
+        continue;
+      }
+      auto childLayer = _result.binding.get<tgfx::Layer>(child);
+      if (childLayer == nullptr) {
+        // Newly added: build its full subtree (and bindings) via the normal convertLayer path.
+        childLayer = convertLayer(child);
+      }
+      if (childLayer != nullptr) {
+        // addChild moves an existing child to the top, so appending in document order yields the
+        // correct final z-order.
+        parentLayer->addChild(childLayer);
+        kept.insert(childLayer.get());
+      }
+    }
+    // Detach and unbind children whose source node was removed from node->children. Iterate a copy
+    // since removeFromParent mutates the parent's child list.
+    auto tgfxChildren = parentLayer->children();
+    for (const auto& tgfxChild : tgfxChildren) {
+      if (kept.find(tgfxChild.get()) == kept.end()) {
+        unbindSubtree(tgfxChild.get());
+        tgfxChild->removeFromParent();
+      }
+    }
+  }
+
+  // Recursively drops binding entries for a detached tgfx layer subtree so removed nodes leave no
+  // stale node->object mapping behind.
+  void unbindSubtree(const tgfx::Layer* layer) {
+    if (layer == nullptr) {
+      return;
+    }
+    const Node* owner = _result.binding.findNode(layer);
+    if (owner != nullptr) {
+      _result.binding.remove(owner);
+    }
+    for (const auto& child : layer->children()) {
+      unbindSubtree(child.get());
+    }
+  }
+
+  // Builds a single Layer node into the supplied binding and returns its new tgfx::Layer. Mirrors
+  // the runtime convertLayer path (composition slots stay empty containers) so the produced layer
+  // matches one created during the initial build, then hands the populated binding back.
+  std::shared_ptr<tgfx::Layer> buildLayerInto(const Layer* node, RuntimeBinding* binding) {
+    _result.binding = std::move(*binding);
+    auto layer = convertLayer(node);
+    resolvePendingMasks();
+    *binding = std::move(_result.binding);
+    return layer;
+  }
+
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
@@ -2132,6 +2247,25 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   // Slot's recursive children build their own subtrees independently.
   context.setNeedsRuntimeData(true);
   return context.buildSubtree(composition);
+}
+
+bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+  if (node == nullptr || binding == nullptr) {
+    return false;
+  }
+  LayerBuilderContext context;
+  context.setNeedsRuntimeData(true);
+  return context.refreshLayerInPlace(node, binding);
+}
+
+std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
+                                                          RuntimeBinding* binding) {
+  if (node == nullptr || binding == nullptr) {
+    return nullptr;
+  }
+  LayerBuilderContext context;
+  context.setNeedsRuntimeData(true);
+  return context.buildLayerInto(node, binding);
 }
 
 }  // namespace pagx
