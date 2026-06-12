@@ -396,9 +396,11 @@ class LayerBuilderContext {
 
   // Unbinds a Fill/Stroke color source, but only if no Fill/Stroke other than excludedOwner still
   // points at it. Shared color sources (referenced by several painters via "@id") stay bound as long
-  // as any referencing painter survives. A gradient's ColorStop bindings are dropped together with
-  // the gradient. excludedOwner is the painter currently being removed; its own binding is dropped by
-  // the caller, so it must not count as a surviving reference.
+  // as any referencing painter survives. A gradient's ColorStop bindings are owned children of the
+  // gradient and are dropped together with it; an ImagePattern's Image is an independently shareable
+  // resource and is dropped only when no surviving ImagePattern still references it. excludedOwner is
+  // the painter currently being removed; its own binding is dropped by the caller, so it must not
+  // count as a surviving reference.
   void unbindColorSourceIfUnreferenced(const ColorSource* color, const Element* excludedOwner) {
     if (color == nullptr || !_result.binding.contains(color)) {
       return;
@@ -417,12 +419,33 @@ class LayerBuilderContext {
         return;
       }
     }
-    if (color->nodeType() != NodeType::SolidColor && color->nodeType() != NodeType::ImagePattern) {
+    if (color->nodeType() == NodeType::ImagePattern) {
+      unbindImageIfUnreferenced(static_cast<const ImagePattern*>(color));
+    } else if (color->nodeType() != NodeType::SolidColor) {
       for (const auto* stop : static_cast<const Gradient*>(color)->colorStops) {
         _result.binding.remove(stop);
       }
     }
     _result.binding.remove(color);
+  }
+
+  // Unbinds the Image bound for an ImagePattern that is about to be removed, but only if no surviving
+  // ImagePattern other than pattern still references the same Image node. An Image is a shareable
+  // "@id" resource, so dropping it unconditionally would break other patterns still using it.
+  void unbindImageIfUnreferenced(const ImagePattern* pattern) {
+    const Image* image = pattern->image;
+    if (image == nullptr || !_result.binding.contains(image)) {
+      return;
+    }
+    for (const auto* node : _result.binding.boundNodes()) {
+      if (node == pattern || node->nodeType() != NodeType::ImagePattern) {
+        continue;
+      }
+      if (static_cast<const ImagePattern*>(node)->image == image) {
+        return;
+      }
+    }
+    _result.binding.remove(image);
   }
 
   // Builds a single Layer node into the supplied binding and returns its new tgfx::Layer. Mirrors
