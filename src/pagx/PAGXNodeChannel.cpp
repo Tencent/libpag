@@ -394,8 +394,8 @@ static std::vector<ChannelDef> BuildPathFields() {
 static std::vector<ChannelDef> BuildTextFields() {
   std::vector<ChannelDef> table = {
       FIELD_STRING(Text, "text", text, Layout),
-      FIELD_POINT_X(Text, "x", position, Anim),
-      FIELD_POINT_Y(Text, "y", position, Anim),
+      FIELD_POINT_X(Text, "x", position, AnimLayout),
+      FIELD_POINT_Y(Text, "y", position, AnimLayout),
       FIELD_STRING(Text, "fontFamily", fontFamily, Layout),
       FIELD_STRING(Text, "fontStyle", fontStyle, Layout),
       FIELD_FLOAT(Text, "fontSize", fontSize, Layout),
