@@ -284,7 +284,7 @@ class PAGXView {
    * baked matrix against the actual attached pixels.
    *
    * Call this once per external image after parsePAGX() and before buildLayers() / the first
-   * attachNativeImage() so resolveImagePatternMatricesByFilePath sees the original size and
+   * attachNativeImage() so ResolveImagePatternMatricesByFilePath sees the original size and
    * can apply the diag(origW/actualW, origH/actualH) post-scale to keep visual placement
    * stable across thumbnail/full quality swaps.
    *
@@ -446,20 +446,10 @@ class PAGXView {
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   // Gesture-freeze pipeline. During active pan/zoom we bypass displayList.render() and
-  // composite two snapshots onto the surface: fitSnapshot (whole document at zoom=1,
-  // blurry when zoomed in but always fills the viewport) + cachedSnapshot (last rendered
-  // viewport, sharp at its capture zoom). Both cleared on parsePAGX/updateSize.
+  // composite fitSnapshot (whole document at zoom=1, blurry when zoomed in but always fills
+  // the viewport) onto the surface. Cleared on parsePAGX/updateSize.
   bool gestureActive = false;
-  std::shared_ptr<tgfx::Image> cachedSnapshot = nullptr;
-  float snapshotZoom = 1.0f;
-  tgfx::Point snapshotOffset = {};
-  // 单调递增计数器：每捕获一次 cached 自增 1，parsePAGX 时也自增。用于诊断
-  // composite 路径实际 blit 的是不是最新的快照（防止某处持有旧的 shared_ptr）。
-  uint32_t cachedVersion = 0;
   std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
-  float fitSnapshotZoom = 1.0f;
-  tgfx::Point fitSnapshotOffset = {};
-  uint32_t fitVersion = 0;
   // fit 的超采样倍数：1 = 同分辨率；>1 = N 倍像素密度，用于超宽/超长文档清晰度。
   float fitSnapshotPixelScale = 1.0f;
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
@@ -468,8 +458,8 @@ class PAGXView {
   // Master switch for the fitSnapshot fast path. When false, draw() always performs a full
   // displayList.render() and never captures a fit snapshot. Toggled via setSnapshotEnabled().
   bool snapshotEnabled = true;
-  // 距离最近一次手势结束的时间戳（emscripten_get_now ms）。用于让 cachedSnapshot 的
-  // 刷新延后到用户真正停下来再做：手势密集时复用上一次稳定 capture 的 cached，避免
+  // 距离最近一次手势结束的时间戳（emscripten_get_now ms）。用于让 fitSnapshot 的
+  // 刷新延后到用户真正停下来再做：手势密集时复用上一次稳定 capture 的快照，避免
   // capture 抓到含 tile fallback 的过渡画面、避免连续 full render 的内存抖动。
   // 0 表示从未发生过手势（首帧前），首帧 capture 不受门控限制。
   double lastGestureEndMs = 0.0;
@@ -718,10 +708,14 @@ class PAGXView {
   // Histogram of decoded image sizes by pixel area, indexed by bucket: 0:<10K, 1:<100K,
   // 2:<500K, 3:<1M, 4:<2M, 5:>=2M. Lets us tell at a glance whether the document is dominated
   // by tiny icons or by large photos without scrolling through per-image log lines.
-  uint32_t imageSizeBuckets[6] = {0, 0, 0, 0, 0, 0};
+  static constexpr size_t IMAGE_SIZE_BUCKET_COUNT = 6;
+  uint32_t imageSizeBuckets[IMAGE_SIZE_BUCKET_COUNT] = {};
 
   float lastZoom = 1.0f;
   bool isZooming = false;
+  // Frame counter driving the throttled GPU cache footprint probe in draw(). Per-instance so
+  // each view's probe cadence is independent rather than shared across all PAGXView instances.
+  int gpuProbeCounter = 0;
   // isZoomingIn is derived per-frame from a single (zoom > lastZoom) comparison and is only
   // consumed by the in/out timeout split in draw() (ZOOM_IN/OUT_END_TIMEOUT_MS). The throttle
   // itself is no longer driven from here -- tgfx infers direction internally.

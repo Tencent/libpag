@@ -23,7 +23,7 @@
 
 namespace pagx {
 
-static int ParseHexDigit(char ch) {
+inline int ParseHexDigit(char ch) {
   if (ch >= '0' && ch <= '9') {
     return ch - '0';
   }
@@ -36,11 +36,11 @@ static int ParseHexDigit(char ch) {
   return -1;
 }
 
-static tgfx::Color DefaultBackgroundColor() {
+inline tgfx::Color DefaultBackgroundColor() {
   return tgfx::Color::FromRGBA(245, 245, 245);
 }
 
-static tgfx::Color ParseHexColor(const std::string& hex) {
+inline tgfx::Color ParseHexColor(const std::string& hex) {
   if (hex.empty() || hex[0] != '#') {
     return DefaultBackgroundColor();
   }

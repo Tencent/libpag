@@ -93,8 +93,6 @@ constexpr uint64_t SMALL_BUCKET_MAX = 100000ULL;
 constexpr uint64_t MID_BUCKET_MAX = 500000ULL;
 constexpr uint64_t LARGE_BUCKET_MAX = 1000000ULL;
 constexpr uint64_t XL_BUCKET_MAX = 2000000ULL;
-// Number of image size buckets.
-constexpr size_t IMAGE_SIZE_BUCKET_COUNT = 6;
 // Pixel threshold for [BigImg] log marker (1 MPx).
 constexpr uint64_t BIG_IMG_THRESHOLD = 1000000ULL;
 // Log throttling interval for image load/upgrade logs.
@@ -279,17 +277,14 @@ void PAGXView::parsePAGX(const val& pagxData) {
   builderSession = nullptr;
   document = nullptr;
   // Drop snapshots so the new document doesn't blit pixels from the old one.
-  cachedSnapshot = nullptr;
   fitSnapshot = nullptr;
-  cachedVersion++;
-  fitVersion = 0;
   fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   gestureActive = false;
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
   // Reset displayList view state. Without this, a render that happens between parsePAGX
   // and buildLayers (the loader is async; the render loop keeps running) captures a fresh
-  // cachedSnapshot keyed against the *previous* document's zoom/offset. The next gesture
+  // snapshot keyed against the *previous* document's zoom/offset. The next gesture
   // would then composite that stale snapshot using the new layout's view state, giving
   // the user the look-and-feel of the previous page.
   displayList.setZoomScale(1.0f);
@@ -464,10 +459,10 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   // ImagePattern matrices are baked in parsePAGX() against the initial image's pixel
   // dimensions. Now that a higher-resolution image has replaced the initial one, those baked
   // matrices would leave the upgraded image visibly misaligned (correct shape placement but
-  // wrong scale/offset inside the shape). resolveImagePatternMatricesByFilePath is idempotent
+  // wrong scale/offset inside the shape). ResolveImagePatternMatricesByFilePath is idempotent
   // thanks to the paint-transform cache in customData, so each upgrade call refreshes against
   // the newly attached decodedImage without losing the original paint transform.
-  resolveImagePatternMatricesByFilePath(document.get(), filePath, &imageOriginalSizes);
+  ResolveImagePatternMatricesByFilePath(document.get(), filePath, &imageOriginalSizes);
   // Regenerate every layer whose fill/stroke currently points at this filePath. The return
   // value is the number of tgfx layers whose contents were refreshed; zero means nothing in
   // the document references the path (callers typically treat this as a no-op success, but
@@ -696,7 +691,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       externalTexturesTotalBytes += p.sizeBytes;
       // Refresh ImagePattern matrices against the newly attached image dimensions; mirrors the
       // upgradeImageFromNative path so progressive thumbnail->full swaps stay aligned.
-      resolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
+      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
       }
@@ -723,10 +718,10 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       // the matrix baked at parsePAGX time (orig-image-* dimensions), which scales the UV
       // mapping for a thumbnail-sized texture by the original full-resolution divisor —
       // sampling lands outside the thumbnail's [0,1] domain and the fill renders blank
-      // (clamped to edge). resolveImagePatternMatrix's source priority falls through to
+      // (clamped to edge). ResolveImagePatternMatrix's source priority falls through to
       // thumbnailImage when decodedImage is absent so this stays correct after a later
       // Full attach overwrites the matrix to the full-resolution dimensions.
-      resolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
+      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
       // [DIAG-EXP] Re-enable rebuildForFilePath. Internal rebuildVectorContents call is
       // disabled inside LayerBuilderSession::rebuildForFilePath (LayerBuilder.cpp) for this
       // experiment so only invalidateImagesByFilePath runs. If Full attach still does not
@@ -762,6 +757,10 @@ void PAGXView::enforceFullBudget() {
     float distSq;
     uint64_t sizeBytes;
     std::string path;
+    // Orders candidates farthest-first so eviction starts with the entries furthest from focus.
+    static bool FartherFirst(const Candidate& a, const Candidate& b) {
+      return a.distSq > b.distSq;
+    }
   };
   std::vector<Candidate> candidates;
   candidates.reserve(externalTextures.size());
@@ -786,8 +785,7 @@ void PAGXView::enforceFullBudget() {
   // Farthest first. Modeled on tgfx's tiled rasterization which prioritizes tiles closest to
   // the user's focal point — we keep the same focal-distance gradient but invert the sweep
   // direction (closest stays, farthest goes).
-  std::sort(candidates.begin(), candidates.end(),
-            [](const Candidate& a, const Candidate& b) { return a.distSq > b.distSq; });
+  std::sort(candidates.begin(), candidates.end(), &Candidate::FartherFirst);
 
   std::vector<std::string> evictedPaths;
   for (const auto& c : candidates) {
@@ -816,7 +814,7 @@ void PAGXView::enforceFullBudget() {
     // attached; otherwise the fallback fill would sample outside the thumbnail's UV domain
     // and render blank (clamp-to-edge). When a replacement Full is later re-attached, the
     // upload path runs the same resolve again with the full-resolution dimensions.
-    resolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes);
+    ResolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes);
     if (builderSession) {
       builderSession->rebuildForFilePath(c.path);
     }
@@ -1108,6 +1106,38 @@ void PAGXView::setImageOriginalSize(const std::string& filePath, float width, fl
   imageOriginalSizes[filePath] = {width, height};
 }
 
+// Parses a float-valued customData attribute, returning `fallback` when the key is absent or
+// the value is not numeric.
+static float ParseFloatAttr(const std::unordered_map<std::string, std::string>& data,
+                            const char* key, float fallback) {
+  auto it = data.find(key);
+  if (it == data.end()) {
+    return fallback;
+  }
+  char* end = nullptr;
+  float value = std::strtof(it->second.c_str(), &end);
+  if (end == it->second.c_str()) {
+    return fallback;
+  }
+  return value;
+}
+
+// Parses an int-valued customData attribute, returning `fallback` when the key is absent or
+// the value is not numeric.
+static int ParseIntAttr(const std::unordered_map<std::string, std::string>& data, const char* key,
+                        int fallback) {
+  auto it = data.find(key);
+  if (it == data.end()) {
+    return fallback;
+  }
+  char* end = nullptr;
+  long value = std::strtol(it->second.c_str(), &end, 10);
+  if (end == it->second.c_str()) {
+    return fallback;
+  }
+  return static_cast<int>(value);
+}
+
 val PAGXView::getImageMetadata() const {
   val result = val::array();
   if (!document) {
@@ -1123,34 +1153,6 @@ val PAGXView::getImageMetadata() const {
   std::unordered_map<std::string, int> pathIndex;
   std::unordered_map<std::string, std::pair<float, float>> originalDimensions;
   std::unordered_map<std::string, std::vector<val>> usagesByPath;
-
-  auto parseFloatAttr = [](const std::unordered_map<std::string, std::string>& data,
-                           const char* key, float fallback) {
-    auto it = data.find(key);
-    if (it == data.end()) {
-      return fallback;
-    }
-    char* end = nullptr;
-    float value = std::strtof(it->second.c_str(), &end);
-    if (end == it->second.c_str()) {
-      return fallback;
-    }
-    return value;
-  };
-
-  auto parseIntAttr = [](const std::unordered_map<std::string, std::string>& data,
-                         const char* key, int fallback) {
-    auto it = data.find(key);
-    if (it == data.end()) {
-      return fallback;
-    }
-    char* end = nullptr;
-    long value = std::strtol(it->second.c_str(), &end, 10);
-    if (end == it->second.c_str()) {
-      return fallback;
-    }
-    return static_cast<int>(value);
-  };
 
   for (const auto& node : document->nodes) {
     if (!node || node->nodeType() != NodeType::ImagePattern) {
@@ -1168,10 +1170,10 @@ val PAGXView::getImageMetadata() const {
     }
 
     const auto& data = pattern->customData;
-    float origWidth = parseFloatAttr(data, "orig-image-width", 0.0f);
-    float origHeight = parseFloatAttr(data, "orig-image-height", 0.0f);
-    float nodeWidth = parseFloatAttr(data, "node-width", 0.0f);
-    float nodeHeight = parseFloatAttr(data, "node-height", 0.0f);
+    float origWidth = ParseFloatAttr(data, "orig-image-width", 0.0f);
+    float origHeight = ParseFloatAttr(data, "orig-image-height", 0.0f);
+    float nodeWidth = ParseFloatAttr(data, "node-width", 0.0f);
+    float nodeHeight = ParseFloatAttr(data, "node-height", 0.0f);
     // scaleMode mapping: the JS side expects the CoCraft business enum
     // (0=FILL, 1=FIT, 2=STRETCH, 3=TILE), not the pagx::ScaleMode enum. Two PAGX exporter
     // generations need to be handled here:
@@ -1184,9 +1186,9 @@ val PAGXView::getImageMetadata() const {
     //     deserialises both onto the pattern, so we recover the business-enum integer by
     //     inspecting the structured fields. The mapping is unambiguous because TILE is the
     //     only mode that uses tileModeX=Repeat.
-    int scaleMode;
+    int scaleMode = 0;
     if (data.find("image-scale-mode") != data.end()) {
-      scaleMode = parseIntAttr(data, "image-scale-mode", 0);
+      scaleMode = ParseIntAttr(data, "image-scale-mode", 0);
     } else if (pattern->tileModeX == TileMode::Repeat) {
       scaleMode = SCALE_MODE_TILE;
     } else if (pattern->scaleMode == ScaleMode::Zoom) {
@@ -1201,7 +1203,7 @@ val PAGXView::getImageMetadata() const {
     }
     // DEFAULT_IMAGE_SCALE_FACTOR matches the default used by ImagePatternMatrixCalculator so TILE
     // patterns that omit the attribute behave identically in C++ and JS.
-    float scaleFactor = parseFloatAttr(data, "scale-factor", DEFAULT_IMAGE_SCALE_FACTOR);
+    float scaleFactor = ParseFloatAttr(data, "scale-factor", DEFAULT_IMAGE_SCALE_FACTOR);
 
     if (pathIndex.find(filePath) == pathIndex.end()) {
       pathIndex[filePath] = static_cast<int>(orderedPaths.size());
@@ -1261,7 +1263,7 @@ void PAGXView::buildLayers() {
   // to compute the final ImagePattern matrices. PAGX files generated by libpag embed image data
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
-  resolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
+  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
 
   document->applyLayout(&fontConfig);
   LogMemProbe("buildLayers.afterApplyLayout");
@@ -1336,10 +1338,7 @@ void PAGXView::updateSize(int width, int height) {
   _height = height;
   surface = nullptr;
   // Snapshots are bound to the old surface size; drop them to avoid dimension mismatch.
-  cachedSnapshot = nullptr;
   fitSnapshot = nullptr;
-  cachedVersion++;
-  fitVersion = 0;
   fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   gestureActive = false;
   zoomedOutFrameSettled = false;
@@ -1415,14 +1414,12 @@ void PAGXView::setSnapshotEnabled(bool enabled) {
   snapshotEnabled = enabled;
   if (!enabled) {
     // Drop the captured snapshot so a stale image cannot resurface if the switch is later
-    // re-enabled mid-session, and bump fitVersion so any TS-side observer notices the
-    // invalidation. Also clear the zoom-out idle token so the next draw() runs a full
+    // re-enabled mid-session. Also clear the zoom-out idle token so the next draw() runs a full
     // render instead of short-circuiting on a now-disabled path. gestureActive stays as-is
     // (the caller's gesture lifecycle is independent), but with no snapshot the fast path
     // in draw() naturally falls through to the full-render branch.
     fitSnapshot = nullptr;
     fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
-    fitVersion++;
     zoomedOutFrameSettled = false;
   }
 }
@@ -1689,7 +1686,6 @@ bool PAGXView::draw() {
     // of tile cache or other internal resources" by diffing against memoryUsage. imageCount is
     // legacy: it counts only wasm-decoded loads via loadFileDataAsNativeImage, so the
     // attachNativeImage path does not increment it; expect imageCount=0 in cocraft scenarios.
-    static int gpuProbeCounter = 0;
     if ((gpuProbeCounter++ % GPU_PROBE_INTERVAL) == 0) {
       LOGI(
           "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
@@ -1770,10 +1766,6 @@ bool PAGXView::draw() {
             context->submit(std::move(snapRecording));
           }
         }
-
-        fitSnapshotZoom = 1.0f;
-        fitSnapshotOffset = {0.0f, 0.0f};
-        fitVersion++;
       }
     }
 
@@ -1880,10 +1872,7 @@ void PAGXView::resetForFreshCapture() {
   // 这两步之间 RAF 可能跑过 full render，把 cached/fit 抓在了"未 init"的中间视图状态下。
   // 调用本方法让 TS 端在 init 完成后丢弃这些临时快照、重置 first-frame 标志，再等待
   // 一次新的首帧——此时抓到的快照就是用户实际会看到的初始画面。
-  cachedSnapshot = nullptr;
   fitSnapshot = nullptr;
-  cachedVersion++;
-  fitVersion = 0;
   fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   hasRenderedFirstFrame = false;
   zoomedOutFrameSettled = false;

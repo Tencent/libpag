@@ -30,7 +30,7 @@
 namespace pagx {
 
 // customData key used to persist the original paint transform exported from the source file.
-// resolveImagePatternMatrix() overwrites pattern->matrix with the baked result, so we stash the
+// ResolveImagePatternMatrix() overwrites pattern->matrix with the baked result, so we stash the
 // original 6-float affine here on first call to make the whole routine idempotent: later calls
 // (for example after progressive image upgrades replace decodedImage with a higher-resolution
 // tgfx::Image) can re-bake against the correct source matrix instead of re-baking the already
@@ -77,7 +77,7 @@ static bool DeserializePaintTransform(const std::string& text, pagx::Matrix* out
   return true;
 }
 
-pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
+pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
                                          float scaleFactor, float origImageWidth, float origImageHeight) {
   pagx::Matrix matrix = {};
@@ -172,7 +172,7 @@ pagx::Matrix calculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
 // fallbackWidth/fallbackHeight are returned untouched when none of the three sources resolves
 // to a positive dimension; callers pass either origImageWidth (legacy path) or 0 (new-format
 // path) depending on what they want to fall back to.
-static void readActualImageDimensions(const pagx::Image* imageNode, float fallbackWidth,
+static void ReadActualImageDimensions(const pagx::Image* imageNode, float fallbackWidth,
                                       float fallbackHeight, float* outWidth, float* outHeight) {
   *outWidth = fallbackWidth;
   *outHeight = fallbackHeight;
@@ -213,7 +213,7 @@ static void readActualImageDimensions(const pagx::Image* imageNode, float fallba
 //   2. origSizeMap[filePath] - registered by the host via setImageOriginalSize(), used as a
 //      fallback for documents exported by older tools that bake the matrix but do not write
 //      the orig-image-* fields into customData.
-static bool resolveNewFormatPattern(pagx::ImagePattern* pattern,
+static bool ResolveNewFormatPattern(pagx::ImagePattern* pattern,
                                     const ImageOriginalSizeMap* origSizeMap) {
   if (!pattern->image) {
     return false;
@@ -254,7 +254,7 @@ static bool resolveNewFormatPattern(pagx::ImagePattern* pattern,
 
   float actualWidth = 0.0f;
   float actualHeight = 0.0f;
-  readActualImageDimensions(pattern->image, origWidth, origHeight, &actualWidth, &actualHeight);
+  ReadActualImageDimensions(pattern->image, origWidth, origHeight, &actualWidth, &actualHeight);
 
   if (actualWidth <= 0.0f || actualHeight <= 0.0f ||
       (actualWidth == origWidth && actualHeight == origHeight)) {
@@ -275,18 +275,11 @@ static bool resolveNewFormatPattern(pagx::ImagePattern* pattern,
   scale.a = origWidth / actualWidth;
   scale.d = origHeight / actualHeight;
 
-  pagx::Matrix result = {};
-  result.a = authoredMatrix.a * scale.a + authoredMatrix.c * scale.b;
-  result.b = authoredMatrix.b * scale.a + authoredMatrix.d * scale.b;
-  result.c = authoredMatrix.a * scale.c + authoredMatrix.c * scale.d;
-  result.d = authoredMatrix.b * scale.c + authoredMatrix.d * scale.d;
-  result.tx = authoredMatrix.tx;
-  result.ty = authoredMatrix.ty;
-  pattern->matrix = result;
+  pattern->matrix = authoredMatrix * scale;
   return true;
 }
 
-bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
+bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
                                const ImageOriginalSizeMap* origSizeMap) {
   if (!pattern || !pattern->image) {
     return false;
@@ -297,7 +290,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
     // No legacy customData: try the new PAGX standard format. When that path is also unable to
     // produce a meaningful result (e.g. origSize hasn't been registered yet), leave the
     // authored matrix unchanged and report unresolved.
-    return resolveNewFormatPattern(pattern, origSizeMap);
+    return ResolveNewFormatPattern(pattern, origSizeMap);
   }
 
   char* end = nullptr;
@@ -337,7 +330,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
   // no decoded asset has arrived yet (placeholder layout during progressive loading).
   float actualImageWidth = 0.0f;
   float actualImageHeight = 0.0f;
-  readActualImageDimensions(pattern->image, origImageWidth, origImageHeight, &actualImageWidth,
+  ReadActualImageDimensions(pattern->image, origImageWidth, origImageHeight, &actualImageWidth,
                             &actualImageHeight);
 
   // The matrix stored during export is paint->transform() (normalized transform). After the
@@ -354,7 +347,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
     pattern->customData[kPaintTransformKey] = SerializePaintTransform(paintTransform);
   }
 
-  pattern->matrix = calculateImagePatternMatrix(
+  pattern->matrix = CalculateImagePatternMatrix(
       scaleMode, actualImageWidth, actualImageHeight,
       nodeWidth, nodeHeight, paintTransform, scaleFactor,
       origImageWidth, origImageHeight);
@@ -362,7 +355,7 @@ bool resolveImagePatternMatrix(pagx::ImagePattern* pattern,
   return true;
 }
 
-void resolveAllImagePatternMatrices(pagx::PAGXDocument* document,
+void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
                                     const ImageOriginalSizeMap* origSizeMap) {
   if (!document) {
     return;
@@ -372,11 +365,11 @@ void resolveAllImagePatternMatrices(pagx::PAGXDocument* document,
       continue;
     }
     auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
-    resolveImagePatternMatrix(pattern, origSizeMap);
+    ResolveImagePatternMatrix(pattern, origSizeMap);
   }
 }
 
-size_t resolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
+size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
                                              const std::string& filePath,
                                              const ImageOriginalSizeMap* origSizeMap) {
   if (!document || filePath.empty()) {
@@ -391,7 +384,7 @@ size_t resolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
     if (!pattern->image || pattern->image->filePath != filePath) {
       continue;
     }
-    if (resolveImagePatternMatrix(pattern, origSizeMap)) {
+    if (ResolveImagePatternMatrix(pattern, origSizeMap)) {
       ++updated;
     }
   }
