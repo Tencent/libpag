@@ -8238,6 +8238,54 @@ PAGX_TEST(PAGXTest, NotifyChangeEmptyLayerGainsContents) {
 }
 
 /**
+ * Test case: a composition child's PAGLayer keeps its subtree-root runtimeLayer across a
+ * notifyChange and stays hit-testable. refreshNodes re-syncs the cached runtimeLayer only for plain
+ * children; a composition child's binding entry is the empty slot, not its subtree root, so it must
+ * be skipped or the hit-test would resolve to the slot instead of the nested child.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeKeepsCompositionChildHitTestable) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->name = "NestedChild";
+  auto childRect = doc->makeNode<pagx::Rectangle>();
+  childRect->position = {50, 50};
+  childRect->size = {100, 100};
+  auto childFill = doc->makeNode<pagx::Fill>();
+  auto childSolid = doc->makeNode<pagx::SolidColor>();
+  childSolid->color = {0, 0, 1, 1};
+  childFill->color = childSolid;
+  childLayer->contents.push_back(childRect);
+  childLayer->contents.push_back(childFill);
+  comp->layers.push_back(childLayer);
+
+  auto compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->name = "CompLayer";
+  compLayer->composition = comp;
+  doc->layers.push_back(compLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+
+  // Mark the top-level composition child dirty so refreshNodes runs its runtimeLayer re-sync loop.
+  doc->notifyChange({compLayer});
+
+  // The composition child's runtimeLayer was not overwritten with its slot, so the nested child is
+  // still resolved by the hit-test.
+  auto hitsAfter = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hitsAfter.empty());
+  EXPECT_EQ(hitsAfter[0]->name(), "NestedChild");
+}
+
+/**
  * Test case: notifyChange re-runs layout so a geometry edit is reflected in the layer's content
  * bounds, while keeping the layer handle valid (the tgfx::Layer instance is preserved).
  */
