@@ -8862,6 +8862,114 @@ PAGX_TEST(PAGXTest, NotifyChangeNestedChildAddRemove) {
 }
 
 /**
+ * Test case: notifyChange adds a newly inserted composition slot layer at runtime. syncChildren has
+ * no pre-built slot for the new layer, so it builds one via BuildLayerInto and attaches the
+ * MakeChild subtree under it. The nested composition content is built into the scene and stays
+ * hit-testable, while the existing sibling layer keeps its handle.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeAddComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto existing = doc->makeNode<pagx::Layer>("E");
+  existing->width = 50;
+  existing->height = 50;
+  doc->layers.push_back(existing);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto existingTgfx = scene->mutableBinding()->get<tgfx::Layer>(existing);
+  ASSERT_TRUE(existingTgfx != nullptr);
+
+  // Build a composition with one filled child layer, then a slot layer that references it.
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto inner = doc->makeNode<pagx::Layer>();
+  inner->name = "NestedChild";
+  auto innerRect = doc->makeNode<pagx::Rectangle>();
+  innerRect->position = {50, 50};
+  innerRect->size = {100, 100};
+  auto innerFill = doc->makeNode<pagx::Fill>();
+  auto innerSolid = doc->makeNode<pagx::SolidColor>();
+  innerSolid->color = {0, 0, 1, 1};
+  innerFill->color = innerSolid;
+  inner->contents.push_back(innerRect);
+  inner->contents.push_back(innerFill);
+  comp->layers.push_back(inner);
+
+  auto slot = doc->makeNode<pagx::Layer>();
+  slot->name = "Slot";
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  // Notify with the newly inserted slot layer; syncChildren builds its composition subtree.
+  doc->notifyChange({slot});
+
+  // The slot is bound, the nested composition content is hit-testable, and the existing sibling
+  // layer keeps its original tgfx instance.
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(slot) != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(existing).get(), existingTgfx.get());
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+}
+
+/**
+ * Test case: notifyChange removes a composition slot layer at runtime. syncChildren detaches the
+ * slot (the binding entry, which carries the nested subtree) and drops the bindings of the slot and
+ * its composition content, while the surviving sibling layer keeps its handle.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemoveComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto existing = doc->makeNode<pagx::Layer>("E");
+  existing->width = 50;
+  existing->height = 50;
+  doc->layers.push_back(existing);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto inner = doc->makeNode<pagx::Layer>();
+  inner->name = "NestedChild";
+  auto innerRect = doc->makeNode<pagx::Rectangle>();
+  innerRect->position = {50, 50};
+  innerRect->size = {100, 100};
+  auto innerFill = doc->makeNode<pagx::Fill>();
+  auto innerSolid = doc->makeNode<pagx::SolidColor>();
+  innerSolid->color = {0, 0, 1, 1};
+  innerFill->color = innerSolid;
+  inner->contents.push_back(innerRect);
+  inner->contents.push_back(innerFill);
+  comp->layers.push_back(inner);
+
+  auto slot = doc->makeNode<pagx::Layer>();
+  slot->name = "Slot";
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto existingTgfx = scene->mutableBinding()->get<tgfx::Layer>(existing);
+  ASSERT_TRUE(existingTgfx != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(slot) != nullptr);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+
+  // Remove the slot layer from the document and notify.
+  doc->layers.pop_back();
+  doc->notifyChange({slot});
+
+  // The slot's binding is dropped, the surviving sibling keeps its instance, and the composition
+  // content is no longer hit-testable.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(slot), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(existing).get(), existingTgfx.get());
+  auto hitsAfter = scene->getLayersUnderPoint(50, 50);
+  for (const auto& hit : hitsAfter) {
+    EXPECT_NE(hit->name(), "NestedChild");
+  }
+}
+
+/**
  * Test case: GetNodeChannel/SetNodeChannel round-trip scalar fields across node types.
  */
 PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
