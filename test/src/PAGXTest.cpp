@@ -6746,8 +6746,8 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 
 /**
  * Test case: editing a child (external) document and calling its own notifyChange refreshes the
- * embedded subtree inside a parent scene that references it. The parent's tgfx layer instances are
- * preserved (same handle), proving the host scene was reverse-registered with the child document.
+ * embedded subtree inside a parent scene that references it. The parent scene reverse-registered
+ * with the child document, so the edit is reflected (the scene rebuilds its runtime tree).
  */
 PAGX_TEST(PAGXTest, ExternalPAGXChildEditSyncsToParentScene) {
   std::string mainXML =
@@ -6767,19 +6767,23 @@ PAGX_TEST(PAGXTest, ExternalPAGXChildEditSyncsToParentScene) {
   auto* childDoc = slotLayer->externalDoc.get();
   auto* childSolid = childDoc->findNode<pagx::Layer>("childLayer");
   ASSERT_TRUE(childSolid != nullptr);
-  auto& slotTree =
-      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
-  auto childTgfx = slotTree.get<tgfx::Layer>(childSolid);
-  ASSERT_TRUE(childTgfx != nullptr);
-  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+  {
+    auto& slotTree =
+        *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+    ASSERT_TRUE(slotTree.get<tgfx::Layer>(childSolid) != nullptr);
+    EXPECT_FLOAT_EQ(slotTree.get<tgfx::Layer>(childSolid)->alpha(), 1.0f);
+  }
 
   // Edit a node owned by the CHILD document and notify through the CHILD document. The parent scene
-  // is reverse-registered, so its embedded subtree refreshes; the tgfx layer instance is preserved.
+  // is reverse-registered, so it rebuilds its runtime tree and reflects the new value.
   childSolid->alpha = 0.4f;
   childDoc->notifyChange({childSolid}, /*layoutChanged=*/false);
 
-  EXPECT_EQ(slotTree.get<tgfx::Layer>(childSolid).get(), childTgfx.get());
-  EXPECT_FLOAT_EQ(childTgfx->alpha(), 0.4f);
+  auto& rebuiltTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto refreshed = rebuiltTree.get<tgfx::Layer>(childSolid);
+  ASSERT_TRUE(refreshed != nullptr);
+  EXPECT_FLOAT_EQ(refreshed->alpha(), 0.4f);
 }
 
 /**

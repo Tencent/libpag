@@ -186,9 +186,9 @@ class PAGXDocument : public Node {
    * refreshes the nodes it is given and does not re-resolve references elsewhere.
    *
    * Editing an external composition: call notifyChange on the document that owns the edited nodes.
-   * Every scene that embeds this document as an external composition is refreshed too. A node may
-   * only be notified through its owning document; passing a node owned by a different (e.g. parent)
-   * document is rejected with no effect.
+   * Every scene that embeds this document as an external composition is refreshed too (it rebuilds
+   * its runtime tree). A node may only be notified through its owning document; passing a node owned
+   * by a different (e.g. parent) document is rejected with no effect.
    * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
    * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
    * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
@@ -213,6 +213,10 @@ class PAGXDocument : public Node {
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
+
+  // Returns true if the node is owned by this document (present in its node list). Used to reject
+  // notifyChange calls for nodes that belong to a different (e.g. external child) document.
+  bool ownsNode(const Node* node) const;
 
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);

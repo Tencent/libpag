@@ -320,25 +320,13 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (dirtyNodes.empty()) {
     return;
   }
-  // A node referenced by an external (child) document is owned by that child document, not this one,
-  // so it must be notified through its own document. Reject foreign nodes: a parent must not notify
-  // a child document's nodes. Child document nodes are simply not in this document's node list.
+  // A node owned by an external (child) document must be notified through that document, not a
+  // parent. Reject foreign nodes: they are simply not in this document's node list.
   for (auto* node : dirtyNodes) {
-    if (node == nullptr) {
-      continue;
-    }
-    bool owned = false;
-    for (auto& ownedNode : nodes) {
-      if (ownedNode.get() == node) {
-        owned = true;
-        break;
-      }
-    }
-    if (!owned) {
+    if (node != nullptr && !ownsNode(node)) {
       LOGE(
-          "PAGXDocument::notifyChange: node not found in this document; a node owned by an "
-          "external "
-          "child document must be notified through that document.");
+          "PAGXDocument::notifyChange: node not owned by this document; notify it through its own "
+          "document.");
       return;
     }
   }
@@ -358,9 +346,25 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   }
 }
 
+bool PAGXDocument::ownsNode(const Node* node) const {
+  for (auto& ownedNode : nodes) {
+    if (ownedNode.get() == node) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {
   if (scene == nullptr) {
     return;
+  }
+  // Avoid duplicate entries: a scene re-registers with its external documents on every rebuild.
+  PruneExpiredScenes(&liveScenes);
+  for (auto& weakScene : liveScenes) {
+    if (weakScene.lock() == scene) {
+      return;
+    }
   }
   liveScenes.emplace_back(scene);
 }
