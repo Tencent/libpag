@@ -97,8 +97,6 @@ constexpr uint64_t XL_BUCKET_MAX = 2000000ULL;
 constexpr uint64_t BIG_IMG_THRESHOLD = 1000000ULL;
 // Log throttling interval for image load/upgrade logs.
 constexpr uint32_t IMAGE_LOG_THROTTLE = 32;
-// Default background color.
-const auto DEFAULT_BG_COLOR = tgfx::Color::FromRGBA(245, 245, 245);
 // Display list tile and subtree cache configuration.
 constexpr size_t DEFAULT_MAX_TILE_COUNT = 256;
 constexpr size_t DEFAULT_SUBTREE_CACHE_SIZE = 2048;
@@ -1286,7 +1284,7 @@ void PAGXView::buildLayers() {
 
 void PAGXView::applyDocumentCustomData() {
   backgroundVisible = false;
-  backgroundTGFXColor = DEFAULT_BG_COLOR;
+  backgroundTGFXColor = DefaultBackgroundColor();
   auto& customData = document->customData;
   auto visibleIt = customData.find("bg-visible");
   if (visibleIt != customData.end()) {

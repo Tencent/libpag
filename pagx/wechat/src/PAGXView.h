@@ -32,6 +32,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "utils/StringParser.h"
 #include "LayerBuilder.h"
 
 namespace tgfx {
@@ -681,7 +682,7 @@ class PAGXView {
 
   // Background state from the PAGX document
   bool backgroundVisible = false;
-  tgfx::Color backgroundTGFXColor = tgfx::Color::FromRGBA(245, 245, 245);
+  tgfx::Color backgroundTGFXColor = DefaultBackgroundColor();
 
   // Performance monitoring
   struct FrameRecord {
