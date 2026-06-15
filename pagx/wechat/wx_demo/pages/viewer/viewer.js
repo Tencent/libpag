@@ -97,7 +97,7 @@ Page({
       
       // Support custom file index from query params
       if (options && options.index) {
-        const index = parseInt(options.index);
+        const index = parseInt(options.index, 10);
         if (index >= 0 && index < SAMPLE_FILES.length) {
           this.setData({ currentIndex: index });
         }

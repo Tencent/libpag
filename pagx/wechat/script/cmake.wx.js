@@ -47,4 +47,9 @@ if (!fs.existsSync(wasmFile)) {
     console.error("WASM file not found. CMake build may have failed:", wasmFile);
     process.exit(1);
 }
-fs.copyFileSync(wasmFile, "../lib/pagx-viewer.wasm")
+try {
+    fs.copyFileSync(wasmFile, "../lib/pagx-viewer.wasm");
+} catch (error) {
+    console.error("Failed to copy WASM file to lib:", error);
+    process.exit(1);
+}
