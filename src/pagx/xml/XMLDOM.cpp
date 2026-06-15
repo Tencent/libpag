@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/xml/XMLDOM.h"
+#include <cstring>
 #include <stack>
 #include <utility>
 #include "pagx/xml/XMLParser.h"

@@ -1576,23 +1576,16 @@ bool PAGXView::draw() {
       DrawBackground(canvas, _width, _height, 1.0f);
     }
     // fit blit：fit 是 z=1 主 surface 状态的 N 倍超采样，所以 blit 缩放 = liveZoom/N。
-    float fitScale = 0.0f;
-    float ftx = 0.0f;
-    float fty = 0.0f;
-    bool fitDrawn = false;
-    if (fitSnapshot != nullptr) {
-      float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : 1.0f;
-      fitScale = liveZoom / pixelScale;
-      ftx = liveOffset.x;
-      fty = liveOffset.y;
-      canvas->save();
-      canvas->translate(ftx, fty);
-      canvas->scale(fitScale, fitScale);
-      canvas->drawImage(fitSnapshot);
-      canvas->restore();
-      fitDrawn = true;
-    }
-    (void)fitDrawn;
+    // The enclosing guard already ensures fitSnapshot != nullptr here.
+    float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : 1.0f;
+    float fitScale = liveZoom / pixelScale;
+    float ftx = liveOffset.x;
+    float fty = liveOffset.y;
+    canvas->save();
+    canvas->translate(ftx, fty);
+    canvas->scale(fitScale, fitScale);
+    canvas->drawImage(fitSnapshot);
+    canvas->restore();
     auto recording = context->flush();
     if (recording) {
       context->submit(std::move(recording));

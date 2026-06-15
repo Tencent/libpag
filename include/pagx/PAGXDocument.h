@@ -284,6 +284,13 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
+  // Assigns `value` to the given Image member field on every Image node whose filePath matches,
+  // returning the first matching node (or nullptr). Shared implementation for the
+  // load/clear decodedImage/thumbnailImage entry points.
+  Image* setImageFieldByFilePath(const std::string& filePath,
+                                 std::shared_ptr<tgfx::Image> Image::*field,
+                                 std::shared_ptr<tgfx::Image> value);
+
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);

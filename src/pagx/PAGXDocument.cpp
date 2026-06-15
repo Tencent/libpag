@@ -327,9 +327,10 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
-Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
-                                      std::shared_ptr<tgfx::Image> decodedImage) {
-  if (filePath.empty() || decodedImage == nullptr) {
+Image* PAGXDocument::setImageFieldByFilePath(const std::string& filePath,
+                                             std::shared_ptr<tgfx::Image> Image::*field,
+                                             std::shared_ptr<tgfx::Image> value) {
+  if (filePath.empty()) {
     return nullptr;
   }
   Image* firstMatch = nullptr;
@@ -341,76 +342,36 @@ Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
     if (image->filePath != filePath) {
       continue;
     }
-    image->decodedImage = decodedImage;
+    image->*field = value;
     if (firstMatch == nullptr) {
       firstMatch = image;
     }
   }
   return firstMatch;
+}
+
+Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
+                                      std::shared_ptr<tgfx::Image> decodedImage) {
+  if (decodedImage == nullptr) {
+    return nullptr;
+  }
+  return setImageFieldByFilePath(filePath, &Image::decodedImage, std::move(decodedImage));
 }
 
 Image* PAGXDocument::loadDecodedImageAsThumbnail(const std::string& filePath,
                                                  std::shared_ptr<tgfx::Image> thumbnailImage) {
-  if (filePath.empty() || thumbnailImage == nullptr) {
+  if (thumbnailImage == nullptr) {
     return nullptr;
   }
-  Image* firstMatch = nullptr;
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->thumbnailImage = thumbnailImage;
-    if (firstMatch == nullptr) {
-      firstMatch = image;
-    }
-  }
-  return firstMatch;
+  return setImageFieldByFilePath(filePath, &Image::thumbnailImage, std::move(thumbnailImage));
 }
 
 Image* PAGXDocument::clearDecodedImage(const std::string& filePath) {
-  if (filePath.empty()) {
-    return nullptr;
-  }
-  Image* firstMatch = nullptr;
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->decodedImage = nullptr;
-    if (firstMatch == nullptr) {
-      firstMatch = image;
-    }
-  }
-  return firstMatch;
+  return setImageFieldByFilePath(filePath, &Image::decodedImage, nullptr);
 }
 
 Image* PAGXDocument::clearThumbnailImage(const std::string& filePath) {
-  if (filePath.empty()) {
-    return nullptr;
-  }
-  Image* firstMatch = nullptr;
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->thumbnailImage = nullptr;
-    if (firstMatch == nullptr) {
-      firstMatch = image;
-    }
-  }
-  return firstMatch;
+  return setImageFieldByFilePath(filePath, &Image::thumbnailImage, nullptr);
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
