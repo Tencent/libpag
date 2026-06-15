@@ -23,6 +23,8 @@
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/html/Woff2FontGenerator.h"
+#include "pagx/nodes/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
@@ -497,6 +499,48 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
   EXPECT_NE(html.find("@font-face"), std::string::npos);
   EXPECT_NE(html.find("pagx-font-"), std::string::npos);
   EXPECT_EQ(html.find("<path"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
+  const std::string xml = R"(
+<pagx width="64" height="32">
+  <Resources>
+    <Font id="bad" unitsPerEm="1">
+      <Glyph advance="1" path="M 0,0 L 1,0 L 1,-1 L 0,-1 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="64" height="32">
+    <Text>
+      <GlyphRun font="@bad" fontSize="16" glyphs="1" x="8" y="24"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(16));
+  EXPECT_NEAR(fontResult.designScale, 16.0f, 0.001f);
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/low-upem-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
 }
 
 CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
