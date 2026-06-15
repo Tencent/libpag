@@ -21,7 +21,7 @@
 namespace pagx {
 
 /**
- * Noise modes for the NoiseFilter.
+ * Noise modes for noise filters and noise layer styles.
  */
 enum class NoiseMode {
   /**
