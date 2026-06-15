@@ -74,7 +74,7 @@ node script/cmake.wx.js -a wasm
 只重新打包 JS（不编译 wasm）：
 
 ```bash
-npm run build:wechat:js
+npm run build:js
 ```
 
 清理 wasm 构建缓存（强制下次完整重编）：
@@ -98,7 +98,7 @@ npm run clean
 ## 运行示例
 
 `wx_demo/` 是使用该 viewer 的最小示例小程序。用微信开发者工具打开该
-目录并点击 **运行** 即可。每次执行 `npm run build:wechat` 都会自动刷新
+目录并点击 **运行** 即可。每次执行 `npm run build` 都会自动刷新
 demo 的 `utils/` 目录。
 
 ## 常见问题
