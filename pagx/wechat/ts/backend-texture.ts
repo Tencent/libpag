@@ -113,7 +113,13 @@ export const createBackendTexture = (
       return cleanupFailedTexture();
     }
   } else {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+    // Mirror the wxCanvas branch: a malformed or oversized source can make texImage2D throw,
+    // which would otherwise leak both the GL.textures slot and the raised premultiply flag.
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+    } catch (e) {
+      return cleanupFailedTexture();
+    }
   }
 
   gl.generateMipmap(gl.TEXTURE_2D);
