@@ -207,7 +207,7 @@ module.exports = { onTransformChanged: onTransformChanged };
 <wxs src="./comment.wxs" module="commentWxs" />
 
 <!-- Canvas（PAGX 渲染区域） -->
-<canvas id="pagx-canvas" type="webgl2" ... />
+<canvas id="pagx-canvas" type="webgl" ... />
 
 <!-- 评论浮层（与 Canvas 同级，共享同一个定位上下文） -->
 <view

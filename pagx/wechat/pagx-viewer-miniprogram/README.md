@@ -522,7 +522,7 @@ module.exports = { onTransformChanged: onTransformChanged };
 ```xml
 <wxs src="./comment.wxs" module="commentWxs" />
 
-<canvas id="pagx-canvas" type="webgl2" ... />
+<canvas id="pagx-canvas" type="webgl" ... />
 
 <view
   wx:for="{{commentPins}}"
