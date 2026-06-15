@@ -185,6 +185,8 @@ static DropShadowFilter* ParseDropShadowFilter(const DOMNode* node, PAGXDocument
 static InnerShadowFilter* ParseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc);
 static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc);
 static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
+static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc);
+static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc);
 
 //==============================================================================
 // Custom data parsing
@@ -2045,8 +2047,8 @@ static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
-  style->excludeChildEffects = GetBoolAttribute(
-      node, "excludeChildEffects", Default<NoiseStyle>().excludeChildEffects, doc);
+  style->excludeChildEffects =
+      GetBoolAttribute(node, "excludeChildEffects", Default<NoiseStyle>().excludeChildEffects, doc);
   style->mode = GET_ENUM(node, "mode", "mono", doc, NoiseMode);
   style->size = GetFloatAttribute(node, "size", Default<NoiseStyle>().size, doc);
   style->density = GetFloatAttribute(node, "density", Default<NoiseStyle>().density, doc);
