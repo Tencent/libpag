@@ -57,7 +57,7 @@
   [animator setSync:YES];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onAsyncSurfacePrepared:)
-                                               name:pag::kAsyncSurfacePreparedNotification
+                                               name:pag::AsyncSurfacePreparedNotification
                                              object:self];
 }
 

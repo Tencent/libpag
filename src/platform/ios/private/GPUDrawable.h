@@ -23,7 +23,7 @@
 
 namespace pag {
 
-extern NSString* const kAsyncSurfacePreparedNotification;
+extern NSString* const AsyncSurfacePreparedNotification;
 
 class GPUDrawable : public Drawable {
  public:

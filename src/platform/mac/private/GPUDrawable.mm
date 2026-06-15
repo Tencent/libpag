@@ -21,7 +21,7 @@
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
 namespace pag {
-NSString* const kAsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
+NSString* const AsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromView(NSView* view) {
   if (view == nil) {
@@ -101,7 +101,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
     strongThis->bufferPreparing = false;
     strongThis->window->getDevice()->unlock();
     if (strongThis->surface) {
-      [[NSNotificationCenter defaultCenter] postNotificationName:kAsyncSurfacePreparedNotification
+      [[NSNotificationCenter defaultCenter] postNotificationName:AsyncSurfacePreparedNotification
                                                           object:strongThis->view
                                                         userInfo:nil];
     }

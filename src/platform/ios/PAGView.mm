@@ -62,7 +62,7 @@
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(AsyncSurfacePrepared:)
-                                               name:pag::kAsyncSurfacePreparedNotification
+                                               name:pag::AsyncSurfacePreparedNotification
                                              object:self.layer];
 }
 
