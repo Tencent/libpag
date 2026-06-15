@@ -1748,7 +1748,16 @@ void SVGWriter::applyFloodColor(const Color& color) {
     _defs->addAttribute("flood-opacity", FloatToString(color.alpha));
   }
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    _defs->addAttribute("style", "flood-color:" + ColorToDisplayP3String(color));
+    std::string style;
+    style.reserve(120);
+    style += "flood-color:";
+    style += ColorToSVGString(color);
+    style += ";flood-color:";
+    style += ColorToDisplayP3String(color);
+    style += ";flood-opacity:";
+    style += FloatToString(color.alpha);
+    style += ';';
+    _defs->addAttribute("style", style);
   }
 }
 
