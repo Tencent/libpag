@@ -27,3 +27,7 @@ globalThis.WebAssembly = WXWebAssembly;
 globalThis.isWxWebAssembly = true;
 // eslint-disable-next-line no-global-assign
 window = globalThis;
+
+// Keep this file a module so the ambient `declare const globalThis` above stays module-scoped;
+// without an import/export it becomes a global script and clashes with the built-in globalThis.
+export {};
