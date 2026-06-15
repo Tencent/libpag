@@ -77,6 +77,14 @@ static bool DeserializePaintTransform(const std::string& text, pagx::Matrix* out
   return true;
 }
 
+// Stretch the image to exactly fill the node by scaling each axis independently. Callers must
+// guarantee imageWidth/imageHeight are positive (the public entry point checks this upfront).
+static void ApplyStretchToNode(pagx::Matrix* matrix, float imageWidth, float imageHeight,
+                               float nodeWidth, float nodeHeight) {
+  matrix->a = nodeWidth / imageWidth;
+  matrix->d = nodeHeight / imageHeight;
+}
+
 pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
                                          float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
                                          float scaleFactor, float origImageWidth, float origImageHeight) {
@@ -136,10 +144,14 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
           matrix.d  =  s00 * invDet;
           matrix.tx = (s01 * s12 - s11 * s02) * invDet;
           matrix.ty = (s10 * s02 - s00 * s12) * invDet;
+        } else {
+          // Singular paint transform cannot be inverted; fall back to the same node/image
+          // proportional stretch used for the identity-paintTransform path instead of leaving
+          // the matrix at its identity initial value.
+          ApplyStretchToNode(&matrix, imageWidth, imageHeight, nodeWidth, nodeHeight);
         }
       } else {
-        matrix.a = nodeWidth / imageWidth;
-        matrix.d = nodeHeight / imageHeight;
+        ApplyStretchToNode(&matrix, imageWidth, imageHeight, nodeWidth, nodeHeight);
       }
       break;
     }
