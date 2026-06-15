@@ -111,14 +111,10 @@ Page({
 
       await this.loadCurrentFile();
       
-      // Initialize gesture manager with canvas (physical pixels) and content dimensions
-      const contentWidth = this.View.contentWidth();
-      const contentHeight = this.View.contentHeight();
+      // Initialize gesture manager with canvas (physical pixels)
       const initState = this.gestureManager.init(
         this.canvas.width,   // physical pixels (rect.width * dpr)
-        this.canvas.height,  // physical pixels (rect.height * dpr)
-        contentWidth,
-        contentHeight
+        this.canvas.height   // physical pixels (rect.height * dpr)
       );
       if (!initState) {
         throw new Error('Failed to initialize gesture manager');
@@ -238,15 +234,11 @@ Page({
     // Manually set boundsOrigin for comment positioning verification.
     this.View.setBoundsOrigin(-900, -193);
     
-    // Re-initialize gesture manager with new content dimensions
+    // Re-initialize gesture manager with new canvas dimensions
     // NOTE: init() automatically resets all transforms and returns the reset state
-    const contentWidth = this.View.contentWidth();
-    const contentHeight = this.View.contentHeight();
     const resetState = this.gestureManager.init(
       this.canvas.width,   // physical pixels
-      this.canvas.height,  // physical pixels
-      contentWidth,
-      contentHeight
+      this.canvas.height   // physical pixels
     );
     
     // Apply reset state to synchronize C++ side
@@ -403,8 +395,7 @@ Page({
       this.gestureJustStarted = true;
     }
     
-    // Pass dpr to convert touch coordinates (logical pixels) to physical pixels
-    const state = this.gestureManager.onTouchStart(e.touches, this.dpr);
+    const state = this.gestureManager.onTouchStart(e.touches);
     this.applyGestureState(state);
   },
 

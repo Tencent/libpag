@@ -63,7 +63,7 @@ export class WXGestureManager {
   private listeners: Record<string, EventListener[]> = {};
   
   /**
-   * Initialize gesture manager with canvas and content dimensions.
+   * Initialize gesture manager with canvas dimensions.
    * Must be called after loading PAGX file.
    * 
    * NOTE: This method resets all transforms (zoom and offsets) to initial state.
@@ -71,17 +71,12 @@ export class WXGestureManager {
    * 
    * @param canvasWidth - Canvas width in physical pixels (rect.width * dpr)
    * @param canvasHeight - Canvas height in physical pixels (rect.height * dpr)
-   * @param contentWidth - PAGX content width in content pixels
-   * @param contentHeight - PAGX content height in content pixels
    */
   public init(
     canvasWidth: number,
-    canvasHeight: number,
-    contentWidth: number,
-    contentHeight: number
+    canvasHeight: number
   ): GestureState | null {
-    if (canvasWidth <= 0 || canvasHeight <= 0 || 
-        contentWidth <= 0 || contentHeight <= 0) {
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
       return null;
     }
     
@@ -108,12 +103,13 @@ export class WXGestureManager {
   
   /**
    * Update canvas size (e.g., after orientation change or window resize).
+   *
+   * @param canvasWidth - Canvas width in physical pixels (rect.width * dpr)
+   * @param canvasHeight - Canvas height in physical pixels (rect.height * dpr)
    */
   public updateSize(
     canvasWidth: number,
-    canvasHeight: number,
-    contentWidth: number,
-    contentHeight: number
+    canvasHeight: number
   ): void {
     // Reject non-positive sizes (mirrors init's validation) so a bad canvas size cannot
     // silently corrupt later zoom-around-point math.
@@ -162,9 +158,8 @@ export class WXGestureManager {
   /**
    * Handle touch start event.
    * @param touches - Touch array from WeChat event (coordinates in logical pixels)
-   * @param dpr - Device pixel ratio for converting to physical pixels
    */
-  public onTouchStart(touches: any[], dpr: number): GestureState {
+  public onTouchStart(touches: any[]): GestureState {
     if (touches.length === 1) {
       // Single finger: prepare for drag
       this.lastTouchX = touches[0].x;
