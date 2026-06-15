@@ -319,7 +319,7 @@ export class View {
 
   /**
    * Attach a host-decoded image (e.g. an OffscreenCanvas produced via
-   * View.decodeImageToCanvas()) as the source for Image nodes matching the given file path.
+   * View.decodeImageFromPath()) as the source for Image nodes matching the given file path.
    * This is the preferred path on WeChat for external image resources because it moves webp/png
    * decoding off the wasm main thread onto the mini-program's native decoder, and lets multiple
    * images decode concurrently.
