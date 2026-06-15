@@ -333,6 +333,13 @@ void PAGXView::parsePAGX(const val& pagxData) {
   inFlightFullRequests.clear();
   evictedFullPaths.clear();
   imageOriginalSizes.clear();
+  // Reset document-derived state up front so a failed parse below leaves clean defaults instead
+  // of retaining the previous document's dimensions / background. On success these are set again
+  // from the freshly parsed document right after FromXML.
+  pagxWidth = 0.0f;
+  pagxHeight = 0.0f;
+  backgroundVisible = false;
+  backgroundTGFXColor = DefaultBackgroundColor();
 
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
@@ -341,6 +348,13 @@ void PAGXView::parsePAGX(const val& pagxData) {
   size_t xmlSize = data->size();
   document = PAGXImporter::FromXML(data->bytes(), data->size());
   if (document) {
+    // Surface document dimensions and document-level custom data (background, bounds origin)
+    // immediately after parse so contentWidth()/contentHeight()/getContentTransform() are usable
+    // before buildLayers(). The progressive loader reads getContentTransform().fitScale right
+    // after parsePAGX() to decide first-frame image quality. buildLayers() no longer repeats it.
+    pagxWidth = document->width;
+    pagxHeight = document->height;
+    applyDocumentCustomData();
     auto paths = document->getExternalFilePaths();
     LOGI(
         "[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
@@ -1293,9 +1307,6 @@ void PAGXView::buildLayers() {
     return;
   }
   hasRenderedFirstFrame = false;
-  pagxWidth = document->width;
-  pagxHeight = document->height;
-  applyDocumentCustomData();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
   LogMemProbe("buildLayers.exit");
