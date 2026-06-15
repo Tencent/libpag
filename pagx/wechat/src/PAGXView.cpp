@@ -512,11 +512,31 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
     // flushPendingUploads commits all of them sequentially, so without this pendingUploads
     // could bloat the realised total above thumbnailBudget. The running sum is kept in
     // pendingThumbnailBytes so this stays O(1) regardless of queue length.
-    uint64_t projected = thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes;
+    //
+    // Replacement subtraction mirrors the full branch below: when the same path already has a
+    // committed thumbnail entry, flushPendingUploads swaps it in place (-= old + += new), so
+    // the net delta is `bytes - oldEntry`, not `bytes`. Subtract the existing entry's sizeBytes
+    // here to avoid over-projecting and triggering an unnecessary eviction or drop.
+    uint64_t replacingBytes = 0;
+    auto existing = thumbnailTextures.find(filePath);
+    if (existing != thumbnailTextures.end()) {
+      replacingBytes = existing->second.sizeBytes;
+    }
+    uint64_t projected =
+        thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
     if (projected > thumbnailBudget) {
       uint64_t over = projected - thumbnailBudget;
       evictOldestThumbnailsUntilFits(over);
-      projected = thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes;
+      // Re-fetch after eviction: evictOldestThumbnailsUntilFits iterates in hash order and may
+      // have dropped this very path, in which case its bytes are already gone from
+      // thumbnailTexturesTotalBytes and must no longer be subtracted as a replacement.
+      replacingBytes = 0;
+      existing = thumbnailTextures.find(filePath);
+      if (existing != thumbnailTextures.end()) {
+        replacingBytes = existing->second.sizeBytes;
+      }
+      projected =
+          thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
     }
     if (projected > thumbnailBudget) {
       LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d",
