@@ -164,7 +164,7 @@ class PAGXView {
    * Both quality tiers may be attached for the same filePath at different times; they live in
    * distinct caches and do not overwrite each other.
    *
-   * @param filePath The external file path to match against Image nodes.
+   * @param filePathVal The external file path to match against Image nodes.
    * @param nativeImage A JavaScript-side decoded image source (OffscreenCanvas, ImageBitmap, or
    *                    similar). Must be truthy.
    * @param qualityRaw The image quality as the integer value of ImageQuality, passed through as
@@ -515,7 +515,7 @@ class PAGXView {
     unsigned textureId = 0;
   };
   // Full-quality cache: subject to per-frame LRU eviction once externalTexturesTotalBytes
-  // exceeds fullBudget. Eviction fires the onTextureEvict callback (TODO: wired in step 6).
+  // exceeds fullBudget. Eviction fires the onTextureEvict callback.
   std::unordered_map<std::string, ExternalTextureEntry> externalTextures = {};
   uint64_t externalTexturesTotalBytes = 0;
   // Thumbnail cache: not evicted on a per-frame basis. Only contracts when an incoming

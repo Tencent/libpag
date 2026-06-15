@@ -131,9 +131,10 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes whose decoded image has
-   * already been supplied (via loadDecodedImage) are also excluded so the same resource is not
-   * fetched twice.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
+   * whose decoded image has already been supplied (via loadDecodedImage) or that already have a
+   * thumbnail attached (via loadDecodedImageAsThumbnail) are also excluded so the same resource is
+   * not fetched twice.
    */
   std::vector<std::string> getExternalFilePaths() const;
 

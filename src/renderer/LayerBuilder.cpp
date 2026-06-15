@@ -112,7 +112,6 @@
 #include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-#include "tgfx/platform/Print.h"
 
 namespace pagx {
 

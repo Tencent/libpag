@@ -156,24 +156,35 @@ export class View {
     // Create RenderCanvas
     view.renderCanvas = RenderCanvas.from(module, canvas);
     view.renderCanvas.retain();
-    view.backendContext = view.renderCanvas.backendContext;
+    try {
+      view.backendContext = view.renderCanvas.backendContext;
 
-    if (!view.backendContext) {
-      throw new Error('Failed to create backend context');
-    }
+      if (!view.backendContext) {
+        throw new Error('Failed to create backend context');
+      }
 
-    // Make context current
-    if (!view.backendContext.makeCurrent(module)) {
-      throw new Error('Failed to make context current');
-    }
+      // Make context current
+      if (!view.backendContext.makeCurrent(module)) {
+        throw new Error('Failed to make context current');
+      }
 
-    // Create C++ PAGXViewWechat instance
-    view.nativeView = module.PAGXView.MakeFrom(canvas.width, canvas.height);
+      // Create C++ PAGXViewWechat instance
+      view.nativeView = module.PAGXView.MakeFrom(canvas.width, canvas.height);
 
-    view.backendContext.clearCurrent(module);
+      view.backendContext.clearCurrent(module);
 
-    if (!view.nativeView) {
-      throw new Error('Failed to create PAGXViewWechat');
+      if (!view.nativeView) {
+        throw new Error('Failed to create PAGXViewWechat');
+      }
+    } catch (e) {
+      // Release the retained RenderCanvas so a partial-init failure does not leak the GL
+      // context, and does not leave a stale retainCount that would block a later destroy()
+      // (RenderCanvas.from reuses by canvas identity, so the leaked instance would otherwise
+      // be picked up and over-retained on a retry with the same canvas).
+      view.renderCanvas.release();
+      view.renderCanvas = null;
+      view.backendContext = null;
+      throw e;
     }
 
     if (view.pagViewOptions.autoRender) {

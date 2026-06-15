@@ -722,11 +722,8 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       // thumbnailImage when decodedImage is absent so this stays correct after a later
       // Full attach overwrites the matrix to the full-resolution dimensions.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
-      // [DIAG-EXP] Re-enable rebuildForFilePath. Internal rebuildVectorContents call is
-      // disabled inside LayerBuilderSession::rebuildForFilePath (LayerBuilder.cpp) for this
-      // experiment so only invalidateImagesByFilePath runs. If Full attach still does not
-      // crash, the corruption originates from rebuildVectorContents -> setContents. If it
-      // crashes, the corruption is in invalidateImagesByFilePath (_imageCache.erase).
+      // Regenerate the affected layers' vector contents so the newly attached thumbnail is
+      // picked up by the cached layer tree.
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
       }
