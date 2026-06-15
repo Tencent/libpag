@@ -1420,7 +1420,7 @@ void PAGXView::setBoundsOrigin(float x, float y) {
 
 void PAGXView::setGestureActive(bool active) {
   if (active) {
-    // 当前阶段只用 fitSnapshot 做 composite，不再抓 cached。
+    // At this stage only fitSnapshot is used for compositing; cached is no longer captured.
     if (fitSnapshot == nullptr) {
       gestureActive = false;
       return;
@@ -1611,7 +1611,7 @@ bool PAGXView::draw() {
     } else {
       DrawBackground(canvas, _width, _height, 1.0f);
     }
-    // fit blit：fit 是 z=1 主 surface 状态的 N 倍超采样，所以 blit 缩放 = liveZoom/N。
+    // fit blit: fit is an N× supersample of the z=1 main-surface state, so the blit scale = liveZoom/N.
     // The enclosing guard already ensures fitSnapshot != nullptr here.
     float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : 1.0f;
     float fitScale = liveZoom / pixelScale;
@@ -1766,12 +1766,13 @@ bool PAGXView::draw() {
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
-      // 切页/首帧后第一次有内容时抓 fit。超宽/超长文档用 offscreen 高清抓，避免放大糊。
+      // Capture fit the first time there is content after a page switch / first frame. Ultra-wide /
+      // ultra-tall documents are captured offscreen at high resolution to avoid blurring when zoomed.
       bool hasContent = contentLayer != nullptr;
       bool fitMissing = fitSnapshot == nullptr;
       if (snapshotEnabled && hasContent && fitMissing) {
         float fitContentScale = computeFitScale();
-        // 内存按 N² 增长（2x≈57MB, 4x≈230MB），iOS 512MB 限制下封顶 2x。
+        // Memory grows by N² (2x≈57MB, 4x≈230MB); capped at 2x under the iOS 512MB limit.
         float pixelScale = fitContentScale < HIGH_RES_FIT_SCALE_THRESHOLD ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
 
         if (pixelScale > DEFAULT_PIXEL_SCALE) {
@@ -1779,7 +1780,7 @@ bool PAGXView::draw() {
           int offH = static_cast<int>(_height * pixelScale);
           auto offscreen = tgfx::Surface::Make(context, offW, offH);
           if (offscreen != nullptr) {
-            // 临时把 displayList 设为 zoom=N、offset=0 渲染到 offscreen，再还原。
+            // Temporarily set displayList to zoom=N, offset=0 to render into offscreen, then restore.
             float savedZoom = static_cast<float>(displayList.zoomScale());
             tgfx::Point savedOffset = displayList.contentOffset();
             displayList.setZoomScale(pixelScale);
@@ -1798,8 +1799,9 @@ bool PAGXView::draw() {
             }
             fitSnapshot = offscreen->makeImageSnapshot();
             fitSnapshotPixelScale = pixelScale;
-            // 同 main surface 路径：snapshot 可能挂了一个延迟 copy task，立刻 flush
-            // 让它在源 offscreen 还干净时完成，避免后续误覆盖。
+            // Same as the main surface path: the snapshot may have a deferred copy task attached;
+            // flush immediately so it completes while the source offscreen is still clean, avoiding
+            // later accidental overwrites.
             auto copyRecording = context->flush();
             if (copyRecording) {
               context->submit(std::move(copyRecording));
@@ -1813,9 +1815,10 @@ bool PAGXView::draw() {
         } else {
           fitSnapshot = surface->makeImageSnapshot();
           fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
-          // makeImageSnapshot 在 externallyOwned surface（小程序 main canvas）上会创建
-          // 一个异步 copy 任务。如果不立刻 flush，这个 copy 会延迟到下次 draw 时执行，
-          // 那时 surface 上的像素可能已被新一次 render 覆盖，导致快照拿到错误内容。
+          // makeImageSnapshot on an externallyOwned surface (mini-program main canvas) creates an
+          // asynchronous copy task. Without an immediate flush, this copy is deferred to the next
+          // draw, by which time the surface pixels may already be overwritten by a new render,
+          // causing the snapshot to capture wrong content.
           auto snapRecording = context->flush();
           if (snapRecording) {
             context->submit(std::move(snapRecording));
@@ -1927,10 +1930,11 @@ bool PAGXView::firstFrameRendered() const {
 }
 
 void PAGXView::resetForFreshCapture() {
-  // 切页时 TS 端先 parsePAGX/buildLayers，后调 gestureManager.init + applyGestureState。
-  // 这两步之间 RAF 可能跑过 full render，把 cached/fit 抓在了"未 init"的中间视图状态下。
-  // 调用本方法让 TS 端在 init 完成后丢弃这些临时快照、重置 first-frame 标志，再等待
-  // 一次新的首帧——此时抓到的快照就是用户实际会看到的初始画面。
+  // On a page switch the TS side first calls parsePAGX/buildLayers, then gestureManager.init +
+  // applyGestureState. Between these two steps RAF may run a full render and capture cached/fit in
+  // the intermediate "not yet init" view state. This method lets the TS side discard those temporary
+  // snapshots after init completes, reset the first-frame flag, and wait for a new first frame — the
+  // snapshot captured then is the initial picture the user actually sees.
   fitSnapshot = nullptr;
   fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
   hasRenderedFirstFrame = false;

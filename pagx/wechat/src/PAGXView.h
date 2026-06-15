@@ -460,7 +460,8 @@ class PAGXView {
   // the viewport) onto the surface. Cleared on parsePAGX/updateSize.
   bool gestureActive = false;
   std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
-  // fit 的超采样倍数：1 = 同分辨率；>1 = N 倍像素密度，用于超宽/超长文档清晰度。
+  // Supersampling factor of the fit snapshot: 1 = same resolution; >1 = N× pixel density, used to
+  // keep ultra-wide / ultra-tall documents sharp.
   float fitSnapshotPixelScale = 1.0f;
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
   // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
@@ -468,10 +469,11 @@ class PAGXView {
   // Master switch for the fitSnapshot fast path. When false, draw() always performs a full
   // displayList.render() and never captures a fit snapshot. Toggled via setSnapshotEnabled().
   bool snapshotEnabled = true;
-  // 距离最近一次手势结束的时间戳（emscripten_get_now ms）。用于让 fitSnapshot 的
-  // 刷新延后到用户真正停下来再做：手势密集时复用上一次稳定 capture 的快照，避免
-  // capture 抓到含 tile fallback 的过渡画面、避免连续 full render 的内存抖动。
-  // 0 表示从未发生过手势（首帧前），首帧 capture 不受门控限制。
+  // Timestamp (emscripten_get_now ms) of the most recent gesture end. Used to defer the refresh of
+  // fitSnapshot until the user truly stops: during dense gestures it reuses the last stable captured
+  // snapshot, avoiding capturing a transitional frame that contains tile fallback and avoiding the
+  // memory churn of consecutive full renders.
+  // 0 means a gesture has never happened (before the first frame); the first-frame capture is not gated.
   double lastGestureEndMs = 0.0;
   // Session owns the LayerBuilder state so upgradeImageFromNative() can regenerate a subset of
   // the layer tree when a higher-resolution asset replaces the thumbnail attached during the
