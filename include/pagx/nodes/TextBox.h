@@ -90,7 +90,7 @@ class TextBox : public Group {
     return NodeType::TextBox;
   }
 
-protected:
+ protected:
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
   void updateLayout(LayoutContext* context) override;

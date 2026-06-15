@@ -408,10 +408,11 @@ class SVGWriter {
   void writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMatrixIndex,
                               std::string& currentSource);
   void writeBlendFilter(const BlendFilter* blend, int& shadowIndex, std::string& currentSource);
-  std::string writeNoiseTurbulence(const NoiseFilter* noise, const std::string& resultName);
-  std::string writeNoiseTurbulence(const NoiseStyle* noise, const std::string& resultName);
-  std::string writeNoiseBand(const NoiseFilter* noise, bool isDark, const std::string& label);
-  std::string writeNoiseBand(const NoiseStyle* noise, bool isDark, const std::string& label);
+  std::string writeNoiseTurbulence(float size, float seed, const std::string& resultName);
+  std::string writeNoiseBand(float size, float density, float seed, bool isDark,
+                             const std::string& label);
+  std::string writeNoiseMultiCore(float size, float density, float seed, float opacity,
+                                  const std::string& id);
   std::string writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
                                std::string& currentSource);
   // Collected per-filter state fed into the final feMerge aggregation.
@@ -988,23 +989,24 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
 // SVGWriter – noise filter primitives
 //==============================================================================
 
-std::string SVGWriter::writeNoiseTurbulence(const NoiseFilter* noise,
-                                            const std::string& resultName) {
-  auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
+std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::string& resultName) {
+  // SVG filter primitives operate in document units and do not receive the runtime content scale
+  // used by GPU rasterization, so exported noise frequency intentionally derives from authoring size.
+  auto freq = size > 0.0f ? 1.0f / size : 0.25f;
   _defs->openElement("feTurbulence");
   _defs->addAttribute("type", "fractalNoise");
   _defs->addAttribute("baseFrequency", FloatToString(freq));
   _defs->addAttribute("stitchTiles", "stitch");
   _defs->addAttribute("numOctaves", "3");
-  _defs->addAttribute("seed", FloatToString(noise->seed));
+  _defs->addAttribute("seed", FloatToString(seed));
   _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
   return resultName;
 }
 
-std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
+std::string SVGWriter::writeNoiseBand(float size, float density, float seed, bool isDark,
                                       const std::string& label) {
-  auto turbResult = writeNoiseTurbulence(noise, "turb" + label);
+  auto turbResult = writeNoiseTurbulence(size, seed, "turb" + label);
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
@@ -1012,7 +1014,7 @@ std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
   _defs->addAttribute("result", "luma" + label);
   _defs->closeElementSelfClosing();
 
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
+  auto d = std::clamp(density, 0.0f, 1.0f);
   int lower = 0;
   int upper = 0;
   if (isDark) {
@@ -1041,40 +1043,34 @@ std::string SVGWriter::writeNoiseBand(const NoiseFilter* noise, bool isDark,
   return "band" + label;
 }
 
-std::string SVGWriter::writeNoiseTurbulence(const NoiseStyle* noise,
-                                            const std::string& resultName) {
-  auto freq = noise->size > 0.0f ? 1.0f / noise->size : 0.25f;
-  _defs->openElement("feTurbulence");
-  _defs->addAttribute("type", "fractalNoise");
-  _defs->addAttribute("baseFrequency", FloatToString(freq));
-  _defs->addAttribute("stitchTiles", "stitch");
-  _defs->addAttribute("numOctaves", "3");
-  _defs->addAttribute("seed", FloatToString(noise->seed));
-  _defs->addAttribute("result", resultName);
-  _defs->closeElementSelfClosing();
-  return resultName;
-}
+std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed, float opacity,
+                                           const std::string& id) {
+  auto turbResult = writeNoiseTurbulence(size, seed, "n" + id);
 
-std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
-                                      const std::string& label) {
-  auto turbResult = writeNoiseTurbulence(noise, "turb" + label);
-
-  _defs->openElement("feColorMatrix");
+  _defs->openElement("feComponentTransfer");
   _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("type", "luminanceToAlpha");
-  _defs->addAttribute("result", "luma" + label);
+  _defs->addAttribute("result", "contrast" + id);
+  _defs->closeElementStart();
+  _defs->openElement("feFuncR");
+  _defs->addAttribute("type", "linear");
+  _defs->addAttribute("slope", "2");
+  _defs->addAttribute("intercept", "-0.5");
   _defs->closeElementSelfClosing();
+  _defs->openElement("feFuncG");
+  _defs->addAttribute("type", "linear");
+  _defs->addAttribute("slope", "2");
+  _defs->addAttribute("intercept", "-0.5");
+  _defs->closeElementSelfClosing();
+  _defs->openElement("feFuncB");
+  _defs->addAttribute("type", "linear");
+  _defs->addAttribute("slope", "2");
+  _defs->addAttribute("intercept", "-0.5");
+  _defs->closeElementSelfClosing();
+  _defs->closeElement();
 
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
-  int lower = 0;
-  int upper = 0;
-  if (isDark) {
-    lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
-    upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
-  } else {
-    lower = std::clamp(static_cast<int>(std::lround(-24.0f * d + 74.0f)), 0, 99);
-    upper = std::clamp(static_cast<int>(std::lround(25.0f * d + 74.0f)), 0, 99);
-  }
+  auto d = std::clamp(density, 0.0f, 1.0f);
+  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
+  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
   std::string table;
   table.reserve(300);
   for (int i = 0; i < 100; i++) {
@@ -1082,16 +1078,39 @@ std::string SVGWriter::writeNoiseBand(const NoiseStyle* noise, bool isDark,
   }
   table.pop_back();
 
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", turbResult);
+  _defs->addAttribute("type", "luminanceToAlpha");
+  _defs->addAttribute("result", "luma" + id);
+  _defs->closeElementSelfClosing();
+
   _defs->openElement("feComponentTransfer");
-  _defs->addAttribute("in", "luma" + label);
-  _defs->addAttribute("result", "band" + label);
+  _defs->addAttribute("in", "luma" + id);
+  _defs->addAttribute("result", "band" + id);
   _defs->closeElementStart();
   _defs->openElement("feFuncA");
   _defs->addAttribute("type", "discrete");
   _defs->addAttribute("tableValues", table);
   _defs->closeElementSelfClosing();
   _defs->closeElement();
-  return "band" + label;
+
+  _defs->openElement("feComposite");
+  _defs->addAttribute("in", "contrast" + id);
+  _defs->addAttribute("in2", "band" + id);
+  _defs->addAttribute("operator", "in");
+  _defs->addAttribute("result", "masked" + id);
+  _defs->closeElementSelfClosing();
+
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", "masked" + id);
+  _defs->addAttribute("type", "matrix");
+  std::string opacityValues = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ";
+  opacityValues += FloatToString(opacity);
+  opacityValues += " 0";
+  _defs->addAttribute("values", opacityValues);
+  _defs->addAttribute("result", "final" + id);
+  _defs->closeElementSelfClosing();
+  return "final" + id;
 }
 
 std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
@@ -1099,7 +1118,7 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise, true, "Dark" + filterId);
+    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId);
     _defs->openElement("feFlood");
     _defs->addAttribute("flood-color", ColorToSVGString(noise->color));
     if (noise->color.alpha < 1.0f) {
@@ -1137,8 +1156,9 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise, true, "Dark" + filterId);
-    auto bright = writeNoiseBand(noise, false, "Bright" + filterId);
+    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId);
+    auto bright =
+        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + filterId);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1205,81 +1225,11 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
     return resultName;
   }
 
-  // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
-  // luminance-based density band (alpha) — then masked and blended, aligned with tgfx's
-  // MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
-  auto turbResult = writeNoiseTurbulence(noise, "n" + filterId);
-
-  // Contrast branch: feFuncR/G/B linear applies slope=2 intercept=-0.5, keeping alpha unchanged.
-  _defs->openElement("feComponentTransfer");
-  _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("result", "contrast" + filterId);
-  _defs->closeElementStart();
-  _defs->openElement("feFuncR");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->openElement("feFuncG");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->openElement("feFuncB");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->closeElement();
-
-  // Density band branch: luminance-to-alpha then discrete band, matching MakeDarkDensityFilter
-  // which uses ComputeDarkBandBuckets, lumaMatrix + AlphaThreshold, and DstOut(lower, upper).
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
-  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
-  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
-  std::string table;
-  table.reserve(300);
-  for (int i = 0; i < 100; i++) {
-    table += (i >= lower && i <= upper) ? "1 " : "0 ";
-  }
-  table.pop_back();
-
-  _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("type", "luminanceToAlpha");
-  _defs->addAttribute("result", "luma" + filterId);
-  _defs->closeElementSelfClosing();
-
-  _defs->openElement("feComponentTransfer");
-  _defs->addAttribute("in", "luma" + filterId);
-  _defs->addAttribute("result", "band" + filterId);
-  _defs->closeElementStart();
-  _defs->openElement("feFuncA");
-  _defs->addAttribute("type", "discrete");
-  _defs->addAttribute("tableValues", table);
-  _defs->closeElementSelfClosing();
-  _defs->closeElement();
+  auto final =
+      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, filterId);
 
   _defs->openElement("feComposite");
-  _defs->addAttribute("in", "contrast" + filterId);
-  _defs->addAttribute("in2", "band" + filterId);
-  _defs->addAttribute("operator", "in");
-  _defs->addAttribute("result", "masked" + filterId);
-  _defs->closeElementSelfClosing();
-
-  // Apply opacity scaling to the masked noise alpha channel.
-  _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", "masked" + filterId);
-  _defs->addAttribute("type", "matrix");
-  std::string opacityValues = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ";
-  opacityValues += FloatToString(noise->opacity);
-  opacityValues += " 0";
-  _defs->addAttribute("values", opacityValues);
-  _defs->addAttribute("result", "final" + filterId);
-  _defs->closeElementSelfClosing();
-
-  _defs->openElement("feComposite");
-  _defs->addAttribute("in", "final" + filterId);
+  _defs->addAttribute("in", final);
   _defs->addAttribute("in2", currentSource);
   _defs->addAttribute("operator", "in");
   _defs->addAttribute("result", "clipped" + filterId);
@@ -1303,7 +1253,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise, true, "Dark" + styleId);
+    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId);
     _defs->openElement("feFlood");
     _defs->addAttribute("flood-color", ColorToSVGString(noise->color));
     if (noise->color.alpha < 1.0f) {
@@ -1330,8 +1280,9 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise, true, "Dark" + styleId);
-    auto bright = writeNoiseBand(noise, false, "Bright" + styleId);
+    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId);
+    auto bright =
+        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1387,81 +1338,12 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     return resultName;
   }
 
-  // Multi mode: single feTurbulence processed through two branches — contrast (RGB) and
-  // luminance-based density band (alpha) — then masked and clipped to SourceGraphic, aligned
-  // with tgfx's MultiNoiseFilter::onBuildBaseShader via MakeDarkDensityFilter.
-  auto turbResult = writeNoiseTurbulence(noise, "n" + styleId);
-
-  // Contrast branch.
-  _defs->openElement("feComponentTransfer");
-  _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("result", "contrast" + styleId);
-  _defs->closeElementStart();
-  _defs->openElement("feFuncR");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->openElement("feFuncG");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->openElement("feFuncB");
-  _defs->addAttribute("type", "linear");
-  _defs->addAttribute("slope", "2");
-  _defs->addAttribute("intercept", "-0.5");
-  _defs->closeElementSelfClosing();
-  _defs->closeElement();
-
-  // Density band branch.
-  auto d = std::clamp(noise->density, 0.0f, 1.0f);
-  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
-  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
-  std::string table;
-  table.reserve(300);
-  for (int i = 0; i < 100; i++) {
-    table += (i >= lower && i <= upper) ? "1 " : "0 ";
-  }
-  table.pop_back();
-
-  _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", turbResult);
-  _defs->addAttribute("type", "luminanceToAlpha");
-  _defs->addAttribute("result", "luma" + styleId);
-  _defs->closeElementSelfClosing();
-
-  _defs->openElement("feComponentTransfer");
-  _defs->addAttribute("in", "luma" + styleId);
-  _defs->addAttribute("result", "band" + styleId);
-  _defs->closeElementStart();
-  _defs->openElement("feFuncA");
-  _defs->addAttribute("type", "discrete");
-  _defs->addAttribute("tableValues", table);
-  _defs->closeElementSelfClosing();
-  _defs->closeElement();
-
-  _defs->openElement("feComposite");
-  _defs->addAttribute("in", "contrast" + styleId);
-  _defs->addAttribute("in2", "band" + styleId);
-  _defs->addAttribute("operator", "in");
-  _defs->addAttribute("result", "masked" + styleId);
-  _defs->closeElementSelfClosing();
-
-  // Apply opacity scaling.
-  _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", "masked" + styleId);
-  _defs->addAttribute("type", "matrix");
-  std::string opacityValues = "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ";
-  opacityValues += FloatToString(noise->opacity);
-  opacityValues += " 0";
-  _defs->addAttribute("values", opacityValues);
-  _defs->addAttribute("result", "final" + styleId);
-  _defs->closeElementSelfClosing();
+  auto final =
+      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId);
 
   auto resultName = "noiseStyleOut" + styleId;
   _defs->openElement("feComposite");
-  _defs->addAttribute("in", "final" + styleId);
+  _defs->addAttribute("in", final);
   _defs->addAttribute("in2", "SourceGraphic");
   _defs->addAttribute("operator", "in");
   _defs->addAttribute("result", resultName);
@@ -1554,7 +1436,23 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
       case NodeType::NoiseStyle: {
         auto noise = static_cast<const NoiseStyle*>(style);
         auto result = writeNoiseStyle(noise, noiseStyleIndex);
-        agg.aboveResults.push_back(result);
+        if (noise->blendMode != BlendMode::Normal) {
+          auto modeStr = BlendModeToFEBlendString(noise->blendMode);
+          if (modeStr) {
+            std::string blendResult = result + "Blended";
+            _defs->openElement("feBlend");
+            _defs->addAttribute("in", result);
+            _defs->addAttribute("in2", "SourceGraphic");
+            _defs->addAttribute("mode", modeStr);
+            _defs->addAttribute("result", blendResult);
+            _defs->closeElementSelfClosing();
+            agg.aboveResults.push_back(blendResult);
+          } else {
+            agg.aboveResults.push_back(result);
+          }
+        } else {
+          agg.aboveResults.push_back(result);
+        }
         agg.needSourceGraphic = true;
         break;
       }

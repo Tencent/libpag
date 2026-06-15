@@ -8558,7 +8558,7 @@
     },
     "PAGXTest": {
         "LayerBuilderAPIConsistency": "f40e23b6",
-        "NoiseFilterAllElements": "798f40c4",
+        "NoiseFilterAllElements": "126228e0",
         "NoiseFilterAnimation": {
             "frame_0": "8d43445d",
             "frame_1": "8d43445d",
@@ -8574,6 +8574,7 @@
             "frame_9": "8d43445d"
         },
         "NoiseFilterModes": "798f40c4",
+        "NoiseStyleBlendModeOnImage": "126228e0",
         "NoiseStyleModes": "1af07597",
         "PrecomposedTextRender": "9b6dea6a",
         "html": {

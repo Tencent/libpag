@@ -7308,12 +7308,12 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
 
-  auto typeface = Typeface::MakeFromPath("/System/Library/Fonts/Helvetica.ttc");
-  auto fontFamily = typeface ? typeface->fontFamily() : std::string();
-  auto fontStyle = typeface ? typeface->fontStyle() : std::string();
-  if (typeface) {
-    fontConfig.registerTypeface(typeface);
-  }
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  fontConfig.registerTypeface(typeface);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
 
   auto makeMonoNoise = [&](float density) {
     auto noise = doc->makeNode<pagx::NoiseFilter>();
@@ -7518,6 +7518,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   svgOpts.fontConfig = &fontConfig;
   auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
   EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<filter"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
 
   auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAllElements.svg");
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -7526,6 +7528,75 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   }
   std::ofstream file(outPath, std::ios::binary);
   file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+}
+
+/**
+ * Test NoiseStyle with blendMode applied to an image layer, verifying both rendering and SVG
+ * export. The blendMode is set to Multiply so the noise composites differently from Normal.
+ * Currently SVG export ignores blendMode, so the SVG output will differ from the GPU rendering.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
+  constexpr int canvasW = 200;
+  constexpr int canvasH = 200;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {200, 200};
+
+  auto* image = doc->makeNode<pagx::Image>();
+  auto imageData =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(imageData != nullptr);
+  image->data = pagx::Data::MakeWithCopy(imageData->bytes(), imageData->size());
+
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1, 0, 0, 1, 0, 0};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  auto* noise = doc->makeNode<pagx::NoiseStyle>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 1.0f;
+  noise->seed = 7;
+  noise->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  noise->blendMode = pagx::BlendMode::Multiply;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(noise);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleBlendModeOnImage"));
+
+  pagx::SVGExportOptions svgOpts;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream svgFile(outPath, std::ios::binary);
+  svgFile.write(svg.data(), static_cast<std::streamsize>(svg.size()));
 }
 
 /**
@@ -7706,6 +7777,17 @@ PAGX_TEST(PAGXTest, ChannelNoiseFilter) {
   auto tgfxMulti = tree.get<tgfx::NoiseFilter>(multiFilter);
   ASSERT_TRUE(tgfxMulti != nullptr);
 
+  EXPECT_FALSE(tree.apply(monoFilter, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiFilter, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
+
   auto timeline = file->getDefaultTimeline();
   ASSERT_TRUE(timeline != nullptr);
 
@@ -7843,6 +7925,17 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
   ASSERT_TRUE(tgfxDuo != nullptr);
   auto tgfxMulti = tree.get<tgfx::NoiseStyle>(multiStyle);
   ASSERT_TRUE(tgfxMulti != nullptr);
+
+  EXPECT_FALSE(tree.apply(monoStyle, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiStyle, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
 
   auto timeline = file->getDefaultTimeline();
   ASSERT_TRUE(timeline != nullptr);

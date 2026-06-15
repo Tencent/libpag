@@ -1288,10 +1288,18 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "size", WriteNoiseStyleSize);
     _result.binding.setWriter(node, "density", WriteNoiseStyleDensity);
     _result.binding.setWriter(node, "seed", WriteNoiseStyleSeed);
-    _result.binding.setWriter(node, "color", WriteNoiseStyleColor);
-    _result.binding.setWriter(node, "firstColor", WriteNoiseStyleFirstColor);
-    _result.binding.setWriter(node, "secondColor", WriteNoiseStyleSecondColor);
-    _result.binding.setWriter(node, "opacity", WriteNoiseStyleOpacity);
+    switch (node->mode) {
+      case NoiseMode::Mono:
+        _result.binding.setWriter(node, "color", WriteNoiseStyleColor);
+        break;
+      case NoiseMode::Duo:
+        _result.binding.setWriter(node, "firstColor", WriteNoiseStyleFirstColor);
+        _result.binding.setWriter(node, "secondColor", WriteNoiseStyleSecondColor);
+        break;
+      case NoiseMode::Multi:
+        _result.binding.setWriter(node, "opacity", WriteNoiseStyleOpacity);
+        break;
+    }
   }
 
   static void WriteBlurFilterX(void* object, const KeyValue& value, float mix) {
@@ -1527,10 +1535,18 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "size", WriteNoiseFilterSize);
     _result.binding.setWriter(node, "density", WriteNoiseFilterDensity);
     _result.binding.setWriter(node, "seed", WriteNoiseFilterSeed);
-    _result.binding.setWriter(node, "color", WriteNoiseFilterColor);
-    _result.binding.setWriter(node, "firstColor", WriteNoiseFilterFirstColor);
-    _result.binding.setWriter(node, "secondColor", WriteNoiseFilterSecondColor);
-    _result.binding.setWriter(node, "opacity", WriteNoiseFilterOpacity);
+    switch (node->mode) {
+      case NoiseMode::Mono:
+        _result.binding.setWriter(node, "color", WriteNoiseFilterColor);
+        break;
+      case NoiseMode::Duo:
+        _result.binding.setWriter(node, "firstColor", WriteNoiseFilterFirstColor);
+        _result.binding.setWriter(node, "secondColor", WriteNoiseFilterSecondColor);
+        break;
+      case NoiseMode::Multi:
+        _result.binding.setWriter(node, "opacity", WriteNoiseFilterOpacity);
+        break;
+    }
   }
 
   std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {

@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * A noise layer style that overlays procedural Perlin noise above the layer content. Three noise
  * modes are available: Mono (single color), Duo (two complementary colors), and Multi (preserving
- * original noise RGB with enhanced contrast).
+ * original noise RGB with enhanced contrast). Mode-specific fields for inactive modes are ignored;
+ * set the fields for the new mode after changing mode.
  */
 class NoiseStyle : public LayerStyle {
  public:
@@ -54,22 +55,26 @@ class NoiseStyle : public LayerStyle {
   float seed = 0.0f;
 
   /**
-   * The noise color for Mono mode. The alpha component controls the noise opacity.
+   * The noise color for Mono mode. Ignored by Duo and Multi modes. The alpha component controls the
+   * noise opacity. The default value is black.
    */
   Color color = {};
 
   /**
-   * The first noise color for Duo mode. The alpha component controls its opacity.
+   * The first noise color for Duo mode. Ignored by Mono and Multi modes. The alpha component
+   * controls its opacity. The default value is black.
    */
   Color firstColor = {};
 
   /**
-   * The second noise color for Duo mode. The alpha component controls its opacity.
+   * The second noise color for Duo mode. Ignored by Mono and Multi modes. The alpha component
+   * controls its opacity. The default value is white.
    */
-  Color secondColor = {};
+  Color secondColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
   /**
-   * The overall noise opacity for Multi mode, in [0, 1]. The default value is 0.15.
+   * The overall noise opacity for Multi mode, in [0, 1]. Ignored by Mono and Duo modes. The default
+   * value is 0.15.
    */
   float opacity = 0.15f;
 
