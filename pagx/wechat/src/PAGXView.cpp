@@ -1608,13 +1608,22 @@ bool PAGXView::draw() {
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
 
-  // Per-stage timings in milliseconds. Zero for stages skipped this frame.
-  double surfaceMs = 0.0;
-  double bgMs = 0.0;
-  double renderMs = 0.0;
-  double flushMs = 0.0;
-  double submitMs = 0.0;
-  double unlockMs = 0.0;
+  // Per-stage timings in milliseconds. Zero for stages skipped this frame. All capture sites
+  // are gated on DRAW_LOG_ENABLED so the emscripten_get_now() probes are fully stripped from
+  // shipped builds, where the only consumers (the slow-frame / first-frame breakdowns below)
+  // are compiled out.
+  [[maybe_unused]] double surfaceMs = 0.0;
+  [[maybe_unused]] double bgMs = 0.0;
+  [[maybe_unused]] double renderMs = 0.0;
+  [[maybe_unused]] double flushMs = 0.0;
+  [[maybe_unused]] double submitMs = 0.0;
+  [[maybe_unused]] double unlockMs = 0.0;
+  [[maybe_unused]] double surfaceStartMs = 0.0;
+  [[maybe_unused]] double bgStartMs = 0.0;
+  [[maybe_unused]] double renderStartMs = 0.0;
+  [[maybe_unused]] double flushStartMs = 0.0;
+  [[maybe_unused]] double submitStartMs = 0.0;
+  [[maybe_unused]] double unlockStartMs = 0.0;
   // Force a render pass when there are pending GPU uploads so flushPendingUploads runs even on
   // an otherwise idle frame; the upload itself will rebuild the affected layers and mark the
   // display list dirty for subsequent frames.
@@ -1632,7 +1641,9 @@ bool PAGXView::draw() {
     // rebuilds triggered inside flushPendingUploads.
     flushPendingUploads(context);
 
-    double surfaceStartMs = emscripten_get_now();
+    if constexpr (DRAW_LOG_ENABLED) {
+      surfaceStartMs = emscripten_get_now();
+    }
     if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
       context->setCacheLimit(MAX_CACHE_LIMIT);
       context->setResourceExpirationFrames(EXPIRATION_FRAMES);
@@ -1646,9 +1657,13 @@ bool PAGXView::draw() {
         return false;
       }
     }
-    surfaceMs = emscripten_get_now() - surfaceStartMs;
+    if constexpr (DRAW_LOG_ENABLED) {
+      surfaceMs = emscripten_get_now() - surfaceStartMs;
+    }
 
-    double bgStartMs = emscripten_get_now();
+    if constexpr (DRAW_LOG_ENABLED) {
+      bgStartMs = emscripten_get_now();
+    }
     auto canvas = surface->getCanvas();
     canvas->clear();
 
@@ -1657,15 +1672,25 @@ bool PAGXView::draw() {
     } else {
       DrawBackground(canvas, _width, _height, 1.0f);
     }
-    bgMs = emscripten_get_now() - bgStartMs;
+    if constexpr (DRAW_LOG_ENABLED) {
+      bgMs = emscripten_get_now() - bgStartMs;
+    }
 
-    double renderStartMs = emscripten_get_now();
+    if constexpr (DRAW_LOG_ENABLED) {
+      renderStartMs = emscripten_get_now();
+    }
     displayList.render(surface.get(), false);
-    renderMs = emscripten_get_now() - renderStartMs;
+    if constexpr (DRAW_LOG_ENABLED) {
+      renderMs = emscripten_get_now() - renderStartMs;
+    }
 
-    double flushStartMs = emscripten_get_now();
+    if constexpr (DRAW_LOG_ENABLED) {
+      flushStartMs = emscripten_get_now();
+    }
     auto recording = context->flush();
-    flushMs = emscripten_get_now() - flushStartMs;
+    if constexpr (DRAW_LOG_ENABLED) {
+      flushMs = emscripten_get_now() - flushStartMs;
+    }
 
     // Throttled GPU cache footprint probe. context->memoryUsage() reports total bytes held by
     // the tgfx ResourceCache (textures + buffers); purgeableBytes is the LRU-evictable subset.
@@ -1693,9 +1718,13 @@ bool PAGXView::draw() {
     }
 
     if (recording) {
-      double submitStartMs = emscripten_get_now();
+      if constexpr (DRAW_LOG_ENABLED) {
+        submitStartMs = emscripten_get_now();
+      }
       context->submit(std::move(recording));
-      submitMs = emscripten_get_now() - submitStartMs;
+      if constexpr (DRAW_LOG_ENABLED) {
+        submitMs = emscripten_get_now() - submitStartMs;
+      }
       if (!hasRenderedFirstFrame) {
         hasRenderedFirstFrame = true;
       }
@@ -1763,9 +1792,13 @@ bool PAGXView::draw() {
     // built and queued; WebGL keeps in-flight commands valid even after deleteTexture.
     drainPendingTextureDeletes();
 
-    double unlockStartMs = emscripten_get_now();
+    if constexpr (DRAW_LOG_ENABLED) {
+      unlockStartMs = emscripten_get_now();
+    }
     device->unlock();
-    unlockMs = emscripten_get_now() - unlockStartMs;
+    if constexpr (DRAW_LOG_ENABLED) {
+      unlockMs = emscripten_get_now() - unlockStartMs;
+    }
   }
 
   double frameEndMs = emscripten_get_now();
