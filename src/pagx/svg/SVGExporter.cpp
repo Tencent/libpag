@@ -1122,9 +1122,8 @@ std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed
   return "final" + id;
 }
 
-void SVGWriter::writeNoiseResultBlend(const std::string& clippedResult,
-                                      const std::string& filterId, BlendMode blendMode,
-                                      std::string& currentSource) {
+void SVGWriter::writeNoiseResultBlend(const std::string& clippedResult, const std::string& filterId,
+                                      BlendMode blendMode, std::string& currentSource) {
   auto resultName = "noiseOut" + filterId;
   _defs->openElement("feBlend");
   _defs->addAttribute("in", clippedResult);
