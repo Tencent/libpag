@@ -751,6 +751,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
+      // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
+      // an ImagePattern before its decoded image is supplied via loadDecodedImage(); leaving the
+      // stroke empty keeps those shapes transparent until the image is ready, matching convertFill.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
