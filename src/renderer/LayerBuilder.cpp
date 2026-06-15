@@ -1050,6 +1050,9 @@ class LayerBuilderContext {
       }
       case NodeType::NoiseStyle: {
         auto style = static_cast<const pagx::NoiseStyle*>(node);
+        if (style->size <= 0.0f) {
+          return nullptr;
+        }
         std::shared_ptr<tgfx::NoiseStyle> tgfxStyle;
         switch (style->mode) {
           case NoiseMode::Mono:
@@ -1594,6 +1597,9 @@ class LayerBuilderContext {
       }
       case NodeType::NoiseFilter: {
         auto filter = static_cast<const pagx::NoiseFilter*>(node);
+        if (filter->size <= 0.0f) {
+          return nullptr;
+        }
         auto tgfxBlendMode = ToTGFX(filter->blendMode);
         std::shared_ptr<tgfx::NoiseFilter> tgfxFilter;
         switch (filter->mode) {
