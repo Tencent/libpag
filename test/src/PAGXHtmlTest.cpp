@@ -254,6 +254,28 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
   EXPECT_NE(html.find("opacity: 0.5"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="160" height="120">
+  <Layer width="100" height="80" matrix="1,0,0,1,30,20">
+    <Rectangle position="50,40" size="100,80" roundness="12"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetY="5" blurX="10" blurY="10" color="#0000001A" showBehindLayer="false"/>
+    <DropShadowStyle offsetY="5" blurX="5" blurY="5" color="#0000001A" showBehindLayer="false"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  size_t filterCount = 0;
+  for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
+    filterCount++;
+  }
+  EXPECT_EQ(filterCount, static_cast<size_t>(1));
+  EXPECT_EQ(html.find(") url(#filter"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_nesting.pagx"));
   ASSERT_FALSE(html.empty());

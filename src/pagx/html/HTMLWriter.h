@@ -472,7 +472,7 @@ class HTMLWriter {
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
   // layer's <div> is emitted.
   void emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop);
-  std::string emitDropShadowFilterDef(const DropShadowStyle* ds);
+  std::string emitDropShadowFilterDef(const std::vector<const DropShadowStyle*>& dropShadows);
   std::string emitInnerShadowFilterDef(const InnerShadowStyle* is);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,

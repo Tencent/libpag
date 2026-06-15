@@ -1597,11 +1597,17 @@ void HTMLWriter::emitBlendAndIsolation(std::string& style, const Layer* layer) {
 // HTMLWriter – layer style filter helpers
 //==============================================================================
 
-std::string HTMLWriter::emitDropShadowFilterDef(const DropShadowStyle* ds) {
-  std::string signature = "dss:" + CssFloatToString(ds->offsetX) + "," +
-                          CssFloatToString(ds->offsetY) + "," + CssFloatToString(ds->blurX) + "," +
-                          CssFloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
-                          (ds->showBehindLayer ? "1" : "0");
+std::string HTMLWriter::emitDropShadowFilterDef(
+    const std::vector<const DropShadowStyle*>& dropShadows) {
+  if (dropShadows.empty()) {
+    return {};
+  }
+  std::string signature = "dss:" + std::to_string(dropShadows.size());
+  for (auto* ds : dropShadows) {
+    signature += "|" + CssFloatToString(ds->offsetX) + "," + CssFloatToString(ds->offsetY) + "," +
+                 CssFloatToString(ds->blurX) + "," + CssFloatToString(ds->blurY) + "," +
+                 ColorToRGBA(ds->color) + "," + (ds->showBehindLayer ? "1" : "0");
+  }
   std::string fid = lookupFilterId(signature);
   if (fid.empty()) {
     fid = _ctx->nextId("filter");
@@ -1613,68 +1619,74 @@ std::string HTMLWriter::emitDropShadowFilterDef(const DropShadowStyle* ds) {
     _defs->addAttr("height", "200%");
     _defs->addAttr("color-interpolation-filters", "sRGB");
     _defs->closeTagStart();
-    // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
-    // erase mask below operate on the layer contour, as required by the spec
-    // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
-    // "use layer contour as erase mask"). Without this, semi-transparent fills would
-    // produce a weaker shadow and leave partially-visible shadow inside the layer.
+    // Saturate SourceAlpha once and feed every DropShadowStyle from that same contour. CSS filter
+    // chains would otherwise feed the previous shadow output into the next shadow's SourceAlpha,
+    // while tgfx draws every layer style from the original layer-style source.
     _defs->openTag("feColorMatrix");
     _defs->addAttr("in", "SourceAlpha");
     _defs->addAttr("type", "matrix");
     _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
     _defs->addAttr("result", "opaqueAlpha");
     _defs->closeTagSelfClosing();
-    _defs->openTag("feGaussianBlur");
-    _defs->addAttr("in", "opaqueAlpha");
-    _defs->addAttr("stdDeviation", CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
-    _defs->addAttr("result", "blur");
-    _defs->closeTagSelfClosing();
-    _defs->openTag("feOffset");
-    _defs->addAttr("in", "blur");
-    if (!FloatNearlyZero(ds->offsetX)) {
-      _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+
+    std::vector<std::string> shadowResults;
+    shadowResults.reserve(dropShadows.size());
+    for (size_t i = 0; i < dropShadows.size(); i++) {
+      auto* ds = dropShadows[i];
+      std::string suffix = std::to_string(i);
+      std::string blurResult = "blur" + suffix;
+      std::string offsetResult = "off" + suffix;
+      std::string shadowResult = "shadow" + suffix;
+      _defs->openTag("feGaussianBlur");
+      _defs->addAttr("in", "opaqueAlpha");
+      _defs->addAttr("stdDeviation",
+                     CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
+      _defs->addAttr("result", blurResult);
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feOffset");
+      _defs->addAttr("in", blurResult);
+      if (!FloatNearlyZero(ds->offsetX)) {
+        _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+      }
+      if (!FloatNearlyZero(ds->offsetY)) {
+        _defs->addAttr("dy", CssFloatToString(ds->offsetY));
+      }
+      _defs->addAttr("result", offsetResult);
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feColorMatrix");
+      _defs->addAttr("in", offsetResult);
+      _defs->addAttr("type", "matrix");
+      _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
+                                   CssFloatToString(ds->color.green) + " 0 0 0 0 " +
+                                   CssFloatToString(ds->color.blue) + " 0 0 0 " +
+                                   CssFloatToString(ds->color.alpha) + " 0");
+      _defs->addAttr("result", shadowResult);
+      _defs->closeTagSelfClosing();
+      if (!ds->showBehindLayer) {
+        std::string clippedResult = "shadowClipped" + suffix;
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", shadowResult);
+        _defs->addAttr("in2", "opaqueAlpha");
+        _defs->addAttr("operator", "out");
+        _defs->addAttr("result", clippedResult);
+        _defs->closeTagSelfClosing();
+        shadowResults.push_back(clippedResult);
+      } else {
+        shadowResults.push_back(shadowResult);
+      }
     }
-    if (!FloatNearlyZero(ds->offsetY)) {
-      _defs->addAttr("dy", CssFloatToString(ds->offsetY));
+
+    _defs->openTag("feMerge");
+    _defs->closeTagStart();
+    for (const auto& result : shadowResults) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", result);
+      _defs->closeTagSelfClosing();
     }
-    _defs->addAttr("result", "off");
+    _defs->openTag("feMergeNode");
+    _defs->addAttr("in", "SourceGraphic");
     _defs->closeTagSelfClosing();
-    _defs->openTag("feColorMatrix");
-    _defs->addAttr("in", "off");
-    _defs->addAttr("type", "matrix");
-    _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
-                                 CssFloatToString(ds->color.green) + " 0 0 0 0 " +
-                                 CssFloatToString(ds->color.blue) + " 0 0 0 " +
-                                 CssFloatToString(ds->color.alpha) + " 0");
-    _defs->addAttr("result", "shadow");
-    _defs->closeTagSelfClosing();
-    if (!ds->showBehindLayer) {
-      _defs->openTag("feComposite");
-      _defs->addAttr("in", "shadow");
-      _defs->addAttr("in2", "opaqueAlpha");
-      _defs->addAttr("operator", "out");
-      _defs->addAttr("result", "shadowClipped");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "shadowClipped");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "SourceGraphic");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
-    } else {
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "shadow");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "SourceGraphic");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
-    }
+    _defs->closeTag();
     _defs->closeTag();
     registerFilterId(signature, fid);
   }
@@ -2115,6 +2127,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // that paint their own filters (otherwise those descendants leak into the shadow's alpha
   // source and darken/widen the shadow beyond the layer silhouette).
   std::vector<std::string> pendingSiblingShadows;
+  std::vector<const DropShadowStyle*> pendingFilterDropShadows;
 
   for (auto* ls : layer->styles) {
     bool hasBlendMode = ls->blendMode != BlendMode::Normal;
@@ -2122,11 +2135,23 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
       if (hasBlendMode) {
+        if (!pendingFilterDropShadows.empty()) {
+          std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+          if (!filterValues.empty()) filterValues += ' ';
+          filterValues += filterRef;
+          pendingFilterDropShadows.clear();
+        }
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
       } else if (ds->blurX == ds->blurY && ds->showBehindLayer && hasBackdropBlurFill &&
                  boxShadowValue.empty()) {
         std::string radius = LayerBoxShadowBorderRadius(layer);
         if (!radius.empty()) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
           // would re-introduce the stacking context we just eliminated.
@@ -2149,6 +2174,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (!hasBlendMode && ds->showBehindLayer) {
         ShadowShape shape = FindLayerShadowShape(layer);
         if (shape.valid) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
           std::string style =
               "position:absolute;left:" + CssFloatToString(shape.left + ds->offsetX) +
               "px;top:" + CssFloatToString(shape.top + ds->offsetY) +
@@ -2168,12 +2199,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           continue;
         }
       }
-      {
-        std::string filterRef = emitDropShadowFilterDef(ds);
+      pendingFilterDropShadows.push_back(ds);
+    } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
+      if (!pendingFilterDropShadows.empty()) {
+        std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
         if (!filterValues.empty()) filterValues += ' ';
         filterValues += filterRef;
+        pendingFilterDropShadows.clear();
       }
-    } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
@@ -2183,10 +2216,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         filterValues += filterRef;
       }
     } else if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
+      if (!pendingFilterDropShadows.empty()) {
+        std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+        if (!filterValues.empty()) filterValues += ' ';
+        filterValues += filterRef;
+        pendingFilterDropShadows.clear();
+      }
       if (hasBlendMode) {
         belowStyles.push_back({NodeType::BackgroundBlurStyle, ls});
       }
     }
+  }
+  if (!pendingFilterDropShadows.empty()) {
+    std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+    if (!filterValues.empty()) filterValues += ' ';
+    filterValues += filterRef;
   }
 
   if (!filterValues.empty()) {
