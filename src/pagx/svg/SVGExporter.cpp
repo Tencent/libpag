@@ -413,8 +413,10 @@ class SVGWriter {
                              const std::string& label);
   std::string writeNoiseMultiCore(float size, float density, float seed, float opacity,
                                   const std::string& id);
-  std::string writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
-                               std::string& currentSource);
+  void writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex, std::string& currentSource);
+  void writeNoiseResultBlend(const std::string& clippedResult, const std::string& filterId,
+                             BlendMode blendMode, std::string& currentSource);
+  void writeNoiseStyleClip(const std::string& noiseResult, const std::string& styleId);
   // Collected per-filter state fed into the final feMerge aggregation.
   struct ShadowAggregate {
     std::vector<std::string> dropShadowResults;
@@ -1115,10 +1117,26 @@ std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed
   return "final" + id;
 }
 
-std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
-                                        std::string& currentSource) {
+void SVGWriter::writeNoiseResultBlend(const std::string& clippedResult,
+                                      const std::string& filterId, BlendMode blendMode,
+                                      std::string& currentSource) {
+  auto resultName = "noiseOut" + filterId;
+  _defs->openElement("feBlend");
+  _defs->addAttribute("in", clippedResult);
+  _defs->addAttribute("in2", currentSource);
+  auto modeStr = BlendModeToFEBlendString(blendMode);
+  if (modeStr) {
+    _defs->addAttribute("mode", modeStr);
+  }
+  _defs->addAttribute("result", resultName);
+  _defs->closeElementSelfClosing();
+  currentSource = resultName;
+}
+
+void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
+                                 std::string& currentSource) {
   if (noise->size <= 0.0f) {
-    return {};
+    return;
   }
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
@@ -1143,18 +1161,8 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
     _defs->addAttribute("result", "clipped" + filterId);
     _defs->closeElementSelfClosing();
 
-    auto resultName = "noiseOut" + filterId;
-    _defs->openElement("feBlend");
-    _defs->addAttribute("in", "clipped" + filterId);
-    _defs->addAttribute("in2", currentSource);
-    auto modeStr = BlendModeToFEBlendString(noise->blendMode);
-    if (modeStr) {
-      _defs->addAttribute("mode", modeStr);
-    }
-    _defs->addAttribute("result", resultName);
-    _defs->closeElementSelfClosing();
-    currentSource = resultName;
-    return resultName;
+    writeNoiseResultBlend("clipped" + filterId, filterId, noise->blendMode, currentSource);
+    return;
   }
 
   if (noise->mode == NoiseMode::Duo) {
@@ -1207,18 +1215,8 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
     _defs->addAttribute("result", "clipped" + filterId);
     _defs->closeElementSelfClosing();
 
-    auto resultName = "noiseOut" + filterId;
-    _defs->openElement("feBlend");
-    _defs->addAttribute("in", "clipped" + filterId);
-    _defs->addAttribute("in2", currentSource);
-    auto modeStr = BlendModeToFEBlendString(noise->blendMode);
-    if (modeStr) {
-      _defs->addAttribute("mode", modeStr);
-    }
-    _defs->addAttribute("result", resultName);
-    _defs->closeElementSelfClosing();
-    currentSource = resultName;
-    return resultName;
+    writeNoiseResultBlend("clipped" + filterId, filterId, noise->blendMode, currentSource);
+    return;
   }
 
   auto multiResult =
@@ -1231,18 +1229,7 @@ std::string SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseInde
   _defs->addAttribute("result", "clipped" + filterId);
   _defs->closeElementSelfClosing();
 
-  auto resultName = "noiseOut" + filterId;
-  _defs->openElement("feBlend");
-  _defs->addAttribute("in", "clipped" + filterId);
-  _defs->addAttribute("in2", currentSource);
-  auto modeStr = BlendModeToFEBlendString(noise->blendMode);
-  if (modeStr) {
-    _defs->addAttribute("mode", modeStr);
-  }
-  _defs->addAttribute("result", resultName);
-  _defs->closeElementSelfClosing();
-  currentSource = resultName;
-  return resultName;
+  writeNoiseResultBlend("clipped" + filterId, filterId, noise->blendMode, currentSource);
 }
 
 std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex) {
@@ -1265,14 +1252,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     _defs->addAttribute("result", "colored" + styleId);
     _defs->closeElementSelfClosing();
 
-    auto resultName = "noiseStyleOut" + styleId;
-    _defs->openElement("feComposite");
-    _defs->addAttribute("in", "colored" + styleId);
-    _defs->addAttribute("in2", "SourceGraphic");
-    _defs->addAttribute("operator", "in");
-    _defs->addAttribute("result", resultName);
-    _defs->closeElementSelfClosing();
-    return resultName;
+    writeNoiseStyleClip("colored" + styleId, styleId);
+    return "noiseStyleOut" + styleId;
   }
 
   if (noise->mode == NoiseMode::Duo) {
@@ -1318,27 +1299,25 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     _defs->addAttribute("result", "duo" + styleId);
     _defs->closeElementSelfClosing();
 
-    auto resultName = "noiseStyleOut" + styleId;
-    _defs->openElement("feComposite");
-    _defs->addAttribute("in", "duo" + styleId);
-    _defs->addAttribute("in2", "SourceGraphic");
-    _defs->addAttribute("operator", "in");
-    _defs->addAttribute("result", resultName);
-    _defs->closeElementSelfClosing();
-    return resultName;
+    writeNoiseStyleClip("duo" + styleId, styleId);
+    return "noiseStyleOut" + styleId;
   }
 
   auto multiResult =
       writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId);
 
+  writeNoiseStyleClip(multiResult, styleId);
+  return "noiseStyleOut" + styleId;
+}
+
+void SVGWriter::writeNoiseStyleClip(const std::string& noiseResult, const std::string& styleId) {
   auto resultName = "noiseStyleOut" + styleId;
   _defs->openElement("feComposite");
-  _defs->addAttribute("in", multiResult);
+  _defs->addAttribute("in", noiseResult);
   _defs->addAttribute("in2", "SourceGraphic");
   _defs->addAttribute("operator", "in");
   _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
-  return resultName;
 }
 
 void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
