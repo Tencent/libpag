@@ -168,28 +168,14 @@ std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   return std::shared_ptr<PAGXView>(new PAGXView(device, width, height));
 }
 
-// Copies data from a JavaScript Uint8Array into a tgfx::Data object.
-static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
-  if (emscriptenData.isUndefined()) {
-    return nullptr;
-  }
-  unsigned int length = emscriptenData["length"].as<unsigned int>();
-  if (length == 0) {
-    return nullptr;
-  }
-  auto buffer = new (std::nothrow) uint8_t[length];
-  if (buffer) {
-    auto memory = val::module_property("HEAPU8")["buffer"];
-    auto memoryView = emscriptenData["constructor"].new_(
-        memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
-    memoryView.call<void>("set", emscriptenData);
-    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
-  }
-  return nullptr;
-}
-
-// Copies data from a JavaScript Uint8Array into a pagx::Data object.
-static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
+// Reads the length of a JavaScript Uint8Array, allocates a matching uint8_t buffer with
+// new(std::nothrow), and copies the array contents into it through a HEAPU8-backed view.
+// Returns the freshly allocated buffer (caller owns it) and writes its length to outLength, or
+// returns nullptr (with outLength = 0) when the input is undefined, empty, or the allocation
+// fails. Shared by the tgfx::Data and pagx::Data converters below, which differ only in the
+// final factory step.
+static uint8_t* AllocAndCopyEmscriptenData(const val& emscriptenData, unsigned int* outLength) {
+  *outLength = 0;
   if (emscriptenData.isUndefined()) {
     return nullptr;
   }
@@ -205,6 +191,27 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
   auto memoryView = emscriptenData["constructor"].new_(
       memory, static_cast<unsigned int>(reinterpret_cast<uintptr_t>(buffer)), length);
   memoryView.call<void>("set", emscriptenData);
+  *outLength = length;
+  return buffer;
+}
+
+// Copies data from a JavaScript Uint8Array into a tgfx::Data object.
+static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = AllocAndCopyEmscriptenData(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
+  return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+}
+
+// Copies data from a JavaScript Uint8Array into a pagx::Data object.
+static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData) {
+  unsigned int length = 0;
+  auto buffer = AllocAndCopyEmscriptenData(emscriptenData, &length);
+  if (!buffer) {
+    return nullptr;
+  }
   return Data::MakeAdopt(buffer, length);
 }
 
