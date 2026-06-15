@@ -246,6 +246,8 @@ if (APPLE)
     set(VIEWER_SPARKLE_SRC "${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework")
 
     add_custom_command(TARGET PAGViewer POST_BUILD
+            # Extract dSYM before macdeployqt (which may strip the binary)
+            COMMAND /bin/sh -c "dsymutil '${VIEWER_BUNDLE_DIR}/Contents/MacOS/PAGViewer' -o '${CMAKE_BINARY_DIR}/PAGViewer.dSYM' 2>/dev/null || true"
             # Copy libffmovie.dylib
             COMMAND /bin/sh -c "mkdir -p '${VIEWER_FRAMEWORKS_DIR}' && [ -f '${VIEWER_FRAMEWORKS_DIR}/libffmovie.dylib' ] || cp '${VIEWER_FFMOVIE_SRC}' '${VIEWER_FRAMEWORKS_DIR}/'"
             # Copy Sparkle.framework

@@ -81,16 +81,16 @@ function generateUniversalDsym() {
     local armDsym="${armDir}/${binaryName}.dSYM"
     local universalDsym="${outputDir}/${binaryName}.dSYM"
 
-    dsymutil "${x86Exe}" -o "${x86Dsym}"
-    if [ $? -ne 0 ];
-    then
-        exitWithError "Generate ${binaryName} x86_64 dSYM failed"
+    # dSYM may already be extracted by CMake POST_BUILD (before macdeployqt runs).
+    # Skip extraction if it exists, otherwise extract from the original binary.
+    if [ ! -d "${x86Dsym}" ]; then
+        dsymutil "${x86Exe}" -o "${x86Dsym}" || \
+            exitWithError "Generate ${binaryName} x86_64 dSYM failed"
     fi
 
-    dsymutil "${armExe}" -o "${armDsym}"
-    if [ $? -ne 0 ];
-    then
-        exitWithError "Generate ${binaryName} arm64 dSYM failed"
+    if [ ! -d "${armDsym}" ]; then
+        dsymutil "${armExe}" -o "${armDsym}" || \
+            exitWithError "Generate ${binaryName} arm64 dSYM failed"
     fi
 
     cp -R "${x86Dsym}" "${universalDsym}"
