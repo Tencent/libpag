@@ -115,6 +115,11 @@ export class WXGestureManager {
     contentWidth: number,
     contentHeight: number
   ): void {
+    // Reject non-positive sizes (mirrors init's validation) so a bad canvas size cannot
+    // silently corrupt later zoom-around-point math.
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+      return;
+    }
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
   }

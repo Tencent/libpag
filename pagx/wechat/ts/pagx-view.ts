@@ -176,19 +176,23 @@ export class View {
       if (!view.nativeView) {
         throw new Error('Failed to create PAGXViewWechat');
       }
+
+      if (view.pagViewOptions.autoRender) {
+        view.startRendering();
+      }
     } catch (e) {
-      // Release the retained RenderCanvas so a partial-init failure does not leak the GL
-      // context, and does not leave a stale retainCount that would block a later destroy()
-      // (RenderCanvas.from reuses by canvas identity, so the leaked instance would otherwise
-      // be picked up and over-retained on a retry with the same canvas).
+      // Release any partially-initialized resources so a failure does not leak the GL context
+      // or the native view, and does not leave a stale retainCount that would block a later
+      // destroy() (RenderCanvas.from reuses by canvas identity, so the leaked instance would
+      // otherwise be picked up and over-retained on a retry with the same canvas).
+      if (view.nativeView) {
+        view.nativeView.delete();
+        view.nativeView = null;
+      }
       view.renderCanvas.release();
       view.renderCanvas = null;
       view.backendContext = null;
       throw e;
-    }
-
-    if (view.pagViewOptions.autoRender) {
-      view.startRendering();
     }
 
     return view;

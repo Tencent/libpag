@@ -167,7 +167,7 @@ const LOCAL_RISK_PATHS = {
   imageLoadMP: { yellow: 80, red: 220 },
   imageRuntimeRisk: { yellow: 45, red: 95 },
 };
-const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = { yellow: 2000, red: 4000 };
+const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = BASE_RISK_PATHS.A_bg_x_uncacheable;
 const BARELY_USABLE_SCORE = 50;
 const NEUTRAL_SDK_GREEN_SCORE = 75;
 const SMALL_AREA_BLUR_RISK = 25;

@@ -374,7 +374,7 @@ Page({
     }
     
     // Always update C++ side immediately for smooth rendering
-    try {// 0,0 1,1
+    try {
       this.View.updateZoomScaleAndOffset(state.zoom, state.offsetX, state.offsetY);
     } catch (error) {
       // Silently ignore errors
@@ -445,7 +445,7 @@ Page({
 
   // Picker Selection
   onPickerChange(e) {
-    const index = parseInt(e.detail.value);
+    const index = parseInt(e.detail.value, 10);
     if (index !== this.data.currentIndex) {
       this.switchFile(index);
     }
