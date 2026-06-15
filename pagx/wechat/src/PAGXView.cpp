@@ -1575,14 +1575,18 @@ bool PAGXView::draw() {
   //      would produce at this zoom, so we can safely blit it instead of re-rendering.
   // The 0.02 margin above 1.0 absorbs float drift on the user's release zoom.
   //
-  // The non-gesture branch additionally requires displayList not to be dirty: a dirty flag
-  // here means the layer tree changed since the snapshot was captured (typically a
-  // progressive image upgrade or a deferred image attach), so blitting fitSnapshot would
-  // hide the new content. Active gestures override this because the user expects steady
-  // pan/zoom feedback even when async upgrades land mid-gesture; the snapshot will be
-  // refreshed on the next non-gesture frame.
+  // The non-gesture branch additionally requires displayList not to be dirty and no queued
+  // uploads: a dirty flag here means the layer tree changed since the snapshot was captured
+  // (typically a progressive image upgrade or a deferred image attach), and a non-empty
+  // pendingUploads means a queued attachNativeImage() texture has not been flushed yet
+  // (queuing marks neither dirty nor clears zoomedOutFrameSettled). Either case must take the
+  // full-render path so flushPendingUploads runs instead of blitting fitSnapshot over the new
+  // content. Active gestures override this because the user expects steady pan/zoom feedback
+  // even when async upgrades land mid-gesture; the snapshot will be refreshed on the next
+  // non-gesture frame.
   bool fitOnly = snapshotEnabled && !gestureActive && fitSnapshot != nullptr &&
-                 liveZoom <= ZOOM_DRIFT_MARGIN && !displayList.hasContentChanged();
+                 liveZoom <= ZOOM_DRIFT_MARGIN && !displayList.hasContentChanged() &&
+                 pendingUploads.empty();
   if (snapshotEnabled && (gestureActive || fitOnly) && surface != nullptr &&
       fitSnapshot != nullptr) {
     auto context = device->lockContext();
