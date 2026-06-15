@@ -429,6 +429,15 @@ class PAGXView {
 
   void applyDocumentCustomData();
 
+  // Updates the decoded-image accounting (count, pixel total, size histogram) for a freshly
+  // decoded image and emits the [Img] / [BigImg] / throttled [MemProbe] debug logs. Shared by
+  // loadFileDataAsNativeImage() and upgradeImageFromNative(); the only differences between the
+  // two call sites are the log tag fragments (opTag/bigImgTag/probeTag) and whether the
+  // throttled probe appends the per-bucket histogram (logBuckets, true only for upgrades).
+  void recordDecodedImage(const std::string& filePath,
+                          const std::shared_ptr<tgfx::Image>& image, const char* opTag,
+                          const char* bigImgTag, const char* probeTag, bool logBuckets);
+
   // Shared contain-mode fit scale used by both the content matrix and the JS-facing content
   // transform. Keeping a single source of truth prevents comment pins from drifting relative to
   // the rendered content.

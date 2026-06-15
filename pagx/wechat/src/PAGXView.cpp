@@ -368,6 +368,46 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
+void PAGXView::recordDecodedImage(const std::string& filePath,
+                                  const std::shared_ptr<tgfx::Image>& image, const char* opTag,
+                                  const char* bigImgTag, const char* probeTag, bool logBuckets) {
+  imageDecodedCount += 1;
+  uint64_t pixels =
+      static_cast<uint64_t>(image->width()) * static_cast<uint64_t>(image->height());
+  imageDecodedPixelTotal += pixels;
+  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
+  // Always log size for each loaded image, plus a [BigImg] marker when a single image is
+  // unusually large (≥ 1 MPx). 1280×1280 = 1.64 MPx is the imageMogr2 default cap; anything
+  // bigger means CDN side did not honor the thumbnail params for this asset.
+  LOGI("[Img] %s path=%s size=%dx%d (%.2fMPx)", opTag, filePath.c_str(), image->width(),
+                 image->height(), static_cast<double>(pixels) / 1e6);
+  if (pixels >= BIG_IMG_THRESHOLD) {
+    LOGI("[BigImg] %s path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)", bigImgTag, filePath.c_str(),
+                   image->width(), image->height(), static_cast<double>(pixels) / 1e6,
+                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
+  }
+  // Throttled probe: every IMAGE_LOG_THROTTLE images log a roll-up to keep the console readable
+  // on image-heavy documents. The upgrade path additionally appends the per-bucket histogram.
+  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
+    if (logBuckets) {
+      LOGI(
+          "[MemProbe] tag=%s.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA) "
+          "buckets=[%u,%u,%u,%u,%u,%u]",
+          probeTag, static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+          static_cast<unsigned long long>(imageDecodedPixelTotal),
+          static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB),
+          imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
+          imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
+    } else {
+      LOGI(
+          "[MemProbe] tag=%s.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
+          probeTag, static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+          static_cast<unsigned long long>(imageDecodedPixelTotal),
+          static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
+    }
+  }
+}
+
 bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val& nativeImage) {
   if (!document || filePath.empty() || !nativeImage.as<bool>()) {
     return false;
@@ -385,32 +425,7 @@ bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val&
   }
   tgfxImage = tgfxImage->makeMipmapped(true);
 
-  imageDecodedCount += 1;
-  uint64_t pixels = static_cast<uint64_t>(tgfxImage->width()) *
-                    static_cast<uint64_t>(tgfxImage->height());
-  imageDecodedPixelTotal += pixels;
-  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
-  // Always log size for each loaded image, plus a [BigImg] marker when a single image is
-  // unusually large (≥ 1 MPx). 1280×1280 = 1.64 MPx is the imageMogr2 default cap; anything
-  // bigger means CDN side did not honor the thumbnail params for this asset.
-  LOGI("[Img] load path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
-                 tgfxImage->width(), tgfxImage->height(),
-                 static_cast<double>(pixels) / 1e6);
-  if (pixels >= BIG_IMG_THRESHOLD) {
-    LOGI("[BigImg] LOAD path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
-                   filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
-                   static_cast<double>(pixels) / 1e6,
-                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
-  }
-  // Throttled probe: every IMAGE_LOG_THROTTLE images log a roll-up to keep the console readable on
-  // image-heavy documents.
-  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
-    LOGI(
-        "[MemProbe] tag=loadImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
-        static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-        static_cast<unsigned long long>(imageDecodedPixelTotal),
-        static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
-  }
+  recordDecodedImage(filePath, tgfxImage, "load", "LOAD", "loadImage", false);
 
   auto* imageNode = document->loadDecodedImage(filePath, tgfxImage);
   return imageNode != nullptr;
@@ -430,30 +445,7 @@ bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& na
   }
   tgfxImage = tgfxImage->makeMipmapped(true);
 
-  imageDecodedCount += 1;
-  uint64_t pixels = static_cast<uint64_t>(tgfxImage->width()) *
-                    static_cast<uint64_t>(tgfxImage->height());
-  imageDecodedPixelTotal += pixels;
-  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
-  LOGI("[Img] upgrade path=%s size=%dx%d (%.2fMPx)", filePath.c_str(),
-                 tgfxImage->width(), tgfxImage->height(),
-                 static_cast<double>(pixels) / 1e6);
-  if (pixels >= BIG_IMG_THRESHOLD) {
-    LOGI("[BigImg] UPGRADE path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)",
-                   filePath.c_str(), tgfxImage->width(), tgfxImage->height(),
-                   static_cast<double>(pixels) / 1e6,
-                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
-  }
-  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
-    LOGI(
-        "[MemProbe] tag=upgradeImage.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA) "
-        "buckets=[%u,%u,%u,%u,%u,%u]",
-        static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-        static_cast<unsigned long long>(imageDecodedPixelTotal),
-        static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB),
-        imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
-        imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
-  }
+  recordDecodedImage(filePath, tgfxImage, "upgrade", "UPGRADE", "upgradeImage", true);
 
   // Attach the upgraded decoded image first so the session's rebuild sees the new pixels when
   // it re-runs convertImagePattern on the affected layers. loadDecodedImage does not clear the
