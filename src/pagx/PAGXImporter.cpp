@@ -52,6 +52,8 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -577,9 +579,9 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
                     " Expected: Layer, Group, Rectangle, Ellipse, Polystar,"
                     " Path, Text, Fill, Stroke, TrimPath, RoundCorner,"
                     " MergePath, TextModifier, TextPath, TextBox, Repeater,"
-                    " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle,"
+                    " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle,"
                     " BlurFilter, DropShadowFilter, InnerShadowFilter,"
-                    " BlendFilter, ColorMatrixFilter.");
+                    " BlendFilter, ColorMatrixFilter, NoiseFilter.");
   }
 
   return layer;
@@ -623,7 +625,7 @@ static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'styles'."
                       " Expected: DropShadowStyle, InnerShadowStyle,"
-                      " BackgroundBlurStyle.");
+                      " BackgroundBlurStyle, NoiseStyle.");
     }
   }
 }
@@ -644,7 +646,7 @@ static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'filters'."
                       " Expected: BlurFilter, DropShadowFilter,"
-                      " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
+                      " InnerShadowFilter, BlendFilter, ColorMatrixFilter, NoiseFilter.");
     }
   }
 }
@@ -758,6 +760,9 @@ static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "BackgroundBlurStyle") {
     return ParseBackgroundBlurStyle(node, doc);
   }
+  if (node->name == "NoiseStyle") {
+    return ParseNoiseStyle(node, doc);
+  }
   return nullptr;
 }
 
@@ -776,6 +781,9 @@ static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "ColorMatrixFilter") {
     return ParseColorMatrixFilter(node, doc);
+  }
+  if (node->name == "NoiseFilter") {
+    return ParseNoiseFilter(node, doc);
   }
   return nullptr;
 }
@@ -2031,6 +2039,34 @@ static void ParseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float&
   }
 }
 
+static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<NoiseStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  style->excludeChildEffects = GetBoolAttribute(
+      node, "excludeChildEffects", Default<NoiseStyle>().excludeChildEffects, doc);
+  style->mode = GET_ENUM(node, "mode", "mono", doc, NoiseMode);
+  style->size = GetFloatAttribute(node, "size", Default<NoiseStyle>().size, doc);
+  style->density = GetFloatAttribute(node, "density", Default<NoiseStyle>().density, doc);
+  style->seed = GetFloatAttribute(node, "seed", Default<NoiseStyle>().seed, doc);
+  auto colorStr = GetAttribute(node, "color");
+  if (!colorStr.empty()) {
+    style->color = GetColorAttribute(node, "color", doc);
+  }
+  auto firstColorStr = GetAttribute(node, "firstColor");
+  if (!firstColorStr.empty()) {
+    style->firstColor = GetColorAttribute(node, "firstColor", doc);
+  }
+  auto secondColorStr = GetAttribute(node, "secondColor");
+  if (!secondColorStr.empty()) {
+    style->secondColor = GetColorAttribute(node, "secondColor", doc);
+  }
+  style->opacity = GetFloatAttribute(node, "opacity", Default<NoiseStyle>().opacity, doc);
+  return style;
+}
+
 static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = makeNodeFromXML<DropShadowStyle>(node, doc);
   if (!style) {
@@ -2076,6 +2112,32 @@ static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDo
 //==============================================================================
 // Layer filter parsing
 //==============================================================================
+
+static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<NoiseFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->mode = GET_ENUM(node, "mode", "mono", doc, NoiseMode);
+  filter->size = GetFloatAttribute(node, "size", Default<NoiseFilter>().size, doc);
+  filter->density = GetFloatAttribute(node, "density", Default<NoiseFilter>().density, doc);
+  filter->seed = GetFloatAttribute(node, "seed", Default<NoiseFilter>().seed, doc);
+  filter->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  auto colorStr = GetAttribute(node, "color");
+  if (!colorStr.empty()) {
+    filter->color = GetColorAttribute(node, "color", doc);
+  }
+  auto firstColorStr = GetAttribute(node, "firstColor");
+  if (!firstColorStr.empty()) {
+    filter->firstColor = GetColorAttribute(node, "firstColor", doc);
+  }
+  auto secondColorStr = GetAttribute(node, "secondColor");
+  if (!secondColorStr.empty()) {
+    filter->secondColor = GetColorAttribute(node, "secondColor", doc);
+  }
+  filter->opacity = GetFloatAttribute(node, "opacity", Default<NoiseFilter>().opacity, doc);
+  return filter;
+}
 
 static BlurFilter* ParseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<BlurFilter>(node, doc);
