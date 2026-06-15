@@ -86,8 +86,7 @@ std::string GetQmlPath() {
     auto pluginContents = exePath.parent_path().parent_path();
     return (pluginContents / "Resources" / "qml").string();
   }
-  return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/PAGExporter.plugin/"
-         "Contents/Resources/qml";
+  return "";
 }
 
 std::string GetDownloadsPath() {
