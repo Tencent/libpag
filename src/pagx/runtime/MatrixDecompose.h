@@ -90,13 +90,25 @@ inline void RecomposeAffine(const DecomposedMatrix& m, float* a, float* b, float
   }
 }
 
-// Interpolates two decomposed matrices component-wise at fraction t in [0, 1].
+// Interpolates two decomposed matrices component-wise at fraction t in [0, 1]. Rotation is
+// interpolated along the shortest arc by wrapping the difference into [-pi, pi]; this keeps tweens
+// like 170deg -> 190deg from spinning the long way 340deg around. Multi-turn winding cannot be
+// recovered from a baked matrix (see DecomposeAffine), so animations needing precise multi-turn or
+// boundary-crossing rotation should drive a scalar rotation channel.
 inline DecomposedMatrix MixDecomposed(const DecomposedMatrix& a, const DecomposedMatrix& b,
                                       float t) {
+  static constexpr float Pi = 3.14159265358979323846f;
+  static constexpr float TwoPi = 2.0f * Pi;
   DecomposedMatrix out = {};
   out.translateX = a.translateX + (b.translateX - a.translateX) * t;
   out.translateY = a.translateY + (b.translateY - a.translateY) * t;
-  out.rotation = a.rotation + (b.rotation - a.rotation) * t;
+  float rotDiff = b.rotation - a.rotation;
+  if (rotDiff > Pi) {
+    rotDiff -= TwoPi;
+  } else if (rotDiff < -Pi) {
+    rotDiff += TwoPi;
+  }
+  out.rotation = a.rotation + rotDiff * t;
   out.scaleX = a.scaleX + (b.scaleX - a.scaleX) * t;
   out.scaleY = a.scaleY + (b.scaleY - a.scaleY) * t;
   out.skew = a.skew + (b.skew - a.skew) * t;

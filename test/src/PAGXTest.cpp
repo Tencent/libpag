@@ -6964,7 +6964,8 @@ PAGX_TEST(PAGXTest, ExternalPAGXGrandchildEditSyncsToRootScene) {
 
 /**
  * Test case: a parent document must not notify a node owned by a child (external) document. Such a
- * node is not in the parent's node list, so notifyChange rejects the call and changes nothing.
+ * node is not in the parent's node list, so notifyChange filters it out and the embedded value
+ * stays unchanged. ownsNode() returns false for the foreign node so callers can predicate the call.
  */
 PAGX_TEST(PAGXTest, ExternalPAGXParentCannotNotifyChildNode) {
   std::string mainXML =
@@ -6989,10 +6990,60 @@ PAGX_TEST(PAGXTest, ExternalPAGXParentCannotNotifyChildNode) {
   ASSERT_TRUE(childTgfx != nullptr);
   EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
 
-  // The parent document does not own the child layer, so notifying it through the parent is rejected
-  // (logs an error) and the embedded value stays unchanged.
+  // ownsNode lets callers detect cross-document mis-routing before calling notifyChange.
+  EXPECT_FALSE(doc->ownsNode(childLayer));
+  EXPECT_TRUE(childDoc->ownsNode(childLayer));
+  EXPECT_TRUE(doc->ownsNode(slotLayer));
+
+  // The parent document does not own the child layer, so it is filtered out of the dirty list and
+  // the embedded value stays unchanged. The call still logs an error reporting the dropped node.
   childLayer->alpha = 0.2f;
   doc->notifyChange({childLayer}, /*layoutChanged=*/false);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+}
+
+/**
+ * Test case: a mixed dirty list with both an owned node and a foreign (child-document) node has
+ * the foreign node filtered out while the owned node still refreshes; one mis-routed entry must
+ * not block the rest of the batch.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXMixedDirtyListFiltersForeignNode) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"local\" width=\"40\" height=\"40\"/>\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* localLayer = doc->findNode<pagx::Layer>("local");
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(localLayer != nullptr);
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayer = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayer != nullptr);
+
+  auto localTgfx = file->mutableBinding()->get<tgfx::Layer>(localLayer);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
+  auto childTgfx = slotTree.get<tgfx::Layer>(childLayer);
+  ASSERT_TRUE(localTgfx != nullptr);
+  ASSERT_TRUE(childTgfx != nullptr);
+  EXPECT_FLOAT_EQ(localTgfx->alpha(), 1.0f);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+
+  // Edit the owned local node and pass both the owned node and a foreign one in the same call.
+  // The foreign node is filtered out (the parent does not own it) but the local one still
+  // refreshes — the batch is not rejected.
+  localLayer->alpha = 0.4f;
+  childLayer->alpha = 0.2f;
+  doc->notifyChange({localLayer, childLayer}, /*layoutChanged=*/false);
+  EXPECT_FLOAT_EQ(localTgfx->alpha(), 0.4f);
   EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
 }
 
@@ -8399,7 +8450,7 @@ PAGX_TEST(PAGXTest, NotifyChangeRenderAttributeInPlace) {
   EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 1.0f);
 
   layer->alpha = 0.3f;
-  doc->notifyChange({layer});
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
 
   // Same tgfx::Layer instance is reused (in place), and the new alpha is reflected.
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
@@ -8433,7 +8484,7 @@ PAGX_TEST(PAGXTest, NotifyChangeVectorContentColor) {
   EXPECT_EQ(tgfxSolid->color(), tgfx::Color({1.0f, 0.0f, 0.0f, 1.0f}));
 
   solid->color = {0.0f, 1.0f, 0.0f, 1.0f};
-  doc->notifyChange({layer});
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
 
   // Contents are regenerated, so the binding now points at a fresh tgfx SolidColor with the edit.
   auto refreshedSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
@@ -8478,7 +8529,7 @@ PAGX_TEST(PAGXTest, NotifyChangeEmptyLayerGainsContents) {
   solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
   fill->color = solid;
   layer->contents.push_back(fill);
-  doc->notifyChange({layer});
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
 
   // The node is now bound to a VectorLayer, the added content is bound, and the nested child layer
   // instance is preserved (its handle stays valid).
@@ -8528,7 +8579,7 @@ PAGX_TEST(PAGXTest, NotifyChangeKeepsCompositionChildHitTestable) {
   EXPECT_EQ(hits[0]->name(), "NestedChild");
 
   // Mark the top-level composition child dirty so refreshNodes runs its runtimeLayer re-sync loop.
-  doc->notifyChange({compLayer});
+  doc->notifyChange({compLayer}, /*layoutChanged=*/true);
 
   // The composition child's runtimeLayer was not overwritten with its slot, so the nested child is
   // still resolved by the hit-test.
@@ -8565,7 +8616,7 @@ PAGX_TEST(PAGXTest, NotifyChangeLayoutWidth) {
   EXPECT_FLOAT_EQ(hits[0]->getBounds().width, 50);
 
   rect->size = {120, 50};
-  doc->notifyChange({layer});
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
 
   // The same tgfx::Layer instance is kept and the regenerated content reflects the new width.
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
@@ -8605,7 +8656,7 @@ PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineWhenNoTimelineNodeDirty) {
   EXPECT_TRUE(timeline->resolved);
 
   // A plain layer edit is not a timeline node, so the timeline is left untouched (cache preserved).
-  doc->notifyChange({layer});
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
   EXPECT_TRUE(timeline->resolved);
 
   // Playback still drives the channel correctly.
@@ -8647,7 +8698,7 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
 
   // Edit the keyframe value and mark the Channel node dirty: timelines are rebuilt.
   alphaChannel->keyframes[0].value = 0.25f;
-  doc->notifyChange({alphaChannel});
+  doc->notifyChange({alphaChannel}, /*layoutChanged=*/true);
 
   // A freshly rebuilt timeline applies the new value.
   auto rebuilt = scene->getDefaultTimeline();
@@ -8699,7 +8750,7 @@ PAGX_TEST(PAGXTest, NotifyChangeRetargetAnimationObject) {
   object->target = "B";
   tgfxA->setAlpha(1.0f);
   tgfxB->setAlpha(1.0f);
-  doc->notifyChange({object});
+  doc->notifyChange({object}, /*layoutChanged=*/true);
   scene->getDefaultTimeline()->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxB->alpha(), 0.5f);
   EXPECT_FLOAT_EQ(tgfxA->alpha(), 1.0f);
@@ -8752,7 +8803,7 @@ PAGX_TEST(PAGXTest, NotifyChangeRemovedAnimationStopsDriving) {
   // Remove the driver from the layer and notify with the animation node dirty: timelines are rebuilt
   // from the now-empty driver list, so nothing drives the child.
   compLayer->timelines.clear();
-  doc->notifyChange({anim});
+  doc->notifyChange({anim}, /*layoutChanged=*/true);
 
   tgfxChild->setAlpha(1.0f);
   scene->advanceAndApply(500'000);
@@ -8779,7 +8830,7 @@ PAGX_TEST(PAGXTest, NotifyChangeAddLayer) {
   second->width = 30;
   second->height = 30;
   doc->layers.push_back(second);
-  doc->notifyChange({second});
+  doc->notifyChange({second}, /*layoutChanged=*/true);
 
   // The new layer now has a tgfx mapping, and the existing one is untouched (same instance).
   auto secondTgfx = scene->mutableBinding()->get<tgfx::Layer>(second);
@@ -8811,7 +8862,7 @@ PAGX_TEST(PAGXTest, NotifyChangeRemoveLayer) {
 
   // Remove the second layer from the document and notify.
   doc->layers.pop_back();
-  doc->notifyChange({second});
+  doc->notifyChange({second}, /*layoutChanged=*/true);
 
   // The removed layer's binding is dropped; the surviving layer keeps its instance.
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(second), nullptr);
@@ -8845,7 +8896,7 @@ PAGX_TEST(PAGXTest, NotifyChangeNestedChildAddRemove) {
   childB->width = 20;
   childB->height = 20;
   parent->children.push_back(childB);
-  doc->notifyChange({parent});
+  doc->notifyChange({parent}, /*layoutChanged=*/true);
 
   // B is built and bound; A and the parent keep their original tgfx instances.
   auto childBTgfx = scene->mutableBinding()->get<tgfx::Layer>(childB);
@@ -8855,7 +8906,7 @@ PAGX_TEST(PAGXTest, NotifyChangeNestedChildAddRemove) {
 
   // Remove the nested child A and notify; its binding is dropped, B and parent stay valid.
   parent->children.erase(parent->children.begin());
-  doc->notifyChange({parent});
+  doc->notifyChange({parent}, /*layoutChanged=*/true);
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childA), nullptr);
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childB).get(), childBTgfx.get());
   EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(parent).get(), parentTgfx.get());
@@ -8902,7 +8953,7 @@ PAGX_TEST(PAGXTest, NotifyChangeAddComposition) {
   doc->layers.push_back(slot);
 
   // Notify with the newly inserted slot layer; syncChildren builds its composition subtree.
-  doc->notifyChange({slot});
+  doc->notifyChange({slot}, /*layoutChanged=*/true);
 
   // The slot is bound, the nested composition content is hit-testable, and the existing sibling
   // layer keeps its original tgfx instance.
@@ -8957,7 +9008,7 @@ PAGX_TEST(PAGXTest, NotifyChangeRemoveComposition) {
 
   // Remove the slot layer from the document and notify.
   doc->layers.pop_back();
-  doc->notifyChange({slot});
+  doc->notifyChange({slot}, /*layoutChanged=*/true);
 
   // The slot's binding is dropped, the surviving sibling keeps its instance, and the composition
   // content is no longer hit-testable.
@@ -9393,6 +9444,63 @@ PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
   EXPECT_FLOAT_EQ(m.getScaleX(), 2.0f);
   EXPECT_FLOAT_EQ(m.getScaleY(), 2.0f);
   EXPECT_FLOAT_EQ(m.getTranslateX(), 10.0f);
+}
+
+/**
+ * Test case: a matrix tween between two rotations on opposite sides of +/-pi (170deg and 190deg,
+ * which atan2 recovers as +2.967 rad and -2.967 rad) takes the shortest arc (a continuous 20deg
+ * sweep through 180deg) instead of the long way (340deg in the opposite direction). Multi-turn
+ * winding is still unrecoverable from a baked matrix and remains documented on the scalar rotation
+ * channel; this test only fixes the +/-pi-boundary case.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerMatrixRotationShortestArc) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* matrixProp = doc->makeNode<pagx::TypedChannel<pagx::Matrix>>();
+  matrixProp->name = "matrix";
+  // 170deg and 190deg encode as +2.967 / -2.967 rad after atan2 recovery; without the wrap fix the
+  // tween would interpolate -5.934 rad (the long way around).
+  pagx::Matrix m170 = pagx::Matrix::Rotate(170.0f);
+  pagx::Matrix m190 = pagx::Matrix::Rotate(190.0f);
+  matrixProp->keyframes.push_back({0, m170, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  matrixProp->keyframes.push_back({60, m190, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(matrixProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // Sweep at 25%, 50%, 75% of the segment. The shortest-arc rotation should rise monotonically from
+  // 170 -> 175 -> 180 -> 185 -> 190 deg; sin and cos act as a sufficient continuity check.
+  // Without the wrap fix, the long-way path (-5.934 * t) would dip below sin(170deg) before
+  // climbing back, breaking monotonicity around midway.
+  auto sample = [&](int64_t timeUs) {
+    timeline->setCurrentTime(timeUs);
+    timeline->apply(1.0f);
+    return tgfxLayer->matrix();
+  };
+  auto m25 = sample(250000);
+  auto m50 = sample(500000);
+  auto m75 = sample(750000);
+  // At 50%, rotation should be exactly 180deg: cos = -1, sin = 0.
+  EXPECT_NEAR(m50.getScaleX(), -1.0f, 1e-3f);
+  EXPECT_NEAR(m50.getSkewY(), 0.0f, 1e-3f);
+  // sin(angle) = m.b for a pure rotation. Monotonic decrease 170 -> 180 -> 190 deg means
+  // sin is positive (+0.087), then 0, then negative (-0.087) — the long way would flip signs.
+  EXPECT_GT(m25.getSkewY(), 0.0f);
+  EXPECT_LT(m75.getSkewY(), 0.0f);
 }
 
 /**

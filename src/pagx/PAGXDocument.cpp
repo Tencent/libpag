@@ -320,15 +320,34 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (dirtyNodes.empty()) {
     return;
   }
-  // A node owned by an external (child) document must be notified through that document, not a
-  // parent. Reject foreign nodes: they are simply not in this document's node list.
+  // Partition the input into nodes this document owns (forwarded to live scenes) and foreign nodes
+  // (dropped, with one aggregate LOGE). A node belongs to exactly one document, so a single
+  // mis-routed entry must not stop the rest of the batch from refreshing — the editor scenario where
+  // a multi-select dirty list mixes nodes from a parent and an embedded child document is common,
+  // and silent batch rejection would translate every such typo into "nothing updates". Foreign-node
+  // edits still need to be re-issued through the owning document by the caller (use ownsNode() to
+  // predicate the call).
+  std::vector<Node*> ownedDirty = {};
+  ownedDirty.reserve(dirtyNodes.size());
+  size_t foreignCount = 0;
   for (auto* node : dirtyNodes) {
-    if (node != nullptr && !ownsNode(node)) {
-      LOGE(
-          "PAGXDocument::notifyChange: node not owned by this document; notify it through its own "
-          "document.");
-      return;
+    if (node == nullptr) {
+      continue;
     }
+    if (ownsNode(node)) {
+      ownedDirty.push_back(node);
+    } else {
+      ++foreignCount;
+    }
+  }
+  if (foreignCount > 0) {
+    LOGE(
+        "PAGXDocument::notifyChange: %zu node(s) not owned by this document were dropped; notify "
+        "them through their own document.",
+        foreignCount);
+  }
+  if (ownedDirty.empty()) {
+    return;
   }
   PruneExpiredScenes(&liveScenes);
   // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
@@ -341,7 +360,7 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   for (auto& weakScene : liveScenes) {
     auto scene = weakScene.lock();
     if (scene != nullptr) {
-      scene->onNodesChanged(dirtyNodes);
+      scene->onNodesChanged(ownedDirty);
     }
   }
 }

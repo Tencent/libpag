@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXNodeChannel.h"
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include "base/utils/Log.h"
 #include "pagx/PAGXChannelTable.h"
@@ -880,14 +881,45 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
   }
 }
 
-static const ChannelDef* FindChannel(NodeType type, const std::string& channel) {
-  const auto& table = ChannelsFor(type);
+// Builds the per-type channel lookup map from the vector, keyed by string_view referencing the
+// ChannelDef's channel const char*. The literal strings have static storage duration so the
+// string_view keys remain valid for the program lifetime.
+static std::unordered_map<std::string_view, const ChannelDef*> BuildChannelIndex(
+    const std::vector<ChannelDef>& table) {
+  std::unordered_map<std::string_view, const ChannelDef*> index = {};
+  index.reserve(table.size());
   for (const auto& field : table) {
-    if (channel == field.channel) {
-      return &field;
-    }
+    index.emplace(std::string_view(field.channel), &field);
   }
-  return nullptr;
+  return index;
+}
+
+// Returns the per-type O(1) lookup index over ChannelsFor(type). The index is a process-wide cache
+// keyed by &table: each type's vector address maps to its built-once
+// unordered_map<string_view, const ChannelDef*>. The cache is not synchronized: PAGX reflection
+// APIs are document-level edit operations and are expected to run on a single thread (matching the
+// rest of the PAGXDocument editing surface), so the first-call insert is not racing with reads in
+// any supported scenario. Underlying ChannelDef::channel pointers are static const char* literals,
+// so string_view keys outlive any caller; the unique_ptr keeps each inner map at a stable address
+// across cache rehashes.
+static const std::unordered_map<std::string_view, const ChannelDef*>& ChannelIndexFor(
+    NodeType type) {
+  using ChannelIndex = std::unordered_map<std::string_view, const ChannelDef*>;
+  const auto& table = ChannelsFor(type);
+  static std::unordered_map<const std::vector<ChannelDef>*, std::unique_ptr<ChannelIndex>> cache =
+      {};
+  auto it = cache.find(&table);
+  if (it == cache.end()) {
+    auto index = std::unique_ptr<ChannelIndex>(new ChannelIndex(BuildChannelIndex(table)));
+    it = cache.emplace(&table, std::move(index)).first;
+  }
+  return *it->second;
+}
+
+static const ChannelDef* FindChannel(NodeType type, const std::string& channel) {
+  const auto& index = ChannelIndexFor(type);
+  auto found = index.find(std::string_view(channel));
+  return found != index.end() ? found->second : nullptr;
 }
 
 bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out) {
@@ -896,11 +928,18 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
   }
   const auto* field = FindChannel(node->nodeType(), channel);
   if (field == nullptr) {
+    LOGE("GetNodeChannel: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
     return false;
   }
   // The read path never mutates the node; const_cast is safe because access only writes when setIn
   // is non-null, which it is not here.
-  return field->access(const_cast<Node*>(node), out, nullptr);
+  if (!field->access(const_cast<Node*>(node), out, nullptr)) {
+    LOGE("GetNodeChannel: failed to read channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
 }
 
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value) {
@@ -937,6 +976,20 @@ bool IsAnimatableChannel(NodeType type, const std::string& channel) {
 bool RequiresLayout(NodeType type, const std::string& channel) {
   const auto* field = FindChannel(type, channel);
   return field != nullptr && HasFlag(field->flags, ChannelFlags::RequiresLayout);
+}
+
+bool ChannelExists(NodeType type, const std::string& channel) {
+  return FindChannel(type, channel) != nullptr;
+}
+
+std::vector<std::string> ListChannels(NodeType type) {
+  const auto& table = ChannelsFor(type);
+  std::vector<std::string> names = {};
+  names.reserve(table.size());
+  for (const auto& field : table) {
+    names.emplace_back(field.channel);
+  }
+  return names;
 }
 
 }  // namespace pagx

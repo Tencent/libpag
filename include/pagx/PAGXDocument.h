@@ -176,28 +176,40 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Reflects post-build edits to the given nodes in every live PAGScene created from this document,
-   * refreshing each affected node's runtime content in place while preserving existing layer
-   * handles. Pass a container node to reconcile its child layer list; editing a timeline node
-   * (Animation, AnimationObject, or Channel) rebuilds all timelines.
+   * Reflects post-build edits to the given nodes in every scene created from this document, while
+   * preserving existing layer handles wherever possible. Pass a container node to reflect changes
+   * to its child list; editing an animation, animation object, or channel applies the new timeline
+   * data to subsequent playback.
    *
    * When an edit changes a node's "@id" reference (e.g. AnimationObject.target, Fill.color), mark
    * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
-   * refreshes the nodes it is given and does not re-resolve references elsewhere.
+   * refreshes the nodes it is given.
    *
    * Editing an external composition: call notifyChange on the document that owns the edited nodes.
-   * Every scene that embeds this document as an external composition is refreshed too (it rebuilds
-   * its runtime tree). A node may only be notified through its owning document; passing a node owned
-   * by a different (e.g. parent) document is rejected with no effect.
+   * Scenes that embed this document as an external composition are refreshed automatically. A node
+   * may only be notified through its owning document; foreign nodes (e.g. a node owned by a child
+   * externalDoc when notifyChange is called on the parent) are skipped, leaving the rest of the
+   * dirty list to refresh as usual. Use ownsNode() if the caller does not statically know which
+   * document owns a given node.
    * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
-   * nodes still owned by this document. Null entries are ignored. Passing an empty list is a no-op.
+   * nodes still owned by this document. Null entries and foreign nodes are skipped. Passing an
+   * empty list (or one whose entries are all skipped) is a no-op.
    * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
-   * fonts, text, geometry) or a child list changed. When true, the full layout pass is re-run before
-   * refreshing so the edited values take effect; when false, layout is skipped for a cheaper
-   * render-only refresh. Defaults to true. Callers that mutate via SetNodeChannel can derive this
-   * from RequiresLayout; structural add/remove must pass true.
+   * fonts, text, geometry) or a child list changed. Pass true to re-run layout before refreshing;
+   * pass false for a cheaper render-only refresh, only safe for edits that do not affect layout
+   * (e.g. alpha, color). Callers that mutate via SetNodeChannel can derive the right value from
+   * RequiresLayout(NodeType, channel); structural add/remove must pass true.
    */
-  void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged = true);
+  void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged);
+
+  /**
+   * Returns true if the node belongs to this document. A node belongs to exactly one document;
+   * passing a node owned by a different document to notifyChange has no effect on this document's
+   * scenes. Use this to dispatch a multi-document edit to the right owners, or to validate a node's
+   * origin before notifying.
+   * @param node the node to check; null returns false.
+   */
+  bool ownsNode(const Node* node) const;
 
   NodeType nodeType() const override {
     return NodeType::Document;
@@ -213,10 +225,6 @@ class PAGXDocument : public Node {
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
-
-  // Returns true if the node is owned by this document (present in its node list). Used to reject
-  // notifyChange calls for nodes that belong to a different (e.g. external child) document.
-  bool ownsNode(const Node* node) const;
 
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);

@@ -255,7 +255,11 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     return;
   }
   if (_rootComposition != nullptr) {
-    _rootComposition->refreshNodes(dirtyNodes);
+    // The root composition has no source Composition node (it represents the document body), so the
+    // ancestor path begins empty. refreshNodes pushes each child composition's source as it
+    // descends.
+    std::unordered_set<const Composition*> visited = {};
+    _rootComposition->refreshNodes(dirtyNodes, visited);
   }
   // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
   // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather

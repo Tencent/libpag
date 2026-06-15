@@ -415,9 +415,10 @@ class LayerBuilderContext {
     if (color == nullptr || !_result.binding.contains(color)) {
       return;
     }
-    for (const auto* node : _result.binding.boundNodes()) {
+    bool stillReferenced = false;
+    _result.binding.forEachBoundNode([&](const Node* node) {
       if (node == excludedOwner) {
-        continue;
+        return true;
       }
       const ColorSource* other = nullptr;
       if (node->nodeType() == NodeType::Fill) {
@@ -426,8 +427,13 @@ class LayerBuilderContext {
         other = static_cast<const Stroke*>(node)->color;
       }
       if (other == color) {
-        return;
+        stillReferenced = true;
+        return false;
       }
+      return true;
+    });
+    if (stillReferenced) {
+      return;
     }
     if (color->nodeType() == NodeType::ImagePattern) {
       unbindImageIfUnreferenced(static_cast<const ImagePattern*>(color));
@@ -447,13 +453,19 @@ class LayerBuilderContext {
     if (image == nullptr || !_result.binding.contains(image)) {
       return;
     }
-    for (const auto* node : _result.binding.boundNodes()) {
+    bool stillReferenced = false;
+    _result.binding.forEachBoundNode([&](const Node* node) {
       if (node == pattern || node->nodeType() != NodeType::ImagePattern) {
-        continue;
+        return true;
       }
       if (static_cast<const ImagePattern*>(node)->image == image) {
-        return;
+        stillReferenced = true;
+        return false;
       }
+      return true;
+    });
+    if (stillReferenced) {
+      return;
     }
     _result.binding.remove(image);
   }

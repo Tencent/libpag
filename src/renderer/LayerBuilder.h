@@ -142,16 +142,17 @@ struct RuntimeBinding {
     return targets.find(node) != targets.end();
   }
 
-  // Collects every node that currently has a binding entry. Used by removal to scan for surviving
-  // references to a shared resource (e.g. a color source referenced by multiple fills) before
-  // unbinding it.
-  std::vector<const Node*> boundNodes() const {
-    std::vector<const Node*> nodes = {};
-    nodes.reserve(targets.size());
+  // Iterates over every node that currently has a binding entry, calling fn(node) on each. Used by
+  // removal to scan for surviving references to a shared resource (e.g. a color source referenced
+  // by multiple fills) before unbinding it. fn returns true to continue iteration, false to stop
+  // early. Iterating directly avoids the per-call vector allocation a snapshot would require.
+  template <typename Fn>
+  void forEachBoundNode(Fn&& fn) const {
     for (const auto& entry : targets) {
-      nodes.push_back(entry.first);
+      if (!fn(entry.first)) {
+        return;
+      }
     }
-    return nodes;
   }
 
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {

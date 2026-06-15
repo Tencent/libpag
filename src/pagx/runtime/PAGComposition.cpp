@@ -151,7 +151,8 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
   }
 }
 
-void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
+void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
+                                  std::unordered_set<const Composition*>& visited) {
   std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
   // Reconcile the child layer list first. A dirty container node means its child list may have
   // gained or lost layers. The root composition (node == nullptr) reconciles against the document's
@@ -167,7 +168,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
   }
   bool containerDirty = node == nullptr || dirtySet.find(node) != dirtySet.end();
   if (sourceLayers != nullptr && containerDirty) {
-    syncChildren(*sourceLayers);
+    syncChildren(*sourceLayers, visited);
   }
 
   // Refresh the attributes/contents of any dirty layer nodes owned by this composition's binding.
@@ -204,12 +205,27 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes) {
   // not disturb in-progress playback.
   for (auto& child : children) {
     if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes);
+      auto* childComposition = static_cast<PAGComposition*>(child.get());
+      // Push the child composition's source onto the ancestor path before recursing, so any layer
+      // newly added inside it that references an ancestor (including this composition) is detected
+      // at the top of MakeChild. Only erase what this frame inserted: a sibling subtree that
+      // legitimately shares the same downstream composition would otherwise drop the marker.
+      const Composition* childSource =
+          childComposition->node != nullptr ? childComposition->node->composition : nullptr;
+      bool inserted = false;
+      if (childSource != nullptr) {
+        inserted = visited.insert(childSource).second;
+      }
+      childComposition->refreshNodes(dirtyNodes, visited);
+      if (inserted) {
+        visited.erase(childSource);
+      }
     }
   }
 }
 
-void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers) {
+void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
+                                  std::unordered_set<const Composition*>& visited) {
   auto scene = rootScene.lock();
   if (!scene || binding == nullptr || runtimeLayer == nullptr) {
     return;
@@ -237,7 +253,9 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers) {
     }
     // Newly added layer: build its tgfx subtree into this binding and wrap it in a runtime node.
     if (layer->composition != nullptr) {
-      std::unordered_set<const Composition*> visited = {};
+      // Reuse the ancestor path threaded in by refreshNodes so a newly added layer that references
+      // an ancestor composition is rejected at the top of MakeChild rather than only after one
+      // wasted PAGComposition allocation deeper in the recursion.
       auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
       if (childComposition == nullptr) {
         continue;
