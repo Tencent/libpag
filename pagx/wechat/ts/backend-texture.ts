@@ -75,6 +75,17 @@ export const createBackendTexture = (
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 
+  // Shared failure cleanup: any error path after the premultiply flag was raised must reset it
+  // before returning, otherwise the sticky UNPACK_PREMULTIPLY_ALPHA_WEBGL state corrupts later
+  // non-premultiplied uploads driven by other code paths (e.g. tgfx.uploadToTexture). Also
+  // deletes the texture and clears its GL.textures slot so the id is not leaked.
+  const cleanupFailedTexture = (): number => {
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.deleteTexture(tex);
+    GL.textures[id] = null;
+    return 0;
+  };
+
   const wxCanvas = source as WxOffscreenCanvas;
   if (wxCanvas.isOffscreenCanvas) {
     // WeChat's 2d OffscreenCanvas cannot be used as a TexImageSource directly on iOS. Read
@@ -83,9 +94,7 @@ export const createBackendTexture = (
     // read-back throws, delete and unregister the texture so its GL.textures id is not leaked.
     const canvasCtx = wxCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
     if (!canvasCtx) {
-      gl.deleteTexture(tex);
-      GL.textures[id] = null;
-      return 0;
+      return cleanupFailedTexture();
     }
     try {
       const imageData = canvasCtx.getImageData(0, 0, width, height);
@@ -101,9 +110,7 @@ export const createBackendTexture = (
         new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength),
       );
     } catch (e) {
-      gl.deleteTexture(tex);
-      GL.textures[id] = null;
-      return 0;
+      return cleanupFailedTexture();
     }
   } else {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
