@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/xml/XMLDOM.h"
-#include <cstring>
 #include <stack>
 #include <utility>
 #include "pagx/xml/XMLParser.h"
@@ -35,33 +34,14 @@ class DOMParser : public XMLParser {
     return _root;
   }
 
-  size_t getElementCount() const {
-    return _elementCount;
-  }
-
-  size_t getAttributeCount() const {
-    return _attributeCount;
-  }
-
-  size_t getTextCount() const {
-    return _textCount;
-  }
-
-  size_t getTotalAttributeBytes() const {
-    return _totalAttributeBytes;
-  }
-
  protected:
   bool onStartElement(const char* element) override {
     startCommon(element, DOMNodeType::Element);
-    _elementCount++;
     return false;
   }
 
   bool onAddAttribute(const char* name, const char* value) override {
     _attributes.push_back({name, value});
-    _attributeCount++;
-    _totalAttributeBytes += strlen(name) + strlen(value);
     return false;
   }
 
@@ -81,7 +61,6 @@ class DOMParser : public XMLParser {
     if (text.find_first_not_of(" \n\r\t") != std::string::npos) {
       startCommon(text, DOMNodeType::Text);
       onEndElement(_elementName.c_str());
-      _textCount++;
     }
     return false;
   }
@@ -138,12 +117,6 @@ class DOMParser : public XMLParser {
   DOMNodeType _elementType = DOMNodeType::Element;
   int _level = 0;
   int _pendingLine = 0;
-
-  // Performance counters
-  size_t _elementCount = 0;
-  size_t _attributeCount = 0;
-  size_t _textCount = 0;
-  size_t _totalAttributeBytes = 0;
 };
 
 // ============== XMLDOM ==============
