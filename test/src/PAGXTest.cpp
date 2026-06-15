@@ -7217,6 +7217,86 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
 }
 
+static pagx::Layer* MakeTestLayer(pagx::PAGXDocument* doc, float x, float y, float fillR,
+                                  float fillG, float fillB) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {fillR, fillG, fillB, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::Layer* MakeTestLayerSimple(pagx::PAGXDocument* doc, float x, float y) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::NoiseFilter* MakeMonoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeDuoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  noise->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeMultiNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Multi;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->opacity = 1.0f;
+  return noise;
+}
+
+static pagx::Fill* MakeSolidFill(pagx::PAGXDocument* doc, float r, float g, float b) {
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {r, g, b, 1.0f};
+  fill->color = solid;
+  return fill;
+}
+
+static void WriteSVGFile(const std::string& svgContent, const std::string& relativePath) {
+  auto outPath = ProjectPath::Absolute(relativePath);
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
+}
+
 /**
  * Test rendering with Mono, Duo, and Multi noise filters side by side.
  */
@@ -7225,22 +7305,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   constexpr int canvasH = 150;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
 
-  auto makeLayer = [&](float x, float y) {
-    auto layer = doc->makeNode<pagx::Layer>();
-    layer->matrix = pagx::Matrix::Translate(x, y);
-    auto rect = doc->makeNode<pagx::Rectangle>();
-    rect->position = {50, 50};
-    rect->size = {100, 100};
-    auto fill = doc->makeNode<pagx::Fill>();
-    auto solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {0.2f, 0.5f, 0.8f, 1.0f};
-    fill->color = solid;
-    layer->contents.push_back(rect);
-    layer->contents.push_back(fill);
-    return layer;
-  };
-
-  auto layer1 = makeLayer(20, 0);
+  auto layer1 = MakeTestLayer(doc.get(), 20, 0, 0.2f, 0.5f, 0.8f);
   auto mono = doc->makeNode<pagx::NoiseFilter>();
   mono->mode = pagx::NoiseMode::Mono;
   mono->size = 8;
@@ -7250,7 +7315,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   layer1->filters.push_back(mono);
   doc->layers.push_back(layer1);
 
-  auto layer2 = makeLayer(150, 0);
+  auto layer2 = MakeTestLayer(doc.get(), 150, 0, 0.2f, 0.5f, 0.8f);
   auto duo = doc->makeNode<pagx::NoiseFilter>();
   duo->mode = pagx::NoiseMode::Duo;
   duo->size = 8;
@@ -7261,7 +7326,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   layer2->filters.push_back(duo);
   doc->layers.push_back(layer2);
 
-  auto layer3 = makeLayer(280, 0);
+  auto layer3 = MakeTestLayer(doc.get(), 280, 0, 0.2f, 0.5f, 0.8f);
   auto multi = doc->makeNode<pagx::NoiseFilter>();
   multi->mode = pagx::NoiseMode::Multi;
   multi->size = 8;
@@ -7288,13 +7353,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
   EXPECT_NE(svg.find("<svg"), std::string::npos);
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterModes.svg");
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterModes.svg");
 }
 /**
  * Test NoiseFilter applied to every supported element type (Rectangle, Ellipse, Path, Polystar,
@@ -7315,43 +7374,6 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
-  auto makeMonoNoise = [&](float density) {
-    auto noise = doc->makeNode<pagx::NoiseFilter>();
-    noise->mode = pagx::NoiseMode::Mono;
-    noise->size = 10;
-    noise->density = density;
-    noise->seed = 42;
-    noise->color = {0.0f, 0.0f, 0.0f, 1.0f};
-    return noise;
-  };
-  auto makeDuoNoise = [&](float density) {
-    auto noise = doc->makeNode<pagx::NoiseFilter>();
-    noise->mode = pagx::NoiseMode::Duo;
-    noise->size = 10;
-    noise->density = density;
-    noise->seed = 42;
-    noise->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
-    noise->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
-    return noise;
-  };
-  auto makeMultiNoise = [&](float density) {
-    auto noise = doc->makeNode<pagx::NoiseFilter>();
-    noise->mode = pagx::NoiseMode::Multi;
-    noise->size = 10;
-    noise->density = density;
-    noise->seed = 42;
-    noise->opacity = 1.0f;
-    return noise;
-  };
-
-  auto makeFill = [&](float r, float g, float b) {
-    auto fill = doc->makeNode<pagx::Fill>();
-    auto solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {r, g, b, 1.0f};
-    fill->color = solid;
-    return fill;
-  };
-
   // Row 1: Rectangle(Mono,0), Ellipse(Duo,0.25), Path(Multi,0.5)
   {
     auto layer = doc->makeNode<pagx::Layer>();
@@ -7361,8 +7383,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     rect->position = {60, 60};
     rect->size = {100, 100};
     layer->contents.push_back(rect);
-    layer->contents.push_back(makeFill(0.2f, 0.5f, 0.8f));
-    layer->filters.push_back(makeMonoNoise(0.0f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.5f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.0f));
     doc->layers.push_back(layer);
   }
   {
@@ -7373,8 +7395,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     ellipse->position = {60, 60};
     ellipse->size = {100, 100};
     layer->contents.push_back(ellipse);
-    layer->contents.push_back(makeFill(0.8f, 0.3f, 0.3f));
-    layer->filters.push_back(makeDuoNoise(0.25f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.3f, 0.3f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.25f));
     doc->layers.push_back(layer);
   }
   {
@@ -7389,8 +7411,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     path->data->close();
     path->position = {10, 10};
     layer->contents.push_back(path);
-    layer->contents.push_back(makeFill(0.3f, 0.7f, 0.3f));
-    layer->filters.push_back(makeMultiNoise(0.5f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.7f, 0.3f));
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
 
@@ -7405,8 +7427,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     polystar->innerRadius = 25;
     polystar->pointCount = 5;
     layer->contents.push_back(polystar);
-    layer->contents.push_back(makeFill(0.7f, 0.5f, 0.9f));
-    layer->filters.push_back(makeMonoNoise(0.75f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.7f, 0.5f, 0.9f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.75f));
     doc->layers.push_back(layer);
   }
   {
@@ -7419,8 +7441,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     text->fontStyle = fontStyle;
     text->fontSize = 60;
     layer->contents.push_back(text);
-    layer->contents.push_back(makeFill(0.2f, 0.6f, 0.9f));
-    layer->filters.push_back(makeDuoNoise(1.0f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.6f, 0.9f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 1.0f));
     doc->layers.push_back(layer);
   }
   {
@@ -7433,9 +7455,9 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     rect->position = {40, 40};
     rect->size = {60, 60};
     group->elements.push_back(rect);
-    group->elements.push_back(makeFill(0.9f, 0.6f, 0.1f));
+    group->elements.push_back(MakeSolidFill(doc.get(), 0.9f, 0.6f, 0.1f));
     layer->contents.push_back(group);
-    layer->filters.push_back(makeMultiNoise(0.5f));
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
 
@@ -7453,9 +7475,9 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     text->fontStyle = fontStyle;
     text->fontSize = 30;
     textBox->elements.push_back(text);
-    textBox->elements.push_back(makeFill(0.1f, 0.4f, 0.7f));
+    textBox->elements.push_back(MakeSolidFill(doc.get(), 0.1f, 0.4f, 0.7f));
     layer->contents.push_back(textBox);
-    layer->filters.push_back(makeDuoNoise(0.5f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
   {
@@ -7470,9 +7492,9 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     repeater->offset = 0;
     repeater->position = {50, 0};
     layer->contents.push_back(rect);
-    layer->contents.push_back(makeFill(0.3f, 0.8f, 0.6f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.8f, 0.6f));
     layer->contents.push_back(repeater);
-    layer->filters.push_back(makeMultiNoise(0.5f));
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
 
@@ -7485,8 +7507,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     rect->position = {80, 40};
     rect->size = {60, 60};
     layer->contents.push_back(rect);
-    layer->contents.push_back(makeFill(0.6f, 0.2f, 0.8f));
-    layer->filters.push_back(makeMonoNoise(0.5f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.6f, 0.2f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
   {
@@ -7497,8 +7519,8 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
     ellipse->position = {40, 80};
     ellipse->size = {60, 80};
     layer->contents.push_back(ellipse);
-    layer->contents.push_back(makeFill(0.8f, 0.7f, 0.2f));
-    layer->filters.push_back(makeDuoNoise(0.5f));
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.7f, 0.2f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
     doc->layers.push_back(layer);
   }
 
@@ -7521,13 +7543,7 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   EXPECT_NE(svg.find("<filter"), std::string::npos);
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAllElements.svg");
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterAllElements.svg");
 }
 
 /**
@@ -7589,13 +7605,7 @@ PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
   EXPECT_NE(svg.find("<image"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream svgFile(outPath, std::ios::binary);
-  svgFile.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
 }
 
 /**
@@ -7607,22 +7617,7 @@ PAGX_TEST(PAGXTest, NoiseStyleModes) {
   constexpr int canvasH = 180;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
 
-  auto makeLayer = [&](float x, float y) {
-    auto layer = doc->makeNode<pagx::Layer>();
-    layer->matrix = pagx::Matrix::Translate(x, y);
-    auto rect = doc->makeNode<pagx::Rectangle>();
-    rect->position = {0, 0};
-    rect->size = {100, 100};
-    auto fill = doc->makeNode<pagx::Fill>();
-    auto solid = doc->makeNode<pagx::SolidColor>();
-    solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
-    fill->color = solid;
-    layer->contents.push_back(rect);
-    layer->contents.push_back(fill);
-    return layer;
-  };
-
-  auto layer1 = makeLayer(20, 40);
+  auto layer1 = MakeTestLayerSimple(doc.get(), 20, 40);
   auto mono = doc->makeNode<pagx::NoiseStyle>();
   mono->mode = pagx::NoiseMode::Mono;
   mono->size = 8;
@@ -7632,7 +7627,7 @@ PAGX_TEST(PAGXTest, NoiseStyleModes) {
   layer1->styles.push_back(mono);
   doc->layers.push_back(layer1);
 
-  auto layer2 = makeLayer(150, 40);
+  auto layer2 = MakeTestLayerSimple(doc.get(), 150, 40);
   auto duo = doc->makeNode<pagx::NoiseStyle>();
   duo->mode = pagx::NoiseMode::Duo;
   duo->size = 8;
@@ -7643,7 +7638,7 @@ PAGX_TEST(PAGXTest, NoiseStyleModes) {
   layer2->styles.push_back(duo);
   doc->layers.push_back(layer2);
 
-  auto layer3 = makeLayer(280, 40);
+  auto layer3 = MakeTestLayerSimple(doc.get(), 280, 40);
   auto multi = doc->makeNode<pagx::NoiseStyle>();
   multi->mode = pagx::NoiseMode::Multi;
   multi->size = 8;
@@ -7670,13 +7665,7 @@ PAGX_TEST(PAGXTest, NoiseStyleModes) {
   EXPECT_NE(svg.find("<svg"), std::string::npos);
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
 
-  auto outPath = ProjectPath::Absolute("test/out/PAGXTest/NoiseStyleModes.svg");
-  auto dirPath = std::filesystem::path(outPath).parent_path();
-  if (!std::filesystem::exists(dirPath)) {
-    std::filesystem::create_directories(dirPath);
-  }
-  std::ofstream file(outPath, std::ios::binary);
-  file.write(svg.data(), static_cast<std::streamsize>(svg.size()));
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleModes.svg");
 }
 
 /**
@@ -7981,6 +7970,8 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
  * Layout: two rectangles side-by-side, left with NoiseFilter, right with NoiseStyle.
  * 12 frames total: 3 Mono, 3 Duo, 3 Multi, 3 Multi+DropShadowFilter+InnerShadowStyle.
  * Density animates from 0.1 to 1.0 across all 12 frames.
+ * The baseline key is "NoiseFilterAnimation" (without the "Export" prefix) to avoid
+ * re-accepting baselines after renaming the test.
  */
 PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
   constexpr int canvasW = 500;
