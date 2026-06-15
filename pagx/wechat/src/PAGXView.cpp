@@ -1559,9 +1559,13 @@ bool PAGXView::draw() {
   // the initial loadFileDataAsNativeImage() attaching pixels to nodes whose first render
   // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
   // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
-  // those post-first-render content changes would be silently dropped.
+  // those post-first-render content changes would be silently dropped. A queued
+  // attachNativeImage() upload neither marks the display list dirty nor clears
+  // zoomedOutFrameSettled, so we must also bail out of the short-circuit when pendingUploads
+  // is non-empty (mirrors the `dirty` computation below); otherwise a Full-quality upload
+  // queued while the view sits idle would never reach flushPendingUploads.
   if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && liveZoom <= ZOOM_DRIFT_MARGIN &&
-      !displayList.hasContentChanged()) {
+      !displayList.hasContentChanged() && pendingUploads.empty()) {
     return true;
   }
 
