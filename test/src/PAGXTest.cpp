@@ -8114,7 +8114,7 @@ PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
 
     tgfx::DisplayList displayList;
     displayList.root()->addChild(tgfxRoot);
-    displayList.render(surface.get(), false);
+    displayList.render(surface.get(), true);
 
     auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
     EXPECT_TRUE(Baseline::Compare(surface, key));
