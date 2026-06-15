@@ -1,3 +1,6 @@
 utils/*
+# performance-monitor.js is hand-written demo source (no build producer), unlike the
+# rollup-generated utils such as gesture-manager.js; keep it tracked so a fresh clone builds.
+!utils/performance-monitor.js
 pages/system-info-test/*
 pages/image-decode-poc/*
