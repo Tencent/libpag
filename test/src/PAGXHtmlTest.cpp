@@ -18,6 +18,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
@@ -538,6 +539,54 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
   EXPECT_NE(html.find("pagx-font-"), std::string::npos);
   EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
+  std::ostringstream glyphs;
+  std::ostringstream runGlyphs;
+  for (int i = 0; i < 391; i++) {
+    glyphs << "      <Glyph advance=\"1\" path=\"M 0,0 L 1,0 L 1,-1 L 0,-1 Z\"/>\n";
+    if (i > 0) {
+      runGlyphs << ',';
+    }
+    runGlyphs << i + 1;
+  }
+  auto xml = std::string(R"(
+<pagx width="64" height="32">
+  <Resources>
+    <Font id="large" unitsPerEm="1">
+)") + glyphs.str() +
+             R"(    </Font>
+  </Resources>
+  <Layer width="64" height="32">
+    <Text>
+      <GlyphRun font="@large" fontSize="16" glyphs=")" +
+             runGlyphs.str() + R"(" x="8" y="24"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/custom-charset-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
   auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
   ASSERT_TRUE(std::filesystem::exists(fontPath));
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));

@@ -443,13 +443,25 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
 
   // Top DICT offsets are computed below after all sub-structures are serialized.
 
-  // String INDEX (empty)
-  std::vector<std::vector<uint8_t>> emptyIndex;
-
-  // Global Subr INDEX (empty)
-
   // Build CharStrings
   uint16_t numGlyphs = static_cast<uint16_t>(font->glyphs.size() + 1);  // +1 for .notdef
+
+  // String INDEX: CFF has 391 standard strings (SID 0-390). The charset assigns SID 1
+  // through numGlyphs-1 to each glyph, so SID 391 and above need custom strings.
+  static constexpr uint16_t CFFStandardStringCount = 391;
+  std::vector<std::vector<uint8_t>> stringEntries;
+  if (numGlyphs > CFFStandardStringCount) {
+    uint16_t extraCount = numGlyphs - CFFStandardStringCount;
+    stringEntries.reserve(extraCount);
+    for (uint16_t i = 0; i < extraCount; i++) {
+      auto name = "g" + std::to_string(CFFStandardStringCount + i);
+      stringEntries.push_back(std::vector<uint8_t>(name.begin(), name.end()));
+    }
+  }
+
+  // Global Subr INDEX
+  std::vector<std::vector<uint8_t>> emptyIndex;
+
   std::vector<std::vector<uint8_t>> charStrings;
   // .notdef glyph
   std::vector<uint8_t> notdef;
@@ -495,7 +507,7 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
 
   // Serialize String INDEX
   std::vector<uint8_t> stringIndex;
-  WriteCFFIndex(stringIndex, emptyIndex);
+  WriteCFFIndex(stringIndex, stringEntries);
 
   // Serialize Global Subr INDEX
   std::vector<uint8_t> globalSubrIndex;
