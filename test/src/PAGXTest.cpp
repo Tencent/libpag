@@ -7533,7 +7533,6 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
 /**
  * Test NoiseStyle with blendMode applied to an image layer, verifying both rendering and SVG
  * export. The blendMode is set to Multiply so the noise composites differently from Normal.
- * Currently SVG export ignores blendMode, so the SVG output will differ from the GPU rendering.
  */
 PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
   constexpr int canvasW = 200;
