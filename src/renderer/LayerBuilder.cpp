@@ -178,6 +178,12 @@ class LayerBuilderContext {
     auto root = build(document);
     LayerBuildResult result = {};
     result.root = root;
+    // Transfer the RuntimeBinding populated during build()/convertLayer so callers (PAGScene,
+    // BuildForRuntime) can drive animation channel writers. The layerMap below is rebuilt
+    // separately and must not be clobbered, so we move only the binding rather than the whole
+    // _result.
+    result.binding = std::move(_result.binding);
+    _result = {};
     // LayerBuildResult exposes a 1:1 pagx Layer -> tgfx Layer map for historical reasons. When
     // a Composition is referenced by multiple Layers a single pagx Layer node actually produces
     // several tgfx Layers; we only surface the first one here to keep the public contract
