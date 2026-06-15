@@ -651,7 +651,7 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
-  if (!text->glyphRuns.empty() && (text->text.empty() || text->fontFamily.empty())) {
+  if (!text->glyphRuns.empty()) {
     const Font* font = nullptr;
     for (auto* run : text->glyphRuns) {
       if (run->font) {
@@ -661,8 +661,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
     if (font && _ctx->woff2Fonts.find(font) != _ctx->woff2Fonts.end()) {
       writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
+      return;
     }
-    return;
+    if (text->text.empty() || text->fontFamily.empty()) {
+      return;
+    }
   }
   if (text->text.empty()) {
     return;

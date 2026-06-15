@@ -543,7 +543,7 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
 }
 
-CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
+CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadXMLAndConvert(R"(
@@ -563,10 +563,10 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunKeepsLiteralText) {
 </pagx>)",
                                 options);
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("搜索"), std::string::npos);
-  EXPECT_NE(html.find("top:8px"), std::string::npos);
-  EXPECT_EQ(html.find("top:2px"), std::string::npos);
-  EXPECT_EQ(html.find("\xEE\x80\x80"), std::string::npos);
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  EXPECT_EQ(html.find("搜索"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
@@ -622,7 +622,8 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
 </pagx>)",
                                 options);
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("智能模式"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  EXPECT_EQ(html.find("智能模式"), std::string::npos);
   EXPECT_NE(html.find("top:2.32px"), std::string::npos);
   EXPECT_NE(html.find("line-height:1"), std::string::npos);
   EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
