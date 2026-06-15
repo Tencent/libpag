@@ -984,19 +984,6 @@ export class View {
     );
   }
 
-  private resetSize(): void {
-    if (!this.canvas) {
-      throw new Error('Canvas element is not found!');
-    }
-
-    // Calculate display size for WeChat MiniProgram
-    const displayWidth = (this.canvas as any).displayWidth !== undefined ? (this.canvas as any).displayWidth : this.canvas.width;
-    const displayHeight = (this.canvas as any).displayHeight !== undefined ? (this.canvas as any).displayHeight : this.canvas.height;
-
-    this.canvas.width = displayWidth * this.dpr;
-    this.canvas.height = displayHeight * this.dpr;
-  }
-
   private renderLoop(): void {
     if (!this.isRendering || this.isDestroyed) {
       return;
