@@ -37,7 +37,7 @@ pagx-viewer-miniprogram/
 ```json
 {
   "dependencies": {
-    "@tencent/pagx-viewer-miniprogram": "1.9.1"
+    "@tencent/pagx-viewer-miniprogram": "1.9.5"
   }
 }
 ```
