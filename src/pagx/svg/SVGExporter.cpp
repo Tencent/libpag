@@ -1416,6 +1416,9 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
           auto modeStr = BlendModeToFEBlendString(noise->blendMode);
           if (modeStr) {
             std::string blendResult = result + "Blended";
+            // NoiseStyle blends against SourceGraphic (not currentSource) because in the tgfx
+            // runtime, LayerStyles execute before LayerFilters and blend against the original
+            // layer content, not the filter chain output.
             _defs->openElement("feBlend");
             _defs->addAttribute("in", result);
             _defs->addAttribute("in2", "SourceGraphic");

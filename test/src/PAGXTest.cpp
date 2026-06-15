@@ -7604,6 +7604,8 @@ PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
   EXPECT_FALSE(svg.empty());
   EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
   EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("feBlend"), std::string::npos);
+  EXPECT_NE(svg.find("mode=\"multiply\""), std::string::npos);
 
   WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
 }
