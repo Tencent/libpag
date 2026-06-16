@@ -1125,6 +1125,16 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
                            mainContentHigh, mainFromExplicit)) {
     return;
   }
+  // Mirror the cross-axis fallback handling below: when the parent has no explicit main-axis
+  // dimension, `ResolveContentRange` anchors `mainContentLow` at the first child's offset,
+  // which silently absorbs any shared leading inset (e.g. content vertically inset within a
+  // `flex: 1` card whose height is dictated by an outer flex line). Pull the low edge back to
+  // the padding edge so `InferMainAxisSpacing` surfaces that inset as `paddingLeading` rather
+  // than dropping it. The trailing edge is left at the children's bounding extent because the
+  // fallback path has no information about the box's true high edge.
+  if (!mainFromExplicit && mainContentLow > mainPadLow + tol) {
+    mainContentLow = mainPadLow;
+  }
   FlexAxis crossAxis = axis == FlexAxis::Row ? FlexAxis::Column : FlexAxis::Row;
   if (!ResolveContentRange(parentResolved, boxes, crossPadLow, crossPadHigh, crossAxis,
                            crossContentLow, crossContentHigh, crossFromExplicit)) {
