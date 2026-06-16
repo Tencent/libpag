@@ -3189,7 +3189,13 @@ async function inlineCanvases() {
 async function materializeDecorativePseudoElements() {
   // Helper functions duplicated locally so this function stays self-contained
   // when shipped through `page.evaluate`. The Node-side helpers are not in
-  // scope inside the browser context.
+  // scope inside the browser context — Puppeteer/Playwright serialise the
+  // function source and only the lexical body travels across the boundary,
+  // so any Node-side identifier used here would throw `ReferenceError` in
+  // the page. Mirror the helper from this file's top section verbatim.
+  function readNum(computed, prop) {
+    return parseFloat(computed.getPropertyValue(prop)) || 0;
+  }
   const PSEUDO_TYPES = ['::before', '::after'];
   // Properties whose computed value the snapshot walker reads from the
   // element. Listing them explicitly keeps the synthetic style attribute

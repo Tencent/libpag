@@ -243,11 +243,16 @@ export async function runSnapshot(
     // SVGs are already removed from `getComputedStyle(el, '::after')` and
     // can't trip the "host carries text pseudo" guard inside the
     // materialiser. Best-effort: a failure here only loses pseudo-element
-    // boxes from the snapshot, never the rest of the document.
+    // boxes from the snapshot, never the rest of the document — but raise
+    // the message above the usual log noise so a regression that disables
+    // the entire pass (e.g. a missing helper triggering `ReferenceError`
+    // inside `page.evaluate`) does not get buried among importer warnings.
     try {
       await page.evaluate(materializeDecorativePseudoElements);
     } catch (err) {
-      if (log) log(`materialize-pseudo-elements failed: ${errMessage(err)}`);
+      if (log) {
+        log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
+      }
     }
 
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
