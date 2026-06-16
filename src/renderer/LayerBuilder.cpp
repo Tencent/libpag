@@ -397,11 +397,11 @@ class LayerBuilderContext {
         unbindContentElements(static_cast<const Group*>(element)->elements);
       } else if (type == NodeType::Fill) {
         auto* fill = static_cast<const Fill*>(element);
-        _result.binding.unregisterColorSourceUser(fill->color, element);
+        _result.binding.untrackColorSource(fill->color, element);
         unbindColorSourceIfUnreferenced(fill->color, element);
       } else if (type == NodeType::Stroke) {
         auto* stroke = static_cast<const Stroke*>(element);
-        _result.binding.unregisterColorSourceUser(stroke->color, element);
+        _result.binding.untrackColorSource(stroke->color, element);
         unbindColorSourceIfUnreferenced(stroke->color, element);
       }
       _result.binding.remove(element);
@@ -419,13 +419,13 @@ class LayerBuilderContext {
     if (color == nullptr || !_result.binding.contains(color)) {
       return;
     }
-    if (_result.binding.isColorSourceReferencedExceptBy(color, excludedOwner)) {
+    if (_result.binding.isColorSourceShared(color, excludedOwner)) {
       return;
     }
     if (color->nodeType() == NodeType::ImagePattern) {
       auto* pattern = static_cast<const ImagePattern*>(color);
       if (pattern->image) {
-        _result.binding.unregisterImageUser(pattern->image, pattern);
+        _result.binding.untrackImage(pattern->image, pattern);
       }
       unbindImageIfUnreferenced(pattern);
     } else if (color->nodeType() != NodeType::SolidColor) {
@@ -444,7 +444,7 @@ class LayerBuilderContext {
     if (image == nullptr || !_result.binding.contains(image)) {
       return;
     }
-    if (_result.binding.isImageReferencedExceptBy(image, pattern)) {
+    if (_result.binding.isImageShared(image, pattern)) {
       return;
     }
     _result.binding.remove(image);
@@ -943,7 +943,7 @@ class LayerBuilderContext {
     if (fill) {
       _result.binding.set(node, fill);
       if (node->color) {
-        _result.binding.registerColorSourceUser(node->color, node);
+        _result.binding.trackColorSource(node->color, node);
       }
       fill->setAlpha(node->alpha);
       if (node->blendMode != BlendMode::Normal) {
@@ -977,7 +977,7 @@ class LayerBuilderContext {
     }
     _result.binding.set(node, stroke);
     if (node->color) {
-      _result.binding.registerColorSourceUser(node->color, node);
+      _result.binding.trackColorSource(node->color, node);
     }
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
@@ -1268,7 +1268,7 @@ class LayerBuilderContext {
     if (pattern) {
       _result.binding.set(node, pattern);
       if (imageNode) {
-        _result.binding.registerImageUser(imageNode, node);
+        _result.binding.trackImage(imageNode, node);
       }
       pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {

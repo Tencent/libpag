@@ -146,43 +146,43 @@ struct RuntimeBinding {
     return targets.find(node) != targets.end();
   }
 
-  // Register a Fill/Stroke in the reverse index for its color source. Called by LayerBuilder after
-  // a painter (Fill or Stroke) is bound to a tgfx object during tree construction.
-  void registerColorSourceUser(const Node* colorSource, const Node* painter) {
-    if (colorSource == nullptr || painter == nullptr) {
+  // Tracks a Fill/Stroke in the reverse index for its color source. Called by LayerBuilder after
+  // an element (Fill or Stroke) is bound to a tgfx object during tree construction.
+  void trackColorSource(const Node* colorSource, const Node* element) {
+    if (colorSource == nullptr || element == nullptr) {
       return;
     }
-    colorSourceUsers[colorSource].push_back(painter);
+    colorSourceUsers[colorSource].push_back(element);
   }
 
-  // Register an ImagePattern in the reverse index for its image. Called by LayerBuilder after an
+  // Tracks an ImagePattern in the reverse index for its image. Called by LayerBuilder after an
   // ImagePattern is bound to a tgfx object during tree construction.
-  void registerImageUser(const Node* image, const Node* pattern) {
+  void trackImage(const Node* image, const Node* pattern) {
     if (image == nullptr || pattern == nullptr) {
       return;
     }
     imageUsers[image].push_back(pattern);
   }
 
-  // Unregister a painter from its color source's reverse index. Called when a Fill/Stroke is
+  // Untrack an element from its color source's reverse index. Called when a Fill/Stroke is
   // about to be removed from the binding.
-  void unregisterColorSourceUser(const Node* colorSource, const Node* painter) {
-    if (colorSource == nullptr || painter == nullptr) {
+  void untrackColorSource(const Node* colorSource, const Node* element) {
+    if (colorSource == nullptr || element == nullptr) {
       return;
     }
     auto it = colorSourceUsers.find(colorSource);
     if (it != colorSourceUsers.end()) {
       auto& vec = it->second;
-      vec.erase(std::remove(vec.begin(), vec.end(), painter), vec.end());
+      vec.erase(std::remove(vec.begin(), vec.end(), element), vec.end());
       if (vec.empty()) {
         colorSourceUsers.erase(it);
       }
     }
   }
 
-  // Unregister an ImagePattern from its image's reverse index. Called when an ImagePattern is
+  // Untrack an ImagePattern from its image's reverse index. Called when an ImagePattern is
   // about to be removed from the binding.
-  void unregisterImageUser(const Node* image, const Node* pattern) {
+  void untrackImage(const Node* image, const Node* pattern) {
     if (image == nullptr || pattern == nullptr) {
       return;
     }
@@ -196,9 +196,9 @@ struct RuntimeBinding {
     }
   }
 
-  // Returns true if any painter other than excludedOwner references the given color source. O(1)
+  // Returns true if any element other than excludedOwner references the given color source. O(1)
   // via the reverse index maintained during build.
-  bool isColorSourceReferencedExceptBy(const Node* colorSource, const Node* excludedOwner) const {
+  bool isColorSourceShared(const Node* colorSource, const Node* excludedOwner) const {
     auto it = colorSourceUsers.find(colorSource);
     if (it == colorSourceUsers.end()) {
       return false;
@@ -213,7 +213,7 @@ struct RuntimeBinding {
 
   // Returns true if any ImagePattern other than excludedPattern references the given image. O(1)
   // via the reverse index maintained during build.
-  bool isImageReferencedExceptBy(const Node* image, const Node* excludedPattern) const {
+  bool isImageShared(const Node* image, const Node* excludedPattern) const {
     auto it = imageUsers.find(image);
     if (it == imageUsers.end()) {
       return false;
