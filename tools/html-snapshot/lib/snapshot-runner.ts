@@ -12,6 +12,7 @@ import {
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
   inlineCanvases,
+  materializeDecorativePseudoElements,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
@@ -227,6 +228,19 @@ export async function runSnapshot(
         // the snapshot — the rest of the page still has to make it out.
         if (log) log(`inline-icon-fonts failed: ${errMessage(err)}`);
       }
+    }
+
+    // Materialise decorative `::before` / `::after` pseudo-elements (toggle
+    // sliders, custom radio dots, divider lines, etc.). Runs after the
+    // icon-font pass so text-bearing pseudos that were converted to inline
+    // SVGs are already removed from `getComputedStyle(el, '::after')` and
+    // can't trip the "host carries text pseudo" guard inside the
+    // materialiser. Best-effort: a failure here only loses pseudo-element
+    // boxes from the snapshot, never the rest of the document.
+    try {
+      await page.evaluate(materializeDecorativePseudoElements);
+    } catch (err) {
+      if (log) log(`materialize-pseudo-elements failed: ${errMessage(err)}`);
     }
 
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
