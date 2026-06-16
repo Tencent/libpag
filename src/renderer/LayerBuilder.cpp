@@ -299,11 +299,16 @@ class LayerBuilderContext {
     if (layer->type() == tgfx::LayerType::Vector) {
       auto* vecLayer = static_cast<tgfx::VectorLayer*>(layer.get());
       for (const auto& content : vecLayer->contents()) {
-        const auto* nodeFromContent = _result.binding.findNode(content.get());
-        if (nodeFromContent != nullptr && nodeFromContent->nodeType() != NodeType::Layer) {
-          oldElements.push_back(const_cast<Element*>(static_cast<const Element*>(nodeFromContent)));
-        }
+        collectElementTree(content.get(), &oldElements);
       }
+    }
+    // Untrack all old elements from the reverse index before rebuilding, so that convertXxx (which
+    // calls trackColorSource/trackImage) starts from a clean slate. Surviving elements will be
+    // re-tracked during convertVectorElement; removed elements stay un-tracked and are cleaned up
+    // below. Without this, every refreshLayerInPlace call would append duplicate entries to the
+    // colorSourceUsers / imageUsers maps.
+    for (auto* element : oldElements) {
+      untrackElementColorSource(element);
     }
     if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
@@ -317,12 +322,12 @@ class LayerBuilderContext {
       }
       vectorLayer->setContents(contents);
     }
-    // Unbind content elements that were removed from node->contents.
+    // Unbind content elements that were removed from node->contents. A Group/TextBox subtree
+    // element is considered removed only when it cannot be reached from any top-level content.
     if (!oldElements.empty()) {
       std::vector<Element*> removed;
       for (auto* element : oldElements) {
-        if (std::find(node->contents.begin(), node->contents.end(), element) ==
-            node->contents.end()) {
+        if (!isElementInContents(element, node->contents)) {
           removed.push_back(element);
         }
       }
@@ -462,6 +467,64 @@ class LayerBuilderContext {
       }
       _result.binding.remove(element);
     }
+  }
+
+  // Recursively collects all descendant elements from a Group/TextBox tree by walking the tgfx
+  // VectorElement hierarchy rather than the node tree. The node tree may have already been
+  // modified (elements erased from Group->elements), but the tgfx tree still holds the full
+  // pre-rebuild structure at the time oldElements are collected in refreshLayerInPlace. This
+  // ensures removed nested elements (e.g., Fill inside a Group) are captured and later unbound.
+  void collectElementTree(const tgfx::VectorElement* tgfxElement, std::vector<Element*>* out) {
+    if (tgfxElement == nullptr) {
+      return;
+    }
+    const auto* nodeFromTgfx = _result.binding.findNode(tgfxElement);
+    if (nodeFromTgfx == nullptr || nodeFromTgfx->nodeType() == NodeType::Layer) {
+      return;
+    }
+    auto* element = const_cast<Element*>(static_cast<const Element*>(nodeFromTgfx));
+    out->push_back(element);
+    auto nodeType = element->nodeType();
+    if (nodeType == NodeType::Group || nodeType == NodeType::TextBox) {
+      auto* tgfxGroup = static_cast<const tgfx::VectorGroup*>(tgfxElement);
+      for (const auto& child : tgfxGroup->elements()) {
+        collectElementTree(child.get(), out);
+      }
+    }
+  }
+
+  // Untracks the color source reverse-index entry for Fill/Stroke elements, or the image reverse
+  // index for ImagePattern. Called before rebuilding content during refreshLayerInPlace so that
+  // surviving elements are re-tracked by convertXxx without accumulating duplicate entries.
+  void untrackElementColorSource(Element* element) {
+    if (element == nullptr) {
+      return;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Fill) {
+      auto* fill = static_cast<const Fill*>(element);
+      _result.binding.untrackColorSource(fill->color, element);
+    } else if (type == NodeType::Stroke) {
+      auto* stroke = static_cast<const Stroke*>(element);
+      _result.binding.untrackColorSource(stroke->color, element);
+    }
+  }
+
+  // Returns true if the element is reachable from any of the top-level contents, recursing into
+  // Group/TextBox containers.
+  static bool isElementInContents(Element* target, const std::vector<Element*>& contents) {
+    for (auto* element : contents) {
+      if (element == target) {
+        return true;
+      }
+      auto type = element->nodeType();
+      if (type == NodeType::Group || type == NodeType::TextBox) {
+        if (isElementInContents(target, static_cast<const Group*>(element)->elements)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // Unbinds a Fill/Stroke color source, but only if no Fill/Stroke other than excludedOwner still

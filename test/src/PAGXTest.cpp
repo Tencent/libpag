@@ -9843,4 +9843,85 @@ PAGX_TEST(PAGXTest, SharedGradientSurvivesAfterOnePainterRemoved) {
   EXPECT_TRUE(binding->contains(stop2));
 }
 
+/**
+ * Test case: multiple refreshLayerInPlace calls do not cause duplicate entries in the
+ * colorSourceUsers reverse index. Each refresh rebuilds vector contents, and convertFill
+ * calls trackColorSource again. Without the pre-refresh untrack step, the colorSourceUsers
+ * vector would grow by one duplicate entry per refresh.
+ */
+PAGX_TEST(PAGXTest, ReverseIndexNoDuplicatesAfterRepeatedRefresh) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("solid");
+  solid->color = {1, 0, 0, 1};
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {20, 20};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  auto* binding = scene->mutableBinding();
+
+  size_t countBefore = binding->colorSourceUsers.at(solid).size();
+  EXPECT_EQ(countBefore, 1u);
+
+  // Refresh the layer 3 times without any content change.
+  for (int i = 0; i < 3; i++) {
+    doc->notifyChange({layer}, /*layoutChanged=*/false);
+  }
+
+  // After repeated refreshes the reverse index must still have exactly one entry.
+  size_t countAfter = binding->colorSourceUsers.at(solid).size();
+  EXPECT_EQ(countAfter, 1u);
+}
+
+/**
+ * Test case: removing a Fill inside a Group and calling notifyChange properly untracks the
+ * old Fill from the reverse index and unbinds its shared color source when no other Fill
+ * references it. Before the fix, collectElementTree only collected top-level content
+ * elements, missing nested Group children.
+ */
+PAGX_TEST(PAGXTest, GroupInnerFillRemovedUnbindsSharedColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("solid");
+  solid->color = {0, 1, 0, 1};
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto ell = doc->makeNode<pagx::Ellipse>();
+  ell->size = {20, 20};
+  group->elements.push_back(ell);
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  group->elements.push_back(fill);
+
+  layer->contents.push_back(group);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  auto* binding = scene->mutableBinding();
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill) != nullptr);
+  EXPECT_TRUE(binding->contains(solid));
+
+  // Remove the Fill from inside the Group.
+  group->elements.erase(std::remove(group->elements.begin(), group->elements.end(), fill),
+                        group->elements.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill) == nullptr);
+  EXPECT_FALSE(binding->contains(solid));
+  EXPECT_EQ(binding->colorSourceUsers.find(solid), binding->colorSourceUsers.end());
+}
+
 }  // namespace pag
