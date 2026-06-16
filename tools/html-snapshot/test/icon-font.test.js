@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const {
   glyphToSvg,
   formatRank,
@@ -7,6 +10,10 @@ const {
   parseFontFaceFromText,
   isPuaCodepoint,
   roundTo,
+  fetchFontBytes,
+  parseFontBuffer,
+  resolveIconFontSvgs,
+  inlineIconFontsOnPage,
 } = require('../dist/lib/icon-font');
 
 // Minimal opentype.js-shaped font stub. `glyphToSvg` only touches
@@ -164,5 +171,166 @@ describe('roundTo', () => {
   test('returns 0 for non-finite input', () => {
     expect(roundTo(NaN, 2)).toBe(0);
     expect(roundTo(Infinity, 2)).toBe(0);
+  });
+});
+
+describe('fetchFontBytes', () => {
+  test('decodes a base64 data: URL', async () => {
+    const payload = Buffer.from('hello-font').toString('base64');
+    const bytes = await fetchFontBytes('data:font/ttf;base64,' + payload);
+    expect(bytes.toString()).toBe('hello-font');
+  });
+
+  test('decodes a non-base64 (percent-encoded) data: URL', async () => {
+    const bytes = await fetchFontBytes('data:font/ttf,' + encodeURIComponent('abc'));
+    expect(bytes.toString()).toBe('abc');
+  });
+
+  test('rejects a data: URL without a comma', async () => {
+    await expect(fetchFontBytes('data:font/ttf')).rejects.toThrow(/malformed data:/);
+  });
+
+  test('reads bytes from a file:// URL', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'icon-font-fetch-'));
+    try {
+      const file = path.join(tmp, 'tiny.ttf');
+      fs.writeFileSync(file, Buffer.from([1, 2, 3, 4]));
+      const bytes = await fetchFontBytes('file://' + file);
+      expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects unsupported schemes', async () => {
+    await expect(fetchFontBytes('ftp://example.com/x.ttf'))
+      .rejects.toThrow(/unsupported scheme/);
+    await expect(fetchFontBytes('relative.ttf'))
+      .rejects.toThrow(/unsupported scheme/);
+  });
+
+  test('reports an HTTP non-2xx as "HTTP <status>"', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false, status: 404 });
+    try {
+      await expect(fetchFontBytes('https://example.com/x.ttf'))
+        .rejects.toThrow(/HTTP 404/);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  test('returns the body bytes on a 2xx HTTP response', async () => {
+    const realFetch = globalThis.fetch;
+    const body = new Uint8Array([0xAA, 0xBB, 0xCC]).buffer;
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => body,
+    });
+    try {
+      const bytes = await fetchFontBytes('https://cdn.example/x.woff2');
+      expect(Array.from(bytes)).toEqual([0xAA, 0xBB, 0xCC]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});
+
+describe('parseFontBuffer', () => {
+  test('rejects an obviously truncated buffer', async () => {
+    // Bytes that don't match WOFF2 magic and aren't a valid SFNT — opentype.parse
+    // surfaces a parse error which propagates out of parseFontBuffer.
+    await expect(parseFontBuffer(Buffer.from('not-a-real-font'))).rejects.toThrow();
+  });
+});
+
+describe('resolveIconFontSvgs', () => {
+  test('returns [] for a falsy / empty target list', async () => {
+    expect(await resolveIconFontSvgs(null, () => {})).toEqual([]);
+    expect(await resolveIconFontSvgs([], () => {})).toEqual([]);
+  });
+
+  test('logs and skips targets whose font URL fails to load', async () => {
+    const logs = [];
+    // Unsupported scheme triggers a synchronous-style rejection inside
+    // fetchFontBytes; the resolver catches it and logs.
+    const out = await resolveIconFontSvgs(
+      [{ id: 'a', codepoint: 0xe900, fontUrl: 'gopher://nope', fontFamily: 'X', format: '', pseudo: '::before' }],
+      (m) => logs.push(m),
+    );
+    expect(out).toEqual([]);
+    expect(logs.join('\n')).toMatch(/failed to load icon font gopher:/);
+  });
+
+  test('skips entries with missing fontUrl without invoking fetch', async () => {
+    const realFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = async () => { fetchCalls++; return { ok: false, status: 0 }; };
+    try {
+      const out = await resolveIconFontSvgs([
+        null,
+        { id: 'a', codepoint: 0xe900 }, // no fontUrl
+      ], () => {});
+      expect(out).toEqual([]);
+      expect(fetchCalls).toBe(0);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});
+
+describe('inlineIconFontsOnPage', () => {
+  // Build a stub `page` exposing only the surface inlineIconFontsOnPage uses:
+  // page.evaluate(arg) returning the value (or throwing) the test wants.
+  function pageStub(returns) {
+    const calls = [];
+    const stub = async (arg) => {
+      calls.push(arg);
+      const next = returns.shift();
+      if (typeof next === 'function') return next(arg);
+      if (next && next.throw) throw next.throw;
+      return next;
+    };
+    return { page: { evaluate: stub }, calls };
+  }
+
+  test('returns 0/0 when the collector evaluate throws', async () => {
+    const logs = [];
+    const { page } = pageStub([
+      { throw: new Error('cssRules denied') },
+      undefined, // applicator (cleanup)
+    ]);
+    const out = await inlineIconFontsOnPage(page, { logger: (m) => logs.push(m) });
+    expect(out).toEqual({ inlined: 0, total: 0 });
+    expect(logs.join('\n')).toMatch(/target collection failed: cssRules denied/);
+  });
+
+  test('returns 0/0 silently when no targets are collected', async () => {
+    const { page } = pageStub([[], undefined]);
+    const out = await inlineIconFontsOnPage(page);
+    expect(out).toEqual({ inlined: 0, total: 0 });
+  });
+
+  test('logs SVG-application failures without rejecting', async () => {
+    const logs = [];
+    // 1st evaluate: returns one target whose fontUrl cannot be fetched, so
+    // resolveIconFontSvgs returns []. 2nd evaluate (the applicator cleanup)
+    // throws, which the function swallows + logs.
+    const { page, calls } = pageStub([
+      [{ id: 'x', codepoint: 0xe900, fontUrl: 'gopher://no', fontFamily: 'X', format: '', pseudo: '::before' }],
+      { throw: new Error('apply boom') },
+    ]);
+    const out = await inlineIconFontsOnPage(page, { logger: (m) => logs.push(m) });
+    expect(out).toEqual({ inlined: 0, total: 1 });
+    // The applicator was still invoked — its failure is non-fatal.
+    expect(calls).toHaveLength(2);
+    expect(logs.some((m) => /SVG application failed: apply boom/.test(m))).toBe(true);
+  });
+
+  test('uses a no-op logger when none is provided', async () => {
+    const { page } = pageStub([{ throw: new Error('x') }, undefined]);
+    // No logger -> inlineIconFontsOnPage must not throw on the rejected evaluate.
+    await expect(inlineIconFontsOnPage(page)).resolves.toEqual({ inlined: 0, total: 0 });
   });
 });

@@ -156,6 +156,116 @@ describe('saveDownloadedFonts', () => {
     expect(saved).toEqual([]);
     expect(logs.join('\n')).toMatch(/failed to save font/);
   });
+
+  test('reuses an existing on-disk file with the same content-addressed name', async () => {
+    // Pre-stage a file at the exact content-addressed name we expect, then
+    // ensure saveDownloadedFonts skips the rewrite (and still reports it).
+    const bytes = fakeSfnt('REUSE');
+    const map = new Map([['https://x/a.ttf', bytes]]);
+    const first = await saveDownloadedFonts(map, outDir);
+    expect(first).toHaveLength(1);
+    const stagedPath = first[0].path;
+    fs.writeFileSync(stagedPath, 'REPLACED');
+
+    const second = await saveDownloadedFonts(map, outDir);
+    expect(second).toHaveLength(1);
+    expect(second[0].path).toBe(stagedPath);
+    // Existing bytes are preserved — the writeFileAtomic call short-circuits.
+    expect(fs.readFileSync(stagedPath, 'utf8')).toBe('REPLACED');
+  });
+
+  test('logs and drops faces whose atomic write fails', async () => {
+    const logs = [];
+    // Make the destination directory read-only so writeFileAtomic's mkdir-
+    // sibling-temp + rename sequence fails. The decode pass already created
+    // the dir (it succeeds first), so the failure surfaces only on the write.
+    fs.mkdirSync(outDir, { recursive: true });
+    const bytes = fakeSfnt('LOCKED');
+    fs.chmodSync(outDir, 0o500);
+    try {
+      const map = new Map([['https://x/locked.ttf', bytes]]);
+      const saved = await saveDownloadedFonts(map, outDir, (m) => logs.push(m));
+      expect(saved).toEqual([]);
+      expect(logs.join('\n')).toMatch(/failed to save font https:\/\/x\/locked\.ttf/);
+    } finally {
+      // Restore permissions so afterEach's rm doesn't leave the tmp behind.
+      fs.chmodSync(outDir, 0o700);
+    }
+  });
+});
+
+describe('toSfnt — short / non-magic buffers', () => {
+  test('returns a sub-4-byte buffer unchanged (no magic to match)', async () => {
+    const tiny = Buffer.from([0x01, 0x02]);
+    const out = await toSfnt(tiny);
+    expect(out).toBe(tiny);
+  });
+});
+
+describe('readFontMeta — name-table fallbacks', () => {
+  // Drive readFontMeta through a stubbed font-codec so we can hit the platform
+  // table → flat-layout → "" name resolution paths without a real font fixture.
+  function loadWithCodecStub(parseImpl) {
+    jest.resetModules();
+    jest.doMock('../dist/lib/font-codec', () => ({
+      loadFontCodec: () => ({ opentype: { parse: parseImpl }, wawoff2: { decompress: async (b) => b } }),
+    }));
+    return require('../dist/lib/font-download');
+  }
+
+  afterEach(() => { jest.resetModules(); });
+
+  test('reads names from the windows platform table', () => {
+    const { readFontMeta: readFM } = loadWithCodecStub(() => ({
+      names: {
+        windows: {
+          fontFamily: { en: 'Stub Sans' },
+          fontSubfamily: { en: 'Bold' },
+        },
+      },
+    }));
+    const meta = readFM(Buffer.from([0x01, 0x02, 0x03, 0x04]));
+    expect(meta.family).toBe('Stub Sans');
+    expect(meta.style).toBe('Bold');
+    expect(meta.ext).toBe('ttf');
+  });
+
+  test('falls back to the flat-layout names when no platform table has the key', () => {
+    const { readFontMeta: readFM } = loadWithCodecStub(() => ({
+      names: {
+        // No windows/macintosh/unicode tables; the v1 flat layout exposes
+        // the records directly under `names`.
+        fontFamily: { en: 'Flat Family' },
+        fontSubfamily: { en: 'Italic' },
+      },
+    }));
+    const meta = readFM(Buffer.from([0x01, 0x02, 0x03, 0x04]));
+    expect(meta.family).toBe('Flat Family');
+    expect(meta.style).toBe('Italic');
+  });
+
+  test('picks any non-empty locale when "en" is missing', () => {
+    const { readFontMeta: readFM } = loadWithCodecStub(() => ({
+      names: {
+        windows: {
+          fontFamily: { fr: 'Famille' },
+          // No subfamily anywhere → readFontMeta defaults to 'Regular'.
+        },
+      },
+    }));
+    const meta = readFM(Buffer.from([0x01, 0x02, 0x03, 0x04]));
+    expect(meta.family).toBe('Famille');
+    expect(meta.style).toBe('Regular');
+  });
+
+  test('marks CFF (OTF) fonts via the tables flag', () => {
+    const { readFontMeta: readFM } = loadWithCodecStub(() => ({
+      names: { windows: { fontFamily: { en: 'CFF Sans' } } },
+      tables: { cff: {} },
+    }));
+    const meta = readFM(Buffer.from([0x01, 0x02, 0x03, 0x04]));
+    expect(meta.ext).toBe('otf');
+  });
 });
 
 // Locate any .woff2 web font already present in the checkout so the WOFF2

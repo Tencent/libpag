@@ -7,6 +7,8 @@ const {
   setStringParam,
   setBoolParam,
   wantsJsonResponse,
+  validateCookies,
+  validateHeaders,
 } = require('../dist/lib/http-utils');
 
 describe('HttpError', () => {
@@ -116,5 +118,63 @@ describe('wantsJsonResponse', () => {
 
   test('false when there is no Accept header', () => {
     expect(wantsJsonResponse(req())).toBe(false);
+  });
+});
+
+describe('validateCookies', () => {
+  test('returns [] for non-array input', () => {
+    expect(validateCookies(null)).toEqual([]);
+    expect(validateCookies(undefined)).toEqual([]);
+    expect(validateCookies({ name: 'x', value: 'y' })).toEqual([]);
+    expect(validateCookies('cookie=1')).toEqual([]);
+  });
+
+  test('keeps entries with both string name and string value', () => {
+    const ok = [{ name: 'a', value: '1' }, { name: 'b', value: '' }];
+    expect(validateCookies(ok)).toEqual(ok);
+  });
+
+  test('drops entries missing required string fields', () => {
+    expect(validateCookies([
+      { name: 'a', value: '1' },
+      { name: 'b' },                  // no value
+      { value: 'c' },                 // no name
+      { name: 1, value: '2' },        // wrong type
+      null,
+      'plain',
+    ])).toEqual([{ name: 'a', value: '1' }]);
+  });
+});
+
+describe('validateHeaders', () => {
+  test('keeps a well-formed [key, value] array', () => {
+    const ok = [['X-A', '1'], ['X-B', 'two']];
+    expect(validateHeaders(ok)).toEqual(ok);
+  });
+
+  test('drops malformed array entries', () => {
+    expect(validateHeaders([
+      ['X-A', '1'],
+      ['only-key'],
+      ['X-B', 1],
+      ['X-C'],
+      null,
+    ])).toEqual([['X-A', '1']]);
+  });
+
+  test('flattens an object form into [key, value] pairs', () => {
+    expect(validateHeaders({ Authorization: 'Bearer x', 'X-Y': 'z' }))
+      .toEqual([['Authorization', 'Bearer x'], ['X-Y', 'z']]);
+  });
+
+  test('drops object entries whose value is not a string', () => {
+    expect(validateHeaders({ A: '1', B: 2, C: null }))
+      .toEqual([['A', '1']]);
+  });
+
+  test('returns [] for unrecognised input', () => {
+    expect(validateHeaders(undefined)).toEqual([]);
+    expect(validateHeaders('Authorization: x')).toEqual([]);
+    expect(validateHeaders(42)).toEqual([]);
   });
 });
