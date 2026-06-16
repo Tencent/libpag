@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Rect.h"
 
@@ -41,13 +43,12 @@ enum class LayerType { Layer, Composition };
 
 /**
  * PAGLayer is the base class of the runtime layer hierarchy. One PAGLayer node exists per source
- * layer of a running composition, mirroring the document's layer tree. It reports the layer's
- * on-screen position and answers hit-test queries. When the same source layer appears in multiple
- * composition instances, each instance owns its own PAGLayer node with its own on-screen position.
- *
- * PAGComposition derives from PAGLayer to add animation playback and child lookup.
+ * layer of a running composition, mirroring the document's layer tree. It holds the rendered
+ * content, its children, and advances the animations declared on its owning composition.
+ * When the same source layer appears in multiple composition instances, each instance owns its own
+ * PAGLayer node with its own on-screen position.
  */
-class PAGLayer {
+class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
  public:
   virtual ~PAGLayer();
 
@@ -93,6 +94,23 @@ class PAGLayer {
    */
   bool hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest = false);
 
+  /**
+   * Advances the animations owned by this layer and its descendants by the given amount of time.
+   * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
+   */
+  virtual void advance(int64_t deltaMicroseconds);
+
+  /**
+   * Applies the current state of the animations owned by this layer and its descendants to the
+   * displayed content.
+   * @param mix blend weight, defaults to 1.0 (full overwrite).
+   */
+  virtual void apply(float mix = 1.0f);
+
+  const Layer* node = nullptr;
+  std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
+  std::vector<std::shared_ptr<PAGLayer>> children = {};
+
  protected:
   // Constructs a runtime layer node for the given source Layer node, the runtime tgfx layer it maps
   // to in a specific composition instance, and the root PAGScene used for surface coordinate
@@ -101,8 +119,6 @@ class PAGLayer {
   PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
            const std::shared_ptr<PAGScene>& scene);
 
-  const Layer* node = nullptr;
-  std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
   std::weak_ptr<PAGScene> rootScene = {};
 
   friend class PAGScene;

@@ -192,10 +192,18 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return {};
   }
-  if (_rootComposition != nullptr) {
-    return _rootComposition->getLayersUnderPoint(rootX, rootY);
+  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
+    return {};
   }
-  return {};
+  std::vector<std::shared_ptr<PAGLayer>> result = {};
+  auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  for (const auto& hitLayer : hitLayers) {
+    auto it = layerRegistry.find(hitLayer.get());
+    if (it != layerRegistry.end() && it->second->layerType() == LayerType::Layer) {
+      result.push_back(it->second->shared_from_this());
+    }
+  }
+  return result;
 }
 
 Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {

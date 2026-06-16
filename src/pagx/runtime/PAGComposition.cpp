@@ -44,18 +44,26 @@ LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
 }
 
+void PAGComposition::advance(int64_t deltaMicroseconds) {
+  for (auto& timeline : timelines) {
+    timeline->advance(deltaMicroseconds);
+  }
+  PAGLayer::advance(deltaMicroseconds);
+}
+
+void PAGComposition::apply(float mix) {
+  for (auto& timeline : timelines) {
+    timeline->apply(mix);
+  }
+  PAGLayer::apply(mix);
+}
+
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
     const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene,
     std::unordered_set<const Composition*>& visited) {
   if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
     return nullptr;
   }
-  // Cycle guard: visited holds the compositions on the current ancestor path. A composition that
-  // references itself (directly or via an A->B->A chain) would otherwise recurse without end and
-  // overflow the stack. Report the cycle on the owning document and drop this subtree. The set is
-  // treated as a path stack (inserted on the way down, erased on return) so a composition reused
-  // by sibling layers is not mistaken for a cycle. The external-file chain guard in
-  // PAGXDocument::LoadExternalComposition does not cover same-document @id references.
   auto* sourceComposition = ownerLayer->composition;
   if (visited.find(sourceComposition) != visited.end()) {
     auto* document = parentScene->document.get();
@@ -71,14 +79,9 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   *composition->binding = std::move(buildResult.binding);
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
-  // Register this host scene with the external document so that editing the external (child)
-  // document and calling its own notifyChange refreshes this scene's embedded subtree. The child
-  // document keeps only a weak reference, so it never keeps the scene alive.
   if (externalDoc != nullptr) {
     externalDoc->registerLiveScene(parentScene);
   }
-  // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
-  // document, then build the persistent per-layer runtime node tree for the composition content.
   composition->spawnTimelines(parentScene);
   visited.insert(sourceComposition);
   composition->buildChildren(ownerLayer->composition->layers, visited);
@@ -87,10 +90,7 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
 }
 
 void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
-  // Discard any existing timelines first so a removed driver or animation produces no timeline and a
-  // removed animation node (findNode returns null below) simply leaves nothing to drive.
   timelines.clear();
-  // The root composition (node == nullptr) has no owner layer and therefore no drivers.
   if (node == nullptr) {
     return;
   }
@@ -131,6 +131,25 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
   if (!scene) {
     return;
   }
+  BuildChildren(binding.get(), layers, children, scene, visited);
+}
+
+std::shared_ptr<PAGLayer> PAGComposition::MakeChildLayer(
+    const Layer* node, const std::shared_ptr<tgfx::Layer>& runtimeLayer,
+    const std::shared_ptr<PAGScene>& scene) {
+  if (scene == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGLayer>(new PAGLayer(node, runtimeLayer, scene));
+}
+
+void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
+                                   std::vector<std::shared_ptr<PAGLayer>>& outChildren,
+                                   const std::shared_ptr<PAGScene>& scene,
+                                   std::unordered_set<const Composition*>& visited) {
+  if (binding == nullptr || scene == nullptr) {
+    return;
+  }
   for (auto* layer : layers) {
     if (layer == nullptr) {
       continue;
@@ -144,9 +163,16 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
       if (childComposition->runtimeLayer != nullptr && layerRuntime != nullptr) {
         layerRuntime->addChild(childComposition->runtimeLayer);
       }
-      children.push_back(std::move(childComposition));
+      outChildren.push_back(std::move(childComposition));
     } else {
-      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
+      auto child = MakeChildLayer(layer, layerRuntime, scene);
+      if (child == nullptr) {
+        continue;
+      }
+      if (!layer->children.empty()) {
+        BuildChildren(binding, layer->children, child->children, scene, visited);
+      }
+      outChildren.push_back(std::move(child));
     }
   }
 }
@@ -154,9 +180,6 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
 void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
                                   std::unordered_set<const Composition*>& visited) {
   std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
-  // Reconcile the child layer list first. A dirty container node means its child list may have
-  // gained or lost layers. The root composition (node == nullptr) reconciles against the document's
-  // top-level layers; a child composition reconciles against its source composition's layers.
   const std::vector<Layer*>* sourceLayers = nullptr;
   if (node == nullptr) {
     auto scene = rootScene.lock();
@@ -171,11 +194,6 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
     syncChildren(*sourceLayers, visited);
   }
 
-  // Refresh the attributes/contents of any dirty layer nodes owned by this composition's binding.
-  // Iterate the dirty set rather than the top-level children so nested child layers (Layer.children
-  // built into the same binding) are refreshed too. RefreshLayerInPlace also reconciles each dirty
-  // layer's own child list, so adding or removing nested children takes effect when the parent layer
-  // is marked dirty.
   if (binding != nullptr) {
     for (auto* dirty : dirtyNodes) {
       if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
@@ -186,11 +204,6 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
       }
     }
-    // RefreshLayerInPlace may swap a plain child's tgfx layer instance (a plain layer promoted to a
-    // VectorLayer once it gains contents). Re-sync only plain children: for them the binding entry
-    // is the runtimeLayer itself. A composition child is skipped because its binding entry is the
-    // empty slot while its runtimeLayer is the nested subtree root, so re-syncing from the binding
-    // would overwrite runtimeLayer with the slot and break hit-testing, bounds and nested re-attach.
     for (auto& child : children) {
       if (child != nullptr && child->node != nullptr && child->layerType() == LayerType::Layer) {
         auto refreshed = binding->get<tgfx::Layer>(child->node);
@@ -200,16 +213,20 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       }
     }
   }
-  // Timelines are intentionally left untouched here: they are reset as a whole tree by PAGScene
-  // (resetTimelines) only when a timeline node changed, so a plain attribute or structural edit does
-  // not disturb in-progress playback.
   for (auto& child : children) {
     if (child != nullptr && child->layerType() != LayerType::Layer) {
       auto* childComposition = static_cast<PAGComposition*>(child.get());
-      // Push the child composition's source onto the ancestor path before recursing, so any layer
-      // newly added inside it that references an ancestor (including this composition) is detected
-      // at the top of MakeChild. Only erase what this frame inserted: a sibling subtree that
-      // legitimately shares the same downstream composition would otherwise drop the marker.
+      // If this is a pure-container (no composition reference) whose source node is dirty, rebuild
+      // its children list so added/removed nested children are reflected.
+      if (childComposition->node != nullptr && childComposition->node->composition == nullptr &&
+          dirtySet.find(childComposition->node) != dirtySet.end()) {
+        childComposition->children.clear();
+        auto scene = rootScene.lock();
+        if (scene != nullptr) {
+          BuildChildren(binding.get(), childComposition->node->children, childComposition->children,
+                        scene, visited);
+        }
+      }
       const Composition* childSource =
           childComposition->node != nullptr ? childComposition->node->composition : nullptr;
       bool inserted = false;
@@ -230,8 +247,6 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
   if (!scene || binding == nullptr || runtimeLayer == nullptr) {
     return;
   }
-  // Index existing runtime children by their source layer node so layers that still exist are
-  // reused unchanged (their tgfx layers and handles remain valid).
   std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};
   for (auto& child : children) {
     if (child != nullptr && child->node != nullptr) {
@@ -251,11 +266,7 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       kept.insert(layer);
       continue;
     }
-    // Newly added layer: build its tgfx subtree into this binding and wrap it in a runtime node.
     if (layer->composition != nullptr) {
-      // Reuse the ancestor path threaded in by refreshNodes so a newly added layer that references
-      // an ancestor composition is rejected at the top of MakeChild rather than only after one
-      // wasted PAGComposition allocation deeper in the recursion.
       auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
       if (childComposition == nullptr) {
         continue;
@@ -273,15 +284,13 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       if (layerRuntime == nullptr) {
         continue;
       }
-      newChildren.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
+      auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
+      if (!layer->children.empty()) {
+        BuildChildren(binding.get(), layer->children, child->children, scene, visited);
+      }
+      newChildren.push_back(std::move(child));
     }
   }
-  // Remove runtime children whose source layer is gone: detach their tgfx layer from this parent
-  // and drop their binding entries so no stale mapping survives. Detach the slot (the binding
-  // entry, which is this composition's direct child), not child->runtimeLayer: for a composition
-  // child the latter is the subtree root nested under the slot, so detaching it would orphan the
-  // empty slot container. Removing the slot detaches it together with its nested subtree. The slot
-  // must be looked up before binding->remove() erases the mapping.
   for (auto& child : children) {
     if (child == nullptr || child->node == nullptr || kept.find(child->node) != kept.end()) {
       continue;
@@ -293,10 +302,6 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
     binding->remove(child->node);
   }
   children = std::move(newChildren);
-  // Reorder this parent's direct child tgfx layers to match the document order. The direct child of
-  // this composition's runtimeLayer is the layer's slot (binding entry), not child->runtimeLayer: a
-  // composition child's runtimeLayer is the subtree root nested under its slot. addChild on a layer
-  // already parented here moves it to the top, so appending in source order yields document order.
   for (auto& child : children) {
     if (child == nullptr || child->node == nullptr) {
       continue;
@@ -306,71 +311,6 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       runtimeLayer->addChild(slot);
     }
   }
-}
-
-void PAGComposition::advance(int64_t deltaMicroseconds) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->advance(deltaMicroseconds);
-    }
-  }
-  for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->advance(deltaMicroseconds);
-    }
-  }
-}
-
-void PAGComposition::apply(float mix) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->apply(mix);
-    }
-  }
-  for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->apply(mix);
-    }
-  }
-}
-
-std::shared_ptr<PAGLayer> PAGComposition::findChildForLayer(const tgfx::Layer* hitLayer) {
-  for (auto& child : children) {
-    if (child == nullptr) {
-      continue;
-    }
-    if (child->runtimeLayer.get() == hitLayer) {
-      return child;
-    }
-    if (child->layerType() != LayerType::Layer) {
-      auto found = static_cast<PAGComposition*>(child.get())->findChildForLayer(hitLayer);
-      if (found != nullptr) {
-        return found;
-      }
-    }
-  }
-  return nullptr;
-}
-
-std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float x, float y) {
-  std::vector<std::shared_ptr<PAGLayer>> result = {};
-  if (runtimeLayer == nullptr) {
-    return result;
-  }
-  // tgfx getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
-  // coordinate space, covering the whole subtree (child composition roots are attached into the
-  // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not bound to a
-  // persistent node; keep only those that match a persistent PAGLayer node's runtimeLayer.
-  // Resolution searches this composition's children and recurses into descendant compositions. The
-  // first array entry stays the top-most layer.
-  auto hitLayers = runtimeLayer->getLayersUnderPoint(x, y);
-  for (const auto& hitLayer : hitLayers) {
-    auto matched = findChildForLayer(hitLayer.get());
-    if (matched != nullptr && matched->layerType() == LayerType::Layer) {
-      result.push_back(std::move(matched));
-    }
-  }
-  return result;
 }
 
 }  // namespace pagx

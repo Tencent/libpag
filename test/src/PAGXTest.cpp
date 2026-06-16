@@ -7431,6 +7431,46 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
 }
 
 /**
+ * Test case: hit test resolves a leaf layer nested under a container layer that has no composition
+ * reference. The container itself is not returned; only the leaf is.
+ */
+PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto container = doc->makeNode<pagx::Layer>();
+  container->name = "Container";
+  container->width = 200;
+  container->height = 200;
+
+  auto leaf = doc->makeNode<pagx::Layer>("leafId");
+  leaf->name = "Leaf";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {60, 60};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 1, 0, 1};
+  fill->color = solid;
+  leaf->contents.push_back(rect);
+  leaf->contents.push_back(fill);
+
+  container->children = {leaf};
+  doc->layers.push_back(container);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  EXPECT_EQ(hits[0]->id(), "leafId");
+
+  auto miss = scene->getLayersUnderPoint(180, 180);
+  EXPECT_TRUE(miss.empty());
+}
+
+/**
  * Test case: when two layers reference the same Composition, each builds an independent runtime
  * composition instance with its own reverse map. Both instances are present and a hit resolves the
  * shared child through the composition subtree, confirming per-instance reverse maps are built and
