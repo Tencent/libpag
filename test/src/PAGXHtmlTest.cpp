@@ -861,6 +861,38 @@ CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   EXPECT_LT(firstPos, secondPos);
 }
 
+CLI_TEST(PAGXHtmlTest, FixedFlexItemKeepsDeclaredWidthInScrollRectLayout) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="340" height="120">
+  <Layer id="clip" width="300" height="100" layout="horizontal" gap="0"
+         alignment="start" scrollRect="0,0,300,100">
+    <Layer id="fixed" width="120" height="100" flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="wide" width="240" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"fixed\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:120px"), std::string::npos);
+  EXPECT_NE(tag.find("flex-shrink:0"), std::string::npos);
+  EXPECT_EQ(tag.find("flex:1"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
