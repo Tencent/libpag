@@ -34,6 +34,8 @@ struct Woff2FontResult {
   uint16_t unitsPerEm = 0;
   // Scale applied to PAGX font design values before writing them into the generated font.
   float designScale = 1.0f;
+  // Smallest non-empty vector glyph advance written to the generated hmtx table.
+  uint16_t minVisibleGlyphAdvance = 0;
 };
 
 /**

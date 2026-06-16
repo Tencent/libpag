@@ -52,6 +52,16 @@ static uint16_t RoundToU16(float value) {
   return static_cast<uint16_t>(std::round(value));
 }
 
+static uint16_t CeilToU16(float value) {
+  if (!std::isfinite(value) || value <= 0.0f) {
+    return 0;
+  }
+  if (value >= static_cast<float>(std::numeric_limits<uint16_t>::max())) {
+    return std::numeric_limits<uint16_t>::max();
+  }
+  return static_cast<uint16_t>(std::ceil(value));
+}
+
 static int16_t ClampToI16(float value) {
   if (!std::isfinite(value)) {
     return 0;
@@ -723,13 +733,56 @@ static std::vector<uint8_t> BuildHead(const FontExportMetrics& metrics, int16_t 
   return table;
 }
 
+static uint16_t ResolveGlyphAdvanceWidth(const Glyph* glyph, const FontExportMetrics& metrics) {
+  auto advance = RoundToU16(glyph->advance * metrics.designScale);
+  if (glyph->path == nullptr || glyph->path->isEmpty()) {
+    return advance;
+  }
+  bool hasPoint = false;
+  float minX = 0.0f;
+  float maxX = 0.0f;
+  for (const auto& point : glyph->path->points()) {
+    if (!std::isfinite(point.x)) {
+      continue;
+    }
+    if (!hasPoint) {
+      minX = point.x;
+      maxX = point.x;
+      hasPoint = true;
+    } else {
+      minX = std::min(minX, point.x);
+      maxX = std::max(maxX, point.x);
+    }
+  }
+  if (!hasPoint) {
+    return advance;
+  }
+  auto boundsAdvance = maxX > 0.0f ? maxX : (maxX - minX);
+  return std::max(advance, CeilToU16(boundsAdvance * metrics.designScale));
+}
+
+static uint16_t ResolveMinVisibleGlyphAdvance(const Font* font, const FontExportMetrics& metrics) {
+  uint16_t minAdvance = 0;
+  for (auto* glyph : font->glyphs) {
+    if (glyph->path == nullptr || glyph->path->isEmpty()) {
+      continue;
+    }
+    auto advance = ResolveGlyphAdvanceWidth(glyph, metrics);
+    if (advance == 0) {
+      continue;
+    }
+    minAdvance = minAdvance == 0 ? advance : std::min(minAdvance, advance);
+  }
+  return minAdvance;
+}
+
 static std::vector<uint8_t> BuildHhea(const Font* font, const FontExportMetrics& metrics,
                                       uint16_t numGlyphs) {
   std::vector<uint8_t> table;
   auto upm = static_cast<int16_t>(metrics.exportUnitsPerEm);
   auto advanceWidthMax = metrics.exportUnitsPerEm;
   for (auto* glyph : font->glyphs) {
-    advanceWidthMax = std::max(advanceWidthMax, RoundToU16(glyph->advance * metrics.designScale));
+    advanceWidthMax = std::max(advanceWidthMax, ResolveGlyphAdvanceWidth(glyph, metrics));
   }
   WriteU16(table, 1);                // majorVersion
   WriteU16(table, 0);                // minorVersion
@@ -759,7 +812,7 @@ static std::vector<uint8_t> BuildHmtx(const Font* font, const FontExportMetrics&
   WriteI16(table, 0);
   // Each glyph
   for (auto* glyph : font->glyphs) {
-    auto advance = RoundToU16(glyph->advance * metrics.designScale);
+    auto advance = ResolveGlyphAdvanceWidth(glyph, metrics);
     WriteU16(table, advance);
     WriteI16(table, 0);  // lsb = 0
   }
@@ -1136,6 +1189,9 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
   auto metrics = ResolveFontExportMetrics(font);
   result.unitsPerEm = metrics.exportUnitsPerEm;
   result.designScale = metrics.designScale;
+  if (!isBitmapFont) {
+    result.minVisibleGlyphAdvance = ResolveMinVisibleGlyphAdvance(font, metrics);
+  }
 
   std::vector<TableEntry> tables;
 
