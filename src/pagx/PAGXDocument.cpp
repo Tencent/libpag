@@ -109,7 +109,8 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
 
 static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
                                 const std::string& filePath, std::shared_ptr<Data> data,
-                                std::unordered_set<std::string>& chain) {
+                                std::unordered_set<std::string>& chain,
+                                std::vector<Node*>& dirtyNodes) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -121,6 +122,7 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
       if (image->filePath == filePath) {
         image->data = data;
         image->filePath = {};
+        dirtyNodes.push_back(image);
         found = true;
       }
     } else if (node->nodeType() == NodeType::Layer) {
@@ -129,14 +131,20 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
   }
   for (auto* layer : layers) {
     bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
-    found = loadedComposition || found;
+    if (loadedComposition) {
+      dirtyNodes.push_back(layer);
+      dirtyNodes.push_back(layer->composition);
+      found = true;
+    }
     if (!loadedComposition && layer->externalDoc != nullptr) {
       // Descend into an already-resolved externalDoc, recording its origin path so a reference back
       // to any ancestor origin (a cycle) is detected. Only erase the entry this frame inserted:
       // sibling externalDocs that legitimately share the same downstream file would otherwise drop
       // an ancestor's marker. insert().second is true exactly when this frame added the path.
       bool inserted = chain.insert(layer->compositionFilePath).second;
-      found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain) || found;
+      found =
+          LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain, dirtyNodes) ||
+          found;
       if (inserted) {
         chain.erase(layer->compositionFilePath);
       }
@@ -285,18 +293,13 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
-  // loadFileData must run before any PAGScene is built from this document: PAGScene::Make()
-  // snapshots the layer/composition tree once, so external compositions resolved here afterwards
-  // would never reach the already-built runtime tree. A non-empty liveScenes means at least one
-  // scene already exists, so warn that the freshly loaded content will not be visible.
-  if (!liveScenes.empty()) {
-    LOGE(
-        "PAGXDocument::loadFileData() called after a PAGScene was created from this document. "
-        "Load all external file data before PAGScene::Make(); the loaded content will not appear "
-        "in existing scenes.");
-  }
   std::unordered_set<std::string> chain = {};
-  return LoadFileDataInChain(this, this, filePath, data, chain);
+  std::vector<Node*> dirtyNodes = {};
+  bool found = LoadFileDataInChain(this, this, filePath, data, chain, dirtyNodes);
+  if (found && !dirtyNodes.empty()) {
+    notifyChange(dirtyNodes, /*layoutChanged=*/true);
+  }
+  return found;
 }
 
 bool PAGXDocument::embed() {
