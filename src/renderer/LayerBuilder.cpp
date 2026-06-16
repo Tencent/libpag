@@ -266,6 +266,23 @@ class LayerBuilderContext {
     layer->setAllowsEdgeAntialiasing(true);
     layer->setPassThroughBackground(true);
     layer->setScrollRect(tgfx::Rect::MakeEmpty());
+    // Collect style/filter nodes currently bound to this layer's styles and filters before
+    // resetting them, so we can clean up entries for any that were removed from node->styles or
+    // node->filters after the rebuild.
+    std::vector<const Node*> oldStyles;
+    for (const auto& tgfxStyle : layer->layerStyles()) {
+      const auto* styleNode = _result.binding.findNode(tgfxStyle.get());
+      if (styleNode != nullptr) {
+        oldStyles.push_back(styleNode);
+      }
+    }
+    std::vector<const Node*> oldFilters;
+    for (const auto& tgfxFilter : layer->filters()) {
+      const auto* filterNode = _result.binding.findNode(tgfxFilter.get());
+      if (filterNode != nullptr) {
+        oldFilters.push_back(filterNode);
+      }
+    }
     layer->setLayerStyles({});
     layer->setFilters({});
     layer->setMask(nullptr);
@@ -314,6 +331,18 @@ class LayerBuilderContext {
       }
     }
     applyLayerAttributes(node, layer.get());
+    // Unbind style/filter nodes that were removed from node->styles or node->filters.
+    for (const auto* styleNode : oldStyles) {
+      if (std::find(node->styles.begin(), node->styles.end(), styleNode) == node->styles.end()) {
+        _result.binding.remove(styleNode);
+      }
+    }
+    for (const auto* filterNode : oldFilters) {
+      if (std::find(node->filters.begin(), node->filters.end(), filterNode) ==
+          node->filters.end()) {
+        _result.binding.remove(filterNode);
+      }
+    }
     // Re-seed the decomposed transform baseline from the node's current authored values, mirroring
     // the initial build (see convertLayer). The Layer's x / y / matrix channels are AnimLayout, so a
     // document edit to them must update the LayerRuntimeTarget baseline; otherwise a concurrent
