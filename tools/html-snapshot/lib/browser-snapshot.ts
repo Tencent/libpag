@@ -671,12 +671,137 @@ function buildStyle(left, top, width, height, computed, opts) {
   return parts.join('; ');
 }
 
+// Read the four per-corner border-radius values from computed style. CSS uses
+// `Hpx` or `Hpx Vpx` (horizontal / vertical radii); we collapse to a single
+// scalar by taking the horizontal component, which is enough for the uniform-
+// radius fast path below (it bails the moment the four corners disagree).
+function readCornerRadii(computed) {
+  function radius(prop) {
+    const raw = (computed.getPropertyValue(prop) || '').trim();
+    if (!raw) return 0;
+    return parseFloat(raw.split(/\s+/)[0]) || 0;
+  }
+  return {
+    tl: radius('border-top-left-radius'),
+    tr: radius('border-top-right-radius'),
+    br: radius('border-bottom-right-radius'),
+    bl: radius('border-bottom-left-radius'),
+  };
+}
+
+// SVG-based renderer for the "uniform-width borders + uniform radius + per-side
+// colours" pattern, as used by pure-CSS ring spinners:
+//
+//   .spinner {
+//     width: 16px; height: 16px;
+//     border: 2px solid rgba(255,255,255,0.4);
+//     border-top-color: #fff;
+//     border-radius: 50%;
+//   }
+//
+// The plain rectangular-overlay fallback in `borderOverlayHTML` paints four
+// straight strips and silently drops the host's `border-radius` (overlays use
+// `position: absolute` and the host is not `overflow: hidden`), which collapses
+// the ring into a square frame. CSS instead splits each corner along the
+// diagonal between the outer and inner corner; for uniform width that diagonal
+// is the 45° bisector. We reproduce this with one stroked <path> per side that
+// covers (corner-arc-half) + (straight edge) + (next-corner-arc-half),
+// stroke-width = border width, mid-line radius = r - w/2 (so the stroke's outer
+// edge lands on the host's `border-radius` and its inner edge on the matching
+// inner radius).
+//
+// Returns null when the pattern doesn't apply: per-side widths differ, radii
+// disagree across corners, the radius is too small to host a ring (r ≤ w/2,
+// where the inner corner collapses), or any side uses a non-solid style — in
+// which case the caller falls back to rectangular overlays.
+function roundedUniformBorderSvg(computed, width, height) {
+  const top = readBorderSide(computed, 'top');
+  const right = readBorderSide(computed, 'right');
+  const bottom = readBorderSide(computed, 'bottom');
+  const left = readBorderSide(computed, 'left');
+  const w = top.width;
+  if (w <= 0) return null;
+  if (right.width !== w || bottom.width !== w || left.width !== w) return null;
+  if (top.style !== 'solid' || right.style !== 'solid' ||
+      bottom.style !== 'solid' || left.style !== 'solid') return null;
+  const radii = readCornerRadii(computed);
+  if (radii.tl <= 0) return null;
+  if (radii.tr !== radii.tl || radii.br !== radii.tl || radii.bl !== radii.tl) return null;
+  const r = radii.tl;
+  if (r <= w / 2) return null;
+  // Clamp the radius the same way CSS does when the corners would otherwise
+  // overlap (r > min(W, H) / 2). Without the clamp a `border-radius: 50%` host
+  // whose computed top-left-radius was reported per-corner (Chromium can do
+  // this for non-square boxes) would draw a path larger than the box.
+  const maxR = Math.min(width, height) / 2;
+  const rOuter = Math.min(r, maxR);
+  if (rOuter <= w / 2) return null;
+  const rMid = rOuter - w / 2;
+  const W = width;
+  const H = height;
+  const centers = {
+    tl: [rOuter, rOuter],
+    tr: [W - rOuter, rOuter],
+    br: [W - rOuter, H - rOuter],
+    bl: [rOuter, H - rOuter],
+  };
+  function pt(center, angleDeg) {
+    const a = angleDeg * Math.PI / 180;
+    return [center[0] + rMid * Math.cos(a), center[1] + rMid * Math.sin(a)];
+  }
+  function fmt(p) {
+    return `${roundPx(p[0])} ${roundPx(p[1])}`;
+  }
+  // Eight corner-cut points (two per corner) plus eight tangent points where
+  // each arc meets the straight edge segment. SVG y-axis points down, so 270°
+  // is up, 0° is right, 90° is down, 180° is left.
+  const tl225 = pt(centers.tl, 225);
+  const tl270 = pt(centers.tl, 270);
+  const tr270 = pt(centers.tr, 270);
+  const tr315 = pt(centers.tr, 315);
+  const tr0   = pt(centers.tr, 0);
+  const br0   = pt(centers.br, 0);
+  const br45  = pt(centers.br, 45);
+  const br90  = pt(centers.br, 90);
+  const bl90  = pt(centers.bl, 90);
+  const bl135 = pt(centers.bl, 135);
+  const bl180 = pt(centers.bl, 180);
+  const tl180 = pt(centers.tl, 180);
+  const arc = `${roundPx(rMid)} ${roundPx(rMid)} 0 0 1`;
+  const segments = [
+    { color: top.color,    d: `M ${fmt(tl225)} A ${arc} ${fmt(tl270)} L ${fmt(tr270)} A ${arc} ${fmt(tr315)}` },
+    { color: right.color,  d: `M ${fmt(tr315)} A ${arc} ${fmt(tr0)}   L ${fmt(br0)}  A ${arc} ${fmt(br45)}`  },
+    { color: bottom.color, d: `M ${fmt(br45)}  A ${arc} ${fmt(br90)}  L ${fmt(bl90)} A ${arc} ${fmt(bl135)}` },
+    { color: left.color,   d: `M ${fmt(bl135)} A ${arc} ${fmt(bl180)} L ${fmt(tl180)} A ${arc} ${fmt(tl225)}` },
+  ];
+  const paths = segments
+    .filter((s) => colorAlpha(s.color) > 0)
+    .map((s) => `<path d="${s.d}" fill="none" stroke="${s.color.trim()}" ` +
+      `stroke-width="${px(w)}" stroke-linecap="butt"/>`)
+    .join('');
+  if (!paths) return '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
+    `left: 0px; top: 0px; width: ${px(W)}; height: ${px(H)}; pointer-events: none" ` +
+    `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${roundPx(W)} ${roundPx(H)}">${paths}</svg>`;
+}
+
 // Returns an array of HTML strings — one absolutely-positioned <div> per
 // non-zero border side — to overlay onto the host box. Used when the element
 // has an asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list
 // row).
+//
+// When the host has uniform border widths + uniform border-radius + only
+// asymmetric *colours* (the canonical CSS ring-spinner pattern), the overlay
+// rectangles can't honour the radius (they're absolutely positioned and the
+// host has no `overflow: hidden`), so the radius would be silently dropped and
+// the spinner would render as a square frame. `roundedUniformBorderSvg`
+// short-circuits that case with one stroked <path> per side; the overlay
+// rectangle path stays for genuinely asymmetric-width borders (list-row
+// dividers, single-side underlines, etc.) where the radius rarely matters.
 function borderOverlayHTML(computed, width, height) {
   if (isUniformBorder(computed)) return [];
+  const ringSvg = roundedUniformBorderSvg(computed, width, height);
+  if (ringSvg !== null) return ringSvg ? [ringSvg] : [];
   const out = [];
   for (const side of SIDES) {
     const b = readBorderSide(computed, side);
@@ -2762,6 +2887,8 @@ const HELPER_FNS = [
   appendBorder,
   appendBoxShadow,
   buildStyle,
+  readCornerRadii,
+  roundedUniformBorderSvg,
   borderOverlayHTML,
   colorAlpha,
   transformOriginXY,
