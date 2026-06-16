@@ -19,6 +19,7 @@
 #include "LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include "ToTGFX.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGXDocument.h"
@@ -136,6 +137,77 @@ namespace pagx {
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
+// Runtime target for a Layer's tgfx::Layer that keeps the layer transform decomposed into its
+// animatable sources (x, y translation and the 2D matrix). The final tgfx matrix is recomposed as
+// Translate(x, y) * matrix, mirroring applyLayerAttributes so x/y and matrix animations stack
+// correctly instead of overwriting each other's setMatrix. Channels other than the transform fall
+// through to the base RuntimeTarget writer table.
+struct LayerRuntimeTarget : RuntimeTarget {
+  float animX = 0;
+  float animY = 0;
+  tgfx::Matrix animMatrix = tgfx::Matrix::I();
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (channel == "x") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      animX = MixFloat(animX, *v, mix);
+      recompose();
+      return true;
+    }
+    if (channel == "y") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      animY = MixFloat(animY, *v, mix);
+      recompose();
+      return true;
+    }
+    if (channel == "matrix") {
+      const auto* v = std::get_if<Matrix>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      auto target = ToTGFX(*v);
+      animMatrix = MixTGFXMatrix(animMatrix, target, mix);
+      recompose();
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    if (channel == "x" || channel == "y" || channel == "matrix") {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+
+  // Seeds the decomposed transform from the node's authored values so the first animated frame
+  // mixes against the static baseline rather than an identity.
+  void initTransform(float x, float y, const tgfx::Matrix& matrix) {
+    animX = x;
+    animY = y;
+    animMatrix = matrix;
+  }
+
+ private:
+  void recompose() {
+    auto* layer = static_cast<tgfx::Layer*>(const_cast<void*>(rawObject()));
+    if (layer == nullptr) {
+      return;
+    }
+    auto result = animMatrix;
+    if (animX != 0 || animY != 0) {
+      result = tgfx::Matrix::MakeTrans(animX, animY) * animMatrix;
+    }
+    layer->setMatrix(result);
+  }
+};
+
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
@@ -199,6 +271,367 @@ class LayerBuilderContext {
       }
     }
     return result;
+  }
+
+  // Rewrites the current state of a single Layer node onto its existing tgfx::Layer, preserving the
+  // tgfx::Layer object identity so handles holding it stay valid. Reuses the supplied binding both
+  // to look up the existing layer and to refresh masks. Vector contents, layer attributes, styles
+  // and filters are regenerated from the node's current fields. Returns false if the node has no
+  // tgfx::Layer in the binding (e.g. it was never built or belongs to another composition slot).
+  bool refreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+    if (node == nullptr || binding == nullptr) {
+      return false;
+    }
+    auto layer = binding->get<tgfx::Layer>(node);
+    if (layer == nullptr) {
+      return false;
+    }
+    _result.binding = std::move(*binding);
+    // A plain (non-composition) node that gained contents since it was built as a plain tgfx::Layer
+    // must be promoted to a VectorLayer, the only layer kind that can hold contents. Swap in a new
+    // VectorLayer in the same parent slot, move the existing child layers over, and rebind the node;
+    // child layers and their own bindings are preserved (only this node's tgfx instance changes).
+    if (node->composition == nullptr && !node->contents.empty() &&
+        layer->type() != tgfx::LayerType::Vector) {
+      layer = promoteToVectorLayer(node, layer);
+    }
+    // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
+    // and the mask is only re-applied when node->mask is set, so reset them first; otherwise an
+    // edit that cleared a matrix / blendMode / scrollRect / style / filter / mask would keep the
+    // previously built value instead of reverting to the default.
+    layer->setMatrix(tgfx::Matrix::I());
+    layer->setMatrix3D(tgfx::Matrix3D::I());
+    layer->setPreserve3D(false);
+    layer->setBlendMode(ToTGFX(BlendMode::Normal));
+    layer->setAllowsEdgeAntialiasing(true);
+    layer->setPassThroughBackground(true);
+    layer->setScrollRect(tgfx::Rect::MakeEmpty());
+    // Collect style/filter nodes currently bound to this layer's styles and filters before
+    // resetting them, so we can clean up entries for any that were removed from node->styles or
+    // node->filters after the rebuild.
+    std::vector<const Node*> oldStyles;
+    for (const auto& tgfxStyle : layer->layerStyles()) {
+      const auto* styleNode = _result.binding.findNode(tgfxStyle.get());
+      if (styleNode != nullptr) {
+        oldStyles.push_back(styleNode);
+      }
+    }
+    std::vector<const Node*> oldFilters;
+    for (const auto& tgfxFilter : layer->filters()) {
+      const auto* filterNode = _result.binding.findNode(tgfxFilter.get());
+      if (filterNode != nullptr) {
+        oldFilters.push_back(filterNode);
+      }
+    }
+    layer->setLayerStyles({});
+    layer->setFilters({});
+    layer->setMask(nullptr);
+    // Regenerate vector contents in place; composition slot layers carry no contents and keep their
+    // runtime-populated children untouched. Only a tgfx::VectorLayer can hold contents. A node that
+    // gained contents was promoted above, and one whose contents were cleared (now empty, but still
+    // a VectorLayer) drops its stale elements via setContents({}). The type guard keeps the cast
+    // safe for plain layers that never had contents.
+    // Collect old content elements that are currently bound so we can unbind those no longer present
+    // in node->contents after the rebuild. Without this, stale binding entries for removed elements
+    // (Fill/Stroke/Elements) remain in the RuntimeBinding, and shared ColorSource/Image unbind logic
+    // never triggers for them.
+    std::vector<Element*> oldElements;
+    if (layer->type() == tgfx::LayerType::Vector) {
+      auto* vecLayer = static_cast<tgfx::VectorLayer*>(layer.get());
+      for (const auto& content : vecLayer->contents()) {
+        collectElementTree(content.get(), &oldElements);
+      }
+    }
+    // Untrack all old elements from the reverse index before rebuilding, so that convertXxx (which
+    // calls trackColorSource/trackImage) starts from a clean slate. Surviving elements will be
+    // re-tracked during convertVectorElement; removed elements stay un-tracked and are cleaned up
+    // below. Without this, every refreshLayerInPlace call would append duplicate entries to the
+    // colorSourceUsers / imageUsers maps.
+    for (auto* element : oldElements) {
+      untrackElementColorSource(element);
+    }
+    if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
+      auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
+      std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
+      contents.reserve(node->contents.size());
+      for (const auto& element : node->contents) {
+        auto tgfxElement = convertVectorElement(element);
+        if (tgfxElement) {
+          contents.push_back(tgfxElement);
+        }
+      }
+      vectorLayer->setContents(contents);
+    }
+    // Unbind content elements that were removed from node->contents. A Group/TextBox subtree
+    // element is considered removed only when it cannot be reached from any top-level content.
+    if (!oldElements.empty()) {
+      std::vector<Element*> removed;
+      for (auto* element : oldElements) {
+        if (!isElementInContents(element, node->contents)) {
+          removed.push_back(element);
+        }
+      }
+      if (!removed.empty()) {
+        unbindContentElements(removed);
+      }
+    }
+    applyLayerAttributes(node, layer.get());
+    // Unbind style/filter nodes that were removed from node->styles or node->filters.
+    for (const auto* styleNode : oldStyles) {
+      if (std::find(node->styles.begin(), node->styles.end(), styleNode) == node->styles.end()) {
+        _result.binding.remove(styleNode);
+      }
+    }
+    for (const auto* filterNode : oldFilters) {
+      if (std::find(node->filters.begin(), node->filters.end(), filterNode) ==
+          node->filters.end()) {
+        _result.binding.remove(filterNode);
+      }
+    }
+    // Re-seed the decomposed transform baseline from the node's current authored values, mirroring
+    // the initial build (see convertLayer). The Layer's x / y / matrix channels are AnimLayout, so a
+    // document edit to them must update the LayerRuntimeTarget baseline; otherwise a concurrent
+    // transform animation would mix against the stale baseline. The target installed for a Layer
+    // node is always a LayerRuntimeTarget (convertLayer), so the static_cast is safe.
+    auto* layerTarget = static_cast<LayerRuntimeTarget*>(_result.binding.getTarget(node));
+    if (layerTarget != nullptr) {
+      auto layerPos = node->renderPosition();
+      layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+    }
+    if (node->mask != nullptr) {
+      _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
+      resolvePendingMasks();
+    }
+    // Reconcile nested child layers (Layer.children) so additions and removals are reflected.
+    // Composition slot layers are skipped: their children come from the runtime composition slot,
+    // not from convertLayer's child recursion.
+    if (node->composition == nullptr) {
+      reconcileChildLayers(node, layer.get());
+    }
+    *binding = std::move(_result.binding);
+    return true;
+  }
+
+  // Replaces a plain tgfx::Layer that has gained contents with a new VectorLayer in the same parent
+  // slot, and rebinds the node to the new instance. The node's child layers are not moved here: the
+  // subsequent reconcileChildLayers re-attaches each still-bound child onto the new layer. set()
+  // keeps the node's existing LayerRuntimeTarget and channel writers, only swapping its object
+  // pointer. Returns the new layer (or the original if it has no parent to swap within).
+  std::shared_ptr<tgfx::Layer> promoteToVectorLayer(const Layer* node,
+                                                    const std::shared_ptr<tgfx::Layer>& oldLayer) {
+    auto* parent = oldLayer->parent();
+    if (parent == nullptr) {
+      return oldLayer;
+    }
+    auto vectorLayer = tgfx::VectorLayer::Make();
+    parent->replaceChild(oldLayer, vectorLayer);
+    _result.binding.set(node, vectorLayer);
+    return vectorLayer;
+  }
+
+  // Reconciles the direct child tgfx layers of a plain (non-composition) Layer node against its
+  // current node->children list. Child nodes that still map to a tgfx layer are reused (handles stay
+  // valid); newly added child nodes are built into the binding; removed children are detached and
+  // unbound (recursively, including their descendants). Surviving children are reordered to match
+  // the document order.
+  void reconcileChildLayers(const Layer* node, tgfx::Layer* parentLayer) {
+    std::unordered_set<const tgfx::Layer*> kept = {};
+    for (const auto& child : node->children) {
+      if (child == nullptr) {
+        continue;
+      }
+      auto childLayer = _result.binding.get<tgfx::Layer>(child);
+      if (childLayer == nullptr) {
+        // Newly added: build its full subtree (and bindings) via the normal convertLayer path.
+        childLayer = convertLayer(child);
+      }
+      if (childLayer != nullptr) {
+        // addChild moves an existing child to the top, so appending in document order yields the
+        // correct final z-order.
+        parentLayer->addChild(childLayer);
+        kept.insert(childLayer.get());
+      }
+    }
+    // Detach and unbind children whose source node was removed from node->children. Iterate a copy
+    // since removeFromParent mutates the parent's child list.
+    auto tgfxChildren = parentLayer->children();
+    for (const auto& tgfxChild : tgfxChildren) {
+      if (kept.find(tgfxChild.get()) == kept.end()) {
+        unbindSubtree(tgfxChild.get());
+        tgfxChild->removeFromParent();
+      }
+    }
+  }
+
+  // Recursively drops binding entries for a detached tgfx layer subtree so removed nodes leave no
+  // stale node->object mapping behind. A Layer's vector content elements are bound as their own
+  // entries keyed by the Element node (not as tgfx layer children), so they are unbound explicitly
+  // when the owning Layer node is found; otherwise removing a layer subtree would leak those
+  // element bindings and leave dangling Node* keys.
+  void unbindSubtree(const tgfx::Layer* layer) {
+    if (layer == nullptr) {
+      return;
+    }
+    const Node* owner = _result.binding.findNode(layer);
+    if (owner != nullptr) {
+      if (owner->nodeType() == NodeType::Layer) {
+        unbindContentElements(static_cast<const Layer*>(owner)->contents);
+      }
+      _result.binding.remove(owner);
+    }
+    for (const auto& child : layer->children()) {
+      unbindSubtree(child.get());
+    }
+  }
+
+  // Drops binding entries for a list of vector content-element nodes, recursing into nested element
+  // containers (Group / TextBox) so the whole element subtree of a removed layer is unbound. A
+  // Fill/Stroke's color source (and a gradient's ColorStops) is bound separately and may be shared
+  // via an "@id" reference, so it is unbound only when no surviving Fill/Stroke still references it.
+  void unbindContentElements(const std::vector<Element*>& elements) {
+    for (auto* element : elements) {
+      if (element == nullptr) {
+        continue;
+      }
+      auto type = element->nodeType();
+      if (type == NodeType::Group || type == NodeType::TextBox) {
+        unbindContentElements(static_cast<const Group*>(element)->elements);
+      } else if (type == NodeType::Fill) {
+        auto* fill = static_cast<const Fill*>(element);
+        _result.binding.untrackColorSource(fill->color, element);
+        unbindColorSourceIfUnreferenced(fill->color, element);
+      } else if (type == NodeType::Stroke) {
+        auto* stroke = static_cast<const Stroke*>(element);
+        _result.binding.untrackColorSource(stroke->color, element);
+        unbindColorSourceIfUnreferenced(stroke->color, element);
+      }
+      _result.binding.remove(element);
+    }
+  }
+
+  // Recursively collects all descendant elements from a Group/TextBox tree by walking the tgfx
+  // VectorElement hierarchy rather than the node tree. The node tree may have already been
+  // modified (elements erased from Group->elements), but the tgfx tree still holds the full
+  // pre-rebuild structure at the time oldElements are collected in refreshLayerInPlace. This
+  // ensures removed nested elements (e.g., Fill inside a Group) are captured and later unbound.
+  void collectElementTree(const tgfx::VectorElement* tgfxElement, std::vector<Element*>* out) {
+    if (tgfxElement == nullptr) {
+      return;
+    }
+    const auto* nodeFromTgfx = _result.binding.findNode(tgfxElement);
+    if (nodeFromTgfx == nullptr || nodeFromTgfx->nodeType() == NodeType::Layer) {
+      return;
+    }
+    auto* element = const_cast<Element*>(static_cast<const Element*>(nodeFromTgfx));
+    out->push_back(element);
+    auto nodeType = element->nodeType();
+    if (nodeType == NodeType::Group || nodeType == NodeType::TextBox) {
+      auto* tgfxGroup = static_cast<const tgfx::VectorGroup*>(tgfxElement);
+      for (const auto& child : tgfxGroup->elements()) {
+        collectElementTree(child.get(), out);
+      }
+    }
+  }
+
+  // Untracks the color source reverse-index entry for Fill/Stroke elements. If the color source
+  // is an ImagePattern, also untracks its imageUsers entry. Called before rebuilding content during
+  // refreshLayerInPlace so that surviving elements are re-tracked by convertXxx without accumulating
+  // duplicate entries.
+  void untrackElementColorSource(Element* element) {
+    if (element == nullptr) {
+      return;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Fill) {
+      auto* fill = static_cast<const Fill*>(element);
+      untrackColorSourceAndImage(fill->color, element);
+    } else if (type == NodeType::Stroke) {
+      auto* stroke = static_cast<const Stroke*>(element);
+      untrackColorSourceAndImage(stroke->color, element);
+    }
+  }
+
+  void untrackColorSourceAndImage(const ColorSource* colorSource, const Node* owner) {
+    if (colorSource == nullptr) {
+      return;
+    }
+    _result.binding.untrackColorSource(colorSource, owner);
+    if (colorSource->nodeType() == NodeType::ImagePattern) {
+      auto* pattern = static_cast<const ImagePattern*>(colorSource);
+      if (pattern->image) {
+        _result.binding.untrackImage(pattern->image, pattern);
+      }
+    }
+  }
+
+  // Returns true if the element is reachable from any of the top-level contents, recursing into
+  // Group/TextBox containers.
+  static bool isElementInContents(Element* target, const std::vector<Element*>& contents) {
+    for (auto* element : contents) {
+      if (element == target) {
+        return true;
+      }
+      auto type = element->nodeType();
+      if (type == NodeType::Group || type == NodeType::TextBox) {
+        if (isElementInContents(target, static_cast<const Group*>(element)->elements)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Unbinds a Fill/Stroke color source, but only if no Fill/Stroke other than excludedOwner still
+  // points at it. Shared color sources (referenced by several painters via "@id") stay bound as long
+  // as any referencing painter survives. A gradient's ColorStop bindings are owned children of the
+  // gradient and are dropped together with it; an ImagePattern's Image is an independently shareable
+  // resource and is dropped only when no surviving ImagePattern still references it. excludedOwner is
+  // the painter currently being removed; its own binding is dropped by the caller, so it must not
+  // count as a surviving reference.
+  void unbindColorSourceIfUnreferenced(const ColorSource* color, const Element* excludedOwner) {
+    if (color == nullptr || !_result.binding.contains(color)) {
+      return;
+    }
+    if (_result.binding.isColorSourceShared(color, excludedOwner)) {
+      return;
+    }
+    if (color->nodeType() == NodeType::ImagePattern) {
+      auto* pattern = static_cast<const ImagePattern*>(color);
+      if (pattern->image) {
+        _result.binding.untrackImage(pattern->image, pattern);
+      }
+      unbindImageIfUnreferenced(pattern);
+    } else if (color->nodeType() != NodeType::SolidColor) {
+      for (const auto* stop : static_cast<const Gradient*>(color)->colorStops) {
+        _result.binding.remove(stop);
+      }
+    }
+    _result.binding.remove(color);
+  }
+
+  // Unbinds the Image bound for an ImagePattern that is about to be removed, but only if no surviving
+  // ImagePattern other than pattern still references the same Image node. An Image is a shareable
+  // "@id" resource, so dropping it unconditionally would break other patterns still using it.
+  void unbindImageIfUnreferenced(const ImagePattern* pattern) {
+    const Image* image = pattern->image;
+    if (image == nullptr || !_result.binding.contains(image)) {
+      return;
+    }
+    if (_result.binding.isImageShared(image, pattern)) {
+      return;
+    }
+    _result.binding.remove(image);
+  }
+
+  // Builds a single Layer node into the supplied binding and returns its new tgfx::Layer. Mirrors
+  // the runtime convertLayer path (composition slots stay empty containers) so the produced layer
+  // matches one created during the initial build, then hands the populated binding back.
+  std::shared_ptr<tgfx::Layer> buildLayerInto(const Layer* node, RuntimeBinding* binding) {
+    _result.binding = std::move(*binding);
+    auto layer = convertLayer(node);
+    resolvePendingMasks();
+    *binding = std::move(_result.binding);
+    return layer;
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
@@ -309,6 +742,11 @@ class LayerBuilderContext {
     }
 
     if (layer) {
+      // Install a transform-aware target so the Layer's x / y / matrix channels share one
+      // recomposed tgfx matrix. set() preserves any existing object, so install before set().
+      auto target = std::unique_ptr<RuntimeTarget>(new LayerRuntimeTarget());
+      auto* layerTarget =
+          static_cast<LayerRuntimeTarget*>(_result.binding.setTarget(node, std::move(target)));
       // Register layer for mask lookups and later rebuildForFilePath(). A single pagx Layer
       // may appear here multiple times when its owning Composition is instanced more than
       // once, so we append rather than overwrite.
@@ -317,6 +755,12 @@ class LayerBuilderContext {
       bindLayerChannels(node);
 
       applyLayerAttributes(node, layer.get());
+      // Seed the decomposed transform from the authored values so the first animated frame mixes
+      // against the static baseline. applyLayerAttributes has already composed them into the layer.
+      if (layerTarget != nullptr) {
+        auto layerPos = node->renderPosition();
+        layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+      }
 
       // Queue mask to be applied in second pass.
       if (node->mask != nullptr) {
@@ -360,36 +804,12 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
   }
 
-  static void WriteLayerX(void* object, const KeyValue& value, float mix) {
-    auto* v = std::get_if<float>(&value);
-    if (v == nullptr) {
-      return;
-    }
-    auto* layer = static_cast<tgfx::Layer*>(object);
-    auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateX(), *v, mix);
-    matrix.setTranslateX(mixed);
-    layer->setMatrix(matrix);
-  }
-
-  static void WriteLayerY(void* object, const KeyValue& value, float mix) {
-    auto* v = std::get_if<float>(&value);
-    if (v == nullptr) {
-      return;
-    }
-    auto* layer = static_cast<tgfx::Layer*>(object);
-    auto matrix = layer->matrix();
-    auto mixed = MixFloat(matrix.getTranslateY(), *v, mix);
-    matrix.setTranslateY(mixed);
-    layer->setMatrix(matrix);
-  }
-
+  // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
+  // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
     _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
     _result.binding.setWriter(node, "visible", WriteLayerVisible);
     _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
-    _result.binding.setWriter(node, "x", WriteLayerX);
-    _result.binding.setWriter(node, "y", WriteLayerY);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
@@ -616,6 +1036,76 @@ class LayerBuilderContext {
     return result;
   }
 
+  // Templated writer for the common "scalar float channel = setter(Mix(getter, value, mix))"
+  // pattern, eliminating one near-identical writer per animatable float property.
+  template <typename T, auto Getter, auto Setter>
+  static void WriteMixedFloat(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    (obj->*Setter)(MixFloat((obj->*Getter)(), *v, mix));
+  }
+
+  // Templated writer for tgfx Color channels (setter takes const Color&).
+  template <typename T, auto Getter, auto Setter>
+  static void WriteMixedColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    (obj->*Setter)(MixTGFXColor((obj->*Getter)(), ToTGFX(*v), mix));
+  }
+
+  // Templated writer for a width/height component of a tgfx Size-valued property. WidthAxis selects
+  // which component the channel drives; the other component is preserved.
+  template <typename T, auto Getter, auto Setter, bool WidthAxis>
+  static void WriteSizeAxis(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    auto size = (obj->*Getter)();
+    if (WidthAxis) {
+      size.width = MixFloat(size.width, *v, mix);
+    } else {
+      size.height = MixFloat(size.height, *v, mix);
+    }
+    (obj->*Setter)(size);
+  }
+
+  // Templated writer for an x/y component of a tgfx Point-valued property.
+  template <typename T, auto Getter, auto Setter, bool XAxis>
+  static void WritePointAxis(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* obj = static_cast<T*>(object);
+    auto point = (obj->*Getter)();
+    if (XAxis) {
+      point.x = MixFloat(point.x, *v, mix);
+    } else {
+      point.y = MixFloat(point.y, *v, mix);
+    }
+    (obj->*Setter)(point);
+  }
+
+  // Rectangle roundness: the PAGX node carries a single float but tgfx exposes a 4-corner array, so
+  // this cannot use WriteMixedFloat. Mix against the first corner and apply uniformly.
+  static void WriteRectangleRoundness(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* rect = static_cast<tgfx::Rectangle*>(object);
+    float current = rect->roundness()[0];
+    rect->setRoundness(MixFloat(current, *v, mix));
+  }
+
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
     rect->setPosition(ToTGFX(node->renderPosition()));
@@ -623,6 +1113,20 @@ class LayerBuilderContext {
     rect->setSize({size.width, size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
+    _result.binding.set(node, rect);
+    _result.binding.setWriter(
+        node, "size.width",
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, true>);
+    _result.binding.setWriter(
+        node, "size.height",
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                             &tgfx::Rectangle::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                             &tgfx::Rectangle::setPosition, false>);
+    _result.binding.setWriter(node, "roundness", WriteRectangleRoundness);
     return rect;
   }
 
@@ -632,6 +1136,19 @@ class LayerBuilderContext {
     auto size = node->renderSize();
     ellipse->setSize({size.width, size.height});
     ellipse->setReversed(node->reversed);
+    _result.binding.set(node, ellipse);
+    _result.binding.setWriter(
+        node, "size.width",
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, true>);
+    _result.binding.setWriter(
+        node, "size.height",
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, false>);
+    _result.binding.setWriter(
+        node, "position.x",
+        WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, &tgfx::Ellipse::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position,
+                                             &tgfx::Ellipse::setPosition, false>);
     return ellipse;
   }
 
@@ -650,6 +1167,31 @@ class LayerBuilderContext {
     } else {
       polystar->setPolystarType(tgfx::PolystarType::Star);
     }
+    _result.binding.set(node, polystar);
+    _result.binding.setWriter(node, "pointCount",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::pointCount,
+                                              &tgfx::Polystar::setPointCount>);
+    _result.binding.setWriter(node, "outerRadius",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRadius,
+                                              &tgfx::Polystar::setOuterRadius>);
+    _result.binding.setWriter(node, "innerRadius",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRadius,
+                                              &tgfx::Polystar::setInnerRadius>);
+    _result.binding.setWriter(node, "outerRoundness",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRoundness,
+                                              &tgfx::Polystar::setOuterRoundness>);
+    _result.binding.setWriter(node, "innerRoundness",
+                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRoundness,
+                                              &tgfx::Polystar::setInnerRoundness>);
+    _result.binding.setWriter(
+        node, "rotation",
+        WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::rotation, &tgfx::Polystar::setRotation>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                             &tgfx::Polystar::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                             &tgfx::Polystar::setPosition, false>);
     return polystar;
   }
 
@@ -735,6 +1277,9 @@ class LayerBuilderContext {
     auto fill = tgfx::FillStyle::Make(colorSource);
     if (fill) {
       _result.binding.set(node, fill);
+      if (node->color) {
+        _result.binding.trackColorSource(node->color, node);
+      }
       fill->setAlpha(node->alpha);
       if (node->blendMode != BlendMode::Normal) {
         fill->setBlendMode(ToTGFX(node->blendMode));
@@ -745,6 +1290,9 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
+      _result.binding.setWriter(
+          node, "alpha",
+          WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>);
     }
     return fill;
   }
@@ -770,6 +1318,9 @@ class LayerBuilderContext {
       return nullptr;
     }
     _result.binding.set(node, stroke);
+    if (node->color) {
+      _result.binding.trackColorSource(node->color, node);
+    }
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
@@ -789,6 +1340,18 @@ class LayerBuilderContext {
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
     }
+    _result.binding.setWriter(node, "width",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
+                                              &tgfx::StrokeStyle::setStrokeWidth>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha,
+                                              &tgfx::StrokeStyle::setAlpha>);
+    _result.binding.setWriter(node, "miterLimit",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit,
+                                              &tgfx::StrokeStyle::setMiterLimit>);
+    _result.binding.setWriter(node, "dashOffset",
+                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::dashOffset,
+                                              &tgfx::StrokeStyle::setDashOffset>);
 
     return stroke;
   }
@@ -922,37 +1485,100 @@ class LayerBuilderContext {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
                                    positions),
         node, node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(
+          node, "startPoint.x",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
+                         &tgfx::LinearGradient::setStartPoint, true>);
+      _result.binding.setWriter(
+          node, "startPoint.y",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
+                         &tgfx::LinearGradient::setStartPoint, false>);
+      _result.binding.setWriter(
+          node, "endPoint.x",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
+                         &tgfx::LinearGradient::setEndPoint, true>);
+      _result.binding.setWriter(
+          node, "endPoint.y",
+          WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
+                         &tgfx::LinearGradient::setEndPoint, false>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(node, "center.x",
+                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                                               &tgfx::RadialGradient::setCenter, true>);
+      _result.binding.setWriter(node, "center.y",
+                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                                               &tgfx::RadialGradient::setCenter, false>);
+      _result.binding.setWriter(node, "radius",
+                                WriteMixedFloat<tgfx::RadialGradient, &tgfx::RadialGradient::radius,
+                                                &tgfx::RadialGradient::setRadius>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
-                                                             node->endAngle, colors, positions),
-                                   node, node->colorStops);
+    auto result =
+        applyGradientProperties(tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle,
+                                                          node->endAngle, colors, positions),
+                                node, node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(node, "center.x",
+                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                                               &tgfx::ConicGradient::setCenter, true>);
+      _result.binding.setWriter(node, "center.y",
+                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                                               &tgfx::ConicGradient::setCenter, false>);
+      _result.binding.setWriter(
+          node, "startAngle",
+          WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::startAngle,
+                          &tgfx::ConicGradient::setStartAngle>);
+      _result.binding.setWriter(node, "endAngle",
+                                WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::endAngle,
+                                                &tgfx::ConicGradient::setEndAngle>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
     extractGradientStops(node->colorStops, &colors, &positions);
-    return applyGradientProperties(
+    auto result = applyGradientProperties(
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
+    if (result != nullptr) {
+      _result.binding.setWriter(
+          node, "center.x",
+          WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
+                         &tgfx::DiamondGradient::setCenter, true>);
+      _result.binding.setWriter(
+          node, "center.y",
+          WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
+                         &tgfx::DiamondGradient::setCenter, false>);
+      _result.binding.setWriter(
+          node, "radius",
+          WriteMixedFloat<tgfx::DiamondGradient, &tgfx::DiamondGradient::radius,
+                          &tgfx::DiamondGradient::setRadius>);
+    }
+    return result;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -960,23 +1586,25 @@ class LayerBuilderContext {
       return nullptr;
     }
 
-    auto image = getOrCreateImage(node->image);
+    auto imageNode = node->image;
+    auto image = getOrCreateImage(imageNode);
     if (!image) {
       // Image data is missing for this node (never loaded or decode failed); paint nothing
       // rather than falling back to an opaque color that would be visibly wrong.
       return nullptr;
     }
+    _result.binding.set(imageNode, image);
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
-    if (!pattern) {
-      return nullptr;
-    }
-    _result.binding.set(node, pattern);
-    pattern->setScaleMode(ToTGFX(node->scaleMode));
-    if (!node->matrix.isIdentity()) {
-      pattern->setMatrix(ToTGFX(node->matrix));
+    if (pattern) {
+      _result.binding.set(node, pattern);
+      _result.binding.trackImage(imageNode, node);
+      pattern->setScaleMode(ToTGFX(node->scaleMode));
+      if (!node->matrix.isIdentity()) {
+        pattern->setMatrix(ToTGFX(node->matrix));
+      }
     }
 
     return pattern;
@@ -1036,6 +1664,16 @@ class LayerBuilderContext {
     if (node->type == TrimType::Continuous) {
       trim->setTrimType(tgfx::TrimPathType::Continuous);
     }
+    _result.binding.set(node, trim);
+    _result.binding.setWriter(
+        node, "start",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::start, &tgfx::TrimPath::setStart>);
+    _result.binding.setWriter(
+        node, "end",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::end, &tgfx::TrimPath::setEnd>);
+    _result.binding.setWriter(
+        node, "offset",
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::offset, &tgfx::TrimPath::setOffset>);
     return trim;
   }
 
@@ -1062,6 +1700,10 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCorner* node) {
     auto round = tgfx::RoundCorner::Make();
     round->setRadius(node->radius);
+    _result.binding.set(node, round);
+    _result.binding.setWriter(node, "radius",
+                              WriteMixedFloat<tgfx::RoundCorner, &tgfx::RoundCorner::radius,
+                                              &tgfx::RoundCorner::setRadius>);
     return round;
   }
 
@@ -1084,7 +1726,75 @@ class LayerBuilderContext {
     repeater->setScale(ToTGFX(node->scale));
     repeater->setStartAlpha(node->startAlpha);
     repeater->setEndAlpha(node->endAlpha);
+    _result.binding.set(node, repeater);
+    _result.binding.setWriter(
+        node, "copies",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::copies, &tgfx::Repeater::setCopies>);
+    _result.binding.setWriter(
+        node, "offset",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::offset, &tgfx::Repeater::setOffset>);
+    _result.binding.setWriter(
+        node, "rotation",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::rotation, &tgfx::Repeater::setRotation>);
+    _result.binding.setWriter(node, "startAlpha",
+                              WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::startAlpha,
+                                              &tgfx::Repeater::setStartAlpha>);
+    _result.binding.setWriter(
+        node, "endAlpha",
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::endAlpha, &tgfx::Repeater::setEndAlpha>);
+    _result.binding.setWriter(
+        node, "anchor.x",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, true>);
+    _result.binding.setWriter(
+        node, "anchor.y",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                             &tgfx::Repeater::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                             &tgfx::Repeater::setPosition, false>);
+    _result.binding.setWriter(
+        node, "scale.x",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, true>);
+    _result.binding.setWriter(
+        node, "scale.y",
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, false>);
     return repeater;
+  }
+
+  // TextModifier optional paint channels: animating sets the optional to the mixed value, blending
+  // against the current value when present and against the target alone when unset.
+  static void WriteTextModifierFillColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto target = ToTGFX(*v);
+    auto current = modifier->fillColor();
+    modifier->setFillColor(current.has_value() ? MixTGFXColor(*current, target, mix) : target);
+  }
+
+  static void WriteTextModifierStrokeColor(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto target = ToTGFX(*v);
+    auto current = modifier->strokeColor();
+    modifier->setStrokeColor(current.has_value() ? MixTGFXColor(*current, target, mix) : target);
+  }
+
+  static void WriteTextModifierStrokeWidth(void* object, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* modifier = static_cast<tgfx::TextModifier*>(object);
+    auto current = modifier->strokeWidth();
+    modifier->setStrokeWidth(current.has_value() ? MixFloat(*current, *v, mix) : *v);
   }
 
   std::shared_ptr<tgfx::TextModifier> convertTextModifier(const TextModifier* node) {
@@ -1110,6 +1820,41 @@ class LayerBuilderContext {
       modifier->setStrokeWidth(node->strokeWidth.value());
     }
 
+    _result.binding.set(node, modifier);
+    _result.binding.setWriter(node, "rotation",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::rotation,
+                                              &tgfx::TextModifier::setRotation>);
+    _result.binding.setWriter(node, "skew",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skew,
+                                              &tgfx::TextModifier::setSkew>);
+    _result.binding.setWriter(node, "skewAxis",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skewAxis,
+                                              &tgfx::TextModifier::setSkewAxis>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::alpha,
+                                              &tgfx::TextModifier::setAlpha>);
+    _result.binding.setWriter(node, "anchor.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                                             &tgfx::TextModifier::setAnchor, true>);
+    _result.binding.setWriter(node, "anchor.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                                             &tgfx::TextModifier::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                                             &tgfx::TextModifier::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                                             &tgfx::TextModifier::setPosition, false>);
+    _result.binding.setWriter(node, "scale.x",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                                             &tgfx::TextModifier::setScale, true>);
+    _result.binding.setWriter(node, "scale.y",
+                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                                             &tgfx::TextModifier::setScale, false>);
+    _result.binding.setWriter(node, "fillColor", WriteTextModifierFillColor);
+    _result.binding.setWriter(node, "strokeColor", WriteTextModifierStrokeColor);
+    _result.binding.setWriter(node, "strokeWidth", WriteTextModifierStrokeWidth);
+
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
     tgfxSelectors.reserve(node->selectors.size());
@@ -1128,6 +1873,26 @@ class LayerBuilderContext {
         tgfxSelector->setWeight(rangeSelector->weight);
         tgfxSelector->setRandomOrder(rangeSelector->randomOrder);
         tgfxSelector->setRandomSeed(static_cast<uint16_t>(rangeSelector->randomSeed));
+        _result.binding.set(rangeSelector, tgfxSelector);
+        _result.binding.setWriter(rangeSelector, "start",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::start,
+                                                  &tgfx::RangeSelector::setStart>);
+        _result.binding.setWriter(rangeSelector, "end",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::end,
+                                                  &tgfx::RangeSelector::setEnd>);
+        _result.binding.setWriter(rangeSelector, "offset",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::offset,
+                                                  &tgfx::RangeSelector::setOffset>);
+        _result.binding.setWriter(rangeSelector, "easeIn",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeIn,
+                                                  &tgfx::RangeSelector::setEaseIn>);
+        _result.binding.setWriter(
+            rangeSelector, "easeOut",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeOut,
+                            &tgfx::RangeSelector::setEaseOut>);
+        _result.binding.setWriter(rangeSelector, "weight",
+                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::weight,
+                                                  &tgfx::RangeSelector::setWeight>);
         tgfxSelectors.push_back(tgfxSelector);
       }
     }
@@ -1182,6 +1947,40 @@ class LayerBuilderContext {
     if (node->skewAxis != 0) {
       group->setSkewAxis(node->skewAxis);
     }
+
+    // Register transform channels. Group and TextBox share these; the node pointer is the source
+    // node passed in (TextBox passes itself), so animation targets resolve to the right binding.
+    _result.binding.set(node, group);
+    _result.binding.setWriter(node, "rotation",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::rotation,
+                                              &tgfx::VectorGroup::setRotation>);
+    _result.binding.setWriter(node, "alpha",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::alpha,
+                                              &tgfx::VectorGroup::setAlpha>);
+    _result.binding.setWriter(
+        node, "skew",
+        WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skew, &tgfx::VectorGroup::setSkew>);
+    _result.binding.setWriter(node, "skewAxis",
+                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skewAxis,
+                                              &tgfx::VectorGroup::setSkewAxis>);
+    _result.binding.setWriter(node, "anchor.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
+                                             &tgfx::VectorGroup::setAnchor, true>);
+    _result.binding.setWriter(node, "anchor.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
+                                             &tgfx::VectorGroup::setAnchor, false>);
+    _result.binding.setWriter(node, "position.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                                             &tgfx::VectorGroup::setPosition, true>);
+    _result.binding.setWriter(node, "position.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                                             &tgfx::VectorGroup::setPosition, false>);
+    _result.binding.setWriter(node, "scale.x",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                             &tgfx::VectorGroup::setScale, true>);
+    _result.binding.setWriter(node, "scale.y",
+                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                             &tgfx::VectorGroup::setScale, false>);
 
     return group;
   }
@@ -2031,6 +2830,25 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   // Slot's recursive children build their own subtrees independently.
   context.setNeedsRuntimeData(true);
   return context.buildSubtree(composition);
+}
+
+bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+  if (node == nullptr || binding == nullptr) {
+    return false;
+  }
+  LayerBuilderContext context;
+  context.setNeedsRuntimeData(true);
+  return context.refreshLayerInPlace(node, binding);
+}
+
+std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
+                                                          RuntimeBinding* binding) {
+  if (node == nullptr || binding == nullptr) {
+    return nullptr;
+  }
+  LayerBuilderContext context;
+  context.setNeedsRuntimeData(true);
+  return context.buildLayerInto(node, binding);
 }
 
 }  // namespace pagx

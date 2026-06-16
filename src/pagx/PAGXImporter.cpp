@@ -1621,6 +1621,13 @@ Color ParseTypedValue<Color>(const std::string& value, PAGXDocument* doc, const 
   return color;
 }
 
+template <>
+Matrix ParseTypedValue<Matrix>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  // MatrixFromString accepts the same "a,b,c,d,tx,ty" form used for the matrix attribute; an
+  // unparseable value yields the identity matrix.
+  return MatrixFromString(value);
+}
+
 template <typename T>
 static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
                            PAGXDocument* doc) {
@@ -1719,6 +1726,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "color") {
     auto ch = makeNodeFromXML<TypedChannel<Color>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "matrix") {
+    auto ch = makeNodeFromXML<TypedChannel<Matrix>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {
