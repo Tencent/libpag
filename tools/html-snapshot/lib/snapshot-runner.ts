@@ -32,12 +32,14 @@ import {
   type CaptureResponseListener,
 } from './capture-listener';
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
+import { responseBytes } from './browser-engine';
 import type {
   BrowserResponse,
   CookieParam,
   EngineName,
   EngineWrapper,
 } from './browser-engine';
+import { ResourceCache, type CachedResource } from './resource-cache';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -74,6 +76,89 @@ export function makeImageCaptureListener(
 function entryToDataUri(entry: ImageCaptureValue): string {
   const ct = (entry && entry.contentType) || 'application/octet-stream';
   return `data:${ct};base64,${entry.buffer.toString('base64')}`;
+}
+
+// Decide whether a (url, contentType) pair represents a sub-resource the cache
+// is meant to hold (CSS / JS / font). Images, documents, XHR, etc. are skipped:
+// they are large or response-specific and would only push the cacheable assets
+// (the actually-shared CDN bundles) out of the budget.
+function isCacheableContentType(url: string, contentType: string): boolean {
+  const ct = (contentType || '').toLowerCase().split(';')[0].trim();
+  if (ct.startsWith('text/css') || ct.startsWith('application/javascript') ||
+      ct.startsWith('text/javascript') || ct.startsWith('application/x-javascript') ||
+      ct.startsWith('application/json') || ct.startsWith('font/') ||
+      ct.startsWith('application/font') || ct.startsWith('application/x-font') ||
+      ct.startsWith('application/vnd.ms-fontobject')) {
+    return true;
+  }
+  // Many CDN font URLs come back with `application/octet-stream`; fall back to
+  // the URL extension so the listener still picks them up.
+  const lowerUrl = url.toLowerCase().split('?')[0];
+  if (lowerUrl.endsWith('.css') || lowerUrl.endsWith('.js') || lowerUrl.endsWith('.mjs') ||
+      lowerUrl.endsWith('.woff') || lowerUrl.endsWith('.woff2') || lowerUrl.endsWith('.ttf') ||
+      lowerUrl.endsWith('.otf') || lowerUrl.endsWith('.eot')) {
+    return true;
+  }
+  return false;
+}
+
+// Route handler for the `request.continue` / `route.fulfill` API. Given the
+// metadata of a network request, return either a `fulfill` decision (with the
+// cached body) or `continue` so the engine performs the real network fetch.
+// Only http(s) GET requests are considered; everything else falls through.
+export interface RouteRequestInfo {
+  url: string;
+  method: string;
+  resourceType: string;
+}
+export type RouteDecision =
+  | { action: 'fulfill'; fulfillment: { status: number; contentType: string; body: Buffer } }
+  | { action: 'continue' };
+
+export function makeResourceCacheRouteHandler(
+  cache: ResourceCache,
+): (req: RouteRequestInfo) => RouteDecision {
+  return function handle(req: RouteRequestInfo): RouteDecision {
+    if (req.method !== 'GET') return { action: 'continue' };
+    if (!/^https?:\/\//i.test(req.url)) return { action: 'continue' };
+    const hit = cache.get(req.url);
+    if (hit === undefined) return { action: 'continue' };
+    return {
+      action: 'fulfill',
+      fulfillment: { status: hit.status, contentType: hit.contentType, body: hit.body },
+    };
+  };
+}
+
+// `page.on('response')` listener that populates `cache` with successful
+// http(s) GET sub-resources (CSS / JS / fonts) so a follow-up snapshot can
+// fulfil them without re-hitting the network. Mirrors the
+// `makeCaptureListener` shape but writes into a typed `ResourceCache` rather
+// than a plain Map, and only stores resources flagged by
+// `isCacheableContentType`.
+export function makeResourceCacheListener(
+  engine: EngineName,
+  cache: ResourceCache,
+  log: CaptureLogger | null,
+): CaptureResponseListener {
+  return async function captureResponse(resp: BrowserResponse): Promise<void> {
+    try {
+      const req = resp.request();
+      if (req.method() !== 'GET') return;
+      const url = resp.url();
+      if (!url || !/^https?:\/\//i.test(url)) return;
+      if (!resp.ok()) return;
+      if (cache.has(url)) return;
+      const headers = resp.headers() || {};
+      const contentType = headers['content-type'] || 'application/octet-stream';
+      if (!isCacheableContentType(url, contentType)) return;
+      const buf = await responseBytes(resp, engine);
+      const entry: CachedResource = { status: 200, contentType, body: buf };
+      cache.set(url, entry);
+    } catch (err) {
+      if (log) log(`resource cache capture skipped: ${errMessage(err)}`);
+    }
+  };
 }
 
 export interface RunSnapshotOptions {
