@@ -23,7 +23,8 @@
 namespace pagx {
 
 /**
- * Base class for layer filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter).
+ * Base class for layer filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter,
+ * ColorMatrixFilter, NoiseFilter).
  */
 class LayerFilter : public Node {
  public:

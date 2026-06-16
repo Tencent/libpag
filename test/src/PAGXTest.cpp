@@ -36,6 +36,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
@@ -56,8 +57,11 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -96,7 +100,9 @@
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/Text.h"
@@ -7209,6 +7215,912 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.d, 2.0f);
   EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
+}
+
+static pagx::Layer* MakeTestLayer(pagx::PAGXDocument* doc, float x, float y, float fillR,
+                                  float fillG, float fillB) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {fillR, fillG, fillB, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::Layer* MakeTestLayerSimple(pagx::PAGXDocument* doc, float x, float y) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::NoiseFilter* MakeMonoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeDuoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  noise->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeMultiNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Multi;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->opacity = 1.0f;
+  return noise;
+}
+
+static pagx::Fill* MakeSolidFill(pagx::PAGXDocument* doc, float r, float g, float b) {
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {r, g, b, 1.0f};
+  fill->color = solid;
+  return fill;
+}
+
+static void WriteSVGFile(const std::string& svgContent, const std::string& relativePath) {
+  auto outPath = ProjectPath::Absolute(relativePath);
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
+}
+
+/**
+ * Test rendering with Mono, Duo, and Multi noise filters side by side.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterModes) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 150;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto layer1 = MakeTestLayer(doc.get(), 20, 0, 0.2f, 0.5f, 0.8f);
+  auto mono = doc->makeNode<pagx::NoiseFilter>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer1->filters.push_back(mono);
+  doc->layers.push_back(layer1);
+
+  auto layer2 = MakeTestLayer(doc.get(), 150, 0, 0.2f, 0.5f, 0.8f);
+  auto duo = doc->makeNode<pagx::NoiseFilter>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 8;
+  duo->density = 0.5f;
+  duo->seed = 42;
+  duo->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer2->filters.push_back(duo);
+  doc->layers.push_back(layer2);
+
+  auto layer3 = MakeTestLayer(doc.get(), 280, 0, 0.2f, 0.5f, 0.8f);
+  auto multi = doc->makeNode<pagx::NoiseFilter>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer3->filters.push_back(multi);
+  doc->layers.push_back(layer3);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterModes"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterModes.svg");
+}
+/**
+ * Test NoiseFilter applied to every supported element type (Rectangle, Ellipse, Path, Polystar,
+ * Text, Group, TextBox) plus Repeater, outputting SVG for visual inspection of contentBounds
+ * correctness.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
+  constexpr int canvasW = 800;
+  constexpr int canvasH = 470;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  fontConfig.registerTypeface(typeface);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  // Row 1: Rectangle(Mono,0), Ellipse(Duo,0.25), Path(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {60, 60};
+    rect->size = {100, 100};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.5f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.0f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {60, 60};
+    ellipse->size = {100, 100};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.3f, 0.3f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.25f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 20);
+
+    auto path = doc->makeNode<pagx::Path>();
+    path->data = doc->makeNode<pagx::PathData>();
+    path->data->moveTo(0, 0);
+    path->data->lineTo(100, 0);
+    path->data->lineTo(50, 100);
+    path->data->close();
+    path->position = {10, 10};
+    layer->contents.push_back(path);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.7f, 0.3f));
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 2: Polystar(Mono,0.75), Text(Duo,1), Group(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 160);
+
+    auto polystar = doc->makeNode<pagx::Polystar>();
+    polystar->position = {60, 60};
+    polystar->outerRadius = 50;
+    polystar->innerRadius = 25;
+    polystar->pointCount = 5;
+    layer->contents.push_back(polystar);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.7f, 0.5f, 0.9f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.75f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 160);
+
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "Hi";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
+    text->fontSize = 60;
+    layer->contents.push_back(text);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.6f, 0.9f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 1.0f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 160);
+
+    auto group = doc->makeNode<pagx::Group>();
+    group->position = {10, 10};
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {40, 40};
+    rect->size = {60, 60};
+    group->elements.push_back(rect);
+    group->elements.push_back(MakeSolidFill(doc.get(), 0.9f, 0.6f, 0.1f));
+    layer->contents.push_back(group);
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 3: TextBox(Duo,0.5), Repeater(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 320);
+
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->width = 120;
+    textBox->height = 100;
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "AB CD";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
+    text->fontSize = 30;
+    textBox->elements.push_back(text);
+    textBox->elements.push_back(MakeSolidFill(doc.get(), 0.1f, 0.4f, 0.7f));
+    layer->contents.push_back(textBox);
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(200, 320);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {30, 30};
+    rect->size = {40, 40};
+    auto repeater = doc->makeNode<pagx::Repeater>();
+    repeater->copies = 3;
+    repeater->offset = 0;
+    repeater->position = {50, 0};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.8f, 0.6f));
+    layer->contents.push_back(repeater);
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 4: Off-center content (contentBounds origin != 0,0)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(440, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {80, 40};
+    rect->size = {60, 60};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.6f, 0.2f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(580, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {40, 80};
+    ellipse->size = {60, 80};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.7f, 0.2f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  doc->applyLayout(&fontConfig);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterAllElements"));
+
+  pagx::SVGExportOptions svgOpts;
+  svgOpts.fontConfig = &fontConfig;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<filter"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterAllElements.svg");
+}
+
+/**
+ * Test NoiseStyle with blendMode applied to an image layer, verifying both rendering and SVG
+ * export. The blendMode is set to Multiply so the noise composites differently from Normal.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
+  constexpr int canvasW = 200;
+  constexpr int canvasH = 200;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {200, 200};
+
+  auto* image = doc->makeNode<pagx::Image>();
+  auto imageData =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(imageData != nullptr);
+  image->data = pagx::Data::MakeWithCopy(imageData->bytes(), imageData->size());
+
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1, 0, 0, 1, 0, 0};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  auto* noise = doc->makeNode<pagx::NoiseStyle>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 1.0f;
+  noise->seed = 7;
+  noise->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  noise->blendMode = pagx::BlendMode::Multiply;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(noise);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleBlendModeOnImage"));
+
+  pagx::SVGExportOptions svgOpts;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("feBlend"), std::string::npos);
+  EXPECT_NE(svg.find("mode=\"multiply\""), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
+}
+
+/**
+ * Test rendering with Mono, Duo, and Multi noise styles side by side.
+ * Covers writeNoiseStyle for all three modes.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleModes) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 180;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto layer1 = MakeTestLayerSimple(doc.get(), 20, 40);
+  auto mono = doc->makeNode<pagx::NoiseStyle>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer1->styles.push_back(mono);
+  doc->layers.push_back(layer1);
+
+  auto layer2 = MakeTestLayerSimple(doc.get(), 150, 40);
+  auto duo = doc->makeNode<pagx::NoiseStyle>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 8;
+  duo->density = 0.5f;
+  duo->seed = 42;
+  duo->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer2->styles.push_back(duo);
+  doc->layers.push_back(layer2);
+
+  auto layer3 = MakeTestLayerSimple(doc.get(), 280, 40);
+  auto multi = doc->makeNode<pagx::NoiseStyle>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer3->styles.push_back(multi);
+  doc->layers.push_back(layer3);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleModes"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleModes.svg");
+}
+
+/**
+ * Test animation channel binding for NoiseFilter (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoFilter = doc->makeNode<pagx::NoiseFilter>("NF_MONO");
+  monoFilter->mode = pagx::NoiseMode::Mono;
+  monoFilter->size = 4;
+  monoFilter->density = 0.2f;
+  monoFilter->seed = 10;
+  monoFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->filters.push_back(monoFilter);
+
+  auto duoFilter = doc->makeNode<pagx::NoiseFilter>("NF_DUO");
+  duoFilter->mode = pagx::NoiseMode::Duo;
+  duoFilter->size = 6;
+  duoFilter->density = 0.3f;
+  duoFilter->seed = 20;
+  duoFilter->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoFilter->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->filters.push_back(duoFilter);
+
+  auto multiFilter = doc->makeNode<pagx::NoiseFilter>("NF_MULTI");
+  multiFilter->mode = pagx::NoiseMode::Multi;
+  multiFilter->size = 8;
+  multiFilter->density = 0.4f;
+  multiFilter->seed = 30;
+  multiFilter->opacity = 0.5f;
+  layer->filters.push_back(multiFilter);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono filter channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NF_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 20.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.8f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo filter channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NF_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi filter channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NF_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseFilter>(monoFilter);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseFilter>(duoFilter);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseFilter>(multiFilter);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  EXPECT_FALSE(tree.apply(monoFilter, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiFilter, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0: values fully overwritten by keyframe targets.
+  timeline->apply(1.0f);
+
+  // Mono: size 4→20, density 0.2→0.8, seed 10→100, color black→red
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 20.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.8f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 100.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseFilter>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 0.0f);
+
+  // Duo: firstColor red→green, secondColor blue→yellow
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseFilter>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().red, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseFilter>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial toward keyframe.
+  // Reset initial values by re-building.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseFilter>(monoFilter);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (20-4)*0.5 = 12
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 12.0f);
+  // density: 0.2 + (0.8-0.2)*0.5 = 0.5
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.5f);
+  // seed: 10 + (100-10)*0.5 = 55
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 55.0f);
+}
+
+/**
+ * Test animation channel binding for NoiseStyle (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoStyle = doc->makeNode<pagx::NoiseStyle>("NS_MONO");
+  monoStyle->mode = pagx::NoiseMode::Mono;
+  monoStyle->size = 4;
+  monoStyle->density = 0.2f;
+  monoStyle->seed = 10;
+  monoStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->styles.push_back(monoStyle);
+
+  auto duoStyle = doc->makeNode<pagx::NoiseStyle>("NS_DUO");
+  duoStyle->mode = pagx::NoiseMode::Duo;
+  duoStyle->size = 6;
+  duoStyle->density = 0.3f;
+  duoStyle->seed = 20;
+  duoStyle->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoStyle->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->styles.push_back(duoStyle);
+
+  auto multiStyle = doc->makeNode<pagx::NoiseStyle>("NS_MULTI");
+  multiStyle->mode = pagx::NoiseMode::Multi;
+  multiStyle->size = 8;
+  multiStyle->density = 0.4f;
+  multiStyle->seed = 30;
+  multiStyle->opacity = 0.5f;
+  layer->styles.push_back(multiStyle);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono style channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NS_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 16.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.9f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo style channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NS_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi style channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NS_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseStyle>(monoStyle);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseStyle>(duoStyle);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseStyle>(multiStyle);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  EXPECT_FALSE(tree.apply(monoStyle, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiStyle, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0
+  timeline->apply(1.0f);
+
+  // Mono: size 4→16, density 0.2→0.9, seed 10→80, color black→green
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 16.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.9f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 80.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseStyle>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 0.0f);
+
+  // Duo: firstColor red→blue, secondColor blue→green
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseStyle>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().blue, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().blue, 0.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseStyle>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial values.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseStyle>(monoStyle);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (16-4)*0.5 = 10
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 10.0f);
+  // density: 0.2 + (0.9-0.2)*0.5 = 0.55
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.55f);
+  // seed: 10 + (80-10)*0.5 = 45
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 45.0f);
+}
+
+/**
+ * Render NoiseFilter/NoiseStyle animation frames across all modes and combined with shadows.
+ * Layout: two rectangles side-by-side, left with NoiseFilter, right with NoiseStyle.
+ * 12 frames total: 3 Mono, 3 Duo, 3 Multi, 3 Multi+DropShadowFilter+InnerShadowStyle.
+ * Density animates from 0.1 to 1.0 across all 12 frames.
+ * The baseline key is "NoiseFilterAnimation" (without the "Export" prefix) to avoid
+ * re-accepting baselines after renaming the test.
+ */
+PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
+  constexpr int canvasW = 500;
+  constexpr int canvasH = 260;
+  constexpr int totalFrames = 12;
+  constexpr int framesPerSection = 3;
+
+  auto outDir = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAnimation");
+  auto dirPath = std::filesystem::path(outDir);
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+
+  for (int i = 0; i < totalFrames; i++) {
+    float density = 0.1f + 0.9f * (static_cast<float>(i) / (totalFrames - 1));
+    int section = i / framesPerSection;
+
+    auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+    // Left rectangle with NoiseFilter
+    auto layerL = doc->makeNode<pagx::Layer>("LL");
+    layerL->width = 220;
+    layerL->height = 220;
+    layerL->matrix = pagx::Matrix::Translate(10, 20);
+    auto rectL = doc->makeNode<pagx::Rectangle>();
+    rectL->position = {110, 110};
+    rectL->size = {220, 220};
+    rectL->roundness = 12;
+    auto fillL = doc->makeNode<pagx::Fill>();
+    auto solidL = doc->makeNode<pagx::SolidColor>();
+    solidL->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillL->color = solidL;
+    layerL->contents.push_back(rectL);
+    layerL->contents.push_back(fillL);
+
+    auto noiseFilter = doc->makeNode<pagx::NoiseFilter>("NF");
+    noiseFilter->size = 8;
+    noiseFilter->density = density;
+    noiseFilter->seed = 42;
+    switch (section) {
+      case 0:
+        noiseFilter->mode = pagx::NoiseMode::Mono;
+        noiseFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseFilter->mode = pagx::NoiseMode::Duo;
+        noiseFilter->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseFilter->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseFilter->mode = pagx::NoiseMode::Multi;
+        noiseFilter->opacity = 0.8f;
+        break;
+    }
+    layerL->filters.push_back(noiseFilter);
+
+    if (section == 3) {
+      auto shadowL = doc->makeNode<pagx::DropShadowFilter>();
+      shadowL->offsetX = 4;
+      shadowL->offsetY = 4;
+      shadowL->blurX = 6;
+      shadowL->blurY = 6;
+      shadowL->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerL->filters.push_back(shadowL);
+
+      auto innerShadowL = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowL->offsetX = 3;
+      innerShadowL->offsetY = 3;
+      innerShadowL->blurX = 8;
+      innerShadowL->blurY = 8;
+      innerShadowL->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerL->styles.push_back(innerShadowL);
+    }
+
+    doc->layers.push_back(layerL);
+
+    // Right rectangle with NoiseStyle
+    auto layerR = doc->makeNode<pagx::Layer>("LR");
+    layerR->width = 220;
+    layerR->height = 220;
+    layerR->matrix = pagx::Matrix::Translate(270, 20);
+    auto rectR = doc->makeNode<pagx::Rectangle>();
+    rectR->position = {110, 110};
+    rectR->size = {220, 220};
+    rectR->roundness = 12;
+    auto fillR = doc->makeNode<pagx::Fill>();
+    auto solidR = doc->makeNode<pagx::SolidColor>();
+    solidR->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillR->color = solidR;
+    layerR->contents.push_back(rectR);
+    layerR->contents.push_back(fillR);
+
+    auto noiseStyle = doc->makeNode<pagx::NoiseStyle>("NS");
+    noiseStyle->size = 8;
+    noiseStyle->density = density;
+    noiseStyle->seed = 42;
+    switch (section) {
+      case 0:
+        noiseStyle->mode = pagx::NoiseMode::Mono;
+        noiseStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseStyle->mode = pagx::NoiseMode::Duo;
+        noiseStyle->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseStyle->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseStyle->mode = pagx::NoiseMode::Multi;
+        noiseStyle->opacity = 0.8f;
+        break;
+    }
+    layerR->styles.push_back(noiseStyle);
+
+    if (section == 3) {
+      auto shadowR = doc->makeNode<pagx::DropShadowFilter>();
+      shadowR->offsetX = 4;
+      shadowR->offsetY = 4;
+      shadowR->blurX = 6;
+      shadowR->blurY = 6;
+      shadowR->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerR->filters.push_back(shadowR);
+
+      auto innerShadowR = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowR->offsetX = 3;
+      innerShadowR->offsetY = 3;
+      innerShadowR->blurX = 8;
+      innerShadowR->blurY = 8;
+      innerShadowR->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerR->styles.push_back(innerShadowR);
+    }
+
+    doc->layers.push_back(layerR);
+
+    doc->applyLayout();
+    auto tgfxRoot = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxRoot != nullptr);
+
+    tgfx::DisplayList displayList;
+    displayList.root()->addChild(tgfxRoot);
+    displayList.render(surface.get(), true);
+
+    auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
+    EXPECT_TRUE(Baseline::Compare(surface, key));
+  }
 }
 
 }  // namespace pag

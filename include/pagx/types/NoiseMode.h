@@ -18,32 +18,24 @@
 
 #pragma once
 
-#include "pagx/types/BlendMode.h"
-#include "pagx/nodes/Node.h"
-
 namespace pagx {
 
 /**
- * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle).
+ * Noise modes for noise filters and noise layer styles.
  */
-class LayerStyle : public Node {
- public:
+enum class NoiseMode {
   /**
-   * The blend mode used when compositing the style. The default value is Normal.
+   * Single-color noise. Noise pixels are filled with one color.
    */
-  BlendMode blendMode = BlendMode::Normal;
-
+  Mono,
   /**
-   * Whether to exclude child layer effects when computing this style. The default value is false.
+   * Dual-color noise. The noise source is split into two complementary regions.
    */
-  bool excludeChildEffects = false;
-
-  ~LayerStyle() override = default;
-
- protected:
-  LayerStyle() = default;
-
-  friend class PAGXDocument;
+  Duo,
+  /**
+   * Multi-color noise preserving original Perlin noise RGB with enhanced contrast.
+   */
+  Multi
 };
 
 }  // namespace pagx
