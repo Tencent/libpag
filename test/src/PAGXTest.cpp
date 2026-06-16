@@ -102,6 +102,7 @@
 #endif
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
@@ -115,7 +116,9 @@
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
+#include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
 #include "tgfx/layers/vectors/Rectangle.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/Text.h"
@@ -8431,6 +8434,7 @@ PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
     auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
     EXPECT_TRUE(Baseline::Compare(surface, key));
   }
+}
 /**
  * Test case: notifyChange reflects a render-attribute edit (alpha) on the live tgfx layer in place,
  * preserving the existing tgfx::Layer instance so handles stay valid.
@@ -9615,6 +9619,228 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
           << "' is Animatable but has no runtime writer";
     }
   }
+}
+
+/**
+ * Test: a SolidColor shared by two Fill painters stays bound when only one Fill is removed.
+ */
+PAGX_TEST(PAGXTest, SharedSolidColorSurvivesAfterOnePainterRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("sharedSolid");
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = solid;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = solid;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill2) != nullptr);
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+}
+
+/**
+ * Test: a SolidColor shared by two Fill painters is unbound when all Fills are removed.
+ */
+PAGX_TEST(PAGXTest, BothPaintersRemovedUnbindsSharedSolidColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("sharedSolid");
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = solid;
+  layer->contents.push_back(fill1);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = solid;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+
+  layer->contents.clear();
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) == nullptr);
+}
+
+/**
+ * Test: an Image shared by two ImagePattern painters stays bound when one pattern is removed.
+ */
+PAGX_TEST(PAGXTest, SharedImageSurvivesAfterOnePatternRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto imageNode = doc->makeNode<pagx::Image>("sharedImage");
+  imageNode->filePath =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/"
+      "5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto pattern1 = doc->makeNode<pagx::ImagePattern>();
+  pattern1->image = imageNode;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = pattern1;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto pattern2 = doc->makeNode<pagx::ImagePattern>();
+  pattern2->image = imageNode;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = pattern2;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+  ASSERT_TRUE(binding->contains(pattern1));
+  ASSERT_TRUE(binding->contains(pattern2));
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_FALSE(binding->contains(pattern2));
+  EXPECT_TRUE(binding->contains(pattern1));
+  EXPECT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+}
+
+/**
+ * Test: an Image shared by two ImagePattern painters is unbound when all patterns are removed.
+ */
+PAGX_TEST(PAGXTest, SharedImageUnboundAfterAllPatternsRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto imageNode = doc->makeNode<pagx::Image>("sharedImage");
+  imageNode->filePath =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/"
+      "5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+
+  auto pattern1 = doc->makeNode<pagx::ImagePattern>();
+  pattern1->image = imageNode;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = pattern1;
+  layer->contents.push_back(fill1);
+
+  auto pattern2 = doc->makeNode<pagx::ImagePattern>();
+  pattern2->image = imageNode;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = pattern2;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+
+  layer->contents.clear();
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_FALSE(binding->contains(fill1));
+  EXPECT_FALSE(binding->contains(pattern1));
+  EXPECT_FALSE(binding->contains(fill2));
+  EXPECT_FALSE(binding->contains(pattern2));
+  EXPECT_TRUE(binding->get<tgfx::Image>(imageNode) == nullptr);
+}
+
+/**
+ * Test: a LinearGradient shared by two Fill painters stays bound (with its ColorStops) when one
+ * Fill is removed.
+ */
+PAGX_TEST(PAGXTest, SharedGradientSurvivesAfterOnePainterRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 1};
+  auto stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0;
+  stop1->color = {1, 0, 0, 1};
+  gradient->colorStops.push_back(stop1);
+  auto stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1;
+  stop2->color = {0, 0, 1, 1};
+  gradient->colorStops.push_back(stop2);
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = gradient;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = gradient;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill2) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::Gradient>(gradient) != nullptr);
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  EXPECT_TRUE(binding->get<tgfx::Gradient>(gradient) != nullptr);
+  EXPECT_TRUE(binding->contains(stop1));
+  EXPECT_TRUE(binding->contains(stop2));
 }
 
 }  // namespace pag
