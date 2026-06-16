@@ -7239,6 +7239,83 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionDeepNestingNoFalseCycle) {
 }
 
 /**
+ * Test case: loading external composition data via loadFileData AFTER PAGScene::Make() sets the
+ * composition on the layer and notifies existing scenes without crashing. The node-level state is
+ * updated correctly.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataExternalCompositionAfterSceneCreation) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\">\n"
+      "    <Timelines>\n"
+      "      <Animation ref=\"@fade\" playing=\"true\"/>\n"
+      "    </Timelines>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  EXPECT_TRUE(slotLayer->composition == nullptr);
+  EXPECT_TRUE(slotLayer->externalDoc == nullptr);
+
+  auto childXML = MakeExternalCompositionXML("childLayer", "fade");
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+
+  // After loading, the slot layer should have its composition resolved.
+  ASSERT_TRUE(slotLayer->composition != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+
+  auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(externalChild != nullptr);
+}
+
+/**
+ * Test case: loading image data via loadFileData AFTER PAGScene::Make() sets the Image node data
+ * and notifies existing scenes without crashing. The node-level state is updated correctly.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto img = doc->makeNode<pagx::Image>("img");
+  img->filePath = "test.png";
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_EQ(img->filePath, "test.png");
+  EXPECT_TRUE(img->data == nullptr);
+
+  uint8_t bytes[] = {1, 2, 3, 4};
+  auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
+  EXPECT_TRUE(doc->loadFileData("test.png", imageData));
+
+  // After loading, image data is set and filePath is cleared.
+  EXPECT_TRUE(img->filePath.empty());
+  ASSERT_TRUE(img->data != nullptr);
+  EXPECT_EQ(img->data->size(), sizeof(bytes));
+}
+
+/**
+ * Test case: loadFileData is a no-op on notifyChange when called before any PAGScene exists.
+ * Verifies that empty dirtyNodes or no liveScenes path is handled correctly.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto img = doc->makeNode<pagx::Image>("img");
+  img->filePath = "test.png";
+
+  uint8_t bytes[] = {1, 2, 3, 4};
+  auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
+  EXPECT_TRUE(doc->loadFileData("test.png", imageData));
+
+  EXPECT_TRUE(img->filePath.empty());
+  ASSERT_TRUE(img->data != nullptr);
+}
+
+/**
  * Test case: a same-document composition that references itself through an @id is caught by the
  * runtime cycle guard in PAGComposition::MakeChild. The external-file chain guard only covers
  * compositionFilePath references, so a self-referencing in-document composition would otherwise
