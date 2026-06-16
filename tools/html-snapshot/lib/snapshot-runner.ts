@@ -151,9 +151,16 @@ export async function runSnapshot(
   // it. Both read disjoint resource types off the same `response` event, so a
   // single composed listener avoids racing two `page.on('response')`
   // handlers (page-loader accepts exactly one).
-  const captureImage = makeImageCaptureListener(engine, imageBytesByUrl, null);
+  //
+  // The capture listeners forward their per-resource skip messages to `log`
+  // when one is provided (`snapshot.js` always passes one; the HTTP service
+  // does too). Passing `null` previously silenced every "image/font capture
+  // skipped: ..." line, so a real CDN failure was indistinguishable from a
+  // healthy run — the snapshot was missing assets but nothing told the
+  // operator why.
+  const captureImage = makeImageCaptureListener(engine, imageBytesByUrl, log);
   const captureFont: CaptureResponseListener | null = downloadFonts
-    ? makeFontCaptureListener(engine, fontBytesByUrl, () => {})
+    ? makeFontCaptureListener(engine, fontBytesByUrl, log)
     : null;
   const onResponse: (resp: BrowserResponse) => void = captureFont
     ? (resp: BrowserResponse) => {

@@ -38,7 +38,7 @@
 
 // @ts-nocheck
 
-import { DROP_TAG_NAMES } from './dom-tags';
+import { DROP_TAG_NAMES_JSON } from './dom-tags';
 
 /* eslint-disable no-undef, no-inner-declarations */
 
@@ -209,6 +209,16 @@ function isVisible(computed) {
   return true;
 }
 
+// Read a single CSSOM declaration as a number, defaulting to 0 when the
+// property is unset / empty / NaN. `getComputedStyle` always returns a
+// string (`''` for missing entries) and `parseFloat('')` is NaN, so the
+// `|| 0` is load-bearing wherever the result feeds arithmetic. Centralised
+// so the dozen `parseFloat(computed.getPropertyValue(...)) || 0` sites
+// across this file stop carrying their own copy.
+function readNum(computed, prop) {
+  return parseFloat(computed.getPropertyValue(prop)) || 0;
+}
+
 // Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
 // a `{ top, right, bottom, left }` object. Tolerates missing / non-numeric
 // values by coercing to 0 — `getComputedStyle` always returns a string but
@@ -217,10 +227,10 @@ function isVisible(computed) {
 function readBox(computed, prefix, suffix) {
   const sfx = suffix ? `-${suffix}` : '';
   return {
-    top:    parseFloat(computed.getPropertyValue(`${prefix}-top${sfx}`))    || 0,
-    right:  parseFloat(computed.getPropertyValue(`${prefix}-right${sfx}`))  || 0,
-    bottom: parseFloat(computed.getPropertyValue(`${prefix}-bottom${sfx}`)) || 0,
-    left:   parseFloat(computed.getPropertyValue(`${prefix}-left${sfx}`))   || 0,
+    top:    readNum(computed, `${prefix}-top${sfx}`),
+    right:  readNum(computed, `${prefix}-right${sfx}`),
+    bottom: readNum(computed, `${prefix}-bottom${sfx}`),
+    left:   readNum(computed, `${prefix}-left${sfx}`),
   };
 }
 
@@ -233,7 +243,7 @@ function readMargin(computed) {
 }
 
 function borderWidthOf(computed, side) {
-  return parseFloat(computed.getPropertyValue(`border-${side}-width`)) || 0;
+  return readNum(computed, `border-${side}-width`);
 }
 
 // Read all three relevant declarations for one border side in a single helper
@@ -597,7 +607,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     // container path) falls back to the conservative previous behaviour
     // — emit both dimensions and let `flex-shrink: 0` plus the measured
     // size pin the layout.
-    const grow = parseFloat(computed.getPropertyValue('flex-grow')) || 0;
+    const grow = readNum(computed, 'flex-grow');
     const mainAxis = opts.flexMainAxis;
     const growActive = grow > 0 && (mainAxis === 'row' || mainAxis === 'column');
     if (growActive) {
@@ -1306,7 +1316,7 @@ function emitTextSpans(textNode, parentRect, computed) {
   }
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws);
-  const lineHeightPx = parseFloat(computed.getPropertyValue('line-height')) || 0;
+  const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
   for (const line of lines) {
     let lt = line.rect.top;
@@ -1642,7 +1652,7 @@ function renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts) {
   // explicit `width`/`height` smaller than `font-size`) still fit
   // visibly inside the wrapper. `parseFloat` of the computed `font-size`
   // returns the resolved pixel value regardless of the source unit.
-  const fontSize = parseFloat(computed.getPropertyValue('font-size')) || 0;
+  const fontSize = readNum(computed, 'font-size');
   let iconW = rect.width;
   let iconH = rect.height;
   if (fontSize > 0) {
@@ -2080,7 +2090,7 @@ function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
   if (rects.length === 0) return false;
   let lineHeightPx = parseFloat(computed.getPropertyValue('line-height'));
   if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
-    const fs = parseFloat(computed.getPropertyValue('font-size')) || 0;
+    const fs = readNum(computed, 'font-size');
     lineHeightPx = fs * 1.2;
   }
   if (lineHeightPx <= 0) return false;
@@ -2220,7 +2230,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       // `flex-shrink: 0` is dropped when grow is active — `flex: <N>`
       // already implies `1 1 0%`, and stacking `flex-shrink: 0` after
       // would re-pin the item to its content width on the main axis.
-      const grow = parseFloat(computed.getPropertyValue('flex-grow')) || 0;
+      const grow = readNum(computed, 'flex-grow');
       const parts = [textStyle];
       if (grow > 0) {
         parts.push(`flex: ${formatFlexGrow(grow)}`);
@@ -2381,7 +2391,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
 function renderFlexTextItem(child, parentComputed) {
   const r = child.rect;
   const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
-  const lineHeightPx = parseFloat(parentComputed.getPropertyValue('line-height')) || 0;
+  const lineHeightPx = readNum(parentComputed, 'line-height');
   const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
   const baseStyle = buildStyle(0, 0, 0, 0, parentComputed, {
     box: false, text: true, positioned: false,
@@ -2772,7 +2782,7 @@ ${parts.join('')}
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
-const DROP_TAGS = new Set(${JSON.stringify(DROP_TAG_NAMES)});
+const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
@@ -3267,8 +3277,8 @@ async function materializeDecorativePseudoElements() {
     if (position !== 'absolute' && position !== 'fixed') {
       return { ok: false, reason: 'in-flow' };
     }
-    const widthPx = parseFloat(cs.getPropertyValue('width')) || 0;
-    const heightPx = parseFloat(cs.getPropertyValue('height')) || 0;
+    const widthPx = readNum(cs, 'width');
+    const heightPx = readNum(cs, 'height');
     if (widthPx <= 0 && heightPx <= 0) {
       return { ok: false, reason: 'zero-size' };
     }
