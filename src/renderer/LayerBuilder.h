@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -32,6 +33,9 @@ class Gradient;
 }  // namespace tgfx
 
 namespace pagx {
+
+class ColorSource;
+class ImagePattern;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
@@ -142,17 +146,84 @@ struct RuntimeBinding {
     return targets.find(node) != targets.end();
   }
 
-  // Iterates over every node that currently has a binding entry, calling fn(node) on each. Used by
-  // removal to scan for surviving references to a shared resource (e.g. a color source referenced
-  // by multiple fills) before unbinding it. fn returns true to continue iteration, false to stop
-  // early. Iterating directly avoids the per-call vector allocation a snapshot would require.
-  template <typename Fn>
-  void forEachBoundNode(Fn&& fn) const {
-    for (const auto& entry : targets) {
-      if (!fn(entry.first)) {
-        return;
+  // Register a Fill/Stroke in the reverse index for its color source. Called by LayerBuilder after
+  // a painter (Fill or Stroke) is bound to a tgfx object during tree construction.
+  void registerColorSourceUser(const Node* colorSource, const Node* painter) {
+    if (colorSource == nullptr || painter == nullptr) {
+      return;
+    }
+    colorSourceUsers[colorSource].push_back(painter);
+  }
+
+  // Register an ImagePattern in the reverse index for its image. Called by LayerBuilder after an
+  // ImagePattern is bound to a tgfx object during tree construction.
+  void registerImageUser(const Node* image, const Node* pattern) {
+    if (image == nullptr || pattern == nullptr) {
+      return;
+    }
+    imageUsers[image].push_back(pattern);
+  }
+
+  // Unregister a painter from its color source's reverse index. Called when a Fill/Stroke is
+  // about to be removed from the binding.
+  void unregisterColorSourceUser(const Node* colorSource, const Node* painter) {
+    if (colorSource == nullptr || painter == nullptr) {
+      return;
+    }
+    auto it = colorSourceUsers.find(colorSource);
+    if (it != colorSourceUsers.end()) {
+      auto& vec = it->second;
+      vec.erase(std::remove(vec.begin(), vec.end(), painter), vec.end());
+      if (vec.empty()) {
+        colorSourceUsers.erase(it);
       }
     }
+  }
+
+  // Unregister an ImagePattern from its image's reverse index. Called when an ImagePattern is
+  // about to be removed from the binding.
+  void unregisterImageUser(const Node* image, const Node* pattern) {
+    if (image == nullptr || pattern == nullptr) {
+      return;
+    }
+    auto it = imageUsers.find(image);
+    if (it != imageUsers.end()) {
+      auto& vec = it->second;
+      vec.erase(std::remove(vec.begin(), vec.end(), pattern), vec.end());
+      if (vec.empty()) {
+        imageUsers.erase(it);
+      }
+    }
+  }
+
+  // Returns true if any painter other than excludedOwner references the given color source. O(1)
+  // via the reverse index maintained during build.
+  bool isColorSourceReferencedExceptBy(const Node* colorSource, const Node* excludedOwner) const {
+    auto it = colorSourceUsers.find(colorSource);
+    if (it == colorSourceUsers.end()) {
+      return false;
+    }
+    for (const auto* painter : it->second) {
+      if (painter != excludedOwner && targets.find(painter) != targets.end()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Returns true if any ImagePattern other than excludedPattern references the given image. O(1)
+  // via the reverse index maintained during build.
+  bool isImageReferencedExceptBy(const Node* image, const Node* excludedPattern) const {
+    auto it = imageUsers.find(image);
+    if (it == imageUsers.end()) {
+      return false;
+    }
+    for (const auto* pattern : it->second) {
+      if (pattern != excludedPattern && targets.find(pattern) != targets.end()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
@@ -205,6 +276,17 @@ struct RuntimeBinding {
   }
 
   std::unordered_map<const Node*, std::unique_ptr<RuntimeTarget>> targets = {};
+
+  // Reverse index: for each ColorSource bound to any Fill/Stroke, the set of Elements
+  // (Fill/Stroke) that reference it. Maintained incrementally by set/remove so
+  // unbindColorSourceIfUnreferenced can check for surviving references in O(1) instead of
+  // scanning all bound nodes.
+  std::unordered_map<const Node*, std::vector<const Node*>> colorSourceUsers = {};
+
+  // Reverse index: for each Image bound to any ImagePattern, the set of ImagePattern nodes that
+  // reference it. Maintained incrementally so unbindImageIfUnreferenced can check for surviving
+  // references in O(1).
+  std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
 };
 
 /**

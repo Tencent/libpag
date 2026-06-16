@@ -396,9 +396,13 @@ class LayerBuilderContext {
       if (type == NodeType::Group || type == NodeType::TextBox) {
         unbindContentElements(static_cast<const Group*>(element)->elements);
       } else if (type == NodeType::Fill) {
-        unbindColorSourceIfUnreferenced(static_cast<const Fill*>(element)->color, element);
+        auto* fill = static_cast<const Fill*>(element);
+        _result.binding.unregisterColorSourceUser(fill->color, element);
+        unbindColorSourceIfUnreferenced(fill->color, element);
       } else if (type == NodeType::Stroke) {
-        unbindColorSourceIfUnreferenced(static_cast<const Stroke*>(element)->color, element);
+        auto* stroke = static_cast<const Stroke*>(element);
+        _result.binding.unregisterColorSourceUser(stroke->color, element);
+        unbindColorSourceIfUnreferenced(stroke->color, element);
       }
       _result.binding.remove(element);
     }
@@ -415,28 +419,15 @@ class LayerBuilderContext {
     if (color == nullptr || !_result.binding.contains(color)) {
       return;
     }
-    bool stillReferenced = false;
-    _result.binding.forEachBoundNode([&](const Node* node) {
-      if (node == excludedOwner) {
-        return true;
-      }
-      const ColorSource* other = nullptr;
-      if (node->nodeType() == NodeType::Fill) {
-        other = static_cast<const Fill*>(node)->color;
-      } else if (node->nodeType() == NodeType::Stroke) {
-        other = static_cast<const Stroke*>(node)->color;
-      }
-      if (other == color) {
-        stillReferenced = true;
-        return false;
-      }
-      return true;
-    });
-    if (stillReferenced) {
+    if (_result.binding.isColorSourceReferencedExceptBy(color, excludedOwner)) {
       return;
     }
     if (color->nodeType() == NodeType::ImagePattern) {
-      unbindImageIfUnreferenced(static_cast<const ImagePattern*>(color));
+      auto* pattern = static_cast<const ImagePattern*>(color);
+      if (pattern->image) {
+        _result.binding.unregisterImageUser(pattern->image, pattern);
+      }
+      unbindImageIfUnreferenced(pattern);
     } else if (color->nodeType() != NodeType::SolidColor) {
       for (const auto* stop : static_cast<const Gradient*>(color)->colorStops) {
         _result.binding.remove(stop);
@@ -453,18 +444,7 @@ class LayerBuilderContext {
     if (image == nullptr || !_result.binding.contains(image)) {
       return;
     }
-    bool stillReferenced = false;
-    _result.binding.forEachBoundNode([&](const Node* node) {
-      if (node == pattern || node->nodeType() != NodeType::ImagePattern) {
-        return true;
-      }
-      if (static_cast<const ImagePattern*>(node)->image == image) {
-        stillReferenced = true;
-        return false;
-      }
-      return true;
-    });
-    if (stillReferenced) {
+    if (_result.binding.isImageReferencedExceptBy(image, pattern)) {
       return;
     }
     _result.binding.remove(image);
@@ -962,6 +942,9 @@ class LayerBuilderContext {
     auto fill = tgfx::FillStyle::Make(colorSource);
     if (fill) {
       _result.binding.set(node, fill);
+      if (node->color) {
+        _result.binding.registerColorSourceUser(node->color, node);
+      }
       fill->setAlpha(node->alpha);
       if (node->blendMode != BlendMode::Normal) {
         fill->setBlendMode(ToTGFX(node->blendMode));
@@ -993,6 +976,9 @@ class LayerBuilderContext {
       return nullptr;
     }
     _result.binding.set(node, stroke);
+    if (node->color) {
+      _result.binding.registerColorSourceUser(node->color, node);
+    }
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
@@ -1281,6 +1267,9 @@ class LayerBuilderContext {
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
       _result.binding.set(node, pattern);
+      if (imageNode) {
+        _result.binding.registerImageUser(imageNode, node);
+      }
       pattern->setScaleMode(ToTGFX(node->scaleMode));
       if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
