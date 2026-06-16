@@ -136,28 +136,27 @@ class PAGTimeline {
               std::weak_ptr<PAGScene> owner);
 
   // Resolves each animation object's target node against contextDoc once and caches the
-  // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup for every
-  // object. Built lazily on the first apply(). The cache is valid only as long as the animation's
-  // objects and contextDoc's nodeMap are not mutated after the owning PAGScene is built.
-  // Cache invalidation will be wired through PAGXDocument::notifyChange → PAGScene::onNodesChanged
-  // which resets resolved to false on affected timelines whenever nodeMap entries change.
+  // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup. Built lazily on
+  // the first apply(). Stale caches are replaced by rebuilding the PAGTimeline (driven by
+  // PAGXDocument::notifyChange when a timeline node is dirty); this cache is never reset in place.
   void resolveTargets();
 
   // Owning scene. animation / binding / contextDoc point into content this scene keeps alive, so
   // advance() and apply() bail out once the scene is gone to avoid dereferencing freed memory.
   std::weak_ptr<PAGScene> owner;
   Animation* animation = nullptr;
-  // Runtime binding the channel writers should target. Top-level timelines use the owning
-  // PAGScene's binding; composition timelines use the binding built for that composition.
+  // Runtime binding the channel writers should target. A null binding marks a top-level timeline:
+  // the owning scene's current root binding is resolved lazily at apply time, so the timeline keeps
+  // working after the scene rebuilds its runtime tree (which frees and replaces that binding). A
+  // non-null binding is a fixed composition binding co-owned with that composition.
   RuntimeBinding* binding = nullptr;
   // Document used to resolve channel target IDs at apply time. Top-level timelines use the scene's
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
   // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
   // Cached target resolution: each entry pairs a resolved target node with the channels driving
-  // it. Populated by resolveTargets() on first apply(); resolved stays false until then. Once
-  // resolved is set it is never reset, so this cache assumes animation->objects and
-  // contextDoc->nodeMap stay stable after the owning PAGScene is built (see resolveTargets()).
+  // it. Populated by resolveTargets() on first apply(); never reset in place — stale caches are
+  // replaced by rebuilding the PAGTimeline (see resolveTargets()).
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;

@@ -54,17 +54,27 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   scene->document = document;
   scene->displayList = std::make_unique<tgfx::DisplayList>();
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
-  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
-  auto rootComp = std::shared_ptr<PAGComposition>(
-      new PAGComposition(nullptr, std::move(buildResult.root), scene));
-  *rootComp->binding = std::move(buildResult.binding);
-  rootComp->document = document.get();
-  scene->_rootComposition = rootComp;
-  std::unordered_set<const Composition*> visited = {};
-  scene->_rootComposition->buildChildren(document->layers, visited);
-  scene->displayList->root()->addChild(rootComp->runtimeLayer);
+  scene->buildRuntimeTree();
   document->registerLiveScene(scene);
   return scene;
+}
+
+void PAGScene::buildRuntimeTree() {
+  // Detach any previously built tree (a rebuild after an external-document edit) so the display list
+  // and timeline cache do not retain stale runtime layers.
+  if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
+    _rootComposition->runtimeLayer->removeFromParent();
+  }
+  timelinesByAnimation.clear();
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
+  auto rootComp = std::shared_ptr<PAGComposition>(
+      new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
+  *rootComp->binding = std::move(buildResult.binding);
+  rootComp->document = document.get();
+  _rootComposition = rootComp;
+  std::unordered_set<const Composition*> visited = {};
+  _rootComposition->buildChildren(document->layers, visited);
+  displayList->root()->addChild(rootComp->runtimeLayer);
 }
 
 PAGScene::~PAGScene() {
@@ -105,8 +115,11 @@ std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
   if (it != timelinesByAnimation.end()) {
     return it->second;
   }
+  // Construct with a null binding so the timeline resolves the scene's current root binding lazily
+  // at apply time. A user-cached handle then survives a runtime-tree rebuild (foreign external-doc
+  // edit) that replaces _rootComposition and frees the old binding, instead of dangling.
   auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+      new PAGTimeline(matched, nullptr, document.get(), weak_from_this()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -225,8 +238,51 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   return true;
 }
 
-void PAGScene::onNodesChanged(const std::vector<Node*>& /*dirtyNodes*/) {
-  // TODO(PR11): rebuild affected runtime sub-trees and reset relevant timelines.
+void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
+  // The dirty nodes belong either to this scene's own document or to an external (child) document
+  // this scene embeds. A child document dispatches to this scene through its own notifyChange; in
+  // that case the nodes are not owned here, and an external composition is built into the runtime
+  // tree once, so it cannot be patched in place — rebuild the whole runtime tree from the document.
+  bool foreign = false;
+  for (auto* node : dirtyNodes) {
+    if (node != nullptr && (document == nullptr || !document->ownsNode(node))) {
+      foreign = true;
+      break;
+    }
+  }
+  if (foreign) {
+    buildRuntimeTree();
+    return;
+  }
+  if (_rootComposition != nullptr) {
+    // The root composition has no source Composition node (it represents the document body), so the
+    // ancestor path begins empty. refreshNodes pushes each child composition's source as it
+    // descends.
+    std::unordered_set<const Composition*> visited = {};
+    _rootComposition->refreshNodes(dirtyNodes, visited);
+  }
+  // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
+  // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather
+  // than patched in place; a removed animation node then simply produces no timeline. Edits that do
+  // not touch a timeline node leave playback untouched.
+  bool timelineDirty = false;
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    auto type = node->nodeType();
+    if (type == NodeType::Animation || type == NodeType::AnimationObject ||
+        type == NodeType::Channel) {
+      timelineDirty = true;
+      break;
+    }
+  }
+  if (timelineDirty) {
+    if (_rootComposition != nullptr) {
+      _rootComposition->resetTimelines();
+    }
+    timelinesByAnimation.clear();
+  }
 }
 
 RuntimeBinding* PAGScene::mutableBinding() {

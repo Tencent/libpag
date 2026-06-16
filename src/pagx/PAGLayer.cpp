@@ -40,6 +40,10 @@ std::string PAGLayer::name() const {
   return node != nullptr ? node->name : std::string();
 }
 
+std::string PAGLayer::id() const {
+  return node != nullptr ? node->id : std::string();
+}
+
 Matrix PAGLayer::getGlobalMatrix() const {
   auto scene = rootScene.lock();
   if (runtimeLayer == nullptr || scene == nullptr) {
