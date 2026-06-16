@@ -12,6 +12,7 @@ import {
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
   inlineCanvases,
+  materializeDecorativePseudoElements,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import { capturePagxAnimationsOnPage } from './animation-capture';
@@ -389,12 +390,26 @@ export async function runSnapshot(
       }
     }
 
+    // Materialise decorative `::before` / `::after` pseudo-elements (toggle
+    // sliders, custom radio dots, divider lines, etc.). Runs after the
+    // icon-font pass so text-bearing pseudos that were converted to inline
+    // SVGs are already removed from `getComputedStyle(el, '::after')` and
+    // can't trip the "host carries text pseudo" guard inside the
+    // materialiser. Best-effort: a failure here only loses pseudo-element
+    // boxes from the snapshot, never the rest of the document.
+    try {
+      await page.evaluate(materializeDecorativePseudoElements);
+    } catch (err) {
+      if (log) log(`materialize-pseudo-elements failed: ${errMessage(err)}`);
+    }
+
     // Normalise any running animations (CSS @keyframes, WAAPI, GSAP, anime.js)
     // into the canonical `@keyframes` + `animation` subset the importer plays
-    // back. Must run after the icon-font/image inlining (so it sees the final
-    // DOM) but before the snapshot is walked (so its injected keyframes block
-    // and inline `animation-*` longhands are captured). Best-effort: a failure
-    // degrades to a static frame.
+    // back. Must run after the icon-font/image inlining and pseudo-element
+    // materialisation (so it sees the final DOM) but before the snapshot is
+    // walked (so its injected keyframes block and inline `animation-*`
+    // longhands are captured). Best-effort: a failure degrades to a static
+    // frame.
     if (captureAnimations) {
       try {
         const stats = await capturePagxAnimationsOnPage(page, {

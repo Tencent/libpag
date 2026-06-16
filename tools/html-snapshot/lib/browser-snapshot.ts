@@ -723,12 +723,137 @@ function buildStyle(left, top, width, height, computed, opts) {
   return parts.join('; ');
 }
 
+// Read the four per-corner border-radius values from computed style. CSS uses
+// `Hpx` or `Hpx Vpx` (horizontal / vertical radii); we collapse to a single
+// scalar by taking the horizontal component, which is enough for the uniform-
+// radius fast path below (it bails the moment the four corners disagree).
+function readCornerRadii(computed) {
+  function radius(prop) {
+    const raw = (computed.getPropertyValue(prop) || '').trim();
+    if (!raw) return 0;
+    return parseFloat(raw.split(/\s+/)[0]) || 0;
+  }
+  return {
+    tl: radius('border-top-left-radius'),
+    tr: radius('border-top-right-radius'),
+    br: radius('border-bottom-right-radius'),
+    bl: radius('border-bottom-left-radius'),
+  };
+}
+
+// SVG-based renderer for the "uniform-width borders + uniform radius + per-side
+// colours" pattern, as used by pure-CSS ring spinners:
+//
+//   .spinner {
+//     width: 16px; height: 16px;
+//     border: 2px solid rgba(255,255,255,0.4);
+//     border-top-color: #fff;
+//     border-radius: 50%;
+//   }
+//
+// The plain rectangular-overlay fallback in `borderOverlayHTML` paints four
+// straight strips and silently drops the host's `border-radius` (overlays use
+// `position: absolute` and the host is not `overflow: hidden`), which collapses
+// the ring into a square frame. CSS instead splits each corner along the
+// diagonal between the outer and inner corner; for uniform width that diagonal
+// is the 45° bisector. We reproduce this with one stroked <path> per side that
+// covers (corner-arc-half) + (straight edge) + (next-corner-arc-half),
+// stroke-width = border width, mid-line radius = r - w/2 (so the stroke's outer
+// edge lands on the host's `border-radius` and its inner edge on the matching
+// inner radius).
+//
+// Returns null when the pattern doesn't apply: per-side widths differ, radii
+// disagree across corners, the radius is too small to host a ring (r ≤ w/2,
+// where the inner corner collapses), or any side uses a non-solid style — in
+// which case the caller falls back to rectangular overlays.
+function roundedUniformBorderSvg(computed, width, height) {
+  const top = readBorderSide(computed, 'top');
+  const right = readBorderSide(computed, 'right');
+  const bottom = readBorderSide(computed, 'bottom');
+  const left = readBorderSide(computed, 'left');
+  const w = top.width;
+  if (w <= 0) return null;
+  if (right.width !== w || bottom.width !== w || left.width !== w) return null;
+  if (top.style !== 'solid' || right.style !== 'solid' ||
+      bottom.style !== 'solid' || left.style !== 'solid') return null;
+  const radii = readCornerRadii(computed);
+  if (radii.tl <= 0) return null;
+  if (radii.tr !== radii.tl || radii.br !== radii.tl || radii.bl !== radii.tl) return null;
+  const r = radii.tl;
+  if (r <= w / 2) return null;
+  // Clamp the radius the same way CSS does when the corners would otherwise
+  // overlap (r > min(W, H) / 2). Without the clamp a `border-radius: 50%` host
+  // whose computed top-left-radius was reported per-corner (Chromium can do
+  // this for non-square boxes) would draw a path larger than the box.
+  const maxR = Math.min(width, height) / 2;
+  const rOuter = Math.min(r, maxR);
+  if (rOuter <= w / 2) return null;
+  const rMid = rOuter - w / 2;
+  const W = width;
+  const H = height;
+  const centers = {
+    tl: [rOuter, rOuter],
+    tr: [W - rOuter, rOuter],
+    br: [W - rOuter, H - rOuter],
+    bl: [rOuter, H - rOuter],
+  };
+  function pt(center, angleDeg) {
+    const a = angleDeg * Math.PI / 180;
+    return [center[0] + rMid * Math.cos(a), center[1] + rMid * Math.sin(a)];
+  }
+  function fmt(p) {
+    return `${roundPx(p[0])} ${roundPx(p[1])}`;
+  }
+  // Eight corner-cut points (two per corner) plus eight tangent points where
+  // each arc meets the straight edge segment. SVG y-axis points down, so 270°
+  // is up, 0° is right, 90° is down, 180° is left.
+  const tl225 = pt(centers.tl, 225);
+  const tl270 = pt(centers.tl, 270);
+  const tr270 = pt(centers.tr, 270);
+  const tr315 = pt(centers.tr, 315);
+  const tr0   = pt(centers.tr, 0);
+  const br0   = pt(centers.br, 0);
+  const br45  = pt(centers.br, 45);
+  const br90  = pt(centers.br, 90);
+  const bl90  = pt(centers.bl, 90);
+  const bl135 = pt(centers.bl, 135);
+  const bl180 = pt(centers.bl, 180);
+  const tl180 = pt(centers.tl, 180);
+  const arc = `${roundPx(rMid)} ${roundPx(rMid)} 0 0 1`;
+  const segments = [
+    { color: top.color,    d: `M ${fmt(tl225)} A ${arc} ${fmt(tl270)} L ${fmt(tr270)} A ${arc} ${fmt(tr315)}` },
+    { color: right.color,  d: `M ${fmt(tr315)} A ${arc} ${fmt(tr0)}   L ${fmt(br0)}  A ${arc} ${fmt(br45)}`  },
+    { color: bottom.color, d: `M ${fmt(br45)}  A ${arc} ${fmt(br90)}  L ${fmt(bl90)} A ${arc} ${fmt(bl135)}` },
+    { color: left.color,   d: `M ${fmt(bl135)} A ${arc} ${fmt(bl180)} L ${fmt(tl180)} A ${arc} ${fmt(tl225)}` },
+  ];
+  const paths = segments
+    .filter((s) => colorAlpha(s.color) > 0)
+    .map((s) => `<path d="${s.d}" fill="none" stroke="${s.color.trim()}" ` +
+      `stroke-width="${px(w)}" stroke-linecap="butt"/>`)
+    .join('');
+  if (!paths) return '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
+    `left: 0px; top: 0px; width: ${px(W)}; height: ${px(H)}; pointer-events: none" ` +
+    `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${roundPx(W)} ${roundPx(H)}">${paths}</svg>`;
+}
+
 // Returns an array of HTML strings — one absolutely-positioned <div> per
 // non-zero border side — to overlay onto the host box. Used when the element
 // has an asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list
 // row).
+//
+// When the host has uniform border widths + uniform border-radius + only
+// asymmetric *colours* (the canonical CSS ring-spinner pattern), the overlay
+// rectangles can't honour the radius (they're absolutely positioned and the
+// host has no `overflow: hidden`), so the radius would be silently dropped and
+// the spinner would render as a square frame. `roundedUniformBorderSvg`
+// short-circuits that case with one stroked <path> per side; the overlay
+// rectangle path stays for genuinely asymmetric-width borders (list-row
+// dividers, single-side underlines, etc.) where the radius rarely matters.
 function borderOverlayHTML(computed, width, height) {
   if (isUniformBorder(computed)) return [];
+  const ringSvg = roundedUniformBorderSvg(computed, width, height);
+  if (ringSvg !== null) return ringSvg ? [ringSvg] : [];
   const out = [];
   for (const side of SIDES) {
     const b = readBorderSide(computed, side);
@@ -976,13 +1101,70 @@ function imageInnerStyle(rect, flexItem, objectFit) {
   return base;
 }
 
-// Walk an SVG subtree and rewrite `currentColor` / `context-fill` /
-// `context-stroke` to the computed colour at that node so the snapshot is
-// self-contained. The clone is detached from the document, so
-// `getComputedStyle` can't resolve it directly; instead we walk the
-// *original* subtree (where the cascade is live) and the clone in lockstep,
-// propagating per-node `color` down the tree.
+// Walk an SVG subtree and freeze the CSS-resolved paint state onto each
+// cloned element so the snapshot renders identically without the page's
+// original stylesheet:
+//
+//   1. `currentColor` / `context-fill` / `context-stroke` literal attribute
+//      values get rewritten to the node's resolved color.
+//   2. Every presentation attribute in `SVG_PRESENTATION_ATTRS` (defined
+//      below as a function-local constant so it ships into the browser
+//      payload via `fn.toString()`) whose resolved value differs from what
+//      the cloned ancestor chain already provides gets written as an
+//      attribute on the clone. Author-emitted attributes (preserved by
+//      `cloneNode(true)`) are kept as-is — we only add what would otherwise
+//      be lost when the page's stylesheet is dropped.
+//
+// The clone is detached from the document, so `getComputedStyle` can't
+// resolve it directly; we walk the *original* subtree (where the cascade is
+// live) and the clone in lockstep, threading the resolved color and the
+// resolved presentation map down the recursion.
 function freezeSvg(svgEl, rect) {
+  // SVG presentation attributes that real-world pages routinely set via CSS
+  // rules (e.g. `.icon path { stroke: #fff; stroke-width: 2; }`) rather
+  // than as element attributes in markup. The subset HTML throws away the
+  // page's stylesheets, so any such CSS-driven paint disappears unless we
+  // freeze the resolved value onto the cloned element here. The list
+  // covers the paint / stroke / fill / opacity / vector-effect family —
+  // the attributes that actually affect what the SVG paints. Layout-only
+  // properties (width, height, x, y, transform) are left to the SVG's own
+  // attributes.
+  const SVG_PRESENTATION_ATTRS = [
+    'fill', 'fill-opacity', 'fill-rule',
+    'stroke', 'stroke-opacity', 'stroke-width',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+    'stroke-dasharray', 'stroke-dashoffset',
+    'opacity', 'visibility', 'clip-rule', 'vector-effect',
+  ];
+  // SVG-spec defaults for the attributes above. Used as the inheritance
+  // root so the top-level <svg>'s computed values only get serialised when
+  // they differ from the spec default. A missing entry is treated as "" so
+  // any non-empty resolved value is emitted.
+  const SVG_PRESENTATION_DEFAULTS = {
+    'fill': 'rgb(0, 0, 0)',
+    'fill-opacity': '1',
+    'fill-rule': 'nonzero',
+    'stroke': 'none',
+    'stroke-opacity': '1',
+    'stroke-width': '1px',
+    'stroke-linecap': 'butt',
+    'stroke-linejoin': 'miter',
+    'stroke-miterlimit': '4',
+    'stroke-dasharray': 'none',
+    'stroke-dashoffset': '0px',
+    'opacity': '1',
+    'visibility': 'visible',
+    'clip-rule': 'nonzero',
+    'vector-effect': 'none',
+  };
+  const readPresentation = (cs) => {
+    const out = {};
+    for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
+      const name = SVG_PRESENTATION_ATTRS[i];
+      out[name] = (cs.getPropertyValue(name) || '').trim();
+    }
+    return out;
+  };
   const clone = svgEl.cloneNode(true);
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
@@ -996,14 +1178,16 @@ function freezeSvg(svgEl, rect) {
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor) => {
+  const walk = (orig, dst, inheritedColor, inheritedAttrs) => {
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
     let here = inheritedColor;
+    let resolvedAttrs = inheritedAttrs;
     if (orig && orig.nodeType === 1) {
       const cs = getComputedStyle(orig);
       if (cs && cs.color) here = cs.color.trim() || here;
+      resolvedAttrs = readPresentation(cs);
     }
     if (dst && dst.nodeType === 1 && dst.getAttribute) {
       const stroke = dst.getAttribute('stroke');
@@ -1020,13 +1204,25 @@ function freezeSvg(svgEl, rect) {
         if (dst.style.fill === 'currentColor') dst.style.fill = here;
         if (dst.style.color === 'currentColor') dst.style.color = here;
       }
+      // Freeze any CSS-resolved presentation attribute that the cloned
+      // ancestor chain doesn't already supply. This is what carries
+      // `<style>.cls path { stroke: ... }` rules into the snapshot.
+      for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
+        const name = SVG_PRESENTATION_ATTRS[i];
+        if (dst.hasAttribute(name)) continue;
+        const value = resolvedAttrs[name];
+        if (!value) continue;
+        const inherited = inheritedAttrs[name] || SVG_PRESENTATION_DEFAULTS[name] || '';
+        if (value === inherited) continue;
+        dst.setAttribute(name, value);
+      }
     }
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs);
   };
-  walk(svgEl, clone, fallback);
+  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS);
   return clone.outerHTML;
 }
 
@@ -1631,6 +1827,21 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
 // An inline-style `display: block` / `flex` / `grid` override on the host
 // is rejected via `el.style.display` so an author who deliberately turned
 // the span into a sized box keeps the wrapper.
+//
+// Author-defined sizing also disqualifies the bare emission. CSS normally
+// ignores `width`/`min-width`/`max-width`/`flex-basis` on inline boxes, but
+// flex blockifies the item so those declarations *do* take effect on a span
+// flex item — and `getComputedStyle(...).width` on a flex item returns the
+// resolved used value (e.g. `70px`), not the specified `auto`, so we can't
+// detect author intent from the property string alone. Instead we compare
+// the element's host rect against the text content's natural rect: when the
+// host is materially wider than its glyphs, the extra space came from a
+// declared `width` / `min-width` / `flex-basis` and bare emission would
+// collapse the column. The classic case is a fixed-width gutter label like
+// `.demo-row .label { width: 70px }` next to `.demo-row .controls`: the
+// label visually occupies 70 px in Chromium, but stripping the width to a
+// bare <span> collapses it to its content width (~18 px for "iOS"), which
+// drags every following sibling 50 px to the left.
 function isPureInlineTextLeaf(el, computed) {
   if (!el || !el.tagName) return false;
   if (!INLINE_BY_DEFAULT_TAGS.has(el.tagName.toLowerCase())) return false;
@@ -1644,7 +1855,41 @@ function isPureInlineTextLeaf(el, computed) {
   const bgClip = (computed.getPropertyValue('background-clip') || '').trim().toLowerCase();
   if (bgClip === 'text') return false;
   if (readInlineTransform(el)) return false;
+  if (hasAuthorDefinedFlexSize(el)) return false;
   return true;
+}
+
+// True when the element's host rect is materially larger than the glyph rect
+// of its text content — meaning a `width` / `min-width` / `flex-basis`
+// declaration is reserving extra space that the bare-content rendering would
+// not reproduce.
+//
+// Why measure rather than read `getComputedStyle(...).width`: when the
+// element is a flex item, Chromium blockifies the box and `width` resolves
+// to the used value (e.g. `70px`) regardless of whether the author wrote
+// `auto`, `70px`, or `min-content`. Comparing the bounding rect against the
+// inner text rect cuts through the blockification and tells us whether the
+// author actually expanded the column.
+//
+// Cross-axis dimensions (height) are intentionally ignored — line-box height
+// always matches `font-size`/`line-height` for single-line text, so a
+// height comparison would be noise. Only the main-axis (width) divergence
+// indicates an author-reserved gutter.
+function hasAuthorDefinedFlexSize(el) {
+  if (!el || !el.getBoundingClientRect) return false;
+  const hostRect = el.getBoundingClientRect();
+  if (!hostRect || hostRect.width <= 0) return false;
+  const textNode = firstTextNodeChild(el);
+  if (!textNode) return false;
+  const range = document.createRange();
+  range.selectNodeContents(textNode);
+  const textRect = range.getBoundingClientRect();
+  if (range.detach) range.detach();
+  if (!textRect) return false;
+  // 1 px slack absorbs subpixel rounding (Chromium reports rect widths to
+  // 0.01 px and the `.label` host typically measures 70 px against an 18.5 px
+  // text rect, so any author-defined width shows up as a >1 px gap).
+  return hostRect.width - textRect.width > 1;
 }
 
 // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
@@ -2758,6 +3003,8 @@ const HELPER_FNS = [
   appendBoxShadow,
   appendAnimation,
   buildStyle,
+  readCornerRadii,
+  roundedUniformBorderSvg,
   borderOverlayHTML,
   colorAlpha,
   transformOriginXY,
@@ -2778,6 +3025,7 @@ const HELPER_FNS = [
   isInlineRunChild,
   isInlineTextLeafCandidate,
   emitInlineRunMarkup,
+  hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
   renderInlineTextLeaf,
   flexMainGapPx,
@@ -2995,6 +3243,234 @@ async function inlineCanvases() {
   }
 }
 
+// ===== Pre-snapshot pass: materialise decorative ::before / ::after pseudo-elements =====
+
+// CSS pseudo-elements have no DOM presence, so the snapshot walker (which
+// reads boxes off `getBoundingClientRect`) sees nothing for a pseudo whose
+// rendering is purely decorative — the white slider thumb generated by
+// `.ios-switch::after { content: ""; width: 27px; ... }`, the dot inside a
+// custom radio, the divider produced by a `::before { content: ""; height:
+// 1px; background: #eee; }`. The existing `renderPseudoTextLeaf` covers
+// *text*-bearing pseudos (icon-font glyphs whose `content` carries a
+// codepoint) but emits nothing for pseudos whose `content` resolves to an
+// empty string and whose visible box comes from width/height/background.
+//
+// This pass walks every element on the live page, asks Chromium for the
+// resolved style of each pseudo, and — when the pseudo carries a
+// `content` value but that value is the empty string — appends a real
+// `<div>` child to the host whose inline style mirrors the pseudo's own
+// box. The synthetic node carries `data-snapshot-pseudo` so authors can
+// trace the emission, and a `data-snapshot-pseudo-host=""` attribute is
+// added to the host to suppress the `renderPseudoTextLeaf` fallback (which
+// would otherwise still try to emit the now-empty pseudo as inline text).
+//
+// Two scopes deliberately stay out:
+//
+//   - text-bearing pseudos (`content: "→"`, `content: "\\e123"`): handled
+//     by `renderPseudoTextLeaf`, which sizes the glyph against its own
+//     font metrics. Materialising those would double-paint the text.
+//
+//   - in-flow decorative pseudos (`position: static / relative / sticky`):
+//     pseudos in the host's flow take main/cross-axis space; injecting a
+//     real sibling would shift the host's other children. The pseudos that
+//     actually need this fix in practice are absolutely / fixed-positioned
+//     boxes (toggles, radios, checkboxes, dividers anchored with `inset`),
+//     so we limit materialisation to that case and skip the rest with a
+//     `data-snapshot-pseudo-skipped=in-flow` marker for diagnosability.
+//
+// The properties copied onto the synthetic div cover the ones the snapshot
+// walker (`STYLE_SCHEMA_BOX` + the `position/inset/transform/box-shadow`
+// reads scattered across `buildStyle`/`borderOverlayHTML`/`transformMatrix`)
+// actually consults; copying every CSS property would balloon the inline
+// style attribute without adding visible information. Border longhands are
+// emitted per side so asymmetric borders survive.
+async function materializeDecorativePseudoElements() {
+  // Helper functions duplicated locally so this function stays self-contained
+  // when shipped through `page.evaluate`. The Node-side helpers are not in
+  // scope inside the browser context.
+  const PSEUDO_TYPES = ['::before', '::after'];
+  // Properties whose computed value the snapshot walker reads from the
+  // element. Listing them explicitly keeps the synthetic style attribute
+  // bounded and deterministic. Border longhands are expanded so asymmetric
+  // borders (`border-top: 1px solid ...`) round-trip.
+  const COPY_PROPS = [
+    'position', 'left', 'right', 'top', 'bottom',
+    'width', 'height',
+    'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'background-color', 'background-image', 'background-clip',
+    'background-size', 'background-repeat', 'background-position',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-top-left-radius', 'border-top-right-radius',
+    'border-bottom-left-radius', 'border-bottom-right-radius',
+    'box-shadow', 'opacity', 'mix-blend-mode', 'filter', 'backdrop-filter',
+    'overflow',
+    'transform', 'transform-origin',
+    'z-index',
+    'box-sizing',
+    'color', 'font-family', 'font-size', 'font-weight', 'font-style',
+    'line-height', 'letter-spacing', 'text-align',
+  ];
+
+  // Defaults emitted by Chromium for properties that don't change anything.
+  // Suppressing them keeps the inline style readable and lines up with the
+  // snapshot walker's own default-skipping logic.
+  const DEFAULTS = new Map([
+    ['position', 'static'],
+    ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
+    ['margin-top', '0px'], ['margin-right', '0px'],
+    ['margin-bottom', '0px'], ['margin-left', '0px'],
+    ['padding-top', '0px'], ['padding-right', '0px'],
+    ['padding-bottom', '0px'], ['padding-left', '0px'],
+    ['background-color', 'rgba(0, 0, 0, 0)'],
+    ['background-image', 'none'],
+    ['background-clip', 'border-box'],
+    ['background-size', 'auto'],
+    ['background-repeat', 'repeat'],
+    ['background-position', '0% 0%'],
+    ['border-top-width', '0px'], ['border-right-width', '0px'],
+    ['border-bottom-width', '0px'], ['border-left-width', '0px'],
+    ['border-top-style', 'none'], ['border-right-style', 'none'],
+    ['border-bottom-style', 'none'], ['border-left-style', 'none'],
+    ['border-top-left-radius', '0px'], ['border-top-right-radius', '0px'],
+    ['border-bottom-left-radius', '0px'], ['border-bottom-right-radius', '0px'],
+    ['box-shadow', 'none'], ['opacity', '1'], ['mix-blend-mode', 'normal'],
+    ['filter', 'none'], ['backdrop-filter', 'none'], ['overflow', 'visible'],
+    ['transform', 'none'],
+    ['z-index', 'auto'],
+    ['box-sizing', 'content-box'],
+  ]);
+
+  // A pseudo's `content` value reaches us with quotes preserved
+  // ("\"\"" for content: ""). Strip surrounding ASCII quotes so the
+  // empty-vs-text branch can be decided on the inner string.
+  function unquoteContent(raw) {
+    const trimmed = (raw || '').trim();
+    if (!trimmed) return '';
+    if (trimmed === 'none' || trimmed === 'normal') return null;
+    // Concatenate every quoted run; ignore counter() / attr() / url() forms
+    // (they don't contribute a stable visible string, and a non-empty
+    // catch-all `out` still routes through the `renderPseudoTextLeaf` path
+    // for any glyph contribution).
+    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    let out = '';
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      out += (m[1] !== undefined ? m[1] : m[2]);
+    }
+    return out;
+  }
+
+  // Decide whether a pseudo with the given resolved style should be
+  // materialised. Out-of-flow position is required so the synthetic sibling
+  // doesn't push the host's real children around. A pseudo with no visible
+  // box (no width / height / background / border / shadow / transform) is
+  // skipped — there's nothing to render anyway.
+  function shouldMaterialise(cs, pseudoText) {
+    if (pseudoText !== '') {
+      return { ok: false, reason: 'text-content' };
+    }
+    const position = (cs.getPropertyValue('position') || '').trim();
+    if (position !== 'absolute' && position !== 'fixed') {
+      return { ok: false, reason: 'in-flow' };
+    }
+    const widthPx = parseFloat(cs.getPropertyValue('width')) || 0;
+    const heightPx = parseFloat(cs.getPropertyValue('height')) || 0;
+    if (widthPx <= 0 && heightPx <= 0) {
+      return { ok: false, reason: 'zero-size' };
+    }
+    return { ok: true };
+  }
+
+  function emitInlineStyle(cs) {
+    const parts = [];
+    for (const prop of COPY_PROPS) {
+      const raw = (cs.getPropertyValue(prop) || '').trim();
+      if (!raw) continue;
+      const def = DEFAULTS.get(prop);
+      if (def !== undefined && raw === def) continue;
+      parts.push(`${prop}: ${raw}`);
+    }
+    return parts.join('; ');
+  }
+
+  // `<svg>` subtrees are an opaque resolver target downstream — leaving
+  // pseudo-elements declared on inline SVG markup alone matches how the
+  // snapshot already passes the SVG through verbatim.
+  const all = document.querySelectorAll('*');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (!(el instanceof Element)) continue;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'style' || tag === 'meta' ||
+        tag === 'link' || tag === 'title' || tag === 'head' || tag === 'html') {
+      continue;
+    }
+    // Don't descend into SVG content; stylesheets rarely target ::before/
+    // ::after on SVG elements and the snapshot ships SVG opaquely.
+    if (el.closest('svg') && tag !== 'svg') continue;
+    // Skip our own synthetic nodes from a previous pass (defensive — the
+    // pipeline today calls this exactly once per page, but the in-page
+    // helpers can also be invoked manually).
+    if (el.hasAttribute('data-snapshot-pseudo')) continue;
+
+    // Two-phase decision: first read both pseudos so we know whether the
+    // host carries a text-bearing pseudo. If it does, leave the host alone
+    // — `renderPseudoTextLeaf` already produces the correct emission, and
+    // appending a real child would knock that path out by flipping
+    // `hasElementChild` to true.
+    const pseudoData = [];
+    let hasTextPseudo = false;
+    for (const pseudo of PSEUDO_TYPES) {
+      const cs = getComputedStyle(el, pseudo);
+      const contentRaw = (cs.getPropertyValue('content') || '').trim();
+      const pseudoText = unquoteContent(contentRaw);
+      if (pseudoText === null) {
+        // content: none / normal — pseudo not generated.
+        pseudoData.push(null);
+        continue;
+      }
+      if (pseudoText !== '') hasTextPseudo = true;
+      pseudoData.push({ cs, pseudoText, pseudo });
+    }
+    if (hasTextPseudo) continue;
+
+    let materialisedAny = false;
+    for (const slot of pseudoData) {
+      if (!slot) continue;
+      const decision = shouldMaterialise(slot.cs, slot.pseudoText);
+      if (!decision.ok) {
+        if (decision.reason !== 'text-content') {
+          el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
+        }
+        continue;
+      }
+
+      const div = document.createElement('div');
+      div.setAttribute('data-snapshot-pseudo', slot.pseudo);
+      const style = emitInlineStyle(slot.cs);
+      if (style) div.setAttribute('style', style);
+      // `::before` is painted before the host's children, `::after` after.
+      // Mirror that order in the DOM so the natural document order matches.
+      if (slot.pseudo === '::before') {
+        if (el.firstChild) {
+          el.insertBefore(div, el.firstChild);
+        } else {
+          el.appendChild(div);
+        }
+      } else {
+        el.appendChild(div);
+      }
+      materialisedAny = true;
+    }
+    if (materialisedAny) {
+      el.setAttribute('data-snapshot-pseudo-host', '');
+    }
+  }
+}
+
 /* eslint-enable no-undef, no-inner-declarations */
 
 // `HELPERS_SRC` / `PAYLOAD_CONSTANTS_SRC` are exposed for the browser-bundle
@@ -3008,6 +3484,7 @@ export {
   TAKE_SNAPSHOT_EXPR,
   inlineExternalImages,
   inlineCanvases,
+  materializeDecorativePseudoElements,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

@@ -26,6 +26,7 @@ const path = require('path');
 const {
   inlineExternalImages,
   inlineCanvases,
+  materializeDecorativePseudoElements,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 } = require('./dist/lib/browser-snapshot');
@@ -48,6 +49,7 @@ const {
 const BROWSER_EXPORTS = [
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
+  { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
   { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
   { name: 'collectIconFontTargets', fn: browserCollectIconFontTargets },
   { name: 'applyIconFontSvgs',      fn: browserApplyIconFontSvgs },
@@ -66,6 +68,7 @@ const banner = `/*!
  *   takeSnapshot()                          -> { html, width, height }
  *   inlineExternalImages(cachedMap?)        -> Promise<void>
  *   inlineCanvases()                        -> Promise<void>
+ *   materializeDecorativePseudoElements()   -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void
  *   collectFontFaceMap()                    -> Promise<{family:{url,format}}>
@@ -102,6 +105,7 @@ return {
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,
+  materializeDecorativePseudoElements: materializeDecorativePseudoElements,
   // Icon-font hooks: callers running outside of node (no opentype.js /
   // wawoff2 available) can still tag icon-font hosts via
   // collectIconFontTargets() and post their own SVG results back via
@@ -254,6 +258,10 @@ const exampleHtml = `<!DOCTYPE html>
         // libraries (ECharts, Chart.js, …) survive the snapshot. No-op when
         // the page has no canvases.
         await HtmlSnapshot.inlineCanvases();
+        // Optional: turn decorative ::before/::after pseudo-elements
+        // (toggle thumbs, custom radio dots, dividers …) into real <div>
+        // children so their boxes survive the snapshot.
+        await HtmlSnapshot.materializeDecorativePseudoElements();
         const { html, width, height } = HtmlSnapshot.takeSnapshot();
         const head = '// ' + width + 'x' + height + ', ' + html.length + ' bytes\\n';
         const preview = html.length > 4000 ? html.slice(0, 4000) + '\\n// …truncated' : html;
