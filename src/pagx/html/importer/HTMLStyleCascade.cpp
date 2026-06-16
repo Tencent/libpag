@@ -55,13 +55,9 @@ std::vector<std::string> SplitCommaArgs(const std::string& args) {
 // Pulls the function name and the argument-list slice from "fn(args)" form. The CSS subset
 // transformer in HTMLSubsetPropertyTable already rejects compound chains and `matrix(...)`
 // before we see the value, but the resolver runs even when subset transformation is bypassed
-// (e.g. `HTMLImporter::Options::autoNormalize == false`), so we re-check the shape here:
-// the FIRST `)` must coincide with the LAST `)` and trail only whitespace, otherwise the
-// value is a compound chain and is rejected.
-bool SplitTransformFunction(const std::string& trimmed, std::string& fnName,
-                            std::string& argsBody) {
-  return ParseCssFunctionCall(trimmed, fnName, argsBody);
-}
+// (e.g. `HTMLImporter::Options::autoNormalize == false`), so we re-check the shape here via
+// `ParseCssFunctionCall`: the FIRST `)` must coincide with the LAST `)` and trail only
+// whitespace, otherwise the value is a compound chain and is rejected.
 
 bool ParseScalarFloat(const std::string& token, float& out) {
   std::string trimmed = Trim(token);
@@ -277,6 +273,29 @@ void ClampBorderRadiusScale(float sum, float edge, float& scale) {
     float fe = edge / sum;
     if (fe < scale) scale = fe;
   }
+}
+
+// Parses a CSS 1-4 token px shorthand (used by `padding` and `margin`). Each whitespace-separated
+// token is resolved through `parseAbsoluteLengthPx`; tokens that fail to parse are reported with
+// `propName` and skipped (the corresponding slot stays at the shorthand-expansion default of 0).
+// Returns false when no usable token survived; otherwise fills `out` via `ExpandFourSideShorthand`.
+bool ParsePxShorthandTokens(const std::string& raw, const char* propName,
+                            HTMLValueParser& valueParser, HTMLDiagnosticSink& diagnostics,
+                            FourSidedValue& out) {
+  auto tokens = SplitTopLevelWhitespace(raw);
+  std::vector<float> nums;
+  nums.reserve(tokens.size());
+  for (auto& t : tokens) {
+    float v = valueParser.parseAbsoluteLengthPx(t);
+    if (std::isnan(v)) {
+      diagnostics.warn(std::string("html: invalid ") + propName + " token '" + t + "'");
+      continue;
+    }
+    nums.push_back(v);
+  }
+  if (nums.empty()) return false;
+  out = ExpandFourSideShorthand(nums);
+  return true;
 }
 
 }  // namespace
@@ -596,18 +615,14 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
   }
   const std::string& padding = LookupProperty(props, "padding");
   if (!padding.empty()) {
-    auto tokens = SplitTopLevelWhitespace(padding);
-    std::vector<float> nums;
-    for (auto& t : tokens) {
-      float v = _valueParser.parseAbsoluteLengthPx(t);
-      if (std::isnan(v)) {
-        _diagnostics.warn("html: invalid padding token '" + t + "'");
-        continue;
-      }
-      nums.push_back(v);
+    FourSidedValue p = {};
+    if (ParsePxShorthandTokens(padding, "padding", _valueParser, _diagnostics, p)) {
+      box.padding.top = p.top;
+      box.padding.right = p.right;
+      box.padding.bottom = p.bottom;
+      box.padding.left = p.left;
+      box.paddingSet = true;
     }
-    box.padding = BuildPaddingShorthand(nums);
-    box.paddingSet = !nums.empty();
   }
   std::string ai = LookupLowerTrimmed(props, "align-items");
   if (!ai.empty()) box.alignItems = ai;
@@ -648,22 +663,13 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
     // `wrapForMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
     const std::string& margin = LookupProperty(props, "margin");
     if (!margin.empty()) {
-      auto tokens = SplitTopLevelWhitespace(margin);
-      std::vector<float> nums;
-      nums.reserve(tokens.size());
-      for (auto& t : tokens) {
-        float v = _valueParser.parseAbsoluteLengthPx(t);
-        if (std::isnan(v)) {
-          _diagnostics.warn("html: invalid margin token '" + t + "'");
-          continue;
-        }
-        nums.push_back(v);
+      FourSidedValue m = {};
+      if (ParsePxShorthandTokens(margin, "margin", _valueParser, _diagnostics, m)) {
+        box.marginTopPx = m.top;
+        box.marginRightPx = m.right;
+        box.marginBottomPx = m.bottom;
+        box.marginLeftPx = m.left;
       }
-      FourSidedValue m = ExpandFourSideShorthand(nums);
-      box.marginTopPx = m.top;
-      box.marginRightPx = m.right;
-      box.marginBottomPx = m.bottom;
-      box.marginLeftPx = m.left;
     }
     applyMarginLonghand(props, "margin-top", box.marginTopPx);
     applyMarginLonghand(props, "margin-right", box.marginRightPx);
@@ -800,7 +806,7 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
 
   std::string fn;
   std::string args;
-  if (!SplitTransformFunction(transform, fn, args)) {
+  if (!ParseCssFunctionCall(transform, fn, args)) {
     _diagnostics.warn("html: transform '" + transform + "' is malformed; ignored");
     return;
   }

@@ -43,7 +43,7 @@ bool IsInlineRunTag(const std::string& tag) {
 }
 
 bool IsInlineLeafChildName(const std::string& name) {
-  return IsInlineRunTag(name) || name == "br";
+  return IsInlineRunTag(name);
 }
 
 std::vector<std::string> SplitTopLevelCommas(const std::string& s) {

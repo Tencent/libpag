@@ -600,6 +600,37 @@ bool ApplyPaddingShorthand(const std::string& value, float& top, float& right, f
   return true;
 }
 
+// Erases the four longhand properties of a CSS edge shorthand (margin-* / padding-* / etc.) from
+// `props`. Used by passes that fold per-side overrides back into a shorthand or otherwise drop
+// the per-side declarations.
+void ClearFourSideProperty(PropertyMap& props, const char* base) {
+  std::string prefix(base);
+  prefix.push_back('-');
+  props.erase(prefix + "top");
+  props.erase(prefix + "right");
+  props.erase(prefix + "bottom");
+  props.erase(prefix + "left");
+}
+
+// Returns true and writes the resolved px value into `out` when `props[key]` is present and
+// parses as a finite px length. Returns false when the property is absent. When the property
+// is present but malformed, behaviour depends on `requireParse`:
+//   - true : the function returns false (caller should bail).
+//   - false: the function returns true with `out` left at its incoming value (caller may
+//            ignore the malformed token).
+// Most call sites want `requireParse=true`; the legacy "tolerant" sites pass false.
+bool TryParseResolvedPx(const PropertyMap& props, const std::string& key, float& out,
+                        bool requireParse = true) {
+  const std::string& v = LookupResolved(props, key);
+  if (v.empty()) return false;
+  float px = 0.0f;
+  if (!ParseNormalisedPx(v, px)) {
+    return !requireParse;
+  }
+  out = px;
+  return true;
+}
+
 // Parses the resolved `padding` shorthand (1-4 px tokens) into top/right/bottom/left. Returns
 // false if the value is missing or any token is not a plain px length. Per-side `padding-*`
 // overrides (when present) win over the shorthand.
@@ -613,23 +644,10 @@ bool ParsePaddingFromResolved(const PropertyMap& props, float& top, float& right
     any = true;
   }
   // Per-side overrides.
-  float px = 0.0f;
-  if (auto v = LookupResolved(props, "padding-top"); !v.empty() && ParseNormalisedPx(v, px)) {
-    top = px;
-    any = true;
-  }
-  if (auto v = LookupResolved(props, "padding-right"); !v.empty() && ParseNormalisedPx(v, px)) {
-    right = px;
-    any = true;
-  }
-  if (auto v = LookupResolved(props, "padding-bottom"); !v.empty() && ParseNormalisedPx(v, px)) {
-    bottom = px;
-    any = true;
-  }
-  if (auto v = LookupResolved(props, "padding-left"); !v.empty() && ParseNormalisedPx(v, px)) {
-    left = px;
-    any = true;
-  }
+  if (TryParseResolvedPx(props, "padding-top", top)) any = true;
+  if (TryParseResolvedPx(props, "padding-right", right)) any = true;
+  if (TryParseResolvedPx(props, "padding-bottom", bottom)) any = true;
+  if (TryParseResolvedPx(props, "padding-left", left)) any = true;
   return any || sh.empty();  // empty padding is fine (zeros)
 }
 
@@ -956,10 +974,7 @@ void ApplyFlexToParent(PropertyMap& parentProps, FlexAxis axis, float padTop, fl
   } else {
     parentProps.erase("padding");
   }
-  parentProps.erase("padding-top");
-  parentProps.erase("padding-right");
-  parentProps.erase("padding-bottom");
-  parentProps.erase("padding-left");
+  ClearFourSideProperty(parentProps, "padding");
   switch (align) {
     case CrossAlign::Stretch:
       parentProps["align-items"] = "stretch";

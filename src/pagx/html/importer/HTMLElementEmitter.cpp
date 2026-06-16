@@ -60,7 +60,7 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
-  if (requiresInnerHost(box)) return false;
+  if (HTMLLayerBuilder::requiresInnerHost(box)) return false;
 
   std::shared_ptr<DOMNode> img = nullptr;
   for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
@@ -83,7 +83,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   // The image must exactly cover the wrapper's content box, anchored at top-left —
   // otherwise the rounded clip would shape only part of the visible image and folding
   // would stretch it across the wrapper.
-  HTMLBoxAttributes imgBox = computeBoxAttributes(img);
+  HTMLBoxAttributes imgBox = _styleCascade->computeBoxAttributes(img);
   if (std::isnan(imgBox.widthPx) || std::isnan(box.widthPx) ||
       !pag::FloatNearlyEqual(imgBox.widthPx, box.widthPx, HTML_IMAGE_WRAPPER_TOLERANCE_PX)) {
     return false;
@@ -113,7 +113,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   pattern->scaleMode = ResolveImageScaleMode(imgBox.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
-  assignElementId(layer, element);
+  _idAllocator->assign(layer, element);
   return true;
 }
 
@@ -127,11 +127,11 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   const std::string& src = *srcAttr;
   if (IsExternalSvgSrc(src)) {
     auto layer = _document->makeNode<Layer>();
-    applySizeAndPosition(layer, box);
-    applyLayerAttributes(layer, element, box);
+    _layerBuilder->applySizeAndPosition(layer, box);
+    _layerBuilder->applyLayerAttributes(layer, element, box);
     layer->importDirective.source = resolveImageSource(src);
     layer->importDirective.format = "svg";
-    assignElementId(layer, element);
+    _idAllocator->assign(layer, element);
     return layer;
   }
 
@@ -139,15 +139,15 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   if (!imageNode) return nullptr;
 
   auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
+  _layerBuilder->applySizeAndPosition(layer, box);
+  _layerBuilder->applyLayerAttributes(layer, element, box);
 
   // Honour `border-radius` directly on `<img>`: a CSS `<img style="border-radius: 50%">` is the
   // canonical way to draw a circular avatar, and per-corner radii (e.g. only the top corners
   // rounded for a "card cover" image) follow the same Path-emission path the container code
   // uses. When the image has no border-radius, `buildBackgroundGeometry` falls back to a plain
   // `Rectangle width=100% height=100%`, preserving the legacy emission verbatim.
-  layer->contents.push_back(buildBackgroundGeometry(box));
+  layer->contents.push_back(_layerBuilder->buildBackgroundGeometry(box));
 
   auto fill = _document->makeNode<Fill>();
   auto pattern = _document->makeNode<ImagePattern>();
@@ -155,7 +155,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
-  assignElementId(layer, element);
+  _idAllocator->assign(layer, element);
   return layer;
 }
 
@@ -163,20 +163,20 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited) {
   auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
+  _layerBuilder->applySizeAndPosition(layer, box);
+  _layerBuilder->applyLayerAttributes(layer, element, box);
 
   // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
   // `resolveInheritedStyle` returns the style descendants see, but `resolvedTextColor`
   // is the *element's own* colour after applying any `style="color: …"` on the
   // SVG itself — exactly what `currentColor` should resolve to at the SVG root.
-  HTMLInheritedStyle svgStyle = resolveInheritedStyle(element, inherited);
+  HTMLInheritedStyle svgStyle = _styleCascade->resolveInheritedStyle(element, inherited);
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 
   layer->importDirective.content = _svgEmitter->serialize(element);
   layer->importDirective.format = "svg";
-  assignElementId(layer, element);
+  _idAllocator->assign(layer, element);
   return layer;
 }
 

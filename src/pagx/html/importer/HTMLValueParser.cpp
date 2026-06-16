@@ -38,6 +38,16 @@ namespace {
 
 constexpr float HtmlPi = 3.14159265358979323846f;
 
+// Pulls the comma-separated argument list of a `xxx-gradient(...)` call. Returns false when the
+// value carries no `(...)` body or fewer than two top-level comma-separated parts (the minimum
+// for a usable gradient: a leading angle/shape descriptor or a stop, plus at least one stop).
+bool ExtractGradientParts(const std::string& value, std::vector<std::string>& outParts) {
+  std::string args = ExtractParenArgs(value);
+  if (args.empty()) return false;
+  outParts = SplitTopLevelCommas(args);
+  return outParts.size() >= 2;
+}
+
 }  // namespace
 
 HTMLValueParser::HTMLValueParser(HTMLDiagnosticSink& sink, const float& canvasWidth,
@@ -268,10 +278,8 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
 }
 
 LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   float cssAngle = 180.0f;  // CSS default: to bottom
   size_t stopStart = 0;
   std::string first = Trim(parts[0]);
@@ -299,10 +307,8 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
 }
 
 RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
   std::string first = ToLower(Trim(parts[0]));
@@ -321,10 +327,8 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
 }
 
 ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   float cssAngle = 0.0f;
   std::string first = ToLower(Trim(parts[0]));
