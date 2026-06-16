@@ -134,7 +134,6 @@ class PluginInstaller : public QObject {
 
   bool copyUserPluginWithRetry(const QString& plugin, int maxRetries = 5) const;
 
-  void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
 
   struct Version {
