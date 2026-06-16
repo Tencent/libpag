@@ -652,14 +652,14 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {
-    const Font* font = nullptr;
+    bool hasEmbeddedFont = false;
     for (auto* run : text->glyphRuns) {
-      if (run->font) {
-        font = run->font;
+      if (run->font && _ctx->woff2Fonts.find(run->font) != _ctx->woff2Fonts.end()) {
+        hasEmbeddedFont = true;
         break;
       }
     }
-    if (font && _ctx->woff2Fonts.find(font) != _ctx->woff2Fonts.end()) {
+    if (hasEmbeddedFont) {
       writeEmbeddedShapeGlyphs(out, text, fill, stroke, alpha);
       return;
     }
@@ -983,21 +983,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, co
                                           const Stroke* stroke, float alpha) {
   // All embedded font glyphs (vector and bitmap) are rendered via WOFF2 @font-face with PUA
   // characters. This preserves glyph-level layout while using the exact embedded outlines.
-  const Font* font = nullptr;
-  for (auto* run : text->glyphRuns) {
-    if (run->font) {
-      font = run->font;
-      break;
-    }
-  }
-  if (!font) {
-    return;
-  }
-  auto it = _ctx->woff2Fonts.find(font);
-  if (it == _ctx->woff2Fonts.end()) {
-    return;
-  }
-  writeEmbeddedShapeGlyphsAsFont(out, text, fill, stroke, alpha, it->second);
+  writeEmbeddedShapeGlyphsAsFont(out, text, fill, stroke, alpha);
 }
 
 static void AppendUTF8(std::string& out, uint32_t cp);
@@ -2148,34 +2134,36 @@ static void AppendUTF8(std::string& out, uint32_t cp) {
 }
 
 void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text,
-                                                const Fill* fill, const Stroke* stroke, float alpha,
-                                                const Woff2FontResult& fontResult) {
+                                                const Fill* fill, const Stroke* stroke,
+                                                float alpha) {
   auto renderPos = text->renderPosition();
-  // Embedded shape glyphs always use per-glyph absolute positioning via xOffsets/positions.
-  // The "simple" no-transform path (single span) is only valid when there are NO xOffsets
-  // and NO per-glyph transforms — which is extremely rare for shape batching.
+  bool hasEmbeddedFont = false;
   bool hasPerGlyphPositioning = false;
+  bool hasBitmapFont = false;
   for (auto* run : text->glyphRuns) {
+    if (!run->font) {
+      continue;
+    }
+    auto it = _ctx->woff2Fonts.find(run->font);
+    if (it == _ctx->woff2Fonts.end()) {
+      continue;
+    }
+    hasEmbeddedFont = true;
     if (!run->xOffsets.empty() || !run->positions.empty() || !run->rotations.empty() ||
         !run->scales.empty() || !run->skews.empty()) {
       hasPerGlyphPositioning = true;
-      break;
+    }
+    if (!run->font->glyphs.empty() && run->font->glyphs[0]->image) {
+      hasBitmapFont = true;
     }
   }
-
-  // Bitmap fonts (CBDT) render embedded PNG pixels directly — CSS color/fill has no effect on
-  // the bitmap content. Only vector (CFF) fonts respect CSS color for glyph rendering.
-  bool isBitmapFont = false;
-  for (auto* run : text->glyphRuns) {
-    if (run->font && !run->font->glyphs.empty() && run->font->glyphs[0]->image) {
-      isBitmapFont = true;
-      break;
-    }
+  if (!hasEmbeddedFont) {
+    return;
   }
 
-  // Build fill/stroke CSS shared by all spans.
+  // Build fill/stroke CSS shared by vector font spans.
   std::string colorCss;
-  if (!isBitmapFont && fill && fill->color) {
+  if (fill && fill->color) {
     auto ct = fill->color->nodeType();
     if (ct == NodeType::SolidColor) {
       auto sc = static_cast<const SolidColor*>(fill->color);
@@ -2192,8 +2180,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     }
   }
   std::string strokeCss;
-  if (!isBitmapFont && stroke && stroke->color &&
-      stroke->color->nodeType() == NodeType::SolidColor) {
+  if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
     auto sc = static_cast<const SolidColor*>(stroke->color);
     bool hasFill = fill && fill->color;
     auto resolved = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
@@ -2210,12 +2197,19 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
   }
 
   // For bitmap fonts, Fill alpha is irrelevant (bitmap pixels carry their own alpha).
-  float effectiveAlpha = isBitmapFont ? 1.0f : alpha;
+  float effectiveAlpha = hasBitmapFont ? 1.0f : alpha;
 
   if (!hasPerGlyphPositioning) {
-    // Simple path: all glyphs as a single <span> with concatenated PUA characters.
-    std::string puaText;
+    bool emittedGlyph = false;
     for (auto* run : text->glyphRuns) {
+      if (!run->font) {
+        continue;
+      }
+      auto fontIt = _ctx->woff2Fonts.find(run->font);
+      if (fontIt == _ctx->woff2Fonts.end()) {
+        continue;
+      }
+      std::string puaText;
       for (auto glyphID : run->glyphs) {
         if (glyphID == 0) {
           continue;
@@ -2223,61 +2217,60 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
         uint32_t codepoint = 0xE000 + (glyphID - 1);
         AppendUTF8(puaText, codepoint);
       }
+      if (puaText.empty()) {
+        continue;
+      }
+      float fontSize = run->fontSize;
+      bool runIsBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image;
+      float posX = renderPos.x + run->x;
+      float posY = renderPos.y + run->y;
+      float cssTop = runIsBitmapFont ? posY : (posY - fontSize);
+      std::string style = "position:absolute;left:" + CssFloatToString(posX) +
+                          "px;top:" + CssFloatToString(cssTop) + "px;line-height:1";
+      style += ";font-family:'" + fontIt->second.familyName + "'";
+      style += ";font-size:" + CssFloatToString(fontSize) + "px";
+      bool hasGradient = !runIsBitmapFont && fill && fill->color &&
+                         fill->color->nodeType() != NodeType::SolidColor;
+      if (hasGradient) {
+        style += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
+      }
+      if (!runIsBitmapFont) {
+        style += colorCss + strokeCss;
+      }
+      if (effectiveAlpha < 1.0f) {
+        style += ";opacity:" + CssFloatToString(effectiveAlpha);
+      }
+      out.openTag("span");
+      out.addAttr("style", style);
+      out.closeTagWithText(puaText);
+      emittedGlyph = true;
     }
-    if (puaText.empty()) {
+    if (!emittedGlyph) {
       return;
     }
-    float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
-    // For the simple path, posX/posY come from the GlyphRun's x/y + renderPos.
-    float posX = renderPos.x;
-    float posY = renderPos.y;
-    if (!text->glyphRuns.empty()) {
-      posX += text->glyphRuns[0]->x;
-      posY += text->glyphRuns[0]->y;
-    }
-    float cssTop = isBitmapFont ? posY : (posY - fontSize);
-    std::string style = "position:absolute;left:" + CssFloatToString(posX) +
-                        "px;top:" + CssFloatToString(cssTop) + "px;line-height:1";
-    style += ";font-family:'" + fontResult.familyName + "'";
-    style += ";font-size:" + CssFloatToString(fontSize) + "px";
-    // For gradient fills, extend span height to cover glyph rendering area below em-box.
-    // Problem: CSS `background-clip:text` clips the gradient to the element's content box
-    // (bounded by line-height). Descenders (g, p, y) and baseline-shifted glyphs render below
-    // the content box, causing the gradient to be truncated at the baseline.
-    // Workaround: padding-bottom expands the content box downward so the gradient covers the
-    // full glyph extent. This relies on Chromium/WebKit including padding in the clip region
-    // for `background-clip:text` — a browser implementation detail, not guaranteed by CSS spec.
-    // If browser behavior changes, gradient text below the baseline may appear clipped.
-    bool hasGradient =
-        !isBitmapFont && fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
-    if (hasGradient) {
-      style += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
-    }
-    style += colorCss + strokeCss;
-    if (effectiveAlpha < 1.0f) {
-      style += ";opacity:" + CssFloatToString(effectiveAlpha);
-    }
-    out.openTag("span");
-    out.addAttr("style", style);
-    out.closeTagWithText(puaText);
   } else {
     // Per-glyph positioning path: each glyph is absolutely positioned to match the SVG path
     // rendering. GlyphRun x/y/xOffsets/positions are in pixel coordinates (not design space).
     // The font's ascender equals unitsPerEm, so the browser places the baseline at
     // top + fontSize. To align the font glyph origin (baseline at y=0 in CFF) with the PAGX
     // coordinate (posY = glyph origin in screen space), we set top = posY - fontSize.
-    float fontSize = text->glyphRuns.empty() ? 12.0f : text->glyphRuns[0]->fontSize;
 
     // For gradient fills with per-glyph positioning, compute the total extent so each span
     // can share the same gradient via background-size/background-position offset.
-    bool isGradientFill =
-        !isBitmapFont && fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
+    bool isGradientFill = fill && fill->color && fill->color->nodeType() != NodeType::SolidColor;
     float totalMinX = 0, totalMaxX = 0;
     if (isGradientFill) {
       bool first = true;
       for (auto* run : text->glyphRuns) {
-        if (!run->font || run->font->unitsPerEm == 0) continue;
-        float scale = fontSize / static_cast<float>(run->font->unitsPerEm);
+        if (!run->font || run->font->unitsPerEm == 0 ||
+            _ctx->woff2Fonts.find(run->font) == _ctx->woff2Fonts.end()) {
+          continue;
+        }
+        bool runIsBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image;
+        if (runIsBitmapFont) {
+          continue;
+        }
+        float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
         for (size_t i = 0; i < run->glyphs.size(); i++) {
           uint16_t gid = run->glyphs[i];
           if (gid == 0) continue;
@@ -2314,6 +2307,13 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       if (!run->font || run->font->unitsPerEm == 0) {
         continue;
       }
+      auto fontIt = _ctx->woff2Fonts.find(run->font);
+      if (fontIt == _ctx->woff2Fonts.end()) {
+        continue;
+      }
+      const auto& fontResult = fontIt->second;
+      float fontSize = run->fontSize;
+      bool runIsBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image;
       for (size_t i = 0; i < run->glyphs.size(); i++) {
         uint16_t glyphID = run->glyphs[i];
         if (glyphID == 0) {
@@ -2336,15 +2336,16 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
                                                         !FloatNearlyZero(run->scales[i].y - 1.0f));
         bool hasSkew = i < run->skews.size() && !FloatNearlyZero(run->skews[i]);
         bool hasTransform = hasRotation || hasGlyphScale || hasSkew;
+        bool useGradientFill = !runIsBitmapFont && isGradientFill && gradientWidth > 0;
 
         // CSS left = pixel X. CSS top depends on font type:
         // - Vector (CFF): top = posY - fontSize (baseline at top+ascent, ascent=fontSize)
         // - Bitmap (CBDT): top = posY (BearingY=ppem places bitmap at em-box top)
         float cssLeft = posX;
-        float cssTop = isBitmapFont ? posY : (posY - fontSize);
+        float cssTop = runIsBitmapFont ? posY : (posY - fontSize);
 
         std::string charStyle;
-        if (hasTransform && !(isGradientFill && gradientWidth > 0)) {
+        if (hasTransform && !useGradientFill) {
           // When per-glyph transforms are present, compute the full CSS matrix that combines
           // position + rotation/scale/skew around the PAGX anchor. We cannot use CSS
           // transform-origin because PAGX's anchor arithmetic shifts only anchorX (not anchorY)
@@ -2413,7 +2414,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
         }
 
-        if (isGradientFill && gradientWidth > 0) {
+        if (useGradientFill) {
           float gradAlpha = 1.0f;
           std::string gradCss = colorToCSS(fill->color, &gradAlpha);
           charStyle += ";background:" + gradCss;
@@ -2424,16 +2425,18 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           // See comment at line 2263: padding-bottom extends clip region for descenders.
           // Browser-dependent: relies on Chromium/WebKit including padding in background-clip:text.
           charStyle += ";padding-bottom:" + CssFloatToString(fontSize) + "px";
-        } else {
+        } else if (!runIsBitmapFont) {
           charStyle += colorCss;
         }
-        charStyle += strokeCss;
+        if (!runIsBitmapFont) {
+          charStyle += strokeCss;
+        }
 
         // For gradient fills that also have per-glyph transforms, use matrix() with the span
         // at its normal left/top position (so gradient background-position works correctly).
         // The matrix encodes the linear transform + position offset caused by the anchor-based
         // rotation/scale/skew, with transform-origin:0 0 since all offsets are baked in.
-        if (hasTransform && isGradientFill && gradientWidth > 0) {
+        if (hasTransform && useGradientFill) {
           auto gi = static_cast<size_t>(glyphID) - 1;
           float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
           float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);

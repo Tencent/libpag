@@ -618,6 +618,44 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   EXPECT_EQ(html.find("搜索"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="120" height="40">
+  <Resources>
+    <Font id="bullet" unitsPerEm="1000">
+      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
+    </Font>
+    <Font id="text" unitsPerEm="1000">
+      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
+      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="120" height="40">
+    <Text text="•AB" fontFamily="PingFang SC" fontSize="16">
+      <GlyphRun font="@bullet" fontSize="16" glyphs="1" x="0" y="24" bounds="0,0,8,16"/>
+      <GlyphRun font="@text" fontSize="16" glyphs="1,2" x="16" y="24"
+                xOffsets="0,16" bounds="16,0,32,16"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  size_t bulletFontCount = 0;
+  for (size_t pos = 0; (pos = html.find("pagx-font-f0", pos)) != std::string::npos; pos++) {
+    bulletFontCount++;
+  }
+  size_t textFontCount = 0;
+  for (size_t pos = 0; (pos = html.find("pagx-font-f1", pos)) != std::string::npos; pos++) {
+    textFontCount++;
+  }
+  EXPECT_GT(bulletFontCount, static_cast<size_t>(1));
+  EXPECT_GT(textFontCount, static_cast<size_t>(1));
+  EXPECT_NE(html.find("\xEE\x80\x81"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

@@ -507,12 +507,10 @@ class HTMLWriter {
   // normal CSS span path when text semantics/layout must stay browser-native.
   void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                 const Stroke* stroke, float alpha);
-  // WOFF2 path: renders embedded vector glyphs as <span> elements referencing a generated
-  // @font-face WOFF2 font, using PUA Unicode characters. Falls through to the SVG <path>
-  // path in writeEmbeddedShapeGlyphs when no WOFF2 font is available for this Font resource.
+  // WOFF2 path: renders embedded glyph runs as <span> elements referencing generated @font-face
+  // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
-                                      const Stroke* stroke, float alpha,
-                                      const Woff2FontResult& fontResult);
+                                      const Stroke* stroke, float alpha);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
