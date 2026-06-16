@@ -924,13 +924,70 @@ function imageInnerStyle(rect, flexItem, objectFit) {
   return base;
 }
 
-// Walk an SVG subtree and rewrite `currentColor` / `context-fill` /
-// `context-stroke` to the computed colour at that node so the snapshot is
-// self-contained. The clone is detached from the document, so
-// `getComputedStyle` can't resolve it directly; instead we walk the
-// *original* subtree (where the cascade is live) and the clone in lockstep,
-// propagating per-node `color` down the tree.
+// Walk an SVG subtree and freeze the CSS-resolved paint state onto each
+// cloned element so the snapshot renders identically without the page's
+// original stylesheet:
+//
+//   1. `currentColor` / `context-fill` / `context-stroke` literal attribute
+//      values get rewritten to the node's resolved color.
+//   2. Every presentation attribute in `SVG_PRESENTATION_ATTRS` (defined
+//      below as a function-local constant so it ships into the browser
+//      payload via `fn.toString()`) whose resolved value differs from what
+//      the cloned ancestor chain already provides gets written as an
+//      attribute on the clone. Author-emitted attributes (preserved by
+//      `cloneNode(true)`) are kept as-is — we only add what would otherwise
+//      be lost when the page's stylesheet is dropped.
+//
+// The clone is detached from the document, so `getComputedStyle` can't
+// resolve it directly; we walk the *original* subtree (where the cascade is
+// live) and the clone in lockstep, threading the resolved color and the
+// resolved presentation map down the recursion.
 function freezeSvg(svgEl, rect) {
+  // SVG presentation attributes that real-world pages routinely set via CSS
+  // rules (e.g. `.icon path { stroke: #fff; stroke-width: 2; }`) rather
+  // than as element attributes in markup. The subset HTML throws away the
+  // page's stylesheets, so any such CSS-driven paint disappears unless we
+  // freeze the resolved value onto the cloned element here. The list
+  // covers the paint / stroke / fill / opacity / vector-effect family —
+  // the attributes that actually affect what the SVG paints. Layout-only
+  // properties (width, height, x, y, transform) are left to the SVG's own
+  // attributes.
+  const SVG_PRESENTATION_ATTRS = [
+    'fill', 'fill-opacity', 'fill-rule',
+    'stroke', 'stroke-opacity', 'stroke-width',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+    'stroke-dasharray', 'stroke-dashoffset',
+    'opacity', 'visibility', 'clip-rule', 'vector-effect',
+  ];
+  // SVG-spec defaults for the attributes above. Used as the inheritance
+  // root so the top-level <svg>'s computed values only get serialised when
+  // they differ from the spec default. A missing entry is treated as "" so
+  // any non-empty resolved value is emitted.
+  const SVG_PRESENTATION_DEFAULTS = {
+    'fill': 'rgb(0, 0, 0)',
+    'fill-opacity': '1',
+    'fill-rule': 'nonzero',
+    'stroke': 'none',
+    'stroke-opacity': '1',
+    'stroke-width': '1px',
+    'stroke-linecap': 'butt',
+    'stroke-linejoin': 'miter',
+    'stroke-miterlimit': '4',
+    'stroke-dasharray': 'none',
+    'stroke-dashoffset': '0px',
+    'opacity': '1',
+    'visibility': 'visible',
+    'clip-rule': 'nonzero',
+    'vector-effect': 'none',
+  };
+  const readPresentation = (cs) => {
+    const out = {};
+    for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
+      const name = SVG_PRESENTATION_ATTRS[i];
+      out[name] = (cs.getPropertyValue(name) || '').trim();
+    }
+    return out;
+  };
   const clone = svgEl.cloneNode(true);
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
@@ -944,14 +1001,16 @@ function freezeSvg(svgEl, rect) {
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor) => {
+  const walk = (orig, dst, inheritedColor, inheritedAttrs) => {
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
     let here = inheritedColor;
+    let resolvedAttrs = inheritedAttrs;
     if (orig && orig.nodeType === 1) {
       const cs = getComputedStyle(orig);
       if (cs && cs.color) here = cs.color.trim() || here;
+      resolvedAttrs = readPresentation(cs);
     }
     if (dst && dst.nodeType === 1 && dst.getAttribute) {
       const stroke = dst.getAttribute('stroke');
@@ -968,13 +1027,25 @@ function freezeSvg(svgEl, rect) {
         if (dst.style.fill === 'currentColor') dst.style.fill = here;
         if (dst.style.color === 'currentColor') dst.style.color = here;
       }
+      // Freeze any CSS-resolved presentation attribute that the cloned
+      // ancestor chain doesn't already supply. This is what carries
+      // `<style>.cls path { stroke: ... }` rules into the snapshot.
+      for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
+        const name = SVG_PRESENTATION_ATTRS[i];
+        if (dst.hasAttribute(name)) continue;
+        const value = resolvedAttrs[name];
+        if (!value) continue;
+        const inherited = inheritedAttrs[name] || SVG_PRESENTATION_DEFAULTS[name] || '';
+        if (value === inherited) continue;
+        dst.setAttribute(name, value);
+      }
     }
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs);
   };
-  walk(svgEl, clone, fallback);
+  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS);
   return clone.outerHTML;
 }
 
