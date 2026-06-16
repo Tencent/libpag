@@ -24,6 +24,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -152,6 +153,34 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   }
   if (config != nullptr) {
     fontConfig_ = *config;
+  }
+  // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
+  // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
+  // size is already set, so without this a size/constraint edit would keep the stale geometry.
+  if (layoutApplied) {
+    for (auto& node : nodes) {
+      switch (node->nodeType()) {
+        case NodeType::Layer:
+          static_cast<Layer*>(node.get())->resetLayout();
+          break;
+        case NodeType::Rectangle:
+        case NodeType::Ellipse:
+        case NodeType::Path:
+        case NodeType::Polystar:
+        case NodeType::Text:
+        case NodeType::TextPath:
+        case NodeType::Group:
+        case NodeType::TextBox: {
+          auto* layoutNode = LayoutNode::AsLayoutNode(static_cast<Element*>(node.get()));
+          if (layoutNode != nullptr) {
+            layoutNode->resetLayout();
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
   }
   LayoutContext context(&fontConfig_);
   // Composition layers are laid out first since they may be referenced by document layers.
@@ -287,22 +316,74 @@ void PAGXDocument::clearEmbed() {
   }
 }
 
-void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes) {
+void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged) {
   if (dirtyNodes.empty()) {
     return;
   }
-  // Prune expired weak_ptr entries to keep liveScenes bounded.
+  // Partition the input into nodes this document owns (forwarded to live scenes) and foreign nodes
+  // (dropped, with one aggregate LOGE). A node belongs to exactly one document, so a single
+  // mis-routed entry must not stop the rest of the batch from refreshing — the editor scenario where
+  // a multi-select dirty list mixes nodes from a parent and an embedded child document is common,
+  // and silent batch rejection would translate every such typo into "nothing updates". Foreign-node
+  // edits still need to be re-issued through the owning document by the caller (use ownsNode() to
+  // predicate the call).
+  std::vector<Node*> ownedDirty = {};
+  ownedDirty.reserve(dirtyNodes.size());
+  size_t foreignCount = 0;
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (ownsNode(node)) {
+      ownedDirty.push_back(node);
+    } else {
+      ++foreignCount;
+    }
+  }
+  if (foreignCount > 0) {
+    LOGE(
+        "PAGXDocument::notifyChange: %zu node(s) not owned by this document were dropped; notify "
+        "them through their own document.",
+        foreignCount);
+  }
+  if (ownedDirty.empty()) {
+    return;
+  }
   PruneExpiredScenes(&liveScenes);
-  // Dispatch to PAGScene::onNodesChanged by iterating liveScenes; each scene decides which dirty
-  // nodes are relevant using its own runtime binding. Implementation lives in PAGScene.cpp to avoid
-  // pulling PAGScene.h into the document header.
-  // TODO(PR11): wire to PAGScene::onNodesChanged once that method is implemented.
-  (void)dirtyNodes;
+  // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
+  // list changes require a full re-layout, since layout is resolved top-down and a single node
+  // cannot be re-measured in isolation. applyLayout() discards the cached layout outputs first when
+  // the document is already laid out (see its reset branch). Pure render edits skip this entirely.
+  if (layoutChanged) {
+    applyLayout();
+  }
+  for (auto& weakScene : liveScenes) {
+    auto scene = weakScene.lock();
+    if (scene != nullptr) {
+      scene->onNodesChanged(ownedDirty);
+    }
+  }
+}
+
+bool PAGXDocument::ownsNode(const Node* node) const {
+  for (auto& ownedNode : nodes) {
+    if (ownedNode.get() == node) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {
   if (scene == nullptr) {
     return;
+  }
+  // Avoid duplicate entries: a scene re-registers with its external documents on every rebuild.
+  PruneExpiredScenes(&liveScenes);
+  for (auto& weakScene : liveScenes) {
+    if (weakScene.lock() == scene) {
+      return;
+    }
   }
   liveScenes.emplace_back(scene);
 }
