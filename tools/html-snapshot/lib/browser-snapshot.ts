@@ -493,7 +493,14 @@ function classify(el, computed) {
     return el.getAttribute('data-snapshot-canvas-src') ? 'canvas' : null;
   }
   if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-    return syntheticText(el) ? 'text' : null;
+    if (syntheticText(el)) return 'text';
+    // No visible text content (e.g. Material's floating-label
+    // `placeholder=" "` trick that pairs with `:placeholder-shown`, or a
+    // value-less input that paints only its border-bottom underline). Keep
+    // the box when the author painted any box visuals so the underline /
+    // background / shadow survives the snapshot.
+    if (hasBoxVisualsForInline(computed)) return 'box';
+    return null;
   }
   return 'box';
 }
