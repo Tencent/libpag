@@ -25,6 +25,7 @@
 #include "base/PAGTest.h"
 #include "cli/CommandVerify.h"
 #include "pagx/HTMLImporter.h"
+#include "pagx/HTMLSubsetTransformer.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -48,6 +49,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/xml/XMLDOM.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -3565,6 +3567,801 @@ PAG_TEST(PAGXHTMLImporterTest, FixtureLogin) {
 
 PAG_TEST(PAGXHTMLImporterTest, FixtureTableVisual) {
   RunFixture("table_visual");
+}
+
+//==================================================================================================
+// Coverage-focused tests for src/pagx/html/importer
+//
+// These exercise raw-cascade (autoNormalize=false) code paths that the subset transformer
+// otherwise handles before HTMLStyleCascade / HTMLParserContext / HTMLCssCascade ever see the
+// input. Without these, the per-CSS-function transform handlers, several CSS tokenizer edge
+// cases, and the `<br>` / unknown-element / stray-text branches in the parser stay dark.
+//==================================================================================================
+
+namespace {
+
+// Parses HTML with the subset transformer disabled so the importer's own CSS cascade and
+// transform machinery run end-to-end.
+inline std::shared_ptr<pagx::PAGXDocument> ParseRaw(const std::string& html) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  return pagx::HTMLImporter::ParseString(html, opts);
+}
+
+// Returns true if any diagnostic message contains all of the given substrings.
+inline bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                    const std::string& needle) {
+  if (!doc) return false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find(needle) != std::string::npos) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+//==================================================================================================
+// HTMLStyleCascade — single-function `transform` handlers (raw cascade only)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewXSetsLayerMatrix) {
+  // skewX(deg) flips sign in the cascade and folds into a horizontal shear; the resulting
+  // matrix is then re-anchored around the box centre by applyBoxTransform.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <div style="transform:skewX(45deg);width:200px;height:60px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  EXPECT_FALSE(div->matrix.isIdentity());
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform '"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:60px">
+      <div style="transform:skewY(30deg);width:100px;height:60px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewXTooManyArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:skewX(10deg, 20deg);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "skewX expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewYNoArgsWarns) {
+  // Two args triggers the "skewY expects 1 argument" branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:skewY(10deg, 20deg);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "skewY expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformRotateSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:rotate(90deg);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformRotateNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:rotate(1, 2);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "rotate expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleUniformSetsLayerMatrix) {
+  // scale(2) -> sx = sy = 2.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scale(2);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleTwoArgsSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scale(2, 0.5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scale(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scale expects 1 or 2 numeric arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleXSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scaleX(2);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleXNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scaleX(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scaleX expects 1 numeric argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scaleY(0.5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleYNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scaleY(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scaleY expects 1 numeric argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateOneArgSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translate(10px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateTwoArgsSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translate(10px, 20px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateNoArgsWarns) {
+  // 3 args triggers the "expects 1 or 2 length arguments" branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(1px, 2px, 3px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate expects 1 or 2 length arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateBadFirstArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate first argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateBadSecondArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(10px, abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate second argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translateX(15px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateX(1px, 2px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX expects 1 length argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXBadArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateX(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translateY(15px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateY(1px, 2px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateY expects 1 length argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYBadArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateY(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateY argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixIdentityIsDropped) {
+  // matrix(1,0,0,1,0,0) is the identity; applyBoxTransform skips it without writing to layer.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:matrix(1,0,0,1,0,0);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixCustomSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:matrix(2,0,0,3,4,5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixWrongArgCountWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:matrix(1,2,3);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "matrix expects 6 numeric arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:matrix(1,0,0,1,0,abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "matrix argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformUnknownFunctionWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:perspective(100px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform function"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not in the supported subset"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMalformedWarns) {
+  // No `(`/`)` -> ParseCssFunctionCall returns false.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:notAFunction;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform '"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "is malformed"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginPxSetsResolvedPivot) {
+  // Non-default px transform-origin lands in the cascade's originX/Y resolution path.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(90deg);transform-origin:0px 0px;width:200px;height:200px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+  // No "transform-origin ... not supported" warning on a clean px form.
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin '0px 0px'"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginUnsupportedKeywordWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:rotate(45deg);transform-origin:left top;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform-origin"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not supported"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginCenterIsSilent) {
+  // The CSS default `center` is a synonym for the box centre and must NOT warn.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(90deg);transform-origin:center;width:200px;height:200px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginPxAtBoxCentreIsSilent) {
+  // Chromium emits the default origin as `<halfW>px <halfH>px`; the cascade detects this and
+  // suppresses the diagnostic, falling back to applyBoxTransform's centre pivot.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="transform:rotate(45deg);transform-origin:100px 50px;width:200px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOnElementWithoutSizeWarnsForOrigin) {
+  // No explicit width/height means applyBoxTransform can't compute the centre pivot, so the
+  // "without explicit width/height" diagnostic fires.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(45deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "without explicit width/height"));
+}
+
+//==================================================================================================
+// HTMLCssCascade — tokenizer edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssAtRuleNoSemicolonNoBraceIsSwallowed) {
+  // An at-rule that runs to EOF with no `;` or `{` falls into the size()-fallback branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @charset
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssCommentInsideAtRulePrelude) {
+  // The comment-skip branch inside the at-rule prelude scanner.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @media /* commented */ (max-width:600px) { .ignored { color:red } }
+      .real { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="real" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssCommentInsideSelector) {
+  // The comment-skip branch inside the rule-prelude scanner that looks for `{`.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .real /* selector comment */ { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="real" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssStrayClosingBraceIsSwallowed) {
+  // A stray `}` outside any rule terminates the prelude scan and the tokenizer recovers.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      } .x { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssUnterminatedBlockBailsOut) {
+  // No closing `}` means the unterminated-block branch trips and the rule is dropped.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .x { background-color:#AABBCC
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssTrailingBlockNoOpeningBrace) {
+  // A selector at end of the stylesheet with no `{` triggers the bracePos-not-found bail-out.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .x { background-color:#AABBCC }
+      .y
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssEmptySelectorIsClassifiedAsInvalid) {
+  // An empty selector survives ClassifySelector and falls through to the unsupported branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      , .x { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="x" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssEmptyClassSelectorRejected) {
+  // `.` alone (no class name) is rejected by ClassifySelector; declarations are dropped.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      . { background-color:#FF0000 }
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "unsupported selector"));
+}
+
+//==================================================================================================
+// HTMLValueParser — empty colour value
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawEmptyColorValueIsTransparent) {
+  // An empty `color:` declaration walks parseColor's empty-string branch, which yields fully
+  // transparent colour. The importer doesn't emit a Fill for such elements, but the
+  // declaration still parses without raising.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="color:;width:50px;height:50px">x</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+//==================================================================================================
+// HTMLParserContext — `<br>`, unknown elements, stray text
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, BrInsideContainerEmitsTextLeaf) {
+  // The `<br>` short-circuit branch in convertElement is reached when subset normalization runs:
+  // the transformer drops text-only `<br>` siblings, but `<div><br/></div>` survives.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:100px;height:50px"><br/></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnknownElementSkippedByDefault) {
+  // Without preserveUnknownElements, an unknown tag is dropped with a diagnostic.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <unknown-thing></unknown-thing>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not supported"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnknownElementPreservedWhenRequested) {
+  // With preserveUnknownElements, the same tag becomes an empty Layer carrying the tag in
+  // customData["html-unknown"].
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  opts.preserveUnknownElements = true;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <unknown-thing></unknown-thing>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* placeholder = doc->layers.front()->children.front();
+  auto it = placeholder->customData.find("html-unknown");
+  ASSERT_NE(it, placeholder->customData.end());
+  EXPECT_EQ(it->second, "unknown-thing");
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "preserved as placeholder"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawStrayTextDirectlyUnderBodyEmitsAnonymousLeaf) {
+  // Stray text directly under `<body>` lands in the convertBody fallback that wraps it in an
+  // anonymous text leaf rather than dropping it.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:50px">free text</body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "stray text inside <body>"));
+  EXPECT_FALSE(doc->layers.front()->children.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawElementAtRootOtherThanHeadBodyWarns) {
+  // An <unexpected> element at <html> root level beside <body> takes the rejection path.
+  auto doc = ParseRaw(R"HTML(
+    <html><foo></foo><body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "is not allowed"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawHeadLinkStylesheetWarns) {
+  // <link rel="stylesheet"> in <head> is not supported and warns.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><link rel="stylesheet" href="theme.css"/></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "external <link"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawHeadLinkOtherRelIsSilent) {
+  // Other <link rel> values (preconnect/icon) are silently ignored — no diagnostic should fire.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><link rel="icon" href="favicon.ico"/></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "external <link"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MissingBodyIsHardError) {
+  // Without <body>, parseDOM hits hardError("html: missing <body>") and returns nullptr.
+  auto doc = ParseRaw(R"HTML(<html><head></head></html>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RootIsNotHtmlReturnsNullptr) {
+  // Root element that isn't <html> falls into the early-return branch in parseDOM.
+  auto doc = ParseRaw(R"HTML(<root></root>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawDeepNestedTreeStaysWithinRecursionLimit) {
+  // A modestly deep tree (well under MAX_HTML_RECURSION_DEPTH=128) round-trips intact, so the
+  // recursion-limit branch is the only path NOT exercised — covered by the import test below.
+  std::string nested;
+  for (int i = 0; i < 30; i++) {
+    nested += "<div style=\"width:100px;height:100px\">";
+  }
+  for (int i = 0; i < 30; i++) {
+    nested += "</div>";
+  }
+  std::string html = "<html><body style=\"width:100px;height:100px\">" + nested + "</body></html>";
+  auto doc = ParseRaw(html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "maximum recursion depth"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawExcessivelyNestedTreeTripsRecursionLimit) {
+  // Exceed MAX_HTML_RECURSION_DEPTH=128 via convertElement, hitting the warn+nullptr branch.
+  std::string opens;
+  std::string closes;
+  for (int i = 0; i < 200; i++) {
+    opens += "<div style=\"width:100px;height:100px\">";
+    closes += "</div>";
+  }
+  std::string html =
+      "<html><body style=\"width:100px;height:100px\">" + opens + closes + "</body></html>";
+  auto doc = ParseRaw(html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "maximum recursion depth"));
+}
+
+//==================================================================================================
+// HTMLElementEmitter — `<img>` / inline `<svg>` rejection branches
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, ImgWithoutSrcSkippedWithDiagnostic) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "<img> missing src"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImgExternalSvgRoutesAsImportDirective) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="icon.svg" style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(layer->importDirective.format, "svg");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsWhenSizesMatch) {
+  // A wrapper <div style="border-radius;overflow:hidden"><img/></div> where the img exactly
+  // fills the wrapper folds into a single rounded fill.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSecondElementChild) {
+  // Two element children -> fold rejects (the early-return when a second <img> shows up).
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px"/>
+        <span>noise</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSizeMismatch) {
+  // Image smaller than wrapper -> fold falls through to the mismatched-size branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:30px;height:30px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsImageOffset) {
+  // Image at non-zero left/top -> fold rejects.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden;position:relative">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px;position:absolute;left:5px;top:5px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgChild) {
+  // A `.svg` source rides the import-directive path, not the fold path.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="icon.svg" style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer::Builder — public custom-pipeline API
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, SubsetTransformerBuilderRunsDefaultPipeline) {
+  // Exercise the Builder API: withOptions + addDefaultPasses + run.
+  std::string html = R"HTML(
+    <html><body style="width:50px;height:50px"></body></html>
+  )HTML";
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
+  ASSERT_NE(dom, nullptr);
+  auto root = dom->getRootNode();
+  ASSERT_NE(root, nullptr);
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  pagx::HTMLSubsetTransformer::Builder builder;
+  auto result = builder.withOptions(opts).addDefaultPasses().run(root);
+  EXPECT_TRUE(result.ok);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SubsetTransformerBuilderMoveAssign) {
+  // Move-construct + move-assign Builder to drag the noexcept move members into coverage.
+  pagx::HTMLSubsetTransformer::Builder a;
+  a.addDefaultPasses();
+  pagx::HTMLSubsetTransformer::Builder b(std::move(a));
+  pagx::HTMLSubsetTransformer::Builder c;
+  c = std::move(b);
+  std::string html = R"HTML(
+    <html><body style="width:50px;height:50px"></body></html>
+  )HTML";
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
+  ASSERT_NE(dom, nullptr);
+  auto result = c.run(dom->getRootNode());
+  EXPECT_TRUE(result.ok);
 }
 
 }  // namespace pag
