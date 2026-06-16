@@ -493,9 +493,10 @@ class LayerBuilderContext {
     }
   }
 
-  // Untracks the color source reverse-index entry for Fill/Stroke elements, or the image reverse
-  // index for ImagePattern. Called before rebuilding content during refreshLayerInPlace so that
-  // surviving elements are re-tracked by convertXxx without accumulating duplicate entries.
+  // Untracks the color source reverse-index entry for Fill/Stroke elements. If the color source
+  // is an ImagePattern, also untracks its imageUsers entry. Called before rebuilding content during
+  // refreshLayerInPlace so that surviving elements are re-tracked by convertXxx without accumulating
+  // duplicate entries.
   void untrackElementColorSource(Element* element) {
     if (element == nullptr) {
       return;
@@ -503,10 +504,23 @@ class LayerBuilderContext {
     auto type = element->nodeType();
     if (type == NodeType::Fill) {
       auto* fill = static_cast<const Fill*>(element);
-      _result.binding.untrackColorSource(fill->color, element);
+      untrackColorSourceAndImage(fill->color, element);
     } else if (type == NodeType::Stroke) {
       auto* stroke = static_cast<const Stroke*>(element);
-      _result.binding.untrackColorSource(stroke->color, element);
+      untrackColorSourceAndImage(stroke->color, element);
+    }
+  }
+
+  void untrackColorSourceAndImage(const ColorSource* colorSource, const Node* owner) {
+    if (colorSource == nullptr) {
+      return;
+    }
+    _result.binding.untrackColorSource(colorSource, owner);
+    if (colorSource->nodeType() == NodeType::ImagePattern) {
+      auto* pattern = static_cast<const ImagePattern*>(colorSource);
+      if (pattern->image) {
+        _result.binding.untrackImage(pattern->image, pattern);
+      }
     }
   }
 
