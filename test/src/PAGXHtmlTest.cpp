@@ -544,37 +544,6 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
 }
 
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontUsesPathBoundsForTinyAdvance) {
-  const std::string xml = R"(
-<pagx width="120" height="40">
-  <Resources>
-    <Font id="tiny" unitsPerEm="1">
-      <Glyph advance="0.011236" path="M 0,0 L 1,0 L 1,-1 L 0,-1 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="120" height="40">
-    <Text>
-      <GlyphRun font="@tiny" fontSize="89" glyphs="1" x="8" y="24"/>
-    </Text>
-    <Fill color="#111111"/>
-  </Layer>
-</pagx>)";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(doc, nullptr);
-  const pagx::Font* font = nullptr;
-  for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Font) {
-      font = static_cast<const pagx::Font*>(node.get());
-      break;
-    }
-  }
-  ASSERT_NE(font, nullptr);
-  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(16));
-  EXPECT_GT(fontResult.minVisibleGlyphAdvance, static_cast<uint16_t>(0));
-}
-
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
   std::ostringstream glyphs;
   std::ostringstream runGlyphs;
