@@ -2880,6 +2880,7 @@ const HELPER_FNS = [
   paddingShorthand,
   nonZero,
   isVisible,
+  readNum,
   readBox,
   readPadding,
   readMargin,
