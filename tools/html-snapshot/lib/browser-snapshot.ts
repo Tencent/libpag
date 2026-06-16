@@ -1579,6 +1579,21 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
 // An inline-style `display: block` / `flex` / `grid` override on the host
 // is rejected via `el.style.display` so an author who deliberately turned
 // the span into a sized box keeps the wrapper.
+//
+// Author-defined sizing also disqualifies the bare emission. CSS normally
+// ignores `width`/`min-width`/`max-width`/`flex-basis` on inline boxes, but
+// flex blockifies the item so those declarations *do* take effect on a span
+// flex item — and `getComputedStyle(...).width` on a flex item returns the
+// resolved used value (e.g. `70px`), not the specified `auto`, so we can't
+// detect author intent from the property string alone. Instead we compare
+// the element's host rect against the text content's natural rect: when the
+// host is materially wider than its glyphs, the extra space came from a
+// declared `width` / `min-width` / `flex-basis` and bare emission would
+// collapse the column. The classic case is a fixed-width gutter label like
+// `.demo-row .label { width: 70px }` next to `.demo-row .controls`: the
+// label visually occupies 70 px in Chromium, but stripping the width to a
+// bare <span> collapses it to its content width (~18 px for "iOS"), which
+// drags every following sibling 50 px to the left.
 function isPureInlineTextLeaf(el, computed) {
   if (!el || !el.tagName) return false;
   if (!INLINE_BY_DEFAULT_TAGS.has(el.tagName.toLowerCase())) return false;
@@ -1592,7 +1607,41 @@ function isPureInlineTextLeaf(el, computed) {
   const bgClip = (computed.getPropertyValue('background-clip') || '').trim().toLowerCase();
   if (bgClip === 'text') return false;
   if (readInlineTransform(el)) return false;
+  if (hasAuthorDefinedFlexSize(el)) return false;
   return true;
+}
+
+// True when the element's host rect is materially larger than the glyph rect
+// of its text content — meaning a `width` / `min-width` / `flex-basis`
+// declaration is reserving extra space that the bare-content rendering would
+// not reproduce.
+//
+// Why measure rather than read `getComputedStyle(...).width`: when the
+// element is a flex item, Chromium blockifies the box and `width` resolves
+// to the used value (e.g. `70px`) regardless of whether the author wrote
+// `auto`, `70px`, or `min-content`. Comparing the bounding rect against the
+// inner text rect cuts through the blockification and tells us whether the
+// author actually expanded the column.
+//
+// Cross-axis dimensions (height) are intentionally ignored — line-box height
+// always matches `font-size`/`line-height` for single-line text, so a
+// height comparison would be noise. Only the main-axis (width) divergence
+// indicates an author-reserved gutter.
+function hasAuthorDefinedFlexSize(el) {
+  if (!el || !el.getBoundingClientRect) return false;
+  const hostRect = el.getBoundingClientRect();
+  if (!hostRect || hostRect.width <= 0) return false;
+  const textNode = firstTextNodeChild(el);
+  if (!textNode) return false;
+  const range = document.createRange();
+  range.selectNodeContents(textNode);
+  const textRect = range.getBoundingClientRect();
+  if (range.detach) range.detach();
+  if (!textRect) return false;
+  // 1 px slack absorbs subpixel rounding (Chromium reports rect widths to
+  // 0.01 px and the `.label` host typically measures 70 px against an 18.5 px
+  // text rect, so any author-defined width shows up as a >1 px gap).
+  return hostRect.width - textRect.width > 1;
 }
 
 // Inner-layout declaration to apply on a text-leaf wrapper that's emitted as
@@ -2662,6 +2711,7 @@ const HELPER_FNS = [
   isInlineRunChild,
   isInlineTextLeafCandidate,
   emitInlineRunMarkup,
+  hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
   renderInlineTextLeaf,
   flexMainGapPx,
