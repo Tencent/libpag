@@ -274,6 +274,20 @@ class LayerBuilderContext {
     // gained contents was promoted above, and one whose contents were cleared (now empty, but still
     // a VectorLayer) drops its stale elements via setContents({}). The type guard keeps the cast
     // safe for plain layers that never had contents.
+    // Collect old content elements that are currently bound so we can unbind those no longer present
+    // in node->contents after the rebuild. Without this, stale binding entries for removed elements
+    // (Fill/Stroke/Elements) remain in the RuntimeBinding, and shared ColorSource/Image unbind logic
+    // never triggers for them.
+    std::vector<Element*> oldElements;
+    if (layer->type() == tgfx::LayerType::Vector) {
+      auto* vecLayer = static_cast<tgfx::VectorLayer*>(layer.get());
+      for (const auto& content : vecLayer->contents()) {
+        const auto* nodeFromContent = _result.binding.findNode(content.get());
+        if (nodeFromContent != nullptr && nodeFromContent->nodeType() != NodeType::Layer) {
+          oldElements.push_back(const_cast<Element*>(static_cast<const Element*>(nodeFromContent)));
+        }
+      }
+    }
     if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
       std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
@@ -285,6 +299,19 @@ class LayerBuilderContext {
         }
       }
       vectorLayer->setContents(contents);
+    }
+    // Unbind content elements that were removed from node->contents.
+    if (!oldElements.empty()) {
+      std::vector<Element*> removed;
+      for (auto* element : oldElements) {
+        if (std::find(node->contents.begin(), node->contents.end(), element) ==
+            node->contents.end()) {
+          removed.push_back(element);
+        }
+      }
+      if (!removed.empty()) {
+        unbindContentElements(removed);
+      }
     }
     applyLayerAttributes(node, layer.get());
     // Re-seed the decomposed transform baseline from the node's current authored values, mirroring
