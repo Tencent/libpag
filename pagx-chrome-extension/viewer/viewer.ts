@@ -576,10 +576,27 @@ async function loadWasm(): Promise<void> {
     });
     playgroundState.module = module as PAGXModule;
     TGFXBind(playgroundState.module as any);
-    const pagxView = playgroundState.module.PAGXView.MakeFrom('#pagx-canvas');
-    if (!pagxView) {
+    // The Wasm bindings expose _PAGXView/_MakeFrom (and _xxx instance methods).
+    // Wrap the native view so the rest of viewer.ts can keep using the
+    // unprefixed PAGXView interface declared above.
+    const nativeView = (playgroundState.module as any)._PAGXView?._MakeFrom('#pagx-canvas');
+    if (!nativeView) {
         throw new Error('Failed to create PAGXView');
     }
+    const pagxView: PAGXView = {
+        registerFonts: (fontData, emojiFontData) => nativeView._registerFonts(fontData, emojiFontData),
+        loadPAGX: (data) => nativeView._loadPAGX(data),
+        parsePAGX: (data) => nativeView._parsePAGX(data),
+        getExternalFilePaths: () => nativeView._getExternalFilePaths(),
+        loadFileData: (path, data) => nativeView._loadFileData(path, data),
+        buildLayers: () => nativeView._buildLayers(),
+        updateSize: () => nativeView._updateSize(),
+        updateZoomScaleAndOffset: (zoom, offsetX, offsetY) => nativeView._updateZoomScaleAndOffset(zoom, offsetX, offsetY),
+        draw: () => nativeView._draw(),
+        contentWidth: () => nativeView._contentWidth(),
+        contentHeight: () => nativeView._contentHeight(),
+        delete: () => nativeView.delete(),
+    };
     playgroundState.pagxView = pagxView;
     updateSize();
     playgroundState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
