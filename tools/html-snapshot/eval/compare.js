@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PNG } = require('pngjs');
-const { unwrap, newPage, mapWaitUntil } = require('../dist/lib/browser-engine');
+const { openAndSettlePage } = require('../dist/lib/page-loader');
 // pixelmatch v7+ is ESM-only (`export default`). Under Node's ESM-from-CJS
 // `require()` interop the module resolves to a namespace object whose default
 // export is the function, so `require('pixelmatch')` itself is not callable.
@@ -150,26 +150,21 @@ async function countFlexInRenderedHtml(browserOrWrapper, htmlPath, opts = {}) {
     viewportWidth = 1400,
     viewportHeight = 900,
     waitMs = 0,
-    waitForRoot = false,
   } = opts;
-  const { engine } = unwrap(browserOrWrapper);
-  const page = await newPage(browserOrWrapper, {
-    viewport: { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 },
+  // Reuse the shared page-loading flow rather than driving page.goto here.
+  // openAndSettlePage registers the Babel classic-runtime shim before
+  // navigation (so @babel/standalone React apps actually mount — otherwise the
+  // live DOM stays empty and flexLive collapses to 0, producing a false
+  // "snapshot invented flex where the live DOM had none" warning) and treats a
+  // flaky `networkidle` timeout as non-fatal. The built-in #root-children wait
+  // is a no-op for the static subset HTML (it has no #root), so the same call
+  // serves both the live and subset counts.
+  const page = await openAndSettlePage(browserOrWrapper, 'file://' + htmlPath, {
+    viewportWidth,
+    viewportHeight,
+    waitMs,
   });
   try {
-    await page.goto('file://' + htmlPath, {
-      waitUntil: mapWaitUntil(engine, 'networkidle'),
-      timeout: 30000,
-    });
-    if (waitForRoot) {
-      try {
-        await page.waitForFunction(
-          'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true',
-          { timeout: 10000 },
-        );
-      } catch (_) { /* not fatal */ }
-    }
-    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
     // Capture the count before closing the page; otherwise the value would be
     // returned via a still-open evaluation handle that gets cancelled when the
     // browser shuts down (TargetCloseError surfaces as an unhandled rejection).

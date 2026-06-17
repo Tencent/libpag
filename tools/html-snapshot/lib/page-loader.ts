@@ -140,7 +140,22 @@ export async function openAndSettlePage(
     await addCookies(page, engine, scoped);
   }
 
-  await page.goto(url, { waitUntil: mapWaitUntil(engine, 'networkidle'), timeout: 30000 });
+  try {
+    await page.goto(url, { waitUntil: mapWaitUntil(engine, 'networkidle'), timeout: 30000 });
+  } catch (err) {
+    // `networkidle` is fragile: it resolves only after the network stays quiet
+    // for ~500ms, which never happens on pages that keep connections open or
+    // stream a long tail of external requests (CDN keep-alive, Google Fonts,
+    // Unsplash/image hosts). The document and its scripts have loaded long
+    // before the wait condition fails, so a navigation *timeout* should not
+    // fail the whole render — fall back to whatever is rendered and let the
+    // waitForRoot + waitMs steps below give async apps time to mount. Anything
+    // that is not a timeout (a genuinely broken navigation) is re-thrown.
+    const msg = err && (err as Error).message ? (err as Error).message : String(err);
+    if (!/timeout/i.test(msg)) throw err;
+    const hasBody = await page.evaluate(() => !!document.body).catch(() => false);
+    if (!hasBody) throw err;
+  }
 
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });
