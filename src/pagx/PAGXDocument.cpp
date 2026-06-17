@@ -107,11 +107,10 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   return true;
 }
 
-static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
-                                const std::string& filePath, std::shared_ptr<Data> data,
-                                std::unordered_set<std::string>& chain,
-                                std::unordered_map<PAGXDocument*, std::vector<Node*>>&
-                                    docDirtyNodes) {
+static bool LoadFileDataInChain(
+    PAGXDocument* root, PAGXDocument* document, const std::string& filePath,
+    std::shared_ptr<Data> data, std::unordered_set<std::string>& chain,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -299,7 +298,14 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes);
   if (found) {
     for (auto& entry : docDirtyNodes) {
-      entry.first->notifyChange(entry.second, true);
+      bool needsLayout = false;
+      for (auto* node : entry.second) {
+        if (node->nodeType() != NodeType::Image) {
+          needsLayout = true;
+          break;
+        }
+      }
+      entry.first->notifyChange(entry.second, needsLayout);
     }
   }
   return found;
