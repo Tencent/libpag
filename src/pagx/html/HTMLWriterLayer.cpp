@@ -1826,10 +1826,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else if (parentLayout == LayoutMode::Vertical) {
       mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
     }
-    // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
-    // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
-    // to layout-resolved size.
-    bool needsSize = !layer->contents.empty() || !layer->styles.empty() || needScrollRectWrapper;
+    // When the layer owns rendered content or child layers, it needs explicit size so that CSS
+    // flexbox measures it from PAGX layout bounds instead of ignoring absolute-positioned DOM.
+    bool needsSize = !layer->contents.empty() || !layer->styles.empty() ||
+                     layer->composition != nullptr || !layer->children.empty() ||
+                     needScrollRectWrapper;
     auto bounds = needsSize ? layer->layoutBounds() : Rect{};
     float resolvedMainSize = NAN;
     if (parentLayout == LayoutMode::Horizontal) {
@@ -2034,7 +2035,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     _ctx->savedChildLayerOffsetY = _ctx->childLayerOffsetY;
     // The legacy branch below handled non-Repeater layers and still runs when `repeater` is
     // null. When a Repeater was present and sized the div above, skip this fallback.
-    if (!repeater && (isFlexContainer || !layer->contents.empty())) {
+    if (!repeater && (isFlexContainer || !layer->contents.empty() ||
+                      layer->composition != nullptr || !layer->children.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + CssFloatToString(bounds.width) + "px";

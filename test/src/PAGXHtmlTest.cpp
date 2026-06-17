@@ -965,6 +965,72 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
   EXPECT_NE(tag.find("height:40px"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, FlexItemWithChildLayerKeepsMeasuredWidth) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="240" height="80">
+  <Layer id="row" width="200" height="40" layout="horizontal" arrangement="spaceBetween">
+    <Layer id="first" width="40" height="40">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="wrapper" height="40">
+      <Layer id="inner" width="40" height="40">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Layer>
+    <Layer id="last" width="40" height="40">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"wrapper\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:40px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, CompositionLayerWithFilterKeepsDeclaredSize) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="80" height="80">
+  <Resources>
+    <Composition id="icon" width="20" height="20">
+      <Layer>
+        <Rectangle position="10,10" size="20,20"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="iconLayer" width="20" height="20" composition="@icon" matrix="1,0,0,1,10,10">
+    <DropShadowStyle offsetY="1" blurX="1" blurY="1" color="#00000033" showBehindLayer="false"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"iconLayer\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:20px"), std::string::npos);
+  EXPECT_NE(tag.find("height:20px"), std::string::npos);
+}
+
 // =============================================================================
 // Layer styles
 // =============================================================================
