@@ -78,6 +78,7 @@ export class VideoReader {
     private currentFrame = -1;
     private targetFrame = -1;
     private visibilityHandle: (() => void) | null = null;
+    private objectURL: string | null = null;
 
     public constructor(
         source: Uint8Array | HTMLVideoElement,
@@ -102,7 +103,8 @@ export class VideoReader {
             });
             const buffer = (source as Uint8Array).slice();
             const blob = new Blob([buffer], {type: 'video/mp4'});
-            this.videoEl.src = URL.createObjectURL(blob);
+            this.objectURL = URL.createObjectURL(blob);
+            this.videoEl.src = this.objectURL;
             if (IPHONE) {
                 // use load() will make a bug on Chrome.
                 this.videoEl.load();
@@ -256,6 +258,10 @@ export class VideoReader {
         removeAllListeners(this.videoEl!, 'timeupdate');
         removeAllListeners(this.videoEl!, 'seeked');
         removeAllListeners(this.videoEl!, 'canplay');
+        if (this.objectURL) {
+            URL.revokeObjectURL(this.objectURL);
+            this.objectURL = null;
+        }
         this.videoEl = null;
         this.bitmapCanvas = null;
         this.bitmapCtx = null;
