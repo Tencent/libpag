@@ -304,39 +304,6 @@ bool PAGXDocument::hasUnresolvedImports() const {
   return false;
 }
 
-static bool IsUrlPath(const std::string& path) {
-  // Match known URL schemes (case-insensitive per RFC 3986 Section 3.1) rather than generic ://
-  // to avoid false positives on Windows paths like C://Users/file.png.
-  // data: URIs have no "://" so they are checked separately.
-  if (path.size() >= 5 && (path[0] == 'd' || path[0] == 'D') &&
-      (path[1] == 'a' || path[1] == 'A') && (path[2] == 't' || path[2] == 'T') &&
-      (path[3] == 'a' || path[3] == 'A') && path[4] == ':') {
-    return true;
-  }
-  auto schemeEnd = path.find("://");
-  if (schemeEnd == std::string::npos) {
-    return false;
-  }
-  auto scheme = path.substr(0, schemeEnd);
-  if (scheme.size() == 4) {
-    if ((scheme[0] == 'h' || scheme[0] == 'H') && (scheme[1] == 't' || scheme[1] == 'T') &&
-        (scheme[2] == 't' || scheme[2] == 'T') && (scheme[3] == 'p' || scheme[3] == 'P')) {
-      return true;
-    }
-    if ((scheme[0] == 'f' || scheme[0] == 'F') && (scheme[1] == 'i' || scheme[1] == 'I') &&
-        (scheme[2] == 'l' || scheme[2] == 'L') && (scheme[3] == 'e' || scheme[3] == 'E')) {
-      return true;
-    }
-  } else if (scheme.size() == 5) {
-    if ((scheme[0] == 'h' || scheme[0] == 'H') && (scheme[1] == 't' || scheme[1] == 'T') &&
-        (scheme[2] == 't' || scheme[2] == 'T') && (scheme[3] == 'p' || scheme[3] == 'P') &&
-        (scheme[4] == 's' || scheme[4] == 'S')) {
-      return true;
-    }
-  }
-  return false;
-}
-
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   AppendExternalFilePaths(this, &paths);
