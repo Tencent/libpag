@@ -20,9 +20,13 @@
 #include <cmath>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -130,6 +134,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
+static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -137,6 +142,145 @@ static void WriteCustomData(XMLBuilder& xml, const Node* node) {
       xml.addAttribute(("data-" + key).c_str(), value);
     }
   }
+}
+
+static std::string LoopModeToString(LoopMode loop) {
+  switch (loop) {
+    case LoopMode::Loop:
+      return "loop";
+    case LoopMode::PingPong:
+      return "pingPong";
+    case LoopMode::Once:
+      return "once";
+  }
+  return "once";
+}
+
+static std::string KeyframeInterpolationToString(KeyframeInterpolationType interpolation) {
+  switch (interpolation) {
+    case KeyframeInterpolationType::None:
+      return "none";
+    case KeyframeInterpolationType::Bezier:
+      return "bezier";
+    case KeyframeInterpolationType::Hold:
+      return "hold";
+    case KeyframeInterpolationType::Linear:
+      return "linear";
+  }
+  return "none";
+}
+
+template <typename T>
+static std::string KeyframeValueToString(const T& value) {
+  return std::to_string(value);
+}
+
+template <>
+std::string KeyframeValueToString<float>(const float& value) {
+  return FloatToString(value);
+}
+
+template <>
+std::string KeyframeValueToString<bool>(const bool& value) {
+  return value ? "true" : "false";
+}
+
+template <>
+std::string KeyframeValueToString<std::string>(const std::string& value) {
+  return value;
+}
+
+template <>
+std::string KeyframeValueToString<ImageRef>(const ImageRef& value) {
+  return "@" + value.id;
+}
+
+template <>
+std::string KeyframeValueToString<Color>(const Color& value) {
+  return ColorToHexString(value, value.alpha < 1.0f);
+}
+
+template <>
+std::string KeyframeValueToString<Matrix>(const Matrix& value) {
+  return MatrixToString(value);
+}
+
+template <typename T>
+static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
+                              const char* typeName) {
+  xml.openElement("Channel");
+  xml.addRequiredAttribute("name", channel->name);
+  xml.addAttribute("type", typeName);
+  xml.closeElementStart();
+  for (const auto& key : channel->keyframes) {
+    xml.openElement("Key");
+    xml.addRequiredAttribute("time", key.time);
+    xml.addRequiredAttribute("value", KeyframeValueToString<T>(key.value));
+    if (key.interpolation != KeyframeInterpolationType::Linear) {
+      xml.addAttribute("interpolation", KeyframeInterpolationToString(key.interpolation));
+    }
+    if (key.bezierOut != Point{}) {
+      xml.addAttribute("bezier-out", PointToString(key.bezierOut));
+    }
+    if (key.bezierIn != Point{}) {
+      xml.addAttribute("bezier-in", PointToString(key.bezierIn));
+    }
+    xml.closeElementSelfClosing();
+  }
+  xml.closeElement();
+}
+
+static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
+  switch (channel->valueType()) {
+    case ChannelValueType::Float:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<float>*>(channel), "float");
+      break;
+    case ChannelValueType::Bool:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<bool>*>(channel), "bool");
+      break;
+    case ChannelValueType::Int:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<int>*>(channel), "int");
+      break;
+    case ChannelValueType::String:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<std::string>*>(channel), "string");
+      break;
+    case ChannelValueType::ImageRef:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<ImageRef>*>(channel), "image");
+      break;
+    case ChannelValueType::Color:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Color>*>(channel), "color");
+      break;
+    case ChannelValueType::Matrix:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
+      break;
+  }
+}
+
+static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
+  if (animations.empty()) {
+    return;
+  }
+  xml.openElement("Animations");
+  xml.closeElementStart();
+  for (const auto* animation : animations) {
+    xml.openElement("Animation");
+    xml.addAttribute("id", animation->id);
+    xml.addRequiredAttribute("duration", animation->duration);
+    xml.addAttribute("frameRate", animation->frameRate, 60.0f);
+    xml.addAttribute("loop", LoopModeToString(animation->loop));
+    xml.closeElementStart();
+    for (const auto* object : animation->objects) {
+      xml.openElement("Object");
+      xml.addRequiredAttribute("target", object->target);
+      xml.closeElementStart();
+      for (const auto* ch : object->channels) {
+        WriteChannel(xml, ch);
+      }
+      xml.closeElement();
+    }
+    xml.closeElement();
+  }
+  xml.closeElement();
 }
 
 //==============================================================================
@@ -952,6 +1096,26 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
+// Mirrors the node types handled by WriteResource. Nodes outside this set (e.g. Animation,
+// AnimationObject, Channel) produce no output and must not trigger a Resources block.
+static bool IsExportableResource(const Node* node) {
+  switch (node->nodeType()) {
+    case NodeType::Image:
+    case NodeType::PathData:
+    case NodeType::Composition:
+    case NodeType::Font:
+    case NodeType::SolidColor:
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient:
+    case NodeType::ImagePattern:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Image: {
@@ -984,13 +1148,14 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addRequiredAttribute("width", comp->width);
       xml.addRequiredAttribute("height", comp->height);
       WriteCustomData(xml, node);
-      if (comp->layers.empty()) {
+      if (comp->layers.empty() && comp->animations.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
           WriteLayer(xml, layer, options);
         }
+        WriteAnimations(xml, comp->animations);
         xml.closeElement();
       }
       break;
@@ -1118,6 +1283,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
   if (node->composition != nullptr && !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
+  } else if (!node->compositionFilePath.empty()) {
+    xml.addAttribute("composition", node->compositionFilePath);
   }
 
   // Build directive attributes.
@@ -1128,7 +1295,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty() || !node->importDirective.content.empty() ||
+                     !node->children.empty() || !node->timelines.empty() ||
+                     !node->importDirective.content.empty() ||
                      !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
@@ -1162,6 +1330,25 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
     WriteLayerFilter(xml, filter);
   }
 
+  // Write Timelines container with one child per Timeline driver.
+  if (!node->timelines.empty()) {
+    xml.openElement("Timelines");
+    xml.closeElementStart();
+    for (const auto& timeline : node->timelines) {
+      switch (timeline->timelineType()) {
+        case TimelineType::Animation: {
+          auto* anim = static_cast<const AnimationTimeline*>(timeline.get());
+          xml.openElement("Animation");
+          xml.addRequiredAttribute("ref", "@" + anim->animationId);
+          xml.addAttribute("playing", anim->playing, true);
+          xml.closeElementSelfClosing();
+          break;
+        }
+      }
+    }
+    xml.closeElement();
+  }
+
   // Write child Layers.
   for (const auto& child : node->children) {
     WriteLayer(xml, child, options);
@@ -1188,24 +1375,26 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
+  WriteAnimations(xml, doc.animations);
 
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;
   for (const auto& resource : doc.nodes) {
-    if (!resource->id.empty()) {
-      if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
-        continue;
-      }
-      hasResources = true;
-      break;
+    if (resource->id.empty() || !IsExportableResource(resource.get())) {
+      continue;
     }
+    if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
+      continue;
+    }
+    hasResources = true;
+    break;
   }
   if (hasResources) {
     xml.openElement("Resources");
     xml.closeElementStart();
 
     for (const auto& resource : doc.nodes) {
-      if (!resource->id.empty()) {
+      if (!resource->id.empty() && IsExportableResource(resource.get())) {
         WriteResource(xml, resource.get(), options);
       }
     }

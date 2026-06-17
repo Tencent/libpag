@@ -20,8 +20,11 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
@@ -29,6 +32,7 @@
 namespace pagx {
 
 class LayoutContext;
+class PAGScene;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -60,6 +64,11 @@ class PAGXDocument : public Node {
   std::vector<Layer*> layers = {};
 
   /**
+   * Top-level animations.
+   */
+  std::vector<Animation*> animations = {};
+
+  /**
    * Creates a node of the specified type and adds it to the document management.
    * If an ID is provided, the node will be indexed for lookup.
    * If the ID already exists, an error will be logged and the new node will replace the old one in
@@ -77,16 +86,19 @@ class PAGXDocument : public Node {
   }
 
   /**
-   * Finds a node by ID.
-   * Returns nullptr if not found.
+   * Finds a node by ID within this document's own node index.
+   * Returns nullptr if not found, or if the node belongs to an external composition document.
+   * @param id The unique identifier of the node.
+   * @return A pointer to the node, or nullptr if not found in this document.
    */
   Node* findNode(const std::string& id) const;
 
   /**
-   * Finds a node of the specified type by ID.
+   * Finds a node of the specified type by ID within this document's own node index.
    * The caller must ensure T matches the actual node type, otherwise behavior is undefined.
+   * Returns nullptr if not found, or if the node belongs to an external composition document.
    * @param id The unique identifier of the node.
-   * @return A pointer to the node cast to type T, or nullptr if not found.
+   * @return A pointer to the node cast to type T, or nullptr if not found in this document.
    */
   template <typename T>
   T* findNode(const std::string& id) const {
@@ -112,26 +124,29 @@ class PAGXDocument : public Node {
   bool hasUnresolvedImports() const;
 
   /**
-   * Returns a list of external file paths referenced by Image nodes that have no embedded data.
-   * Data URIs (paths starting with "data:") are excluded.
+   * Returns a list of external file paths referenced by Image nodes or external composition layers
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
   /**
-   * Loads external file data for an Image node matching the given file path. Once loaded, the
-   * Image's data field is populated and its filePath is cleared, so the renderer uses embedded data
-   * instead of file I/O.
-   * @param filePath the external file path to match against Image nodes
-   * @param data the file content to embed into the matching Image node
-   * @return true if a matching Image node was found and its data was loaded successfully
+   * Loads external file data matching the given file path. Image data is embedded into matching
+   * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
+   * Must be called before creating any PAGScene from this document: PAGScene::Make() builds its
+   * runtime tree once, so external compositions resolved after a scene exists will not appear in
+   * that scene.
+   * @param filePath the external file path to match against Image nodes or composition layers
+   * @param data the file content to embed or parse
+   * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
-   * constraints. Must be called before rendering or font embedding. This method should only
-   * be called once per document — repeated calls may produce incorrect results because
-   * measurement data is cached and some layout operations permanently modify source geometry.
+   * constraints. Must be called before rendering or font embedding. Re-running layout on an
+   * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
+   * reset branch discards the cached layout outputs first so nodes are re-measured from their
+   * current fields.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -145,24 +160,89 @@ class PAGXDocument : public Node {
     return layoutApplied;
   }
 
+  /**
+   * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
+   * The document must have had applyLayout() called first so that Text nodes contain valid
+   * layout run data.
+   * @return true if embedding succeeded, false if layout has not been applied.
+   */
+  bool embed();
+
+  /**
+   * Clears all embedded GlyphRuns from Text nodes in the document. Typically called before a
+   * subsequent applyLayout() when re-embedding a file that already has embedded fonts, so that
+   * layout performs runtime shaping instead of reusing stale embedded data.
+   */
+  void clearEmbed();
+
+  /**
+   * Reflects post-build edits to the given nodes in every scene created from this document, while
+   * preserving existing layer handles wherever possible. Pass a container node to reflect changes
+   * to its child list; editing an animation, animation object, or channel applies the new timeline
+   * data to subsequent playback.
+   *
+   * When an edit changes a node's "@id" reference (e.g. AnimationObject.target, Fill.color), mark
+   * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
+   * refreshes the nodes it is given.
+   *
+   * Editing an external composition: call notifyChange on the document that owns the edited nodes.
+   * Scenes that embed this document as an external composition are refreshed automatically. A node
+   * may only be notified through its owning document; foreign nodes (e.g. a node owned by a child
+   * externalDoc when notifyChange is called on the parent) are skipped, leaving the rest of the
+   * dirty list to refresh as usual. Use ownsNode() if the caller does not statically know which
+   * document owns a given node.
+   * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
+   * nodes still owned by this document. Null entries and foreign nodes are skipped. Passing an
+   * empty list (or one whose entries are all skipped) is a no-op.
+   * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
+   * fonts, text, geometry) or a child list changed. Pass true to re-run layout before refreshing;
+   * pass false for a cheaper render-only refresh, only safe for edits that do not affect layout
+   * (e.g. alpha, color). Callers that mutate via SetNodeChannel can derive the right value from
+   * RequiresLayout(NodeType, channel); structural add/remove must pass true.
+   */
+  void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged);
+
+  /**
+   * Returns true if the node belongs to this document. A node belongs to exactly one document;
+   * passing a node owned by a different document to notifyChange has no effect on this document's
+   * scenes. Use this to dispatch a multi-document edit to the right owners, or to validate a node's
+   * origin before notifying.
+   * @param node the node to check; null returns false.
+   */
+  bool ownsNode(const Node* node) const;
+
   NodeType nodeType() const override {
     return NodeType::Document;
   }
 
  private:
   PAGXDocument() = default;
+  // Recursive layout worker. visited holds the documents on the current ancestor path so an
+  // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
+  // is detected and stops the recursion instead of overflowing the stack.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
 
+  // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
+  void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
+  void unregisterLiveScene(PAGScene* scene);
+
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 
+  // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
+  // does not keep PAGScene alive; expired entries are pruned during notifyChange.
+  std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
+
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
+  friend class PAGScene;
+  friend class PAGComposition;
 };
 
 }  // namespace pagx

@@ -84,6 +84,20 @@ enum class NodeType {
    */
   Glyph,
 
+  // Animation
+  /**
+   * An animation timeline.
+   */
+  Animation,
+  /**
+   * A keyed object in an animation.
+   */
+  AnimationObject,
+  /**
+   * A keyed channel in an animation object.
+   */
+  Channel,
+
   // Layer
   /**
    * A layer node that contains vector elements and child layers.
@@ -103,6 +117,10 @@ enum class NodeType {
    * A background blur layer style.
    */
   BackgroundBlurStyle,
+  /**
+   * A noise layer style.
+   */
+  NoiseStyle,
 
   // Layer Filters
   /**
@@ -125,6 +143,10 @@ enum class NodeType {
    * A color matrix filter.
    */
   ColorMatrixFilter,
+  /**
+   * A noise filter.
+   */
+  NoiseFilter,
 
   // Elements (geometry, painters, modifiers, containers)
   /**

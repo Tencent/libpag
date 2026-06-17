@@ -19,6 +19,10 @@
 #import "PAGView.h"
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/mac/private/GPUDrawable.h"
+
+@interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
+@end
 
 @implementation PAGView {
   PAGPlayer* pagPlayer;
@@ -27,6 +31,8 @@
   NSString* filePath;
   PAGAnimator* animator;
   BOOL _isVisible;
+  NSHashTable* listeners;
+  NSLock* listenerLock;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -43,9 +49,16 @@
   self.layer.backgroundColor = [NSColor clearColor].CGColor;
   pagPlayer = [[PAGPlayer alloc] init];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
+  listeners = [[NSHashTable weakObjectsHashTable] retain];
+  listenerLock = [[NSLock alloc] init];
+  [animator addListener:self];
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(onAsyncSurfacePrepared:)
+                                               name:pag::AsyncSurfacePreparedNotification
+                                             object:self];
 }
 
 - (void)dealloc {
@@ -55,6 +68,9 @@
   [pagSurface release];
   [pagFile release];
   [filePath release];
+  [listeners release];
+  [listenerLock release];
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
 }
 
@@ -120,11 +136,72 @@
 }
 
 - (void)addListener:(id<PAGViewListener>)listener {
-  [animator addListener:(id<PAGAnimatorListener>)listener];
+  if (listener == nil) {
+    return;
+  }
+  [listenerLock lock];
+  [listeners addObject:listener];
+  [listenerLock unlock];
 }
 
 - (void)removeListener:(id<PAGViewListener>)listener {
-  [animator removeListener:(id<PAGAnimatorListener>)listener];
+  if (listener == nil) {
+    return;
+  }
+  [listenerLock lock];
+  [listeners removeObject:listener];
+  [listenerLock unlock];
+}
+
+#pragma mark - PAGAnimatorListener
+
+- (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationStart:)];
+}
+
+- (void)onAnimationEnd:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationEnd:)];
+}
+
+- (void)onAnimationCancel:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationCancel:)];
+}
+
+- (void)onAnimationRepeat:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationRepeat:)];
+}
+
+- (void)onAnimationUpdate:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationUpdate:)];
+}
+
+- (void)dispatchListenerEvent:(SEL)selector {
+  if ([NSThread isMainThread]) {
+    [self performListenerEventOnMainThread:selector];
+    return;
+  }
+  // Retain self before crossing threads to keep the receiver alive until the
+  // dispatched block finishes notifying listeners on the main thread.
+  [self retain];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self performListenerEventOnMainThread:selector];
+    [self release];
+  });
+}
+
+- (void)performListenerEventOnMainThread:(SEL)selector {
+  [listenerLock lock];
+  NSArray* copiedListeners = [[listeners allObjects] retain];
+  [listenerLock unlock];
+  for (id<PAGViewListener> listener in copiedListeners) {
+    if ([listener respondsToSelector:selector]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+      [listener performSelector:selector withObject:self];
+#pragma clang diagnostic pop
+    }
+  }
+  [copiedListeners release];
 }
 
 - (void)onAnimationFlush:(double)progress {
@@ -279,5 +356,9 @@
     return [pagPlayer getBounds:pagLayer];
   }
   return CGRectNull;
+}
+
+- (void)onAsyncSurfacePrepared:(NSNotification*)notification {
+  [animator update];
 }
 @end

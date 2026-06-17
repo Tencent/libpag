@@ -42,7 +42,10 @@
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
@@ -360,26 +363,6 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
 }
 
-namespace {
-
-// Look for the first non-container <TextBox> in `elements` so it can be
-// associated with sibling Text geometry (matches the legacy
-// CollectFillStroke().textBox behaviour). Container TextBoxes (those with
-// children) are handled separately as scopes by processVectorScope.
-const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
-  for (auto* e : elements) {
-    if (e->nodeType() == NodeType::TextBox) {
-      auto* tb = static_cast<const TextBox*>(e);
-      if (tb->elements.empty()) {
-        return tb;
-      }
-    }
-  }
-  return nullptr;
-}
-
-}  // namespace
-
 // Dispatch a single accumulated geometry through the appropriate per-shape
 // writer with the given Painter applied. Each painter that renders a geometry
 // goes through this function so that multi-fill / multi-stroke produces one
@@ -599,7 +582,7 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer,
     return true;
   }
 
-  auto pixelScale = static_cast<float>(_rasterDPI) / 96.0f;
+  auto pixelScale = _rasterScale;
   auto pngData = withBackdrop ? RenderLayerCompositeWithBackdrop(&_gpu, buildResult.root, tgfxLayer,
                                                                  pixelScale)
                               : RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, pixelScale);

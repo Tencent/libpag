@@ -24,7 +24,14 @@
 
 namespace pag {
 
-enum class InstallResult { Success, SourceNotFound, PermissionDenied, AeRunning, UnknownError };
+enum class InstallResult {
+  Success,
+  SourceNotFound,
+  PermissionDenied,
+  AeRunning,
+  UserCancelled,
+  UnknownError
+};
 
 enum class VersionResult {
   Success,
@@ -62,6 +69,14 @@ class PluginInstaller : public QObject {
   InstallResult installPlugin();
   InstallResult uninstallPlugin();
 
+  /// Run once at app startup to keep the AE plugin in sync with the bundled version.
+  /// Behavior depends on the installed state:
+  ///   - Not installed: prompts the user to install.
+  ///   - Installed but version differs: prompts the user to update.
+  ///   - Installed and versions match: no-op.
+  /// Idempotent: subsequent calls within the same session are silent.
+  void checkPluginOnStartup();
+
   QString getInstalledVersion() const;
   bool isPluginInstalled() const;
 
@@ -75,9 +90,24 @@ class PluginInstaller : public QObject {
   void uninstallCompleted(InstallResult result, const QString& message);
 
  private:
+  /// The plugin used as the source of truth for "is anything installed?" and version
+  /// comparison during startup checks. Must be present in pluginInfoList().
+  static constexpr const char* PrimaryPluginName = "PAGExporter";
+
+  InstallResult performInstall();
+  void promptAndInstall(const QString& title, const QString& message);
+  QString getPluginVersionAt(const QString& path) const;
   bool checkAeRunning();
   bool requestConfirmation(const QString& title, const QString& message);
   void showMessage(const QString& title, const QString& message, bool isWarning = false);
+
+  /// Single source of truth for the install/update prompts. Shared between the manual
+  /// installPlugin() path and the startup checkPluginOnStartup() path so wording stays in
+  /// sync — keep this list aligned with the matching messages in Chinese.ts.
+  static QString InstallPromptTitle();
+  static QString InstallPromptMessage();
+  static QString UpdatePromptTitle();
+  static QString UpdatePromptMessage();
 
   QStringList getAeInstallPaths();
   QString getPluginSourcePath(const QString& pluginName) const;
@@ -96,20 +126,14 @@ class PluginInstaller : public QObject {
   QStringList getPluginList() const;
   static const QList<PluginInfo>& pluginInfoList();
 
-  void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
   QString getQtResourceDir() const;
   bool shouldExcludeFile(const QString& fileName) const;
   bool shouldExcludeDir(const QString& dirName) const;
-
-  void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendExporterDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
 
   void storeViewerPathForPlugin() const;
 
   bool copyUserPluginWithRetry(const QString& plugin, int maxRetries = 5) const;
 
-  void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
 
   struct Version {
@@ -125,6 +149,7 @@ class PluginInstaller : public QObject {
 
   int minSupportedYear = DefaultMinYear;
   int maxSupportedYear = DefaultMaxYear;
+  bool startupCheckTriggered = false;
 };
 
 }  // namespace pag

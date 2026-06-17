@@ -40,8 +40,14 @@ bool PluginInstaller::hasUpdate() const {
       continue;
     }
 
-    auto sourceVersion = getPluginVersion(sourcePath);
-    auto installedVersion = getPluginVersion(installPath);
+    // Flag an update when the source version is strictly newer, or when the installed version
+    // is unparseable (returns 0) but the source version is valid — this handles upgrading from
+    // old builds that lacked embedded version resources.
+    int64_t sourceVersion = getPluginVersion(sourcePath);
+    int64_t installedVersion = getPluginVersion(installPath);
+    if (sourceVersion == 0) {
+      continue;
+    }
     if (installedVersion == 0 || sourceVersion > installedVersion) {
       return true;
     }
@@ -55,26 +61,86 @@ InstallResult PluginInstaller::installPlugin() {
   bool hasUpdateAvailable = hasUpdate();
 
   if (!pluginInstalled) {
-    if (!requestConfirmation(tr("Install Adobe After Effects Plug-in"),
-                             tr("Do you want to install the Adobe After Effects plugins?"))) {
-      return InstallResult::UnknownError;
+    if (!requestConfirmation(InstallPromptTitle(), InstallPromptMessage())) {
+      return InstallResult::UserCancelled;
     }
-  }
-
-  else if (hasUpdateAvailable) {
-    if (!requestConfirmation(
-            tr("Update Adobe After Effects Plug-in"),
-            tr("New plugin versions are available. Do you want to install them?"))) {
-      return InstallResult::UnknownError;
+  } else if (hasUpdateAvailable) {
+    if (!requestConfirmation(UpdatePromptTitle(), UpdatePromptMessage())) {
+      return InstallResult::UserCancelled;
     }
   } else {
     if (!requestConfirmation(tr("Reinstall Adobe After Effects Plug-in"),
                              tr("The plugins are already installed with the latest version. "
                                 "Do you want to reinstall them?"))) {
-      return InstallResult::UnknownError;
+      return InstallResult::UserCancelled;
     }
   }
 
+  return performInstall();
+}
+
+void PluginInstaller::checkPluginOnStartup() {
+  // Idempotent: only run on the first call per session. Each call shows a modal, so allowing
+  // repeated calls would let any unintended QML re-trigger spam the user.
+  if (startupCheckTriggered) {
+    return;
+  }
+  startupCheckTriggered = true;
+
+  // Read versions only for diagnostic logging — install/update decisions go through
+  // isPluginInstalled() and hasUpdate() so the startup path stays consistent with
+  // installPlugin() and automatically covers any plugin in pluginInfoList().
+  QString sourceVersion = getPluginVersionAt(getPluginSourcePath(PrimaryPluginName));
+  QString installedVersion = getPluginVersionAt(getPluginInstallPath(PrimaryPluginName));
+
+  if (!isPluginInstalled()) {
+    if (sourceVersion.isEmpty()) {
+      // No bundled plugin to install — nothing we can do.
+      qDebug() << "[PluginInstaller] startup: plugin not installed and no bundled source";
+      return;
+    }
+    qDebug() << "[PluginInstaller] startup: plugin not installed, sourceVersion=" << sourceVersion;
+    promptAndInstall(InstallPromptTitle(), InstallPromptMessage());
+    return;
+  }
+
+  if (hasUpdate()) {
+    qDebug() << "[PluginInstaller] startup: update available, source=" << sourceVersion
+             << "installed=" << installedVersion;
+    promptAndInstall(UpdatePromptTitle(), UpdatePromptMessage());
+    return;
+  }
+
+  qDebug() << "[PluginInstaller] startup: plugin up to date, version=" << installedVersion;
+}
+
+void PluginInstaller::promptAndInstall(const QString& title, const QString& message) {
+  if (!requestConfirmation(title, message)) {
+    qDebug() << "[PluginInstaller] user declined prompt";
+    return;
+  }
+  performInstall();
+}
+
+QString PluginInstaller::InstallPromptTitle() {
+  return tr("Install Adobe After Effects Plug-in");
+}
+
+QString PluginInstaller::InstallPromptMessage() {
+  return tr("Do you want to install the Adobe After Effects plugins?");
+}
+
+QString PluginInstaller::UpdatePromptTitle() {
+  return tr("Update Adobe After Effects Plug-in");
+}
+
+QString PluginInstaller::UpdatePromptMessage() {
+  return tr(
+      "A new version of the Adobe After Effects plugin is available. "
+      "Would you like to update it now?");
+}
+
+InstallResult PluginInstaller::performInstall() {
   while (checkAeRunning()) {
     if (!requestConfirmation(tr("Please close Adobe After Effects"),
                              tr("Adobe After Effects is currently running. Please close it and "
@@ -115,7 +181,7 @@ InstallResult PluginInstaller::installPlugin() {
 InstallResult PluginInstaller::uninstallPlugin() {
   if (!requestConfirmation(tr("Uninstall Plugins"),
                            tr("Are you sure you want to uninstall the selected plugins?"))) {
-    return InstallResult::UnknownError;
+    return InstallResult::UserCancelled;
   }
 
   while (checkAeRunning()) {
@@ -143,24 +209,27 @@ InstallResult PluginInstaller::uninstallPlugin() {
 }
 
 QString PluginInstaller::getInstalledVersion() const {
-  QString pluginName = "PAGExporter";
-  QString installPath = getPluginInstallPath(pluginName);
-  if (!QFile::exists(installPath)) {
+  return getPluginVersionAt(getPluginInstallPath(PrimaryPluginName));
+}
+
+QString PluginInstaller::getPluginVersionAt(const QString& path) const {
+  if (!QFile::exists(path)) {
     return QString();
   }
   QString version;
-  if (getPluginVersionString(installPath, version) == VersionResult::Success) {
+  if (getPluginVersionString(path, version) == VersionResult::Success) {
     return version;
   }
   return QString();
 }
 
 bool PluginInstaller::isPluginInstalled() const {
-  QString pluginName = "PAGExporter";
-  return QFile::exists(getPluginInstallPath(pluginName));
+  return QFile::exists(getPluginInstallPath(PrimaryPluginName));
 }
 
 const QList<PluginInfo>& PluginInstaller::pluginInfoList() {
+  // The "PAGExporter" entry must stay in sync with PluginInstaller::PrimaryPluginName,
+  // which is the plugin used for startup install/update detection.
   static const QList<PluginInfo> list = {
       {"PAGExporter", PluginPermission::Admin},
       {"H264EncoderTools", PluginPermission::User},

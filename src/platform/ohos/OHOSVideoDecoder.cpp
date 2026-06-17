@@ -29,23 +29,23 @@
 #include "base/utils/Log.h"
 #include "rendering/video/SoftwareData.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 #define NV12_PLANE_COUNT 2
 
 namespace {
-// RAII wrapper for per-frame NV12 CPU buffers. The lifetime is owned by the SoftwareData
+// RAII wrapper for per-frame NV12 CPU buffers. The Y and UV planes share a single contiguous
+// allocation, so only the base pointer is owned. The lifetime is owned by the SoftwareData
 // attached to the ImageBuffer, so the memory stays alive until the asynchronous GPU upload
 // task finishes, even if the decoder has been destroyed in the meantime.
 struct NV12FrameBuffer {
-  uint8_t* data[2] = {nullptr, nullptr};
-  int lineSize[2] = {0, 0};
+  uint8_t* data = nullptr;
 
   NV12FrameBuffer() = default;
 
   ~NV12FrameBuffer() {
-    delete[] data[0];
-    delete[] data[1];
+    delete[] data;
   }
 
   NV12FrameBuffer(const NV12FrameBuffer&) = delete;
@@ -111,17 +111,37 @@ OHOSVideoDecoder::OHOSVideoDecoder(const VideoFormat& format, bool hardware) {
 }
 
 OHOSVideoDecoder::~OHOSVideoDecoder() {
-  if (videoCodec != nullptr) {
-    releaseOutputBuffer();
-    OH_VideoDecoder_Flush(videoCodec);
-    OH_VideoDecoder_Stop(videoCodec);
-    OH_VideoDecoder_Destroy(videoCodec);
-    videoCodec = nullptr;
+  // Move ownership of the codec and user data to a background task to avoid blocking the
+  // caller thread (e.g. ArkUI main thread) on synchronous IPC into av_codec_service.
+  // OH_VideoDecoder_Flush/Stop/Destroy wait for all pending callbacks to finish, which can
+  // take seconds on busy devices and trigger ANR when invoked on the UI thread.
+  // Per the OHOS documentation, after OH_VideoDecoder_Destroy returns the codec will not
+  // deliver any further callbacks, so it is safe to release CodecUserData afterwards.
+  if (videoCodec == nullptr) {
+    if (codecUserData) {
+      delete codecUserData;
+      codecUserData = nullptr;
+    }
+    return;
   }
-  if (codecUserData) {
-    codecUserData->clearQueue();
-    delete codecUserData;
-  }
+  auto codec = videoCodec;
+  auto userData = codecUserData;
+  auto pendingBuffer = codecBufferInfo;
+  videoCodec = nullptr;
+  codecUserData = nullptr;
+  codecBufferInfo = {0, nullptr};
+  tgfx::Task::Run([codec, userData, pendingBuffer]() {
+    if (pendingBuffer.buffer) {
+      OH_VideoDecoder_FreeOutputBuffer(codec, pendingBuffer.bufferIndex);
+    }
+    OH_VideoDecoder_Flush(codec);
+    OH_VideoDecoder_Stop(codec);
+    OH_VideoDecoder_Destroy(codec);
+    if (userData) {
+      userData->clearQueue();
+      delete userData;
+    }
+  });
 }
 
 bool OHOSVideoDecoder::initDecoder(const OH_AVCodecCategory avCodecCategory) {
@@ -291,6 +311,13 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
         return nullptr;
       }
     }
+    if (videoStride < videoFormat.width || videoSliceHeight < videoFormat.height) {
+      LOGE(
+          "OHOSVideoDecoder: invalid stride/sliceHeight stride=%d sliceHeight=%d "
+          "width=%d height=%d",
+          videoStride, videoSliceHeight, videoFormat.width, videoFormat.height);
+      return nullptr;
+    }
     auto capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
     if (capacity <= 0) {
       return nullptr;
@@ -300,33 +327,37 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       return nullptr;
     }
     size_t yBufferSize = static_cast<size_t>(videoStride) * static_cast<size_t>(videoSliceHeight);
-    size_t uvBufferSize = codecBufferInfo.attr.size > static_cast<int32_t>(yBufferSize)
-                              ? static_cast<size_t>(codecBufferInfo.attr.size) - yBufferSize
-                              : 0;
-    if (uvBufferSize == 0) {
+    // NV12 has a half-height interleaved UV plane, so its strided size is exactly half of Y.
+    size_t uvStridedSize = yBufferSize / 2;
+    size_t requiredSize = yBufferSize + uvStridedSize;
+    if (static_cast<size_t>(codecBufferInfo.attr.size) < requiredSize ||
+        static_cast<size_t>(capacity) < requiredSize) {
+      LOGE("OHOSVideoDecoder: buffer too small attrSize=%d capacity=%d required=%zu",
+           codecBufferInfo.attr.size, capacity, requiredSize);
       return nullptr;
     }
 
     // Allocate a fresh frame buffer for every decoded frame. SoftwareData keeps a
     // shared_ptr to the NV12FrameBuffer, so the memory stays alive until the asynchronous
     // GPU upload task consumes it, even if the decoder is destroyed in the meantime.
+    // One extra Y-stride row is over-allocated as trailing padding: on some HarmonyOS devices
+    // libGLES_mali.so reads past the last row of the source buffer during glTexSubImage2D,
+    // which crashes when the buffer has no padding behind it. The pad row is zeroed so the
+    // driver's out-of-bounds read always lands on valid, mapped memory.
     auto frameBuffer = std::make_shared<NV12FrameBuffer>();
-    frameBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
-    if (frameBuffer->data[0] == nullptr) {
+    size_t allocSize = requiredSize + static_cast<size_t>(videoStride);
+    frameBuffer->data = new (std::nothrow) uint8_t[allocSize];
+    if (frameBuffer->data == nullptr) {
       return nullptr;
     }
-    frameBuffer->lineSize[0] = videoStride;
-    frameBuffer->data[1] = new (std::nothrow) uint8_t[uvBufferSize];
-    if (frameBuffer->data[1] == nullptr) {
-      return nullptr;
-    }
-    frameBuffer->lineSize[1] = videoStride;
+    memcpy(frameBuffer->data, yuvAddress, requiredSize);
+    memset(frameBuffer->data + requiredSize, 0, static_cast<size_t>(videoStride));
 
-    memcpy(frameBuffer->data[0], yuvAddress, yBufferSize);
-    memcpy(frameBuffer->data[1], yuvAddress + yBufferSize, uvBufferSize);
-
-    uint8_t* planes[3] = {frameBuffer->data[0], frameBuffer->data[1], nullptr};
-    int lineSizes[3] = {frameBuffer->lineSize[0], frameBuffer->lineSize[1], 0};
+    // Y and UV planes share the single allocation; UV starts right after the Y plane. Both
+    // keep the decoder's stride as rowBytes, so the GPU upload uses GL_UNPACK_ROW_LENGTH to
+    // skip the per-row padding (supported on the GLES 3 context libpag creates).
+    uint8_t* planes[3] = {frameBuffer->data, frameBuffer->data + yBufferSize, nullptr};
+    int lineSizes[3] = {videoStride, videoStride, 0};
     auto yuvData =
         SoftwareData<NV12FrameBuffer>::Make(videoFormat.width, videoFormat.height, planes,
                                             lineSizes, NV12_PLANE_COUNT, std::move(frameBuffer));

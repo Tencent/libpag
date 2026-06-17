@@ -77,13 +77,17 @@ static void ModifyTransform3DForCameraLayer(pag::Layer* layer, AEGP_LayerFlags l
     return;
   }
 
-  if (transform3D->scale->animatable()) {
+  if (transform3D->scale == nullptr) {
+    transform3D->scale = new pag::Property<pag::Point3D>();
+  } else if (transform3D->scale->animatable()) {
     delete transform3D->scale;
     transform3D->scale = new pag::Property<pag::Point3D>();
   }
   transform3D->scale->value = pag::Point3D::Make(1, 1, 1);
 
-  if (transform3D->opacity->animatable()) {
+  if (transform3D->opacity == nullptr) {
+    transform3D->opacity = new pag::Property<pag::Opacity>();
+  } else if (transform3D->opacity->animatable()) {
     delete transform3D->opacity;
     transform3D->opacity = new pag::Property<pag::Opacity>();
   }
@@ -93,7 +97,9 @@ static void ModifyTransform3DForCameraLayer(pag::Layer* layer, AEGP_LayerFlags l
     delete transform3D->anchorPoint;
 
     auto position = transform3D->position;
-    if (!position->animatable()) {
+    if (position == nullptr) {
+      transform3D->anchorPoint = new pag::Property<pag::Point3D>();
+    } else if (!position->animatable()) {
       transform3D->anchorPoint = new pag::Property<pag::Point3D>();
       transform3D->anchorPoint->value = position->value;
     } else {
