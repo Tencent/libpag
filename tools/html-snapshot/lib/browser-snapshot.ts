@@ -607,9 +607,26 @@ function buildStyle(left, top, width, height, computed, opts) {
     // container path) falls back to the conservative previous behaviour
     // — emit both dimensions and let `flex-shrink: 0` plus the measured
     // size pin the layout.
+    //
+    // A main-axis `max-width` / `max-height` on the item (e.g. Tailwind's
+    // `max-w-xl` on a `flex-1` search-bar wrapper) caps how far the browser
+    // lets the grow stretch the item — leftover main-axis space stays with
+    // the parent and downstream siblings sit next to the capped item. PAGX's
+    // HTML subset drops `max-width` / `max-height`
+    // (HTMLSubsetPropertyTable.cpp), so forwarding bare `flex: <grow>`
+    // would let PAGX hand the item the full leftover space and displace the
+    // downstream siblings (the xiaohongshu_react header was the canonical
+    // case: the `+发布` cluster jumped from x≈730 to x≈1177 because the
+    // `flex-1 max-w-xl` search wrapper grew to 1010px instead of 576px).
+    // When such a cap exists on the main axis, fall through to the pinned-
+    // size branch so the measured layout survives.
     const grow = readNum(computed, 'flex-grow');
     const mainAxis = opts.flexMainAxis;
-    const growActive = grow > 0 && (mainAxis === 'row' || mainAxis === 'column');
+    const mainAxisMaxProp = mainAxis === 'column' ? 'max-height' : 'max-width';
+    const mainAxisMax = (computed.getPropertyValue(mainAxisMaxProp) || '').trim().toLowerCase();
+    const mainAxisCapped = mainAxisMax !== '' && mainAxisMax !== 'none';
+    const growActive =
+      grow > 0 && (mainAxis === 'row' || mainAxis === 'column') && !mainAxisCapped;
     if (growActive) {
       if (mainAxis === 'row') {
         parts.push(`height: ${px(height)}`);
@@ -2230,9 +2247,20 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       // `flex-shrink: 0` is dropped when grow is active — `flex: <N>`
       // already implies `1 1 0%`, and stacking `flex-shrink: 0` after
       // would re-pin the item to its content width on the main axis.
+      //
+      // A main-axis `max-width` / `max-height` on the span caps the grow
+      // in the source layout, but PAGX's HTML subset drops those caps
+      // (HTMLSubsetPropertyTable.cpp), so forwarding `flex: <grow>` here
+      // would let PAGX hand the span the full leftover space. Mirror the
+      // capped-axis check from buildStyle and fall back to `flex-shrink:
+      // 0` so the measured intrinsic size pins the layout instead.
       const grow = readNum(computed, 'flex-grow');
       const parts = [textStyle];
-      if (grow > 0) {
+      const parentMainAxis = opts.flexMainAxis === 'column' ? 'column' : 'row';
+      const inlineMaxProp = parentMainAxis === 'column' ? 'max-height' : 'max-width';
+      const inlineMax = (computed.getPropertyValue(inlineMaxProp) || '').trim().toLowerCase();
+      const inlineCapped = inlineMax !== '' && inlineMax !== 'none';
+      if (grow > 0 && !inlineCapped) {
         parts.push(`flex: ${formatFlexGrow(grow)}`);
       } else {
         parts.push('flex-shrink: 0');
