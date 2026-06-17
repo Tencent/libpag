@@ -110,7 +110,8 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
 static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
                                 const std::string& filePath, std::shared_ptr<Data> data,
                                 std::unordered_set<std::string>& chain,
-                                std::vector<Node*>& dirtyNodes) {
+                                std::unordered_map<PAGXDocument*, std::vector<Node*>>&
+                                    docDirtyNodes) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -122,7 +123,7 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
       if (image->filePath == filePath) {
         image->data = data;
         image->filePath = {};
-        dirtyNodes.push_back(image);
+        docDirtyNodes[document].push_back(image);
         found = true;
       }
     } else if (node->nodeType() == NodeType::Layer) {
@@ -132,8 +133,8 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
   for (auto* layer : layers) {
     bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
     if (loadedComposition) {
-      dirtyNodes.push_back(layer);
-      dirtyNodes.push_back(layer->composition);
+      docDirtyNodes[document].push_back(layer);
+      docDirtyNodes[document].push_back(layer->composition);
       found = true;
     }
     if (!loadedComposition && layer->externalDoc != nullptr) {
@@ -142,9 +143,9 @@ static bool LoadFileDataInChain(PAGXDocument* root, PAGXDocument* document,
       // sibling externalDocs that legitimately share the same downstream file would otherwise drop
       // an ancestor's marker. insert().second is true exactly when this frame added the path.
       bool inserted = chain.insert(layer->compositionFilePath).second;
-      found =
-          LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain, dirtyNodes) ||
-          found;
+      found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain,
+                                  docDirtyNodes) ||
+              found;
       if (inserted) {
         chain.erase(layer->compositionFilePath);
       }
@@ -294,10 +295,12 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     return false;
   }
   std::unordered_set<std::string> chain = {};
-  std::vector<Node*> dirtyNodes = {};
-  bool found = LoadFileDataInChain(this, this, filePath, data, chain, dirtyNodes);
-  if (found && !dirtyNodes.empty()) {
-    notifyChange(dirtyNodes, /*layoutChanged=*/true);
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
+  bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes);
+  if (found) {
+    for (auto& entry : docDirtyNodes) {
+      entry.first->notifyChange(entry.second, /*layoutChanged=*/true);
+    }
   }
   return found;
 }
