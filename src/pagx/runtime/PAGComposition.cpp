@@ -157,7 +157,7 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
       continue;
     }
     auto layerRuntime = binding->get<tgfx::Layer>(layer);
-    if (layerRuntime == nullptr) {
+    if (layerRuntime == nullptr && layer->composition == nullptr) {
       layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
     }
     if (layer->composition != nullptr) {
