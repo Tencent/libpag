@@ -35,9 +35,9 @@ struct RuntimeBinding;
 
 /**
  * PAGComposition is the runtime instance of a composition. It derives from PAGLayer, adding the
- * ability to drive the animations declared inside the composition. When the same composition is referenced from multiple places, each reference produces an
- * independent PAGComposition with its own playback state, so animating or hit-testing one does not
- * affect the others.
+ * ability to drive the animations declared inside the composition. When the same composition is
+ * referenced from multiple places, each reference produces an independent PAGComposition with its
+ * own playback state, so animating or rendering one does not affect the others.
  */
 class PAGComposition : public PAGLayer {
  public:

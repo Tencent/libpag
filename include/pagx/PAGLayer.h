@@ -36,8 +36,8 @@ class PAGScene;
 
 /**
  * Identifies the concrete runtime type of a PAGLayer in the runtime layer hierarchy, so callers can
- * downcast without RTTI. Layer is a leaf runtime layer, Composition adds animation playback and hit
- * testing over its content.
+ * downcast without RTTI. Layer is a plain runtime layer (may carry children), Composition adds
+ * animation playback.
  */
 enum class LayerType { Layer, Composition };
 
