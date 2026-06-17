@@ -113,6 +113,12 @@ class PAGComposition : public PAGLayer {
   // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
 
+  // Rebuilds children of a plain PAGLayer container whose source node is dirty, and recurses into
+  // its descendant plain containers. Called by refreshNodes.
+  void refreshPlainContainerChildren(PAGLayer* container,
+                                     const std::vector<Node*>& dirtyNodes,
+                                     std::unordered_set<const Composition*>& visited);
+
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;

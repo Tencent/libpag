@@ -9964,4 +9964,86 @@ PAGX_TEST(PAGXTest, GroupInnerFillRemovedUnbindsSharedColor) {
   EXPECT_EQ(binding->colorSourceUsers.find(solid), binding->colorSourceUsers.end());
 }
 
+/**
+ * Test case: notifyChange on a deeply nested pure-container with added grandchildren. Hit test
+ * confirms the full depth is rebuilt correctly after the edit.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto root = doc->makeNode<pagx::Layer>("Root");
+  root->name = "Root";
+  root->width = 200;
+  root->height = 200;
+  doc->layers.push_back(root);
+
+  auto middle = doc->makeNode<pagx::Layer>("Middle");
+  middle->name = "Middle";
+  middle->width = 200;
+  middle->height = 200;
+  root->children.push_back(middle);
+
+  auto leaf = doc->makeNode<pagx::Layer>("Leaf");
+  leaf->name = "Leaf";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {60, 60};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  leaf->contents.push_back(rect);
+  leaf->contents.push_back(fill);
+  middle->children.push_back(leaf);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  EXPECT_EQ(hits[1]->name(), "Middle");
+  EXPECT_EQ(hits[2]->name(), "Root");
+
+  // Add a grandchild under middle and notify.
+  auto grandchild = doc->makeNode<pagx::Layer>("Grandchild");
+  grandchild->name = "Grandchild";
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->position = {120, 120};
+  rect2->size = {60, 60};
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid2 = doc->makeNode<pagx::SolidColor>();
+  solid2->color = {0, 1, 0, 1};
+  fill2->color = solid2;
+  grandchild->contents.push_back(rect2);
+  grandchild->contents.push_back(fill2);
+  middle->children.push_back(grandchild);
+  doc->notifyChange({middle}, /*layoutChanged=*/true);
+
+  hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  hits = scene->getLayersUnderPoint(120, 120);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Grandchild");
+
+  // Remove the grandchild and notify; it is no longer hit.
+  middle->children.pop_back();
+  doc->notifyChange({middle}, /*layoutChanged=*/true);
+
+  hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  // No content covers (120,120) after removing grandchild: Middle has no direct content.
+  hits = scene->getLayersUnderPoint(120, 120);
+  ASSERT_EQ(hits.size(), 0u);
+
+  // Clear all children of the middle container and notify; all nested layers are removed.
+  middle->children.clear();
+  doc->notifyChange({middle}, /*layoutChanged=*/true);
+
+  hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 0u);
+  hits = scene->getLayersUnderPoint(120, 120);
+  ASSERT_EQ(hits.size(), 0u);
+}
+
 }  // namespace pag

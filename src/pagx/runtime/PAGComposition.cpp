@@ -155,6 +155,9 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
       continue;
     }
     auto layerRuntime = binding->get<tgfx::Layer>(layer);
+    if (layerRuntime == nullptr && layer->composition == nullptr) {
+      layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
+    }
     if (layer->composition != nullptr) {
       auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
       if (childComposition == nullptr) {
@@ -171,6 +174,11 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
       }
       if (!layer->children.empty()) {
         BuildChildren(binding, layer->children, child->children, scene, visited);
+        for (auto& nestedChild : child->children) {
+          if (nestedChild->runtimeLayer != nullptr && child->runtimeLayer != nullptr) {
+            child->runtimeLayer->addChild(nestedChild->runtimeLayer);
+          }
+        }
       }
       outChildren.push_back(std::move(child));
     }
@@ -239,6 +247,11 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       }
     }
   }
+  for (auto& child : children) {
+    if (child != nullptr && child->layerType() == LayerType::Layer && !child->children.empty()) {
+      refreshPlainContainerChildren(child.get(), dirtyNodes, visited);
+    }
+  }
 }
 
 void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
@@ -287,6 +300,11 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
       if (!layer->children.empty()) {
         BuildChildren(binding.get(), layer->children, child->children, scene, visited);
+        for (auto& nestedChild : child->children) {
+          if (nestedChild->runtimeLayer != nullptr && child->runtimeLayer != nullptr) {
+            child->runtimeLayer->addChild(nestedChild->runtimeLayer);
+          }
+        }
       }
       newChildren.push_back(std::move(child));
     }
@@ -309,6 +327,48 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
     auto slot = binding->get<tgfx::Layer>(child->node);
     if (slot != nullptr) {
       runtimeLayer->addChild(slot);
+    }
+  }
+}
+
+void PAGComposition::refreshPlainContainerChildren(
+    PAGLayer* container, const std::vector<Node*>& dirtyNodes,
+    std::unordered_set<const Composition*>& visited) {
+  if (container == nullptr || container->node == nullptr) {
+    return;
+  }
+  std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
+  bool dirty = dirtySet.find(container->node) != dirtySet.end();
+  if (dirty) {
+    auto scene = rootScene.lock();
+    if (scene != nullptr) {
+      container->children.clear();
+      if (container->runtimeLayer != nullptr) {
+        container->runtimeLayer->removeChildren();
+      }
+      for (auto* sourceChild : container->node->children) {
+        if (sourceChild != nullptr && binding->get<tgfx::Layer>(sourceChild) == nullptr) {
+          LayerBuilder::BuildLayerInto(sourceChild, binding.get());
+        }
+      }
+      BuildChildren(binding.get(), container->node->children, container->children, scene, visited);
+      if (container->runtimeLayer != nullptr) {
+        for (auto& newChild : container->children) {
+          if (newChild->runtimeLayer != nullptr) {
+            container->runtimeLayer->addChild(newChild->runtimeLayer);
+          }
+        }
+      }
+    }
+  }
+  for (auto& child : container->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes, visited);
+    } else if (!child->children.empty()) {
+      refreshPlainContainerChildren(child.get(), dirtyNodes, visited);
     }
   }
 }
