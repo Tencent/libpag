@@ -1843,6 +1843,7 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
   }
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
   font->file = GetAttribute(node, "file");
+  font->fileOriginal = font->file;
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -2621,9 +2622,6 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
         }
         if (node->nodeType() == NodeType::Font) {
           auto* font = static_cast<Font*>(node.get());
-          if (!font->file.empty()) {
-            font->fileOriginal = font->file;
-          }
           ResolveRelativePath(basePath, font->file);
         }
       }

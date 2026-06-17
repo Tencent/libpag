@@ -70,13 +70,15 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
   {
     std::ofstream out(tempPath);
     if (!out.is_open()) {
-      std::cerr << command << ": failed to write '" << tempPath << "'\n";
+      std::cerr << command << ": failed to write '" << filePath
+                << "' (creating temp file failed)\n";
       return false;
     }
     out << content;
     out.close();
     if (out.fail()) {
-      std::cerr << command << ": error writing to '" << tempPath << "'\n";
+      std::cerr << command << ": failed to write '" << filePath
+                << "' (writing temp file failed)\n";
       std::remove(tempPath.c_str());
       return false;
     }
@@ -84,7 +86,8 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
   std::error_code ec;
   std::filesystem::rename(tempPath, filePath, ec);
   if (ec) {
-    std::cerr << command << ": failed to replace '" << filePath << "'\n";
+    std::cerr << command << ": failed to write '" << filePath
+              << "' (replacing output file failed)\n";
     std::remove(tempPath.c_str());
     return false;
   }
