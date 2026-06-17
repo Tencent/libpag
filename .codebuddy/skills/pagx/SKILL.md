@@ -86,7 +86,7 @@ npm install -g @libpag/pagx
 ```
 
 This stays light — the ~150 MB headless browser is **not** downloaded now. It installs itself
-automatically the first time you run a conversion that needs it (Step 3), into a per-user cache, with
+automatically on the first conversion that needs it (Step 3), into a per-user cache, with
 progress shown on screen. Requires `node` on PATH.
 
 **Case B — inside the libpag repository (contributor).** Run the setup script from anywhere inside

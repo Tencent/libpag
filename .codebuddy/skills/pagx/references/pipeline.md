@@ -137,7 +137,7 @@ cd tools/html-snapshot
 node server.js            # http://127.0.0.1:8787
 ```
 
-Then convert via HTTP (the server can also run `pagx import` for you):
+Then convert via HTTP (the server can also run `pagx import` itself):
 
 ```bash
 # HTML in, PAGX out:

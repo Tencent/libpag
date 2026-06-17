@@ -4,6 +4,18 @@ The `pagx` command-line tool provides utilities for working with PAGX files. All
 operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
 setup script in `SKILL.md`).
 
+## Table of contents
+
+- [pagx verify](#pagx-verify) — diagnostics + layout + render in one call
+- [pagx render](#pagx-render) — render a PAGX file to an image
+- [pagx format](#pagx-format) — pretty-print a PAGX file
+- [pagx layout](#pagx-layout) — layout-engine bounds as XML
+- [pagx bounds](#pagx-bounds) — rendered pixel bounds of Layers
+- [pagx font](#pagx-font) — `info` (query metrics) and `embed` (embed into PAGX)
+- [pagx import](#pagx-import) — convert SVG/HTML to PAGX
+- [pagx resolve](#pagx-resolve) — expand inline `<svg>` and `import` attributes
+- [pagx export](#pagx-export) — export PAGX to SVG/HTML/PPTX
+
 ---
 
 ## pagx verify
