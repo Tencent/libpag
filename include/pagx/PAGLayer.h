@@ -36,12 +36,6 @@ class PAGComposition;
 class PAGScene;
 
 /**
- * Callback type for PAGLayer::forEachComposition. Receives each PAGComposition found in the
- * subtree and an opaque context pointer for caller-specific data.
- */
-using CompositionVisitor = void (*)(PAGComposition*, void* context);
-
-/**
  * Identifies the concrete runtime type of a PAGLayer in the runtime layer hierarchy, so callers can
  * downcast without RTTI. Layer is a plain runtime layer (may carry children), Composition adds
  * animation playback.
@@ -132,7 +126,7 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
    * operations that must reach every composition in the tree, including those nested under plain
    * PAGLayer containers.
    */
-  virtual void forEachComposition(CompositionVisitor visitor, void* context);
+  virtual void forEachComposition(void (*visitor)(PAGComposition*));
 
   std::weak_ptr<PAGScene> rootScene = {};
 

@@ -120,18 +120,18 @@ void PAGComposition::spawnTimelinesFromScene() {
   }
 }
 
-static void ResetCompositionTimelines(PAGComposition* comp, void*) {
-  comp->spawnTimelinesFromScene();
-}
-
 void PAGComposition::resetTimelines() {
   spawnTimelinesFromScene();
-  forEachComposition(ResetCompositionTimelines, nullptr);
+  forEachComposition(ResetCompositionTimelines);
 }
 
-void PAGComposition::forEachComposition(CompositionVisitor visitor, void* context) {
-  PAGLayer::forEachComposition(visitor, context);
-  visitor(this, context);
+void PAGComposition::forEachComposition(void (*visitor)(PAGComposition*)) {
+  PAGLayer::forEachComposition(visitor);
+  visitor(this);
+}
+
+void PAGComposition::ResetCompositionTimelines(PAGComposition* comp) {
+  comp->spawnTimelinesFromScene();
 }
 
 void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
