@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import PAGXWasm from '../wasm/pagx-playground';
+import PAGXWasm from '../wasm/pagx-viewer';
 import { TGFXBind } from '@tgfx/binding';
 import { getCached, putCache, clearStaleCache } from './cache-manager';
 
@@ -55,7 +55,7 @@ const MAX_ZOOM = 1000.0;
 // Resource URLs
 const FONT_URL = chrome.runtime.getURL('fonts/NotoSansSC-Regular.otf');
 const EMOJI_FONT_URL = chrome.runtime.getURL('fonts/NotoColorEmoji.ttf');
-const WASM_URL = chrome.runtime.getURL('wasm/pagx-playground.wasm');
+const WASM_URL = chrome.runtime.getURL('wasm/pagx-viewer.wasm');
 
 const ESTIMATED_WASM_SIZE = 2400000;
 const ESTIMATED_FONT_SIZE = 8800000;
@@ -571,7 +571,7 @@ async function loadWasm(): Promise<void> {
 
     const module = await PAGXWasm({
         locateFile: (file: string) => chrome.runtime.getURL('wasm/' + file),
-        mainScriptUrlOrBlob: chrome.runtime.getURL('wasm/pagx-playground.js'),
+        mainScriptUrlOrBlob: chrome.runtime.getURL('wasm/pagx-viewer.js'),
         wasmBinary: wasmBuffer,
     });
     playgroundState.module = module as PAGXModule;

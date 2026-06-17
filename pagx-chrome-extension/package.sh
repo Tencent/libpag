@@ -56,8 +56,8 @@ FORMAT="${FORMAT:-crx}"
 # Verify build artifacts exist
 MISSING=()
 [ ! -f "${SCRIPT_DIR}/viewer/viewer.js" ] && MISSING+=("viewer/viewer.js")
-[ ! -f "${SCRIPT_DIR}/wasm/pagx-playground.js" ] && MISSING+=("wasm/pagx-playground.js")
-[ ! -f "${SCRIPT_DIR}/wasm/pagx-playground.wasm" ] && MISSING+=("wasm/pagx-playground.wasm")
+[ ! -f "${SCRIPT_DIR}/wasm/pagx-viewer.js" ] && MISSING+=("wasm/pagx-viewer.js")
+[ ! -f "${SCRIPT_DIR}/wasm/pagx-viewer.wasm" ] && MISSING+=("wasm/pagx-viewer.wasm")
 [ ! -f "${SCRIPT_DIR}/fonts/NotoSansSC-Regular.otf" ] && MISSING+=("fonts/NotoSansSC-Regular.otf")
 [ ! -f "${SCRIPT_DIR}/fonts/NotoColorEmoji.ttf" ] && MISSING+=("fonts/NotoColorEmoji.ttf")
 
@@ -81,9 +81,9 @@ create_dist_dir() {
   mkdir -p "${DIST_DIR}/viewer"
   cp viewer/viewer.html viewer/viewer.css viewer/viewer.js "${DIST_DIR}/viewer/"
   mkdir -p "${DIST_DIR}/wasm"
-  cp wasm/pagx-playground.js wasm/pagx-playground.wasm "${DIST_DIR}/wasm/"
-  if [ -f wasm/pagx-playground.worker.js ]; then
-    cp wasm/pagx-playground.worker.js "${DIST_DIR}/wasm/"
+  cp wasm/pagx-viewer.js wasm/pagx-viewer.wasm "${DIST_DIR}/wasm/"
+  if [ -f wasm/pagx-viewer.worker.js ]; then
+    cp wasm/pagx-viewer.worker.js "${DIST_DIR}/wasm/"
   fi
   mkdir -p "${DIST_DIR}/fonts"
   cp fonts/NotoSansSC-Regular.otf fonts/NotoColorEmoji.ttf "${DIST_DIR}/fonts/"

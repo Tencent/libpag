@@ -1,6 +1,6 @@
 {
   "name": "pagx-chrome-extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PAGX Viewer - Chrome Extension for previewing PAGX files",
   "type": "module",
   "scripts": {

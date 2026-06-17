@@ -16,18 +16,18 @@ echo "Building PAGX Chrome Extension..."
 
 # Step 1: Build WASM module using playground build system
 echo "Step 1: Building WASM module..."
-cd "${PROJECT_ROOT}/playground"
+cd "${PROJECT_ROOT}/playground/pagx-viewer"
 npm run build:release
 
 # Step 2: Copy WASM artifacts
 echo "Step 2: Copying WASM artifacts..."
-WASM_SRC="${PROJECT_ROOT}/playground/wasm-mt"
+WASM_SRC="${PROJECT_ROOT}/playground/pagx-viewer/wasm-mt"
 WASM_DST="${SCRIPT_DIR}/wasm"
 mkdir -p "${WASM_DST}"
-cp "${WASM_SRC}/pagx-playground.js" "${WASM_DST}/"
-cp "${WASM_SRC}/pagx-playground.wasm" "${WASM_DST}/"
-if [ -f "${WASM_SRC}/pagx-playground.worker.js" ]; then
-  cp "${WASM_SRC}/pagx-playground.worker.js" "${WASM_DST}/"
+cp "${WASM_SRC}/pagx-viewer.js" "${WASM_DST}/"
+cp "${WASM_SRC}/pagx-viewer.wasm" "${WASM_DST}/"
+if [ -f "${WASM_SRC}/pagx-viewer.worker.js" ]; then
+  cp "${WASM_SRC}/pagx-viewer.worker.js" "${WASM_DST}/"
 fi
 
 # Step 3: Copy fonts from project resources
