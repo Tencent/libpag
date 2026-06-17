@@ -30,6 +30,12 @@ export const removeListener = (
   eventHandlers[event]
     ?.filter(({ node, handler }) => node === targetNode && handler === targetHandler)
     .forEach(({ node, handler, capture }) => node.removeEventListener(event, handler, capture));
+  // Remove the matched entries from the registry as well. Otherwise the retained handler closures
+  // (which capture the video element, promise resolvers and timers) accumulate on every seek/canplay
+  // and leak memory during looping playback.
+  eventHandlers[event] = eventHandlers[event]?.filter(
+    ({ node, handler }) => !(node === targetNode && handler === targetHandler),
+  );
 };
 
 export const removeAllListeners = (targetNode: HTMLElement, event: K) => {
