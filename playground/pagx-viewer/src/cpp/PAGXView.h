@@ -112,6 +112,7 @@ class PAGXView {
 
   bool useCustomBackgroundColor = false;
   Color customBackgroundColor = {};
+  Color defaultBackgroundColor = {1.0, 1.0, 1.0, 1.0};
 
   // Performance monitoring
   struct FrameRecord {

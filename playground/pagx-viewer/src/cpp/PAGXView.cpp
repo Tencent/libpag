@@ -310,7 +310,7 @@ void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
   customBackgroundColor = {};
   if (scene != nullptr) {
-    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
+    scene->getDisplayOptions()->setBackgroundColor(defaultBackgroundColor);
   }
   presentImmediately = true;
 }
@@ -331,7 +331,7 @@ void PAGXView::draw() {
   if (useCustomBackgroundColor) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   } else {
-    scene->getDisplayOptions()->setBackgroundColor({});
+    scene->getDisplayOptions()->setBackgroundColor(defaultBackgroundColor);
   }
   scene->draw(pagSurface, true);
   auto device = window->getDevice();
