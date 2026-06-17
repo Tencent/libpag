@@ -108,6 +108,17 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return color;
     }
   }
+  // CSS hsl()/hsla() (CSS Color 3 comma syntax + CSS Color 4 space syntax). Authored CSS
+  // such as `background: hsl(120 100% 50%)` reaches us verbatim because the snapshot stage
+  // can leave the function call intact (Chrome only normalises `hsl()` to `rgb()` on certain
+  // computed-style channels). Without this the value falls through to the unrecognised-color
+  // diagnostic and we render opaque black, which is what HUD-style canvases hit.
+  if (lowered.compare(0, 3, "hsl") == 0) {
+    Color hsl = {};
+    if (ParseCSSHSLColor(value, hsl)) {
+      return hsl;
+    }
+  }
   // Named color
   const auto& named = NamedColors();
   auto it = named.find(lowered);

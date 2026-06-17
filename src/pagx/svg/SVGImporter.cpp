@@ -2262,6 +2262,18 @@ Color SVGParserContext::parseColor(const std::string& value) {
     }
   }
 
+  // CSS Color 3/4 hsl()/hsla(). SVG presentation attributes (`fill="hsl(120,100%,50%)"`,
+  // `stroke="hsla(...)"`) preserve the authored function call verbatim, so the importer must
+  // resolve the same colour space the browser does. Falls through to the named-color table on
+  // a parse miss to preserve the historical behaviour for malformed input.
+  if (value.size() >= 3 && (value[0] == 'h' || value[0] == 'H') &&
+      (value[1] == 's' || value[1] == 'S') && (value[2] == 'l' || value[2] == 'L')) {
+    Color hsl = {};
+    if (ParseCSSHSLColor(value, hsl)) {
+      return hsl;
+    }
+  }
+
   // CSS Color Level 4: color(display-p3 r g b) or color(display-p3 r g b / a)
   if (value.compare(0, 6, "color(") == 0) {
     auto color = ParseCSSColorFunction(value);
