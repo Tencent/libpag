@@ -930,6 +930,41 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
   EXPECT_EQ(tag.find("flex:1"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="260" height="160">
+  <Layer id="stack" width="220" layout="vertical" alignment="start">
+    <Layer id="header" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EEEEEE"/>
+    </Layer>
+    <Layer id="scroller" width="220" layout="horizontal" alignment="center" scrollRect="0,0,220,40">
+      <Layer id="item" width="40" height="40" includeInLayout="false">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Layer>
+    <Layer id="footer" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#DDDDDD"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"scroller\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("height:40px"), std::string::npos);
+}
+
 // =============================================================================
 // Layer styles
 // =============================================================================

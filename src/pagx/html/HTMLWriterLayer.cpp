@@ -1829,7 +1829,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
     // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
     // to layout-resolved size.
-    bool needsSize = !layer->contents.empty() || !layer->styles.empty();
+    bool needsSize = !layer->contents.empty() || !layer->styles.empty() || needScrollRectWrapper;
     auto bounds = needsSize ? layer->layoutBounds() : Rect{};
     float resolvedMainSize = NAN;
     if (parentLayout == LayoutMode::Horizontal) {
@@ -1852,6 +1852,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
     float outputW = !std::isnan(layer->width) ? layer->width : (needsSize ? bounds.width : NAN);
     float outputH = !std::isnan(layer->height) ? layer->height : (needsSize ? bounds.height : NAN);
+    if (needScrollRectWrapper) {
+      if ((std::isnan(outputW) || outputW <= 0) && layer->scrollRect.width > 0) {
+        outputW = layer->scrollRect.width;
+      }
+      if ((std::isnan(outputH) || outputH <= 0) && layer->scrollRect.height > 0) {
+        outputH = layer->scrollRect.height;
+      }
+    }
     if (!std::isnan(outputW) && outputW > 0) {
       if (!style.empty()) {
         style += ';';
