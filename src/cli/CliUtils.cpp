@@ -77,8 +77,7 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
     out << content;
     out.close();
     if (out.fail()) {
-      std::cerr << command << ": failed to write '" << filePath
-                << "' (writing temp file failed)\n";
+      std::cerr << command << ": failed to write '" << filePath << "' (writing temp file failed)\n";
       std::remove(tempPath.c_str());
       return false;
     }
