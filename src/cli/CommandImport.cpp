@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -216,8 +219,27 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, const std::s
   }
   int status = pclose(pipe);
   if (status != 0) {
-    result.error = "html-snapshot failed (exit status " + std::to_string(status) +
-                   "); see stderr above for details";
+    // `pclose` returns the wait(2) status on POSIX (so 127 lives in the high byte and means
+    // "shell could not exec the command", typically `node` not on PATH) and the raw exit code
+    // on Windows. Decode where we can so the diagnostic distinguishes `node` missing from a
+    // genuine snapshot failure — without this the raw status integer (e.g. 32512 == 127 << 8)
+    // looks identical to "snapshot crashed".
+#ifdef _WIN32
+    int exitCode = status;
+#else
+    int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+    if (exitCode == 127) {
+      result.error =
+          "html-snapshot failed: `node` not found on PATH. Install Node.js (>=18) or set "
+          "PATH to a shell where it is reachable, then re-run.";
+    } else if (exitCode >= 0) {
+      result.error = "html-snapshot failed (exit code " + std::to_string(exitCode) +
+                     "); see stderr above for details";
+    } else {
+      result.error = "html-snapshot terminated abnormally (status " + std::to_string(status) +
+                     "); see stderr above for details";
+    }
     return result;
   }
   if (html.empty()) {

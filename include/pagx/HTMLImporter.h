@@ -110,6 +110,16 @@ class HTMLImporter {
      */
     FontConfig* fontConfig = nullptr;
 
+    /**
+     * Anchor directory used to resolve relative `<img src="...">` paths when parsing from
+     * in-memory bytes (`Parse(const uint8_t*, size_t, ...)` / `ParseString`). The file-based
+     * `Parse(const std::string&, ...)` overload derives this from the input file's parent
+     * directory and ignores this option. Empty (default) means "no base path"; relative
+     * sources then pass through unchanged, which only works when every `<img>` already uses
+     * an absolute path or `data:` URI (the canonical output of `tools/html-snapshot`).
+     */
+    std::string basePath = {};
+
     Options() {
     }
   };

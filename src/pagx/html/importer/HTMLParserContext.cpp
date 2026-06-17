@@ -50,6 +50,12 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
   _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
+  // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
+  // honour the caller-supplied base path here. The file entry point overrides this with
+  // the input file's parent directory.
+  if (!_options.basePath.empty()) {
+    _imageResources->setBasePath(_options.basePath);
+  }
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {
