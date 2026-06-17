@@ -156,30 +156,8 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
     if (layer == nullptr) {
       continue;
     }
-    auto layerRuntime = binding->get<tgfx::Layer>(layer);
-    if (layerRuntime == nullptr && layer->composition == nullptr) {
-      layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
-    }
-    if (layer->composition != nullptr) {
-      auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
-      if (childComposition == nullptr) {
-        continue;
-      }
-      if (childComposition->runtimeLayer != nullptr && layerRuntime != nullptr) {
-        layerRuntime->addChild(childComposition->runtimeLayer);
-      }
-      outChildren.push_back(std::move(childComposition));
-    } else {
-      auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
-      if (!layer->children.empty()) {
-        BuildChildren(binding, layer->children, child->children, scene, visited);
-        for (auto& nestedChild : child->children) {
-          auto nestedSlot = binding->get<tgfx::Layer>(nestedChild->node);
-          if (nestedSlot != nullptr && child->runtimeLayer != nullptr) {
-            child->runtimeLayer->addChild(nestedSlot);
-          }
-        }
-      }
+    auto child = BuildChildLayer(layer, binding, scene, visited);
+    if (child != nullptr) {
       outChildren.push_back(std::move(child));
     }
   }
@@ -268,7 +246,10 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     }
     return childComposition;
   }
-  auto layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
+  auto layerRuntime = binding->get<tgfx::Layer>(layer);
+  if (layerRuntime == nullptr) {
+    layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
+  }
   if (layerRuntime == nullptr) {
     return nullptr;
   }
