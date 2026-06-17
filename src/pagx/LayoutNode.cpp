@@ -38,6 +38,20 @@ bool LayoutNode::hasConstraints() const {
          !std::isnan(percentHeight);
 }
 
+void LayoutNode::resetLayout() {
+  // Reset only the layout-computed outputs so a subsequent updateSize() re-measures and re-resolves
+  // from the current authored fields. The authored inputs (width/height, constraints, percent*) are
+  // left untouched.
+  preferredX = 0;
+  preferredY = 0;
+  preferredWidth = NAN;
+  preferredHeight = NAN;
+  layoutX = NAN;
+  layoutY = NAN;
+  layoutWidth = NAN;
+  layoutHeight = NAN;
+}
+
 Rect LayoutNode::layoutBounds() const {
   float x = std::isnan(layoutX) ? preferredX : layoutX;
   float y = std::isnan(layoutY) ? preferredY : layoutY;
