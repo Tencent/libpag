@@ -78,16 +78,11 @@ explanations, and summaries. Keep the conversation non-technical — describe pr
 
 Before the first conversion, make sure the tools are ready. There are two cases.
 
-**Case A — no repository (regular user, the common case).** Install the published CLI globally; the
-snapshot tool is bundled inside it:
-
-```bash
-npm install -g @libpag/pagx
-```
-
-This stays light — the ~150 MB headless browser is **not** downloaded now. It installs itself
-automatically on the first conversion that needs it (Step 3), into a per-user cache, with
-progress shown on screen. Requires `node` on PATH.
+**Case A — no repository (regular user, the common case).** Install the published CLI as shown in
+[CLI Setup](#cli-setup) above (`npm install -g @libpag/pagx`); the snapshot tool is bundled inside
+it. This stays light — the ~150 MB headless browser is **not** downloaded then. It installs itself
+automatically on the first conversion that needs it (Step 3), into a per-user cache, with progress
+shown on screen. Requires `node` on PATH.
 
 **Case B — inside the libpag repository (contributor).** Run the setup script from anywhere inside
 the repo:
