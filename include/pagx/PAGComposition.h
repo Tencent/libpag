@@ -73,14 +73,16 @@ class PAGComposition : public PAGLayer {
   void buildChildren(const std::vector<Layer*>& layers,
                      std::unordered_set<const Composition*>& visited);
 
-  // Creates a leaf PAGLayer node. Internal factory used by BuildChildren.
-  static std::shared_ptr<PAGLayer> MakeChildLayer(const Layer* node,
-                                                  const std::shared_ptr<tgfx::Layer>& runtimeLayer,
-                                                  const std::shared_ptr<PAGScene>& scene);
-
  private:
+  // Builds a new runtime PAGLayer or PAGComposition for the given source layer, attaching its
+  // tgfx subtree into the parent binding's slots. Shared by syncChildren and
+  // refreshPlainContainerChildren so the construction logic stays in one place.
+  static std::shared_ptr<PAGLayer> BuildChildLayer(
+      const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
+      std::unordered_set<const Composition*>& visited);
+
   // Builds the persistent per-layer runtime node tree into outChildren. Internal static helper used
-  // by buildChildren, MakeChild and refreshNodes.
+  // by BuildChildLayer and buildChildren.
   static void BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
                             std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                             const std::shared_ptr<PAGScene>& scene,
@@ -127,7 +129,8 @@ class PAGComposition : public PAGLayer {
   // its descendant plain containers. Called by refreshNodes.
   void refreshPlainContainerChildren(PAGLayer* container,
                                      const std::vector<Node*>& dirtyNodes,
-                                     std::unordered_set<const Composition*>& visited);
+                                     std::unordered_set<const Composition*>& visited,
+                                     const std::unordered_set<const Node*>& dirtySet);
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
