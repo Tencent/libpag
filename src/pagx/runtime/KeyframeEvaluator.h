@@ -19,10 +19,13 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 
 namespace pagx {
@@ -63,6 +66,19 @@ template <>
 inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /*b*/,
                                             double /*t*/) {
   return a;
+}
+
+template <>
+inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double t) {
+  // See MatrixDecompose.h for the winding limitation: matrix rotation interpolation cannot recover
+  // full turns, so keyframes needing precise multi-turn or +/-pi-boundary rotation should target a
+  // scalar rotation channel (e.g. Group::rotation) instead of a Matrix.
+  auto da = DecomposeAffine(a.a, a.b, a.c, a.d, a.tx, a.ty);
+  auto db = DecomposeAffine(b.a, b.b, b.c, b.d, b.tx, b.ty);
+  auto mixed = MixDecomposed(da, db, static_cast<float>(t));
+  Matrix result = {};
+  RecomposeAffine(mixed, &result.a, &result.b, &result.c, &result.d, &result.tx, &result.ty);
+  return result;
 }
 
 // Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.

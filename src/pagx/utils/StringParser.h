@@ -40,6 +40,7 @@
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
+#include "pagx/types/NoiseMode.h"
 #include "pagx/types/Padding.h"
 #include "pagx/types/ScaleMode.h"
 #include "pagx/types/TextAnchor.h"
@@ -195,6 +196,13 @@ bool IsValidAlignmentString(const std::string& str);
 std::string ArrangementToString(Arrangement arr);
 Arrangement ArrangementFromString(const std::string& str);
 bool IsValidArrangementString(const std::string& str);
+
+//==============================================================================
+// NoiseMode
+//==============================================================================
+std::string NoiseModeToString(NoiseMode mode);
+NoiseMode NoiseModeFromString(const std::string& str);
+bool IsValidNoiseModeString(const std::string& str);
 
 //==============================================================================
 // Padding

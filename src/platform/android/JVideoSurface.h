@@ -27,6 +27,17 @@ class JVideoSurface {
   static std::shared_ptr<tgfx::SurfaceTextureReader> GetImageReader(JNIEnv* env,
                                                                     jobject videoSurface);
 
+  /**
+   * Releases the SurfaceTextureReader held by the Java VideoSurface to break the
+   * SurfaceTextureReader <-> Java VideoSurface circular reference. This must be called from native
+   * code when the C++ owner of the videoSurface jobject (typically HardwareDecoder) is about to be
+   * destroyed; otherwise the SurfaceTexture and its underlying GPU resources stay alive until the
+   * Java GC eventually reclaims the Java VideoSurface, which never happens while the native
+   * SurfaceTexture still holds a global reference to the Java android.graphics.SurfaceTexture that
+   * has the Java VideoSurface registered as its OnFrameAvailableListener.
+   */
+  static void Release(JNIEnv* env, jobject videoSurface);
+
   explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceTextureReader> imageReader)
       : imageReader(imageReader) {
   }

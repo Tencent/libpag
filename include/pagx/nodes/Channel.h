@@ -24,6 +24,7 @@
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
@@ -32,7 +33,7 @@ namespace pagx {
  * ordered to match ChannelValueType, so the active alternative index equals the corresponding
  * ChannelValueType value.
  */
-using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color>;
+using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix>;
 
 /**
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
@@ -45,6 +46,7 @@ enum class ChannelValueType : uint8_t {
   String = 3,
   ImageRef = 4,
   Color = 5,
+  Matrix = 6,
 };
 
 /**

@@ -5,8 +5,8 @@ plugiPath=$1
 script_path=$(realpath "$0")
 script_dir=$(dirname "$script_path")
 rootPath=$(realpath "$script_dir/../..")
-if ! [ -w '${AE_PLUGIN_PATH}/PAGExporter.plugin' ]; then
+if ! [ -w "${AE_PLUGIN_PATH}/PAGExporter.plugin" ]; then
 	${rootPath}/scripts/mac/takeControl
 fi
-rm -r -f "${AE_PLUGIN_PATH}/PAGExporter.plugin"
-cp -r -f ${plugiPath} "${AE_PLUGIN_PATH}/"
+rm -rf "${AE_PLUGIN_PATH}/PAGExporter.plugin"
+cp -a "${plugiPath}" "${AE_PLUGIN_PATH}/"

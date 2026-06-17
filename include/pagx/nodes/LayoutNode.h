@@ -105,6 +105,17 @@ class LayoutNode {
   bool hasConstraints() const;
 
   /**
+   * Clears the layout-computed outputs (preferred and resolved position/size) so the node is
+   * re-measured on the next layout pass. Authored inputs (width/height, constraints, percent sizes)
+   * are left unchanged.
+   *
+   * Called automatically by `PAGXDocument::applyLayout` before re-running layout on an
+   * already-laid-out document, so callers normally do not invoke this directly. Calling it without
+   * a subsequent layout pass leaves the node without resolved geometry.
+   */
+  void resetLayout();
+
+  /**
    * Returns the layout-resolved bounds of this node in its parent's coordinate space.
    * Only valid after applyLayout() has been called. Before layout, returns an empty Rect.
    */

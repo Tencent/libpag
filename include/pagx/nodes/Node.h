@@ -117,6 +117,10 @@ enum class NodeType {
    * A background blur layer style.
    */
   BackgroundBlurStyle,
+  /**
+   * A noise layer style.
+   */
+  NoiseStyle,
 
   // Layer Filters
   /**
@@ -139,6 +143,10 @@ enum class NodeType {
    * A color matrix filter.
    */
   ColorMatrixFilter,
+  /**
+   * A noise filter.
+   */
+  NoiseFilter,
 
   // Elements (geometry, painters, modifiers, containers)
   /**
