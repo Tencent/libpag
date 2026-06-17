@@ -1871,6 +1871,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       }
       style += "position:relative";
     }
+    // Flex items normally have their position controlled by the parent flexbox, but they may
+    // still carry a non-identity matrix (e.g. a 180° rotation that cancels a parent rotation).
+    // Without emitting the transform here, the visual cancellation is lost and contents appear
+    // mirrored/flipped.
+    std::string flexTransform = LayerTransformCSS(layer);
+    if (!flexTransform.empty()) {
+      if (!style.empty()) {
+        style += ';';
+      }
+      style += "transform:" + flexTransform + ";transform-origin:0 0";
+    }
   } else {
     style += "position:absolute";
     auto renderPos = layer->renderPosition();
@@ -2128,6 +2139,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // source and darken/widen the shadow beyond the layer silhouette).
   std::vector<std::string> pendingSiblingShadows;
   std::vector<const DropShadowStyle*> pendingFilterDropShadows;
+  bool hasNestedDomContent = !layer->children.empty() || layer->composition != nullptr;
+  auto appendBoxShadow = [&boxShadowValue](const DropShadowStyle* ds) {
+    if (!boxShadowValue.empty()) {
+      boxShadowValue += ", ";
+    }
+    boxShadowValue += CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
+                      "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+  };
 
   for (auto* ls : layer->styles) {
     bool hasBlendMode = ls->blendMode != BlendMode::Normal;
@@ -2155,8 +2174,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
           // would re-introduce the stacking context we just eliminated.
-          boxShadowValue = CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
-                           "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+          appendBoxShadow(ds);
           boxShadowBorderRadius = radius;
           suppressGroupOpacity = true;
           continue;
@@ -2165,12 +2183,28 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         // because it reads source alpha as-is, so semi-transparent fills produce proportionally
         // weaker shadows while PAGX's shadow shape comes from a saturated opaque silhouette.
       }
+      if (!hasBlendMode && !ds->showBehindLayer && ds->blurX == ds->blurY && hasNestedDomContent) {
+        std::string radius = LayerBoxShadowBorderRadius(layer);
+        if (!radius.empty() && FindLayerShadowShape(layer).valid) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
+          appendBoxShadow(ds);
+          if (boxShadowBorderRadius.empty()) {
+            boxShadowBorderRadius = radius;
+          }
+          continue;
+        }
+      }
       // Sibling-div shadow path: emit one <div> that reproduces the layer's primary fill shape
       // (Rectangle/Ellipse), tinted with the shadow color and CSS-blurred. Avoids the
       // filter-cascade darkening that a `filter:url(...)` on the layer div suffers when the
-      // layer has children painting their own filters. Only showBehindLayer=true is covered —
-      // false requires an erase-mask that CSS has no direct equivalent for, so it continues
-      // down the SVG filter path.
+      // layer has children painting their own filters. For showBehindLayer=false, a simple
+      // full-cover Rectangle/Ellipse can use CSS box-shadow on the layer box; non-box shapes
+      // still fall through to the SVG filter path.
       if (!hasBlendMode && ds->showBehindLayer) {
         ShadowShape shape = FindLayerShadowShape(layer);
         if (shape.valid) {

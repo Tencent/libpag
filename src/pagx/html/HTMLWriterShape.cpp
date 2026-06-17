@@ -324,6 +324,151 @@ bool IsPathClockwise(const PathData& pathData) {
   return ComputePathSignedArea(pathData) > 0;
 }
 
+// Ensures every contour in the path has the specified winding direction. For multi-contour paths
+// (e.g. stroke outlines with outer CW ring + inner CCW ring), reversing the entire path as a unit
+// destroys the relative winding relationship. This function reverses only those individual contours
+// whose direction does not match `clockwise`, preserving the intended fill semantics.
+static std::string EnsureContoursDirection(const PathData& pathData, bool clockwise) {
+  struct Segment {
+    PathVerb verb = PathVerb::Move;
+    std::vector<Point> points = {};
+  };
+  struct Contour {
+    Point startPoint = {};
+    std::vector<Segment> segments = {};
+    bool closed = false;
+  };
+  std::vector<Contour> contours = {};
+  Contour currentContour = {};
+  bool hasContour = false;
+
+  struct ContourVisitor {
+    std::vector<Contour>& contours;
+    Contour& currentContour;
+    bool& hasContour;
+    void operator()(PathVerb verb, const Point* pts) {
+      switch (verb) {
+        case PathVerb::Move:
+          if (hasContour) {
+            contours.push_back(std::move(currentContour));
+            currentContour = {};
+          }
+          currentContour.startPoint = pts[0];
+          hasContour = true;
+          break;
+        case PathVerb::Line: {
+          Segment seg = {PathVerb::Line, {pts[0]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Quad: {
+          Segment seg = {PathVerb::Quad, {pts[0], pts[1]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Cubic: {
+          Segment seg = {PathVerb::Cubic, {pts[0], pts[1], pts[2]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Close:
+          currentContour.closed = true;
+          break;
+      }
+    }
+  };
+  ContourVisitor visitor{contours, currentContour, hasContour};
+  pathData.forEach(std::ref(visitor));
+  if (hasContour) {
+    contours.push_back(std::move(currentContour));
+  }
+
+  std::string result;
+  for (auto& contour : contours) {
+    // Compute signed area for this contour.
+    float area = 0;
+    Point cur = contour.startPoint;
+    for (auto& seg : contour.segments) {
+      Point end = seg.points.back();
+      area += (cur.x * end.y - end.x * cur.y);
+      cur = end;
+    }
+    if (contour.closed) {
+      area += (cur.x * contour.startPoint.y - contour.startPoint.x * cur.y);
+    }
+    bool isCW = area > 0;
+
+    if (isCW == clockwise) {
+      // Emit contour as-is.
+      result += "M" + CssFloatToString(contour.startPoint.x) + " " +
+                CssFloatToString(contour.startPoint.y);
+      for (auto& seg : contour.segments) {
+        switch (seg.verb) {
+          case PathVerb::Line:
+            result +=
+                "L" + CssFloatToString(seg.points[0].x) + " " + CssFloatToString(seg.points[0].y);
+            break;
+          case PathVerb::Quad:
+            result += "Q" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(seg.points[1].x) +
+                      " " + CssFloatToString(seg.points[1].y);
+            break;
+          case PathVerb::Cubic:
+            result += "C" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(seg.points[1].x) +
+                      " " + CssFloatToString(seg.points[1].y) + " " +
+                      CssFloatToString(seg.points[2].x) + " " + CssFloatToString(seg.points[2].y);
+            break;
+          default:
+            break;
+        }
+      }
+      if (contour.closed) {
+        result += "Z";
+      }
+    } else {
+      // Emit contour reversed.
+      if (contour.segments.empty()) {
+        result += "M" + CssFloatToString(contour.startPoint.x) + " " +
+                  CssFloatToString(contour.startPoint.y);
+        if (contour.closed) {
+          result += "Z";
+        }
+        continue;
+      }
+      Point newStart = contour.segments.back().points.back();
+      result += "M" + CssFloatToString(newStart.x) + " " + CssFloatToString(newStart.y);
+      for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
+        auto& seg = contour.segments[static_cast<size_t>(i)];
+        Point segStart = (i == 0) ? contour.startPoint
+                                  : contour.segments[static_cast<size_t>(i - 1)].points.back();
+        switch (seg.verb) {
+          case PathVerb::Line:
+            result += "L" + CssFloatToString(segStart.x) + " " + CssFloatToString(segStart.y);
+            break;
+          case PathVerb::Quad:
+            result += "Q" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) + " " +
+                      CssFloatToString(segStart.y);
+            break;
+          case PathVerb::Cubic:
+            result += "C" + CssFloatToString(seg.points[1].x) + " " +
+                      CssFloatToString(seg.points[1].y) + " " + CssFloatToString(seg.points[0].x) +
+                      " " + CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) +
+                      " " + CssFloatToString(segStart.y);
+            break;
+          default:
+            break;
+        }
+      }
+      if (contour.closed) {
+        result += "Z";
+      }
+    }
+  }
+  return result;
+}
+
 float ComputeCubicBezierLength(Point p0, Point p1, Point p2, Point p3, int depth) {
   if (depth > 8) {
     float dx = p3.x - p0.x;
@@ -2081,39 +2226,28 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       } else {
         GeoToPathData(g.element, g.type, pathData);
       }
-      bool needReverse = false;
       switch (mergeMode) {
         case MergePathMode::Union:
-          if (!IsPathClockwise(pathData)) {
-            needReverse = true;
-          }
+          // For Union with nonzero fill-rule, all contours must be clockwise so overlapping
+          // regions are filled. Use per-contour direction enforcement to correctly handle
+          // multi-contour paths (e.g. stroke outlines with outer CW + inner CCW rings).
+          mergedPath += EnsureContoursDirection(pathData, true);
           fillRule = "nonzero";
           break;
         case MergePathMode::Xor:
+          mergedPath += PathDataToSVGString(pathData);
           fillRule = "evenodd";
           break;
         case MergePathMode::Difference:
-          if (i == 0) {
-            if (!IsPathClockwise(pathData)) {
-              needReverse = true;
-            }
-          } else {
-            if (IsPathClockwise(pathData)) {
-              needReverse = true;
-            }
-          }
+          // For Difference: first shape clockwise (additive), subsequent shapes
+          // counter-clockwise (subtractive). Per-contour enforcement handles multi-contour.
+          mergedPath += EnsureContoursDirection(pathData, i == 0);
           fillRule = "nonzero";
           break;
         case MergePathMode::Append:
         default:
+          mergedPath += PathDataToSVGString(pathData);
           break;
-      }
-      if (needReverse) {
-        PathData reversed = PathDataFromSVGString("");
-        ReversePathData(pathData, reversed);
-        mergedPath += PathDataToSVGString(reversed);
-      } else {
-        mergedPath += PathDataToSVGString(pathData);
       }
     }
     if (mergedPath.empty()) {
