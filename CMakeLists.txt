@@ -234,8 +234,10 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 
-    # HTML exporter
+    # HTML exporter (importer subtree is wired separately above so PAG_BUILD_HTML can keep
+    # it out of non-HTML builds)
     file(GLOB_RECURSE HTML_EXPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/*.*)
+    list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)

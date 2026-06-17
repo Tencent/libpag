@@ -250,7 +250,7 @@ struct TransformHandlerEntry {
   bool composeMatrix;
 };
 
-const TransformHandlerEntry kTransformHandlers[] = {
+const TransformHandlerEntry TRANSFORM_HANDLERS[] = {
     {"skewx", &ParseSkewX, true},           {"skewy", &ParseSkewY, true},
     {"rotate", &ParseRotate, true},         {"scale", &ParseScale, true},
     {"scalex", &ParseScaleX, true},         {"scaley", &ParseScaleY, true},
@@ -259,7 +259,7 @@ const TransformHandlerEntry kTransformHandlers[] = {
 };
 
 const TransformHandlerEntry* FindTransformHandler(const std::string& fn) {
-  for (const auto& entry : kTransformHandlers) {
+  for (const auto& entry : TRANSFORM_HANDLERS) {
     if (fn == entry.name) return &entry;
   }
   return nullptr;

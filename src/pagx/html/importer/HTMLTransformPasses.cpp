@@ -1341,33 +1341,35 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
   if (childProps.size() < 2) return;
 
   const size_t n = childProps.size();
-  // `kEps` absorbs the same sub-pixel rounding that `ResolveLength` introduces when
+  // `MARGIN_EPS_PX` absorbs the same sub-pixel rounding that `ResolveLength` introduces when
   // converting Tailwind arbitrary values; tighter equality misfires on legitimate uniformity.
-  constexpr float kEps = 0.05f;
+  constexpr float MARGIN_EPS_PX = 0.05f;
 
   // Trailing pattern: all leadMargins must be ~0; trailMargins[0..n-2] uniform > 0; the
   // last trailMargin is 0 or matches the others.
   bool trailingOK = true;
   for (float l : leadMargins) {
-    if (!ApproxEqual(l, 0.0f, kEps)) {
+    if (!ApproxEqual(l, 0.0f, MARGIN_EPS_PX)) {
       trailingOK = false;
       break;
     }
   }
   if (trailingOK) {
     float g = trailMargins[0];
-    if (g <= kEps) {
+    if (g <= MARGIN_EPS_PX) {
       trailingOK = false;
     } else {
       for (size_t i = 1; i + 1 < n; ++i) {
-        if (!ApproxEqual(trailMargins[i], g, kEps)) {
+        if (!ApproxEqual(trailMargins[i], g, MARGIN_EPS_PX)) {
           trailingOK = false;
           break;
         }
       }
       if (trailingOK) {
         float last = trailMargins[n - 1];
-        if (!ApproxEqual(last, 0.0f, kEps) && !ApproxEqual(last, g, kEps)) trailingOK = false;
+        if (!ApproxEqual(last, 0.0f, MARGIN_EPS_PX) && !ApproxEqual(last, g, MARGIN_EPS_PX)) {
+          trailingOK = false;
+        }
       }
     }
     if (trailingOK) {
@@ -1385,25 +1387,27 @@ void TryPromoteMarginToGap(const std::shared_ptr<DOMNode>& parent, HTMLTransform
   // leadMargin is 0 or matches the others.
   bool leadingOK = true;
   for (float t : trailMargins) {
-    if (!ApproxEqual(t, 0.0f, kEps)) {
+    if (!ApproxEqual(t, 0.0f, MARGIN_EPS_PX)) {
       leadingOK = false;
       break;
     }
   }
   if (leadingOK) {
     float g = leadMargins[1];
-    if (g <= kEps) {
+    if (g <= MARGIN_EPS_PX) {
       leadingOK = false;
     } else {
       for (size_t i = 2; i < n; ++i) {
-        if (!ApproxEqual(leadMargins[i], g, kEps)) {
+        if (!ApproxEqual(leadMargins[i], g, MARGIN_EPS_PX)) {
           leadingOK = false;
           break;
         }
       }
       if (leadingOK) {
         float first = leadMargins[0];
-        if (!ApproxEqual(first, 0.0f, kEps) && !ApproxEqual(first, g, kEps)) leadingOK = false;
+        if (!ApproxEqual(first, 0.0f, MARGIN_EPS_PX) && !ApproxEqual(first, g, MARGIN_EPS_PX)) {
+          leadingOK = false;
+        }
       }
     }
     if (leadingOK) {

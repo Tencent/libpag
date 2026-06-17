@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CSSFontStyle.h"
-#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <string>
@@ -35,8 +34,9 @@ std::string TrimAscii(const std::string& s) {
 }
 
 std::string ToLowerAscii(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  for (auto& c : s) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
   return s;
 }
 

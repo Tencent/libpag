@@ -78,9 +78,49 @@ inline std::string SaveFile(const std::string& content, const std::string& key) 
 }
 
 template <typename T>
+struct PagxNodeTypeOf;
+
+#define DECLARE_PAGX_NODE_TYPE(Type)                              \
+  template <>                                                     \
+  struct PagxNodeTypeOf<pagx::Type> {                             \
+    static constexpr pagx::NodeType value = pagx::NodeType::Type; \
+  }
+
+DECLARE_PAGX_NODE_TYPE(Rectangle);
+DECLARE_PAGX_NODE_TYPE(Path);
+DECLARE_PAGX_NODE_TYPE(Fill);
+DECLARE_PAGX_NODE_TYPE(Stroke);
+DECLARE_PAGX_NODE_TYPE(Text);
+DECLARE_PAGX_NODE_TYPE(TextBox);
+DECLARE_PAGX_NODE_TYPE(Group);
+DECLARE_PAGX_NODE_TYPE(SolidColor);
+DECLARE_PAGX_NODE_TYPE(LinearGradient);
+DECLARE_PAGX_NODE_TYPE(RadialGradient);
+DECLARE_PAGX_NODE_TYPE(ConicGradient);
+DECLARE_PAGX_NODE_TYPE(ImagePattern);
+DECLARE_PAGX_NODE_TYPE(DropShadowStyle);
+DECLARE_PAGX_NODE_TYPE(InnerShadowStyle);
+DECLARE_PAGX_NODE_TYPE(BackgroundBlurStyle);
+DECLARE_PAGX_NODE_TYPE(BlurFilter);
+DECLARE_PAGX_NODE_TYPE(DropShadowFilter);
+
+#undef DECLARE_PAGX_NODE_TYPE
+
+// Type-safe replacement for `dynamic_cast<T*>(node)` rooted in the project's `nodeType()`
+// dispatch. Returns `node` cast to `T*` when its runtime tag matches `PagxNodeTypeOf<T>::value`,
+// nullptr otherwise. Hoisted out of the test bodies so the file follows the codebase rule of
+// avoiding `dynamic_cast`.
+template <typename T, typename Base>
+T* As(Base* node) {
+  if (!node) return nullptr;
+  if (node->nodeType() != PagxNodeTypeOf<T>::value) return nullptr;
+  return static_cast<T*>(node);
+}
+
+template <typename T>
 T* FindElement(const std::vector<pagx::Element*>& contents) {
   for (auto* e : contents) {
-    if (auto* match = dynamic_cast<T*>(e)) {
+    if (auto* match = As<T>(e)) {
       return match;
     }
   }
@@ -97,7 +137,7 @@ template <typename T>
 size_t CountElements(const std::vector<pagx::Element*>& contents) {
   size_t count = 0;
   for (auto* e : contents) {
-    if (dynamic_cast<T*>(e)) count++;
+    if (As<T>(e)) count++;
   }
   return count;
 }
@@ -124,7 +164,7 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
 inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   auto* fill = FindElementOfType<pagx::Fill>(layer);
   if (!fill) return {};
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   if (!solid) return {};
   return solid->color;
 }
@@ -224,7 +264,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundColorBecomesRectangleAndFill) {
   EXPECT_FLOAT_EQ(rect->percentWidth, 100.0f);
   EXPECT_FLOAT_EQ(rect->percentHeight, 100.0f);
   EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
   EXPECT_FLOAT_EQ(div->width, 80.0f);
@@ -306,7 +346,7 @@ PAG_TEST(PAGXHTMLImporterTest, BorderProducesStroke) {
   auto* stroke = FindElementOfType<pagx::Stroke>(div);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(stroke->color);
+  auto* solid = As<pagx::SolidColor>(stroke->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
   EXPECT_EQ(stroke->align, pagx::StrokeAlign::Inside);
@@ -367,7 +407,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(div->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(div->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->offsetX, 0.0f);
   EXPECT_FLOAT_EQ(drop->offsetY, 2.0f);
@@ -386,7 +426,7 @@ PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* inner = dynamic_cast<pagx::InnerShadowStyle*>(div->styles.front());
+  auto* inner = As<pagx::InnerShadowStyle>(div->styles.front());
   ASSERT_NE(inner, nullptr);
   EXPECT_FLOAT_EQ(inner->offsetX, 2.0f);
   EXPECT_FLOAT_EQ(inner->offsetY, 2.0f);
@@ -426,7 +466,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowAndOverflowHiddenSplitsLayers) {
   EXPECT_FALSE(outer->clipToBounds);
   EXPECT_TRUE(outer->contents.empty());
   ASSERT_EQ(outer->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(outer->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(outer->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
   // Wrapper takes over the original layout slot so the parent's flow / constraints are
@@ -465,7 +505,7 @@ PAG_TEST(PAGXHTMLImporterTest, InsetShadowWithOverflowHiddenStaysOnClippedLayer)
   // No outer wrapper is introduced: the layer keeps both the clip and the inset shadow.
   EXPECT_TRUE(div->clipToBounds);
   ASSERT_EQ(div->styles.size(), 1u);
-  EXPECT_NE(dynamic_cast<pagx::InnerShadowStyle*>(div->styles.front()), nullptr);
+  EXPECT_NE(As<pagx::InnerShadowStyle>(div->styles.front()), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OpacityMapsToLayerAlpha) {
@@ -575,7 +615,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientAngleConversion) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   // CSS 90deg (to right) maps to PAGX 0° (along +X axis). startPoint(0, 0.5) → endPoint(1, 0.5).
   EXPECT_TRUE(NearlyEqual(lg->startPoint.x, 0.0f, 0.005f));
@@ -597,7 +637,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -613,7 +653,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   // CSS 0° = top, PAGX 0° = right ⇒ PAGX angle = −90°.
   EXPECT_TRUE(NearlyEqual(cg->startAngle, -90.0f, 0.01f));
@@ -629,11 +669,11 @@ PAG_TEST(PAGXHTMLImporterTest, FilterBlurAndDropShadow) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->filters.size(), 2u);
-  auto* blur = dynamic_cast<pagx::BlurFilter*>(div->filters[0]);
+  auto* blur = As<pagx::BlurFilter>(div->filters[0]);
   ASSERT_NE(blur, nullptr);
   EXPECT_FLOAT_EQ(blur->blurX, 2.0f);
   EXPECT_FLOAT_EQ(blur->blurY, 2.0f);
-  auto* drop = dynamic_cast<pagx::DropShadowFilter*>(div->filters[1]);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[1]);
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->offsetY, 1.0f);
 }
@@ -648,7 +688,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
   auto* div = doc->layers.front()->children.front();
   bool foundBlur = false;
   for (auto* s : div->styles) {
-    if (auto* b = dynamic_cast<pagx::BackgroundBlurStyle*>(s)) {
+    if (auto* b = As<pagx::BackgroundBlurStyle>(s)) {
       EXPECT_FLOAT_EQ(b->blurX, 6.0f);
       foundBlur = true;
     }
@@ -682,7 +722,7 @@ PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   // No TextBox needed for a uniform-style leaf.
   bool hasTextBox = false;
   for (auto* e : leaf->contents) {
-    if (dynamic_cast<pagx::TextBox*>(e)) hasTextBox = true;
+    if (As<pagx::TextBox>(e)) hasTextBox = true;
   }
   EXPECT_FALSE(hasTextBox);
 }
@@ -699,8 +739,8 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
   ASSERT_NE(tb, nullptr);
   size_t textCount = 0, groupCount = 0;
   for (auto* e : tb->elements) {
-    if (dynamic_cast<pagx::Text*>(e)) textCount++;
-    if (dynamic_cast<pagx::Group*>(e)) groupCount++;
+    if (As<pagx::Text>(e)) textCount++;
+    if (As<pagx::Group>(e)) groupCount++;
   }
   EXPECT_EQ(textCount, 1u);
   EXPECT_EQ(groupCount, 1u);
@@ -714,11 +754,11 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
 inline void GatherTextRuns(const std::vector<pagx::Element*>& elements,
                            std::vector<pagx::Text*>* texts, std::vector<pagx::Fill*>* fills) {
   for (auto* e : elements) {
-    if (auto* t = dynamic_cast<pagx::Text*>(e)) {
+    if (auto* t = As<pagx::Text>(e)) {
       texts->push_back(t);
-    } else if (auto* f = dynamic_cast<pagx::Fill*>(e)) {
+    } else if (auto* f = As<pagx::Fill>(e)) {
       fills->push_back(f);
-    } else if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+    } else if (auto* g = As<pagx::Group>(e)) {
       GatherTextRuns(g->elements, texts, fills);
     }
   }
@@ -779,8 +819,8 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunC
   EXPECT_FLOAT_EQ(texts[0]->fontSize, 44.0f);
   EXPECT_EQ(texts[1]->text, "亿美元");
   EXPECT_FLOAT_EQ(texts[1]->fontSize, 22.0f);
-  auto* solid0 = dynamic_cast<pagx::SolidColor*>(fills[0]->color);
-  auto* solid1 = dynamic_cast<pagx::SolidColor*>(fills[1]->color);
+  auto* solid0 = As<pagx::SolidColor>(fills[0]->color);
+  auto* solid1 = As<pagx::SolidColor>(fills[1]->color);
   ASSERT_NE(solid0, nullptr);
   ASSERT_NE(solid1, nullptr);
   EXPECT_TRUE(ColorNear(solid0->color, HexColor(0x111111, 1.0f)));
@@ -942,7 +982,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageRegistersImageResource) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_FALSE(pattern->image->filePath.empty());
@@ -1071,7 +1111,7 @@ PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
   auto* rect = FindElementOfType<pagx::Rectangle>(div);
@@ -1382,12 +1422,12 @@ PAG_TEST(PAGXHTMLImporterTest, TextDecorationColorDifferingWrapsInGroup) {
   // The decoration overlay is wrapped in a Group when its colour differs from the text.
   bool foundGroup = false;
   for (auto* e : leaf->contents) {
-    if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+    if (auto* g = As<pagx::Group>(e)) {
       auto* rect = FindElement<pagx::Rectangle>(g->elements);
       auto* fill = FindElement<pagx::Fill>(g->elements);
       ASSERT_NE(rect, nullptr);
       ASSERT_NE(fill, nullptr);
-      auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+      auto* solid = As<pagx::SolidColor>(fill->color);
       ASSERT_NE(solid, nullptr);
       EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
       foundGroup = true;
@@ -1446,7 +1486,7 @@ PAG_TEST(PAGXHTMLImporterTest, CommaSeparatedClassRulesApply) {
     auto* rect = FindElementOfType<pagx::Rectangle>(div);
     ASSERT_NE(fill, nullptr);
     ASSERT_NE(rect, nullptr);
-    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    auto* solid = As<pagx::SolidColor>(fill->color);
     ASSERT_NE(solid, nullptr);
     EXPECT_TRUE(ColorNear(solid->color, HexColor(0x112233)));
     EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
@@ -1469,7 +1509,7 @@ PAG_TEST(PAGXHTMLImporterTest, MultipleClassesMergeWithLastWinning) {
   auto* rect = FindElementOfType<pagx::Rectangle>(div);
   ASSERT_NE(fill, nullptr);
   ASSERT_NE(rect, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF8800)));
   EXPECT_FLOAT_EQ(rect->roundness, 4.0f);
@@ -1486,7 +1526,7 @@ PAG_TEST(PAGXHTMLImporterTest, InlineStyleBeatsClassRule) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x22AAEE)));
 }
@@ -1502,7 +1542,7 @@ PAG_TEST(PAGXHTMLImporterTest, ElementSelectorAppliesToTag) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x33CC44)));
 }
@@ -1522,7 +1562,7 @@ PAG_TEST(PAGXHTMLImporterTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
 }
@@ -1729,7 +1769,7 @@ PAG_TEST(PAGXHTMLImporterTest, NamedColorAccepted) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
 }
@@ -1800,7 +1840,7 @@ PAG_TEST(PAGXHTMLImporterTest, BodyDefaultsArial14Color) {
   EXPECT_FLOAT_EQ(text->fontSize, 14.0f);
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x1E293B)));
 }
@@ -2115,7 +2155,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientToBottomRight) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   // CSS 135deg → PAGX 45deg (top-left to bottom-right diagonal).
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
@@ -2130,7 +2170,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientThreeStopsInterpolatesMiddleOffset)
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 3u);
   EXPECT_TRUE(NearlyEqual(lg->colorStops[0]->offset, 0.0f, 0.01f));
@@ -2146,7 +2186,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientFrom90DegMapsToZero) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   // CSS 90° (right) ⇒ PAGX 0° (along +X axis).
   EXPECT_TRUE(NearlyEqual(cg->startAngle, 0.0f, 0.01f));
@@ -2183,7 +2223,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesGradientToTextFill) {
     textFill = FindElementOfType<pagx::Fill>(textLeaf);
   }
   ASSERT_NE(textFill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(textFill->color);
+  auto* lg = As<pagx::LinearGradient>(textFill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 2u);
   EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
@@ -2207,7 +2247,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
   EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 1u);
   auto* fill = FindElementOfType<pagx::Fill>(outer);
   ASSERT_NE(fill, nullptr);
-  EXPECT_NE(dynamic_cast<pagx::LinearGradient*>(fill->color), nullptr);
+  EXPECT_NE(As<pagx::LinearGradient>(fill->color), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnchorHrefStoredAsCustomData) {
@@ -2233,7 +2273,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnchorDefaultsBlueAndUnderline) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x2563EB)));
   // Underline overlay rectangle should exist.
@@ -2309,7 +2349,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoRectangle) {
   // And one Fill carrying the image pattern.
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
@@ -2332,7 +2372,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageDefaultObjectFitIsStretch) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
@@ -2374,7 +2414,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageWithAsymmetricBorderRadiusEmitsPath) {
   EXPECT_EQ(cubicCount, 2u);
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
 }
 
@@ -2388,7 +2428,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitContainMapsToLetterBox) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
 }
@@ -2403,7 +2443,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
@@ -2437,7 +2477,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoPathForAsymmetricRadi
   EXPECT_EQ(cubicCount, 2u);
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
@@ -2455,7 +2495,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRespectsObjectFit) {
   auto* wrapper = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
@@ -2494,8 +2534,8 @@ PAG_TEST(PAGXHTMLImporterTest, RepeatedImageSourceDeduplicated) {
   auto* fillB = FindElementOfType<pagx::Fill>(kids[1]);
   ASSERT_NE(fillA, nullptr);
   ASSERT_NE(fillB, nullptr);
-  auto* patA = dynamic_cast<pagx::ImagePattern*>(fillA->color);
-  auto* patB = dynamic_cast<pagx::ImagePattern*>(fillB->color);
+  auto* patA = As<pagx::ImagePattern>(fillA->color);
+  auto* patB = As<pagx::ImagePattern>(fillB->color);
   ASSERT_NE(patA, nullptr);
   ASSERT_NE(patB, nullptr);
   EXPECT_EQ(patA->image, patB->image);
@@ -2601,7 +2641,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawClassRuleAppliedWithoutSubsetTransformer) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
 }
@@ -2634,7 +2674,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTrans
   for (auto* div : doc->layers.front()->children) {
     auto* fill = FindElementOfType<pagx::Fill>(div);
     ASSERT_NE(fill, nullptr);
-    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    auto* solid = As<pagx::SolidColor>(fill->color);
     ASSERT_NE(solid, nullptr);
     EXPECT_TRUE(ColorNear(solid->color, HexColor(0x114455)));
   }
@@ -2690,7 +2730,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawAtRuleSurvivesAndIsHandledByCascade) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xAABBCC)));
 }
@@ -2712,7 +2752,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawAtRuleNoBlockSkipped) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x446688)));
 }
@@ -2735,7 +2775,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawCssCommentsStripped) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x225588)));
 }
@@ -3338,7 +3378,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(div->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(div->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000), 0.02f));
 }
@@ -3354,7 +3394,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientWithRadAngle) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
@@ -3370,7 +3410,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientWithTurnAngle) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
@@ -3385,7 +3425,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithEllipseDescriptor) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -3400,7 +3440,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientThreeStopsImplicitMiddleInterpolated) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 3u);
   EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
@@ -3519,7 +3559,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithCenterOnly) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -3535,7 +3575,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientWithExplicitDegOffsetPerStop) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   ASSERT_EQ(cg->colorStops.size(), 2u);
   EXPECT_TRUE(NearlyEqual(cg->colorStops.front()->offset, 0.0f, 0.01f));
@@ -3554,7 +3594,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientWithExplicitPxOffsetPerStop) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 2u);
 }

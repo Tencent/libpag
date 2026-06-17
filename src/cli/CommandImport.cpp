@@ -103,6 +103,18 @@ static std::string NormalizeFormat(const std::string& format, const std::string&
 // html-snapshot bridge
 //--------------------------------------------------------------------------------------------------
 
+// Returns true when `path[0..n)` matches `prefix[0..n)` after ASCII lower-casing. Caller
+// passes the prefix length explicitly so we don't pay for `strlen` on a literal each call.
+static bool StartsWithLower(const std::string& path, const char* prefix, size_t n) {
+  if (path.size() < n) return false;
+  for (size_t i = 0; i < n; ++i) {
+    if (std::tolower(static_cast<unsigned char>(path[i])) != prefix[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Returns true when `path` begins with `http://` or `https://` (case-insensitive). The
 // html-snapshot script accepts URLs natively, so we bypass the on-disk file checks for
 // these inputs.
@@ -110,16 +122,7 @@ static bool IsHttpUrl(const std::string& path) {
   if (path.size() < 7) {
     return false;
   }
-  auto starts = [&](const char* prefix, size_t n) {
-    if (path.size() < n) return false;
-    for (size_t i = 0; i < n; ++i) {
-      if (std::tolower(static_cast<unsigned char>(path[i])) != prefix[i]) {
-        return false;
-      }
-    }
-    return true;
-  };
-  return starts("http://", 7) || starts("https://", 8);
+  return StartsWithLower(path, "http://", 7) || StartsWithLower(path, "https://", 8);
 }
 
 // POSIX shell quoting (single-quote wrap, escape any embedded single quotes). The
