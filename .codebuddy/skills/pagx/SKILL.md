@@ -1,43 +1,30 @@
 ---
 name: pagx
 description: >-
-  Generates well-structured PAGX files from visual descriptions, converts an HTML
-  file/URL or a described visual (poster, card, banner, social post) to PAGX, and
-  edits existing ones. Use when user asks to create, write, design, or modify PAGX
-  content, convert HTML to PAGX, run pagx CLI commands (render, verify, format,
-  layout, bounds, font info/embed, import/export, export to HTML for browser
-  preview), or look up PAGX element attributes and syntax.
+  Converts an HTML file/URL or a described visual (poster, card, banner, social
+  post) to a PAGX file. Use when the user asks to create a PAGX from a visual
+  description, convert HTML to PAGX, or run pagx CLI commands (render, verify,
+  format, layout, bounds, font info/embed, import/export, export to HTML for
+  browser preview).
 ---
 
 # PAGX Skill
 
-There are two ways to produce a PAGX file. Pick the one that fits the request:
-
-- **Author PAGX directly** — write PAGX XML with full control over structure,
-  constraints, and animation-ready layout. Best for precise PAGX semantics,
-  hand-editing XML, or iterating on an existing `.pagx`. See [Generation Workflow](#generation-workflow).
-- **HTML → PAGX** — design a normal HTML page (or take an existing `.html`/URL) and
-  convert it to PAGX with a single command. Best for non-technical users, visual
-  descriptions in plain language, or when an HTML file/URL already exists. See
-  [HTML to PAGX Workflow](#html-to-pagx-workflow).
-
-If the user is approaching the task visually and does not care about PAGX internals,
-prefer **HTML → PAGX**. If they need precise PAGX control or are editing a `.pagx`
-directly, use the **Generation Workflow**.
+Produce a PAGX file from a visual design: design a normal HTML page (or take an
+existing `.html`/URL) and convert it to PAGX with a single command. Best for
+non-technical users, visual descriptions in plain language, or when an HTML
+file/URL already exists. See [HTML to PAGX Workflow](#html-to-pagx-workflow).
 
 ## Reference Lookup
 
-When looking up PAGX syntax, attributes, node behavior, or CLI usage, consult the
-relevant reference:
+When looking up PAGX syntax, node behavior, or CLI usage, consult the relevant
+reference:
 
 | Reference | Content | Loading |
 |-----------|--------|---------|
-| `references/guide.md` | Spec rules, techniques, common pitfalls | Read before generating |
-| `references/patterns.md` | Structural patterns for UI components, layouts, tables, charts, decorative effects | Read before generating |
-| `references/attributes.md` | Attribute defaults, enumerations, required attributes | As needed |
 | `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` (SVG, HTML) | As needed |
-| `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML (HTML → PAGX) |
-| `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed (HTML → PAGX) |
+| `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML |
+| `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed |
 
 ---
 
@@ -70,130 +57,6 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 
 ---
 
-## Generation Workflow
-
-**When**: User asks to create, write, design, or modify a PAGX file from a text
-description, reference image, or design intent.
-
-Before writing any PAGX code, read `references/guide.md` (spec rules, techniques,
-and especially §Common Pitfalls) and `references/patterns.md` (structural patterns
-for components and layouts). Read `references/attributes.md` as needed for attribute defaults.
-
-### Task tracking
-
-At the start of every generation task, create a task list to track progress:
-- One task for Step 2 (Skeleton)
-- One task per section for Step 3 (e.g., "Fill section: heroCard", "Fill section: tabBar")
-- One task for Step 4 (Polish)
-
-Mark each task in-progress before starting it and completed after all checks pass.
-Do NOT start the next task until the current one is completed.
-
----
-
-### Step 1: Assess
-
-**Do**:
-1. Clarify requirements — ask the user if canvas size, visual style, text content, or
-   color scheme is unclear or ambiguous.
-2. Establish a style sheet — color palette, spacing scale, roundness, font hierarchy.
-3. Decompose the visual into a **containment tree** — a hierarchical list of containers
-   and their direct children. Determine containment by reading the source description
-   paragraph by paragraph: elements described within the same block belong to that
-   container, not as siblings of it. This tree directly determines the section `id`s
-   and nesting used in Step 2.
-
-**Forbidden**: Do NOT write any PAGX code in this step.
-
----
-
-### Step 2: Skeleton
-
-**Do**: Write the `<pagx>` root and all section Layers with **structural layout attributes**
-(`id`, `width`/`height`, `flex`, `layout`, `gap`, `alignment`, `arrangement`),
-**background fills, and section dividers** using the nested container structure
-(see `guide.md` §Container Layout). Assign `id` to every structural section for scoped
-verification in Step 3.
-
-**Checks**:
-1. Run `pagx verify input.pagx` — **ALL diagnostics MUST be fixed**. Re-run until exit
-   code is 0 with no diagnostic output. Do NOT proceed while any diagnostic remains.
-2. Read the `.layout.xml` and verify each section's bounds match the intended sizes
-   and positions. Fix any issues.
-3. Read the screenshot and confirm backgrounds, dividers, and section proportions
-   match the design intent. Fix any issues.
-
-**Forbidden**: Do NOT proceed to Step 3 until verify exits cleanly with zero diagnostics.
-
----
-
-### Step 3: Fill Sections
-
-For each section (identified by `id`), one at a time:
-
-**Do**: Fill in all visual content for this section only.
-
-**Checks**:
-1. Run `pagx verify --scale 2 --id "sectionId" input.pagx` — **ALL diagnostics MUST be
-   fixed**. Re-run until exit code is 0 with no diagnostic output.
-2. Read the section `.layout.xml` and verify element bounds match the design intent
-   — check sizes (e.g., input height, icon dimensions), spacing, and that nothing
-   has zero or unexpected dimensions. Fix any issues.
-3. Read the section screenshot and verify against the design intent — check that
-   colors, font sizes, text content, and icons are correct. Fix any issues.
-
-**Cleanup**: After all checks pass, delete that section's scoped artifacts
-(`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
-
-**Forbidden**: Do NOT edit other sections. Do NOT proceed to the next section until
-verify exits cleanly with zero diagnostics.
-
----
-
-### Step 4: Polish
-
-**Do**: Review the full design holistically and refine cross-section details — spacing,
-alignment, color consistency, visual hierarchy — that only become apparent at full scale.
-
-**Checks**:
-1. Run `pagx verify --scale 2 input.pagx` — **ALL diagnostics MUST be fixed**. Re-run
-   until exit code is 0 with no diagnostic output.
-2. Launch a sub-agent as an adversarial reviewer — this is the core of quality
-   assurance. **NEVER** read `references/checklist.md` yourself; it is exclusively
-   for the sub-agent. Use `subagent_type="general-purpose"` and `model="reasoning"`.
-   Use the following prompt, replacing placeholders with absolute paths:
-
-   ```
-   You are a strict, adversarial visual QA reviewer for a PAGX design file (an XML-based
-   vector graphics format). Find every problem you can. Assume something is wrong until
-   you prove it correct.
-
-   Design intent: {design_intent}
-
-   Files:
-   - PAGX source: {pagx_path}
-   - Layout XML: {layout_path}
-   - Screenshot: {screenshot_path}
-
-   Read all three files and {checklist_path}, then check every item in the
-   checklist. Report every issue you find.
-   ```
-
-3. Copy every reported issue into the Step 4 task description as a numbered list.
-   Work through each one: default to fixing; only mark `[FALSE POSITIVE]` if you
-   can prove QA misread the file (e.g., layout.xml shows correct bounds). Do NOT
-   dismiss issues as "minor", "looks okay", or "design constraint".
-
-**Final verification**: After all fixes, run `pagx verify` one last time. If ANY diagnostic
-appears, the task is NOT complete — fix it. Only mark Step 4 complete when verify exits
-with code 0 and produces no diagnostic output.
-
-Keep final `input.png` for reference (do not commit). If further edits are made after
-this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
-scoped `{id}` artifacts produced during the fix.
-
----
-
 ## HTML to PAGX Workflow
 
 Help regular users (no design-tool or PAGX experience) produce a PAGX file without writing PAGX by
@@ -205,9 +68,7 @@ icons, charts on `<canvas>`) is flattened automatically into clean PAGX.
 **When**: the goal is a finished PAGX and the user is approaching it visually — describes what they
 want in plain language ("一张活动海报", "a product card with price and button"), already has an `.html`
 file or a public URL to convert, or is a non-developer who should not be asked PAGX-specific
-questions. For precise PAGX semantics (constraints, repeaters, layer styles, animation-ready
-structure) or hand-editing a `.pagx`, use the [Generation Workflow](#generation-workflow) above
-instead — and you can hand a converted `.pagx` off to it for deeper polish.
+questions.
 
 **Communicate in the user's language.** Mirror the language the user is writing in for all questions,
 explanations, and summaries. Keep the conversation non-technical — describe progress in terms of
@@ -324,6 +185,3 @@ the warm HTTP server for fast iteration, and a manual step-by-step path for debu
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
 4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
    it contains. Do not commit generated `.png` / `.subset.html` files.
-
-For deeper polish of the resulting PAGX (precise spacing, constraints, animation-ready structure),
-switch to the [Generation Workflow](#generation-workflow), which edits the `.pagx` directly.
