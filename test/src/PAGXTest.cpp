@@ -6354,6 +6354,7 @@ struct NestedCompFixture {
   std::string animationId;
   pagx::Layer* childLayer = nullptr;
   pagx::SolidColor* solid = nullptr;
+  pagx::TypedChannel<float>* alphaChannel = nullptr;
 };
 
 NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::string& compId,
@@ -6394,6 +6395,7 @@ NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::strin
   alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   obj->channels.push_back(alphaProp);
+  fx.alphaChannel = alphaProp;
 
   return fx;
 }
@@ -10044,6 +10046,56 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   ASSERT_EQ(hits.size(), 0u);
   hits = scene->getLayersUnderPoint(120, 120);
   ASSERT_EQ(hits.size(), 0u);
+}
+
+/**
+ * Test case: a PAGComposition nested under a plain PAGLayer container has its timelines properly
+ * reset when notifyChange marks a timeline node dirty. The two baseline snapshots capture different
+ * alpha values, proving the nested composition's timeline was actually rebuilt.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto container = doc->makeNode<pagx::Layer>("Container");
+  container->name = "Container";
+  container->width = 200;
+  container->height = 200;
+
+  auto slot = doc->makeNode<pagx::Layer>("Slot");
+  slot->composition = fx.comp;
+  slot->width = 100;
+  slot->height = 100;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  container->children.push_back(slot);
+  doc->layers.push_back(container);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+  EXPECT_EQ(rootChildren[0]->children[0]->layerType(), pagx::LayerType::Composition);
+
+  // Advance to frame 30: linear keyframes [0→0, 60→1.0] → alpha = 0.5.
+  scene->advanceAndApply(500'000);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ResetTimelinesInNestedContainer_before"));
+
+  // Modify the starting keyframe value and mark Animation dirty → triggers resetTimelines.
+  fx.alphaChannel->keyframes[0].value = 0.3f;
+  doc->notifyChange({fx.comp->animations[0]}, /*layoutChanged=*/true);
+
+  // After reset, the rebuilt timeline uses the new keyframes. At frame 30: alpha = 0.3 + 0.35 = 0.65.
+  scene->advanceAndApply(500'000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ResetTimelinesInNestedContainer_after"));
 }
 
 }  // namespace pag
