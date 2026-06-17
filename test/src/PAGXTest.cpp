@@ -20,8 +20,8 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
