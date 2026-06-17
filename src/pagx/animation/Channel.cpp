@@ -65,6 +65,11 @@ ChannelValueType TypedChannel<Color>::valueType() const {
   return ChannelValueType::Color;
 }
 
+template <>
+ChannelValueType TypedChannel<Matrix>::valueType() const {
+  return ChannelValueType::Matrix;
+}
+
 // Explicit instantiations: must cover every alternative of KeyValue.
 template class TypedChannel<float>;
 template class TypedChannel<bool>;
@@ -72,5 +77,6 @@ template class TypedChannel<int>;
 template class TypedChannel<std::string>;
 template class TypedChannel<ImageRef>;
 template class TypedChannel<Color>;
+template class TypedChannel<Matrix>;
 
 }  // namespace pagx

@@ -151,8 +151,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
  private:
   PAGScene();
 
-  // Intended dispatch target for PAGXDocument::notifyChange; wiring is not yet implemented.
+  // Dispatch target for PAGXDocument::notifyChange. Refreshes the runtime tree in place for edits to
+  // this document's own nodes; rebuilds the whole tree when the edit comes from an embedded external
+  // document (its nodes are not owned by this scene's document).
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
+
+  // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
+  // tree first. Used at creation and when an embedded external document changes (an external
+  // composition is built into the tree once and cannot be patched in place).
+  void buildRuntimeTree();
 
   RuntimeBinding* mutableBinding();
 
