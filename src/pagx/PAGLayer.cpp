@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGLayer.h"
+#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/nodes/Layer.h"
 #include "renderer/LayerBuilder.h"
@@ -97,12 +98,14 @@ Rect PAGLayer::getBounds() const {
 
 void PAGLayer::advance(int64_t deltaMicroseconds) {
   for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
     child->advance(deltaMicroseconds);
   }
 }
 
 void PAGLayer::apply(float mix) {
   for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
     child->apply(mix);
   }
 }

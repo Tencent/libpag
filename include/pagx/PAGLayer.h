@@ -108,9 +108,21 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
    */
   virtual void apply(float mix = 1.0f);
 
-  const Layer* node = nullptr;
-  std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
-  std::vector<std::shared_ptr<PAGLayer>> children = {};
+  /**
+   * Returns the source Layer node associated with this runtime layer, or nullptr for the root
+   * composition.
+   */
+  const Layer* getNode() const {
+    return node;
+  }
+
+  /**
+   * Returns the runtime children of this layer. PAGComposition children are PAGComposition
+   * instances; plain PAGLayer children are the layers nested under this container.
+   */
+  const std::vector<std::shared_ptr<PAGLayer>>& getChildren() const {
+    return children;
+  }
 
  protected:
   // Constructs a runtime layer node for the given source Layer node, the runtime tgfx layer it maps
@@ -120,11 +132,16 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
            const std::shared_ptr<PAGScene>& scene);
 
+  const Layer* node = nullptr;
+  std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
+  std::vector<std::shared_ptr<PAGLayer>> children = {};
+
   /**
    * Traverses the runtime layer subtree and calls visitor for every PAGComposition node found.
-   * PAGComposition overrides this to include itself after its children. Used by composition-level
-   * operations that must reach every composition in the tree, including those nested under plain
-   * PAGLayer containers.
+   * Visits descendants only and does NOT invoke the visitor on this node itself (even if this is
+   * a PAGComposition). PAGComposition overrides this to include itself — after visiting all of
+   * its descendants, it calls visitor(this). This ensures every composition in the tree is visited
+   * exactly once, including the node on which the traversal is started.
    */
   virtual void forEachComposition(void (*visitor)(PAGComposition*));
 

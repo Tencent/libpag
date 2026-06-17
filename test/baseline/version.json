@@ -8576,6 +8576,8 @@
         "NoiseFilterModes": "798f40c4",
         "NoiseStyleBlendModeOnImage": "126228e0",
         "NoiseStyleModes": "1af07597",
+        "NotifyChangeDocumentSize_after": "17af0e63",
+        "NotifyChangeDocumentSize_before": "516fb7fa",
         "PrecomposedTextRender": "9b6dea6a",
         "ResetTimelinesInNestedContainer_after": "b0636c3e",
         "ResetTimelinesInNestedContainer_before": "b0636c3e",

@@ -10098,4 +10098,676 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ResetTimelinesInNestedContainer_after"));
 }
 
+/**
+ * Test case: external composition loaded under a plain container, then editing a child document
+ * node and notifying the child document syncs the edit to the parent scene through the container
+ * nesting. Verifies that PAGLayer children (introduced for plain-container nesting) don't break
+ * the external-composition reverse-registration path.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXContainerNotify) {
+  std::string mainXML =
+      "<pagx width=\"200\" height=\"200\">\n"
+      "  <Layer id=\"container\" width=\"200\" height=\"200\">\n"
+      "    <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  std::string childXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"childLayer\" name=\"childLayer\" width=\"50\" height=\"50\">\n"
+      "    <Rectangle width=\"50\" height=\"50\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#FF0000\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"fade\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"childLayer\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+
+  // Verify the scene built correctly (slot nested under container).
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->layerType(), pagx::LayerType::Layer);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children[0]->layerType(), pagx::LayerType::Composition);
+
+  // Edit a node in the child document; notify through the child document.
+  childLayerNode->alpha = 0.25f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  // Verify the parent scene reflects the change via hit-test position.
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "childLayer");
+}
+
+/**
+ * Test case: load external composition, create scene, then edit the slot layer on the parent
+ * document and notify the parent. Verifies the parent doc's notifyChange correctly rebuilds a
+ * slot that lives under a plain container.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXLoadNotifySlot) {
+  std::string mainXML =
+      "<pagx width=\"200\" height=\"200\">\n"
+      "  <Layer id=\"container\" width=\"200\" height=\"200\">\n"
+      "    <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  std::string childXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"childLayer\" name=\"childLayer\" width=\"50\" height=\"50\">\n"
+      "    <Rectangle width=\"50\" height=\"50\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#FF0000\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Hit-test before edit: childLayer covers (0,0)-(50,50) inside the 200x200 scene.
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "childLayer");
+
+  // Edit the slot layer and notify the parent document.
+  slotLayer->width = 80;
+  slotLayer->height = 80;
+  doc->notifyChange({slotLayer}, /*layoutChanged=*/true);
+
+  // Verify the scene still has the expected structure after the edit.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children[0]->layerType(), pagx::LayerType::Composition);
+
+  // After edit and layout, the composition content is still hittable under the container.
+  hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "childLayer");
+}
+
+/**
+ * Test case: passing a content node (SolidColor) directly to notifyChange resolves it to its
+ * owning Layer and refreshes the scene in place.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeContentNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Change the SolidColor's value and notify with the SolidColor node directly.
+  solid->color = {0, 1, 0, 1};
+  doc->notifyChange({solid}, /*layoutChanged=*/false);
+
+  // The scene should still have the correct structure — the SolidColor was resolved to
+  // its owning Layer and refreshed.
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+}
+
+/**
+ * Test case: dirtying a content node in an external composition and notifying the child document
+ * triggers the foreign-node full-rebuild path in the parent scene.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXContentNodeNotify) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  std::string childXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"childLayer\" name=\"childLayer\" width=\"50\" height=\"50\">\n"
+      "    <Rectangle width=\"50\" height=\"50\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor id=\"solid\" color=\"#FF0000\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* solid = childDoc->findNode<pagx::SolidColor>("solid");
+  ASSERT_TRUE(solid != nullptr);
+
+  // Edit a content node in the child document and notify the child document.
+  solid->color = {0, 1, 0, 1};
+  childDoc->notifyChange({solid}, /*layoutChanged=*/false);
+
+  // The parent scene should have rebuilt from the foreign-node change.
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "childLayer");
+}
+
+/**
+ * Test case: passing a ColorStop directly to notifyChange resolves it through the
+ * Fill → Gradient → ColorStop chain and refreshes the owning Layer.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeColorStop) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto gradient = doc->makeNode<pagx::LinearGradient>();
+  auto stop = doc->makeNode<pagx::ColorStop>();
+  stop->offset = 0;
+  stop->color = {1, 0, 0, 1};
+  gradient->colorStops = {stop};
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Edit the ColorStop directly and notify.
+  stop->color = {0, 1, 0, 1};
+  doc->notifyChange({stop}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+}
+
+/**
+ * Test case: passing an Image node (through ImagePattern.image) directly to notifyChange
+ * resolves it through Fill → ImagePattern → Image and refreshes the owning Layer.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeImageNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto image = doc->makeNode<pagx::Image>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Edit the Image node and pass it directly to notifyChange.
+  image->filePath = "updated.png";
+  doc->notifyChange({image}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+}
+
+/**
+ * Test case: passing a nested element inside a Group resolves through Group.elements
+ * and refreshes the owning Layer.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeGroupElement) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto group = doc->makeNode<pagx::Group>();
+  auto rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Edit the nested Rectangle and pass it directly to notifyChange.
+  rect->size.width = 80;
+  doc->notifyChange({rect}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+}
+
+/**
+ * Test case: passing a LayerFilter directly to notifyChange resolves it through
+ * Layer.filters and refreshes the owning Layer.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeFilter) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  auto blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 5;
+  blur->blurY = 5;
+  layer->contents = {rect, fill};
+  layer->filters = {blur};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Edit the filter and pass it directly to notifyChange.
+  blur->blurX = 10;
+  doc->notifyChange({blur}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+}
+
+/**
+ * Test case: a content node not owned by any Layer (orphan) is silently dropped
+ * by notifyChange — no crash, just a no-op.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeOrphanNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+
+  // Create an orphan node not attached to any Layer tree.
+  auto orphan = doc->makeNode<pagx::SolidColor>();
+  orphan->color = {0, 1, 0, 1};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Notify with the orphan — should not crash, just silently drop it.
+  doc->notifyChange({orphan}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+}
+
+/**
+ * Test case: a shared_ptr to a child inside a plain container stays valid after the container
+ * is marked dirty and notifyChange does an incremental sync (handle preservation).
+ */
+PAGX_TEST(PAGXTest, NotifyChangePreserveContainerChildHandle) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto container = doc->makeNode<pagx::Layer>("container");
+  container->width = 200;
+  container->height = 200;
+  auto leaf = doc->makeNode<pagx::Layer>("leaf");
+  leaf->name = "Leaf";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  leaf->contents = {rect, fill};
+  container->children = {leaf};
+  doc->layers = {container};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Capture a handle to the leaf before notifyChange.
+  auto& containerChild = scene->rootComposition()->children[0];
+  ASSERT_EQ(containerChild->layerType(), pagx::LayerType::Layer);
+  auto handle = containerChild->children[0];
+  ASSERT_TRUE(handle != nullptr);
+  ASSERT_EQ(handle->name(), "Leaf");
+
+  // Edit the container (add a new child at a different position) and notify.
+  auto newLeaf = doc->makeNode<pagx::Layer>("newLeaf");
+  newLeaf->name = "NewLeaf";
+  newLeaf->width = 50;
+  newLeaf->height = 50;
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->position = {100, 0};
+  rect2->size.width = 50;
+  rect2->size.height = 50;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = solid;
+  newLeaf->contents = {rect2, fill2};
+  container->children.push_back(newLeaf);
+  doc->notifyChange({container}, /*layoutChanged=*/true);
+
+  // The old handle must still point to the same instance and be hit-testable.
+  ASSERT_EQ(handle->name(), "Leaf");
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+}
+
+/**
+ * Test case: animation timeline drives correctly when the composition slot is nested under a
+ * plain container. advance/apply propagates through the container's children.
+ */
+PAGX_TEST(PAGXTest, CompositionTimelineThroughContainer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto container = doc->makeNode<pagx::Layer>("container");
+  container->width = 200;
+  container->height = 200;
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 100;
+  slot->height = 100;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  container->children.push_back(slot);
+  doc->layers.push_back(container);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->layerType(), pagx::LayerType::Layer);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children[0]->layerType(), pagx::LayerType::Composition);
+
+  // Advance through the container: linear 0→1 over 60 frames. Just verify it doesn't crash
+  // and the tree stays intact.
+  scene->advanceAndApply(500'000);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+  ASSERT_EQ(rootChildren[0]->children[0]->layerType(), pagx::LayerType::Composition);
+
+  // Advance to end.
+  scene->advanceAndApply(500'000);
+  ASSERT_EQ(rootChildren[0]->children.size(), 1u);
+}
+
+/**
+ * Test case: changing PAGXDocument::width and notifying the document itself triggers a full
+ * rebuild, reflecting the new size in runtime layers.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeDocumentSize) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_FLOAT_EQ(scene->width(), 200);
+  EXPECT_FLOAT_EQ(scene->height(), 200);
+
+  // Resize the document and notify the document node.
+  doc->width = 300;
+  doc->height = 300;
+  doc->notifyChange({doc.get()}, /*layoutChanged=*/true);
+
+  EXPECT_FLOAT_EQ(scene->width(), 300);
+  EXPECT_FLOAT_EQ(scene->height(), 300);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+}
+
+/**
+ * Test case: after changing document size and notifying the document node, layers with constraint
+ * layout (bottom/right anchored) re-layout to new positions relative to the new canvas size.
+ * Baseline snapshots are taken before and after the resize for visual verification.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  // Top-level layer anchored to document canvas via bottom/right constraints.
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 100;
+  child->height = 60;
+  child->bottom = 25;
+  child->right = 50;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 60;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  child->contents = {rect, fill};
+  doc->layers = {child};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Bottom=25 on 300-high canvas → y = 300 - 60 - 25 = 215.
+  // Right=50 on 400-wide canvas → x = 400 - 100 - 50 = 250.
+  auto handle = scene->rootComposition()->children[0];
+  auto bounds = scene->getGlobalBounds(handle);
+  EXPECT_NEAR(bounds.x, 250, 1.0e-3f);
+  EXPECT_NEAR(bounds.y, 215, 1.0e-3f);
+
+  // Snapshot before resize: red rect at (250, 215) on 400×300 canvas.
+  auto surface = pagx::PAGSurface::MakeOffscreen(400, 300);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_before"));
+
+  // Resize document to 600×500 and notify.
+  doc->width = 600;
+  doc->height = 500;
+  doc->notifyChange({doc.get()}, /*layoutChanged=*/true);
+
+  // After rebuild: y = 500 - 60 - 25 = 415, x = 600 - 100 - 50 = 450.
+  handle = scene->rootComposition()->children[0];
+  bounds = scene->getGlobalBounds(handle);
+  EXPECT_NEAR(bounds.x, 450, 1.0e-3f);
+  EXPECT_NEAR(bounds.y, 415, 1.0e-3f);
+
+  // Snapshot after resize: red rect at (450, 415) on 600×500 canvas.
+  surface = pagx::PAGSurface::MakeOffscreen(600, 500);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_after"));
+}
+
+/**
+ * Test case: a top-level plain layer gains contents via notifyChange. The layer is promoted
+ * to a VectorLayer, runtimeLayer is synced via binding. Verifies promotion end-to-end.
+ */
+PAGX_TEST(PAGXTest, NotifyChangePromoteTopLevelPlainLayer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->name = "TopLeaf";
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers = {layer};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto* binding = scene->mutableBinding();
+  auto built = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(built != nullptr);
+  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  auto promoted = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(promoted != nullptr);
+  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
+
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "TopLeaf");
+}
+
+/**
+ * Test case: a plain layer inside a container gains contents via notifyChange. The container
+ * itself is not dirty, so runtimeLayer sync must reach through plain container nesting.
+ */
+PAGX_TEST(PAGXTest, NotifyChangePromotePlainLayerInContainer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto container = doc->makeNode<pagx::Layer>("container");
+  container->width = 200;
+  container->height = 200;
+  auto leaf = doc->makeNode<pagx::Layer>("leaf");
+  leaf->name = "Leaf";
+  leaf->width = 100;
+  leaf->height = 100;
+  container->children = {leaf};
+  doc->layers = {container};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto* binding = scene->mutableBinding();
+  auto built = binding->get<tgfx::Layer>(leaf);
+  ASSERT_TRUE(built != nullptr);
+  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  leaf->contents = {rect, fill};
+  doc->notifyChange({leaf}, /*layoutChanged=*/true);
+
+  auto promoted = binding->get<tgfx::Layer>(leaf);
+  ASSERT_TRUE(promoted != nullptr);
+  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+}
+
+/**
+ * Test case: deeply nested plain leaf gains contents.
+ * Promotion sync reaches through nested plain container recursion.
+ */
+PAGX_TEST(PAGXTest, NotifyChangePromoteDeeplyNestedPlainLayer) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto container = doc->makeNode<pagx::Layer>("container");
+  container->width = 200;
+  container->height = 200;
+  auto childContainer = doc->makeNode<pagx::Layer>("childContainer");
+  childContainer->width = 200;
+  childContainer->height = 200;
+  auto leaf = doc->makeNode<pagx::Layer>("leaf");
+  leaf->name = "DeepLeaf";
+  leaf->width = 100;
+  leaf->height = 100;
+  childContainer->children = {leaf};
+  container->children = {childContainer};
+  doc->layers = {container};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto* binding = scene->mutableBinding();
+  auto built = binding->get<tgfx::Layer>(leaf);
+  ASSERT_TRUE(built != nullptr);
+  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  leaf->contents = {rect, fill};
+  doc->notifyChange({leaf}, /*layoutChanged=*/true);
+
+  auto promoted = binding->get<tgfx::Layer>(leaf);
+  ASSERT_TRUE(promoted != nullptr);
+  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "DeepLeaf");
+}
+
 }  // namespace pag

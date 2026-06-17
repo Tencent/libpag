@@ -251,6 +251,15 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
   // this scene embeds. A child document dispatches to this scene through its own notifyChange; in
   // that case the nodes are not owned here, and an external composition is built into the runtime
   // tree once, so it cannot be patched in place — rebuild the whole runtime tree from the document.
+  //
+  // The document node itself (NodeType::Document) triggers a full rebuild so changes to
+  // PAGXDocument::width/height are reflected in the root runtime layer.
+  for (auto* node : dirtyNodes) {
+    if (node != nullptr && node->nodeType() == NodeType::Document) {
+      buildRuntimeTree();
+      return;
+    }
+  }
   bool foreign = false;
   for (auto* node : dirtyNodes) {
     if (node != nullptr && (document == nullptr || !document->ownsNode(node))) {
