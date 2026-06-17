@@ -113,34 +113,25 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
   }
 }
 
-void PAGComposition::resetTimelines() {
+void PAGComposition::spawnTimelinesFromScene() {
   auto scene = rootScene.lock();
   if (scene != nullptr) {
     spawnTimelines(scene);
   }
-  for (auto& child : children) {
-    if (child == nullptr) {
-      continue;
-    }
-    if (child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->resetTimelines();
-    } else if (!child->children.empty()) {
-      resetTimelinesInDescendants(child.get());
-    }
-  }
 }
 
-void PAGComposition::resetTimelinesInDescendants(PAGLayer* layer) {
-  for (auto& child : layer->children) {
-    if (child == nullptr) {
-      continue;
-    }
-    if (child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->resetTimelines();
-    } else if (!child->children.empty()) {
-      resetTimelinesInDescendants(child.get());
-    }
-  }
+static void ResetCompositionTimelines(PAGComposition* comp, void*) {
+  comp->spawnTimelinesFromScene();
+}
+
+void PAGComposition::resetTimelines() {
+  spawnTimelinesFromScene();
+  forEachComposition(ResetCompositionTimelines, nullptr);
+}
+
+void PAGComposition::forEachComposition(CompositionVisitor visitor, void* context) {
+  PAGLayer::forEachComposition(visitor, context);
+  visitor(this, context);
 }
 
 void PAGComposition::buildChildren(const std::vector<Layer*>& layers,

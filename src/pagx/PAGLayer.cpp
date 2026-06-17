@@ -107,4 +107,12 @@ void PAGLayer::apply(float mix) {
   }
 }
 
+void PAGLayer::forEachComposition(CompositionVisitor visitor, void* context) {
+  for (auto& child : children) {
+    if (child != nullptr) {
+      child->forEachComposition(visitor, context);
+    }
+  }
+}
+
 }  // namespace pagx

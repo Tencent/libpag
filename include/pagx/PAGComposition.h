@@ -109,13 +109,15 @@ class PAGComposition : public PAGLayer {
   // when a timeline node changes. The root composition has no owner layer and spawns no timelines.
   void spawnTimelines(const std::shared_ptr<PAGScene>& scene);
 
+  // Spawns timelines for this composition using its own scene reference. Internal helper.
+  void spawnTimelinesFromScene();
+
   // Resets the timelines of this composition and all descendant compositions. Called when an edit
   // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
 
-  // Recursively resets timelines of PAGComposition nodes found in the descendant tree of a plain
-  // PAGLayer container. Called by resetTimelines.
-  void resetTimelinesInDescendants(PAGLayer* layer);
+  // Override to include this PAGComposition node itself in the traversal after visiting children.
+  void forEachComposition(CompositionVisitor visitor, void* context) override;
 
   // Rebuilds children of a plain PAGLayer container whose source node is dirty, and recurses into
   // its descendant plain containers. Called by refreshNodes.

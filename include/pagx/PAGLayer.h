@@ -32,7 +32,14 @@ class Layer;
 namespace pagx {
 
 class Layer;
+class PAGComposition;
 class PAGScene;
+
+/**
+ * Callback type for PAGLayer::forEachComposition. Receives each PAGComposition found in the
+ * subtree and an opaque context pointer for caller-specific data.
+ */
+using CompositionVisitor = void (*)(PAGComposition*, void* context);
 
 /**
  * Identifies the concrete runtime type of a PAGLayer in the runtime layer hierarchy, so callers can
@@ -118,6 +125,14 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   // has no owning source layer). Created by the PAGComposition/PAGScene factories.
   PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
            const std::shared_ptr<PAGScene>& scene);
+
+  /**
+   * Traverses the runtime layer subtree and calls visitor for every PAGComposition node found.
+   * PAGComposition overrides this to include itself after its children. Used by composition-level
+   * operations that must reach every composition in the tree, including those nested under plain
+   * PAGLayer containers.
+   */
+  virtual void forEachComposition(CompositionVisitor visitor, void* context);
 
   std::weak_ptr<PAGScene> rootScene = {};
 
