@@ -222,38 +222,8 @@ if (PAG_BUILD_PAGX)
     endif ()
 
     if (PAG_BUILD_HTML)
-        list(APPEND PAG_FILES
-            src/pagx/html/importer/HTMLBoxAttributes.h
-            src/pagx/html/importer/HTMLDetail.cpp
-            src/pagx/html/importer/HTMLDetail.h
-            src/pagx/html/importer/HTMLDiagnosticSink.cpp
-            src/pagx/html/importer/HTMLDiagnosticSink.h
-            src/pagx/html/importer/HTMLElementEmitter.cpp
-            src/pagx/html/importer/HTMLIdAllocator.cpp
-            src/pagx/html/importer/HTMLIdAllocator.h
-            src/pagx/html/importer/HTMLImageResources.cpp
-            src/pagx/html/importer/HTMLImageResources.h
-            src/pagx/html/importer/HTMLImporter.cpp
-            src/pagx/html/importer/HTMLInlineSvgEmitter.cpp
-            src/pagx/html/importer/HTMLInlineSvgEmitter.h
-            src/pagx/html/importer/HTMLStyleCascade.cpp
-            src/pagx/html/importer/HTMLStyleCascade.h
-            src/pagx/html/importer/HTMLLayerBuilder.cpp
-            src/pagx/html/importer/HTMLLayerBuilder.h
-            src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
-            src/pagx/html/importer/HTMLTextFragmentBuilder.h
-            src/pagx/html/importer/HTMLValueParser.cpp
-            src/pagx/html/importer/HTMLValueParser.h
-            src/pagx/html/importer/HTMLParserContext.cpp
-            src/pagx/html/importer/HTMLParserContext.h
-            src/pagx/html/importer/HTMLSubsetTransformer.cpp
-            src/pagx/html/importer/HTMLTransformPasses.cpp
-            src/pagx/html/importer/HTMLTransformPasses.h
-            src/pagx/html/importer/HTMLTransformContext.h
-            src/pagx/html/importer/HTMLCssCascade.cpp
-            src/pagx/html/importer/HTMLCssCascade.h
-            src/pagx/html/importer/HTMLSubsetPropertyTable.cpp
-            src/pagx/html/importer/HTMLSubsetPropertyTable.h)
+        file(GLOB_RECURSE HTML_IMPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/importer/*.*)
+        list(APPEND PAG_FILES ${HTML_IMPORTER_SOURCES})
     endif ()
 
     if (PAG_BUILD_PPT)
