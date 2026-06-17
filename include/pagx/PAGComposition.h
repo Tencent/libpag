@@ -73,6 +73,11 @@ class PAGComposition : public PAGLayer {
   void buildChildren(const std::vector<Layer*>& layers,
                      std::unordered_set<const Composition*>& visited);
 
+  // Creates a leaf PAGLayer node. Internal factory used by BuildChildren.
+  static std::shared_ptr<PAGLayer> MakeChildLayer(const Layer* node,
+                                                  const std::shared_ptr<tgfx::Layer>& runtimeLayer,
+                                                  const std::shared_ptr<PAGScene>& scene);
+
  private:
   // Builds the persistent per-layer runtime node tree into outChildren. Internal static helper used
   // by buildChildren, MakeChild and refreshNodes.
@@ -122,19 +127,7 @@ class PAGComposition : public PAGLayer {
   // its descendant plain containers. Called by refreshNodes.
   void refreshPlainContainerChildren(PAGLayer* container,
                                      const std::vector<Node*>& dirtyNodes,
-                                     std::unordered_set<const Composition*>& visited,
-                                     const std::unordered_set<const Node*>& dirtySet);
-
-  // Syncs runtimeLayer and layerRegistry for plain children whose tgfx instance may have been
-  // promoted by RefreshLayerInPlace. Called by refreshNodes after dirty leaf layers are refreshed.
-  void syncPromotedLayers();
-
-  // Builds a new runtime PAGLayer or PAGComposition for the given source layer, attaching its
-  // tgfx subtree into the parent binding's slots. Shared by syncChildren and
-  // refreshPlainContainerChildren so the construction logic stays in one place.
-  static std::shared_ptr<PAGLayer> BuildChildLayer(
-      const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
-      std::unordered_set<const Composition*>& visited);
+                                     std::unordered_set<const Composition*>& visited);
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
