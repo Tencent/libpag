@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pag {

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include <memory>
 #include <utility>
 #include <vector>

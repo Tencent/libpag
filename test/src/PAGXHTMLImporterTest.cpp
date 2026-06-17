@@ -25,7 +25,7 @@
 #include "base/PAGTest.h"
 #include "cli/CommandVerify.h"
 #include "pagx/HTMLImporter.h"
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"

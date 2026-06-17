@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"

@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
