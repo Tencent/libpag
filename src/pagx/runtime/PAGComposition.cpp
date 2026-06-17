@@ -119,8 +119,26 @@ void PAGComposition::resetTimelines() {
     spawnTimelines(scene);
   }
   for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() != LayerType::Layer) {
       static_cast<PAGComposition*>(child.get())->resetTimelines();
+    } else if (!child->children.empty()) {
+      resetTimelinesInDescendants(child.get());
+    }
+  }
+}
+
+void PAGComposition::resetTimelinesInDescendants(PAGLayer* layer) {
+  for (auto& child : layer->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->resetTimelines();
+    } else if (!child->children.empty()) {
+      resetTimelinesInDescendants(child.get());
     }
   }
 }
@@ -224,17 +242,6 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
   for (auto& child : children) {
     if (child != nullptr && child->layerType() != LayerType::Layer) {
       auto* childComposition = static_cast<PAGComposition*>(child.get());
-      // If this is a pure-container (no composition reference) whose source node is dirty, rebuild
-      // its children list so added/removed nested children are reflected.
-      if (childComposition->node != nullptr && childComposition->node->composition == nullptr &&
-          dirtySet.find(childComposition->node) != dirtySet.end()) {
-        childComposition->children.clear();
-        auto scene = rootScene.lock();
-        if (scene != nullptr) {
-          BuildChildren(binding.get(), childComposition->node->children, childComposition->children,
-                        scene, visited);
-        }
-      }
       const Composition* childSource =
           childComposition->node != nullptr ? childComposition->node->composition : nullptr;
       bool inserted = false;

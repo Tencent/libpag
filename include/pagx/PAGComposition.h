@@ -113,6 +113,10 @@ class PAGComposition : public PAGLayer {
   // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
 
+  // Recursively resets timelines of PAGComposition nodes found in the descendant tree of a plain
+  // PAGLayer container. Called by resetTimelines.
+  void resetTimelinesInDescendants(PAGLayer* layer);
+
   // Rebuilds children of a plain PAGLayer container whose source node is dirty, and recurses into
   // its descendant plain containers. Called by refreshNodes.
   void refreshPlainContainerChildren(PAGLayer* container,
