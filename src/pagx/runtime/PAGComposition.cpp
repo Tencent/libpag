@@ -170,9 +170,6 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
       }
       outChildren.push_back(std::move(childComposition));
     } else {
-      if (scene == nullptr) {
-        continue;
-      }
       auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
       if (!layer->children.empty()) {
         BuildChildren(binding, layer->children, child->children, scene, visited);
