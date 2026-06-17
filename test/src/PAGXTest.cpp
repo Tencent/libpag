@@ -7268,18 +7268,35 @@ PAGX_TEST(PAGXTest, LoadFileDataExternalCompositionAfterSceneCreation) {
   ASSERT_TRUE(slotLayer->externalDoc != nullptr);
   ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
 
-  auto* externalChild = slotLayer->externalDoc->findNode<pagx::Layer>("childLayer");
-  ASSERT_TRUE(externalChild != nullptr);
+  // Composition child appears in runtime tree after loadFileData triggered notifyChange.
+  auto& slotChildren = scene->rootComposition()->children[0]->children;
+  ASSERT_FALSE(slotChildren.empty());
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
 }
 
 /**
  * Test case: loading image data via loadFileData AFTER PAGScene::Make() sets the Image node data
- * and notifies existing scenes without crashing. The node-level state is updated correctly.
+ * and notifies existing scenes without crashing. Verifies both node-level state and scene integrity.
  */
 PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 50;
+  layer->height = 50;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto pattern = doc->makeNode<pagx::ImagePattern>();
   auto img = doc->makeNode<pagx::Image>("img");
   img->filePath = "test.png";
+  pattern->image = img;
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers = {layer};
+  doc->applyLayout();
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -7294,6 +7311,9 @@ PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   EXPECT_TRUE(img->filePath.empty());
   ASSERT_TRUE(img->data != nullptr);
   EXPECT_EQ(img->data->size(), sizeof(bytes));
+
+  // Scene structure intact after notifyChange triggered by loadFileData.
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
 }
 
 /**

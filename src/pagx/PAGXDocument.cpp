@@ -110,7 +110,8 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
 static bool LoadFileDataInChain(
     PAGXDocument* root, PAGXDocument* document, const std::string& filePath,
     std::shared_ptr<Data> data, std::unordered_set<std::string>& chain,
-    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes) {
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes,
+    bool& needsLayout) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -133,7 +134,7 @@ static bool LoadFileDataInChain(
     bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
     if (loadedComposition) {
       docDirtyNodes[document].push_back(layer);
-      docDirtyNodes[document].push_back(layer->composition);
+      needsLayout = true;
       found = true;
     }
     if (!loadedComposition && layer->externalDoc != nullptr) {
@@ -143,7 +144,7 @@ static bool LoadFileDataInChain(
       // an ancestor's marker. insert().second is true exactly when this frame added the path.
       bool inserted = chain.insert(layer->compositionFilePath).second;
       found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain,
-                                  docDirtyNodes) ||
+                                  docDirtyNodes, needsLayout) ||
               found;
       if (inserted) {
         chain.erase(layer->compositionFilePath);
@@ -295,16 +296,11 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   }
   std::unordered_set<std::string> chain = {};
   std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
-  bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes);
+  bool needsLayout = false;
+  bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes,
+                                   needsLayout);
   if (found) {
     for (auto& entry : docDirtyNodes) {
-      bool needsLayout = false;
-      for (auto* node : entry.second) {
-        if (node->nodeType() != NodeType::Image) {
-          needsLayout = true;
-          break;
-        }
-      }
       entry.first->notifyChange(entry.second, needsLayout);
     }
   }
