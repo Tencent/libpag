@@ -780,8 +780,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
       // Emit base class.
       auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
       classRules.push_back({baseName, BuildDeclarationsString(classification.sharedProps),
-                            /*isPaired=*/true,
-                            /*isRoot=*/false});
+                            true,
+                            false});
 
       // Emit modifier classes (dedup by varying-value key within this group).
       std::unordered_map<std::string, std::string> varyingKeyToModifierName;
@@ -815,7 +815,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
           }
           modName = prefix + std::to_string(prefixCounters[prefix]++);
           classRules.push_back({modName, BuildDeclarationsString(varyingProps),
-                                /*isPaired=*/true, /*isRoot=*/false});
+                                true, false});
           varyingKeyToModifierName[varyingKey] = modName;
         }
         tagClassNames[entry.tagIndex] = {baseName, modName};
@@ -842,7 +842,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
           // dedup key (styleToClassName) continues to use decodedStyle: two tags with the
           // same source style trivially map to the same sorted output, so the cache works.
           classRules.push_back({className, BuildDeclarationsString(entry.properties),
-                                /*isPaired=*/false, /*isRoot=*/(prefix == "root")});
+                                false, (prefix == "root")});
           styleToClassName[entry.decodedStyle] = className;
           tagClassNames[entry.tagIndex] = {className};
         }
