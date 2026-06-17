@@ -65,7 +65,7 @@ class PPTWriterContext {
   }
 
   std::string addRawImage(std::shared_ptr<tgfx::Data> pngData) {
-    return registerImage(nullptr, std::move(pngData), /*jpeg=*/false);
+    return registerImage(nullptr, std::move(pngData), false);
   }
 
   const std::vector<ImageEntry>& images() const {

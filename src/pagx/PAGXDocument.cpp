@@ -299,7 +299,7 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes);
   if (found) {
     for (auto& entry : docDirtyNodes) {
-      entry.first->notifyChange(entry.second, /*layoutChanged=*/true);
+      entry.first->notifyChange(entry.second, true);
     }
   }
   return found;
