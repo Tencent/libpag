@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time environment setup / health check for the html-to-pagx skill.
+# One-time environment setup / health check for the pagx skill's HTML→PAGX workflow.
 #
 # Verifies the two tools the conversion needs and prepares the snapshot tool:
 #   1. node      — required to run the snapshot pipeline
