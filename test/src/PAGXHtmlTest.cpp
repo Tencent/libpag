@@ -279,6 +279,36 @@ CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
   EXPECT_EQ(html.find(") url(#filter"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, ParentDropShadowWithShadowedChildAvoidsWrapperFilter) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="240" height="200">
+  <Layer id="parent" width="180" height="140" matrix="1,0,0,1,30,30">
+    <Rectangle position="90,70" size="180,140" roundness="12"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetY="5" blurX="10" blurY="10" color="#0000001A" showBehindLayer="false"/>
+    <Layer id="child" width="80" height="50" matrix="1,0,0,1,50,70">
+      <Rectangle position="40,25" size="80,50" roundness="8"/>
+      <Fill color="#1E1E1E"/>
+      <DropShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000033" showBehindLayer="false"/>
+    </Layer>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"parent\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_EQ(tag.find("filter:"), std::string::npos);
+  EXPECT_NE(html.find("box-shadow:0 5px 10px rgba(0,0,0,0.102)"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_nesting.pagx"));
   ASSERT_FALSE(html.empty());
