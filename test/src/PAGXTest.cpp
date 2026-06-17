@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <unordered_map>
 #include "cli/CommandResolve.h"
@@ -192,6 +193,41 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
     file.write(xml.data(), static_cast<std::streamsize>(xml.size()));
   }
   return outPath;
+}
+
+static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) {
+  if (scene == nullptr || scene->rootComposition() == nullptr) {
+    return;
+  }
+  auto binding = scene->mutableBinding();
+  if (binding == nullptr) {
+    return;
+  }
+  std::function<void(const std::shared_ptr<pagx::PAGLayer>&)> verifyLayer;
+  verifyLayer = [&](const std::shared_ptr<pagx::PAGLayer>& layer) {
+    if (layer == nullptr) {
+      return;
+    }
+    auto* node = layer->getNode();
+    if (node != nullptr) {
+      auto bound = binding->get<tgfx::Layer>(node);
+      EXPECT_EQ(bound.get(), layer->runtimeLayer.get())
+          << "binding mismatch: promotion sync may not have run for this layer";
+    }
+    if (layer->runtimeLayer != nullptr) {
+      auto it = scene->layerRegistry.find(layer->runtimeLayer.get());
+      EXPECT_NE(it, scene->layerRegistry.end())
+          << "layerRegistry missing entry: hit-test will miss this layer";
+      if (it != scene->layerRegistry.end()) {
+        EXPECT_EQ(it->second, layer.get())
+            << "layerRegistry maps to wrong PAGLayer: hit-test returns incorrect layer";
+      }
+    }
+    for (auto& child : layer->getChildren()) {
+      verifyLayer(child);
+    }
+  };
+  verifyLayer(scene->rootComposition());
 }
 
 /**
@@ -8558,10 +8594,12 @@ PAGX_TEST(PAGXTest, NotifyChangeEmptyLayerGainsContents) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto* binding = scene->mutableBinding();
-  // Built with empty contents: the live layer is a plain tgfx::Layer, not a VectorLayer.
+  // All plain layers are built as VectorLayer from the start — they can hold contents
+  // without promotion. Verify the layer is a VectorLayer, content binding works, and the
+  // nested child layer instance survives the refresh.
   auto built = binding->get<tgfx::Layer>(layer);
   ASSERT_TRUE(built != nullptr);
-  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+  EXPECT_EQ(built->type(), tgfx::LayerType::Vector);
   auto childBuilt = binding->get<tgfx::Layer>(child);
   ASSERT_TRUE(childBuilt != nullptr);
 
@@ -10503,6 +10541,7 @@ PAGX_TEST(PAGXTest, NotifyChangePreserveContainerChildHandle) {
   auto hits = scene->getLayersUnderPoint(25, 25);
   ASSERT_FALSE(hits.empty());
   EXPECT_EQ(hits[0]->name(), "Leaf");
+  AssertSceneConsistent(scene);
 }
 
 /**
@@ -10639,135 +10678,6 @@ PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
   ASSERT_TRUE(surface != nullptr);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_after"));
-}
-
-/**
- * Test case: a top-level plain layer gains contents via notifyChange. The layer is promoted
- * to a VectorLayer, runtimeLayer is synced via binding. Verifies promotion end-to-end.
- */
-PAGX_TEST(PAGXTest, NotifyChangePromoteTopLevelPlainLayer) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto layer = doc->makeNode<pagx::Layer>("L");
-  layer->name = "TopLeaf";
-  layer->width = 100;
-  layer->height = 100;
-  doc->layers = {layer};
-
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(scene != nullptr);
-
-  auto* binding = scene->mutableBinding();
-  auto built = binding->get<tgfx::Layer>(layer);
-  ASSERT_TRUE(built != nullptr);
-  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 100;
-  rect->size.height = 100;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>();
-  solid->color = {1, 0, 0, 1};
-  fill->color = solid;
-  layer->contents = {rect, fill};
-  doc->notifyChange({layer}, /*layoutChanged=*/true);
-
-  auto promoted = binding->get<tgfx::Layer>(layer);
-  ASSERT_TRUE(promoted != nullptr);
-  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
-
-  auto hits = scene->getLayersUnderPoint(50, 50);
-  ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->name(), "TopLeaf");
-}
-
-/**
- * Test case: a plain layer inside a container gains contents via notifyChange. The container
- * itself is not dirty, so runtimeLayer sync must reach through plain container nesting.
- */
-PAGX_TEST(PAGXTest, NotifyChangePromotePlainLayerInContainer) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto container = doc->makeNode<pagx::Layer>("container");
-  container->width = 200;
-  container->height = 200;
-  auto leaf = doc->makeNode<pagx::Layer>("leaf");
-  leaf->name = "Leaf";
-  leaf->width = 100;
-  leaf->height = 100;
-  container->children = {leaf};
-  doc->layers = {container};
-
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(scene != nullptr);
-
-  auto* binding = scene->mutableBinding();
-  auto built = binding->get<tgfx::Layer>(leaf);
-  ASSERT_TRUE(built != nullptr);
-  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 100;
-  rect->size.height = 100;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>();
-  solid->color = {1, 0, 0, 1};
-  fill->color = solid;
-  leaf->contents = {rect, fill};
-  doc->notifyChange({leaf}, /*layoutChanged=*/true);
-
-  auto promoted = binding->get<tgfx::Layer>(leaf);
-  ASSERT_TRUE(promoted != nullptr);
-  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
-
-  auto hits = scene->getLayersUnderPoint(25, 25);
-  ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->name(), "Leaf");
-}
-
-/**
- * Test case: deeply nested plain leaf gains contents.
- * Promotion sync reaches through nested plain container recursion.
- */
-PAGX_TEST(PAGXTest, NotifyChangePromoteDeeplyNestedPlainLayer) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto container = doc->makeNode<pagx::Layer>("container");
-  container->width = 200;
-  container->height = 200;
-  auto childContainer = doc->makeNode<pagx::Layer>("childContainer");
-  childContainer->width = 200;
-  childContainer->height = 200;
-  auto leaf = doc->makeNode<pagx::Layer>("leaf");
-  leaf->name = "DeepLeaf";
-  leaf->width = 100;
-  leaf->height = 100;
-  childContainer->children = {leaf};
-  container->children = {childContainer};
-  doc->layers = {container};
-
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(scene != nullptr);
-
-  auto* binding = scene->mutableBinding();
-  auto built = binding->get<tgfx::Layer>(leaf);
-  ASSERT_TRUE(built != nullptr);
-  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
-
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 100;
-  rect->size.height = 100;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto solid = doc->makeNode<pagx::SolidColor>();
-  solid->color = {1, 0, 0, 1};
-  fill->color = solid;
-  leaf->contents = {rect, fill};
-  doc->notifyChange({leaf}, /*layoutChanged=*/true);
-
-  auto promoted = binding->get<tgfx::Layer>(leaf);
-  ASSERT_TRUE(promoted != nullptr);
-  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
-
-  auto hits = scene->getLayersUnderPoint(25, 25);
-  ASSERT_FALSE(hits.empty());
-  EXPECT_EQ(hits[0]->name(), "DeepLeaf");
 }
 
 }  // namespace pag

@@ -190,22 +190,6 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
       }
     }
-    // RefreshLayerInPlace's promoteToVectorLayer already swaps the old tgfx instance with the
-    // new one via parent->replaceChild. Sync runtimeLayer and layerRegistry so the PAGLayer
-    // handle points to the correct instance and hit-test resolves correctly.
-    for (auto& child : children) {
-      if (child != nullptr && child->node != nullptr && child->layerType() == LayerType::Layer) {
-        auto refreshed = binding->get<tgfx::Layer>(child->node);
-        if (refreshed != nullptr && refreshed != child->runtimeLayer) {
-          auto scene = rootScene.lock();
-          if (scene != nullptr) {
-            scene->layerRegistry.erase(child->runtimeLayer.get());
-            scene->layerRegistry[refreshed.get()] = child.get();
-          }
-          child->runtimeLayer = refreshed;
-        }
-      }
-    }
   }
   for (auto& child : children) {
     if (child == nullptr) {
@@ -383,22 +367,6 @@ void PAGComposition::refreshPlainContainerChildren(
             container->runtimeLayer->addChild(slot);
           }
         }
-      }
-    }
-  }
-  // Sync runtimeLayer for plain children that may have been promoted (gained contents →
-  // upgraded to VectorLayer) during RefreshLayerInPlace. Runs regardless of whether the
-  // container itself is dirty, because a child deeper in the tree may have been promoted.
-  for (auto& child : container->children) {
-    if (child != nullptr && child->node != nullptr && child->layerType() == LayerType::Layer) {
-      auto refreshed = binding->get<tgfx::Layer>(child->node);
-      if (refreshed != nullptr && refreshed != child->runtimeLayer) {
-        auto sceneSync = rootScene.lock();
-        if (sceneSync != nullptr) {
-          sceneSync->layerRegistry.erase(child->runtimeLayer.get());
-          sceneSync->layerRegistry[refreshed.get()] = child.get();
-        }
-        child->runtimeLayer = refreshed;
       }
     }
   }
