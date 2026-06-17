@@ -371,7 +371,8 @@ std::vector<std::string> PAGXView::getExternalFilePaths() const {
   return document->getExternalFilePaths();
 }
 
-bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
+bool PAGXView::loadFileData(const val& filePathVal, const val& fileData) {
+  auto filePath = filePathVal.as<std::string>();
   if (!document) {
     return false;
   }
@@ -422,7 +423,8 @@ void PAGXView::recordDecodedImage(const std::string& filePath,
   }
 }
 
-bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val& nativeImage) {
+bool PAGXView::loadFileDataAsNativeImage(const val& filePathVal, const val& nativeImage) {
+  auto filePath = filePathVal.as<std::string>();
   if (!document || filePath.empty() || !nativeImage.as<bool>()) {
     return false;
   }
@@ -445,7 +447,8 @@ bool PAGXView::loadFileDataAsNativeImage(const std::string& filePath, const val&
   return imageNode != nullptr;
 }
 
-bool PAGXView::upgradeImageFromNative(const std::string& filePath, const val& nativeImage) {
+bool PAGXView::upgradeImageFromNative(const val& filePathVal, const val& nativeImage) {
+  auto filePath = filePathVal.as<std::string>();
   if (!document || !builderSession || filePath.empty() || !nativeImage.as<bool>()) {
     return false;
   }
@@ -1127,7 +1130,8 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   return result;
 }
 
-void PAGXView::setImageOriginalSize(const std::string& filePath, float width, float height) {
+void PAGXView::setImageOriginalSize(const val& filePathVal, float width, float height) {
+  auto filePath = filePathVal.as<std::string>();
   if (filePath.empty() || width <= 0.0f || height <= 0.0f) {
     return;
   }

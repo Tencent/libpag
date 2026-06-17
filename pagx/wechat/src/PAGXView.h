@@ -127,7 +127,7 @@ class PAGXView {
    * @param fileData The file content as a JavaScript Uint8Array.
    * @return True if a matching Image node was found and its data was loaded successfully.
    */
-  bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
+  bool loadFileData(const emscripten::val& filePathVal, const emscripten::val& fileData);
 
   /**
    * Attaches an already-decoded native image to Image nodes matching the given file path. The
@@ -146,7 +146,7 @@ class PAGXView {
    * @param nativeImage  A JavaScript-side decoded image object.
    * @return True if at least one matching Image node was found and attached.
    */
-  bool loadFileDataAsNativeImage(const std::string& filePath,
+  bool loadFileDataAsNativeImage(const emscripten::val& filePathVal,
                                  const emscripten::val& nativeImage);
 
   /**
@@ -236,7 +236,7 @@ class PAGXView {
    *                    loadFileDataAsNativeImage).
    * @return True if at least one layer's contents were regenerated as a result of the swap.
    */
-  bool upgradeImageFromNative(const std::string& filePath,
+  bool upgradeImageFromNative(const emscripten::val& filePathVal,
                               const emscripten::val& nativeImage);
 
   /**
@@ -295,7 +295,7 @@ class PAGXView {
    * @param width    Original image width in pixels (> 0).
    * @param height   Original image height in pixels (> 0).
    */
-  void setImageOriginalSize(const std::string& filePath, float width, float height);
+  void setImageOriginalSize(const emscripten::val&  filePathVal, float width, float height);
 
   /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
