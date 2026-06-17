@@ -22,6 +22,9 @@
 #include <utility>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 

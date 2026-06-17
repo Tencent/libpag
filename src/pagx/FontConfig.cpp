@@ -94,6 +94,18 @@ void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
   data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
 }
 
+void FontConfig::merge(const FontConfig& other) {
+  if (this == &other || other.data == nullptr) {
+    return;
+  }
+  for (const auto& entry : other.data->registeredTypefaces) {
+    data->registeredTypefaces[entry.first] = entry.second;
+  }
+  data->fallbackTypefaces.insert(data->fallbackTypefaces.end(),
+                                 other.data->fallbackTypefaces.begin(),
+                                 other.data->fallbackTypefaces.end());
+}
+
 std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   std::vector<std::string> names = {};
   names.reserve(data->fallbackTypefaces.size());

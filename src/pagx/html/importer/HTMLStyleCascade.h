@@ -110,6 +110,12 @@ class HTMLStyleCascade {
 
   // Cached resolved style per DOM node. Each entry merges inline + class + element rules + tag
   // defaults.
+  //
+  // Lifetime: the raw `DOMNode*` keys are valid only for a single Parse cycle. The DOM is owned
+  // by `HTMLParserContext` via `shared_ptr<XMLDOM>` and is not mutated mid-parse, so keys never
+  // dangle within one cycle. If the cascade is ever reused across parses, this cache must be
+  // cleared first; switching to `weak_ptr<DOMNode>` would express the constraint at the cost of
+  // a hash-table indirection.
   std::unordered_map<const DOMNode*, PropertyMap> _resolvedCache = {};
 };
 

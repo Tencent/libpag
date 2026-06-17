@@ -25,6 +25,10 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
 
 namespace pagx {
 

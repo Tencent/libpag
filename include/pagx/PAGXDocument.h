@@ -35,9 +35,10 @@ class LayoutContext;
 class PAGScene;
 
 /**
- * PAGXDocument is the root container for a PAGX document.
- * It contains resources and layers. This is a pure data structure class.
- * Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and
+ * font configuration of a parsed/authored document, and tracks the live PAGScene instances
+ * created from it so post-build edits issued through `notifyChange()` can be broadcast to
+ * each scene. Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
@@ -146,10 +147,6 @@ class PAGXDocument : public Node {
    * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
    * so glyph-level fallback can pick them up at layout time). Callers may also register
    * additional typefaces or fallbacks directly before invoking `applyLayout`.
-   *
-   * Note: `applyLayout(const FontConfig*)` with a non-null argument REPLACES this config
-   * wholesale. Pass `nullptr` (or merge the contents of this config into your own first)
-   * to preserve importer-injected fallback fonts across the layout call.
    */
   FontConfig& fontConfig() {
     return fontConfig_;
@@ -165,11 +162,11 @@ class PAGXDocument : public Node {
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
    * current fields.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
-   *                   REPLACES the internal config (importer-injected fallback fonts on the
-   *                   internal config are discarded — merge them in via `fontConfig()` first
-   *                   if you want them preserved). Pass nullptr to use the previously set
-   *                   config, which is the right choice for HTML-imported documents that
-   *                   want to keep the importer's fallback stack.
+   *                   its typefaces and fallback fonts are MERGED into the internal config —
+   *                   importer-injected fallback fonts (e.g. from the HTML importer) are
+   *                   preserved, and the caller's entries layer on top with caller-supplied
+   *                   registered typefaces winning on key conflicts. Pass nullptr to use the
+   *                   internal config unchanged.
    */
   void applyLayout(const FontConfig* fontConfig = nullptr);
 

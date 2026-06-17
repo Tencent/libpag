@@ -152,7 +152,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     return;
   }
   if (config != nullptr) {
-    fontConfig_ = *config;
+    fontConfig_.merge(*config);
   }
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred

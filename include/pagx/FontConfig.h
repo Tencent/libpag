@@ -68,6 +68,14 @@ class FontConfig {
                        const std::string& fontStyle);
 
   /**
+   * Merges another FontConfig into this one. Registered typefaces from `other` are added with
+   * `other` winning on key conflicts; fallback typefaces from `other` are appended to the
+   * existing fallback chain. Used by `PAGXDocument::applyLayout` so a caller-supplied config
+   * does not silently discard fallback fonts that an importer (e.g. HTML) seeded earlier.
+   */
+  void merge(const FontConfig& other);
+
+  /**
    * Returns the family names of all fallback typefaces in registration order. Primarily
    * intended for diagnostics and tests; callers should not rely on this for font lookup
    * (use `applyLayout` and let `LayoutContext` resolve typefaces internally).

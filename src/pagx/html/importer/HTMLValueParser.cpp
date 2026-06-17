@@ -70,20 +70,31 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   }
   if (value[0] == '#') {
     auto length = value.length();
-    if (length == 4 || length == 5) {
+    if (length == 4 || length == 5 || length == 7 || length == 9) {
       char expanded[9] = {};
       size_t outIdx = 0;
-      for (size_t i = 1; i < length; i++) {
-        expanded[outIdx++] = value[i];
-        expanded[outIdx++] = value[i];
+      if (length == 4 || length == 5) {
+        for (size_t i = 1; i < length; i++) {
+          expanded[outIdx++] = value[i];
+          expanded[outIdx++] = value[i];
+        }
+      } else {
+        for (size_t i = 1; i < length; i++) {
+          expanded[outIdx++] = value[i];
+        }
       }
       expanded[outIdx] = '\0';
-      uint32_t hex = std::strtoul(expanded, nullptr, 16);
-      return HexToColor(hex, /*hasAlpha=*/length == 5);
-    }
-    if (length == 7 || length == 9) {
-      uint32_t hex = std::strtoul(value.c_str() + 1, nullptr, 16);
-      return HexToColor(hex, /*hasAlpha=*/length == 9);
+      // strtoul stops at the first non-hex character and silently returns the prefix value,
+      // so '#ZZZZZZ' would otherwise parse to 0 (opaque black) without any diagnostic.
+      // Validate via endptr that every digit was consumed before trusting the result.
+      char* endPtr = nullptr;
+      uint32_t hex = std::strtoul(expanded, &endPtr, 16);
+      if (endPtr != nullptr && *endPtr == '\0') {
+        bool hasAlpha = (length == 5 || length == 9);
+        return HexToColor(hex, hasAlpha);
+      }
+      _diagnostics.warn("html: malformed hex color '" + value + "'; falling back to opaque black");
+      return {0, 0, 0, 1, ColorSpace::SRGB};
     }
   }
   if (value.compare(0, 3, "rgb") == 0) {

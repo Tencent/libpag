@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLTransformPasses.h"
+// TODO: split this translation unit into per-pass files (DocumentSkeletonPass.cpp,
+// AbsoluteToFlexInferencePass.cpp, BorderRadiusPass.cpp, …) once the surrounding API has
+// stabilised. Tracked separately to avoid expanding this PR further.
 #include <algorithm>
 #include <cctype>
 #include <cmath>

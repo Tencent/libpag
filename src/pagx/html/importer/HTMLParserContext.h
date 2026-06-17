@@ -37,30 +37,14 @@
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BlurFilter.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/nodes/ConicGradient.h"
-#include "pagx/nodes/DropShadowFilter.h"
-#include "pagx/nodes/DropShadowStyle.h"
-#include "pagx/nodes/Ellipse.h"
-#include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/InnerShadowStyle.h"
-#include "pagx/nodes/Layer.h"
-#include "pagx/nodes/LinearGradient.h"
-#include "pagx/nodes/RadialGradient.h"
-#include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextBox.h"
 #include "pagx/types/Color.h"
-#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
+
+class Image;
+class Layer;
+struct DOMNode;
+class XMLDOM;
 
 /**
  * Internal HTML parser implementation. Builds a PAGXDocument from an HTML DOM, applying

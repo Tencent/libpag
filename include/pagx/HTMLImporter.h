@@ -108,7 +108,7 @@ class HTMLImporter {
      * Note: only the contents at call time are copied; the pointer does not need to outlive
      * the returned document.
      */
-    FontConfig* fontConfig = nullptr;
+    const FontConfig* fontConfig = nullptr;
 
     /**
      * Anchor directory used to resolve relative `<img src="...">` paths when parsing from
@@ -138,7 +138,10 @@ class HTMLImporter {
                                              const Options& options = Options());
 
   /**
-   * Parses an HTML string and creates a PAGX Document.
+   * Parses an HTML string and creates a PAGX Document. The content is treated as a UTF-8
+   * encoded byte sequence (matching `XMLDOM::Make`); embedded NUL bytes are permitted as long
+   * as the underlying XML parser accepts them. Other encodings (UTF-16, GBK, …) must be
+   * transcoded to UTF-8 before being passed in.
    */
   static std::shared_ptr<PAGXDocument> ParseString(const std::string& htmlContent,
                                                    const Options& options = Options());
