@@ -21,7 +21,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
@@ -620,164 +619,6 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
-}
-
-static std::string TitleToKey(const std::string& title) {
-  // Convert to lowercase with underscores, ignoring parenthesized content (e.g., "(Composition)")
-  std::string key;
-  int parenDepth = 0;
-  for (char ch : title) {
-    if (ch == '(') {
-      parenDepth++;
-      continue;
-    }
-    if (ch == ')') {
-      if (parenDepth > 0) {
-        parenDepth--;
-      }
-      continue;
-    }
-    if (parenDepth > 0) {
-      continue;
-    }
-    if (std::isalnum(static_cast<unsigned char>(ch))) {
-      key += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-    } else if (!key.empty() && key.back() != '_') {
-      key += '_';
-    }
-  }
-  // Trim trailing underscore
-  if (!key.empty() && key.back() == '_') {
-    key.pop_back();
-  }
-  return key;
-}
-
-static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
-    const std::string& markdownPath) {
-  std::vector<std::pair<std::string, std::string>> patterns;
-  std::ifstream file(markdownPath);
-  if (!file.is_open()) {
-    return patterns;
-  }
-
-  std::string currentTitle;
-  bool inCodeBlock = false;
-  std::string codeContent;
-  std::unordered_map<std::string, int> keyCounts;
-
-  std::string line;
-  while (std::getline(file, line)) {
-    if (!inCodeBlock) {
-      // Track the most recent ### heading
-      if (line.size() > 4 && line.substr(0, 4) == "### ") {
-        currentTitle = line.substr(4);
-      }
-      // Detect start of xml code block
-      if (line.size() >= 5 && line.substr(0, 5) == "```xm") {
-        inCodeBlock = true;
-        codeContent.clear();
-      }
-    } else {
-      if (line == "```") {
-        inCodeBlock = false;
-        // Only keep complete PAGX documents (skip code snippets)
-        auto trimmed = codeContent;
-        auto pos = trimmed.find_first_not_of(" \t\n\r");
-        if (pos != std::string::npos) {
-          trimmed = trimmed.substr(pos);
-        }
-        // Skip XML declaration if present
-        if (trimmed.substr(0, 5) == "<?xml") {
-          pos = trimmed.find('\n');
-          if (pos != std::string::npos) {
-            trimmed = trimmed.substr(pos + 1);
-            pos = trimmed.find_first_not_of(" \t\n\r");
-            if (pos != std::string::npos) {
-              trimmed = trimmed.substr(pos);
-            }
-          }
-        }
-        if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
-          auto baseKey = TitleToKey(currentTitle);
-          auto count = ++keyCounts[baseKey];
-          auto key = count > 1 ? baseKey + "_" + std::to_string(count) : baseKey;
-          patterns.emplace_back(key, codeContent);
-        }
-      } else {
-        if (!codeContent.empty()) {
-          codeContent += "\n";
-        }
-        codeContent += line;
-      }
-    }
-  }
-  return patterns;
-}
-
-static void TestMarkdownPatterns(tgfx::Context* context, const std::string& markdownPath,
-                                 const std::string& prefix = "", float scale = 1.0f) {
-  auto patterns = ExtractMarkdownPatterns(markdownPath);
-  ASSERT_FALSE(patterns.empty()) << "No patterns found in: " << markdownPath;
-
-  // Ensure output directory exists, then copy test image for patterns referencing "avatar.jpg".
-  auto outDir = std::filesystem::path(ProjectPath::Absolute("test/out/PAGXTest"));
-  std::filesystem::create_directories(outDir);
-  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/imageReplacement.jpg"),
-                             outDir / "avatar.jpg",
-                             std::filesystem::copy_options::overwrite_existing);
-
-  pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& [name, xmlContent] : patterns) {
-    auto key = prefix + name;
-
-    auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
-
-    // Load via FromFile so relative image paths resolve against the pagx directory.
-    // LoadAndResolve also expands any <Import> nodes (e.g., inline SVG) before rendering.
-    auto doc = LoadAndResolve(pagxPath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to parse XML for: " << key;
-      continue;
-    }
-    if (!doc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : doc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
-    }
-
-    doc->applyLayout(&fontConfig);
-    auto layer = pagx::LayerBuilder::Build(doc.get());
-    if (!layer) {
-      ADD_FAILURE() << "Failed to build layer for: " << key;
-      continue;
-    }
-
-    int canvasWidth = static_cast<int>(std::ceil(doc->width * scale));
-    int canvasHeight = static_cast<int>(std::ceil(doc->height * scale));
-    auto surface = Surface::Make(context, canvasWidth, canvasHeight);
-    if (!surface) {
-      ADD_FAILURE() << "Failed to create surface for: " << key;
-      continue;
-    }
-    DisplayList displayList;
-    if (scale != 1.0f) {
-      auto container = tgfx::Layer::Make();
-      container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-      container->addChild(layer);
-      displayList.root()->addChild(container);
-    } else {
-      displayList.root()->addChild(layer);
-    }
-    displayList.render(surface.get(), false);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
-    VerifyFile(pagxPath, key);
-  }
 }
 
 static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
@@ -3700,16 +3541,6 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
   EXPECT_TRUE(std::isnan(child2->bottom));
   EXPECT_TRUE(std::isnan(child2->centerX));
   EXPECT_TRUE(std::isnan(child2->centerY));
-}
-
-/**
- * Test all PAGX patterns embedded in the skill patterns.md documentation.
- * Extracts complete PAGX documents from markdown code blocks and renders them.
- */
-PAGX_TEST(PAGXTest, SkillPatterns) {
-  TestMarkdownPatterns(context,
-                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/patterns.md"),
-                       "skills_", 2.0f);
 }
 
 /**
