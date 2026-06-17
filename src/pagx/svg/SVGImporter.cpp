@@ -444,8 +444,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
       auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
       if (maskLayer) {
         layer->mask = maskLayer;
-        // SVG masks use luminance by default.
-        layer->maskType = MaskType::Luminance;
+        // SVG mask-type property determines how the mask is computed.
+        // Default is "luminance" (uses luminance of mask content); "alpha" uses alpha channel.
+        std::string maskTypeStr = getAttribute(maskIt->second, "mask-type");
+        layer->maskType = (maskTypeStr == "alpha") ? MaskType::Alpha : MaskType::Luminance;
         // Add mask layer as invisible layer to the document.
         _maskLayers.push_back(maskLayer);
       }
@@ -1809,6 +1811,15 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     auto strokeNode = _document->makeNode<Stroke>();
 
+    // Determine effective stroke-opacity. Applies to both url() and solid color strokes.
+    std::string strokeOpacity = getAttribute(element, "stroke-opacity");
+    if (strokeOpacity.empty()) {
+      strokeOpacity = inheritedStyle.strokeOpacity;
+    }
+    if (!strokeOpacity.empty()) {
+      strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
+    }
+
     if (stroke.compare(0, 4, "url(") == 0) {
       std::string refId = resolveUrl(stroke);
       // Use getColorSourceForRef which handles reference counting.
@@ -1818,15 +1829,6 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       }
       strokeNode->color = getColorSourceForRef(refId, shapeBounds);
     } else {
-      // Determine effective stroke-opacity.
-      std::string strokeOpacity = getAttribute(element, "stroke-opacity");
-      if (strokeOpacity.empty()) {
-        strokeOpacity = inheritedStyle.strokeOpacity;
-      }
-      if (!strokeOpacity.empty()) {
-        strokeNode->alpha = strtof(strokeOpacity.c_str(), nullptr);
-      }
-
       // Convert color to SolidColor for PAGX compatibility.
       // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(stroke);
@@ -2821,6 +2823,12 @@ static bool isSameGeometry(const Element* a, const Element* b) {
 static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
                                const Element*& outPainter) {
   if (!layer || layer->contents.size() != 2) {
+    return false;
+  }
+  // Invisible layers (e.g., mask reference layers) must not be merged with visible layers,
+  // even when they share the same geometry. Otherwise the visible layer's painter would be
+  // pulled into the invisible layer and disappear from the final output.
+  if (!layer->visible) {
     return false;
   }
   if (!layer->children.empty() || !layer->filters.empty() || !layer->styles.empty()) {
