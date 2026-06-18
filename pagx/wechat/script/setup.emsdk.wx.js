@@ -1,6 +1,13 @@
 /*
 * WeChat Mini Program compilation depends on emsdk version 3.1.20.
 * This script is used to download and activate the specified version of emsdk.
+*
+* WARNING: Do NOT upgrade the emsdk version without thorough testing on real devices.
+* WeChat's WXWebAssembly runtime has limited compatibility with Emscripten's generated
+* JS glue code. Versions above 3.1.20 produce API calls (e.g. newer TextDecoder usage,
+* BigInt integration, or ES module patterns) that WXWebAssembly does not support,
+* causing silent failures or crashes at runtime. This version is a hard constraint
+* determined by the WeChat Mini Program platform, not a development preference.
 */
 
 import fs from 'fs';
