@@ -28,6 +28,7 @@
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
@@ -160,10 +161,23 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     device->unlock();
     return false;
   }
-  displayList->render(tgfxSurface.get(), autoClear);
+  if (_backgroundLayer != nullptr) {
+    auto canvas = tgfxSurface->getCanvas();
+    if (autoClear) {
+      canvas->clear();
+    }
+    _backgroundLayer->draw(canvas);
+    displayList->render(tgfxSurface.get(), false);
+  } else {
+    displayList->render(tgfxSurface.get(), autoClear);
+  }
   drawable->present(context);
   device->unlock();
   return true;
+}
+
+void PAGScene::setBackgroundLayer(std::shared_ptr<tgfx::Layer> layer) {
+  _backgroundLayer = std::move(layer);
 }
 
 float PAGScene::width() const {

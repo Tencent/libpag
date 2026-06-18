@@ -20,6 +20,7 @@
 
 #include <emscripten/bind.h>
 #include <deque>
+#include "GridBackground.h"
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGScene.h"
@@ -112,6 +113,12 @@ class PAGXView {
 
   bool useCustomBackgroundColor = false;
   Color customBackgroundColor = {};
+
+  // Checkerboard background cache
+  std::shared_ptr<GridBackgroundLayer> backgroundLayer = nullptr;
+  int lastBackgroundWidth = 0;
+  int lastBackgroundHeight = 0;
+  float lastBackgroundDensity = 0.0f;
 
   // Performance monitoring
   struct FrameRecord {

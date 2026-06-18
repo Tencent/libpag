@@ -149,6 +149,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
+  /**
+   * Sets a custom tgfx::Layer to be drawn behind the scene content. The background layer is drawn
+   * in surface coordinates (not affected by zoomScale or contentOffset) after the surface is
+   * cleared and before the display list is rendered. Pass nullptr to remove a previously set
+   * background layer.
+   * @param layer the layer to draw as background, or nullptr to remove.
+   */
+  void setBackgroundLayer(std::shared_ptr<tgfx::Layer> layer);
+
  private:
   PAGScene();
 
@@ -183,6 +192,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unique_ptr<tgfx::DisplayList> displayList;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
+
+  std::shared_ptr<tgfx::Layer> _backgroundLayer = nullptr;
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};

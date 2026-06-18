@@ -308,7 +308,7 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
 
 void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
-  customBackgroundColor = {};
+  customBackgroundColor = {0, 0, 0, 0};
   if (scene != nullptr) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   }
@@ -330,8 +330,22 @@ void PAGXView::draw() {
   }
   if (useCustomBackgroundColor) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
+    scene->setBackgroundLayer(nullptr);
   } else {
-    scene->getDisplayOptions()->setBackgroundColor({});
+    scene->getDisplayOptions()->setBackgroundColor({0, 0, 0, 0});
+    auto density = currentCanvasWidth > 0 ? static_cast<float>(lastSurfaceWidth) /
+                                                static_cast<float>(currentCanvasWidth)
+                                          : 1.0f;
+    int bgWidth = lastSurfaceWidth;
+    int bgHeight = lastSurfaceHeight;
+    if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
+        std::abs(density - lastBackgroundDensity) > 0.001f) {
+      backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
+      lastBackgroundWidth = bgWidth;
+      lastBackgroundHeight = bgHeight;
+      lastBackgroundDensity = density;
+    }
+    scene->setBackgroundLayer(backgroundLayer);
   }
   scene->draw(pagSurface, true);
   auto device = window->getDevice();
