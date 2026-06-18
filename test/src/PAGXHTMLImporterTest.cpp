@@ -217,7 +217,7 @@ inline pagx::HTMLSubsetTransformer::Result RunTransform(
 
 // Returns the first <body> child whose tag matches `tag`.
 inline std::shared_ptr<pagx::DOMNode> FirstBodyChild(const std::shared_ptr<pagx::DOMNode>& root,
-                                                    const std::string& tag = "") {
+                                                     const std::string& tag = "") {
   if (!root) return nullptr;
   auto body = root->getFirstChild("body");
   if (!body) return nullptr;

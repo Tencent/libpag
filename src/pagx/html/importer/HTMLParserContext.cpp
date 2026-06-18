@@ -210,7 +210,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
-    const auto& style = getResolvedStyle(entry.first);
+    const auto& style = _styleCascade->getResolvedStyle(entry.first);
     _animationBuilder->buildForElement(style, entry.second);
   }
   flushFontFallbacksToDocument();
