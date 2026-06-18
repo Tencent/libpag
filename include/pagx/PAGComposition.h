@@ -95,6 +95,7 @@ class PAGComposition : public PAGLayer {
   // return, so any newly added layer that references an ancestor composition is detected at the top
   // of MakeChild rather than one frame deeper.
   void refreshNodes(const std::vector<Node*>& dirtyNodes,
+                    const std::unordered_set<const Node*>& dirtySet,
                     std::unordered_set<const Composition*>& visited);
 
   // Reconciles this composition's runtime children with the given source layer list: reuses

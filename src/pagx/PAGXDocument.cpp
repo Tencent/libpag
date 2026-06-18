@@ -32,8 +32,10 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -324,65 +326,71 @@ void PAGXDocument::clearEmbed() {
 
 namespace {
 
-// Checks whether a Fill, Stroke, Group, or ImagePattern node references (directly or indirectly
-// through its color/image fields) the given target node. Used by findLayerForContentNode to
-// determine whether a content node belongs to a particular Layer.
+// Checks whether a content node references (directly or indirectly through its fields) the given
+// target node. Used by findLayerForContentNode to determine whether a content node belongs to a
+// particular Layer.
 bool contentReferencesNode(const Node* parent, const Node* target) {
   if (parent == nullptr || target == nullptr) {
     return false;
   }
-  if (parent->nodeType() == NodeType::Fill) {
-    auto* fill = static_cast<const Fill*>(parent);
-    if (fill->color == target) {
-      return true;
+  switch (parent->nodeType()) {
+    case NodeType::Fill: {
+      auto* fill = static_cast<const Fill*>(parent);
+      return fill->color == target ||
+             (fill->color != nullptr && contentReferencesNode(fill->color, target));
     }
-    if (fill->color != nullptr && contentReferencesNode(fill->color, target)) {
-      return true;
+    case NodeType::Stroke: {
+      auto* stroke = static_cast<const Stroke*>(parent);
+      return stroke->color == target ||
+             (stroke->color != nullptr && contentReferencesNode(stroke->color, target));
     }
-  }
-  if (parent->nodeType() == NodeType::Stroke) {
-    auto* stroke = static_cast<const Stroke*>(parent);
-    if (stroke->color == target) {
-      return true;
+    case NodeType::ImagePattern: {
+      auto* pattern = static_cast<const ImagePattern*>(parent);
+      return pattern->image == target;
     }
-    if (stroke->color != nullptr && contentReferencesNode(stroke->color, target)) {
-      return true;
-    }
-  }
-  if (parent->nodeType() == NodeType::ImagePattern) {
-    auto* pattern = static_cast<const ImagePattern*>(parent);
-    return pattern->image == target;
-  }
-  // Check Gradient.colorStops (LinearGradient, RadialGradient, ConicGradient, DiamondGradient).
-  if (parent->nodeType() == NodeType::LinearGradient ||
-      parent->nodeType() == NodeType::RadialGradient ||
-      parent->nodeType() == NodeType::ConicGradient ||
-      parent->nodeType() == NodeType::DiamondGradient) {
-    auto* gradient = static_cast<const Gradient*>(parent);
-    for (auto* stop : gradient->colorStops) {
-      if (stop == target) {
-        return true;
+    // Check Gradient.colorStops (LinearGradient, RadialGradient, ConicGradient, DiamondGradient).
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient: {
+      auto* gradient = static_cast<const Gradient*>(parent);
+      for (auto* stop : gradient->colorStops) {
+        if (stop == target) {
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  if (parent->nodeType() == NodeType::Group) {
-    auto* group = static_cast<const Group*>(parent);
-    for (auto* elem : group->elements) {
-      if (elem == target || contentReferencesNode(elem, target)) {
-        return true;
+    case NodeType::Group: {
+      auto* group = static_cast<const Group*>(parent);
+      for (auto* elem : group->elements) {
+        if (elem == target || contentReferencesNode(elem, target)) {
+          return true;
+        }
       }
+      return false;
     }
-  }
-  if (parent->nodeType() == NodeType::TextBox) {
-    auto* textBox = static_cast<const TextBox*>(parent);
-    for (auto* elem : textBox->elements) {
-      if (elem == target || contentReferencesNode(elem, target)) {
-        return true;
+    case NodeType::TextBox: {
+      auto* textBox = static_cast<const TextBox*>(parent);
+      for (auto* elem : textBox->elements) {
+        if (elem == target || contentReferencesNode(elem, target)) {
+          return true;
+        }
       }
+      return false;
     }
+    // Path and TextPath both reference a PathData resource node whose shape data may be mutated.
+    case NodeType::Path: {
+      auto* path = static_cast<const Path*>(parent);
+      return path->data == target;
+    }
+    case NodeType::TextPath: {
+      auto* textPath = static_cast<const TextPath*>(parent);
+      return textPath->path == target;
+    }
+    default:
+      return false;
   }
-  return false;
 }
 
 // Searches all Layer nodes in the document for any whose contents, filters, or styles reference
@@ -518,12 +526,7 @@ bool PAGXDocument::ownsNode(const Node* node) const {
   if (node == this) {
     return true;
   }
-  for (auto& ownedNode : nodes) {
-    if (ownedNode.get() == node) {
-      return true;
-    }
-  }
-  return false;
+  return nodeSet.find(node) != nodeSet.end();
 }
 
 void PAGXDocument::registerLiveScene(const std::shared_ptr<PAGScene>& scene) {

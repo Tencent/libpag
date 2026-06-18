@@ -195,6 +195,32 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
   return outPath;
 }
 
+static void VerifyLayerConsistency(const std::shared_ptr<pagx::PAGScene>& scene,
+                                   pagx::RuntimeBinding* binding,
+                                   const std::shared_ptr<pagx::PAGLayer>& layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  auto* node = layer->getNode();
+  if (node != nullptr) {
+    auto bound = binding->get<tgfx::Layer>(node);
+    EXPECT_EQ(bound.get(), layer->runtimeLayer.get())
+        << "binding mismatch: promotion sync may not have run for this layer";
+  }
+  if (layer->runtimeLayer != nullptr) {
+    auto it = scene->layerRegistry.find(layer->runtimeLayer.get());
+    EXPECT_NE(it, scene->layerRegistry.end())
+        << "layerRegistry missing entry: hit-test will miss this layer";
+    if (it != scene->layerRegistry.end()) {
+      EXPECT_EQ(it->second, layer.get())
+          << "layerRegistry maps to wrong PAGLayer: hit-test returns incorrect layer";
+    }
+  }
+  for (auto& child : layer->getChildren()) {
+    VerifyLayerConsistency(scene, binding, child);
+  }
+}
+
 static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) {
   if (scene == nullptr || scene->rootComposition() == nullptr) {
     return;
@@ -203,31 +229,7 @@ static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) 
   if (binding == nullptr) {
     return;
   }
-  std::function<void(const std::shared_ptr<pagx::PAGLayer>&)> verifyLayer;
-  verifyLayer = [&](const std::shared_ptr<pagx::PAGLayer>& layer) {
-    if (layer == nullptr) {
-      return;
-    }
-    auto* node = layer->getNode();
-    if (node != nullptr) {
-      auto bound = binding->get<tgfx::Layer>(node);
-      EXPECT_EQ(bound.get(), layer->runtimeLayer.get())
-          << "binding mismatch: promotion sync may not have run for this layer";
-    }
-    if (layer->runtimeLayer != nullptr) {
-      auto it = scene->layerRegistry.find(layer->runtimeLayer.get());
-      EXPECT_NE(it, scene->layerRegistry.end())
-          << "layerRegistry missing entry: hit-test will miss this layer";
-      if (it != scene->layerRegistry.end()) {
-        EXPECT_EQ(it->second, layer.get())
-            << "layerRegistry maps to wrong PAGLayer: hit-test returns incorrect layer";
-      }
-    }
-    for (auto& child : layer->getChildren()) {
-      verifyLayer(child);
-    }
-  };
-  verifyLayer(scene->rootComposition());
+  VerifyLayerConsistency(scene, binding, scene->rootComposition());
 }
 
 /**

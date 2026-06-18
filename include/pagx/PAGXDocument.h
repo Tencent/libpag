@@ -81,6 +81,7 @@ class PAGXDocument : public Node {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
     registerNode(result, id);
+    nodeSet.insert(result);
     nodes.push_back(std::move(node));
     return result;
   }
@@ -209,6 +210,10 @@ class PAGXDocument : public Node {
    * sizes — new elements have no resolved layout bounds until a layout pass runs. Callers that
    * mutate via SetNodeChannel can derive the right value from RequiresLayout(NodeType, channel);
    * structural add/remove must pass true.
+   *
+   * Performance note: Prefer passing the owning Layer directly when known. Resolving a content
+   * node to its owning Layer requires scanning all document nodes (O(N)). For batch edits to a
+   * known Layer, pass the Layer once instead of every modified content child.
    */
   void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged);
 
@@ -244,6 +249,8 @@ class PAGXDocument : public Node {
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
+  // O(1) containment check for ownsNode(), maintained alongside nodes.
+  std::unordered_set<const Node*> nodeSet = {};
 
   // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.

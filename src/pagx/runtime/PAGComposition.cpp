@@ -164,8 +164,8 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
 }
 
 void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
+                                  const std::unordered_set<const Node*>& dirtySet,
                                   std::unordered_set<const Composition*>& visited) {
-  std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
   const std::vector<Layer*>* sourceLayers = nullptr;
   if (node == nullptr) {
     auto scene = rootScene.lock();
@@ -203,7 +203,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       if (childSource != nullptr) {
         inserted = visited.insert(childSource).second;
       }
-      childComposition->refreshNodes(dirtyNodes, visited);
+      childComposition->refreshNodes(dirtyNodes, dirtySet, visited);
       if (inserted) {
         visited.erase(childSource);
       }
@@ -378,7 +378,7 @@ void PAGComposition::refreshPlainContainerChildren(
       continue;
     }
     if (child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes, visited);
+      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes, dirtySet, visited);
     } else if (!child->children.empty()) {
       refreshPlainContainerChildren(child.get(), dirtyNodes, visited, dirtySet);
     }
