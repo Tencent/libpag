@@ -61,34 +61,45 @@ void PAGComposition::apply(float mix) {
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
     const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene,
     std::unordered_set<const Composition*>& visited) {
-  if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
+  if (ownerLayer == nullptr || parentScene == nullptr) {
     return nullptr;
   }
   // Cycle guard: visited acts as a path stack — a composition on the current ancestor chain
   // is rejected, but the same composition reused by a sibling is not (visited is scoped per path).
   // The external-file chain guard (loadFileData) does not cover same-document @id references.
   auto* sourceComposition = ownerLayer->composition;
-  if (visited.find(sourceComposition) != visited.end()) {
-    auto* document = parentScene->document.get();
-    if (document != nullptr) {
-      document->errors.push_back("Cyclic composition reference detected: '@" +
-                                 sourceComposition->id + "'.");
+  if (sourceComposition != nullptr) {
+    if (visited.find(sourceComposition) != visited.end()) {
+      auto* document = parentScene->document.get();
+      if (document != nullptr) {
+        document->errors.push_back("Cyclic composition reference detected: '@" +
+                                   sourceComposition->id + "'.");
+      }
+      return nullptr;
     }
-    return nullptr;
   }
   auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
   auto composition = std::shared_ptr<PAGComposition>(
       new PAGComposition(ownerLayer, std::move(buildResult.root), parentScene));
   *composition->binding = std::move(buildResult.binding);
+  // When the composition is not yet loaded (composition == nullptr), BuildCompositionSubtree
+  // returns an empty root. Build a minimal tgfx slot layer so the PAGComposition has a valid
+  // runtimeLayer for syncChildren to attach children into later.
+  if (composition->runtimeLayer == nullptr) {
+    composition->runtimeLayer =
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get());
+  }
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
   if (externalDoc != nullptr) {
     externalDoc->registerLiveScene(parentScene);
   }
   composition->spawnTimelines(parentScene);
-  visited.insert(sourceComposition);
-  composition->buildChildren(ownerLayer->composition->layers, visited);
-  visited.erase(sourceComposition);
+  if (sourceComposition != nullptr) {
+    visited.insert(sourceComposition);
+    composition->buildChildren(ownerLayer->composition->layers, visited);
+    visited.erase(sourceComposition);
+  }
   return composition;
 }
 
@@ -216,10 +227,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
 std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
     std::unordered_set<const Composition*>& visited) {
-  if (layer == nullptr || binding == nullptr || scene == nullptr) {
-    return nullptr;
-  }
-  if (layer->composition != nullptr) {
+  if (layer->composition != nullptr || !layer->compositionFilePath.empty()) {
     auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
     if (childComposition == nullptr) {
       return nullptr;
@@ -315,13 +323,13 @@ void PAGComposition::refreshPlainContainerChildren(
     PAGLayer* container, const std::vector<Node*>& dirtyNodes,
     std::unordered_set<const Composition*>& visited,
     const std::unordered_set<const Node*>& dirtySet) {
-  if (container == nullptr || container->node == nullptr || binding == nullptr) {
+  if (container == nullptr || container->node == nullptr) {
     return;
   }
   bool dirty = dirtySet.find(container->node) != dirtySet.end();
   if (dirty) {
     auto scene = rootScene.lock();
-    if (scene != nullptr) {
+    if (scene != nullptr && binding != nullptr) {
       // Incrementally sync the container's runtime children with its source layer list, reusing
       // existing PAGLayer / PAGComposition handles so external holders are not invalidated.
       std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};
