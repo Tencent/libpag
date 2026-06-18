@@ -33,6 +33,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextBox.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -373,13 +374,23 @@ bool contentReferencesNode(const Node* parent, const Node* target) {
       }
     }
   }
+  if (parent->nodeType() == NodeType::TextBox) {
+    auto* textBox = static_cast<const TextBox*>(parent);
+    for (auto* elem : textBox->elements) {
+      if (elem == target || contentReferencesNode(elem, target)) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
-// Searches all Layer nodes in the document for one whose contents, filters, or styles reference
-// the given content node. Returns a pointer to the first Layer found, or nullptr if not found.
-const Layer* findLayerForContentNode(const std::vector<std::unique_ptr<Node>>& allNodes,
-                                     const Node* target) {
+// Searches all Layer nodes in the document for any whose contents, filters, or styles reference
+// the given content node. A node may be shared across multiple Layers (e.g. a SolidColor referenced
+// by several Fills), so ALL matching Layers are returned. Returns an empty vector if not found.
+std::vector<const Layer*> findLayerForContentNode(
+    const std::vector<std::unique_ptr<Node>>& allNodes, const Node* target) {
+  std::vector<const Layer*> result = {};
   for (auto& node : allNodes) {
     if (node->nodeType() != NodeType::Layer) {
       continue;
@@ -387,21 +398,24 @@ const Layer* findLayerForContentNode(const std::vector<std::unique_ptr<Node>>& a
     auto* layer = static_cast<const Layer*>(node.get());
     for (auto* elem : layer->contents) {
       if (elem == target || contentReferencesNode(elem, target)) {
-        return layer;
+        result.push_back(layer);
+        break;
       }
     }
     for (auto* filter : layer->filters) {
       if (filter == target) {
-        return layer;
+        result.push_back(layer);
+        break;
       }
     }
     for (auto* style : layer->styles) {
       if (style == target) {
-        return layer;
+        result.push_back(layer);
+        break;
       }
     }
   }
-  return nullptr;
+  return result;
 }
 
 }  // namespace
@@ -460,9 +474,11 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
           type == NodeType::AnimationObject || type == NodeType::Channel) {
         layerDirty.push_back(node);
       } else {
-        auto* owningLayer = findLayerForContentNode(nodes, node);
-        if (owningLayer != nullptr) {
-          layerDirty.push_back(const_cast<Layer*>(owningLayer));
+        auto owningLayers = findLayerForContentNode(nodes, node);
+        for (auto* owningLayer : owningLayers) {
+          if (owningLayer != nullptr) {
+            layerDirty.push_back(const_cast<Layer*>(owningLayer));
+          }
         }
       }
     }

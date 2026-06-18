@@ -216,6 +216,9 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
 std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
     std::unordered_set<const Composition*>& visited) {
+  if (layer == nullptr || binding == nullptr || scene == nullptr) {
+    return nullptr;
+  }
   if (layer->composition != nullptr) {
     auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
     if (childComposition == nullptr) {
