@@ -18,18 +18,23 @@ function copyFiles() {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  const files = ['pagx-viewer.js', 'pagx-viewer.wasm.br'];
+  const files = ['pagx-check.js','pagx-viewer.js', 'pagx-viewer.wasm.br'];
+  const missing = [];
   for (const file of files) {
     const src = path.join(sourceDir, file);
     const dst = path.join(targetDir, file);
     if (!fs.existsSync(src)) {
-      console.warn(`Warning: source file not found: ${src}`);
+      missing.push(src);
+      console.error(`Error: source file not found: ${src}`);
       continue;
     }
     fs.copyFileSync(src, dst);
     console.log(`Copied ${file}`);
   }
+  if (missing.length > 0) {
+    console.error(`${missing.length} required file(s) missing, aborting.`);
+    process.exit(1);
+  }
 }
 
 copyFiles();
-
