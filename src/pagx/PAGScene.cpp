@@ -17,11 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include "pagx/PAGViewModel.h"
+#include "pagx/DataBindRuntime.h"
+#include "pagx/DataContext.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/types/Matrix.h"
@@ -75,7 +82,75 @@ void PAGScene::buildRuntimeTree() {
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
   displayList->root()->addChild(rootComp->runtimeLayer);
+  buildViewModels();
 }
+
+
+std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
+    ViewModel* schema, const std::shared_ptr<PAGScene>& scene) {
+  if (schema == nullptr) return nullptr;
+  auto vm = std::shared_ptr<PAGViewModel>(new PAGViewModel());
+  vm->id = schema->id;
+  for (auto* prop : schema->properties) {
+    if (prop == nullptr) continue;
+    std::shared_ptr<PAGViewModelValue> value = nullptr;
+    switch (prop->propertyType) {
+      case ViewModelPropertyType::Number: { auto v = std::make_shared<PAGViewModelValueNumber>(); v->propertyValue = prop->defaultNumber; v->type = ViewModelValueType::Number; value = std::move(v); break; }
+      case ViewModelPropertyType::String: { auto v = std::make_shared<PAGViewModelValueString>(); v->propertyValue = prop->defaultString; v->type = ViewModelValueType::String; value = std::move(v); break; }
+      case ViewModelPropertyType::Boolean: { auto v = std::make_shared<PAGViewModelValueBoolean>(); v->propertyValue = prop->defaultBoolean; v->type = ViewModelValueType::Boolean; value = std::move(v); break; }
+      case ViewModelPropertyType::Color: { auto v = std::make_shared<PAGViewModelValueColor>(); v->propertyValue = prop->defaultColor; v->type = ViewModelValueType::Color; value = std::move(v); break; }
+      case ViewModelPropertyType::Image: { auto v = std::make_shared<PAGViewModelValueImage>(); v->propertyValue = prop->defaultImage; v->type = ViewModelValueType::Image; value = std::move(v); break; }
+      case ViewModelPropertyType::ViewModel: { auto v = std::make_shared<PAGViewModelValueViewModel>(); v->type = ViewModelValueType::ViewModel; value = std::move(v); break; }
+    }
+    if (value) { value->propertyName = prop->name; value->setScene(scene); vm->propertyMap[prop->name] = value; vm->propertyList.push_back(value); }
+  }
+  return vm;
+}
+
+void PAGScene::buildNestedViewModels(PAGComposition* rootComp) {
+  if (rootComp == nullptr) return;
+  for (auto& child : rootComp->children) {
+    if (child == nullptr || child->layerType() != LayerType::Composition) continue;
+    auto* childComp = static_cast<PAGComposition*>(child.get());
+    const auto* sourceLayer = childComp->node;
+    if (sourceLayer == nullptr || sourceLayer->composition == nullptr) continue;
+    const auto* compSchema = sourceLayer->composition;
+    if (compSchema->viewModel != nullptr) {
+      auto childVM = PAGScene::CreateViewModelFromSchema(compSchema->viewModel, shared_from_this());
+      childComp->compositionViewModel = childVM;
+      childComp->dataBindRuntime = std::make_unique<DataBindRuntime>();
+      auto dataCtx = std::make_shared<DataContext>(childVM);
+      if (rootComp->dataContext != nullptr) dataCtx->parent(rootComp->dataContext);
+      childComp->dataContext = dataCtx;
+      if (rootComp->compositionViewModel != nullptr && !sourceLayer->vmContext.empty()) {
+        auto propName = sourceLayer->vmContext;
+        if (propName.find("$vm.") == 0) propName = propName.substr(4);
+        auto prop = rootComp->compositionViewModel->propertyViewModel(propName);
+        if (prop) prop->referenceInstance = childVM;
+      }
+      if (!compSchema->dataBinds.empty())
+        childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),
+                                         childComp->binding.get(), document.get());
+    }
+    buildNestedViewModels(childComp);
+  }
+}
+
+void PAGScene::buildViewModels() {
+  auto self = shared_from_this();
+  rootViewModel = PAGScene::CreateViewModelFromSchema(document->viewModel, self);
+  if (rootViewModel != nullptr && _rootComposition != nullptr) {
+    _rootComposition->compositionViewModel = rootViewModel;
+    _rootComposition->dataBindRuntime = std::make_unique<DataBindRuntime>();
+    _rootComposition->dataContext = std::make_shared<DataContext>(rootViewModel);
+    if (!document->dataBinds.empty())
+      _rootComposition->dataBindRuntime->bind(document->dataBinds,
+                                              _rootComposition->dataContext.get(),
+                                              _rootComposition->binding.get(), document.get());
+    buildNestedViewModels(_rootComposition.get());
+  }
+}
+
 
 PAGScene::~PAGScene() {
   if (document != nullptr) {
@@ -146,6 +221,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
     return false;
   }
+  flushDataBinds();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -185,6 +261,14 @@ void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
   }
 }
 
+std::shared_ptr<PAGViewModel> PAGScene::viewModel() {
+  return rootViewModel;
+}
+
+void PAGScene::flushDataBinds() const {
+  if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   float rootX = 0;
@@ -214,6 +298,7 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   if (scene.get() != this) {
     return {};
   }
+  flushDataBinds();
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
   auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
   Matrix rootToSurface = {};

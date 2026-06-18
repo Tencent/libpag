@@ -18,52 +18,41 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include <memory>
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
+class PAGViewModelValue;
 
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * ObserverHandle is an RAII handle for a registered value-change observer. The observer is
+ * automatically removed when the handle is destroyed. Call detach() to remove the observer
+ * early. Move-only; copying is forbidden.
  */
-class Composition : public Node {
+class ObserverHandle {
  public:
-  /**
-   * The width of the composition in pixels.
-   */
-  float width = 0.0f;
+  ObserverHandle();
+  ~ObserverHandle();
+
+  ObserverHandle(const ObserverHandle&) = delete;
+  ObserverHandle& operator=(const ObserverHandle&) = delete;
+
+  ObserverHandle(ObserverHandle&& other) noexcept;
+  ObserverHandle& operator=(ObserverHandle&& other) noexcept;
 
   /**
-   * The height of the composition in pixels.
+   * Removes the observer immediately. Safe to call multiple times; subsequent calls are no-ops.
+   * Implicitly called by the destructor.
    */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  ViewModel* viewModel = nullptr;
-  std::vector<DataBind*> dataBinds = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
-  }
+  void detach();
 
  private:
-  Composition() = default;
+  ObserverHandle(std::shared_ptr<PAGViewModelValue> source, int observerId);
 
-  friend class PAGXDocument;
+  std::weak_ptr<PAGViewModelValue> source;
+  int observerId = 0;
+
+  friend class PAGViewModelValue;
 };
 
 }  // namespace pagx

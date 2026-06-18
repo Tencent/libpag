@@ -31,8 +31,10 @@
 
 namespace pagx {
 
+class DataBind;
 class LayoutContext;
 class PAGScene;
+class ViewModel;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -67,6 +69,9 @@ class PAGXDocument : public Node {
    * Top-level animations.
    */
   std::vector<Animation*> animations = {};
+
+  ViewModel* viewModel = nullptr;
+  std::vector<DataBind*> dataBinds = {};
 
   /**
    * Creates a node of the specified type and adds it to the document management.

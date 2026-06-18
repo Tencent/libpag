@@ -218,7 +218,12 @@ enum class NodeType {
   /**
    * A precomposed glyph run for text rendering.
    */
-  GlyphRun
+  GlyphRun,
+
+  ViewModel,
+  ViewModelProperty,
+  DataBind,
+  DataConverter
 };
 
 /**

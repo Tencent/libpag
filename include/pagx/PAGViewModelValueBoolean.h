@@ -18,52 +18,33 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/PAGViewModelValue.h"
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * PAGViewModelValueBoolean holds a boolean ViewModel property value.
  */
-class Composition : public Node {
+class PAGViewModelValueBoolean : public PAGViewModelValue {
  public:
   /**
-   * The width of the composition in pixels.
+   * Returns the current boolean value.
    */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  ViewModel* viewModel = nullptr;
-  std::vector<DataBind*> dataBinds = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  bool value() const {
+    return propertyValue;
   }
 
- private:
-  Composition() = default;
+  /**
+   * Sets the boolean value. Setting the same value is a no-op.
+   */
+  void value(bool v);
 
-  friend class PAGXDocument;
+  bool propertyValue = false;
+
+ private:
+
+  friend class PAGViewModel;
+  friend class PAGScene;
 };
 
 }  // namespace pagx

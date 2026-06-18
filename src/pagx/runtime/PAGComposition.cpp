@@ -18,6 +18,8 @@
 
 #include "pagx/PAGComposition.h"
 #include <unordered_map>
+#include "pagx/PAGViewModel.h"
+#include "pagx/DataBindRuntime.h"
 #include <unordered_set>
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"

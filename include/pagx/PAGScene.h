@@ -36,7 +36,11 @@ namespace pagx {
 class Animation;
 class Node;
 class PAGSurface;
+class PAGViewModel;
 class PAGXDocument;
+class SuppressDelegation;
+class PAGViewModelValue;
+class ViewModel;
 struct Matrix;
 struct RuntimeBinding;
 
@@ -94,6 +98,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Returns the root PAGComposition of this scene.
    */
   std::shared_ptr<PAGComposition> rootComposition() const;
+
+  std::shared_ptr<PAGViewModel> viewModel();
 
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
@@ -161,6 +167,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // tree first. Used at creation and when an embedded external document changes (an external
   // composition is built into the tree once and cannot be patched in place).
   void buildRuntimeTree();
+  void buildViewModels();
+  void buildNestedViewModels(PAGComposition* rootComp);
+  static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
+  void flushDataBinds() const;
 
   RuntimeBinding* mutableBinding();
 
@@ -178,6 +188,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
+  std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
@@ -192,6 +203,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;
+  friend class PAGViewModelValue;
+  friend class SuppressDelegation;
 };
 
 }  // namespace pagx

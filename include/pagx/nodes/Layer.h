@@ -165,6 +165,8 @@ class Layer : public Node, public LayoutNode {
    */
   std::vector<std::unique_ptr<Timeline>> timelines = {};
 
+  std::string vmContext = {};
+
   /**
    * The vector elements contained in this layer (geometry, painters, modifiers, etc.).
    */

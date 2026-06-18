@@ -69,6 +69,10 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
@@ -148,6 +152,9 @@ static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
 static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc);
+static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc);
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc, bool isRootDocument = false);
+static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc);
 static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc);
 static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc);
 static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc);
@@ -308,6 +315,10 @@ static bool PreRegisterResource(const DOMNode* node, PAGXDocument* doc) {
     doc->makeNode<DiamondGradient>(id);
   } else if (node->name == "ImagePattern") {
     doc->makeNode<ImagePattern>(id);
+  } else if (node->name == "ViewModel") {
+    doc->makeNode<ViewModel>(id);
+  } else if (node->name == "DataConverter") {
+    doc->makeNode<DataConverter>(id);
   } else {
     return false;
   }
@@ -327,6 +338,10 @@ static bool ParseResource(const DOMNode* node, PAGXDocument* doc) {
     ParseFont(node, doc);
   } else if (node->name == "Composition") {
     ParseComposition(node, doc);
+  } else if (node->name == "ViewModel") {
+    ParseViewModel(node, doc);
+  } else if (node->name == "DataConverter") {
+    ParseDataConverter(node, doc);
   } else {
     return ParseColorSource(node, doc) != nullptr;
   }
@@ -508,6 +523,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     layer->compositionFilePath = compositionAttr;
   }
   layer->timelines.clear();
+  layer->vmContext = GetAttribute(node, "vmContext");
 
   // Build directive attributes.
   layer->importDirective.source = GetAttribute(node, "import");
@@ -1481,6 +1497,11 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
   }
   comp->width = GetFloatAttribute(node, "width", Default<Composition>().width, doc);
   comp->height = GetFloatAttribute(node, "height", Default<Composition>().height, doc);
+  auto viewModelAttr = GetAttribute(node, "viewModel");
+  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
+    comp->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
+    if (!comp->viewModel) ReportError(doc, node, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
+  }
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -2643,6 +2664,12 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
 
+  auto viewModelAttr = GetAttribute(root, "viewModel");
+  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
+    doc->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
+    if (!doc->viewModel) ReportError(doc, root, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
+  }
+
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
   if (child) {
@@ -2660,6 +2687,9 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
         }
       } else if (child->name == "Animations") {
         ParseAnimations(child.get(), &doc->animations, doc);
+      } else if (child->name == "DataBind") {
+        auto bind = ParseDataBind(child.get(), doc, true);
+        if (bind) doc->dataBinds.push_back(bind);
       } else if (child->name != "Resources") {
         ReportError(doc, child.get(),
                     "Element '" + child->name +
@@ -2668,6 +2698,70 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+}
+
+static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
+  auto vm = makeNodeFromXML<ViewModel>(node, doc);
+  if (!vm) return nullptr;
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Property") {
+      auto prop = makeNodeFromXML<ViewModelProperty>(child.get(), doc);
+      if (prop) {
+        prop->name = GetAttribute(child.get(), "name");
+        auto typeStr = GetAttribute(child.get(), "type");
+        if (typeStr == "Number" || typeStr == "number") { prop->propertyType = ViewModelPropertyType::Number; prop->defaultNumber = GetFloatAttribute(child.get(), "default", prop->defaultNumber, doc); }
+        else if (typeStr == "String" || typeStr == "string") { prop->propertyType = ViewModelPropertyType::String; prop->defaultString = GetAttribute(child.get(), "default"); }
+        else if (typeStr == "Boolean" || typeStr == "boolean") { prop->propertyType = ViewModelPropertyType::Boolean; prop->defaultBoolean = GetBoolAttribute(child.get(), "default", prop->defaultBoolean, doc); }
+        else if (typeStr == "Color" || typeStr == "color") { prop->propertyType = ViewModelPropertyType::Color; prop->defaultColor = GetColorAttribute(child.get(), "default", doc); }
+        else if (typeStr == "Image" || typeStr == "image") { prop->propertyType = ViewModelPropertyType::Image; prop->defaultImage = GetAttribute(child.get(), "default"); }
+        else if (typeStr == "ViewModel" || typeStr == "viewModel") { prop->propertyType = ViewModelPropertyType::ViewModel; }
+        auto converterId = GetAttribute(child.get(), "dataConverter");
+        if (!converterId.empty() && converterId[0] == '@') prop->dataConverter = doc->findNode<DataConverter>(converterId.substr(1));
+        auto vmRef = GetAttribute(child.get(), "viewModelRef");
+        if (!vmRef.empty() && vmRef[0] == '@') prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
+        vm->properties.push_back(prop);
+      }
+    } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
+      (void)ParseDataConverter(child.get(), doc);
+    }
+    child = child->nextSibling;
+  }
+  return vm;
+}
+
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc, bool isRootDocument) {
+  (void)isRootDocument;
+  auto bind = makeNodeFromXML<DataBind>(node, doc);
+  if (!bind) return nullptr;
+  bind->source = GetAttribute(node, "source");
+  bind->target = GetAttribute(node, "target");
+  bind->channel = GetAttribute(node, "channel");
+  auto flagsStr = GetAttribute(node, "flags");
+  if (!flagsStr.empty()) {
+    if (flagsStr == "ToTarget" || flagsStr == "toTarget") bind->flags = DataBindFlags::ToTarget;
+    else if (flagsStr == "ToSource" || flagsStr == "toSource") bind->flags = DataBindFlags::ToSource;
+    else if (flagsStr == "TwoWay" || flagsStr == "twoWay") bind->flags = DataBindFlags::TwoWay;
+    else if (flagsStr == "Once" || flagsStr == "once") bind->flags = DataBindFlags::Once;
+  }
+  (void)doc;
+  return bind;
+}
+
+static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc) {
+  auto converter = makeNodeFromXML<DataConverter>(node, doc);
+  if (!converter) return nullptr;
+  converter->converterType = GetAttribute(node, "type");
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Param") {
+      auto name = GetAttribute(child.get(), "name");
+      auto value = GetAttribute(child.get(), "value");
+      if (!name.empty()) converter->params[name] = value;
+    }
+    child = child->nextSibling;
+  }
+  return converter;
 }
 
 }  // namespace pagx

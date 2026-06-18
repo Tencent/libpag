@@ -18,52 +18,32 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include <memory>
+#include "pagx/PAGViewModelValue.h"
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
+class PAGViewModel;
 
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * PAGViewModelValueViewModel holds a reference to a nested PAGViewModel instance. When a ViewModel
+ * property has type "ViewModel", this value wraps the child PAGViewModel that was independently
+ * instantiated from the referenced ViewModel schema.
  */
-class Composition : public Node {
+class PAGViewModelValueViewModel : public PAGViewModelValue {
  public:
   /**
-   * The width of the composition in pixels.
+   * Returns the referenced nested PAGViewModel instance, or nullptr if none is set.
    */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  ViewModel* viewModel = nullptr;
-  std::vector<DataBind*> dataBinds = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  std::shared_ptr<PAGViewModel> referenceViewModelInstance() const {
+    return referenceInstance;
   }
 
  private:
-  Composition() = default;
+  std::shared_ptr<PAGViewModel> referenceInstance = nullptr;
 
-  friend class PAGXDocument;
+  friend class PAGViewModel;
+  friend class PAGScene;
 };
 
 }  // namespace pagx
