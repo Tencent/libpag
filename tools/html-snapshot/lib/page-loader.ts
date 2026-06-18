@@ -15,6 +15,7 @@ import {
   mapWaitUntil,
   addCookies,
   addInitScript,
+  waitForNetworkIdle,
   type Browser,
   type BrowserResponse,
   type CookieParam,
@@ -140,22 +141,50 @@ export async function openAndSettlePage(
     await addCookies(page, engine, scoped);
   }
 
+  // Navigate gating on `load` (document + all subresources fetched), not
+  // `networkidle`. `networkidle` is fragile: it resolves only after the
+  // network stays quiet for ~500ms, which is easily defeated by pages that
+  // keep connections open or stream a long tail of external requests (CDN
+  // keep-alive, Google Fonts, icon webfonts, the Tailwind Play CDN, image
+  // hosts). Worse, when many pages load concurrently the shared CDNs saturate
+  // and even reaching `<body>` can blow past the 30s deadline — a
+  // parser-blocking `<script src="cdn…">` placed after slow stylesheets stalls
+  // the parser, so the timeout fallback would see no body and fail the whole
+  // render. `load` is reliable under that contention and guarantees a body.
   try {
-    await page.goto(url, { waitUntil: mapWaitUntil(engine, 'networkidle'), timeout: 30000 });
+    await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: 30000 });
   } catch (err) {
-    // `networkidle` is fragile: it resolves only after the network stays quiet
-    // for ~500ms, which never happens on pages that keep connections open or
-    // stream a long tail of external requests (CDN keep-alive, Google Fonts,
-    // Unsplash/image hosts). The document and its scripts have loaded long
-    // before the wait condition fails, so a navigation *timeout* should not
-    // fail the whole render — fall back to whatever is rendered and let the
-    // waitForRoot + waitMs steps below give async apps time to mount. Anything
-    // that is not a timeout (a genuinely broken navigation) is re-thrown.
+    // A navigation *timeout* should still not fail the whole render: the
+    // document is usually parsed and painted well before every last subresource
+    // resolves, so fall back to whatever is rendered as long as a body exists
+    // and let the waitForRoot + waitMs steps below give async apps time to
+    // mount. Anything that is not a timeout (a genuinely broken navigation) is
+    // re-thrown.
     const msg = err && (err as Error).message ? (err as Error).message : String(err);
     if (!/timeout/i.test(msg)) throw err;
-    const hasBody = await page.evaluate(() => !!document.body).catch(() => false);
-    if (!hasBody) throw err;
+    let hasBody = await page.evaluate(() => !!document.body).catch(() => false);
+    if (!hasBody) {
+      // No `<body>` yet usually means a parser-blocking `<script src="cdn…">`
+      // queued behind slow external stylesheets stalled the HTML parser before
+      // it reached `<body>` (common under high concurrency when shared CDNs are
+      // saturated). The document is still live — give the parser a bounded
+      // extra window to finish rather than failing the whole render, then
+      // re-check. Only if the body never materialises is this a genuine dead
+      // navigation worth re-throwing.
+      hasBody = await page
+        .waitForSelector('body', { timeout: 15000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!hasBody) throw err;
+    }
   }
+
+  // Best-effort settle: give the network a short, bounded chance to go quiet so
+  // late `@font-face` fetches and SPA XHRs land before we screenshot. This is
+  // non-fatal — `waitForNetworkIdle` resolves either way — so a chatty CDN only
+  // costs the settle budget instead of failing navigation the way a
+  // `networkidle`-gated `goto` would.
+  await waitForNetworkIdle(page, engine, 5000);
 
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });
