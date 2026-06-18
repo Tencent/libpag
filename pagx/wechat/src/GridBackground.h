@@ -33,9 +33,9 @@ class GridBackgroundLayer : public tgfx::Layer {
  private:
   GridBackgroundLayer(int width, int height, float density);
 
-  int _width = 0;
-  int _height = 0;
-  float _density = 1.f;
+  int gridWidth = 0;
+  int gridHeight = 0;
+  float density = 1.f;
 };
 
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);

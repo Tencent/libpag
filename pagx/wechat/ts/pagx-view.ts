@@ -124,7 +124,7 @@ export interface PAGXViewOptions {
  *     const bytes = await myDownloader(path);               // Custom fetch / caching.
  *     const canvas = await View.decodeImageFromBytes(bytes); // Host-native decode, runs
  *                                                            // concurrently for each path.
- *     view.loadFileDataAsNativeImage(path, canvas);          // Swap in on the next frame.
+ *     view.attachNativeImage(path, canvas, ImageQuality.Full); // Swap in on the next frame.
  *   })();
  * }
  * ```
@@ -293,13 +293,16 @@ export class View {
       throw new Error('Native view not initialized');
     }
     const paths = this.nativeView.getExternalFilePaths();
-    const result: string[] = [];
-    const count = paths.size();
-    for (let i = 0; i < count; i++) {
-      result.push(paths.get(i));
+    try {
+      const result: string[] = [];
+      const count = paths.size();
+      for (let i = 0; i < count; i++) {
+        result.push(paths.get(i));
+      }
+      return result;
+    } finally {
+      paths.delete();
     }
-    paths.delete();
-    return result;
   }
 
   /**
@@ -318,54 +321,12 @@ export class View {
   }
 
   /**
-   * Attach a host-decoded image (e.g. an OffscreenCanvas produced via
-   * View.decodeImageFromPath()) as the source for Image nodes matching the given file path.
-   * This is the preferred path on WeChat for external image resources because it moves webp/png
-   * decoding off the wasm main thread onto the mini-program's native decoder, and lets multiple
-   * images decode concurrently.
-   *
-   * Unlike loadFileData(), this method may be called AFTER buildLayers(). When called post-
-   * build, any VectorLayers whose shapes reference the updated image are rebuilt in place and
-   * will reflect the new asset on the next draw() call, so callers can trigger progressive
-   * image appearance without reconstructing the layer tree.
-   *
-   * @param filePath The external file path to match against Image nodes.
-   * @param nativeImage A host-decoded image object (typically an OffscreenCanvas).
-   * @returns True if a matching Image node was found and attached.
-   */
-  public loadFileDataAsNativeImage(filePath: string, nativeImage: unknown): boolean {
-    if (!this.nativeView) {
-      throw new Error('Native view not initialized');
-    }
-    return this.nativeView.loadFileDataAsNativeImage(filePath, nativeImage);
-  }
-
-  /**
-   * Swap in a new host-decoded image for an already-rendered filePath and rebuild every layer
-   * that references it in place. Use this when replacing a low-resolution thumbnail with a
-   * higher-resolution version during progressive image loading; the next draw() picks up the
-   * upgraded asset without any additional calls. Returns false when the filePath is not
-   * currently referenced by any layer or buildLayers() has not been invoked yet.
-   *
-   * Call loadFileDataAsNativeImage() for the first-time attachment (before buildLayers()) and
-   * this method for subsequent swaps (after buildLayers()).
-   *
-   * @param filePath The external file path to match against Image nodes.
-   * @param nativeImage A host-decoded image object (typically an OffscreenCanvas).
-   */
-  public upgradeImageFromNative(filePath: string, nativeImage: unknown): boolean {
-    if (!this.nativeView) {
-      throw new Error('Native view not initialized');
-    }
-    return this.nativeView.upgradeImageFromNative(filePath, nativeImage);
-  }
-
-  /**
    * Attaches a host-decoded native image (typically an OffscreenCanvas) to Image nodes
-   * matching the given filePath under a specific quality tier. Unlike loadFileDataAsNativeImage
-   * + upgradeImageFromNative, the pixels are uploaded as a GPU-resident backend texture on the
-   * next draw() and the host-side OffscreenCanvas can be released as soon as this call
-   * returns; the renderer no longer holds a reference into the JS heap once the upload runs.
+   * matching the given filePath under a specific quality tier.
+   *
+   * The image is queued for GPU upload; actual texImage2D happens during the next draw() call
+   * inside flushPendingUploads(). The OffscreenCanvas can be released as soon as this method
+   * returns. Affected layers are rebuilt in place so the new asset shows up on the next frame.
    *
    * Two quality tiers may be attached for the same filePath at different times. Typical
    * progressive flow:
@@ -381,9 +342,8 @@ export class View {
    *                    OffscreenCanvas; the latter is detected by the `isOffscreenCanvas`
    *                    discriminator.
    * @param quality Quality tier; selects the Image-node slot the upload writes to.
-   * @returns True when the request was queued. The actual GPU upload happens on the next
-   *          draw(); a return value of false typically means the thumbnail budget cannot fit
-   *          the upload (Thumbnail) or the document/native view is not ready.
+   * @returns True when the upload request was queued successfully. False typically means the
+   *          budget cannot fit or the document is not ready.
    */
   public attachNativeImage(
     filePath: string,
@@ -1030,7 +990,7 @@ export class View {
 
   /**
    * Decode an image from a file path (temp file or URL the mini-program can resolve) into an
-   * OffscreenCanvas. The decoded canvas is what loadFileDataAsNativeImage() expects. This
+   * OffscreenCanvas. The decoded canvas is what attachNativeImage() expects. This
    * utility is deliberately kept as a primitive -- it does not handle downloads or caching -- so
    * callers can plug in their own network/caching logic (which is commonly required for CDN
    * signing, retry policy, and so on).

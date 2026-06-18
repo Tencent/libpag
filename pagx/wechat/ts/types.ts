@@ -39,18 +39,10 @@ export interface PAGXViewNative {
     /** Loads external file data for an Image node matching the given path. Returns true on success. */
     loadFileData: (filePath: string, fileData: Uint8Array) => boolean;
     /**
-     * Attaches a host-decoded native image (e.g. an OffscreenCanvas produced by drawing a
-     * wx.createImage() result) to Image nodes matching the given path. Used for async image
-     * loading to avoid wasm-side webp decoding. Can be called after buildLayers() for
-     * progressive updates; returns true if at least one matching node was found.
-     */
-    loadFileDataAsNativeImage: (filePath: string, nativeImage: any) => boolean;
-    /**
      * Attaches a host-decoded native image to Image nodes matching the given path under a
-     * specific quality tier. Unlike loadFileDataAsNativeImage(), the image is uploaded as a
-     * GPU-resident backend texture on the next draw() and the host-side OffscreenCanvas can be
-     * released as soon as this call returns. The qualityRaw argument is the integer value of
-     * ImageQuality (Thumbnail = 0, Full = 1); the C++ side rejects any other value.
+     * specific quality tier. The image is queued for GPU texture upload; actual texImage2D
+     * happens during the next draw(). The qualityRaw argument is the integer value of
+     * ImageQuality (Thumbnail = 0, Full = 1).
      */
     attachNativeImage: (filePath: string, nativeImage: any, qualityRaw: number) => boolean;
     /**
@@ -78,14 +70,6 @@ export interface PAGXViewNative {
      * eviction sweep reduces totalBytes back below the hard cap.
      */
     isFullBudgetSaturated: () => boolean;
-    /**
-     * Replaces the decoded image attached to the given filePath with a new version AND
-     * immediately regenerates the contents of every layer that renders it, so the next draw()
-     * picks up the upgraded asset. Returns true when at least one layer was rebuilt. Call
-     * loadFileDataAsNativeImage() for the first-time attachment (before buildLayers()) and
-     * upgradeImageFromNative() for later swaps (after buildLayers()).
-     */
-    upgradeImageFromNative: (filePath: string, nativeImage: any) => boolean;
     /**
      * Returns root-space (canvas-pixel) bounds for each filePath in the provided list. Values
      * are either { unionBounds, largestBounds } objects or null when the filePath is not
@@ -213,7 +197,7 @@ export interface ImageUsage {
  * Metadata entry returned for each externally referenced image by View.getImageMetadata().
  */
 export interface ImageMetadataEntry {
-    /** External file path, used as the key when calling loadFileDataAsNativeImage() etc. */
+    /** External file path, used as the key when calling attachNativeImage() etc. */
     filePath: string;
     /** Original image width in source pixels (0 when the exporter omitted it). */
     origWidth: number;

@@ -130,48 +130,26 @@ class PAGXView {
   bool loadFileData(const emscripten::val& filePathVal, const emscripten::val& fileData);
 
   /**
-   * Attaches an already-decoded native image to Image nodes matching the given file path. The
-   * native image must be a JavaScript object tgfx's web NativeCodec understands (typically an
-   * OffscreenCanvas produced by drawing a wx.createImage() result). This lets callers perform
-   * asynchronous decoding on the host side (e.g. via the mini-program's native webp decoder) and
-   * hand the renderer an already-decoded asset, bypassing the wasm libwebp path entirely.
-   *
-   * Unlike loadFileData(), this method can be called AFTER buildLayers(). When it is called
-   * post-build, any VectorLayers that reference the image are rebuilt in place so the new asset
-   * shows up on the next draw(); shapes whose fill was empty because the image had not yet
-   * arrived become visible at that point. This is the primary mechanism for progressive image
-   * loading on WeChat.
-   *
-   * @param filePath   The external file path to match against Image nodes.
-   * @param nativeImage  A JavaScript-side decoded image object.
-   * @return True if at least one matching Image node was found and attached.
-   */
-  bool loadFileDataAsNativeImage(const emscripten::val& filePathVal,
-                                 const emscripten::val& nativeImage);
-
-  /**
    * Attaches a host-decoded native image (typically an OffscreenCanvas) to Image nodes matching
-   * the given file path under a specific quality tier. Unlike loadFileDataAsNativeImage(), which
-   * hands off the JS object to tgfx's NativeCodec wrapper, this entry point uploads the pixels
-   * to a GPU texture immediately at the next draw() call (inside lockContext) and stores the
-   * resulting tgfx::Image as a backend-texture image whose lifetime is tied to PAGXView's own
-   * LRU caches. The OffscreenCanvas can be released by the caller as soon as this method
-   * returns; the C++ side keeps a reference to the JS object only until the upload runs.
+   * the given file path under a specific quality tier. The image is queued for GPU texture
+   * upload on the next draw() call (inside lockContext); the OffscreenCanvas can be released as
+   * soon as this method returns. Affected layers are rebuilt in place after the upload so the
+   * new asset shows up on the same frame.
    *
    * The quality argument selects which slot on the Image node receives the result:
    *   - ImageQuality::Thumbnail writes to Image::thumbnailImage (fallback rendering).
    *   - ImageQuality::Full writes to Image::decodedImage (primary rendering).
    *
    * Both quality tiers may be attached for the same filePath at different times; they live in
-   * distinct caches and do not overwrite each other.
+   * distinct caches and do not overwrite each other. Can be called both before and after
+   * buildLayers(); the upload and rebuild happen at draw() time regardless.
    *
    * @param filePathVal The external file path to match against Image nodes.
    * @param nativeImage A JavaScript-side decoded image source (OffscreenCanvas, ImageBitmap, or
    *                    similar). Must be truthy.
    * @param qualityRaw The image quality as the integer value of ImageQuality, passed through as
    *                   a plain int because the JS binding cannot pass enum values directly.
-   * @return True if the request was queued for upload. The actual GPU upload happens at the
-   *         next draw().
+   * @return True if the request was queued for upload.
    */
   bool attachNativeImage(const emscripten::val& filePathVal, const emscripten::val& nativeImage,
                          int qualityRaw);
@@ -217,27 +195,7 @@ class PAGXView {
    */
   bool isFullBudgetSaturated() const;
 
-  /**
-   * Replaces the decoded image attached to Image nodes that share the given filePath with a new
-   * version and immediately regenerates the vector contents of every affected VectorLayer. Use
-   * this to swap a low-resolution thumbnail for a full-resolution version (progressive image
-   * loading); the next draw() call uses the new asset without any explicit rebuildLayers().
-   *
-   * The call is a no-op when buildLayers() has not been invoked (there is no layer tree to
-   * update yet). For the first-time load of an image during initial buildLayers() use
-   * loadFileDataAsNativeImage() instead -- that entry point only attaches the decoded image
-   * without touching any layers, which is what the pre-build path needs.
-   *
-   * Must be called on the main thread and not from inside draw(); the layer mutation below
-   * relies on there being no concurrent render in progress.
-   *
-   * @param filePath The external file path to match against Image nodes.
-   * @param nativeImage A JavaScript-side decoded image object (same contract as
-   *                    loadFileDataAsNativeImage).
-   * @return True if at least one layer's contents were regenerated as a result of the swap.
-   */
-  bool upgradeImageFromNative(const emscripten::val& filePathVal,
-                              const emscripten::val& nativeImage);
+
 
   /**
    * Returns root-space bounds (canvas pixel coordinates, already accounting for fitScale and
@@ -429,15 +387,6 @@ class PAGXView {
 
   void applyDocumentCustomData();
 
-  // Updates the decoded-image accounting (count, pixel total, size histogram) for a freshly
-  // decoded image and emits the [Img] / [BigImg] / throttled [MemProbe] debug logs. Shared by
-  // loadFileDataAsNativeImage() and upgradeImageFromNative(); the only differences between the
-  // two call sites are the log tag fragments (opTag/bigImgTag/probeTag) and whether the
-  // throttled probe appends the per-bucket histogram (logBuckets, true only for upgrades).
-  void recordDecodedImage(const std::string& filePath,
-                          const std::shared_ptr<tgfx::Image>& image, const char* opTag,
-                          const char* bigImgTag, const char* probeTag, bool logBuckets);
-
   // Shared contain-mode fit scale used by both the content matrix and the JS-facing content
   // transform. Keeping a single source of truth prevents comment pins from drifting relative to
   // the rendered content.
@@ -475,10 +424,10 @@ class PAGXView {
   // memory churn of consecutive full renders.
   // 0 means a gesture has never happened (before the first frame); the first-frame capture is not gated.
   double lastGestureEndMs = 0.0;
-  // Session owns the LayerBuilder state so upgradeImageFromNative() can regenerate a subset of
-  // the layer tree when a higher-resolution asset replaces the thumbnail attached during the
-  // initial buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks
-  // across documents.
+  // Session owns the LayerBuilder state so attachNativeImage() can regenerate a subset of the
+  // layer tree when a higher-resolution asset replaces the thumbnail attached during the initial
+  // buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks across
+  // documents.
   std::unique_ptr<LayerBuilderSession> builderSession = nullptr;
 
   // Pending GPU upload requested by attachNativeImage(). Each entry parks the JS-side decoded
@@ -687,8 +636,8 @@ class PAGXView {
   void emitTextureEvict(const std::vector<std::string>& filePaths);
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  int _width = 0;
-  int _height = 0;
+  int canvasWidth = 0;
+  int canvasHeight = 0;
   FontConfig fontConfig = {};
 
   // Background state from the PAGX document
@@ -705,16 +654,16 @@ class PAGXView {
   bool lastFrameSlow = false;
 
   // Bounds origin: PAGX content bounding box top-left relative to cocraft canvas origin
-  float _boundsOriginX = 0.0f;
-  float _boundsOriginY = 0.0f;
+  float boundsOriginX = 0.0f;
+  float boundsOriginY = 0.0f;
   bool boundsOriginOverridden = false;
 
   // State tracking
   bool hasRenderedFirstFrame = false;
 
-  // Accumulated decoded image accounting (debug only). Reset in parsePAGX(). Counts each call
-  // to loadFileDataAsNativeImage / upgradeImageFromNative; pixel total approximates the GPU
-  // texture footprint at RGBA8 (×4 bytes), useful for correlating wasm heap with image load.
+  // Accumulated decoded image accounting (debug only). Reset in parsePAGX(). Pixel total
+  // approximates the GPU texture footprint at RGBA8 (×4 bytes), useful for correlating wasm
+  // heap with image load. Currently only incremented by flushPendingUploads.
   uint64_t imageDecodedPixelTotal = 0;
   uint32_t imageDecodedCount = 0;
   // Histogram of decoded image sizes by pixel area, indexed by bucket: 0:<10K, 1:<100K,

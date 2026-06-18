@@ -216,7 +216,7 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 }
 
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
-: device(device), _width(width), _height(height) {
+: device(device), canvasWidth(width), canvasHeight(height) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   // Keep zoomScalePrecision at tgfx's default (1000, i.e. 0.001 step) so pinch gestures feel
   // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
@@ -383,107 +383,7 @@ bool PAGXView::loadFileData(const val& filePathVal, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
-void PAGXView::recordDecodedImage(const std::string& filePath,
-                                  const std::shared_ptr<tgfx::Image>& image, const char* opTag,
-                                  const char* bigImgTag, const char* probeTag, bool logBuckets) {
-  imageDecodedCount += 1;
-  uint64_t pixels =
-      static_cast<uint64_t>(image->width()) * static_cast<uint64_t>(image->height());
-  imageDecodedPixelTotal += pixels;
-  imageSizeBuckets[ImageSizeBucket(pixels)] += 1;
-  // Always log size for each loaded image, plus a [BigImg] marker when a single image is
-  // unusually large (≥ 1 MPx). 1280×1280 = 1.64 MPx is the imageMogr2 default cap; anything
-  // bigger means CDN side did not honor the thumbnail params for this asset.
-  LOGI("[Img] %s path=%s size=%dx%d (%.2fMPx)", opTag, filePath.c_str(), image->width(),
-                 image->height(), static_cast<double>(pixels) / 1e6);
-  if (pixels >= BIG_IMG_THRESHOLD) {
-    LOGI("[BigImg] %s path=%s size=%dx%d (%.2fMPx ~%lluKB RGBA)", bigImgTag, filePath.c_str(),
-                   image->width(), image->height(), static_cast<double>(pixels) / 1e6,
-                   static_cast<unsigned long long>(pixels * RGBA_BYTES_PER_PIXEL / BYTES_PER_KB));
-  }
-  // Throttled probe: every IMAGE_LOG_THROTTLE images log a roll-up to keep the console readable
-  // on image-heavy documents. The upgrade path additionally appends the per-bucket histogram.
-  if ((imageDecodedCount % IMAGE_LOG_THROTTLE) == 0) {
-    if (logBuckets) {
-      LOGI(
-          "[MemProbe] tag=%s.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA) "
-          "buckets=[%u,%u,%u,%u,%u,%u]",
-          probeTag, static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-          static_cast<unsigned long long>(imageDecodedPixelTotal),
-          static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB),
-          imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
-          imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
-    } else {
-      LOGI(
-          "[MemProbe] tag=%s.tick wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
-          probeTag, static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-          static_cast<unsigned long long>(imageDecodedPixelTotal),
-          static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
-    }
-  }
-}
 
-bool PAGXView::loadFileDataAsNativeImage(const val& filePathVal, const val& nativeImage) {
-  auto filePath = filePathVal.as<std::string>();
-  if (!document || filePath.empty() || !nativeImage.as<bool>()) {
-    return false;
-  }
-  // Wrap the host-decoded asset as a tgfx::Image backed by NativeCodec. This path bypasses
-  // wasm-side libwebp/libpng decoding entirely: sampling the image later will go through
-  // WebImageBuffer::onMakeTexture which uploads straight from the OffscreenCanvas.
-  auto codec = tgfx::ImageCodec::MakeFrom(nativeImage);
-  if (!codec) {
-    return false;
-  }
-  auto tgfxImage = tgfx::Image::MakeFrom(codec);
-  if (!tgfxImage) {
-    return false;
-  }
-  tgfxImage = tgfxImage->makeMipmapped(true);
-
-  recordDecodedImage(filePath, tgfxImage, "load", "LOAD", "loadImage", false);
-
-  auto* imageNode = document->loadDecodedImage(filePath, tgfxImage);
-  return imageNode != nullptr;
-}
-
-bool PAGXView::upgradeImageFromNative(const val& filePathVal, const val& nativeImage) {
-  auto filePath = filePathVal.as<std::string>();
-  if (!document || !builderSession || filePath.empty() || !nativeImage.as<bool>()) {
-    return false;
-  }
-  auto codec = tgfx::ImageCodec::MakeFrom(nativeImage);
-  if (!codec) {
-    return false;
-  }
-  auto tgfxImage = tgfx::Image::MakeFrom(codec);
-  if (!tgfxImage) {
-    return false;
-  }
-  tgfxImage = tgfxImage->makeMipmapped(true);
-
-  recordDecodedImage(filePath, tgfxImage, "upgrade", "UPGRADE", "upgradeImage", true);
-
-  // Attach the upgraded decoded image first so the session's rebuild sees the new pixels when
-  // it re-runs convertImagePattern on the affected layers. loadDecodedImage does not clear the
-  // filePath, so subsequent calls can replace it again (useful for multi-stage upgrades).
-  if (document->loadDecodedImage(filePath, tgfxImage) == nullptr) {
-    return false;
-  }
-  // ImagePattern matrices are baked in parsePAGX() against the initial image's pixel
-  // dimensions. Now that a higher-resolution image has replaced the initial one, those baked
-  // matrices would leave the upgraded image visibly misaligned (correct shape placement but
-  // wrong scale/offset inside the shape). ResolveImagePatternMatricesByFilePath is idempotent
-  // thanks to the paint-transform cache in customData, so each upgrade call refreshes against
-  // the newly attached decodedImage without losing the original paint transform.
-  ResolveImagePatternMatricesByFilePath(document.get(), filePath, &imageOriginalSizes);
-  // Regenerate every layer whose fill/stroke currently points at this filePath. The return
-  // value is the number of tgfx layers whose contents were refreshed; zero means nothing in
-  // the document references the path (callers typically treat this as a no-op success, but
-  // we surface it as a boolean so JS can log it).
-  bool ok = builderSession->rebuildForFilePath(filePath) > 0;
-  return ok;
-}
 
 bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
                                  int qualityRaw) {
@@ -723,8 +623,8 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       externalTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the newly attached image dimensions; mirrors the
-      // upgradeImageFromNative path so progressive thumbnail->full swaps stay aligned.
+      // Refresh ImagePattern matrices against the newly attached image dimensions so
+      // progressive thumbnail->full swaps stay aligned.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
@@ -874,7 +774,7 @@ void PAGXView::enforceFullBudget() {
 }
 
 tgfx::Rect PAGXView::computeViewportInRootCoords() const {
-  if (_width <= 0 || _height <= 0) {
+  if (canvasWidth <= 0 || canvasHeight <= 0) {
     return tgfx::Rect::MakeEmpty();
   }
   // Layer hierarchy: displayList.root() applies (zoomScale, contentOffset); contentLayer below
@@ -891,8 +791,8 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   auto offset = displayList.contentOffset();
   float left = (-offset.x) / zoomScale;
   float top = (-offset.y) / zoomScale;
-  float width = static_cast<float>(_width) / zoomScale;
-  float height = static_cast<float>(_height) / zoomScale;
+  float width = static_cast<float>(canvasWidth) / zoomScale;
+  float height = static_cast<float>(canvasHeight) / zoomScale;
   // 1.2x expansion around the viewport center absorbs fling-deceleration overshoot and small
   // user adjustments that would otherwise momentarily push an in-focus texture outside the
   // strict viewport, triggering an avoidable evict→re-upload cycle. Match the same factor
@@ -1301,7 +1201,7 @@ void PAGXView::buildLayers() {
   LogMemProbe("buildLayers.afterApplyLayout");
 
   // Route through LayerBuilderSession so the build state survives into the progressive image
-  // upgrade path; see upgradeImageFromNative() below.
+  // upgrade path; post-build attachNativeImage(Full) calls rebuildForFilePath() on this session.
   builderSession = std::make_unique<LayerBuilderSession>();
   auto buildResult = builderSession->build(document.get());
   contentLayer = buildResult.root;
@@ -1344,7 +1244,7 @@ void PAGXView::applyDocumentCustomData() {
       char* end = nullptr;
       float value = std::strtof(originXIt->second.c_str(), &end);
       if (end != originXIt->second.c_str()) {
-        _boundsOriginX = value;
+        boundsOriginX = value;
       }
     }
     auto originYIt = customData.find("bounds-origin-y");
@@ -1352,7 +1252,7 @@ void PAGXView::applyDocumentCustomData() {
       char* end = nullptr;
       float value = std::strtof(originYIt->second.c_str(), &end);
       if (end != originYIt->second.c_str()) {
-        _boundsOriginY = value;
+        boundsOriginY = value;
       }
     }
   }
@@ -1363,8 +1263,8 @@ void PAGXView::updateSize(int width, int height) {
     return;
   }
 
-  _width = width;
-  _height = height;
+  canvasWidth = width;
+  canvasHeight = height;
   surface = nullptr;
   // Snapshots are bound to the old surface size; drop them to avoid dimension mismatch.
   fitSnapshot = nullptr;
@@ -1391,11 +1291,11 @@ void PAGXView::updateSize(int width, int height) {
 // offset by downloading 20p thumbnails first, so the first-frame texture payload stays low.
 // Returns 0 when dimensions are invalid; callers must check before using the result.
 float PAGXView::computeFitScale() const {
-  if (_width <= 0 || _height <= 0 || pagxWidth <= 0 || pagxHeight <= 0) {
+  if (canvasWidth <= 0 || canvasHeight <= 0 || pagxWidth <= 0 || pagxHeight <= 0) {
     return 0.0f;
   }
-  float scaleX = static_cast<float>(_width) / pagxWidth;
-  float scaleY = static_cast<float>(_height) / pagxHeight;
+  float scaleX = static_cast<float>(canvasWidth) / pagxWidth;
+  float scaleY = static_cast<float>(canvasHeight) / pagxHeight;
   return std::min(scaleX, scaleY);
 }
 
@@ -1407,8 +1307,8 @@ void PAGXView::applyCenteringTransform() {
   if (scale <= 0.0f) {
     return;
   }
-  float offsetX = (static_cast<float>(_width) - pagxWidth * scale) * 0.5f;
-  float offsetY = (static_cast<float>(_height) - pagxHeight * scale) * 0.5f;
+  float offsetX = (static_cast<float>(canvasWidth) - pagxWidth * scale) * 0.5f;
+  float offsetY = (static_cast<float>(canvasHeight) - pagxHeight * scale) * 0.5f;
 
   auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
   matrix.preScale(scale, scale);
@@ -1417,8 +1317,8 @@ void PAGXView::applyCenteringTransform() {
 }
 
 void PAGXView::setBoundsOrigin(float x, float y) {
-  _boundsOriginX = x;
-  _boundsOriginY = y;
+  boundsOriginX = x;
+  boundsOriginY = y;
   boundsOriginOverridden = true;
 }
 
@@ -1458,12 +1358,12 @@ val PAGXView::getContentTransform() const {
   float centerOffsetX = 0.0f;
   float centerOffsetY = 0.0f;
   if (fitScale > 0.0f) {
-    centerOffsetX = (static_cast<float>(_width) - pagxWidth * fitScale) * 0.5f;
-    centerOffsetY = (static_cast<float>(_height) - pagxHeight * fitScale) * 0.5f;
+    centerOffsetX = (static_cast<float>(canvasWidth) - pagxWidth * fitScale) * 0.5f;
+    centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
   }
   val result = val::object();
-  result.set("boundsOriginX", _boundsOriginX);
-  result.set("boundsOriginY", _boundsOriginY);
+  result.set("boundsOriginX", boundsOriginX);
+  result.set("boundsOriginY", boundsOriginY);
   result.set("fitScale", fitScale);
   result.set("centerOffsetX", centerOffsetX);
   result.set("centerOffsetY", centerOffsetY);
@@ -1571,7 +1471,7 @@ bool PAGXView::draw() {
   // immediately. Bail out as soon as tgfx reports actual content has changed -- once the
   // fast path settled into idle, the only way hasContentChanged() flips back to true is a
   // layer-tree mutation (progressive image upgrade swapping a higher-resolution texture, or
-  // the initial loadFileDataAsNativeImage() attaching pixels to nodes whose first render
+  // the initial attachNativeImage() attaching pixels to nodes whose first render
   // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
   // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
   // those post-first-render content changes would be silently dropped. A queued
@@ -1611,9 +1511,9 @@ bool PAGXView::draw() {
     auto canvas = surface->getCanvas();
     canvas->clear();
     if (backgroundVisible) {
-      DrawSolidBackground(canvas, _width, _height, backgroundTGFXColor);
+      DrawSolidBackground(canvas, canvasWidth, canvasHeight, backgroundTGFXColor);
     } else {
-      DrawBackground(canvas, _width, _height, 1.0f);
+      DrawBackground(canvas, canvasWidth, canvasHeight, 1.0f);
     }
     // fit blit: fit is an N× supersample of the z=1 main-surface state, so the blit scale = liveZoom/N.
     // The enclosing guard already ensures fitSnapshot != nullptr here.
@@ -1686,13 +1586,13 @@ bool PAGXView::draw() {
     if constexpr (DRAW_LOG_ENABLED) {
       surfaceStartMs = emscripten_get_now();
     }
-    if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
+    if (surface == nullptr || surface->width() != canvasWidth || surface->height() != canvasHeight) {
       context->setCacheLimit(MAX_CACHE_LIMIT);
       context->setResourceExpirationFrames(EXPIRATION_FRAMES);
       tgfx::GLFrameBufferInfo glInfo = {};
       glInfo.id = 0;
       glInfo.format = GL_RGBA8;
-      tgfx::BackendRenderTarget renderTarget(glInfo, _width, _height);
+      tgfx::BackendRenderTarget renderTarget(glInfo, canvasWidth, canvasHeight);
       surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::BottomLeft);
       if (surface == nullptr) {
         device->unlock();
@@ -1710,9 +1610,9 @@ bool PAGXView::draw() {
     canvas->clear();
 
     if (backgroundVisible) {
-      DrawSolidBackground(canvas, _width, _height, backgroundTGFXColor);
+      DrawSolidBackground(canvas, canvasWidth, canvasHeight, backgroundTGFXColor);
     } else {
-      DrawBackground(canvas, _width, _height, 1.0f);
+      DrawBackground(canvas, canvasWidth, canvasHeight, 1.0f);
     }
     if constexpr (DRAW_LOG_ENABLED) {
       bgMs = emscripten_get_now() - bgStartMs;
@@ -1739,8 +1639,9 @@ bool PAGXView::draw() {
     // The SDK-side accounting (external/thumb totals + entry counts + pending uploads) makes it
     // possible to tell apart "tgfx is full of backend textures we asked for" from "tgfx is full
     // of tile cache or other internal resources" by diffing against memoryUsage. imageCount is
-    // legacy: it counts only wasm-decoded loads via loadFileDataAsNativeImage, so the
-    // attachNativeImage path does not increment it; expect imageCount=0 in cocraft scenarios.
+    // legacy: it counts only pre-build synchronous loads via attachNativeImage, so the
+    // post-build backend-texture path does not increment it; expect imageCount=0 in scenarios
+    // that exclusively use the post-build flow.
     if ((gpuProbeCounter++ % GPU_PROBE_INTERVAL) == 0) {
       LOGI(
           "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
@@ -1780,8 +1681,8 @@ bool PAGXView::draw() {
         float pixelScale = fitContentScale < HIGH_RES_FIT_SCALE_THRESHOLD ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
 
         if (pixelScale > DEFAULT_PIXEL_SCALE) {
-          int offW = static_cast<int>(_width * pixelScale);
-          int offH = static_cast<int>(_height * pixelScale);
+          int offW = static_cast<int>(canvasWidth * pixelScale);
+          int offH = static_cast<int>(canvasHeight * pixelScale);
           auto offscreen = tgfx::Surface::Make(context, offW, offH);
           if (offscreen != nullptr) {
             // Temporarily set displayList to zoom=N, offset=0 to render into offscreen, then restore.
@@ -1869,8 +1770,8 @@ bool PAGXView::draw() {
           "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
           "drawPx=(%.0fx%.0f)",
           frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs, dirty ? 1 : 0,
-          lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, _width,
-          _height, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
+          lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, canvasWidth,
+          canvasHeight, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
     }
   }
 
@@ -1946,11 +1847,11 @@ void PAGXView::resetForFreshCapture() {
 }
 
 int PAGXView::width() const {
-  return _width;
+  return canvasWidth;
 }
 
 int PAGXView::height() const {
-  return _height;
+  return canvasHeight;
 }
 
 void PAGXView::updatePerformanceState(double frameDurationMs) {

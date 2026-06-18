@@ -29,25 +29,26 @@ std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make(int width, int he
 }
 
 GridBackgroundLayer::GridBackgroundLayer(int width, int height, float density)
-    : _width(width), _height(height), _density(density) {
+    : gridWidth(width), gridHeight(height), density(density) {
   invalidateContent();
 }
 
 void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
-  recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height)),
-                    backgroundPaint);
+  recorder->addRect(
+      tgfx::Rect::MakeWH(static_cast<float>(gridWidth), static_cast<float>(gridHeight)),
+      backgroundPaint);
 
   tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   // Use fixed logical size (32px) so the grid looks the same on all screens.
   int logicalTileSize = 32;
-  int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * _density);
+  int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * density);
   if (tileSize <= 0) {
     tileSize = logicalTileSize;
   }
-  for (int y = 0; y < _height; y += tileSize) {
+  for (int y = 0; y < gridHeight; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < _width; x += tileSize) {
+    for (int x = 0; x < gridWidth; x += tileSize) {
       if (draw) {
         recorder->addRect(
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),

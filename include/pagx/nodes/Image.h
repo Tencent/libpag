@@ -46,23 +46,20 @@ class Image : public Node {
   std::string filePath = {};
 
   /**
-   * A pre-decoded tgfx::Image produced by the host runtime, typically via an async native
-   * decoder on platforms where synchronous codec decoding is expensive (e.g. WeChat mini-program
-   * where wasm libwebp decoding blocks the main thread). When non-null, the renderer uses this
-   * directly and skips encoded-bytes decoding. Populated on the WeChat platform by
-   * PAGXView::attachNativeImage() with quality=Full (and the legacy
-   * loadFileDataAsNativeImage() / upgradeImageFromNative entry points which forward to it);
-   * other platforms currently leave it null.
+   * A pre-decoded tgfx::Image provided by the host runtime via PAGXDocument::loadDecodedImage().
+   * When non-null, the renderer uses this directly and skips encoded-bytes decoding. Typically
+   * populated by platforms where synchronous codec decoding is expensive and an async native
+   * decoder is preferred. Platforms that do not use this flow leave it null.
    */
   std::shared_ptr<tgfx::Image> decodedImage = nullptr;
 
   /**
-   * Low-resolution preview tgfx::Image attached alongside the full-resolution decodedImage.
-   * Populated by PAGXView::attachNativeImage() with quality=Thumbnail. When the renderer cannot
-   * use decodedImage (initial load not yet complete, or the full-resolution texture has been
-   * evicted under memory pressure), it falls back to thumbnailImage so the affected fill area
-   * shows a blurry preview rather than a blank rectangle. Always nullptr on platforms that do
-   * not opt into the backend-texture image flow.
+   * Low-resolution preview tgfx::Image used as a fallback when decodedImage is unavailable
+   * (initial load not yet complete, or the full-resolution texture has been evicted under memory
+   * pressure). When non-null, the renderer falls back to this so the affected fill area shows a
+   * blurry preview rather than a blank rectangle. Populated via PAGXDocument::loadDecodedImage()
+   * with a thumbnail-quality image. Platforms that do not use progressive image loading leave it
+   * null.
    */
   std::shared_ptr<tgfx::Image> thumbnailImage = nullptr;
 
