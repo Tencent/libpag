@@ -223,6 +223,7 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_HTML)
         list(APPEND PAG_FILES
+            src/pagx/html/importer/AbsoluteToFlexInferencePass.cpp
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h
@@ -253,6 +254,8 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLTransformContext.h
             src/pagx/html/importer/HTMLTransformPasses.cpp
             src/pagx/html/importer/HTMLTransformPasses.h
+            src/pagx/html/importer/HTMLTransformPassUtils.cpp
+            src/pagx/html/importer/HTMLTransformPassUtils.h
             src/pagx/html/importer/HTMLValueParser.cpp
             src/pagx/html/importer/HTMLValueParser.h)
     endif ()

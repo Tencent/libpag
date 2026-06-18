@@ -32,6 +32,23 @@ namespace pagx {
 
 using namespace pagx::html;
 
+namespace {
+
+// Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
+// All importer-controlled transformer behaviour funnels through here so adding a new shared
+// option only edits one location instead of being mirrored at every parseDOM() call site.
+HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Options& opts) {
+  HTMLSubsetTransformer::Options result = {};
+  result.strict = opts.strict;
+  result.preserveUnknownElements = opts.preserveUnknownElements;
+  result.canvasWidth = opts.targetWidth;
+  result.canvasHeight = opts.targetHeight;
+  result.inferFlexFromAbsolute = opts.inferFlexFromAbsolute;
+  return result;
+}
+
+}  // namespace
+
 //==================================================================================================
 // HTMLParserContext: top-level traversal
 //==================================================================================================
@@ -95,13 +112,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
   // through `_diagnostics` so they end up on PAGXDocument::errors once the document exists.
   if (_options.autoNormalize) {
-    HTMLSubsetTransformer::Options topts = {};
-    topts.strict = _options.strict;
-    topts.preserveUnknownElements = _options.preserveUnknownElements;
-    topts.canvasWidth = _options.targetWidth;
-    topts.canvasHeight = _options.targetHeight;
-    topts.inferFlexFromAbsolute = _options.inferFlexFromAbsolute;
-    auto report = HTMLSubsetTransformer::Transform(root, topts);
+    auto report = HTMLSubsetTransformer::Transform(root, DeriveTransformerOptions(_options));
     for (auto& diag : report.diagnostics) {
       std::string formatted = diag.message;
       if (!diag.code.empty()) {

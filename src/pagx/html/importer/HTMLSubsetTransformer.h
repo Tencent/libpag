@@ -29,16 +29,19 @@ struct DOMNode;
 class HTMLTransformPass;
 
 /**
+ * Internal HTML subset normaliser. NOT part of the pagx public API — this header lives under
+ * `src/pagx/html/importer/` and the only out-of-tree caller is the importer's unit-test target,
+ * which exercises the pipeline directly via `Builder` to keep transformer-level coverage
+ * decoupled from the importer. Tooling and embedders should go through `pagx::HTMLImporter`.
+ *
  * Rewrites an HTML DOM so that the produced tree strictly satisfies the subset documented in
- * `spec/html_subset.md`.
+ * `spec/html_subset.md`. Inputs that already follow the subset pass through unchanged. Inputs
+ * that use disallowed elements, selectors, properties, or units are either rewritten (when
+ * there is a deterministic equivalent within the subset) or pruned with a structured
+ * diagnostic.
  *
- * Inputs that already follow the subset pass through unchanged. Inputs that use disallowed
- * elements, selectors, properties, or units are either rewritten (when there is a deterministic
- * equivalent within the subset) or pruned with a structured diagnostic.
- *
- * The transformer is designed to run as an automatic pre-pass inside `HTMLImporter::Parse` so
- * downstream code only ever sees subset-compliant HTML. It can also be invoked standalone (for
- * example by tooling that wants to inspect the normalised intermediate form).
+ * The transformer runs as an automatic pre-pass inside `HTMLImporter::Parse` so the importer
+ * only ever sees subset-compliant HTML.
  *
  * CSS resolution scope: inline styles, `<style>` blocks (class + element selectors only),
  * element defaults, inheritable cascade. Tailwind utility classes are NOT compiled; if such
