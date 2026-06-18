@@ -112,10 +112,12 @@ that actually animate) so still cases don't inflate the score.
 
 ## Caveats
 
-- The runtime plays only the channels the subset supports — `opacity`, `transform: translate`,
-  `color`, `background-color`. A page animating scale / rotation / non-translate transforms will
-  diff against a baseline that *does* show them, so its SSIM is bounded below 1.0 by design (same
-  philosophy as the static eval, which strips JS and subpixel detail).
+- The runtime plays only the channels the subset supports — `opacity`, `transform`
+  (translate via `x`/`y`, and scale / rotate / skew / `matrix` via the full affine `matrix`
+  channel), `color`, `background-color`. 3D transforms (`matrix3d` / `rotate3d` / `perspective`)
+  and layout-affecting animations still diff against a baseline that *does* show them, so those
+  cases stay bounded below 1.0 SSIM by design (same philosophy as the static eval, which strips
+  JS and subpixel detail).
 - Animation seeking uses `document.getAnimations()`, which surfaces CSS + WAAPI + Motion One.
   Purely rAF-driven libraries (some GSAP / anime.js setups) are captured by the snapshot tool's
   sampler but are **not** deterministically seekable in the baseline, so those cases fall back to a

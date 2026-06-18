@@ -38,7 +38,8 @@ struct CssKeyframesRule;
  * `spec/html_subset.md` §13) onto the PAGX animation model. For each animated element the builder
  * emits an `Animation` -> `AnimationObject` -> `Channel` -> `Keyframe` graph into
  * `PAGXDocument::animations`, restricted to the channels the runtime can play back
- * (`alpha` / `x` / `y` on the element's Layer, and `color` on the Layer's solid Fill).
+ * (`alpha` / `x` / `y` on the element's Layer for opacity and pure translation; the full affine
+ * `matrix` channel for scale / rotate / skew transforms; and `color` on the Layer's solid Fill).
  *
  * The builder borrows the importer's diagnostic sink, value parser and id allocator; the document
  * handle and the `@keyframes` registry are bound after the document and cascade exist.

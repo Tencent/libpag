@@ -3985,7 +3985,9 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
   EXPECT_NEAR(ch->keyframes.back().value, 0.0f, kEps);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupportedTransformWarnsAndDrops) {
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateProducesMatrixChannel) {
+  // `rotate` (like scale / skew) is a non-translation transform, so it routes through the full
+  // affine `matrix` channel rather than x/y. No unsupported-property warning is expected.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -3999,19 +4001,64 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupportedTransformWarnsAndDrops) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
   }
-  EXPECT_TRUE(warned);
-  // rotate maps to no runtime channel, so no animation is emitted.
-  EXPECT_TRUE(doc->animations.empty());
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixKeepsTranslateDropsScale) {
+PAG_TEST(PAGXHTMLImporterTest, AnimationScaleProducesMatrixChannel) {
+  // `transform: scale(...)` is animatable through the `matrix` channel. The pivot is baked from
+  // the element's box centre so the keyframe matrices mirror the static applyBoxTransform path.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes pulse {
+        0%   { transform: scale(1); }
+        100% { transform: scale(2); }
+      }
+    </style></head>
+    <body style="width:200px;height:200px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;transform-origin:50% 50%;
+                           animation:pulse 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  // No x/y channels: a non-translation transform routes entirely through the matrix channel.
+  EXPECT_EQ(FindChannel(anim, "x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "y"), nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  // 0% scale(1) about a (25, 25) pivot is the identity.
+  const auto& first = mCh->keyframes.front().value;
+  EXPECT_FLOAT_EQ(first.a, 1.0f);
+  EXPECT_FLOAT_EQ(first.d, 1.0f);
+  // 100% scale(2) about (25, 25): a == d == 2, tx == ty == -25 (T(c) * S(2) * T(-c)).
+  const auto& last = mCh->keyframes.back().value;
+  EXPECT_FLOAT_EQ(last.a, 2.0f);
+  EXPECT_FLOAT_EQ(last.d, 2.0f);
+  EXPECT_FLOAT_EQ(last.tx, -25.0f);
+  EXPECT_FLOAT_EQ(last.ty, -25.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixWithScaleProducesMatrixChannel) {
   // A `matrix(...)` that combines a scale with a translation (the common shape `getComputedStyle`
-  // reports for GSAP-style animations) must keep the translation on x/y while dropping the scale,
-  // warning that an unsupported component was lost.
+  // reports for GSAP-style animations) is now carried verbatim through the `matrix` channel — the
+  // scale is preserved rather than dropped.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -4028,25 +4075,47 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixKeepsTranslateDropsScale) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  EXPECT_EQ(FindChannel(anim, "x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "y"), nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  // The 0% matrix scales by 2 — preserved, not dropped.
+  EXPECT_FLOAT_EQ(mCh->keyframes.front().value.a, 2.0f);
+  EXPECT_FLOAT_EQ(mCh->keyframes.front().value.d, 2.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {
+  // 3D transforms (matrix3d / rotate3d / perspective) have no 2D affine representation, so they
+  // warn and drop, emitting no animation when no other channel survives.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin3d {
+        0%   { transform: rotate3d(0, 1, 0, 0deg); }
+        100% { transform: rotate3d(0, 1, 0, 180deg); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:spin3d 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
   bool warned = false;
   for (const auto& msg : doc->errors) {
     if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
   }
   EXPECT_TRUE(warned);
-  ASSERT_EQ(doc->animations.size(), 1u);
-  auto* anim = doc->animations.front();
-  auto* xCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "x"));
-  auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
-  ASSERT_NE(xCh, nullptr);
-  ASSERT_NE(yCh, nullptr);
-  // `fill-mode: forwards` avoids the trailing baseline keyframe, so x/y carry exactly the two
-  // authored stops with the translation extracted from each matrix (scale dropped).
-  ASSERT_EQ(xCh->keyframes.size(), 2u);
-  ASSERT_EQ(yCh->keyframes.size(), 2u);
-  EXPECT_FLOAT_EQ(xCh->keyframes.front().value, 10.0f);
-  EXPECT_FLOAT_EQ(yCh->keyframes.front().value, 200.0f);
-  EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 30.0f);
-  EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 0.0f);
+  EXPECT_TRUE(doc->animations.empty());
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnknownKeyframesWarns) {

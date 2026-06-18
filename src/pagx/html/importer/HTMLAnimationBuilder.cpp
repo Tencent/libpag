@@ -344,20 +344,13 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
   }
 }
 
-// Decomposed translate component of a single-function CSS `transform` value.
-struct TranslateDecomp {
-  bool hasX = false;
-  bool hasY = false;
-  bool hasUnsupported = false;  // rotate/scale/skew/non-translate matrix
-  float x = 0.0f;
-  float y = 0.0f;
-};
+constexpr float kPi = 3.14159265358979323846f;
 
 // Parses a single finite float from a token (whitespace tolerated). Returns true and writes the
 // result on success; on failure (non-numeric, NaN, infinity) leaves the output untouched. Used to
-// validate matrix/matrix3d arguments before their components are emitted as translation values
-// — without this guard, `strtof`'s 0-on-failure behavior would silently produce (0, 0) translates
-// for malformed transforms.
+// validate matrix/scale arguments before they are folded into a transform matrix — without this
+// guard, `strtof`'s 0-on-failure behavior would silently produce degenerate matrices for malformed
+// transforms.
 bool ParseFiniteFloat(const std::string& token, float& outValue) {
   std::string t = Trim(token);
   const char* begin = t.c_str();
@@ -368,89 +361,156 @@ bool ParseFiniteFloat(const std::string& token, float& outValue) {
   return true;
 }
 
-TranslateDecomp DecomposeTranslate(const std::string& transformValue, HTMLValueParser& parser) {
-  TranslateDecomp out = {};
-  std::string trimmed = Trim(transformValue);
+// Parses a CSS `transform` value — a single function or a space-separated compound chain — into a
+// 2D affine `Matrix`. The chain is multiplied left-to-right (`A B C` -> A * B * C), matching CSS
+// application order. `pureTranslate` is set true only when every function in the chain is a
+// translation (`translate[X|Y]`, or a `matrix(...)` whose linear part is identity), letting the
+// caller route the animation through the cheaper layout-preserving `x`/`y` channels. Returns false
+// when the value contains a function outside the animatable 2D subset (matrix3d / rotate3d /
+// perspective / unparseable), so the caller drops the keyframe transform with a diagnostic.
+//
+// `transform-origin` is NOT folded in here — the matrix is the raw CSS value, mirroring
+// `HTMLTransform::matrix`; the caller pivots it via `T(cx,cy) * m * T(-cx,-cy)` exactly like
+// `HTMLLayerBuilder::applyBoxTransform` does for the static path.
+bool ParseTransformMatrix(const std::string& value, HTMLValueParser& parser, Matrix& outMatrix,
+                          bool& pureTranslate) {
+  outMatrix = Matrix::Identity();
+  pureTranslate = true;
+  std::string trimmed = Trim(value);
   std::string lc = ToLower(trimmed);
-  if (trimmed.empty() || lc == "none") return out;
-  std::string fn;
-  std::string args;
-  if (!ParseCssFunctionCall(trimmed, fn, args)) {
-    out.hasUnsupported = true;
-    return out;
+  if (trimmed.empty() || lc == "none") {
+    return true;  // identity == translate(0, 0)
   }
-  auto parts = SplitTopLevelCommas(args);
-  if (fn == "translatex" && parts.size() == 1) {
-    out.x = parser.parseAbsoluteLengthPx(parts[0]);
-    out.hasX = !std::isnan(out.x);
-    if (!out.hasX) out.x = 0.0f;
-    return out;
-  }
-  if (fn == "translatey" && parts.size() == 1) {
-    out.y = parser.parseAbsoluteLengthPx(parts[0]);
-    out.hasY = !std::isnan(out.y);
-    if (!out.hasY) out.y = 0.0f;
-    return out;
-  }
-  if (fn == "translate" && (parts.size() == 1 || parts.size() == 2)) {
-    out.x = parser.parseAbsoluteLengthPx(parts[0]);
-    out.hasX = !std::isnan(out.x);
-    if (!out.hasX) out.x = 0.0f;
-    if (parts.size() == 2) {
-      out.y = parser.parseAbsoluteLengthPx(parts[1]);
-      out.hasY = !std::isnan(out.y);
-      if (!out.hasY) out.y = 0.0f;
-    }
-    return out;
-  }
-  if (fn == "matrix" && parts.size() == 6) {
-    // Parse the linear part (a, b, c, d) for an identity check; tx/ty (e, f) carry the
-    // translation. `strtof` returns 0 with an unmoved end pointer for non-numeric input, which
-    // would silently turn malformed `matrix(...)` values into a (0, 0) translation. Validate
-    // that each component actually parsed and is finite before using its value, otherwise flag
-    // the whole transform as unsupported and skip the channel.
-    float a = 0.0f, b = 0.0f, c = 0.0f, d = 0.0f;
-    if (!ParseFiniteFloat(parts[0], a) || !ParseFiniteFloat(parts[1], b) ||
-        !ParseFiniteFloat(parts[2], c) || !ParseFiniteFloat(parts[3], d) ||
-        !ParseFiniteFloat(parts[4], out.x) || !ParseFiniteFloat(parts[5], out.y)) {
-      out = {};
-      out.hasUnsupported = true;
-      return out;
-    }
-    out.hasX = true;
-    out.hasY = true;
-    if (!(a == 1.0f && b == 0.0f && c == 0.0f && d == 1.0f)) out.hasUnsupported = true;
-    return out;
-  }
-  if (fn == "matrix3d" && parts.size() == 16) {
-    // Column-major 4×4: indices 12,13 are the x/y translation. Everything else (scale/rotation/
-    // skew/perspective and the unsupported tz at index 14) is dropped, mirroring the 2D matrix
-    // handling above. Validate every component to avoid silently emitting (0, 0) translations
-    // when the matrix3d args are malformed.
-    bool pureTranslate = true;
-    for (int i = 0; i < 16 && pureTranslate; i++) {
-      if (i == 12 || i == 13) continue;
-      float v = 0.0f;
-      if (!ParseFiniteFloat(parts[i], v)) {
-        out = {};
-        out.hasUnsupported = true;
-        return out;
+  auto funcs = SplitTopLevelWhitespace(trimmed);
+  if (funcs.empty()) return false;
+  bool any = false;
+  for (const auto& fnCall : funcs) {
+    std::string fn;
+    std::string args;
+    if (!ParseCssFunctionCall(Trim(fnCall), fn, args)) return false;
+    auto parts = SplitTopLevelCommas(args);
+    Matrix m = Matrix::Identity();
+    bool isTranslate = false;
+    if (fn == "translate" && (parts.size() == 1 || parts.size() == 2)) {
+      float tx = parser.parseAbsoluteLengthPx(parts[0]);
+      if (std::isnan(tx)) return false;
+      float ty = 0.0f;
+      if (parts.size() == 2) {
+        ty = parser.parseAbsoluteLengthPx(parts[1]);
+        if (std::isnan(ty)) return false;
       }
-      float identity = (i == 0 || i == 5 || i == 10 || i == 15) ? 1.0f : 0.0f;
-      if (v != identity) pureTranslate = false;
+      m = Matrix::Translate(tx, ty);
+      isTranslate = true;
+    } else if (fn == "translatex" && parts.size() == 1) {
+      float tx = parser.parseAbsoluteLengthPx(parts[0]);
+      if (std::isnan(tx)) return false;
+      m = Matrix::Translate(tx, 0.0f);
+      isTranslate = true;
+    } else if (fn == "translatey" && parts.size() == 1) {
+      float ty = parser.parseAbsoluteLengthPx(parts[0]);
+      if (std::isnan(ty)) return false;
+      m = Matrix::Translate(0.0f, ty);
+      isTranslate = true;
+    } else if (fn == "scale" && (parts.size() == 1 || parts.size() == 2)) {
+      float sx = 0.0f;
+      if (!ParseFiniteFloat(parts[0], sx)) return false;
+      float sy = sx;
+      if (parts.size() == 2 && !ParseFiniteFloat(parts[1], sy)) return false;
+      m = Matrix::Scale(sx, sy);
+    } else if (fn == "scalex" && parts.size() == 1) {
+      float sx = 0.0f;
+      if (!ParseFiniteFloat(parts[0], sx)) return false;
+      m = Matrix::Scale(sx, 1.0f);
+    } else if (fn == "scaley" && parts.size() == 1) {
+      float sy = 0.0f;
+      if (!ParseFiniteFloat(parts[0], sy)) return false;
+      m = Matrix::Scale(1.0f, sy);
+    } else if (fn == "rotate" && parts.size() == 1) {
+      m = Matrix::Rotate(ParseAngle(parts[0]));
+    } else if (fn == "skewx" && parts.size() == 1) {
+      // CSS skewX(α) == [1 0 tan(α) 1 0 0]; the x-shear lives in `c`.
+      m.c = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
+    } else if (fn == "skewy" && parts.size() == 1) {
+      // CSS skewY(α) == [1 tan(α) 0 1 0 0]; the y-shear lives in `b`.
+      m.b = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
+    } else if (fn == "skew" && (parts.size() == 1 || parts.size() == 2)) {
+      m.c = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
+      if (parts.size() == 2) {
+        m.b = std::tan(ParseAngle(parts[1]) * kPi / 180.0f);
+      }
+    } else if (fn == "matrix" && parts.size() == 6) {
+      float v[6];
+      for (int i = 0; i < 6; i++) {
+        if (!ParseFiniteFloat(parts[i], v[i])) return false;
+      }
+      m.a = v[0];
+      m.b = v[1];
+      m.c = v[2];
+      m.d = v[3];
+      m.tx = v[4];
+      m.ty = v[5];
+      isTranslate = (v[0] == 1.0f && v[1] == 0.0f && v[2] == 0.0f && v[3] == 1.0f);
+    } else {
+      return false;  // matrix3d / rotate3d / perspective / unknown -> drop
     }
-    if (!ParseFiniteFloat(parts[12], out.x) || !ParseFiniteFloat(parts[13], out.y)) {
-      out = {};
-      out.hasUnsupported = true;
-      return out;
-    }
-    out.hasX = true;
-    out.hasY = true;
-    if (!pureTranslate) out.hasUnsupported = true;
-    return out;
+    if (!isTranslate) pureTranslate = false;
+    outMatrix = outMatrix * m;
+    any = true;
   }
-  out.hasUnsupported = true;
-  return out;
+  return any;
+}
+
+// Resolves a single CSS `transform-origin` component (one axis) to absolute pixels. Handles px /
+// keyword (left/top = 0, right/bottom = dim, center = dim/2) / percentage forms. Returns NaN when
+// the dimension is unknown (so a percentage / keyword can't be resolved) or the token is unparsed.
+float ResolveOriginComponent(const std::string& token, float dim, HTMLValueParser& parser) {
+  std::string t = Trim(token);
+  std::string lc = ToLower(t);
+  if (lc == "center") return std::isnan(dim) ? NAN : dim * 0.5f;
+  if (lc == "left" || lc == "top") return 0.0f;
+  if (lc == "right" || lc == "bottom") return dim;
+  if (!t.empty() && t.back() == '%') {
+    char* end = nullptr;
+    float p = std::strtof(t.c_str(), &end);
+    if (end == t.c_str()) return NAN;
+    return std::isnan(dim) ? NAN : dim * p / 100.0f;
+  }
+  return parser.parseAbsoluteLengthPx(t);
+}
+
+// Resolves the transform-origin pivot (cx, cy) in the element's local box space, mirroring
+// `HTMLLayerBuilder::applyBoxTransform` so animated transforms pivot exactly like the static path.
+// Prefers an explicit `transform-origin`; falls back to the box centre from the resolved (or
+// layer-authored) width/height. Returns false when neither a usable origin nor box dimensions are
+// known, in which case the caller pivots at the top-left and warns.
+bool ResolvePivot(const std::unordered_map<std::string, std::string>& style, const Layer* layer,
+                  HTMLValueParser& parser, float& cx, float& cy) {
+  float w = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
+  float h = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
+  if (std::isnan(w) && layer != nullptr) w = layer->width;
+  if (std::isnan(h) && layer != nullptr) h = layer->height;
+
+  std::string origin = ToLower(GetTrimmed(style, "transform-origin"));
+  bool originIsCentre =
+      origin.empty() || origin == "center" || origin == "center center" || origin == "50% 50%";
+  if (!originIsCentre) {
+    auto tokens = SplitTopLevelWhitespace(origin);
+    if (tokens.size() == 2) {
+      float ox = ResolveOriginComponent(tokens[0], w, parser);
+      float oy = ResolveOriginComponent(tokens[1], h, parser);
+      if (!std::isnan(ox) && !std::isnan(oy)) {
+        cx = ox;
+        cy = oy;
+        return true;
+      }
+    }
+  }
+  if (!std::isnan(w) && !std::isnan(h)) {
+    cx = w * 0.5f;
+    cy = h * 0.5f;
+    return true;
+  }
+  return false;
 }
 
 // Ordering predicate for keyframe stops by ascending offset.
@@ -854,8 +914,16 @@ bool HTMLAnimationBuilder::buildForElement(
   std::vector<Keyframe<float>> alphaKeys;
   std::vector<Keyframe<float>> xKeys;
   std::vector<Keyframe<float>> yKeys;
+  std::vector<Keyframe<Matrix>> matrixKeys;
   std::vector<Keyframe<Color>> colorKeys;
   bool warnedTransform = false;
+
+  // Raw (un-pivoted) CSS transform matrix per keyframe, collected first so we can decide once
+  // whether the whole animation is a pure translation (cheap layout-preserving x/y channels) or a
+  // general affine (the `matrix` channel). `transformAllPureTranslate` stays true only while every
+  // keyframe's transform is a translation.
+  std::vector<std::pair<Frame, Matrix>> transformStops;
+  bool transformAllPureTranslate = true;
 
   for (const auto& stop : stops) {
     Frame time = static_cast<Frame>(
@@ -878,15 +946,17 @@ bool HTMLAnimationBuilder::buildForElement(
         v = std::max(0.0f, std::min(1.0f, v));
         alphaKeys.push_back({time, v, interp, {}, {}});
       } else if (prop == "transform") {
-        TranslateDecomp t = DecomposeTranslate(val, _valueParser);
-        if (t.hasUnsupported && !warnedTransform) {
+        Matrix m = {};
+        bool pureTranslate = false;
+        if (ParseTransformMatrix(val, _valueParser, m, pureTranslate)) {
+          transformStops.push_back({time, m});
+          if (!pureTranslate) transformAllPureTranslate = false;
+        } else if (!warnedTransform) {
           _diagnostics.warn(
-              "html: only 'translate' is animatable in 'transform'; rotate/scale/skew dropped "
-              "[subset:animation-unsupported-property]");
+              "html: unsupported 'transform' value '" + Trim(val) +
+              "' in @keyframes; dropped [subset:animation-unsupported-property]");
           warnedTransform = true;
         }
-        if (t.hasX) xKeys.push_back({time, t.x, interp, {}, {}});
-        if (t.hasY) yKeys.push_back({time, t.y, interp, {}, {}});
       } else if (prop == "color" || prop == "background-color") {
         Color c = _valueParser.parseColor(val);
         colorKeys.push_back({time, c, interp, {}, {}});
@@ -897,10 +967,44 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
+  // Lower the collected transform matrices onto the playable channel(s). A pure-translation
+  // animation keeps the existing `x`/`y` path (it preserves the layout-assigned position through
+  // the inner-wrapper split below, and avoids matrix-decompose interpolation entirely). Any
+  // scale / rotate / skew (or a non-translation `matrix(...)`) routes the *full* affine through a
+  // single `matrix` channel, pivoted around the element's transform-origin exactly like the static
+  // `HTMLLayerBuilder::applyBoxTransform` path so the animated and static transforms agree.
+  if (!transformStops.empty()) {
+    if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
+        yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
+      }
+    } else {
+      float cx = 0.0f;
+      float cy = 0.0f;
+      bool hasPivot = ResolvePivot(resolvedStyle, layer, _valueParser, cx, cy);
+      if (!hasPivot) {
+        _diagnostics.warn(
+            "html: transform animation without resolvable transform-origin; pivoting at top-left "
+            "may differ from CSS [subset:animation-unsupported-property]");
+      }
+      Matrix toCenter = Matrix::Translate(cx, cy);
+      Matrix fromCenter = Matrix::Translate(-cx, -cy);
+      for (const auto& ts : transformStops) {
+        Matrix m = ts.second;
+        if (hasPivot) {
+          m = toCenter * m * fromCenter;
+        }
+        matrixKeys.push_back({ts.first, m, interp, {}, {}});
+      }
+    }
+  }
+
   // Apply bezier handles between consecutive keyframes for each channel.
   ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+  ApplyBezierHandles(matrixKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(colorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
 
   // CSS `steps()` / `step-start` / `step-end` are not a runtime interpolation type — they expand
@@ -910,10 +1014,12 @@ bool HTMLAnimationBuilder::buildForElement(
     ExpandSteps(alphaKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(matrixKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(colorKeys, easing.stepCount, easing.stepJump);
   }
 
-  if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && colorKeys.empty()) {
+  if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() &&
+      colorKeys.empty()) {
     return false;
   }
 
@@ -928,8 +1034,12 @@ bool HTMLAnimationBuilder::buildForElement(
   //          this method runs. The fill must be located before SplitForTransformAnimation moves
   //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
   //          split and is reused later as the channel target.
+  //   matrix: the layer's static transform (`layer->matrix`), which the renderer already seeds as
+  //          the animatable baseline (LayerRuntimeTarget::initTransform). The CSS keyframe matrices
+  //          override it during playback and fill-mode restores it outside the active window.
   float baselineAlpha = layer->alpha;
   float baselineXY = 0.0f;
+  Matrix baselineMatrix = layer->matrix;
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
   if (!colorKeys.empty()) {
@@ -972,6 +1082,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyFillMode(alphaKeys, spec.fillMode, baselineAlpha, loopOnce, activeEnd);
   ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
+  ApplyFillMode(matrixKeys, spec.fillMode, baselineMatrix, loopOnce, activeEnd);
   // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
   // the channel is dropped below, so the fill-mode mutation would be wasted work and the
   // diagnostic message would be misleading.
@@ -1054,6 +1165,21 @@ bool HTMLAnimationBuilder::buildForElement(
       ch->keyframes = std::move(yKeys);
       object->channels.push_back(ch);
     }
+    animation->objects.push_back(object);
+  }
+
+  // Layer-targeted `matrix` channel for scale / rotate / skew (and any non-translation transform).
+  // Unlike x/y, the matrix channel animates the element's own transform (`Layer.matrix`) and not
+  // its layout position, so no inner-wrapper split is needed: the renderer recomposes the final
+  // transform as `Translate(layoutPosition) * matrix`, keeping the layout offset intact while the
+  // keyframes drive scale/rotate/skew/translate about the baked transform-origin pivot.
+  if (!matrixKeys.empty()) {
+    auto* object = _document->makeNode<AnimationObject>();
+    object->target = layer->id;
+    auto* ch = _document->makeNode<TypedChannel<Matrix>>();
+    ch->name = "matrix";
+    ch->keyframes = std::move(matrixKeys);
+    object->channels.push_back(ch);
     animation->objects.push_back(object);
   }
 

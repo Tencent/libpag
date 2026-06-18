@@ -464,15 +464,25 @@ Everything else inside a `@keyframes` stop is warned and dropped
 | CSS animated property | PAGX channel | Target node | Value type |
 |-----------------------|--------------|-------------|------------|
 | `opacity` | `alpha` | the element's `Layer` | float |
-| `transform: translateX(N)` / `translate(N, …)` | `x` | the element's `Layer` | float |
-| `transform: translateY(N)` / `translate(…, N)` | `y` | the element's `Layer` | float |
+| `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
+| `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
 | `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
 
-`transform` is decomposed: only the translation component is honoured. A `@keyframes` stop whose
-`transform` contains `rotate` / `scale` / `skew` / `matrix` drops the non-translation part with
-`subset:animation-unsupported-property` (the runtime has no rotation/scale/matrix channel on a
-`Layer`). Layout-affecting properties (`width`, `height`, `margin`, `padding`, `gap`, `flex`, …)
-are never animatable (see §4.4) and are dropped the same way.
+`transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
+compound chains — `translate[X|Y]` / `scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`). When
+*every* keyframe is a pure translation the animation uses the cheaper `x` / `y` channels (which stack
+on top of the layout-assigned position). As soon as any keyframe carries scale / rotate / skew (or a
+non-translation `matrix(...)`), the *full* affine is routed through a single `matrix` channel,
+pivoted around the element's `transform-origin` exactly like the static `transform` path
+(`T(cx,cy) · M · T(-cx,-cy)`), so static and animated transforms agree. 3D forms
+(`matrix3d` / `rotate3d` / `perspective`) have no 2D affine representation and are dropped with
+`subset:animation-unsupported-property`. Layout-affecting properties (`width`, `height`, `margin`,
+`padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped the same way.
+
+> Matrix-channel interpolation decomposes each keyframe into translation / scale / rotation / shear
+> and interpolates those components (`pagx/runtime/MatrixDecompose.h`); it cannot recover full turns
+> or rotations crossing ±180° between two adjacent keyframes, so very large per-segment rotations
+> take the short way around. Authoring intermediate `@keyframes` stops (the common case) avoids this.
 
 The animated element's `Layer` is given a generated `id` (prefix `anim`) when it has no author
 `id`, so the emitted `<Object target="…">` can reference it. `color` animation requires the
