@@ -66,6 +66,16 @@ export default [
     plugins: plugins,
   },
   {
+    input: path.resolve(__dirname, '../ts/pagx-check.ts'),
+    output: {
+      banner,
+      file: path.resolve(__dirname, '../lib/pagx-check.js'),
+      format: 'esm',
+      sourcemap: !isRelease
+    },
+    plugins: plugins,
+  },
+  {
     input: path.resolve(__dirname, '../ts/gesture-manager.ts'),
     output: {
       banner,

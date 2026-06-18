@@ -89,11 +89,27 @@ npm run clean
 
 | 文件 | 说明 |
 |------|------|
-| `lib/pagx-viewer.js` | 打包后的 ESM 胶水层 + TypeScript 绑定 |
+| `lib/pagx-viewer.js` | 打包后的 ESM 胶水层 + TypeScript 绑定（核心渲染器） |
 | `lib/pagx-viewer.wasm` | 未压缩的 WebAssembly 模块 |
 | `lib/pagx-viewer.wasm.br` | 随小程序分发的 Brotli 压缩版 wasm |
+| `lib/pagx-check.js` | 独立的渲染风险评估工具（可选，见下文） |
 | `wx_demo/utils/pagx-viewer.js` | 示例小程序副本，由 `copy-files.js` 自动同步 |
 | `wx_demo/utils/pagx-viewer.wasm.br` | 示例小程序副本，由 `copy-files.js` 自动同步 |
+
+### `pagx-check.js` — 渲染风险评估工具
+
+`pagx-check.js` 是一个**可选的**独立模块，用于评估当前设备能否流畅渲染指定的
+PAGX 文件。它**不是渲染必需依赖**，不依赖 WASM 模块或 WebGL 上下文。
+
+需要预渲染卡顿检测的业务可单独引入：
+
+```javascript
+const { CheckPagx } = require('./pagx-check');
+const result = await CheckPagx(pagxFileBytes);
+// result.score >= 阈值表示预期可流畅渲染
+```
+
+如果你的应用不需要风险评估，部署时可以省略 `pagx-check.js`，不会影响渲染功能。
 
 ## 运行示例
 

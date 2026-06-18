@@ -784,6 +784,10 @@ function uint8ArrayToString(data: Uint8Array): string {
 /**
  * Evaluate the render-stutter risk of a PAGX file; a higher score means smoother rendering.
  *
+ * This is an **optional** diagnostic utility — it is NOT required for rendering. The module is
+ * built as a standalone JS file (`lib/pagx-check.js`) with no dependency on the WASM renderer
+ * or WebGL context. Hosts that do not need pre-render stutter detection can omit it entirely.
+ *
  * Rendering recommendation (decided by runtime platform):
  * - Android: score >= 65 renders normally
  * - Other platforms (iOS, etc.): score >= 75 renders normally

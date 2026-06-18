@@ -92,11 +92,29 @@ After a successful build, the distributable files are:
 
 | File | Purpose |
 |------|---------|
-| `lib/pagx-viewer.js` | Bundled ESM glue + TypeScript bindings |
+| `lib/pagx-viewer.js` | Bundled ESM glue + TypeScript bindings (core renderer) |
 | `lib/pagx-viewer.wasm` | Uncompressed WebAssembly module |
 | `lib/pagx-viewer.wasm.br` | Brotli-compressed wasm shipped to the mini program |
+| `lib/pagx-check.js` | Standalone render-risk evaluator (optional, see below) |
 | `wx_demo/utils/pagx-viewer.js` | Demo copy, kept in sync by `copy-files.js` |
 | `wx_demo/utils/pagx-viewer.wasm.br` | Demo copy, kept in sync by `copy-files.js` |
+
+### `pagx-check.js` — Render Risk Evaluator
+
+`pagx-check.js` is an **optional** standalone module that evaluates whether a
+PAGX file is likely to render smoothly on the current device. It is **not**
+required for rendering and does not depend on the WASM module or WebGL context.
+
+Hosts that want pre-render stutter detection can import it separately:
+
+```javascript
+const { CheckPagx } = require('./pagx-check');
+const result = await CheckPagx(pagxFileBytes);
+// result.score >= threshold means smooth rendering is expected
+```
+
+If your application does not need the risk check, simply omit `pagx-check.js`
+from your deployment — it will not affect rendering functionality.
 
 ## Running the Demo
 

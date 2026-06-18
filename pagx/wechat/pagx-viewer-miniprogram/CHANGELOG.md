@@ -47,10 +47,10 @@
 
 ### 变更
 
-- TypeScript 类型完善：`PAGX` interface 显式声明了 `View`（`typeof View`）与
-  `CheckPagx` 字段。先前两者依赖 `TGFX` 的索引签名（`[key: string]: any`）兜底，IDE
-  无法补全；现在 `await PAGXInit({...})` 拿到的 `module` 上调用 `module.View.init(...)`
-  / `module.CheckPagx(data)` 可获得完整的参数与返回值类型补全
+- TypeScript 类型完善：`PAGX` interface 显式声明了 `View`（`typeof View`）字段。
+  先前依赖 `TGFX` 的索引签名（`[key: string]: any`）兜底，IDE 无法补全；现在
+  `await PAGXInit({...})` 拿到的 `module` 上调用 `module.View.init(...)` 可获得完整的
+  参数与返回值类型补全
 - 仅类型层面补充，对外运行时 API 与 v1.9 保持一致
 
 ---
@@ -95,12 +95,6 @@
 
 #### 其它新增 API
 
-- `View.loadFileDataAsNativeImage(filePath, nativeImage)`：把宿主解码好的图片直接挂
-  到 Image 节点。与 `loadFileData()` 不同，此方法可在 `buildLayers()` **之后**调用，
-  SDK 会自动重建引用该图的 VectorLayer，下一帧即生效。适用于渐进式首次填图
-- `View.upgradeImageFromNative(filePath, nativeImage)`：替换某 `filePath` 已挂载的图片
-  为新版本（典型场景：缩略图 → 高清图升级），并就地重建所有引用层。仅在
-  `buildLayers()` 之后有效；首次填图请用 `loadFileDataAsNativeImage()`
 - `View.setSnapshotEnabled(enabled)`：fitSnapshot 快路径开关。默认 `true`，会在 zoom
   ≤ 1.02 时直接 blit 缓存的 fit-to-canvas 快照，跳过完整 displayList 渲染。关闭后每帧
   强制完整渲染，牺牲性能换取首帧清晰度与渐进式加载的实时反馈
@@ -112,9 +106,10 @@
 
 #### 渲染卡顿预检
 
-- `module.CheckPagx(pagxData)`：异步评估 PAGX 文件在当前设备上的渲染卡顿风险。
-  **挂在 `PAGXInit` 返回的 module 上**，必须先 `await PAGXInit({...})` 拿到 module 后调用，
-  不是从包顶层 import 的独立函数
+- `CheckPagx(pagxData)`：异步评估 PAGX 文件在当前设备上的渲染卡顿风险。
+  作为**独立模块**（`lib/pagx-check.js`）发布，不包含在 `pagx-viewer.js` 中，
+  不依赖 WASM 初始化或 WebGL 上下文。使用方式：
+  `const { CheckPagx } = require('./utils/pagx-check')`
   - SDK 内部根据五条独立失效路径（BgBlur 嵌套、Path 几何量、大画布 × 元素密度、BgBlur 数量、
     Layer 数量）对文件评分，并按设备性能等级（`wx.getDeviceBenchmarkInfo`）动态收紧阈值
   - 返回 `Promise<{ score, benchmarkLevel, deviceTier, platform }>`

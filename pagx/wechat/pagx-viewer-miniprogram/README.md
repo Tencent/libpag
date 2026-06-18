@@ -12,7 +12,8 @@ pagx-viewer-miniprogram/
 ├── lib/
 │   ├── pagx-viewer.js        # PAGX 核心库（含 WASM 绑定）
 │   ├── pagx-viewer.wasm      # 未压缩 WASM 模块（~3.4MB）
-│   └── pagx-viewer.wasm.br   # Brotli 压缩 WASM 模块（~980KB）
+│   ├── pagx-viewer.wasm.br   # Brotli 压缩 WASM 模块（~980KB）
+│   └── pagx-check.js         # 渲染卡顿预检工具（可选，独立模块）
 ├── types/                    # TypeScript 类型定义
 │   ├── pagx/wechat/ts/       # PAGX 核心类型（pagx / pagx-view / pagx-check / types ...）
 │   └── third_party/tgfx/     # TGFX 图形库类型
@@ -196,8 +197,6 @@ const module = await PAGXInit({
 | `View.parsePAGX(data: Uint8Array)` | 仅解析 PAGX 文件，不构建层树（三步加载第 1 步） |
 | `View.getExternalFilePaths()` | 获取外部图片资源路径列表（三步加载第 2 步） |
 | `View.loadFileData(filePath, fileData)` | 加载外部文件字节流到对应 Image 节点（wasm 内解码） |
-| `View.loadFileDataAsNativeImage(filePath, nativeImage)` | 把宿主解码好的图片注入 Image 节点；可在 `buildLayers()` 之后调用，用于渐进式首次填图（v1.9+） |
-| `View.upgradeImageFromNative(filePath, nativeImage)` | 替换某 `filePath` 已挂载图片为新版本（缩略图 → 高清升级），并就地重建引用层（v1.9+） |
 | `View.attachNativeImage(filePath, nativeImage, quality)` | 按质量等级（`Thumbnail` / `Full`）上传宿主解码图片为 GPU 常驻 backend texture，并接入 SDK 的 LRU 驱逐（v1.9+） |
 | `View.setImageOriginalSize(filePath, width, height)` | 声明外部图片的原始像素尺寸，用于校正降采样注入后的 ImagePattern 矩阵（v1.9.3+） |
 | `View.setTextureEventHandler(handler)` | 注册纹理生命周期回调（`onTextureRequest` / `onTextureEvict`）（v1.9+） |
@@ -933,33 +932,22 @@ view.attachNativeImage(m.filePath, thumbCanvas, ImageQuality.Thumbnail);
   localBounds 较重，建议放到首帧渲染完成后的 idle 时机（如 `setTimeout(0)` 或 `wx.nextTick`）
 - `getImageMetadata()` 需在 `parsePAGX()` 之后调用，可作为决定缩略图档位的依据
 - 渐进式加载场景下，建议关闭 `setSnapshotEnabled(false)`，避免缩略图被永久 cache 而看不到高清升级
-- `loadFileDataAsNativeImage()`（v1.9 之前已存在的旧入口）仍保留，作为不区分质量等级的简单注入；
-  推荐新代码统一走 `attachNativeImage(..., quality)`，享受 LRU + 缩略图兜底
+- 推荐统一使用 `attachNativeImage(..., quality)`，享受 LRU + 缩略图兜底
 
 ## PAGX 渲染卡顿预检（v1.9+）
 
 针对低端机加载复杂 PAGX 文件可能卡顿的场景，SDK 提供 `CheckPagx(pagxData)` 异步预检接口，
 业务层可在加载前快速判断当前设备 + 当前文件是否可顺畅渲染。
 
-> **调用方式**：`CheckPagx` 不是从包顶层 import 的独立函数，而是挂在 `PAGXInit` 返回的
-> `module` 上。必须先 `await PAGXInit({...})`，才能通过 `module.CheckPagx(data)` 调用。
->
-> v1.9.1 起 `PAGX` interface 已显式声明 `CheckPagx` 字段，TypeScript 用户在 `module.CheckPagx(data)`
-> 上可获得完整的入参类型与返回值（`PagxCheckResult`）字段补全。
+> **独立模块**：`CheckPagx` 是一个**可选的**独立 JS 模块（`lib/pagx-check.js`），不包含在
+> `pagx-viewer.js` 中，也不依赖 WASM 初始化或 WebGL 上下文。不需要卡顿预检的宿主可以完全
+> 不引入此文件，不影响渲染功能。
 
 ```javascript
-import { PAGXInit } from './utils/pagx-viewer';
+const { CheckPagx } = require('./utils/pagx-check');
 
 Page({
-  module: null,
-
   async onLoad() {
-    // 先初始化 wasm 模块
-    this.module = await PAGXInit({
-      locateFile: (file) => '/utils/' + file,
-    });
-
-    // 之后才能调用 CheckPagx
     await this.safeLoad('/assets/your-animation.pagx');
   },
 
@@ -967,7 +955,7 @@ Page({
     const fs = wx.getFileSystemManager();
     const data = new Uint8Array(fs.readFileSync(filePath));
 
-    const result = await this.module.CheckPagx(data);
+    const result = await CheckPagx(data);
     // result = { score, benchmarkLevel, deviceTier, platform }
 
     const minScore = result.platform === 'android' ? 65 : 75;
