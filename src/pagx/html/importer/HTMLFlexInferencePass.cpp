@@ -510,8 +510,7 @@ void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& c
 
 }  // namespace
 
-void AbsoluteToFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root,
-                                        HTMLTransformContext& ctx) {
+void HTMLFlexInferencePass::apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) {
   if (!root || ctx.hasFatal()) return;
   if (!ctx.options().inferFlexFromAbsolute) return;
   auto body = root->getFirstChild("body");

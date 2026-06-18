@@ -4833,7 +4833,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, StrictModeFailsOnUnsupportedProperty) {
 }
 
 //==================================================================================================
-// HTMLSubsetTransformer — AbsoluteToFlexInference (opt-in)
+// HTMLSubsetTransformer — HTMLFlexInference (opt-in)
 //==================================================================================================
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceIsOffByDefault) {

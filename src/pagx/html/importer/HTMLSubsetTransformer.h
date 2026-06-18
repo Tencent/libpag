@@ -104,7 +104,7 @@ class HTMLSubsetTransformer {
     float canvasHeight = NAN;
 
     /**
-     * Enables the `AbsoluteToFlexInference` pass. When true, containers whose children form a
+     * Enables the `HTMLFlexInference` pass. When true, containers whose children form a
      * clean 1D row or column of `position: absolute` boxes are rewritten into `display: flex`
      * with inferred `gap`, `padding`, `align-items` (and `flex-direction`); children lose
      * their `position`/`left`/`right`/`top`/`bottom` declarations. Containers that do not
@@ -118,7 +118,7 @@ class HTMLSubsetTransformer {
     bool inferFlexFromAbsolute = false;
 
     /**
-     * Snap tolerance (in pixels) used by `AbsoluteToFlexInference` when deciding whether two
+     * Snap tolerance (in pixels) used by `HTMLFlexInference` when deciding whether two
      * positions are "the same". Values within this distance are treated as equal. Default
      * 1.5 px, which absorbs typical sub-pixel rounding noise from `getBoundingClientRect()`.
      */

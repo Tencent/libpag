@@ -24,7 +24,7 @@
 
 namespace pagx::html {
 
-// Shared helpers used by the flex-related transformer passes (AbsoluteToFlexInference,
+// Shared helpers used by the flex-related transformer passes (HTMLFlexInference,
 // MarginToGapPromotion, SpaceJustifyOverflowCollapse). These all operate on the
 // post-PropertyFilter resolved style map where every length has been normalised to plain px,
 // so the parsers reject percent / calc / em / etc. by design.

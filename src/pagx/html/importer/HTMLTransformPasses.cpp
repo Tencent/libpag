@@ -18,7 +18,7 @@
 
 #include "pagx/html/importer/HTMLTransformPasses.h"
 // TODO: continue splitting this translation unit per pass (DocumentSkeletonPass.cpp,
-// MarginToGapPromotionPass.cpp, …). `AbsoluteToFlexInferencePass` and the shared length /
+// MarginToGapPromotionPass.cpp, …). `HTMLFlexInferencePass` and the shared length /
 // margin helpers (`HTMLTransformPassUtils`) have already been hoisted out; the remaining six
 // passes still share file-local anonymous-namespace helpers and will move once the surrounding
 // API has stabilised. Tracked separately to avoid expanding this PR further.

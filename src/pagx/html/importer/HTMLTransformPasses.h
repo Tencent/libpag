@@ -90,7 +90,7 @@ class PropertyFilterPass : public HTMLTransformPass {
 };
 
 /**
- * Optional Pass — AbsoluteToFlexInference.
+ * Optional Pass — HTMLFlexInference.
  *
  * Recovers flexbox semantics from a tree where every visual element is `position: absolute`
  * with explicit `left/top/width/height` (the canonical output of `tools/html-snapshot`). For
@@ -108,10 +108,10 @@ class PropertyFilterPass : public HTMLTransformPass {
  * informational `subset:flex-inference-skipped` diagnostic records the reason. Successful
  * conversions emit `subset:flex-inferred`.
  */
-class AbsoluteToFlexInferencePass : public HTMLTransformPass {
+class HTMLFlexInferencePass : public HTMLTransformPass {
  public:
   const char* name() const override {
-    return "AbsoluteToFlexInference";
+    return "HTMLFlexInference";
   }
   void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
 };
