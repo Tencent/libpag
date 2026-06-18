@@ -393,6 +393,11 @@ class LayerBuilder {
  * cycle), and then call rebuildForFilePath() whenever a new decoded image has been attached to
  * the document via PAGXDocument::loadDecodedImage(). Destroying the session releases all cached
  * layer/image state.
+ *
+ * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
+ * for the entire lifetime of this session. The session stores a non-owning pointer to the
+ * document and dereferences it on every rebuildForFilePath() call. Destroy the session before
+ * (or together with) the document.
  */
 class LayerBuilderSession {
  public:
@@ -423,6 +428,13 @@ class LayerBuilderSession {
    *         currently references the given filePath (or the document has not been built yet).
    */
   size_t rebuildForFilePath(const std::string& filePath);
+
+  /**
+   * Drops the entire internal image cache. Call this after the document undergoes structural
+   * node changes (e.g. after notifyChange with node additions or removals) because the
+   * cache keys are raw Image* pointers that become dangling when nodes are replaced.
+   */
+  void invalidateAllImages();
 
   /**
    * Returns every tgfx::Layer that was produced for the given pagx Layer during build(). A

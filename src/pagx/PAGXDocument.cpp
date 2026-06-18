@@ -355,6 +355,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (ownedDirty.empty()) {
     return;
   }
+  // Invalidate the filePath -> Layer index so the next query rebuilds it from the (possibly
+  // modified) tree topology. Edits may add/remove Image references or change filePath values.
+  layersByImageFilePathBuilt = false;
+  layersByImageFilePath.clear();
   PruneExpiredScenes(&liveScenes);
   // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
   // list changes require a full re-layout, since layout is resolved top-down and a single node
@@ -521,10 +525,11 @@ static void CollectImageFilePathsFromLayers(
   }
 }
 
-std::vector<const Layer*> PAGXDocument::findLayersByImageFilePath(
+const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
     const std::string& imageFilePath) {
+  static const std::vector<const Layer*> empty;
   if (imageFilePath.empty()) {
-    return {};
+    return empty;
   }
   if (!layersByImageFilePathBuilt) {
     std::unordered_map<std::string, std::unordered_set<const Layer*>> tempIndex;
@@ -540,7 +545,7 @@ std::vector<const Layer*> PAGXDocument::findLayersByImageFilePath(
   }
   auto it = layersByImageFilePath.find(imageFilePath);
   if (it == layersByImageFilePath.end()) {
-    return {};
+    return empty;
   }
   return it->second;
 }

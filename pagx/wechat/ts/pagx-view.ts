@@ -31,6 +31,10 @@ import { getSystemInfo } from './wx-system-info';
 
 declare const wx: wx;
 
+// Maximum consecutive draw() failures before the render loop is stopped to avoid infinite
+// error-logging when the GL context is lost or permanently broken.
+const MAX_CONSECUTIVE_DRAW_FAILURES = 5;
+
 /**
  * Quality tier for an image attached via View.attachNativeImage(). The two tiers map to
  * distinct slots on each Image node and obey different lifecycle rules:
@@ -210,6 +214,7 @@ export class View {
   private isRendering = false;
   private firstFrameCallbackFired = false;
   private animationFrameId: number = 0;
+  private consecutiveDrawFailures = 0;
 
   // Cached viewport state. Mutated by panBy/pinchBy and by direct
   // updateZoomScaleAndOffset() callers; read by getViewportInfo() and the
@@ -835,8 +840,8 @@ export class View {
     }
     this.isRendering = false;
     if (this.animationFrameId) {
-      if (this.canvas && (this.canvas as any).cancelAnimationFrame) {
-        (this.canvas as any).cancelAnimationFrame(this.animationFrameId);
+      if (this.canvas && this.canvas.cancelAnimationFrame) {
+        this.canvas.cancelAnimationFrame(this.animationFrameId);
       } else {
         clearTimeout(this.animationFrameId);
       }
@@ -960,9 +965,16 @@ export class View {
     this.backendContext.makeCurrent(this.module);
     try {
       this.nativeView!.draw();
+      this.consecutiveDrawFailures = 0;
     } catch (e) {
-      // Draw failure should not kill the render loop. Log and continue.
+      this.consecutiveDrawFailures += 1;
       console.error('[PAGXView] draw failed in render loop:', e);
+      if (this.consecutiveDrawFailures >= MAX_CONSECUTIVE_DRAW_FAILURES) {
+        console.error('[PAGXView] too many consecutive draw failures, stopping render loop.');
+        this.backendContext.clearCurrent(this.module);
+        this.isRendering = false;
+        return;
+      }
     }
     this.backendContext.clearCurrent(this.module);
 
@@ -977,14 +989,14 @@ export class View {
       this.pagViewOptions.onAfterRender();
     }
 
-    if (this.canvas && (this.canvas as any).requestAnimationFrame) {
-      this.animationFrameId = (this.canvas as any).requestAnimationFrame(() => {
+    if (this.canvas && this.canvas.requestAnimationFrame) {
+      this.animationFrameId = this.canvas.requestAnimationFrame(() => {
         this.renderLoop();
       });
     } else {
       this.animationFrameId = setTimeout(() => {
         this.renderLoop();
-      }, 16) as any;
+      }, 16) as unknown as number;
     }
   }
 

@@ -820,7 +820,7 @@ std::unordered_map<std::string, tgfx::Rect> PAGXView::computeFullPathBounds() co
   // of getImageBounds() for consistency.
   for (const auto& kv : externalTextures) {
     const auto& path = kv.first;
-    auto affectedLayers = document->findLayersByImageFilePath(path);
+    const auto& affectedLayers = document->findLayersByImageFilePath(path);
     if (affectedLayers.empty()) {
       continue;
     }
@@ -981,7 +981,7 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   auto count = filePathList["length"].as<unsigned>();
   for (unsigned i = 0; i < count; ++i) {
     std::string filePath = filePathList[i].as<std::string>();
-    auto affectedLayers = document->findLayersByImageFilePath(filePath);
+    const auto& affectedLayers = document->findLayersByImageFilePath(filePath);
     if (affectedLayers.empty()) {
       result.set(filePath, val::null());
       continue;
@@ -1679,6 +1679,17 @@ bool PAGXView::draw() {
         float fitContentScale = computeFitScale();
         // Memory grows by N² (2x≈57MB, 4x≈230MB); capped at 2x under the iOS 512MB limit.
         float pixelScale = fitContentScale < HIGH_RES_FIT_SCALE_THRESHOLD ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
+        // Runtime memory budget check: if the high-res snapshot would push total GPU memory
+        // (existing textures + snapshot) past fullBudget, fall back to DEFAULT_PIXEL_SCALE.
+        if (pixelScale > DEFAULT_PIXEL_SCALE) {
+          uint64_t snapshotBytes = static_cast<uint64_t>(canvasWidth * pixelScale) *
+                                   static_cast<uint64_t>(canvasHeight * pixelScale) *
+                                   RGBA_BYTES_PER_PIXEL;
+          uint64_t totalProjected = externalTexturesTotalBytes + thumbnailTexturesTotalBytes + snapshotBytes;
+          if (totalProjected > fullBudget) {
+            pixelScale = DEFAULT_PIXEL_SCALE;
+          }
+        }
 
         if (pixelScale > DEFAULT_PIXEL_SCALE) {
           int offW = static_cast<int>(canvasWidth * pixelScale);

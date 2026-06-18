@@ -19,21 +19,24 @@
 /**
  * Class decorator that wraps all prototype methods with a destroy check.
  * Methods called on a destroyed instance will log an error and return early.
+ * The target class must have an `isDestroyed: boolean` instance property.
  */
-export function destroyVerify(constructor: any) {
-  const functions = Object.getOwnPropertyNames(constructor.prototype).filter(
-    (name) => name !== 'constructor' && typeof constructor.prototype[name] === 'function',
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+export function destroyVerify(constructor: Function): void {
+  const proto = constructor.prototype as Record<string, unknown>;
+  const functions = Object.getOwnPropertyNames(proto).filter(
+    (name) => name !== 'constructor' && typeof proto[name] === 'function',
   );
 
-  const proxyFn = (target: { [prop: string]: any }, methodName: string) => {
-    const fn = target[methodName];
-    target[methodName] = function (...args: any[]) {
-      if (this['isDestroyed']) {
+  const proxyFn = (target: Record<string, unknown>, methodName: string) => {
+    const fn = target[methodName] as (...args: unknown[]) => unknown;
+    target[methodName] = function (this: { isDestroyed: boolean }, ...args: unknown[]): unknown {
+      if (this.isDestroyed) {
         console.error(`Don't call ${methodName} of the ${constructor.name} that is destroyed.`);
-        return;
+        return undefined;
       }
       return fn.call(this, ...args);
     };
   };
-  functions.forEach((name) => proxyFn(constructor.prototype, name));
+  functions.forEach((name) => proxyFn(proto, name));
 }

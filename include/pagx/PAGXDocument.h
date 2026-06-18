@@ -217,14 +217,16 @@ class PAGXDocument : public Node {
    * once.
    *
    * The lookup is served from a lazily built index over all Image-bearing ImagePattern nodes;
-   * the first call walks the entire document, later calls are O(1) hash lookups. Only Image
-   * nodes reachable through ImagePattern contribute to the index today, other node types that
-   * might gain a filePath in the future will need their own lookup helpers.
+   * the first call walks the entire document, later calls are O(1) hash lookups. The index is
+   * automatically invalidated by notifyChange() so structural edits (adding/removing Layers or
+   * changing Image filePath values) are reflected on the next query. Only Image nodes reachable
+   * through ImagePattern contribute to the index today, other node types that might gain a
+   * filePath in the future will need their own lookup helpers.
    *
    * @param imageFilePath the Image node filePath to match against
    * @return the list of Layers referencing the given image filePath, empty when no match
    */
-  std::vector<const Layer*> findLayersByImageFilePath(const std::string& imageFilePath);
+  const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
@@ -331,7 +333,9 @@ class PAGXDocument : public Node {
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
   // Lazily built index of Image node filePath -> pagx Layer list, used by
-  // findLayersByImageFilePath().
+  // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits
+  // may alter the tree topology or Image node filePath values. Also freed when the document is
+  // destroyed (on the next parsePAGX() call).
   std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
   bool layersByImageFilePathBuilt = false;
 

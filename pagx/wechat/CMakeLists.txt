@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 3.13)
 project(PAGXViewer)
 
 # Include vendor tools from libpag root
-include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
+set(_VENDOR_CMAKE ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
+if (NOT EXISTS "${_VENDOR_CMAKE}")
+    message(FATAL_ERROR "vendor.cmake not found at ${_VENDOR_CMAKE}. Run sync_deps.sh first.")
+endif ()
+include(${_VENDOR_CMAKE})
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -16,6 +20,9 @@ if (NOT TGFX_DIR)
     set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/tgfx)
 endif ()
 get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
+if (NOT EXISTS "${TGFX_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "TGFX not found at ${TGFX_DIR}. Run sync_deps.sh first.")
+endif ()
 
 # Enable WASM SIMD optimization globally (must be set before add_subdirectory)
 # This enables 128-bit SIMD instructions for faster image processing and matrix operations.

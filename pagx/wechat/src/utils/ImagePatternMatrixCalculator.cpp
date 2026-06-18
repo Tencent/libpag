@@ -44,6 +44,10 @@ static constexpr const char* kPaintTransformKey = "paint-transform";
 // the two caches independent.
 static constexpr const char* kAuthoredMatrixKey = "authored-pattern-matrix";
 
+// Threshold for treating a 2x2 determinant as singular (non-invertible). Values below this
+// produce numerically unstable inverses under float32 precision (~7 significant digits).
+static constexpr float SINGULAR_DETERMINANT_EPSILON = 1e-6f;
+
 static std::string SerializePaintTransform(const pagx::Matrix& matrix) {
   char buf[128] = {};
   std::snprintf(buf, sizeof(buf), "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g", matrix.a, matrix.b, matrix.c,
@@ -136,7 +140,7 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
         s10 *= imageHeight; s11 *= imageHeight; s12 *= imageHeight;
 
         float det = s00 * s11 - s01 * s10;
-        if (std::abs(det) > 1e-10f) {
+        if (std::abs(det) > SINGULAR_DETERMINANT_EPSILON) {
           float invDet = 1.0f / det;
           matrix.a  =  s11 * invDet;
           matrix.c  = -s01 * invDet;

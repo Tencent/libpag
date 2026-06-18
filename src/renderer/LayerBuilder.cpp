@@ -676,12 +676,11 @@ class LayerBuilderContext {
 
   // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
   // conversion goes through getOrCreateImage() again and picks up the updated decodedImage /
-  // data pointer. Returns true when at least one cache entry was cleared.
-  bool invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
+  // data pointer.
+  void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
     if (filePath.empty()) {
-      return false;
+      return;
     }
-    bool cleared = false;
     for (auto& node : document.nodes) {
       if (!node || node->nodeType() != NodeType::Image) {
         continue;
@@ -690,11 +689,15 @@ class LayerBuilderContext {
       if (imageNode->filePath != filePath) {
         continue;
       }
-      if (_imageCache.erase(imageNode) > 0) {
-        cleared = true;
-      }
+      _imageCache.erase(imageNode);
     }
-    return cleared;
+  }
+
+  // Drops the entire image cache. Must be called when the document's node tree undergoes
+  // structural changes (e.g. notifyChange with node additions/removals) because the raw Image*
+  // keys may become dangling after such edits.
+  void invalidateAllImages() {
+    _imageCache.clear();
   }
 
   // Builds the tgfx VectorElement list for a pagx Layer's contents, skipping elements that
@@ -2704,6 +2707,10 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  // Maps pagx Image node pointers to their tgfx::Image wrappers. The raw pointer keys are stable
+  // as long as the document's node vector is not structurally modified. If the document undergoes
+  // structural changes (node additions/removals via notifyChange), callers must call
+  // invalidateAllImages() to prevent dangling-pointer lookups.
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -2752,6 +2759,8 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
 
 // LayerBuilderSession PImpl: owns the LayerBuilderContext and a non-owning pointer back to the
 // PAGXDocument so rebuildForFilePath() can re-enumerate Image nodes and affected layers.
+// Lifetime guarantee: PAGXView always destroys builderSession before document (both in
+// parsePAGX() and in the destructor's member destruction order), so this pointer never dangles.
 struct LayerBuilderSession::Impl {
   LayerBuilderContext context;
   PAGXDocument* document = nullptr;
@@ -2777,6 +2786,10 @@ LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
   return impl->context.buildWithMap(*document);
 }
 
+void LayerBuilderSession::invalidateAllImages() {
+  impl->context.invalidateAllImages();
+}
+
 size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
   if (!impl->document || filePath.empty()) {
     return 0;
@@ -2785,7 +2798,7 @@ size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
   // into convertImagePattern() picks up the freshly attached decodedImage / data pointer.
   impl->context.invalidateImagesByFilePath(*impl->document, filePath);
 
-  auto affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
   if (affectedLayers.empty()) {
     return 0;
   }
