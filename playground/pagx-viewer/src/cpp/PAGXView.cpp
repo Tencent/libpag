@@ -176,11 +176,11 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  if (scene != nullptr) {
-    scene->advanceAndApply(deltaUs);
-  }
   if (defaultTimeline != nullptr) {
     defaultTimeline->advanceAndApply(deltaUs);
+  }
+  if (scene != nullptr) {
+    scene->advanceAndApply(deltaUs);
   }
 }
 

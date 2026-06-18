@@ -28,6 +28,7 @@
 
 namespace tgfx {
 class DisplayList;
+class Layer;
 }  // namespace tgfx
 
 namespace pagx {
@@ -182,6 +183,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unique_ptr<tgfx::DisplayList> displayList;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
+
+  // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
+  std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
   friend class PAGTimeline;
