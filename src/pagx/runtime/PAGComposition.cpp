@@ -315,13 +315,13 @@ void PAGComposition::refreshPlainContainerChildren(
     PAGLayer* container, const std::vector<Node*>& dirtyNodes,
     std::unordered_set<const Composition*>& visited,
     const std::unordered_set<const Node*>& dirtySet) {
-  if (container == nullptr || container->node == nullptr) {
+  if (container == nullptr || container->node == nullptr || binding == nullptr) {
     return;
   }
   bool dirty = dirtySet.find(container->node) != dirtySet.end();
   if (dirty) {
     auto scene = rootScene.lock();
-    if (scene != nullptr && binding != nullptr) {
+    if (scene != nullptr) {
       // Incrementally sync the container's runtime children with its source layer list, reusing
       // existing PAGLayer / PAGComposition handles so external holders are not invalidated.
       std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};

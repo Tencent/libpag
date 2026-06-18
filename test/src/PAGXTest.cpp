@@ -10458,6 +10458,47 @@ PAGX_TEST(PAGXTest, NotifyChangeFilter) {
 }
 
 /**
+ * Test case: a SolidColor shared by two Layers via their respective Fill is resolved to both
+ * owning Layers when passed to notifyChange. Verifies findLayerForContentNode returns all
+ * matching Layers, not just the first one found.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeSharedColorUpdatesAllLayers) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer1 = doc->makeNode<pagx::Layer>("layer1");
+  layer1->width = 100;
+  layer1->height = 100;
+  auto layer2 = doc->makeNode<pagx::Layer>("layer2");
+  layer2->width = 100;
+  layer2->height = 100;
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size.width = 100;
+  rect1->size.height = 100;
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size.width = 100;
+  rect2->size.height = 100;
+
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill1->color = solid;
+  fill2->color = solid;
+  layer1->contents = {rect1, fill1};
+  layer2->contents = {rect2, fill2};
+  doc->layers = {layer1, layer2};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Change the shared SolidColor and notify with the SolidColor node directly.
+  solid->color = {0, 1, 0, 1};
+  doc->notifyChange({solid}, /*layoutChanged=*/false);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 2u);
+}
+
+/**
  * Test case: a content node not owned by any Layer (orphan) is silently dropped
  * by notifyChange — no crash, just a no-op.
  */
