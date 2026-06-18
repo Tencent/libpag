@@ -29,11 +29,6 @@
 namespace pagx {
 
 /**
- * Maximum nesting depth tolerated during HTML traversal. Mirrors the SVG importer.
- */
-static constexpr int MAX_HTML_RECURSION_DEPTH = 128;
-
-/**
  * Default CSS font-size used for HTML text leaves before any user style is applied.
  */
 static constexpr float HTML_DEFAULT_FONT_SIZE = 14.0f;

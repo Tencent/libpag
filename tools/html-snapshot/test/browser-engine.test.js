@@ -12,6 +12,8 @@ const {
   addCookies,
   responseBytes,
   addInitScript,
+  formatLaunchHint,
+  launchBrowser,
 } = require('../dist/lib/browser-engine');
 
 describe('resolveEngine', () => {
@@ -200,5 +202,112 @@ describe('addInitScript', () => {
     const page = { addInitScript: (arg) => calls.push(arg) };
     await addInitScript(page, 'playwright', 'window.x=1');
     expect(calls).toEqual([{ content: 'window.x=1' }]);
+  });
+});
+
+describe('formatLaunchHint', () => {
+  test('returns null for unrelated errors', () => {
+    expect(formatLaunchHint(new Error('something else'), 'puppeteer')).toBeNull();
+    expect(formatLaunchHint('plain string error', 'puppeteer')).toBeNull();
+  });
+
+  test('returns puppeteer-flavoured install lines for the missing-binary message', () => {
+    const out = formatLaunchHint(new Error('Could not find Chrome (ver. xyz)'), 'puppeteer');
+    expect(Array.isArray(out)).toBe(true);
+    expect(out[0]).toMatch(/failed to launch headless Chromium for engine 'puppeteer'/);
+    expect(out.some((l) => /puppeteer browsers install chrome/.test(l))).toBe(true);
+  });
+
+  test('returns playwright-flavoured install lines', () => {
+    const out = formatLaunchHint(new Error("Executable doesn't exist at /opt/foo"), 'playwright');
+    expect(out[0]).toMatch(/engine 'playwright'/);
+    expect(out.some((l) => /playwright install chromium/.test(l))).toBe(true);
+  });
+
+  test('matches "Failed to launch the browser process" verbatim', () => {
+    const out = formatLaunchHint(new Error('Failed to launch the browser process'), 'puppeteer');
+    expect(out).not.toBeNull();
+  });
+
+  test('handles non-Error throws by stringifying them', () => {
+    expect(formatLaunchHint('Could not find Chrome', 'puppeteer')).not.toBeNull();
+    expect(formatLaunchHint('benign string', 'puppeteer')).toBeNull();
+  });
+});
+
+describe('launchBrowser — package loading & options', () => {
+  // Each test reloads `dist/lib/browser-engine` after registering a mock for
+  // the engine package, so the lazy `require()` inside loadEngine picks up
+  // the stub instead of the real puppeteer / playwright install.
+  function loadWithMock(pkg, mockFactory) {
+    jest.resetModules();
+    jest.doMock(pkg, mockFactory, { virtual: true });
+    return require('../dist/lib/browser-engine');
+  }
+
+  afterEach(() => {
+    jest.resetModules();
+  });
+
+  test('rejects with the install hint when the engine package fails to load', async () => {
+    const mod = loadWithMock('puppeteer', () => { throw new Error('Cannot find module foo'); });
+    await expect(mod.launchBrowser({ engine: 'puppeteer' }))
+      .rejects.toThrow(/failed to load 'puppeteer' for browser engine 'puppeteer'/);
+  });
+
+  test('passes default headless + args to puppeteer.launch', async () => {
+    const launches = [];
+    const mod = loadWithMock('puppeteer', () => ({
+      launch: async (opts) => { launches.push(opts); return { closed: false }; },
+    }));
+    const handle = await mod.launchBrowser({ engine: 'puppeteer' });
+    expect(handle.engine).toBe('puppeteer');
+    expect(launches).toHaveLength(1);
+    expect(launches[0].headless).toBe(true);
+    expect(launches[0].args).toEqual(['--no-sandbox', '--font-render-hinting=none']);
+    // executablePath plumbing is engine-specific; puppeteer reads its env var
+    // at launch time, so this code path must NOT inject one.
+    expect('executablePath' in launches[0]).toBe(false);
+  });
+
+  test('honours headless: false and a custom args array', async () => {
+    const launches = [];
+    const mod = loadWithMock('puppeteer', () => ({
+      launch: async (opts) => { launches.push(opts); return {}; },
+    }));
+    await mod.launchBrowser({ engine: 'puppeteer', headless: false, args: ['--remote-debugging-port=9222'] });
+    expect(launches[0].headless).toBe(false);
+    expect(launches[0].args).toEqual(['--remote-debugging-port=9222']);
+  });
+
+  test('playwright: forwards executablePath when supplied', async () => {
+    const launches = [];
+    const mod = loadWithMock('playwright', () => ({
+      chromium: { launch: async (opts) => { launches.push(opts); return {}; } },
+    }));
+    await mod.launchBrowser({ engine: 'playwright', executablePath: '/opt/chromium' });
+    expect(launches[0].executablePath).toBe('/opt/chromium');
+  });
+
+  test('playwright: falls back to PLAYWRIGHT_EXECUTABLE_PATH', async () => {
+    const launches = [];
+    const mod = loadWithMock('playwright', () => ({
+      chromium: { launch: async (opts) => { launches.push(opts); return {}; } },
+    }));
+    const saved = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
+    process.env.PLAYWRIGHT_EXECUTABLE_PATH = '/from-env/chromium';
+    try {
+      await mod.launchBrowser({ engine: 'playwright' });
+      expect(launches[0].executablePath).toBe('/from-env/chromium');
+    } finally {
+      if (saved === undefined) delete process.env.PLAYWRIGHT_EXECUTABLE_PATH;
+      else process.env.PLAYWRIGHT_EXECUTABLE_PATH = saved;
+    }
+  });
+
+  test('playwright: rejects when the package omits chromium', async () => {
+    const mod = loadWithMock('playwright', () => ({}));
+    await expect(mod.launchBrowser({ engine: 'playwright' }))
+      .rejects.toThrow(/'playwright' module does not expose chromium/);
   });
 });

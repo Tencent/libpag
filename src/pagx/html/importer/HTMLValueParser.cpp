@@ -38,6 +38,16 @@ namespace {
 
 constexpr float HtmlPi = 3.14159265358979323846f;
 
+// Pulls the comma-separated argument list of a `xxx-gradient(...)` call. Returns false when the
+// value carries no `(...)` body or fewer than two top-level comma-separated parts (the minimum
+// for a usable gradient: a leading angle/shape descriptor or a stop, plus at least one stop).
+bool ExtractGradientParts(const std::string& value, std::vector<std::string>& outParts) {
+  std::string args = ExtractParenArgs(value);
+  if (args.empty()) return false;
+  outParts = SplitTopLevelCommas(args);
+  return outParts.size() >= 2;
+}
+
 }  // namespace
 
 HTMLValueParser::HTMLValueParser(HTMLDiagnosticSink& sink, const float& canvasWidth,
@@ -60,20 +70,31 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   }
   if (value[0] == '#') {
     auto length = value.length();
-    if (length == 4 || length == 5) {
+    if (length == 4 || length == 5 || length == 7 || length == 9) {
       char expanded[9] = {};
       size_t outIdx = 0;
-      for (size_t i = 1; i < length; i++) {
-        expanded[outIdx++] = value[i];
-        expanded[outIdx++] = value[i];
+      if (length == 4 || length == 5) {
+        for (size_t i = 1; i < length; i++) {
+          expanded[outIdx++] = value[i];
+          expanded[outIdx++] = value[i];
+        }
+      } else {
+        for (size_t i = 1; i < length; i++) {
+          expanded[outIdx++] = value[i];
+        }
       }
       expanded[outIdx] = '\0';
-      uint32_t hex = std::strtoul(expanded, nullptr, 16);
-      return HexToColor(hex, /*hasAlpha=*/length == 5);
-    }
-    if (length == 7 || length == 9) {
-      uint32_t hex = std::strtoul(value.c_str() + 1, nullptr, 16);
-      return HexToColor(hex, /*hasAlpha=*/length == 9);
+      // strtoul stops at the first non-hex character and silently returns the prefix value,
+      // so '#ZZZZZZ' would otherwise parse to 0 (opaque black) without any diagnostic.
+      // Validate via endptr that every digit was consumed before trusting the result.
+      char* endPtr = nullptr;
+      uint32_t hex = std::strtoul(expanded, &endPtr, 16);
+      if (endPtr != nullptr && *endPtr == '\0') {
+        bool hasAlpha = (length == 5 || length == 9);
+        return HexToColor(hex, hasAlpha);
+      }
+      _diagnostics.warn("html: malformed hex color '" + value + "'; falling back to opaque black");
+      return {0, 0, 0, 1, ColorSpace::SRGB};
     }
   }
   if (value.compare(0, 3, "rgb") == 0) {
@@ -96,6 +117,17 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       color.blue = b / 255.0f;
       color.alpha = a;
       return color;
+    }
+  }
+  // CSS hsl()/hsla() (CSS Color 3 comma syntax + CSS Color 4 space syntax). Authored CSS
+  // such as `background: hsl(120 100% 50%)` reaches us verbatim because the snapshot stage
+  // can leave the function call intact (Chrome only normalises `hsl()` to `rgb()` on certain
+  // computed-style channels). Without this the value falls through to the unrecognised-color
+  // diagnostic and we render opaque black, which is what HUD-style canvases hit.
+  if (lowered.compare(0, 3, "hsl") == 0) {
+    Color hsl = {};
+    if (ParseCSSHSLColor(value, hsl)) {
+      return hsl;
     }
   }
   // Named color
@@ -197,11 +229,8 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
       s.offsetX = lengths[0];
       s.offsetY = lengths[1];
       if (lengths.size() >= 3) s.blur = lengths[2];
-      if (lengths.size() >= 4) {
-        s.spread = lengths[3];
-        if (s.spread != 0) {
-          _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
-        }
+      if (lengths.size() >= 4 && lengths[3] != 0) {
+        _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
       }
     } else {
       _diagnostics.warn("html: malformed box-shadow '" + item + "'");
@@ -268,10 +297,8 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
 }
 
 LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   float cssAngle = 180.0f;  // CSS default: to bottom
   size_t stopStart = 0;
   std::string first = Trim(parts[0]);
@@ -299,10 +326,8 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
 }
 
 RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
   std::string first = ToLower(Trim(parts[0]));
@@ -321,10 +346,8 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
 }
 
 ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return nullptr;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.size() < 2) return nullptr;
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   float cssAngle = 0.0f;
   std::string first = ToLower(Trim(parts[0]));

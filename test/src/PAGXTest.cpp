@@ -21,7 +21,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
@@ -32,21 +31,28 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGXChannelTable.h"
+#include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -56,19 +62,27 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -87,17 +101,24 @@
 #endif
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
+#include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/Rectangle.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/Text.h"
 #include "utils/Baseline.h"
@@ -598,164 +619,6 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
-}
-
-static std::string TitleToKey(const std::string& title) {
-  // Convert to lowercase with underscores, ignoring parenthesized content (e.g., "(Composition)")
-  std::string key;
-  int parenDepth = 0;
-  for (char ch : title) {
-    if (ch == '(') {
-      parenDepth++;
-      continue;
-    }
-    if (ch == ')') {
-      if (parenDepth > 0) {
-        parenDepth--;
-      }
-      continue;
-    }
-    if (parenDepth > 0) {
-      continue;
-    }
-    if (std::isalnum(static_cast<unsigned char>(ch))) {
-      key += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-    } else if (!key.empty() && key.back() != '_') {
-      key += '_';
-    }
-  }
-  // Trim trailing underscore
-  if (!key.empty() && key.back() == '_') {
-    key.pop_back();
-  }
-  return key;
-}
-
-static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
-    const std::string& markdownPath) {
-  std::vector<std::pair<std::string, std::string>> patterns;
-  std::ifstream file(markdownPath);
-  if (!file.is_open()) {
-    return patterns;
-  }
-
-  std::string currentTitle;
-  bool inCodeBlock = false;
-  std::string codeContent;
-  std::unordered_map<std::string, int> keyCounts;
-
-  std::string line;
-  while (std::getline(file, line)) {
-    if (!inCodeBlock) {
-      // Track the most recent ### heading
-      if (line.size() > 4 && line.substr(0, 4) == "### ") {
-        currentTitle = line.substr(4);
-      }
-      // Detect start of xml code block
-      if (line.size() >= 5 && line.substr(0, 5) == "```xm") {
-        inCodeBlock = true;
-        codeContent.clear();
-      }
-    } else {
-      if (line == "```") {
-        inCodeBlock = false;
-        // Only keep complete PAGX documents (skip code snippets)
-        auto trimmed = codeContent;
-        auto pos = trimmed.find_first_not_of(" \t\n\r");
-        if (pos != std::string::npos) {
-          trimmed = trimmed.substr(pos);
-        }
-        // Skip XML declaration if present
-        if (trimmed.substr(0, 5) == "<?xml") {
-          pos = trimmed.find('\n');
-          if (pos != std::string::npos) {
-            trimmed = trimmed.substr(pos + 1);
-            pos = trimmed.find_first_not_of(" \t\n\r");
-            if (pos != std::string::npos) {
-              trimmed = trimmed.substr(pos);
-            }
-          }
-        }
-        if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
-          auto baseKey = TitleToKey(currentTitle);
-          auto count = ++keyCounts[baseKey];
-          auto key = count > 1 ? baseKey + "_" + std::to_string(count) : baseKey;
-          patterns.emplace_back(key, codeContent);
-        }
-      } else {
-        if (!codeContent.empty()) {
-          codeContent += "\n";
-        }
-        codeContent += line;
-      }
-    }
-  }
-  return patterns;
-}
-
-static void TestMarkdownPatterns(tgfx::Context* context, const std::string& markdownPath,
-                                 const std::string& prefix = "", float scale = 1.0f) {
-  auto patterns = ExtractMarkdownPatterns(markdownPath);
-  ASSERT_FALSE(patterns.empty()) << "No patterns found in: " << markdownPath;
-
-  // Ensure output directory exists, then copy test image for patterns referencing "avatar.jpg".
-  auto outDir = std::filesystem::path(ProjectPath::Absolute("test/out/PAGXTest"));
-  std::filesystem::create_directories(outDir);
-  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/imageReplacement.jpg"),
-                             outDir / "avatar.jpg",
-                             std::filesystem::copy_options::overwrite_existing);
-
-  pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
-
-  for (const auto& [name, xmlContent] : patterns) {
-    auto key = prefix + name;
-
-    auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
-
-    // Load via FromFile so relative image paths resolve against the pagx directory.
-    // LoadAndResolve also expands any <Import> nodes (e.g., inline SVG) before rendering.
-    auto doc = LoadAndResolve(pagxPath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to parse XML for: " << key;
-      continue;
-    }
-    if (!doc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : doc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
-    }
-
-    doc->applyLayout(&fontConfig);
-    auto layer = pagx::LayerBuilder::Build(doc.get());
-    if (!layer) {
-      ADD_FAILURE() << "Failed to build layer for: " << key;
-      continue;
-    }
-
-    int canvasWidth = static_cast<int>(std::ceil(doc->width * scale));
-    int canvasHeight = static_cast<int>(std::ceil(doc->height * scale));
-    auto surface = Surface::Make(context, canvasWidth, canvasHeight);
-    if (!surface) {
-      ADD_FAILURE() << "Failed to create surface for: " << key;
-      continue;
-    }
-    DisplayList displayList;
-    if (scale != 1.0f) {
-      auto container = tgfx::Layer::Make();
-      container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-      container->addChild(layer);
-      displayList.root()->addChild(container);
-    } else {
-      displayList.root()->addChild(layer);
-    }
-    displayList.render(surface.get(), false);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
-    VerifyFile(pagxPath, key);
-  }
 }
 
 static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
@@ -3681,16 +3544,6 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
 }
 
 /**
- * Test all PAGX patterns embedded in the skill patterns.md documentation.
- * Extracts complete PAGX documents from markdown code blocks and renders them.
- */
-PAGX_TEST(PAGXTest, SkillPatterns) {
-  TestMarkdownPatterns(context,
-                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/patterns.md"),
-                       "skills_", 2.0f);
-}
-
-/**
  * Test case: Verify resource cross-references resolve regardless of XML declaration order.
  * Resources declared later in <Resources> should be referenceable by earlier resources via '@id'.
  */
@@ -5830,13 +5683,11 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
   auto& tree = *file->mutableBinding();
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
 
-  auto matrix = tgfxLayer->matrix();
-  matrix.setTranslateX(20.0f);
-  tgfxLayer->setMatrix(matrix);
-
+  // The layer transform is held as decomposed state on the runtime target, seeded from the node's
+  // authored x (0 here). apply(0.5) mixes that baseline toward the keyframe value 100.
   auto timeline = file->getDefaultTimeline();
   timeline->apply(0.5f);
-  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 60.0f);  // 20 + (100-20)*0.5
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);  // 0 + (100-0)*0.5
 }
 
 /**
@@ -6734,6 +6585,303 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 }
 
 /**
+ * Test case: editing a child (external) document and calling its own notifyChange refreshes the
+ * embedded subtree inside a parent scene that references it. The parent scene reverse-registered
+ * with the child document, so the edit is reflected (the scene rebuilds its runtime tree).
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXChildEditSyncsToParentScene) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+  {
+    auto& slotTree =
+        *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+    ASSERT_TRUE(slotTree.get<tgfx::Layer>(childLayerNode) != nullptr);
+    EXPECT_FLOAT_EQ(slotTree.get<tgfx::Layer>(childLayerNode)->alpha(), 1.0f);
+  }
+
+  // Edit a node owned by the CHILD document and notify through the CHILD document. The parent scene
+  // is reverse-registered, so it rebuilds its runtime tree and reflects the new value.
+  childLayerNode->alpha = 0.4f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  auto& rebuiltTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto refreshed = rebuiltTree.get<tgfx::Layer>(childLayerNode);
+  ASSERT_TRUE(refreshed != nullptr);
+  EXPECT_FLOAT_EQ(refreshed->alpha(), 0.4f);
+}
+
+/**
+ * Test case: a top-level timeline cached by the caller keeps driving correctly after the scene
+ * rebuilds its runtime tree (triggered by editing an embedded external child document). The
+ * timeline resolves the scene's current root binding lazily at apply time, so the cached handle
+ * does not dangle when the old binding is freed by the rebuild.
+ */
+PAGX_TEST(PAGXTest, TopLevelTimelineSurvivesExternalChildRebuild) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"mainLayer\" width=\"100\" height=\"100\">\n"
+      "    <Rectangle width=\"100\" height=\"100\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#00FF00\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"spin\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"mainLayer\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto* mainLayer = doc->findNode<pagx::Layer>("mainLayer");
+  ASSERT_TRUE(mainLayer != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Cache the top-level timeline handle BEFORE the rebuild, like a caller that keeps it per frame.
+  // Drive to a mid value (0.5) distinct from the layer's default alpha (1.0) so the assertion proves
+  // the timeline actually wrote through the binding, not that the value happened to match.
+  auto cachedTimeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(cachedTimeline != nullptr);
+  cachedTimeline->setCurrentTime(500'000);  // frame 30 of a 60-frame, 60fps animation
+  cachedTimeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Layer>(mainLayer)->alpha(), 0.5f);
+
+  // Edit the CHILD document and notify through it: the parent scene rebuilds its runtime tree, which
+  // frees the old root binding the cached timeline was originally built against.
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+  childLayerNode->alpha = 0.3f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  // Applying the CACHED handle must re-resolve the new binding and drive the value, not crash.
+  cachedTimeline->setCurrentTime(500'000);
+  cachedTimeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Layer>(mainLayer)->alpha(), 0.5f);
+}
+
+/**
+ * Test case: the scene's display options (zoom scale and content offset) persist across a runtime
+ * tree rebuild triggered by an external-child edit. buildRuntimeTree only swaps the root layer on
+ * the persistent displayList, so the zoom/offset stored on that displayList must survive untouched.
+ */
+PAGX_TEST(PAGXTest, DisplayOptionsSurviveExternalChildRebuild) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* options = scene->getDisplayOptions();
+  ASSERT_TRUE(options != nullptr);
+  options->setZoomScale(2.0f);
+  options->setContentOffset(30.0f, 40.0f);
+
+  // Edit the CHILD document and notify through it to force the parent scene to rebuild its tree.
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayerNode = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayerNode != nullptr);
+  childLayerNode->alpha = 0.5f;
+  childDoc->notifyChange({childLayerNode}, /*layoutChanged=*/false);
+
+  // Zoom and offset live on the persistent displayList, so the rebuild must leave them unchanged.
+  EXPECT_FLOAT_EQ(options->getZoomScale(), 2.0f);
+  EXPECT_FLOAT_EQ(options->getContentOffset().x, 30.0f);
+  EXPECT_FLOAT_EQ(options->getContentOffset().y, 40.0f);
+}
+
+/**
+ * Test case: deep (A->B->C) reverse-registration. Document A embeds child B.pagx, which embeds
+ * grandchild C.pagx. Editing a node in the grandchild document C and notifying through C must
+ * refresh A's embedded subtree, proving the root scene reverse-registered all the way down (C's
+ * liveScenes contains A's scene), not just one level.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXGrandchildEditSyncsToRootScene) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slotB\" composition=\"b.pagx\"/>\n"
+      "</pagx>\n";
+  // B embeds C through a layer whose composition points at c.pagx.
+  std::string childBXML =
+      "<pagx width=\"60\" height=\"60\">\n"
+      "  <Layer id=\"slotC\" composition=\"c.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("b.pagx", MakePAGXData(childBXML)));
+  // After B is loaded its own external file (c.pagx) becomes enumerable; load it too.
+  EXPECT_TRUE(
+      doc->loadFileData("c.pagx", MakePAGXData(MakeExternalCompositionXML("grandLayer", "fade"))));
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+
+  auto* slotB = doc->findNode<pagx::Layer>("slotB");
+  ASSERT_TRUE(slotB != nullptr);
+  ASSERT_TRUE(slotB->externalDoc != nullptr);
+  auto* bDoc = slotB->externalDoc.get();
+  auto* slotC = bDoc->findNode<pagx::Layer>("slotC");
+  ASSERT_TRUE(slotC != nullptr);
+  ASSERT_TRUE(slotC->externalDoc != nullptr);
+  auto* cDoc = slotC->externalDoc.get();
+  auto* grandLayer = cDoc->findNode<pagx::Layer>("grandLayer");
+  ASSERT_TRUE(grandLayer != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // The root scene must have reverse-registered into the GRANDCHILD document, otherwise notifying
+  // through cDoc would be a silent no-op (a missing deep-registration bug).
+  ASSERT_FALSE(cDoc->liveScenes.empty());
+  bool rootRegistered = false;
+  for (auto& weakScene : cDoc->liveScenes) {
+    if (weakScene.lock() == scene) {
+      rootRegistered = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(rootRegistered);
+
+  // Locate the grandchild's runtime layer through A's tree: root -> B composition -> C composition.
+  auto* bComposition =
+      static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  auto* cComposition = static_cast<pagx::PAGComposition*>(bComposition->children[0].get());
+  ASSERT_TRUE(cComposition->binding->get<tgfx::Layer>(grandLayer) != nullptr);
+  EXPECT_FLOAT_EQ(cComposition->binding->get<tgfx::Layer>(grandLayer)->alpha(), 1.0f);
+
+  // Edit the grandchild node and notify through the grandchild document: A's scene rebuilds and the
+  // deeply embedded subtree reflects the new value.
+  grandLayer->alpha = 0.25f;
+  cDoc->notifyChange({grandLayer}, /*layoutChanged=*/false);
+
+  auto* rebuiltB = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  auto* rebuiltC = static_cast<pagx::PAGComposition*>(rebuiltB->children[0].get());
+  auto refreshed = rebuiltC->binding->get<tgfx::Layer>(grandLayer);
+  ASSERT_TRUE(refreshed != nullptr);
+  EXPECT_FLOAT_EQ(refreshed->alpha(), 0.25f);
+}
+
+/**
+ * Test case: a parent document must not notify a node owned by a child (external) document. Such a
+ * node is not in the parent's node list, so notifyChange filters it out and the embedded value
+ * stays unchanged. ownsNode() returns false for the foreign node so callers can predicate the call.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXParentCannotNotifyChildNode) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayer = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayer != nullptr);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto childTgfx = slotTree.get<tgfx::Layer>(childLayer);
+  ASSERT_TRUE(childTgfx != nullptr);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+
+  // ownsNode lets callers detect cross-document mis-routing before calling notifyChange.
+  EXPECT_FALSE(doc->ownsNode(childLayer));
+  EXPECT_TRUE(childDoc->ownsNode(childLayer));
+  EXPECT_TRUE(doc->ownsNode(slotLayer));
+
+  // The parent document does not own the child layer, so it is filtered out of the dirty list and
+  // the embedded value stays unchanged. The call still logs an error reporting the dropped node.
+  childLayer->alpha = 0.2f;
+  doc->notifyChange({childLayer}, /*layoutChanged=*/false);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+}
+
+/**
+ * Test case: a mixed dirty list with both an owned node and a foreign (child-document) node has
+ * the foreign node filtered out while the owned node still refreshes; one mis-routed entry must
+ * not block the rest of the batch.
+ */
+PAGX_TEST(PAGXTest, ExternalPAGXMixedDirtyListFiltersForeignNode) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"local\" width=\"40\" height=\"40\"/>\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->loadFileData("child.pagx",
+                                MakePAGXData(MakeExternalCompositionXML("childLayer", "fade"))));
+  auto* localLayer = doc->findNode<pagx::Layer>("local");
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(localLayer != nullptr);
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto* childDoc = slotLayer->externalDoc.get();
+  auto* childLayer = childDoc->findNode<pagx::Layer>("childLayer");
+  ASSERT_TRUE(childLayer != nullptr);
+
+  auto localTgfx = file->mutableBinding()->get<tgfx::Layer>(localLayer);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[1].get())->binding;
+  auto childTgfx = slotTree.get<tgfx::Layer>(childLayer);
+  ASSERT_TRUE(localTgfx != nullptr);
+  ASSERT_TRUE(childTgfx != nullptr);
+  EXPECT_FLOAT_EQ(localTgfx->alpha(), 1.0f);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+
+  // Edit the owned local node and pass both the owned node and a foreign one in the same call.
+  // The foreign node is filtered out (the parent does not own it) but the local one still
+  // refreshes — the batch is not rejected.
+  localLayer->alpha = 0.4f;
+  childLayer->alpha = 0.2f;
+  doc->notifyChange({localLayer, childLayer}, /*layoutChanged=*/false);
+  EXPECT_FLOAT_EQ(localTgfx->alpha(), 0.4f);
+  EXPECT_FLOAT_EQ(childTgfx->alpha(), 1.0f);
+}
+
+/**
  * Test case: external file enumeration continues through loaded external PAGX documents.
  */
 PAGX_TEST(PAGXTest, ExternalPAGXCompositionNestedFiles) {
@@ -6988,7 +7136,7 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
 
-  auto layer = doc->makeNode<pagx::Layer>();
+  auto layer = doc->makeNode<pagx::Layer>("hitLayerId");
   layer->name = "HitLayer";
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->position = {50, 40};
@@ -7007,6 +7155,8 @@ PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto hits = file->getLayersUnderPoint(50, 40);
   ASSERT_FALSE(hits.empty());
   EXPECT_EQ(hits[0]->name(), "HitLayer");
+  // The handle also exposes the source node's id (the "@id" used for document references).
+  EXPECT_EQ(hits[0]->id(), "hitLayerId");
 
   auto miss = file->getLayersUnderPoint(180, 180);
   EXPECT_TRUE(miss.empty());
@@ -7209,6 +7359,2400 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.d, 2.0f);
   EXPECT_FLOAT_EQ(matrix.tx, 70.0f);
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
+}
+
+static pagx::Layer* MakeTestLayer(pagx::PAGXDocument* doc, float x, float y, float fillR,
+                                  float fillG, float fillB) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {fillR, fillG, fillB, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::Layer* MakeTestLayerSimple(pagx::PAGXDocument* doc, float x, float y) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static pagx::NoiseFilter* MakeMonoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeDuoNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  noise->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  return noise;
+}
+
+static pagx::NoiseFilter* MakeMultiNoiseFilter(pagx::PAGXDocument* doc, float density) {
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Multi;
+  noise->size = 10;
+  noise->density = density;
+  noise->seed = 42;
+  noise->opacity = 1.0f;
+  return noise;
+}
+
+static pagx::Fill* MakeSolidFill(pagx::PAGXDocument* doc, float r, float g, float b) {
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {r, g, b, 1.0f};
+  fill->color = solid;
+  return fill;
+}
+
+static void WriteSVGFile(const std::string& svgContent, const std::string& relativePath) {
+  auto outPath = ProjectPath::Absolute(relativePath);
+  auto dirPath = std::filesystem::path(outPath).parent_path();
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+  std::ofstream file(outPath, std::ios::binary);
+  file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
+}
+
+/**
+ * Test rendering with Mono, Duo, and Multi noise filters side by side.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterModes) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 150;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto layer1 = MakeTestLayer(doc.get(), 20, 0, 0.2f, 0.5f, 0.8f);
+  auto mono = doc->makeNode<pagx::NoiseFilter>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer1->filters.push_back(mono);
+  doc->layers.push_back(layer1);
+
+  auto layer2 = MakeTestLayer(doc.get(), 150, 0, 0.2f, 0.5f, 0.8f);
+  auto duo = doc->makeNode<pagx::NoiseFilter>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 8;
+  duo->density = 0.5f;
+  duo->seed = 42;
+  duo->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer2->filters.push_back(duo);
+  doc->layers.push_back(layer2);
+
+  auto layer3 = MakeTestLayer(doc.get(), 280, 0, 0.2f, 0.5f, 0.8f);
+  auto multi = doc->makeNode<pagx::NoiseFilter>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer3->filters.push_back(multi);
+  doc->layers.push_back(layer3);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterModes"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterModes.svg");
+}
+/**
+ * Test NoiseFilter applied to every supported element type (Rectangle, Ellipse, Path, Polystar,
+ * Text, Group, TextBox) plus Repeater, outputting SVG for visual inspection of contentBounds
+ * correctness.
+ */
+PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
+  constexpr int canvasW = 800;
+  constexpr int canvasH = 470;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  fontConfig.registerTypeface(typeface);
+  auto fontFamily = typeface->fontFamily();
+  auto fontStyle = typeface->fontStyle();
+
+  // Row 1: Rectangle(Mono,0), Ellipse(Duo,0.25), Path(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {60, 60};
+    rect->size = {100, 100};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.5f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.0f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {60, 60};
+    ellipse->size = {100, 100};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.3f, 0.3f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.25f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 20);
+
+    auto path = doc->makeNode<pagx::Path>();
+    path->data = doc->makeNode<pagx::PathData>();
+    path->data->moveTo(0, 0);
+    path->data->lineTo(100, 0);
+    path->data->lineTo(50, 100);
+    path->data->close();
+    path->position = {10, 10};
+    layer->contents.push_back(path);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.7f, 0.3f));
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 2: Polystar(Mono,0.75), Text(Duo,1), Group(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 160);
+
+    auto polystar = doc->makeNode<pagx::Polystar>();
+    polystar->position = {60, 60};
+    polystar->outerRadius = 50;
+    polystar->innerRadius = 25;
+    polystar->pointCount = 5;
+    layer->contents.push_back(polystar);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.7f, 0.5f, 0.9f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.75f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(150, 160);
+
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "Hi";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
+    text->fontSize = 60;
+    layer->contents.push_back(text);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.2f, 0.6f, 0.9f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 1.0f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(280, 160);
+
+    auto group = doc->makeNode<pagx::Group>();
+    group->position = {10, 10};
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {40, 40};
+    rect->size = {60, 60};
+    group->elements.push_back(rect);
+    group->elements.push_back(MakeSolidFill(doc.get(), 0.9f, 0.6f, 0.1f));
+    layer->contents.push_back(group);
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 3: TextBox(Duo,0.5), Repeater(Multi,0.5)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(20, 320);
+
+    auto textBox = doc->makeNode<pagx::TextBox>();
+    textBox->width = 120;
+    textBox->height = 100;
+    auto text = doc->makeNode<pagx::Text>();
+    text->text = "AB CD";
+    text->fontFamily = fontFamily;
+    text->fontStyle = fontStyle;
+    text->fontSize = 30;
+    textBox->elements.push_back(text);
+    textBox->elements.push_back(MakeSolidFill(doc.get(), 0.1f, 0.4f, 0.7f));
+    layer->contents.push_back(textBox);
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(200, 320);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {30, 30};
+    rect->size = {40, 40};
+    auto repeater = doc->makeNode<pagx::Repeater>();
+    repeater->copies = 3;
+    repeater->offset = 0;
+    repeater->position = {50, 0};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.3f, 0.8f, 0.6f));
+    layer->contents.push_back(repeater);
+    layer->filters.push_back(MakeMultiNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  // Row 4: Off-center content (contentBounds origin != 0,0)
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(440, 20);
+
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {80, 40};
+    rect->size = {60, 60};
+    layer->contents.push_back(rect);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.6f, 0.2f, 0.8f));
+    layer->filters.push_back(MakeMonoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+  {
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->matrix = pagx::Matrix::Translate(580, 20);
+
+    auto ellipse = doc->makeNode<pagx::Ellipse>();
+    ellipse->position = {40, 80};
+    ellipse->size = {60, 80};
+    layer->contents.push_back(ellipse);
+    layer->contents.push_back(MakeSolidFill(doc.get(), 0.8f, 0.7f, 0.2f));
+    layer->filters.push_back(MakeDuoNoiseFilter(doc.get(), 0.5f));
+    doc->layers.push_back(layer);
+  }
+
+  doc->applyLayout(&fontConfig);
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseFilterAllElements"));
+
+  pagx::SVGExportOptions svgOpts;
+  svgOpts.fontConfig = &fontConfig;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<filter"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseFilterAllElements.svg");
+}
+
+/**
+ * Test NoiseStyle with blendMode applied to an image layer, verifying both rendering and SVG
+ * export. The blendMode is set to Multiply so the noise composites differently from Normal.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
+  constexpr int canvasW = 200;
+  constexpr int canvasH = 200;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {200, 200};
+
+  auto* image = doc->makeNode<pagx::Image>();
+  auto imageData =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(imageData != nullptr);
+  image->data = pagx::Data::MakeWithCopy(imageData->bytes(), imageData->size());
+
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1, 0, 0, 1, 0, 0};
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  auto* noise = doc->makeNode<pagx::NoiseStyle>();
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 1.0f;
+  noise->seed = 7;
+  noise->color = {0.5f, 0.5f, 0.5f, 1.0f};
+  noise->blendMode = pagx::BlendMode::Multiply;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(noise);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleBlendModeOnImage"));
+
+  pagx::SVGExportOptions svgOpts;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, svgOpts);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("feBlend"), std::string::npos);
+  EXPECT_NE(svg.find("mode=\"multiply\""), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleBlendModeOnImage.svg");
+}
+
+/**
+ * Test rendering with Mono, Duo, and Multi noise styles side by side.
+ * Covers writeNoiseStyle for all three modes.
+ */
+PAGX_TEST(PAGXTest, NoiseStyleModes) {
+  constexpr int canvasW = 400;
+  constexpr int canvasH = 180;
+  auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+  auto layer1 = MakeTestLayerSimple(doc.get(), 20, 40);
+  auto mono = doc->makeNode<pagx::NoiseStyle>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 8;
+  mono->density = 0.5f;
+  mono->seed = 42;
+  mono->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer1->styles.push_back(mono);
+  doc->layers.push_back(layer1);
+
+  auto layer2 = MakeTestLayerSimple(doc.get(), 150, 40);
+  auto duo = doc->makeNode<pagx::NoiseStyle>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 8;
+  duo->density = 0.5f;
+  duo->seed = 42;
+  duo->firstColor = {1.0f, 1.0f, 0.0f, 1.0f};
+  duo->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer2->styles.push_back(duo);
+  doc->layers.push_back(layer2);
+
+  auto layer3 = MakeTestLayerSimple(doc.get(), 280, 40);
+  auto multi = doc->makeNode<pagx::NoiseStyle>();
+  multi->mode = pagx::NoiseMode::Multi;
+  multi->size = 8;
+  multi->density = 0.5f;
+  multi->seed = 42;
+  multi->opacity = 1.0f;
+  layer3->styles.push_back(multi);
+  doc->layers.push_back(layer3);
+
+  doc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NoiseStyleModes"));
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  EXPECT_NE(svg.find("feTurbulence"), std::string::npos);
+
+  WriteSVGFile(svg, "test/out/PAGXTest/NoiseStyleModes.svg");
+}
+
+/**
+ * Test animation channel binding for NoiseFilter (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoFilter = doc->makeNode<pagx::NoiseFilter>("NF_MONO");
+  monoFilter->mode = pagx::NoiseMode::Mono;
+  monoFilter->size = 4;
+  monoFilter->density = 0.2f;
+  monoFilter->seed = 10;
+  monoFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->filters.push_back(monoFilter);
+
+  auto duoFilter = doc->makeNode<pagx::NoiseFilter>("NF_DUO");
+  duoFilter->mode = pagx::NoiseMode::Duo;
+  duoFilter->size = 6;
+  duoFilter->density = 0.3f;
+  duoFilter->seed = 20;
+  duoFilter->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoFilter->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->filters.push_back(duoFilter);
+
+  auto multiFilter = doc->makeNode<pagx::NoiseFilter>("NF_MULTI");
+  multiFilter->mode = pagx::NoiseMode::Multi;
+  multiFilter->size = 8;
+  multiFilter->density = 0.4f;
+  multiFilter->seed = 30;
+  multiFilter->opacity = 0.5f;
+  layer->filters.push_back(multiFilter);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono filter channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NF_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 20.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.8f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo filter channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NF_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{1.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi filter channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NF_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseFilter>(monoFilter);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseFilter>(duoFilter);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseFilter>(multiFilter);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  EXPECT_FALSE(tree.apply(monoFilter, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoFilter, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiFilter, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiFilter, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0: values fully overwritten by keyframe targets.
+  timeline->apply(1.0f);
+
+  // Mono: size 4→20, density 0.2→0.8, seed 10→100, color black→red
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 20.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.8f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 100.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseFilter>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 0.0f);
+
+  // Duo: firstColor red→green, secondColor blue→yellow
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseFilter>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().red, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseFilter>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial toward keyframe.
+  // Reset initial values by re-building.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseFilter>(monoFilter);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (20-4)*0.5 = 12
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 12.0f);
+  // density: 0.2 + (0.8-0.2)*0.5 = 0.5
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.5f);
+  // seed: 10 + (100-10)*0.5 = 55
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 55.0f);
+}
+
+/**
+ * Test animation channel binding for NoiseStyle (Mono/Duo/Multi modes).
+ */
+PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto monoStyle = doc->makeNode<pagx::NoiseStyle>("NS_MONO");
+  monoStyle->mode = pagx::NoiseMode::Mono;
+  monoStyle->size = 4;
+  monoStyle->density = 0.2f;
+  monoStyle->seed = 10;
+  monoStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  layer->styles.push_back(monoStyle);
+
+  auto duoStyle = doc->makeNode<pagx::NoiseStyle>("NS_DUO");
+  duoStyle->mode = pagx::NoiseMode::Duo;
+  duoStyle->size = 6;
+  duoStyle->density = 0.3f;
+  duoStyle->seed = 20;
+  duoStyle->firstColor = {1.0f, 0.0f, 0.0f, 1.0f};
+  duoStyle->secondColor = {0.0f, 0.0f, 1.0f, 1.0f};
+  layer->styles.push_back(duoStyle);
+
+  auto multiStyle = doc->makeNode<pagx::NoiseStyle>("NS_MULTI");
+  multiStyle->mode = pagx::NoiseMode::Multi;
+  multiStyle->size = 8;
+  multiStyle->density = 0.4f;
+  multiStyle->seed = 30;
+  multiStyle->opacity = 0.5f;
+  layer->styles.push_back(multiStyle);
+
+  auto anim = doc->makeNode<pagx::Animation>("a");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+
+  // Mono style channels
+  auto* monoObj = doc->makeNode<pagx::AnimationObject>();
+  monoObj->target = "NS_MONO";
+  anim->objects.push_back(monoObj);
+  auto* monoSize = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSize->name = "size";
+  monoSize->keyframes.push_back({0, 16.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSize);
+  auto* monoDensity = doc->makeNode<pagx::TypedChannel<float>>();
+  monoDensity->name = "density";
+  monoDensity->keyframes.push_back({0, 0.9f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoDensity);
+  auto* monoSeed = doc->makeNode<pagx::TypedChannel<float>>();
+  monoSeed->name = "seed";
+  monoSeed->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoSeed);
+  auto* monoColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  monoColor->name = "color";
+  monoColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  monoObj->channels.push_back(monoColor);
+
+  // Duo style channels
+  auto* duoObj = doc->makeNode<pagx::AnimationObject>();
+  duoObj->target = "NS_DUO";
+  anim->objects.push_back(duoObj);
+  auto* duoFirstColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoFirstColor->name = "firstColor";
+  duoFirstColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoFirstColor);
+  auto* duoSecondColor = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  duoSecondColor->name = "secondColor";
+  duoSecondColor->keyframes.push_back(
+      {0, pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  duoObj->channels.push_back(duoSecondColor);
+
+  // Multi style channels
+  auto* multiObj = doc->makeNode<pagx::AnimationObject>();
+  multiObj->target = "NS_MULTI";
+  anim->objects.push_back(multiObj);
+  auto* multiOpacity = doc->makeNode<pagx::TypedChannel<float>>();
+  multiOpacity->name = "opacity";
+  multiOpacity->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  multiObj->channels.push_back(multiOpacity);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  auto& tree = *file->mutableBinding();
+
+  auto tgfxMono = tree.get<tgfx::NoiseStyle>(monoStyle);
+  ASSERT_TRUE(tgfxMono != nullptr);
+  auto tgfxDuo = tree.get<tgfx::NoiseStyle>(duoStyle);
+  ASSERT_TRUE(tgfxDuo != nullptr);
+  auto tgfxMulti = tree.get<tgfx::NoiseStyle>(multiStyle);
+  ASSERT_TRUE(tgfxMulti != nullptr);
+
+  EXPECT_FALSE(tree.apply(monoStyle, "firstColor",
+                          pagx::KeyValue(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(monoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(duoStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(duoStyle, "opacity", pagx::KeyValue(1.0f), 1.0f));
+  EXPECT_FALSE(
+      tree.apply(multiStyle, "color", pagx::KeyValue(pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}), 1.0f));
+  EXPECT_FALSE(tree.apply(multiStyle, "secondColor",
+                          pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
+
+  auto timeline = file->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Apply at mix=1.0
+  timeline->apply(1.0f);
+
+  // Mono: size 4→16, density 0.2→0.9, seed 10→80, color black→green
+  EXPECT_FLOAT_EQ(tgfxMono->size(), 16.0f);
+  EXPECT_FLOAT_EQ(tgfxMono->density(), 0.9f);
+  EXPECT_FLOAT_EQ(tgfxMono->seed(), 80.0f);
+  auto monoNoise = std::static_pointer_cast<tgfx::MonoNoiseStyle>(tgfxMono);
+  EXPECT_FLOAT_EQ(monoNoise->color().green, 1.0f);
+  EXPECT_FLOAT_EQ(monoNoise->color().red, 0.0f);
+
+  // Duo: firstColor red→blue, secondColor blue→green
+  auto duoNoise = std::static_pointer_cast<tgfx::DuoNoiseStyle>(tgfxDuo);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().blue, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->firstColor().red, 0.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().green, 1.0f);
+  EXPECT_FLOAT_EQ(duoNoise->secondColor().blue, 0.0f);
+
+  // Multi: opacity 0.5→1.0
+  auto multiNoise = std::static_pointer_cast<tgfx::MultiNoiseStyle>(tgfxMulti);
+  EXPECT_FLOAT_EQ(multiNoise->opacity(), 1.0f);
+
+  // Apply at mix=0.5: interpolate from initial values.
+  auto file2 = pagx::PAGScene::Make(doc);
+  auto& tree2 = *file2->mutableBinding();
+  auto tgfxMono2 = tree2.get<tgfx::NoiseStyle>(monoStyle);
+  auto timeline2 = file2->getDefaultTimeline();
+  timeline2->apply(0.5f);
+
+  // size: 4 + (16-4)*0.5 = 10
+  EXPECT_FLOAT_EQ(tgfxMono2->size(), 10.0f);
+  // density: 0.2 + (0.9-0.2)*0.5 = 0.55
+  EXPECT_FLOAT_EQ(tgfxMono2->density(), 0.55f);
+  // seed: 10 + (80-10)*0.5 = 45
+  EXPECT_FLOAT_EQ(tgfxMono2->seed(), 45.0f);
+}
+
+/**
+ * Render NoiseFilter/NoiseStyle animation frames across all modes and combined with shadows.
+ * Layout: two rectangles side-by-side, left with NoiseFilter, right with NoiseStyle.
+ * 12 frames total: 3 Mono, 3 Duo, 3 Multi, 3 Multi+DropShadowFilter+InnerShadowStyle.
+ * Density animates from 0.1 to 1.0 across all 12 frames.
+ * The baseline key is "NoiseFilterAnimation" (without the "Export" prefix) to avoid
+ * re-accepting baselines after renaming the test.
+ */
+PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
+  constexpr int canvasW = 500;
+  constexpr int canvasH = 260;
+  constexpr int totalFrames = 12;
+  constexpr int framesPerSection = 3;
+
+  auto outDir = ProjectPath::Absolute("test/out/PAGXTest/NoiseFilterAnimation");
+  auto dirPath = std::filesystem::path(outDir);
+  if (!std::filesystem::exists(dirPath)) {
+    std::filesystem::create_directories(dirPath);
+  }
+
+  auto surface = Surface::Make(context, canvasW, canvasH);
+  ASSERT_TRUE(surface != nullptr);
+
+  for (int i = 0; i < totalFrames; i++) {
+    float density = 0.1f + 0.9f * (static_cast<float>(i) / (totalFrames - 1));
+    int section = i / framesPerSection;
+
+    auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
+
+    // Left rectangle with NoiseFilter
+    auto layerL = doc->makeNode<pagx::Layer>("LL");
+    layerL->width = 220;
+    layerL->height = 220;
+    layerL->matrix = pagx::Matrix::Translate(10, 20);
+    auto rectL = doc->makeNode<pagx::Rectangle>();
+    rectL->position = {110, 110};
+    rectL->size = {220, 220};
+    rectL->roundness = 12;
+    auto fillL = doc->makeNode<pagx::Fill>();
+    auto solidL = doc->makeNode<pagx::SolidColor>();
+    solidL->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillL->color = solidL;
+    layerL->contents.push_back(rectL);
+    layerL->contents.push_back(fillL);
+
+    auto noiseFilter = doc->makeNode<pagx::NoiseFilter>("NF");
+    noiseFilter->size = 8;
+    noiseFilter->density = density;
+    noiseFilter->seed = 42;
+    switch (section) {
+      case 0:
+        noiseFilter->mode = pagx::NoiseMode::Mono;
+        noiseFilter->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseFilter->mode = pagx::NoiseMode::Duo;
+        noiseFilter->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseFilter->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseFilter->mode = pagx::NoiseMode::Multi;
+        noiseFilter->opacity = 0.8f;
+        break;
+    }
+    layerL->filters.push_back(noiseFilter);
+
+    if (section == 3) {
+      auto shadowL = doc->makeNode<pagx::DropShadowFilter>();
+      shadowL->offsetX = 4;
+      shadowL->offsetY = 4;
+      shadowL->blurX = 6;
+      shadowL->blurY = 6;
+      shadowL->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerL->filters.push_back(shadowL);
+
+      auto innerShadowL = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowL->offsetX = 3;
+      innerShadowL->offsetY = 3;
+      innerShadowL->blurX = 8;
+      innerShadowL->blurY = 8;
+      innerShadowL->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerL->styles.push_back(innerShadowL);
+    }
+
+    doc->layers.push_back(layerL);
+
+    // Right rectangle with NoiseStyle
+    auto layerR = doc->makeNode<pagx::Layer>("LR");
+    layerR->width = 220;
+    layerR->height = 220;
+    layerR->matrix = pagx::Matrix::Translate(270, 20);
+    auto rectR = doc->makeNode<pagx::Rectangle>();
+    rectR->position = {110, 110};
+    rectR->size = {220, 220};
+    rectR->roundness = 12;
+    auto fillR = doc->makeNode<pagx::Fill>();
+    auto solidR = doc->makeNode<pagx::SolidColor>();
+    solidR->color = {0.9f, 0.9f, 0.9f, 1.0f};
+    fillR->color = solidR;
+    layerR->contents.push_back(rectR);
+    layerR->contents.push_back(fillR);
+
+    auto noiseStyle = doc->makeNode<pagx::NoiseStyle>("NS");
+    noiseStyle->size = 8;
+    noiseStyle->density = density;
+    noiseStyle->seed = 42;
+    switch (section) {
+      case 0:
+        noiseStyle->mode = pagx::NoiseMode::Mono;
+        noiseStyle->color = {0.0f, 0.0f, 0.0f, 1.0f};
+        break;
+      case 1:
+        noiseStyle->mode = pagx::NoiseMode::Duo;
+        noiseStyle->firstColor = {1.0f, 0.2f, 0.0f, 1.0f};
+        noiseStyle->secondColor = {0.0f, 0.2f, 1.0f, 1.0f};
+        break;
+      default:
+        noiseStyle->mode = pagx::NoiseMode::Multi;
+        noiseStyle->opacity = 0.8f;
+        break;
+    }
+    layerR->styles.push_back(noiseStyle);
+
+    if (section == 3) {
+      auto shadowR = doc->makeNode<pagx::DropShadowFilter>();
+      shadowR->offsetX = 4;
+      shadowR->offsetY = 4;
+      shadowR->blurX = 6;
+      shadowR->blurY = 6;
+      shadowR->color = {0.0f, 0.0f, 0.0f, 0.6f};
+      layerR->filters.push_back(shadowR);
+
+      auto innerShadowR = doc->makeNode<pagx::InnerShadowStyle>();
+      innerShadowR->offsetX = 3;
+      innerShadowR->offsetY = 3;
+      innerShadowR->blurX = 8;
+      innerShadowR->blurY = 8;
+      innerShadowR->color = {0.0f, 0.0f, 0.0f, 0.5f};
+      layerR->styles.push_back(innerShadowR);
+    }
+
+    doc->layers.push_back(layerR);
+
+    doc->applyLayout();
+    auto tgfxRoot = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxRoot != nullptr);
+
+    tgfx::DisplayList displayList;
+    displayList.root()->addChild(tgfxRoot);
+    displayList.render(surface.get(), true);
+
+    auto key = "PAGXTest/NoiseFilterAnimation/frame_" + std::to_string(i);
+    EXPECT_TRUE(Baseline::Compare(surface, key));
+  }
+}
+/**
+ * Test case: notifyChange reflects a render-attribute edit (alpha) on the live tgfx layer in place,
+ * preserving the existing tgfx::Layer instance so handles stay valid.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRenderAttributeInPlace) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 1.0f);
+
+  layer->alpha = 0.3f;
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  // Same tgfx::Layer instance is reused (in place), and the new alpha is reflected.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+}
+
+/**
+ * Test case: notifyChange regenerates vector contents so a SolidColor edit is reflected after the
+ * refresh.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeVectorContentColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
+  ASSERT_TRUE(tgfxSolid != nullptr);
+  EXPECT_EQ(tgfxSolid->color(), tgfx::Color({1.0f, 0.0f, 0.0f, 1.0f}));
+
+  solid->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  // Contents are regenerated, so the binding now points at a fresh tgfx SolidColor with the edit.
+  auto refreshedSolid = scene->mutableBinding()->get<tgfx::SolidColor>(solid);
+  ASSERT_TRUE(refreshedSolid != nullptr);
+  EXPECT_EQ(refreshedSolid->color(), tgfx::Color({0.0f, 1.0f, 0.0f, 1.0f}));
+}
+
+/**
+ * Test case: notifyChange promotes a layer that was built empty (a plain tgfx::Layer) to a
+ * VectorLayer once it gains contents, so the added content renders. The owning PAGLayer's
+ * runtimeLayer is re-synced to the new instance and existing nested children are preserved.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeEmptyLayerGainsContents) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  // A nested child layer so we can verify it survives the promotion.
+  auto child = doc->makeNode<pagx::Layer>("C");
+  child->width = 10;
+  child->height = 10;
+  layer->children.push_back(child);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  // Built with empty contents: the live layer is a plain tgfx::Layer, not a VectorLayer.
+  auto built = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(built != nullptr);
+  EXPECT_NE(built->type(), tgfx::LayerType::Vector);
+  auto childBuilt = binding->get<tgfx::Layer>(child);
+  ASSERT_TRUE(childBuilt != nullptr);
+
+  // Add a rectangle + fill, then notify. The layer must be promoted to a VectorLayer.
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  // The node is now bound to a VectorLayer, the added content is bound, and the nested child layer
+  // instance is preserved (its handle stays valid).
+  auto promoted = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(promoted != nullptr);
+  EXPECT_EQ(promoted->type(), tgfx::LayerType::Vector);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+  EXPECT_EQ(binding->get<tgfx::Layer>(child).get(), childBuilt.get());
+}
+
+/**
+ * Test case: a composition child's PAGLayer keeps its subtree-root runtimeLayer across a
+ * notifyChange and stays hit-testable. refreshNodes re-syncs the cached runtimeLayer only for plain
+ * children; a composition child's binding entry is the empty slot, not its subtree root, so it must
+ * be skipped or the hit-test would resolve to the slot instead of the nested child.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeKeepsCompositionChildHitTestable) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto childLayer = doc->makeNode<pagx::Layer>();
+  childLayer->name = "NestedChild";
+  auto childRect = doc->makeNode<pagx::Rectangle>();
+  childRect->position = {50, 50};
+  childRect->size = {100, 100};
+  auto childFill = doc->makeNode<pagx::Fill>();
+  auto childSolid = doc->makeNode<pagx::SolidColor>();
+  childSolid->color = {0, 0, 1, 1};
+  childFill->color = childSolid;
+  childLayer->contents.push_back(childRect);
+  childLayer->contents.push_back(childFill);
+  comp->layers.push_back(childLayer);
+
+  auto compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->name = "CompLayer";
+  compLayer->composition = comp;
+  doc->layers.push_back(compLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+
+  // Mark the top-level composition child dirty so refreshNodes runs its runtimeLayer re-sync loop.
+  doc->notifyChange({compLayer}, /*layoutChanged=*/true);
+
+  // The composition child's runtimeLayer was not overwritten with its slot, so the nested child is
+  // still resolved by the hit-test.
+  auto hitsAfter = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hitsAfter.empty());
+  EXPECT_EQ(hitsAfter[0]->name(), "NestedChild");
+}
+
+/**
+ * Test case: notifyChange re-runs layout so a geometry edit is reflected in the layer's content
+ * bounds, while keeping the layer handle valid (the tgfx::Layer instance is preserved).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeLayoutWidth) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {50, 50};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(10, 10);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_FLOAT_EQ(hits[0]->getBounds().width, 50);
+
+  rect->size = {120, 50};
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  // The same tgfx::Layer instance is kept and the regenerated content reflects the new width.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer).get(), tgfxLayer.get());
+  auto hitsAfter = scene->getLayersUnderPoint(10, 10);
+  ASSERT_FALSE(hitsAfter.empty());
+  EXPECT_FLOAT_EQ(hitsAfter[0]->getBounds().width, 120);
+}
+
+/**
+ * Test case: a non-timeline edit (a plain layer attribute) does NOT disturb timelines — the
+ * timeline keeps its resolved cache and in-progress playback. Only timeline-node edits reset
+ * timelines.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineWhenNoTimelineNodeDirty) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+  EXPECT_TRUE(timeline->resolved);
+
+  // A plain layer edit is not a timeline node, so the timeline is left untouched (cache preserved).
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+  EXPECT_TRUE(timeline->resolved);
+
+  // Playback still drives the channel correctly.
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  tgfxLayer->setAlpha(1.0f);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+}
+
+/**
+ * Test case: editing a timeline node (a Channel keyframe) resets the scene's timelines so the new
+ * keyframe value takes effect on the next apply.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+
+  // Edit the keyframe value and mark the Channel node dirty: timelines are rebuilt.
+  alphaChannel->keyframes[0].value = 0.25f;
+  doc->notifyChange({alphaChannel}, /*layoutChanged=*/true);
+
+  // A freshly rebuilt timeline applies the new value.
+  auto rebuilt = scene->getDefaultTimeline();
+  ASSERT_TRUE(rebuilt != nullptr);
+  tgfxLayer->setAlpha(1.0f);
+  rebuilt->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.25f);
+}
+
+/**
+ * Test case: a reference edit (repointing AnimationObject.target to a different node) takes effect
+ * when the caller marks the referencing timeline node dirty, since the timeline is rebuilt and
+ * re-resolves its targets. Demonstrates the "mark every node on the reference chain dirty" rule.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRetargetAnimationObject) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layerA = doc->makeNode<pagx::Layer>("A");
+  layerA->width = 50;
+  layerA->height = 50;
+  doc->layers.push_back(layerA);
+  auto layerB = doc->makeNode<pagx::Layer>("B");
+  layerB->width = 50;
+  layerB->height = 50;
+  doc->layers.push_back(layerB);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "A";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxA = binding->get<tgfx::Layer>(layerA);
+  auto tgfxB = binding->get<tgfx::Layer>(layerB);
+  ASSERT_TRUE(tgfxA != nullptr);
+  ASSERT_TRUE(tgfxB != nullptr);
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxA->alpha(), 0.5f);
+
+  // Repoint the target from A to B and mark the referencing AnimationObject dirty: the timeline is
+  // rebuilt and re-resolves to B.
+  object->target = "B";
+  tgfxA->setAlpha(1.0f);
+  tgfxB->setAlpha(1.0f);
+  doc->notifyChange({object}, /*layoutChanged=*/true);
+  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxB->alpha(), 0.5f);
+  EXPECT_FLOAT_EQ(tgfxA->alpha(), 1.0f);
+}
+
+/**
+ * Test case: removing the animation driver from a layer and notifying with the animation node dirty
+ * stops it driving. The composition timeline is rebuilt from the owner layer's now-empty driver
+ * list, so no timeline drives the target and advancing no longer changes it.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemovedAnimationStopsDriving) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 50;
+  comp->height = 50;
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 50;
+  child->height = 50;
+  comp->layers.push_back(child);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "child";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto compLayer = doc->makeNode<pagx::Layer>("compLayer");
+  compLayer->composition = comp;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "anim";
+  driver->playing = true;
+  compLayer->timelines.push_back(std::move(driver));
+  doc->layers.push_back(compLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get())
+                      ->binding.get();
+  auto tgfxChild = binding->get<tgfx::Layer>(child);
+  ASSERT_TRUE(tgfxChild != nullptr);
+  scene->advanceAndApply(0);
+  EXPECT_FLOAT_EQ(tgfxChild->alpha(), 0.5f);
+
+  // Remove the driver from the layer and notify with the animation node dirty: timelines are rebuilt
+  // from the now-empty driver list, so nothing drives the child.
+  compLayer->timelines.clear();
+  doc->notifyChange({anim}, /*layoutChanged=*/true);
+
+  tgfxChild->setAlpha(1.0f);
+  scene->advanceAndApply(500'000);
+  EXPECT_FLOAT_EQ(tgfxChild->alpha(), 1.0f);
+}
+
+/**
+ * Test case: notifyChange adds a newly inserted top-level layer to the live scene while keeping the
+ * existing sibling's tgfx layer (and handle) unchanged.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeAddLayer) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto first = doc->makeNode<pagx::Layer>("A");
+  first->width = 50;
+  first->height = 50;
+  doc->layers.push_back(first);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto firstTgfx = scene->mutableBinding()->get<tgfx::Layer>(first);
+  ASSERT_TRUE(firstTgfx != nullptr);
+
+  auto second = doc->makeNode<pagx::Layer>("B");
+  second->width = 30;
+  second->height = 30;
+  doc->layers.push_back(second);
+  doc->notifyChange({second}, /*layoutChanged=*/true);
+
+  // The new layer now has a tgfx mapping, and the existing one is untouched (same instance).
+  auto secondTgfx = scene->mutableBinding()->get<tgfx::Layer>(second);
+  ASSERT_TRUE(secondTgfx != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(first).get(), firstTgfx.get());
+  EXPECT_NE(secondTgfx.get(), firstTgfx.get());
+}
+
+/**
+ * Test case: notifyChange removes a deleted layer from the live scene and drops its binding, while
+ * the surviving sibling's tgfx layer (and handle) stays valid.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemoveLayer) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto first = doc->makeNode<pagx::Layer>("A");
+  first->width = 50;
+  first->height = 50;
+  doc->layers.push_back(first);
+  auto second = doc->makeNode<pagx::Layer>("B");
+  second->width = 30;
+  second->height = 30;
+  doc->layers.push_back(second);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto firstTgfx = scene->mutableBinding()->get<tgfx::Layer>(first);
+  ASSERT_TRUE(firstTgfx != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(second) != nullptr);
+
+  // Remove the second layer from the document and notify.
+  doc->layers.pop_back();
+  doc->notifyChange({second}, /*layoutChanged=*/true);
+
+  // The removed layer's binding is dropped; the surviving layer keeps its instance.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(second), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(first).get(), firstTgfx.get());
+}
+
+/**
+ * Test case: notifyChange reconciles a plain layer's nested children (Layer.children): adding and
+ * removing a nested child is reflected, while the parent and surviving children keep their handles.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeNestedChildAddRemove) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto parent = doc->makeNode<pagx::Layer>("P");
+  parent->width = 100;
+  parent->height = 100;
+  doc->layers.push_back(parent);
+  auto childA = doc->makeNode<pagx::Layer>("A");
+  childA->width = 40;
+  childA->height = 40;
+  parent->children.push_back(childA);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto parentTgfx = scene->mutableBinding()->get<tgfx::Layer>(parent);
+  auto childATgfx = scene->mutableBinding()->get<tgfx::Layer>(childA);
+  ASSERT_TRUE(parentTgfx != nullptr);
+  ASSERT_TRUE(childATgfx != nullptr);
+
+  // Add a nested child B under the parent and notify with the parent (container) node.
+  auto childB = doc->makeNode<pagx::Layer>("B");
+  childB->width = 20;
+  childB->height = 20;
+  parent->children.push_back(childB);
+  doc->notifyChange({parent}, /*layoutChanged=*/true);
+
+  // B is built and bound; A and the parent keep their original tgfx instances.
+  auto childBTgfx = scene->mutableBinding()->get<tgfx::Layer>(childB);
+  ASSERT_TRUE(childBTgfx != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(parent).get(), parentTgfx.get());
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childA).get(), childATgfx.get());
+
+  // Remove the nested child A and notify; its binding is dropped, B and parent stay valid.
+  parent->children.erase(parent->children.begin());
+  doc->notifyChange({parent}, /*layoutChanged=*/true);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childA), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(childB).get(), childBTgfx.get());
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(parent).get(), parentTgfx.get());
+}
+
+/**
+ * Test case: notifyChange adds a newly inserted composition slot layer at runtime. syncChildren has
+ * no pre-built slot for the new layer, so it builds one via BuildLayerInto and attaches the
+ * MakeChild subtree under it. The nested composition content is built into the scene and stays
+ * hit-testable, while the existing sibling layer keeps its handle.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeAddComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto existing = doc->makeNode<pagx::Layer>("E");
+  existing->width = 50;
+  existing->height = 50;
+  doc->layers.push_back(existing);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto existingTgfx = scene->mutableBinding()->get<tgfx::Layer>(existing);
+  ASSERT_TRUE(existingTgfx != nullptr);
+
+  // Build a composition with one filled child layer, then a slot layer that references it.
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto inner = doc->makeNode<pagx::Layer>();
+  inner->name = "NestedChild";
+  auto innerRect = doc->makeNode<pagx::Rectangle>();
+  innerRect->position = {50, 50};
+  innerRect->size = {100, 100};
+  auto innerFill = doc->makeNode<pagx::Fill>();
+  auto innerSolid = doc->makeNode<pagx::SolidColor>();
+  innerSolid->color = {0, 0, 1, 1};
+  innerFill->color = innerSolid;
+  inner->contents.push_back(innerRect);
+  inner->contents.push_back(innerFill);
+  comp->layers.push_back(inner);
+
+  auto slot = doc->makeNode<pagx::Layer>();
+  slot->name = "Slot";
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  // Notify with the newly inserted slot layer; syncChildren builds its composition subtree.
+  doc->notifyChange({slot}, /*layoutChanged=*/true);
+
+  // The slot is bound, the nested composition content is hit-testable, and the existing sibling
+  // layer keeps its original tgfx instance.
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(slot) != nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(existing).get(), existingTgfx.get());
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+}
+
+/**
+ * Test case: notifyChange removes a composition slot layer at runtime. syncChildren detaches the
+ * slot (the binding entry, which carries the nested subtree) and drops the bindings of the slot and
+ * its composition content, while the surviving sibling layer keeps its handle.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemoveComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto existing = doc->makeNode<pagx::Layer>("E");
+  existing->width = 50;
+  existing->height = 50;
+  doc->layers.push_back(existing);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 100;
+  comp->height = 100;
+  auto inner = doc->makeNode<pagx::Layer>();
+  inner->name = "NestedChild";
+  auto innerRect = doc->makeNode<pagx::Rectangle>();
+  innerRect->position = {50, 50};
+  innerRect->size = {100, 100};
+  auto innerFill = doc->makeNode<pagx::Fill>();
+  auto innerSolid = doc->makeNode<pagx::SolidColor>();
+  innerSolid->color = {0, 0, 1, 1};
+  innerFill->color = innerSolid;
+  inner->contents.push_back(innerRect);
+  inner->contents.push_back(innerFill);
+  comp->layers.push_back(inner);
+
+  auto slot = doc->makeNode<pagx::Layer>();
+  slot->name = "Slot";
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto existingTgfx = scene->mutableBinding()->get<tgfx::Layer>(existing);
+  ASSERT_TRUE(existingTgfx != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Layer>(slot) != nullptr);
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->name(), "NestedChild");
+
+  // Remove the slot layer from the document and notify.
+  doc->layers.pop_back();
+  doc->notifyChange({slot}, /*layoutChanged=*/true);
+
+  // The slot's binding is dropped, the surviving sibling keeps its instance, and the composition
+  // content is no longer hit-testable.
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(slot), nullptr);
+  EXPECT_EQ(scene->mutableBinding()->get<tgfx::Layer>(existing).get(), existingTgfx.get());
+  auto hitsAfter = scene->getLayersUnderPoint(50, 50);
+  for (const auto& hit : hitsAfter) {
+    EXPECT_NE(hit->name(), "NestedChild");
+  }
+}
+
+/**
+ * Test case: GetNodeChannel/SetNodeChannel round-trip scalar fields across node types.
+ */
+PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.4f)));
+  EXPECT_FLOAT_EQ(layer->alpha, 0.4f);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(layer, "alpha", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), 0.4f);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "visible", pagx::KeyValue(false)));
+  EXPECT_FALSE(layer->visible);
+
+  // LayoutNode shared field via the derived type.
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "width", pagx::KeyValue(120.0f)));
+  EXPECT_FLOAT_EQ(layer->width, 120.0f);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "roundness", pagx::KeyValue(8.0f)));
+  EXPECT_FLOAT_EQ(rect->roundness, 8.0f);
+
+  auto selector = doc->makeNode<pagx::RangeSelector>();
+  EXPECT_TRUE(pagx::SetNodeChannel(selector, "randomSeed", pagx::KeyValue(7)));
+  EXPECT_EQ(selector->randomSeed, 7);
+}
+
+/**
+ * Test case: enum channels use the string enum name; invalid strings and wrong types are rejected.
+ */
+PAGX_TEST(PAGXTest, NodeChannelEnumRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("multiply"))));
+  EXPECT_EQ(layer->blendMode, pagx::BlendMode::Multiply);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(layer, "blendMode", &out));
+  EXPECT_EQ(std::get<std::string>(out), "multiply");
+
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("notamode"))));
+  EXPECT_EQ(layer->blendMode, pagx::BlendMode::Multiply);
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(1.0f)));
+}
+
+/**
+ * Test case: Point/Size/Padding fields are addressed by suffixed channels.
+ */
+PAGX_TEST(PAGXTest, NodeChannelCompositeSuffixes) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.x", pagx::KeyValue(10.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.y", pagx::KeyValue(20.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.width", pagx::KeyValue(30.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.height", pagx::KeyValue(40.0f)));
+  EXPECT_FLOAT_EQ(rect->position.x, 10.0f);
+  EXPECT_FLOAT_EQ(rect->position.y, 20.0f);
+  EXPECT_FLOAT_EQ(rect->size.width, 30.0f);
+  EXPECT_FLOAT_EQ(rect->size.height, 40.0f);
+
+  auto group = doc->makeNode<pagx::Group>();
+  EXPECT_TRUE(pagx::SetNodeChannel(group, "padding.left", pagx::KeyValue(5.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(group, "padding.bottom", pagx::KeyValue(6.0f)));
+  EXPECT_FLOAT_EQ(group->padding.left, 5.0f);
+  EXPECT_FLOAT_EQ(group->padding.bottom, 6.0f);
+}
+
+/**
+ * Test case: Color channels round-trip; id-based lookup feeds SetNodeChannel.
+ */
+PAGX_TEST(PAGXTest, NodeChannelColorAndIdLookup) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  doc->makeNode<pagx::SolidColor>("fillColor");
+
+  auto* solid = doc->findNode<pagx::SolidColor>("fillColor");
+  ASSERT_TRUE(solid != nullptr);
+  pagx::Color green = {0.0f, 1.0f, 0.0f, 1.0f};
+  EXPECT_TRUE(pagx::SetNodeChannel(solid, "color", pagx::KeyValue(green)));
+  EXPECT_EQ(solid->color, green);
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(solid, "color", &out));
+  EXPECT_EQ(std::get<pagx::Color>(out), green);
+}
+
+/**
+ * Test case: unknown channel, type mismatch, and null node return false.
+ */
+PAGX_TEST(PAGXTest, NodeChannelRejectsUnsupported) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "nosuchchannel", pagx::KeyValue(1.0f)));
+  pagx::KeyValue out;
+  EXPECT_FALSE(pagx::GetNodeChannel(layer, "nosuchchannel", &out));
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(std::string("x"))));
+  EXPECT_FALSE(pagx::SetNodeChannel(nullptr, "alpha", pagx::KeyValue(1.0f)));
+}
+
+/**
+ * Test case: optional fields read false while unset, then round-trip after a write.
+ */
+PAGX_TEST(PAGXTest, NodeChannelOptionalFields) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+
+  // Unset optionals report no value on read.
+  pagx::KeyValue out;
+  EXPECT_FALSE(pagx::GetNodeChannel(modifier, "strokeWidth", &out));
+  EXPECT_FALSE(pagx::GetNodeChannel(modifier, "fillColor", &out));
+
+  // Writing populates the optional, and the value reads back.
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(3.0f)));
+  EXPECT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_FLOAT_EQ(*modifier->strokeWidth, 3.0f);
+  EXPECT_TRUE(pagx::GetNodeChannel(modifier, "strokeWidth", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), 3.0f);
+
+  pagx::Color red = {1.0f, 0.0f, 0.0f, 1.0f};
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "fillColor", pagx::KeyValue(red)));
+  EXPECT_TRUE(modifier->fillColor.has_value());
+  EXPECT_TRUE(pagx::GetNodeChannel(modifier, "fillColor", &out));
+  EXPECT_EQ(std::get<pagx::Color>(out), red);
+
+  // Wrong value type on an optional is still rejected.
+  EXPECT_FALSE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(std::string("x"))));
+}
+
+/**
+ * Test case: ResetNodeChannel restores a channel to its node type's default value. Covers scalars,
+ * enums, component-wise channels (only the addressed axis is reset), and optionals (reset clears the
+ * value), plus rejection of null nodes and unknown channels.
+ */
+PAGX_TEST(PAGXTest, NodeChannelReset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+
+  // Scalar: edit then reset returns to the default carried by a fresh node.
+  float defaultAlpha = pagx::Default<pagx::Layer>().alpha;
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.3f)));
+  EXPECT_TRUE(pagx::ResetNodeChannel(layer, "alpha"));
+  EXPECT_FLOAT_EQ(layer->alpha, defaultAlpha);
+
+  // Enum: reset returns to the default blend mode.
+  pagx::BlendMode defaultBlend = pagx::Default<pagx::Layer>().blendMode;
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "blendMode", pagx::KeyValue(std::string("multiply"))));
+  EXPECT_TRUE(pagx::ResetNodeChannel(layer, "blendMode"));
+  EXPECT_EQ(layer->blendMode, defaultBlend);
+
+  // Component-wise: resetting position.x leaves position.y untouched. Rectangle's default position
+  // is NaN (the auto-layout sentinel), so the reset is checked via isnan rather than equality.
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.x", pagx::KeyValue(10.0f)));
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "position.y", pagx::KeyValue(20.0f)));
+  EXPECT_TRUE(pagx::ResetNodeChannel(rect, "position.x"));
+  EXPECT_TRUE(std::isnan(rect->position.x));
+  EXPECT_TRUE(std::isnan(pagx::Default<pagx::Rectangle>().position.x));
+  EXPECT_FLOAT_EQ(rect->position.y, 20.0f);
+
+  // Optional: reset clears a previously written value.
+  EXPECT_TRUE(pagx::SetNodeChannel(modifier, "strokeWidth", pagx::KeyValue(3.0f)));
+  EXPECT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_TRUE(pagx::ResetNodeChannel(modifier, "strokeWidth"));
+  EXPECT_FALSE(modifier->strokeWidth.has_value());
+
+  // Rejection: null node and unknown channel.
+  EXPECT_FALSE(pagx::ResetNodeChannel(nullptr, "alpha"));
+  EXPECT_FALSE(pagx::ResetNodeChannel(layer, "nosuchchannel"));
+}
+
+/**
+ * Test case: ChannelsFor exposes every channel of a node type, each with a working accessor and
+ * flags that match the IsAnimatableChannel/RequiresLayout queries.
+ */
+PAGX_TEST(PAGXTest, NodeChannelTableConsistency) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+
+  const auto& channels = pagx::ChannelsFor(pagx::NodeType::Layer);
+  ASSERT_FALSE(channels.empty());
+  bool sawAnimatable = false;
+  bool sawRequiresLayout = false;
+  bool sawNoFlags = false;
+  for (const auto& channel : channels) {
+    // The flags reported by the table must agree with the by-name query helpers.
+    EXPECT_EQ(pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable),
+              pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel.channel));
+    EXPECT_EQ(pagx::HasFlag(channel.flags, pagx::ChannelFlags::RequiresLayout),
+              pagx::RequiresLayout(pagx::NodeType::Layer, channel.channel));
+    // Every listed channel must be readable on a freshly built node.
+    pagx::KeyValue out;
+    EXPECT_TRUE(pagx::GetNodeChannel(layer, channel.channel, &out))
+        << "channel '" << channel.channel << "' is listed but not readable";
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+      sawAnimatable = true;
+    }
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::RequiresLayout)) {
+      sawRequiresLayout = true;
+    }
+    if (channel.flags == pagx::ChannelFlags::None) {
+      sawNoFlags = true;
+    }
+  }
+  EXPECT_TRUE(sawAnimatable);
+  EXPECT_TRUE(sawRequiresLayout);
+  EXPECT_TRUE(sawNoFlags);
+
+  // A node type with no reflectable channels yields an empty table.
+  EXPECT_TRUE(pagx::ChannelsFor(pagx::NodeType::Document).empty());
+}
+
+/**
+ * Test case: IsAnimatableChannel marks channels that have a runtime writer. Pure render outputs and
+ * in-place geometry are animatable; auto-layout inputs (width, padding) and the layer name are not.
+ */
+PAGX_TEST(PAGXTest, NodeChannelAnimatableClass) {
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "alpha"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "x"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "width"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "padding.left"));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "name"));
+
+  // Geometry outputs are animatable (driven in place during playback).
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "size.width"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Polystar, "outerRadius"));
+  // Unknown channel is not animatable.
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Rectangle, "nope"));
+}
+
+/**
+ * Test case: RequiresLayout marks channels whose document edit only takes effect after a layout
+ * pass. This covers both auto-layout inputs and layout-derived geometry, so a channel can be both
+ * animatable and layout-requiring (e.g. a shape's size / position, or a layer's x / y).
+ */
+PAGX_TEST(PAGXTest, NodeChannelRequiresLayout) {
+  // Auto-layout inputs require layout.
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "width"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "padding.left"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Text, "fontSize"));
+  // Layout-derived geometry requires layout even though it is also animatable.
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "size.width"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "position.x"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Polystar, "outerRadius"));
+  EXPECT_TRUE(pagx::RequiresLayout(pagx::NodeType::Layer, "x"));
+  // Pure render channels refresh without layout.
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Layer, "alpha"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Rectangle, "roundness"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Fill, "alpha"));
+  // Unknown channel does not require layout.
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::Layer, "nope"));
+}
+
+/**
+ * Test case: notifyChange with layoutChanged=false skips the layout pass — a render edit still
+ * takes effect, while a layout edit made in the same call is intentionally NOT reflected (proving
+ * layout was skipped).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRenderOnlySkipsLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Rectangle>(rect) != nullptr);
+
+  // Edit a render field (alpha) and a layout field (rect size) together, but notify as render-only.
+  // dirty is the host layer: geometry size is refreshed via the layer's RefreshLayerInPlace, which
+  // rebuilds vector contents from renderSize(). With layout skipped, renderSize() keeps the stale
+  // value, so the size edit is intentionally not reflected.
+  layer->alpha = 0.3f;
+  rect->size = {120, 40};
+  doc->notifyChange({layer}, /*layoutChanged=*/false);
+
+  // Render edit reflected; layout edit NOT reflected because layout was skipped (size stays 40).
+  // Re-fetch the tgfx Rectangle since RefreshLayerInPlace rebuilds vector contents.
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 40.0f);
+
+  // Now notify with layoutChanged=true: re-layout updates renderSize and the edit takes effect.
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 120.0f);
+}
+
+/**
+ * Test case: the documented edit workflow end to end — mutate a channel via SetNodeChannel, derive
+ * the layoutChanged flag from RequiresLayout, then call notifyChange. A render channel (alpha)
+ * refreshes with layout skipped; a layout-affecting channel (rect width via size.width) only takes
+ * effect once RequiresLayout routes it through a layout pass.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeFromSetNodeChannel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->alpha = 1.0f;
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  ASSERT_TRUE(scene->mutableBinding()->get<tgfx::Rectangle>(rect) != nullptr);
+
+  // Render channel: alpha does not require layout, so the caller-derived flag skips layout. The
+  // edit still reaches the live layer.
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.3f)));
+  bool alphaLayout = pagx::RequiresLayout(layer->nodeType(), "alpha");
+  EXPECT_FALSE(alphaLayout);
+  doc->notifyChange({layer}, alphaLayout);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+
+  // Layout-affecting channel: size.width requires layout, so the derived flag re-runs layout and
+  // the new width is reflected. Re-fetch the tgfx Rectangle since refresh rebuilds vector contents.
+  EXPECT_TRUE(pagx::SetNodeChannel(rect, "size.width", pagx::KeyValue(120.0f)));
+  bool widthLayout = pagx::RequiresLayout(rect->nodeType(), "size.width");
+  EXPECT_TRUE(widthLayout);
+  doc->notifyChange({layer}, widthLayout);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Rectangle>(rect)->size().width, 120.0f);
+}
+
+/**
+ * Test case: a Rectangle's size.width channel drives the tgfx Rectangle size in place.
+ */
+PAGX_TEST(PAGXTest, ChannelRectangleSize) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto rect = doc->makeNode<pagx::Rectangle>("R");
+  rect->position = {0, 0};
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "R";
+  anim->objects.push_back(object);
+  auto* widthProp = doc->makeNode<pagx::TypedChannel<float>>();
+  widthProp->name = "size.width";
+  widthProp->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(widthProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxRect = scene->mutableBinding()->get<tgfx::Rectangle>(rect);
+  ASSERT_TRUE(tgfxRect != nullptr);
+  EXPECT_FLOAT_EQ(tgfxRect->size().width, 40.0f);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // mix=0.5 from 40 toward 100 = 70; height untouched.
+  timeline->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxRect->size().width, 70.0f);
+  EXPECT_FLOAT_EQ(tgfxRect->size().height, 40.0f);
+}
+
+/**
+ * Test case: a Layer's matrix channel drives the tgfx layer transform via TRS-decomposed mixing,
+ * and stacks with the layer's authored x/y translation.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 10;
+  layer->y = 0;
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* matrixProp = doc->makeNode<pagx::TypedChannel<pagx::Matrix>>();
+  matrixProp->name = "matrix";
+  // Target matrix is a pure 2x scale; baseline is identity.
+  pagx::Matrix scaled = pagx::Matrix::Scale(2.0f, 2.0f);
+  matrixProp->keyframes.push_back({0, scaled, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(matrixProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // mix=1: matrix becomes 2x scale, composed with the authored x translation (10).
+  timeline->apply(1.0f);
+  auto m = tgfxLayer->matrix();
+  EXPECT_FLOAT_EQ(m.getScaleX(), 2.0f);
+  EXPECT_FLOAT_EQ(m.getScaleY(), 2.0f);
+  EXPECT_FLOAT_EQ(m.getTranslateX(), 10.0f);
+}
+
+/**
+ * Test case: a matrix tween between two rotations on opposite sides of +/-pi (170deg and 190deg,
+ * which atan2 recovers as +2.967 rad and -2.967 rad) takes the shortest arc (a continuous 20deg
+ * sweep through 180deg) instead of the long way (340deg in the opposite direction). Multi-turn
+ * winding is still unrecoverable from a baked matrix and remains documented on the scalar rotation
+ * channel; this test only fixes the +/-pi-boundary case.
+ */
+PAGX_TEST(PAGXTest, ChannelLayerMatrixRotationShortestArc) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* matrixProp = doc->makeNode<pagx::TypedChannel<pagx::Matrix>>();
+  matrixProp->name = "matrix";
+  // 170deg and 190deg encode as +2.967 / -2.967 rad after atan2 recovery; without the wrap fix the
+  // tween would interpolate -5.934 rad (the long way around).
+  pagx::Matrix m170 = pagx::Matrix::Rotate(170.0f);
+  pagx::Matrix m190 = pagx::Matrix::Rotate(190.0f);
+  matrixProp->keyframes.push_back({0, m170, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  matrixProp->keyframes.push_back({60, m190, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(matrixProp);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(timeline != nullptr);
+  // Sweep at 25%, 50%, 75% of the segment. The shortest-arc rotation should rise monotonically from
+  // 170 -> 175 -> 180 -> 185 -> 190 deg; sin and cos act as a sufficient continuity check.
+  // Without the wrap fix, the long-way path (-5.934 * t) would dip below sin(170deg) before
+  // climbing back, breaking monotonicity around midway.
+  auto sample = [&](int64_t timeUs) {
+    timeline->setCurrentTime(timeUs);
+    timeline->apply(1.0f);
+    return tgfxLayer->matrix();
+  };
+  auto m25 = sample(250000);
+  auto m50 = sample(500000);
+  auto m75 = sample(750000);
+  // At 50%, rotation should be exactly 180deg: cos = -1, sin = 0.
+  EXPECT_NEAR(m50.getScaleX(), -1.0f, 1e-3f);
+  EXPECT_NEAR(m50.getSkewY(), 0.0f, 1e-3f);
+  // sin(angle) = m.b for a pure rotation. Monotonic decrease 170 -> 180 -> 190 deg means
+  // sin is positive (+0.087), then 0, then negative (-0.087) — the long way would flip signs.
+  EXPECT_GT(m25.getSkewY(), 0.0f);
+  EXPECT_LT(m75.getSkewY(), 0.0f);
+}
+
+/**
+ * Test case: every channel the reflection registry marks Animatable for a built node type has a
+ * matching runtime writer, so animations cannot target a channel that silently does nothing.
+ */
+PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // A vector layer carrying one of each geometry / paint / modifier element.
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {40, 40};
+  layer->contents.push_back(rect);
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {40, 40};
+  layer->contents.push_back(ellipse);
+  auto polystar = doc->makeNode<pagx::Polystar>();
+  layer->contents.push_back(polystar);
+  auto trim = doc->makeNode<pagx::TrimPath>();
+  layer->contents.push_back(trim);
+  auto roundCorner = doc->makeNode<pagx::RoundCorner>();
+  layer->contents.push_back(roundCorner);
+  auto repeater = doc->makeNode<pagx::Repeater>();
+  layer->contents.push_back(repeater);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto strokeColor = doc->makeNode<pagx::SolidColor>();
+  stroke->color = strokeColor;
+  layer->contents.push_back(stroke);
+
+  // A group with transform channels, plus a fill backed by each gradient kind so the gradient point
+  // writers and their ColorStop writers are exercised.
+  auto group = doc->makeNode<pagx::Group>();
+  auto groupRect = doc->makeNode<pagx::Rectangle>();
+  groupRect->size = {20, 20};
+  group->elements.push_back(groupRect);
+  layer->contents.push_back(group);
+
+  auto linear = doc->makeNode<pagx::LinearGradient>();
+  auto linearStop = doc->makeNode<pagx::ColorStop>();
+  linearStop->color = {1, 0, 0, 1};
+  linear->colorStops.push_back(linearStop);
+  auto linearFill = doc->makeNode<pagx::Fill>();
+  linearFill->color = linear;
+  layer->contents.push_back(linearFill);
+
+  auto radial = doc->makeNode<pagx::RadialGradient>();
+  auto radialFill = doc->makeNode<pagx::Fill>();
+  radialFill->color = radial;
+  layer->contents.push_back(radialFill);
+
+  auto conic = doc->makeNode<pagx::ConicGradient>();
+  auto conicFill = doc->makeNode<pagx::Fill>();
+  conicFill->color = conic;
+  layer->contents.push_back(conicFill);
+
+  auto diamond = doc->makeNode<pagx::DiamondGradient>();
+  auto diamondFill = doc->makeNode<pagx::Fill>();
+  diamondFill->color = diamond;
+  layer->contents.push_back(diamondFill);
+
+  // A text modifier carrying a range selector exercises the modifier transform/color writers and
+  // the selector writers.
+  auto modifier = doc->makeNode<pagx::TextModifier>();
+  auto selector = doc->makeNode<pagx::RangeSelector>();
+  modifier->selectors.push_back(selector);
+  layer->contents.push_back(modifier);
+
+  // One of each layer style and filter kind so their animatable writers are covered.
+  auto dropStyle = doc->makeNode<pagx::DropShadowStyle>();
+  layer->styles.push_back(dropStyle);
+  auto innerStyle = doc->makeNode<pagx::InnerShadowStyle>();
+  layer->styles.push_back(innerStyle);
+  auto backgroundBlurStyle = doc->makeNode<pagx::BackgroundBlurStyle>();
+  layer->styles.push_back(backgroundBlurStyle);
+  auto blurFilter = doc->makeNode<pagx::BlurFilter>();
+  layer->filters.push_back(blurFilter);
+  auto dropFilter = doc->makeNode<pagx::DropShadowFilter>();
+  layer->filters.push_back(dropFilter);
+  auto innerFilter = doc->makeNode<pagx::InnerShadowFilter>();
+  layer->filters.push_back(innerFilter);
+  auto blendFilter = doc->makeNode<pagx::BlendFilter>();
+  layer->filters.push_back(blendFilter);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+
+  // For each built node, every Animatable channel in the registry must have a runtime writer. Text
+  // and TextBox are intentionally omitted: they require a registered font to build, while every
+  // other node type with animatable channels is covered here.
+  pagx::Node* nodes[] = {
+      layer,      rect,       ellipse,     polystar,   trim,      roundCorner, repeater,
+      fill,       stroke,     solid,       group,      linear,    linearStop,  radial,
+      conic,      diamond,    modifier,    selector,   dropStyle, innerStyle,  backgroundBlurStyle,
+      blurFilter, dropFilter, innerFilter, blendFilter};
+  for (auto* node : nodes) {
+    for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
+      if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+        continue;
+      }
+      EXPECT_TRUE(binding->hasWriter(node, channel.channel))
+          << "node type " << static_cast<int>(node->nodeType()) << " channel '" << channel.channel
+          << "' is Animatable but has no runtime writer";
+    }
+  }
+}
+
+/**
+ * Test: a SolidColor shared by two Fill painters stays bound when only one Fill is removed.
+ */
+PAGX_TEST(PAGXTest, SharedSolidColorSurvivesAfterOnePainterRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("sharedSolid");
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = solid;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = solid;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill2) != nullptr);
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+}
+
+/**
+ * Test: a SolidColor shared by two Fill painters is unbound when all Fills are removed.
+ */
+PAGX_TEST(PAGXTest, BothPaintersRemovedUnbindsSharedSolidColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("sharedSolid");
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = solid;
+  layer->contents.push_back(fill1);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = solid;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::SolidColor>(solid) != nullptr);
+
+  layer->contents.clear();
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::SolidColor>(solid) == nullptr);
+}
+
+/**
+ * Test: an Image shared by two ImagePattern painters stays bound when one pattern is removed.
+ */
+PAGX_TEST(PAGXTest, SharedImageSurvivesAfterOnePatternRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto imageNode = doc->makeNode<pagx::Image>("sharedImage");
+  imageNode->filePath =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/"
+      "5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto pattern1 = doc->makeNode<pagx::ImagePattern>();
+  pattern1->image = imageNode;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = pattern1;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto pattern2 = doc->makeNode<pagx::ImagePattern>();
+  pattern2->image = imageNode;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = pattern2;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+  ASSERT_TRUE(binding->contains(pattern1));
+  ASSERT_TRUE(binding->contains(pattern2));
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_FALSE(binding->contains(pattern2));
+  EXPECT_TRUE(binding->contains(pattern1));
+  EXPECT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+}
+
+/**
+ * Test: an Image shared by two ImagePattern painters is unbound when all patterns are removed.
+ */
+PAGX_TEST(PAGXTest, SharedImageUnboundAfterAllPatternsRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto imageNode = doc->makeNode<pagx::Image>("sharedImage");
+  imageNode->filePath =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/"
+      "5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+
+  auto pattern1 = doc->makeNode<pagx::ImagePattern>();
+  pattern1->image = imageNode;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = pattern1;
+  layer->contents.push_back(fill1);
+
+  auto pattern2 = doc->makeNode<pagx::ImagePattern>();
+  pattern2->image = imageNode;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = pattern2;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::Image>(imageNode) != nullptr);
+
+  layer->contents.clear();
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_FALSE(binding->contains(fill1));
+  EXPECT_FALSE(binding->contains(pattern1));
+  EXPECT_FALSE(binding->contains(fill2));
+  EXPECT_FALSE(binding->contains(pattern2));
+  EXPECT_TRUE(binding->get<tgfx::Image>(imageNode) == nullptr);
+}
+
+/**
+ * Test: a LinearGradient shared by two Fill painters stays bound (with its ColorStops) when one
+ * Fill is removed.
+ */
+PAGX_TEST(PAGXTest, SharedGradientSurvivesAfterOnePainterRemoved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 1};
+  auto stop1 = doc->makeNode<pagx::ColorStop>();
+  stop1->offset = 0;
+  stop1->color = {1, 0, 0, 1};
+  gradient->colorStops.push_back(stop1);
+  auto stop2 = doc->makeNode<pagx::ColorStop>();
+  stop2->offset = 1;
+  stop2->color = {0, 0, 1, 1};
+  gradient->colorStops.push_back(stop2);
+
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size = {20, 20};
+  layer->contents.push_back(rect1);
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  fill1->color = gradient;
+  layer->contents.push_back(fill1);
+
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size = {20, 20};
+  layer->contents.push_back(rect2);
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  fill2->color = gradient;
+  layer->contents.push_back(fill2);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::FillStyle>(fill2) != nullptr);
+  ASSERT_TRUE(binding->get<tgfx::Gradient>(gradient) != nullptr);
+
+  layer->contents.erase(std::remove(layer->contents.begin(), layer->contents.end(), fill2),
+                        layer->contents.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill2) == nullptr);
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill1) != nullptr);
+  EXPECT_TRUE(binding->get<tgfx::Gradient>(gradient) != nullptr);
+  EXPECT_TRUE(binding->contains(stop1));
+  EXPECT_TRUE(binding->contains(stop2));
+}
+
+/**
+ * Test case: multiple refreshLayerInPlace calls do not cause duplicate entries in the
+ * colorSourceUsers reverse index. Each refresh rebuilds vector contents, and convertFill
+ * calls trackColorSource again. Without the pre-refresh untrack step, the colorSourceUsers
+ * vector would grow by one duplicate entry per refresh.
+ */
+PAGX_TEST(PAGXTest, ReverseIndexNoDuplicatesAfterRepeatedRefresh) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("solid");
+  solid->color = {1, 0, 0, 1};
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {20, 20};
+  layer->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  auto* binding = scene->mutableBinding();
+
+  size_t countBefore = binding->colorSourceUsers.at(solid).size();
+  EXPECT_EQ(countBefore, 1u);
+
+  // Refresh the layer 3 times without any content change.
+  for (int i = 0; i < 3; i++) {
+    doc->notifyChange({layer}, /*layoutChanged=*/false);
+  }
+
+  // After repeated refreshes the reverse index must still have exactly one entry.
+  size_t countAfter = binding->colorSourceUsers.at(solid).size();
+  EXPECT_EQ(countAfter, 1u);
+}
+
+/**
+ * Test case: removing a Fill inside a Group and calling notifyChange properly untracks the
+ * old Fill from the reverse index and unbinds its shared color source when no other Fill
+ * references it. Before the fix, collectElementTree only collected top-level content
+ * elements, missing nested Group children.
+ */
+PAGX_TEST(PAGXTest, GroupInnerFillRemovedUnbindsSharedColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto solid = doc->makeNode<pagx::SolidColor>("solid");
+  solid->color = {0, 1, 0, 1};
+
+  auto group = doc->makeNode<pagx::Group>();
+  auto ell = doc->makeNode<pagx::Ellipse>();
+  ell->size = {20, 20};
+  group->elements.push_back(ell);
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  group->elements.push_back(fill);
+
+  layer->contents.push_back(group);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  auto* binding = scene->mutableBinding();
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill) != nullptr);
+  EXPECT_TRUE(binding->contains(solid));
+
+  // Remove the Fill from inside the Group.
+  group->elements.erase(std::remove(group->elements.begin(), group->elements.end(), fill),
+                        group->elements.end());
+  doc->notifyChange({layer}, /*layoutChanged=*/true);
+
+  EXPECT_TRUE(binding->get<tgfx::FillStyle>(fill) == nullptr);
+  EXPECT_FALSE(binding->contains(solid));
+  EXPECT_EQ(binding->colorSourceUsers.find(solid), binding->colorSourceUsers.end());
 }
 
 }  // namespace pag

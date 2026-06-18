@@ -137,7 +137,7 @@ cd tools/html-snapshot
 node server.js            # http://127.0.0.1:8787
 ```
 
-Then convert via HTTP (the server can also run `pagx import` for you):
+Then convert via HTTP (the server can also run `pagx import` itself):
 
 ```bash
 # HTML in, PAGX out:
@@ -168,7 +168,7 @@ pagx render page.pagx -o page.png --scale 2                # preview
 
 Inspecting `page.subset.html` shows exactly what the browser captured — the fastest way to see why
 an element is missing or mispositioned. `pagx verify page.pagx` runs diagnostics + layout + render
-in one call (see the `pagx` skill / `references/cli.md`).
+in one call.
 
 ## Direct subset import without a browser
 
@@ -195,8 +195,8 @@ usually-harmless ones:
 - `subset:unsupported-property` — a CSS property has no PAGX equivalent and was dropped (e.g.
   `min-width`, `aspect-ratio`, `background-size`, `text-overflow`). If the visual is unaffected in
   the preview, ignore; otherwise express the intent differently (fixed sizes, etc.).
-- `subset:unsupported-tag` — an element was removed (interactive widget, `<iframe>`, etc.). Replace
-  it with a styled `<div>`/`<img>` per `authoring-html.md` §What to avoid.
+- `subset:unsupported-tag` — an element was removed (interactive widget, `<iframe>`, `<video>`,
+  etc.). Replace it with a styled `<div>` or a poster `<img>` that looks the same.
 - `subset:flex-inference-skipped` — a container's children overlapped or had inconsistent spacing,
   so flex was not inferred (kept absolute). Usually fine; tidy the source layout if alignment looks
   off.
@@ -214,7 +214,7 @@ usually-harmless ones:
 | `cannot find module './dist/...'` | The tool was not built. Run `npm run build` in `tools/html-snapshot`. |
 | Blank / mostly-empty PNG | Content was hidden, off-canvas, or rendered after the snapshot. Match `--viewport-width/height` to the `body` size and raise `--wait-ms`; check `<input>.subset.html` for what was captured. |
 | Text in the wrong font | The web font was not embedded. Keep the Google Fonts `<link>` and convert with `--embed-fonts`. |
-| An element is missing | It is an unsupported/interactive widget, hidden, or a tainted/WebGL `<canvas>`. See `authoring-html.md` §What to avoid. |
+| An element is missing | It was hidden (`display:none`/`opacity:0`), an unsupported/interactive widget, or a tainted/WebGL `<canvas>`. Include only visible content; use a styled `<div>` for controls and same-origin/CORS image sources. |
 | Chart is missing or empty | Canvas captured before it drew (raise `--wait-ms`/`--selector`) or it is tainted/WebGL (use same-origin/CORS sources). |
 | Relative `<img>`/CSS not loading (local file) | Local relative resources do not resolve. Inline as data URIs or use absolute URLs; or convert from a URL instead. |
 | Layout looks absolute, not flex | Add `--html-infer-flex` (on by default in `html2pagx`); some layouts are intentionally skipped — see `subset:flex-inference-skipped`. |

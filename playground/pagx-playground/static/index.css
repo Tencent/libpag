@@ -524,8 +524,7 @@ html, body {
 .samples-list .sample-image {
     width: 100%;
     aspect-ratio: 1 / 1;
-    background:
-        repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+    background: #f5f5f5;
     border-radius: 6px;
     object-fit: contain;
 }

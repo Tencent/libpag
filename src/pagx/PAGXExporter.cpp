@@ -201,6 +201,11 @@ std::string KeyframeValueToString<Color>(const Color& value) {
   return ColorToHexString(value, value.alpha < 1.0f);
 }
 
+template <>
+std::string KeyframeValueToString<Matrix>(const Matrix& value) {
+  return MatrixToString(value);
+}
+
 template <typename T>
 static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
                               const char* typeName) {
@@ -245,6 +250,9 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       break;
     case ChannelValueType::Color:
       WriteTypedChannel(xml, static_cast<const TypedChannel<Color>*>(channel), "color");
+      break;
+    case ChannelValueType::Matrix:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
       break;
   }
 }

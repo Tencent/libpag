@@ -20,6 +20,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
@@ -28,6 +29,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -51,6 +53,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/xml/XMLDOM.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -78,9 +81,49 @@ inline std::string SaveFile(const std::string& content, const std::string& key) 
 }
 
 template <typename T>
+struct PagxNodeTypeOf;
+
+#define DECLARE_PAGX_NODE_TYPE(Type)                              \
+  template <>                                                     \
+  struct PagxNodeTypeOf<pagx::Type> {                             \
+    static constexpr pagx::NodeType value = pagx::NodeType::Type; \
+  }
+
+DECLARE_PAGX_NODE_TYPE(Rectangle);
+DECLARE_PAGX_NODE_TYPE(Path);
+DECLARE_PAGX_NODE_TYPE(Fill);
+DECLARE_PAGX_NODE_TYPE(Stroke);
+DECLARE_PAGX_NODE_TYPE(Text);
+DECLARE_PAGX_NODE_TYPE(TextBox);
+DECLARE_PAGX_NODE_TYPE(Group);
+DECLARE_PAGX_NODE_TYPE(SolidColor);
+DECLARE_PAGX_NODE_TYPE(LinearGradient);
+DECLARE_PAGX_NODE_TYPE(RadialGradient);
+DECLARE_PAGX_NODE_TYPE(ConicGradient);
+DECLARE_PAGX_NODE_TYPE(ImagePattern);
+DECLARE_PAGX_NODE_TYPE(DropShadowStyle);
+DECLARE_PAGX_NODE_TYPE(InnerShadowStyle);
+DECLARE_PAGX_NODE_TYPE(BackgroundBlurStyle);
+DECLARE_PAGX_NODE_TYPE(BlurFilter);
+DECLARE_PAGX_NODE_TYPE(DropShadowFilter);
+
+#undef DECLARE_PAGX_NODE_TYPE
+
+// Type-safe replacement for `dynamic_cast<T*>(node)` rooted in the project's `nodeType()`
+// dispatch. Returns `node` cast to `T*` when its runtime tag matches `PagxNodeTypeOf<T>::value`,
+// nullptr otherwise. Hoisted out of the test bodies so the file follows the codebase rule of
+// avoiding `dynamic_cast`.
+template <typename T, typename Base>
+T* As(Base* node) {
+  if (!node) return nullptr;
+  if (node->nodeType() != PagxNodeTypeOf<T>::value) return nullptr;
+  return static_cast<T*>(node);
+}
+
+template <typename T>
 T* FindElement(const std::vector<pagx::Element*>& contents) {
   for (auto* e : contents) {
-    if (auto* match = dynamic_cast<T*>(e)) {
+    if (auto* match = As<T>(e)) {
       return match;
     }
   }
@@ -97,7 +140,7 @@ template <typename T>
 size_t CountElements(const std::vector<pagx::Element*>& contents) {
   size_t count = 0;
   for (auto* e : contents) {
-    if (dynamic_cast<T*>(e)) count++;
+    if (As<T>(e)) count++;
   }
   return count;
 }
@@ -124,7 +167,7 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
 inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   auto* fill = FindElementOfType<pagx::Fill>(layer);
   if (!fill) return {};
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   if (!solid) return {};
   return solid->color;
 }
@@ -148,6 +191,65 @@ inline pagx::AnimationObject* FindObjectByTarget(pagx::Animation* anim,
     if (obj && obj->target == targetId) return obj;
   }
   return nullptr;
+}
+
+// HTMLSubsetTransformer helpers -----------------------------------------------------------
+
+inline std::shared_ptr<pagx::DOMNode> ParseHtml(const std::string& html) {
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
+  if (!dom) return nullptr;
+  return dom->getRootNode();
+}
+
+inline pagx::HTMLSubsetTransformer::Result RunTransform(
+    const std::string& html, std::shared_ptr<pagx::DOMNode>* outRoot,
+    const pagx::HTMLSubsetTransformer::Options& opts = {}) {
+  auto root = ParseHtml(html);
+  if (!root) {
+    pagx::HTMLSubsetTransformer::Result r;
+    r.ok = false;
+    return r;
+  }
+  auto result = pagx::HTMLSubsetTransformer::Transform(root, opts);
+  if (outRoot) *outRoot = root;
+  return result;
+}
+
+// Returns the first <body> child whose tag matches `tag`.
+inline std::shared_ptr<pagx::DOMNode> FirstBodyChild(const std::shared_ptr<pagx::DOMNode>& root,
+                                                    const std::string& tag = "") {
+  if (!root) return nullptr;
+  auto body = root->getFirstChild("body");
+  if (!body) return nullptr;
+  return body->getFirstChild(tag);
+}
+
+inline std::string AttrValue(const std::shared_ptr<pagx::DOMNode>& node, const std::string& name) {
+  if (!node) return {};
+  const auto* val = node->findAttribute(name);
+  return val ? *val : std::string();
+}
+
+inline bool HasDiagnostic(const pagx::HTMLSubsetTransformer::Result& result,
+                          const std::string& code) {
+  for (const auto& d : result.diagnostics) {
+    if (d.code == code) return true;
+  }
+  return false;
+}
+
+inline bool StyleContains(const std::shared_ptr<pagx::DOMNode>& node, const std::string& needle) {
+  return AttrValue(node, "style").find(needle) != std::string::npos;
+}
+
+// Counts the number of element children directly under `parent`.
+inline size_t CountElementChildren(const std::shared_ptr<pagx::DOMNode>& parent) {
+  size_t n = 0;
+  if (!parent) return 0;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element) n++;
+  }
+  return n;
 }
 
 }  // namespace
@@ -187,7 +289,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundColorBecomesRectangleAndFill) {
   EXPECT_FLOAT_EQ(rect->percentWidth, 100.0f);
   EXPECT_FLOAT_EQ(rect->percentHeight, 100.0f);
   EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
   EXPECT_FLOAT_EQ(div->width, 80.0f);
@@ -269,7 +371,7 @@ PAG_TEST(PAGXHTMLImporterTest, BorderProducesStroke) {
   auto* stroke = FindElementOfType<pagx::Stroke>(div);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(stroke->color);
+  auto* solid = As<pagx::SolidColor>(stroke->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
   EXPECT_EQ(stroke->align, pagx::StrokeAlign::Inside);
@@ -330,7 +432,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(div->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(div->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->offsetX, 0.0f);
   EXPECT_FLOAT_EQ(drop->offsetY, 2.0f);
@@ -349,7 +451,7 @@ PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* inner = dynamic_cast<pagx::InnerShadowStyle*>(div->styles.front());
+  auto* inner = As<pagx::InnerShadowStyle>(div->styles.front());
   ASSERT_NE(inner, nullptr);
   EXPECT_FLOAT_EQ(inner->offsetX, 2.0f);
   EXPECT_FLOAT_EQ(inner->offsetY, 2.0f);
@@ -389,7 +491,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowAndOverflowHiddenSplitsLayers) {
   EXPECT_FALSE(outer->clipToBounds);
   EXPECT_TRUE(outer->contents.empty());
   ASSERT_EQ(outer->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(outer->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(outer->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
   // Wrapper takes over the original layout slot so the parent's flow / constraints are
@@ -428,7 +530,7 @@ PAG_TEST(PAGXHTMLImporterTest, InsetShadowWithOverflowHiddenStaysOnClippedLayer)
   // No outer wrapper is introduced: the layer keeps both the clip and the inset shadow.
   EXPECT_TRUE(div->clipToBounds);
   ASSERT_EQ(div->styles.size(), 1u);
-  EXPECT_NE(dynamic_cast<pagx::InnerShadowStyle*>(div->styles.front()), nullptr);
+  EXPECT_NE(As<pagx::InnerShadowStyle>(div->styles.front()), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OpacityMapsToLayerAlpha) {
@@ -538,7 +640,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientAngleConversion) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   // CSS 90deg (to right) maps to PAGX 0° (along +X axis). startPoint(0, 0.5) → endPoint(1, 0.5).
   EXPECT_TRUE(NearlyEqual(lg->startPoint.x, 0.0f, 0.005f));
@@ -560,7 +662,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -576,7 +678,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   // CSS 0° = top, PAGX 0° = right ⇒ PAGX angle = −90°.
   EXPECT_TRUE(NearlyEqual(cg->startAngle, -90.0f, 0.01f));
@@ -592,11 +694,11 @@ PAG_TEST(PAGXHTMLImporterTest, FilterBlurAndDropShadow) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->filters.size(), 2u);
-  auto* blur = dynamic_cast<pagx::BlurFilter*>(div->filters[0]);
+  auto* blur = As<pagx::BlurFilter>(div->filters[0]);
   ASSERT_NE(blur, nullptr);
   EXPECT_FLOAT_EQ(blur->blurX, 2.0f);
   EXPECT_FLOAT_EQ(blur->blurY, 2.0f);
-  auto* drop = dynamic_cast<pagx::DropShadowFilter*>(div->filters[1]);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[1]);
   ASSERT_NE(drop, nullptr);
   EXPECT_FLOAT_EQ(drop->offsetY, 1.0f);
 }
@@ -611,7 +713,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
   auto* div = doc->layers.front()->children.front();
   bool foundBlur = false;
   for (auto* s : div->styles) {
-    if (auto* b = dynamic_cast<pagx::BackgroundBlurStyle*>(s)) {
+    if (auto* b = As<pagx::BackgroundBlurStyle>(s)) {
       EXPECT_FLOAT_EQ(b->blurX, 6.0f);
       foundBlur = true;
     }
@@ -645,7 +747,7 @@ PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   // No TextBox needed for a uniform-style leaf.
   bool hasTextBox = false;
   for (auto* e : leaf->contents) {
-    if (dynamic_cast<pagx::TextBox*>(e)) hasTextBox = true;
+    if (As<pagx::TextBox>(e)) hasTextBox = true;
   }
   EXPECT_FALSE(hasTextBox);
 }
@@ -662,8 +764,8 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
   ASSERT_NE(tb, nullptr);
   size_t textCount = 0, groupCount = 0;
   for (auto* e : tb->elements) {
-    if (dynamic_cast<pagx::Text*>(e)) textCount++;
-    if (dynamic_cast<pagx::Group*>(e)) groupCount++;
+    if (As<pagx::Text>(e)) textCount++;
+    if (As<pagx::Group>(e)) groupCount++;
   }
   EXPECT_EQ(textCount, 1u);
   EXPECT_EQ(groupCount, 1u);
@@ -677,11 +779,11 @@ PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
 inline void GatherTextRuns(const std::vector<pagx::Element*>& elements,
                            std::vector<pagx::Text*>* texts, std::vector<pagx::Fill*>* fills) {
   for (auto* e : elements) {
-    if (auto* t = dynamic_cast<pagx::Text*>(e)) {
+    if (auto* t = As<pagx::Text>(e)) {
       texts->push_back(t);
-    } else if (auto* f = dynamic_cast<pagx::Fill*>(e)) {
+    } else if (auto* f = As<pagx::Fill>(e)) {
       fills->push_back(f);
-    } else if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+    } else if (auto* g = As<pagx::Group>(e)) {
       GatherTextRuns(g->elements, texts, fills);
     }
   }
@@ -742,8 +844,8 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunC
   EXPECT_FLOAT_EQ(texts[0]->fontSize, 44.0f);
   EXPECT_EQ(texts[1]->text, "亿美元");
   EXPECT_FLOAT_EQ(texts[1]->fontSize, 22.0f);
-  auto* solid0 = dynamic_cast<pagx::SolidColor*>(fills[0]->color);
-  auto* solid1 = dynamic_cast<pagx::SolidColor*>(fills[1]->color);
+  auto* solid0 = As<pagx::SolidColor>(fills[0]->color);
+  auto* solid1 = As<pagx::SolidColor>(fills[1]->color);
   ASSERT_NE(solid0, nullptr);
   ASSERT_NE(solid1, nullptr);
   EXPECT_TRUE(ColorNear(solid0->color, HexColor(0x111111, 1.0f)));
@@ -905,7 +1007,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageRegistersImageResource) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_FALSE(pattern->image->filePath.empty());
@@ -1034,7 +1136,7 @@ PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
   auto* rect = FindElementOfType<pagx::Rectangle>(div);
@@ -1345,12 +1447,12 @@ PAG_TEST(PAGXHTMLImporterTest, TextDecorationColorDifferingWrapsInGroup) {
   // The decoration overlay is wrapped in a Group when its colour differs from the text.
   bool foundGroup = false;
   for (auto* e : leaf->contents) {
-    if (auto* g = dynamic_cast<pagx::Group*>(e)) {
+    if (auto* g = As<pagx::Group>(e)) {
       auto* rect = FindElement<pagx::Rectangle>(g->elements);
       auto* fill = FindElement<pagx::Fill>(g->elements);
       ASSERT_NE(rect, nullptr);
       ASSERT_NE(fill, nullptr);
-      auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+      auto* solid = As<pagx::SolidColor>(fill->color);
       ASSERT_NE(solid, nullptr);
       EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
       foundGroup = true;
@@ -1409,7 +1511,7 @@ PAG_TEST(PAGXHTMLImporterTest, CommaSeparatedClassRulesApply) {
     auto* rect = FindElementOfType<pagx::Rectangle>(div);
     ASSERT_NE(fill, nullptr);
     ASSERT_NE(rect, nullptr);
-    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    auto* solid = As<pagx::SolidColor>(fill->color);
     ASSERT_NE(solid, nullptr);
     EXPECT_TRUE(ColorNear(solid->color, HexColor(0x112233)));
     EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
@@ -1432,7 +1534,7 @@ PAG_TEST(PAGXHTMLImporterTest, MultipleClassesMergeWithLastWinning) {
   auto* rect = FindElementOfType<pagx::Rectangle>(div);
   ASSERT_NE(fill, nullptr);
   ASSERT_NE(rect, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF8800)));
   EXPECT_FLOAT_EQ(rect->roundness, 4.0f);
@@ -1449,7 +1551,7 @@ PAG_TEST(PAGXHTMLImporterTest, InlineStyleBeatsClassRule) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x22AAEE)));
 }
@@ -1465,7 +1567,7 @@ PAG_TEST(PAGXHTMLImporterTest, ElementSelectorAppliesToTag) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x33CC44)));
 }
@@ -1485,7 +1587,7 @@ PAG_TEST(PAGXHTMLImporterTest, UnsupportedSelectorIgnoredAndDoesNotApply) {
   auto* div = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(div);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
 }
@@ -1692,7 +1794,7 @@ PAG_TEST(PAGXHTMLImporterTest, NamedColorAccepted) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
 }
@@ -1763,7 +1865,7 @@ PAG_TEST(PAGXHTMLImporterTest, BodyDefaultsArial14Color) {
   EXPECT_FLOAT_EQ(text->fontSize, 14.0f);
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x1E293B)));
 }
@@ -2078,7 +2180,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientToBottomRight) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   // CSS 135deg → PAGX 45deg (top-left to bottom-right diagonal).
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
@@ -2093,7 +2195,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientThreeStopsInterpolatesMiddleOffset)
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 3u);
   EXPECT_TRUE(NearlyEqual(lg->colorStops[0]->offset, 0.0f, 0.01f));
@@ -2109,7 +2211,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientFrom90DegMapsToZero) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   // CSS 90° (right) ⇒ PAGX 0° (along +X axis).
   EXPECT_TRUE(NearlyEqual(cg->startAngle, 0.0f, 0.01f));
@@ -2146,7 +2248,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesGradientToTextFill) {
     textFill = FindElementOfType<pagx::Fill>(textLeaf);
   }
   ASSERT_NE(textFill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(textFill->color);
+  auto* lg = As<pagx::LinearGradient>(textFill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 2u);
   EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
@@ -2170,7 +2272,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
   EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 1u);
   auto* fill = FindElementOfType<pagx::Fill>(outer);
   ASSERT_NE(fill, nullptr);
-  EXPECT_NE(dynamic_cast<pagx::LinearGradient*>(fill->color), nullptr);
+  EXPECT_NE(As<pagx::LinearGradient>(fill->color), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnchorHrefStoredAsCustomData) {
@@ -2196,7 +2298,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnchorDefaultsBlueAndUnderline) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x2563EB)));
   // Underline overlay rectangle should exist.
@@ -2272,7 +2374,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoRectangle) {
   // And one Fill carrying the image pattern.
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
@@ -2295,7 +2397,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageDefaultObjectFitIsStretch) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
@@ -2337,7 +2439,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageWithAsymmetricBorderRadiusEmitsPath) {
   EXPECT_EQ(cubicCount, 2u);
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
 }
 
@@ -2351,7 +2453,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitContainMapsToLetterBox) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
 }
@@ -2366,7 +2468,7 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   auto* leaf = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(leaf);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
@@ -2400,7 +2502,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoPathForAsymmetricRadi
   EXPECT_EQ(cubicCount, 2u);
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   ASSERT_NE(pattern->image, nullptr);
   EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
@@ -2418,7 +2520,7 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRespectsObjectFit) {
   auto* wrapper = doc->layers.front()->children.front();
   auto* fill = FindElementOfType<pagx::Fill>(wrapper);
   ASSERT_NE(fill, nullptr);
-  auto* pattern = dynamic_cast<pagx::ImagePattern*>(fill->color);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
@@ -2443,6 +2545,103 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
   EXPECT_FALSE(wrapper->children.empty());
 }
 
+// Snapshot pipeline pattern: the html-snapshot tool wraps every replaced element
+// in an extra `<div>` (see `renderBoxedReplaced` in `tools/html-snapshot/lib/
+// browser-snapshot.ts`) so border overlays can be hosted alongside the image.
+// When the authored CSS already wraps the `<img>` in a `border-radius;overflow:
+// hidden` round-clip, the resulting subset HTML has the round-clip wrapper, the
+// snapshot wrapper, and the image stacked three deep. The fold has to skip the
+// transparent layout-only wrapper(s) and still recognise the round-clip pattern
+// — otherwise rounded avatars render as squares.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsThroughLayoutOnlyDiv) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px;overflow:hidden">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  EXPECT_FALSE(wrapper->clipToBounds);
+  auto* rect = FindElementOfType<pagx::Rectangle>(wrapper);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_GT(rect->roundness, 0.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
+}
+
+// Two stacked layout-only wrappers between the round-clip container and the
+// `<img>` still fold — covers authored markup that adds an extra positioning
+// `<div>` on top of the snapshot wrapper.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsThroughTwoLayoutOnlyDivs) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px">
+          <div style="position:absolute;left:0;top:0;width:64px;height:64px;overflow:hidden">
+            <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+          </div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  EXPECT_FALSE(wrapper->clipToBounds);
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  ASSERT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+}
+
+// Negative: the intermediate wrapper must be visually transparent. A
+// `background-color` on it would paint a square fill that the rounded outer
+// outline cannot clip in PAGX (the only clip primitive is rectangular), so the
+// fold must keep the standard nested layout in that case.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithBackground) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px;background-color:#000">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->children.empty());
+}
+
+// Negative: an intermediate wrapper that does not exactly cover the outer
+// content box would shift the image out from under the rounded outline. The
+// fold has to bail so the image renders inside its own child layer at the
+// authored position.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithSizeMismatch) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:48px;height:48px">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:48px;height:48px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->children.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RepeatedImageSourceDeduplicated) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:80px">
@@ -2457,8 +2656,8 @@ PAG_TEST(PAGXHTMLImporterTest, RepeatedImageSourceDeduplicated) {
   auto* fillB = FindElementOfType<pagx::Fill>(kids[1]);
   ASSERT_NE(fillA, nullptr);
   ASSERT_NE(fillB, nullptr);
-  auto* patA = dynamic_cast<pagx::ImagePattern*>(fillA->color);
-  auto* patB = dynamic_cast<pagx::ImagePattern*>(fillB->color);
+  auto* patA = As<pagx::ImagePattern>(fillA->color);
+  auto* patB = As<pagx::ImagePattern>(fillB->color);
   ASSERT_NE(patA, nullptr);
   ASSERT_NE(patB, nullptr);
   EXPECT_EQ(patA->image, patB->image);
@@ -2564,7 +2763,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawClassRuleAppliedWithoutSubsetTransformer) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
 }
@@ -2597,7 +2796,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawCommaSeparatedSelectorsApplyWithoutSubsetTrans
   for (auto* div : doc->layers.front()->children) {
     auto* fill = FindElementOfType<pagx::Fill>(div);
     ASSERT_NE(fill, nullptr);
-    auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+    auto* solid = As<pagx::SolidColor>(fill->color);
     ASSERT_NE(solid, nullptr);
     EXPECT_TRUE(ColorNear(solid->color, HexColor(0x114455)));
   }
@@ -2653,7 +2852,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawAtRuleSurvivesAndIsHandledByCascade) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0xAABBCC)));
 }
@@ -2675,7 +2874,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawAtRuleNoBlockSkipped) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x446688)));
 }
@@ -2698,7 +2897,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawCssCommentsStripped) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* solid = dynamic_cast<pagx::SolidColor*>(fill->color);
+  auto* solid = As<pagx::SolidColor>(fill->color);
   ASSERT_NE(solid, nullptr);
   EXPECT_TRUE(ColorNear(solid->color, HexColor(0x225588)));
 }
@@ -3301,7 +3500,7 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowDefaultsToBlackWhenColorOmitted) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   ASSERT_EQ(div->styles.size(), 1u);
-  auto* drop = dynamic_cast<pagx::DropShadowStyle*>(div->styles.front());
+  auto* drop = As<pagx::DropShadowStyle>(div->styles.front());
   ASSERT_NE(drop, nullptr);
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000), 0.02f));
 }
@@ -3317,7 +3516,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientWithRadAngle) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
@@ -3333,7 +3532,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientWithTurnAngle) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   EXPECT_GT(lg->endPoint.x, lg->startPoint.x);
 }
@@ -3348,7 +3547,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithEllipseDescriptor) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -3363,7 +3562,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientThreeStopsImplicitMiddleInterpolated) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 3u);
   EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
@@ -3482,7 +3681,7 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithCenterOnly) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* rg = dynamic_cast<pagx::RadialGradient*>(fill->color);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
@@ -3498,7 +3697,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientWithExplicitDegOffsetPerStop) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* cg = dynamic_cast<pagx::ConicGradient*>(fill->color);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
   ASSERT_NE(cg, nullptr);
   ASSERT_EQ(cg->colorStops.size(), 2u);
   EXPECT_TRUE(NearlyEqual(cg->colorStops.front()->offset, 0.0f, 0.01f));
@@ -3517,7 +3716,7 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientWithExplicitPxOffsetPerStop) {
   ASSERT_NE(doc, nullptr);
   auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
   ASSERT_NE(fill, nullptr);
-  auto* lg = dynamic_cast<pagx::LinearGradient*>(fill->color);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 2u);
 }
@@ -3967,6 +4166,2122 @@ PAG_TEST(PAGXHTMLImporterTest, FixtureLogin) {
 
 PAG_TEST(PAGXHTMLImporterTest, FixtureTableVisual) {
   RunFixture("table_visual");
+}
+
+//==================================================================================================
+// Coverage-focused tests for src/pagx/html/importer
+//
+// These exercise raw-cascade (autoNormalize=false) code paths that the subset transformer
+// otherwise handles before HTMLStyleCascade / HTMLParserContext / HTMLCssCascade ever see the
+// input. Without these, the per-CSS-function transform handlers, several CSS tokenizer edge
+// cases, and the `<br>` / unknown-element / stray-text branches in the parser stay dark.
+//==================================================================================================
+
+namespace {
+
+// Parses HTML with the subset transformer disabled so the importer's own CSS cascade and
+// transform machinery run end-to-end.
+inline std::shared_ptr<pagx::PAGXDocument> ParseRaw(const std::string& html) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  return pagx::HTMLImporter::ParseString(html, opts);
+}
+
+// Returns true if any diagnostic message contains all of the given substrings.
+inline bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                    const std::string& needle) {
+  if (!doc) return false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find(needle) != std::string::npos) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+//==================================================================================================
+// HTMLStyleCascade — single-function `transform` handlers (raw cascade only)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewXSetsLayerMatrix) {
+  // skewX(deg) flips sign in the cascade and folds into a horizontal shear; the resulting
+  // matrix is then re-anchored around the box centre by applyBoxTransform.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <div style="transform:skewX(45deg);width:200px;height:60px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  EXPECT_FALSE(div->matrix.isIdentity());
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform '"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:60px">
+      <div style="transform:skewY(30deg);width:100px;height:60px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewXTooManyArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:skewX(10deg, 20deg);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "skewX expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformSkewYNoArgsWarns) {
+  // Two args triggers the "skewY expects 1 argument" branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:skewY(10deg, 20deg);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "skewY expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformRotateSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:rotate(90deg);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformRotateNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:rotate(1, 2);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "rotate expects 1 argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleUniformSetsLayerMatrix) {
+  // scale(2) -> sx = sy = 2.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scale(2);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleTwoArgsSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scale(2, 0.5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scale(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scale expects 1 or 2 numeric arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleXSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scaleX(2);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleXNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scaleX(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scaleX expects 1 numeric argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:scaleY(0.5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformScaleYNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:scaleY(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "scaleY expects 1 numeric argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateOneArgSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translate(10px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateTwoArgsSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translate(10px, 20px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateNoArgsWarns) {
+  // 3 args triggers the "expects 1 or 2 length arguments" branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(1px, 2px, 3px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate expects 1 or 2 length arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateBadFirstArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate first argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateBadSecondArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translate(10px, abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translate second argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translateX(15px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateX(1px, 2px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX expects 1 length argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateXBadArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateX(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:translateY(15px);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYNoArgsWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateY(1px, 2px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateY expects 1 length argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformTranslateYBadArgWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:translateY(abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateY argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixIdentityIsDropped) {
+  // matrix(1,0,0,1,0,0) is the identity; applyBoxTransform skips it without writing to layer.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:matrix(1,0,0,1,0,0);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixCustomSetsLayerMatrix) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="transform:matrix(2,0,0,3,4,5);width:100px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixWrongArgCountWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:matrix(1,2,3);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "matrix expects 6 numeric arguments"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixNonNumericWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:matrix(1,0,0,1,0,abc);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "matrix argument"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformUnknownFunctionWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:perspective(100px);width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform function"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not in the supported subset"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformMalformedWarns) {
+  // No `(`/`)` -> ParseCssFunctionCall returns false.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:notAFunction;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform '"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "is malformed"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginPxSetsResolvedPivot) {
+  // Non-default px transform-origin lands in the cascade's originX/Y resolution path.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(90deg);transform-origin:0px 0px;width:200px;height:200px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->matrix.isIdentity());
+  // No "transform-origin ... not supported" warning on a clean px form.
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin '0px 0px'"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginUnsupportedKeywordWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="transform:rotate(45deg);transform-origin:left top;width:50px;height:50px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform-origin"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not supported"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginCenterIsSilent) {
+  // The CSS default `center` is a synonym for the box centre and must NOT warn.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(90deg);transform-origin:center;width:200px;height:200px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginPxAtBoxCentreIsSilent) {
+  // Chromium emits the default origin as `<halfW>px <halfH>px`; the cascade detects this and
+  // suppresses the diagnostic, falling back to applyBoxTransform's centre pivot.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="transform:rotate(45deg);transform-origin:100px 50px;width:200px;height:100px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOnElementWithoutSizeWarnsForOrigin) {
+  // No explicit width/height means applyBoxTransform can't compute the centre pivot, so the
+  // "without explicit width/height" diagnostic fires.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="transform:rotate(45deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "without explicit width/height"));
+}
+
+//==================================================================================================
+// HTMLCssCascade — tokenizer edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssAtRuleNoSemicolonNoBraceIsSwallowed) {
+  // An at-rule that runs to EOF with no `;` or `{` falls into the size()-fallback branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @charset
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssCommentInsideAtRulePrelude) {
+  // The comment-skip branch inside the at-rule prelude scanner.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @media /* commented */ (max-width:600px) { .ignored { color:red } }
+      .real { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="real" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssCommentInsideSelector) {
+  // The comment-skip branch inside the rule-prelude scanner that looks for `{`.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .real /* selector comment */ { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="real" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssStrayClosingBraceIsSwallowed) {
+  // A stray `}` outside any rule terminates the prelude scan and the tokenizer recovers.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      } .x { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssUnterminatedBlockBailsOut) {
+  // No closing `}` means the unterminated-block branch trips and the rule is dropped.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .x { background-color:#AABBCC
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssTrailingBlockNoOpeningBrace) {
+  // A selector at end of the stylesheet with no `{` triggers the bracePos-not-found bail-out.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      .x { background-color:#AABBCC }
+      .y
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssEmptySelectorIsClassifiedAsInvalid) {
+  // An empty selector survives ClassifySelector and falls through to the unsupported branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      , .x { background-color:#AABBCC }
+    </style></head>
+      <body style="width:50px;height:50px">
+        <div class="x" style="width:50px;height:50px"></div>
+      </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawCssEmptyClassSelectorRejected) {
+  // `.` alone (no class name) is rejected by ClassifySelector; declarations are dropped.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      . { background-color:#FF0000 }
+    </style></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "unsupported selector"));
+}
+
+//==================================================================================================
+// HTMLValueParser — empty colour value
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawEmptyColorValueIsTransparent) {
+  // An empty `color:` declaration walks parseColor's empty-string branch, which yields fully
+  // transparent colour. The importer doesn't emit a Fill for such elements, but the
+  // declaration still parses without raising.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="color:;width:50px;height:50px">x</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+//==================================================================================================
+// HTMLParserContext — `<br>`, unknown elements, stray text
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, BrInsideContainerEmitsTextLeaf) {
+  // The `<br>` short-circuit branch in convertElement is reached when subset normalization runs:
+  // the transformer drops text-only `<br>` siblings, but `<div><br/></div>` survives.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:100px;height:50px"><br/></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnknownElementSkippedByDefault) {
+  // Without preserveUnknownElements, an unknown tag is dropped with a diagnostic.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <unknown-thing></unknown-thing>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not supported"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnknownElementPreservedWhenRequested) {
+  // With preserveUnknownElements, the same tag becomes an empty Layer carrying the tag in
+  // customData["html-unknown"].
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  opts.preserveUnknownElements = true;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <unknown-thing></unknown-thing>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* placeholder = doc->layers.front()->children.front();
+  auto it = placeholder->customData.find("html-unknown");
+  ASSERT_NE(it, placeholder->customData.end());
+  EXPECT_EQ(it->second, "unknown-thing");
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "preserved as placeholder"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawStrayTextDirectlyUnderBodyEmitsAnonymousLeaf) {
+  // Stray text directly under `<body>` lands in the convertBody fallback that wraps it in an
+  // anonymous text leaf rather than dropping it.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:50px">free text</body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "stray text inside <body>"));
+  EXPECT_FALSE(doc->layers.front()->children.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawElementAtRootOtherThanHeadBodyWarns) {
+  // An <unexpected> element at <html> root level beside <body> takes the rejection path.
+  auto doc = ParseRaw(R"HTML(
+    <html><foo></foo><body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "is not allowed"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawHeadLinkStylesheetWarns) {
+  // <link rel="stylesheet"> in <head> is not supported and warns.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><link rel="stylesheet" href="theme.css"/></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "external <link"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawHeadLinkOtherRelIsSilent) {
+  // Other <link rel> values (preconnect/icon) are silently ignored — no diagnostic should fire.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><link rel="icon" href="favicon.ico"/></head>
+      <body style="width:50px;height:50px"></body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "external <link"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MissingBodyIsHardError) {
+  // Without <body>, parseDOM hits hardError("html: missing <body>") and returns nullptr.
+  auto doc = ParseRaw(R"HTML(<html><head></head></html>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RootIsNotHtmlReturnsNullptr) {
+  // Root element that isn't <html> falls into the early-return branch in parseDOM.
+  auto doc = ParseRaw(R"HTML(<root></root>)HTML");
+  EXPECT_EQ(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawDeepNestedTreeStaysWithinRecursionLimit) {
+  // A modestly deep tree (well under MAX_HTML_RECURSION_DEPTH=128) round-trips intact, so the
+  // recursion-limit branch is the only path NOT exercised — covered by the import test below.
+  std::string nested;
+  for (int i = 0; i < 30; i++) {
+    nested += "<div style=\"width:100px;height:100px\">";
+  }
+  for (int i = 0; i < 30; i++) {
+    nested += "</div>";
+  }
+  std::string html = "<html><body style=\"width:100px;height:100px\">" + nested + "</body></html>";
+  auto doc = ParseRaw(html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "maximum recursion depth"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawExcessivelyNestedTreeTripsRecursionLimit) {
+  // Exceed MAX_HTML_RECURSION_DEPTH=128 via convertElement, hitting the warn+nullptr branch.
+  std::string opens;
+  std::string closes;
+  for (int i = 0; i < 200; i++) {
+    opens += "<div style=\"width:100px;height:100px\">";
+    closes += "</div>";
+  }
+  std::string html =
+      "<html><body style=\"width:100px;height:100px\">" + opens + closes + "</body></html>";
+  auto doc = ParseRaw(html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "maximum recursion depth"));
+}
+
+//==================================================================================================
+// HTMLElementEmitter — `<img>` / inline `<svg>` rejection branches
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, ImgWithoutSrcSkippedWithDiagnostic) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "<img> missing src"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImgExternalSvgRoutesAsImportDirective) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="icon.svg" style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(layer->importDirective.format, "svg");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsWhenSizesMatch) {
+  // A wrapper <div style="border-radius;overflow:hidden"><img/></div> where the img exactly
+  // fills the wrapper folds into a single rounded fill.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSecondElementChild) {
+  // Two element children -> fold rejects (the early-return when a second <img> shows up).
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px"/>
+        <span>noise</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSizeMismatch) {
+  // Image smaller than wrapper -> fold falls through to the mismatched-size branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:30px;height:30px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsImageOffset) {
+  // Image at non-zero left/top -> fold rejects.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden;position:relative">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+             style="width:50px;height:50px;position:absolute;left:5px;top:5px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgChild) {
+  // A `.svg` source rides the import-directive path, not the fold path.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="icon.svg" style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer::Builder — public custom-pipeline API
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, SubsetTransformerBuilderRunsDefaultPipeline) {
+  // Exercise the Builder API: withOptions + addDefaultPasses + run.
+  std::string html = R"HTML(
+    <html><body style="width:50px;height:50px"></body></html>
+  )HTML";
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
+  ASSERT_NE(dom, nullptr);
+  auto root = dom->getRootNode();
+  ASSERT_NE(root, nullptr);
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  pagx::HTMLSubsetTransformer::Builder builder;
+  auto result = builder.withOptions(opts).addDefaultPasses().run(root);
+  EXPECT_TRUE(result.ok);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SubsetTransformerBuilderMoveAssign) {
+  // Move-construct + move-assign Builder to drag the noexcept move members into coverage.
+  pagx::HTMLSubsetTransformer::Builder a;
+  a.addDefaultPasses();
+  pagx::HTMLSubsetTransformer::Builder b(std::move(a));
+  pagx::HTMLSubsetTransformer::Builder c;
+  c = std::move(b);
+  std::string html = R"HTML(
+    <html><body style="width:50px;height:50px"></body></html>
+  )HTML";
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
+  ASSERT_NE(dom, nullptr);
+  auto result = c.run(dom->getRootNode());
+  EXPECT_TRUE(result.ok);
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Cascade resolution
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ClassRuleIsAppliedAsInlineStyle) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>.btn { color: red; }</style></head>
+             <body style="width:100px;height:50px">
+               <span class="btn">x</span></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto span = FirstBodyChild(root, "span");
+  ASSERT_NE(span, nullptr);
+  EXPECT_TRUE(StyleContains(span, "color: red"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, InlineStyleOverridesClassRule) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>.btn { color: red; }</style></head>
+             <body style="width:100px;height:50px">
+               <span class="btn" style="color: blue">x</span></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto span = FirstBodyChild(root, "span");
+  EXPECT_TRUE(StyleContains(span, "color: blue"));
+  EXPECT_FALSE(StyleContains(span, "color: red"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ElementSelectorIsAppliedToAllMatches) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>p { font-size: 20px; }</style></head>
+             <body style="width:100px;height:50px">
+               <p>a</p><p>b</p></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  size_t found = 0;
+  for (auto c = root->getFirstChild("body")->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element && c->name == "p" &&
+        StyleContains(c, "font-size: 20px")) {
+      found++;
+    }
+  }
+  EXPECT_EQ(found, 2u);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedSelectorsAreDroppedWithDiagnostic) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>
+               * { padding: 0; }
+               .a .b { color: red; }
+               .btn:hover { color: blue; }
+             </style></head><body style="width:1px;height:1px"></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-selector"));
+  size_t selectorWarns = 0;
+  for (const auto& d : result.diagnostics) {
+    if (d.code == "subset:unsupported-selector") selectorWarns++;
+  }
+  EXPECT_GE(selectorWarns, 3u);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, AtRuleIsDroppedWithDiagnostic) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>
+               @media (max-width: 600px) { .x { color: red; } }
+               .y { color: blue; }
+             </style></head><body style="width:1px;height:1px">
+               <span class="x">a</span><span class="y">b</span></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-at-rule"));
+  auto body = root->getFirstChild("body");
+  auto child = body->firstChild;
+  while (child) {
+    if (child->type == pagx::DOMNodeType::Element && child->name == "span") {
+      // The .x rule is inside @media — it should NOT apply.
+      EXPECT_FALSE(StyleContains(child, "color: red"));
+    }
+    child = child->nextSibling;
+  }
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Property normalisation
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginIsForwardedAsResolvedPx) {
+  // CSS `margin` (and the four longhands) are now first-class subset properties: the
+  // transformer routes them through `ResolveLength{,Shorthand}` to normalise units to
+  // plain px and then forwards them on the inline `style="…"` attribute so the resolver
+  // can fold them onto Layer positioning / padding. No diagnostic should fire.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="margin: 8px; padding: 4px"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "margin: 8px"));
+  EXPECT_TRUE(StyleContains(div, "padding: 4px"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SupportedTransformIsKept) {
+  // Single-function `transform` forms in the supported subset (skewX/skewY/rotate/scale[X|Y]/
+  // translate[X|Y]) are forwarded untouched; the resolver later maps them onto the TextBox's
+  // transform fields. Earlier the subset transformer dropped every `transform` declaration
+  // unconditionally because Layer has no transform model, and text leaves had no way to
+  // honour skew/rotate either.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="transform: rotate(45deg)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "transform: rotate(45deg)"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedTransformIsDropped) {
+  // Compound chains and `matrix(...)` would need 2x2 matrix decomposition the importer
+  // doesn't implement; they're dropped with a diagnostic rather than passed through and
+  // mis-applied later.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="transform: rotate(45deg) translate(10px)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "transform"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipTextIsKept) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: linear-gradient(90deg, #F00, #00F);
+                           background-clip: text"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "background-clip: text"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipBorderBoxIsDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: border-box"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, WebkitBackgroundClipCoalescesToStandardName) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: linear-gradient(90deg, #F00, #00F);
+                           -webkit-background-clip: text"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "background-clip: text"));
+  EXPECT_FALSE(StyleContains(div, "-webkit-background-clip"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShorthandCollapsesToGrow) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: 1 1 0%"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "flex: 1"));
+  EXPECT_FALSE(StyleContains(div, "1 1 0%"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-shorthand-collapsed"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, RemUnitConvertsToPixels) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: 1.5rem"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "width: 24px"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unit-coerced"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, EmUnitResolvesAgainstInheritedFontSize) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;font-size:20px">
+               <p style="font-size: 1.5em">large</p></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto p = FirstBodyChild(root, "p");
+  // 1.5em of 20px = 30px.
+  EXPECT_TRUE(StyleContains(p, "font-size: 30px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, VwResolvesAgainstCanvasWidth) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.canvasWidth = 800.0f;
+  opts.canvasHeight = 600.0f;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:800px;height:600px">
+               <div style="width: 50vw"></div></body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "width: 400px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionRelativeIsDroppedSilently) {
+  // PAGX has no CSS-style containing-block concept (children always anchor to
+  // their direct parent), so `position: relative` is a no-op and we drop it
+  // without a warning. This lets the html-snapshot pipeline emit
+  // `position: relative` on flex items — needed so abs descendants anchor
+  // correctly when the snapshot is opened in a real browser — without the
+  // importer downgrading those flex items to `position: absolute` and yanking
+  // them out of the parent's flex flow.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: relative; top: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "position:"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionFixedIsDowngradedToAbsolute) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: fixed; top: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(div, "position: absolute"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Structure normalisation
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedTagIsDroppedByDefault) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div>ok</div>
+               <table><tr><td>nope</td></tr></table>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  // Only the <div> survives.
+  EXPECT_EQ(CountElementChildren(body), 1u);
+  EXPECT_EQ(body->getFirstChild()->name, "div");
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-tag"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedTagPreservedWhenOptionSet) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.preserveUnknownElements = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <custom-element></custom-element></body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  auto preserved = FirstBodyChild(root, "div");
+  ASSERT_NE(preserved, nullptr);
+  EXPECT_EQ(AttrValue(preserved, "data-html-unknown"), "custom-element");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StrayTextInsideContainerIsWrappedInParagraph) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div>hello</div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  ASSERT_NE(div, nullptr);
+  auto firstChild = div->getFirstChild();
+  ASSERT_NE(firstChild, nullptr);
+  EXPECT_EQ(firstChild->name, "p");
+  EXPECT_TRUE(HasDiagnostic(result, "subset:text-wrapped"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StyleBlockIsRemovedByDefault) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>.x { color: red; }</style></head>
+             <body style="width:1px;height:1px"></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto head = root->getFirstChild("head");
+  ASSERT_NE(head, nullptr);
+  EXPECT_EQ(head->getFirstChild("style"), nullptr);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StyleBlockKeptWhenPreservationRequested) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.preserveStyleBlock = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><style>.x { color: red; }</style></head>
+             <body style="width:1px;height:1px"></body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_NE(root->getFirstChild("head")->getFirstChild("style"), nullptr);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ClassAttributeStrippedByDefault) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div class="card btn"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_EQ(AttrValue(div, "class"), "");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ScriptElementInHeadIsDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><head><script>var x = 1;</script><title>t</title></head>
+             <body style="width:1px;height:1px"></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_EQ(root->getFirstChild("head")->getFirstChild("script"), nullptr);
+  EXPECT_NE(root->getFirstChild("head")->getFirstChild("title"), nullptr);
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Strict mode
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StrictModeFailsOnUnsupportedProperty) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.strict = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  // `clip-path` stays on the explicit-drop list (PAGX has no equivalent geometry primitive),
+  // so it remains a clean trigger for strict-mode failures even after `margin` was promoted
+  // out of the drop set in MarginIsResolvedThroughPaddingWrapper.
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="clip-path: inset(10px)"></div></body></html>)HTML",
+      &root, opts);
+  EXPECT_FALSE(result.ok);
+  EXPECT_FALSE(result.diagnostics.empty());
+  EXPECT_EQ(result.diagnostics.front().severity, pagx::HTMLSubsetTransformer::Severity::Error);
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — HTMLFlexInference (opt-in)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceIsOffByDefault) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+  // Both divs keep their absolute positioning by default.
+  size_t absCount = 0;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element && StyleContains(c, "position: absolute")) {
+      absCount++;
+    }
+  }
+  EXPECT_EQ(absCount, 2u);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversRowLayoutWhenEnabled) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:10px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:70px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:130px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  EXPECT_TRUE(StyleContains(body, "gap: 10px"));
+  // padTop=0, padRight=20, padBottom=0, padLeft=10 → 4-token shorthand.
+  EXPECT_TRUE(StyleContains(body, "padding: 0px 20px 0px 10px"));
+  // All children span the body's full height (50px) → align-items: stretch.
+  EXPECT_TRUE(StyleContains(body, "align-items: stretch"));
+  // Every child loses its position/left/top, and (because of stretch) its cross-axis size.
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_FALSE(StyleContains(c, "position"));
+    EXPECT_FALSE(StyleContains(c, "left:"));
+    EXPECT_FALSE(StyleContains(c, "top:"));
+    EXPECT_FALSE(StyleContains(c, "height:"));
+    // Main-axis (width) is preserved.
+    EXPECT_TRUE(StyleContains(c, "width: 50px"));
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversColumnLayoutWithCenter) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:120px;height:200px">
+               <div style="position:absolute;left:10px;top:10px;width:100px;height:50px"></div>
+               <div style="position:absolute;left:35px;top:70px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:10px;top:130px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_TRUE(StyleContains(body, "gap: 10px"));
+  // padTop=10, padRight=0, padBottom=20, padLeft=0 → "T R B" 3-token form.
+  EXPECT_TRUE(StyleContains(body, "padding: 10px 0px 20px"));
+  // First/last children span the inner content width (10..110); middle one is centred at
+  // x=35..85. Their common cross-axis property is `center`, not `stretch`.
+  EXPECT_TRUE(StyleContains(body, "align-items: center"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsOverlappingChildren) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:200px">
+               <div style="position:absolute;left:0px;top:0px;width:100px;height:100px"></div>
+               <div style="position:absolute;left:50px;top:50px;width:100px;height:100px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+  // Both children keep their absolute positioning.
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type == pagx::DOMNodeType::Element) {
+      EXPECT_TRUE(StyleContains(c, "position: absolute"));
+    }
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsMixedCrossAlignment) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:100px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:25px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:120px;top:50px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceSkipsInconsistentGap) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div style="position:absolute;left:0px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:60px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:200px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+  auto body = root->getFirstChild("body");
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceLeavesExistingFlexAlone) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px;display:flex;gap:5px">
+               <div style="width:50px;height:50px"></div>
+               <div style="width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  // No flex-inferred diagnostic — body already declared display:flex, we don't second-guess.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  // The original gap survives untouched.
+  EXPECT_TRUE(StyleContains(body, "gap: 5px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceReordersChildrenWhenDomOrderDiffersFromAxis) {
+  // The three children are declared out of visual order: source order is left, right, middle
+  // (by `left:`). Without DOM reordering, applying `display:flex` would render them in source
+  // order, swapping the visible right and middle columns. Verify the fix puts them back in
+  // position order so the visual layout is preserved.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div data-id="left"   style="position:absolute;left:0px;top:0px;width:100px;height:50px"></div>
+               <div data-id="right"  style="position:absolute;left:200px;top:0px;width:100px;height:50px"></div>
+               <div data-id="middle" style="position:absolute;left:100px;top:0px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  std::vector<std::string> orderedIds;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    orderedIds.push_back(AttrValue(c, "data-id"));
+  }
+  ASSERT_EQ(orderedIds.size(), 3u);
+  EXPECT_EQ(orderedIds[0], "left");
+  EXPECT_EQ(orderedIds[1], "middle");
+  EXPECT_EQ(orderedIds[2], "right");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsChildrenWhenDomOrderMatchesAxis) {
+  // Sanity-check: when the source order already matches position order, no reordering is
+  // needed and the children appear in their original sequence.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:50px">
+               <div data-id="a" style="position:absolute;left:0px;top:0px;width:100px;height:50px"></div>
+               <div data-id="b" style="position:absolute;left:100px;top:0px;width:100px;height:50px"></div>
+               <div data-id="c" style="position:absolute;left:200px;top:0px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  std::vector<std::string> orderedIds;
+  for (auto c = body->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    orderedIds.push_back(AttrValue(c, "data-id"));
+  }
+  ASSERT_EQ(orderedIds.size(), 3u);
+  EXPECT_EQ(orderedIds[0], "a");
+  EXPECT_EQ(orderedIds[1], "b");
+  EXPECT_EQ(orderedIds[2], "c");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderStretchParent) {
+  // Regression for the snapshot.js → pagx import pipeline (`html2pagx`). The body has a
+  // column-stretch flex layout (children span the full body width), so the outer pass
+  // erases each child's `width: 320px`. The inner child is itself a row container whose
+  // own children stop short of both edges (`left:14..286`), and its row padding must be
+  // recovered from the original 320px width rather than from the children's bbox. With
+  // pre-order traversal the inner inference happened *after* the outer strip and silently
+  // collapsed the padding to 0; the fix walks children first so the inner pass still sees
+  // the explicit width.
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:320px;height:120px">
+               <div style="position:absolute;left:0px;top:0px;width:320px;height:60px;background-color:#fff">
+                 <div style="position:absolute;left:14px;top:18px;width:24px;height:24px"></div>
+                 <div style="position:absolute;left:48px;top:18px;width:200px;height:24px"></div>
+                 <div style="position:absolute;left:258px;top:18px;width:24px;height:24px"></div>
+                 <div style="position:absolute;left:292px;top:18px;width:14px;height:24px"></div>
+               </div>
+               <div style="position:absolute;left:0px;top:60px;width:320px;height:60px;background-color:#fff">
+                 <div style="position:absolute;left:0px;top:0px;width:160px;height:60px"></div>
+                 <div style="position:absolute;left:160px;top:0px;width:160px;height:60px"></div>
+               </div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_TRUE(StyleContains(body, "align-items: stretch"));
+
+  // First child: header row whose direct children stop 14px from both edges. After the fix
+  // its inner inference uses the original 320px width and recovers padding-left/right = 14.
+  auto topBar = body->firstChild;
+  ASSERT_NE(topBar, nullptr);
+  ASSERT_EQ(topBar->type, pagx::DOMNodeType::Element);
+  EXPECT_TRUE(StyleContains(topBar, "display: flex"));
+  EXPECT_TRUE(StyleContains(topBar, "flex-direction: row"));
+  // Asymmetric main-axis padding (14 left, 14 right) emitted as the 2-token shorthand.
+  EXPECT_TRUE(StyleContains(topBar, "padding: 0px 14px"));
+  // Because the parent stretches its cross axis, the top bar's width is erased.
+  EXPECT_FALSE(StyleContains(topBar, "width:"));
+
+  // Second child: a row of two siblings that exactly tile the parent. Its inner inference
+  // should produce zero horizontal padding (and is allowed to use stretch on its own
+  // children's height).
+  auto grid = topBar->nextSibling;
+  while (grid && grid->type != pagx::DOMNodeType::Element) grid = grid->nextSibling;
+  ASSERT_NE(grid, nullptr);
+  EXPECT_TRUE(StyleContains(grid, "display: flex"));
+  EXPECT_TRUE(StyleContains(grid, "flex-direction: row"));
+  // No padding emitted (all four sides are zero — the shorthand is suppressed entirely).
+  EXPECT_FALSE(StyleContains(grid, "padding:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceTolerancePicksUpSubpixelDrift) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  // Gaps are 10.4 / 9.6 (drift < default 1.5px tolerance) and tops drift by 0.7px (< tol).
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="position:absolute;left:10px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:70.4px;top:0.7px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:130px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Idempotency
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, IdempotentOnAlreadySubsetInput) {
+  std::shared_ptr<pagx::DOMNode> rootA;
+  auto resultA = RunTransform(
+      R"HTML(<html><body style="width: 100px; height: 50px;">
+               <div style="background-color: #FFFFFF; padding: 8px;"></div></body></html>)HTML",
+      &rootA);
+  ASSERT_TRUE(resultA.ok);
+  // Run a second time on the already-normalised output.
+  pagx::HTMLSubsetTransformer::Result resultB = pagx::HTMLSubsetTransformer::Transform(rootA);
+  ASSERT_TRUE(resultB.ok);
+  EXPECT_TRUE(resultB.diagnostics.empty());
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Per-property transforms: keyword fallbacks and edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayInlineDowngradesToBlock) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: inline"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "display: block"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayInlineBlockDowngradesToBlock) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: inline-block"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "display: block"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DisplayUnknownDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="display: grid"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "display:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionRowReverseFallsBackToRow) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:row-reverse">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  EXPECT_FALSE(StyleContains(body, "row-reverse"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionColumnReverseFallsBackToColumn) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:column-reverse">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_FALSE(StyleContains(body, "column-reverse"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexDirectionUnknownDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;flex-direction:diagonal">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "flex-direction:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, AlignItemsBaselineKept) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;align-items:baseline">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(root->getFirstChild("body"), "align-items: baseline"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, AlignItemsInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;align-items:floaty">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "align-items:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, JustifyContentInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px;display:flex;justify-content:bouncy">
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(root->getFirstChild("body"), "justify-content:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShrinkZeroDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex-shrink: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "flex-shrink"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexShrinkNonzeroWarns) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex-shrink: 2"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexNoneMapsToZero) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "flex: 0"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexAutoMapsToOne) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: auto"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "flex: 1"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexUnknownKeywordDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: stretchy"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "flex:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexWithUnitOnGrowWarns) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="flex: 2px"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionStickyDowngradedToAbsolute) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: sticky; top: 0"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "position: absolute"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionStaticDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: static"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "position:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="position: floating"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "position:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageUrlDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: url(image.png)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageNoneDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-image: weirdvalue"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: padding-box"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="background-clip: weird-clip"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDashedPreserved) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px dashed #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "dashed"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDottedPreserved) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px dotted #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "dotted"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDoubleDowngradedToSolid) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: 2px double #000"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderNoneDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="border: none"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "border:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityNonNumberDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: invalid"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "opacity:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityPercentNormalised) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: 50%"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // Internally clamps to [0,1]; 50% becomes 0.5.
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "opacity: 0.5"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityClampedAbove1) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="opacity: 2"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "opacity: 1"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitNoneDowngradedToContain) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: none"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitScaleDownDowngraded) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: scale-down"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitInvalidDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <img src="x.png" style="object-fit: zoomy"/></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "img"), "object-fit"));
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — Length resolution
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthCalcDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: calc(100% - 10px)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthVarDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: var(--w)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthClampDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: clamp(10px, 50%, 200px)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthMinDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: min(10px, 50%)"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthAutoDroppedSilently) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: auto; height: inherit"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(div, "width:"));
+  EXPECT_FALSE(StyleContains(div, "height:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthPtConvertedToPx) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="font-size: 12pt"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // 12pt = 16px (12 * 4 / 3).
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "font-size: 16px"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unit-coerced"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthVwWithoutCanvasDropped) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  // Default canvasWidth/canvasHeight = 0 → vw/vh cannot resolve.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:200px">
+               <div style="width: 50vw"></div></body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthInvalidUnitDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: 5xq"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthMalformedDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="width: notalength"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "width:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, LengthShorthandResolvesEachToken) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:1px;height:1px">
+               <div style="padding: 1rem 2pt"></div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // 1rem -> 16px, 2pt -> 2.667px.
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "padding: 16px"));
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — MarginToGapPromotion
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapTrailingWithBlankLastChild) {
+  // The Tailwind-style pattern: every flex child has the same `mb`, except the last one.
+  // The pass should lift the shared margin onto the container's `gap` and clear all per-child
+  // margins, so PAGX's vertical layout reproduces the CSS gutters.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 12px"));
+  for (auto c = wrapper->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_FALSE(StyleContains(c, "margin-bottom"));
+    EXPECT_FALSE(StyleContains(c, "margin-top"));
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapTrailingUniformAllChildren) {
+  // The same uniform `mb` on every child (including the last). The pass still lifts onto
+  // `gap` and zero out the trailing margins; the trailing `mb` on the last child becomes
+  // empty bottom padding which CSS accepts.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:400px">
+               <div style="display:flex;flex-direction:column;width:200px;height:400px">
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 8px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapLeadingPattern) {
+  // The leading pattern: first child has no margin-top, every subsequent child has the same
+  // margin-top. Pass should still promote.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px"></div>
+                 <div style="width:100px;height:50px;margin-top:16px"></div>
+                 <div style="width:100px;height:50px;margin-top:16px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 16px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapWorksOnRowFlex) {
+  // Same logic on the row axis: uniform margin-right across siblings becomes the container's
+  // `gap`. Ensures the pass is axis-symmetric, not column-only.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:60px">
+               <div style="display:flex;flex-direction:row;width:300px;height:60px">
+                 <div style="width:50px;height:50px;margin-right:10px"></div>
+                 <div style="width:50px;height:50px;margin-right:10px"></div>
+                 <div style="width:50px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 10px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsInconsistentMargins) {
+  // Inconsistent trailing margins (8px vs 12px) and no leading margins: neither pattern
+  // matches, so the pass leaves the tree untouched and emits no promotion diagnostic.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(wrapper, "gap:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsWhenContainerHasGap) {
+  // Container already declares its own positive `gap`: leave the per-child margins alone.
+  // We deliberately set the gap to a value distinct from the per-child margin so a buggy
+  // implementation that overwrites the gap is easy to spot.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;gap:4px;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px;margin-bottom:12px"></div>
+                 <div style="width:100px;height:50px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "gap: 4px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsWhenShorthandHasBothEdgeMargins) {
+  // `margin: 4px 12px` makes EVERY child carry a non-zero leading AND trailing main-axis
+  // margin (top=bottom=4 for a column flex). The actual CSS gutter between siblings is
+  // mb + mt = 8, not 4, so a naive lift to `gap: 4px` would change the rendering. The pass
+  // must conservatively decline both the trailing and leading patterns and leave the
+  // shorthand untouched.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:300px">
+               <div style="display:flex;flex-direction:column;width:200px;height:300px">
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+                 <div style="width:100px;height:50px;margin: 4px 12px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_FALSE(StyleContains(wrapper, "gap:"));
+  // Children keep their original shorthand verbatim.
+  for (auto c = wrapper->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_TRUE(StyleContains(c, "margin: 4px 12px"));
+  }
+}
+
+//==================================================================================================
+// HTMLSubsetTransformer — SpaceJustifyOverflowCollapse
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyCollapseAccountsForChildMargin) {
+  // Children fit the container by `width` alone (3 × 50 = 150 ≤ 200) but overflow once
+  // their `margin-right` is included (3 × 50 + 2 × 30 = 210 > 200). The pass must count
+  // the margins; otherwise it would leave `space-between` in place and PAGX would render
+  // the leftover space as a positive gap that doesn't exist in the browser.
+  //
+  // We disable MarginToGap (by using a leading + trailing mix that doesn't match either
+  // pattern) so the SpaceJustify pass is the one observed.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:80px">
+               <div style="display:flex;flex-direction:row;justify-content:space-between;width:200px;height:80px">
+                 <div style="width:50px;height:50px;margin-right:30px"></div>
+                 <div style="width:50px;height:50px;margin-left:30px;margin-right:30px"></div>
+                 <div style="width:50px;height:50px;margin-left:30px"></div>
+               </div></body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
+  auto wrapper = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(wrapper, "justify-content: flex-start"));
+  // MarginToGap should have stayed away from this mixed-leading/trailing layout.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
 }
 
 }  // namespace pag

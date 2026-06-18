@@ -43,7 +43,7 @@ bool IsInlineRunTag(const std::string& tag) {
 }
 
 bool IsInlineLeafChildName(const std::string& name) {
-  return IsInlineRunTag(name) || name == "br";
+  return IsInlineRunTag(name);
 }
 
 std::vector<std::string> SplitTopLevelCommas(const std::string& s) {
@@ -464,7 +464,7 @@ bool LooksAbsolutePath(const std::string& src) {
   if (src.find("://") != std::string::npos) return true;
   if (src.compare(0, 5, "data:") == 0) return true;
   // Windows drive letter ("C:/")
-  if (src.size() > 2 && std::isalpha(static_cast<unsigned char>(src[0])) && src[1] == ':' &&
+  if (src.size() >= 3 && std::isalpha(static_cast<unsigned char>(src[0])) && src[1] == ':' &&
       (src[2] == '/' || src[2] == '\\')) {
     return true;
   }

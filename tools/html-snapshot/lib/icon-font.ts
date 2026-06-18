@@ -33,7 +33,7 @@
 // the pseudo-text leaf, sizing the SVG to the host's measured rect.
 
 import * as fs from 'fs';
-import { DROP_TAG_NAMES } from './dom-tags';
+import { DROP_TAGS_UPPER_JSON } from './dom-tags';
 import { errMessage } from './common';
 import { loadFontCodec } from './font-codec';
 import type { Page } from './browser-engine';
@@ -380,9 +380,7 @@ const ICON_FONT_HELPER_FNS: Function[] = [
 // closure) ensures both browser entry points reuse one Set instead of
 // reconstructing it on every call.
 const ICON_FONT_DROP_TAGS_SRC =
-  'const DROP_TAGS_UPPER = new Set(' +
-  JSON.stringify(DROP_TAG_NAMES.map(function (s) { return s.toUpperCase(); })) +
-  ');';
+  'const DROP_TAGS_UPPER = new Set(' + DROP_TAGS_UPPER_JSON + ');';
 export const ICON_FONT_HELPERS_SRC =
   ICON_FONT_DROP_TAGS_SRC + '\n\n' +
   ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');

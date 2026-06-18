@@ -321,6 +321,34 @@ export async function addInitScript(
   await page.evaluateOnNewDocument(script);
 }
 
+// Best-effort wait for the page's network to go quiet (no in-flight requests
+// for ~500ms), used *after* a `load`-gated navigation. Unlike passing
+// `waitUntil: 'networkidle'` to `page.goto`, this is a separate, bounded step
+// the caller can treat as non-fatal: the document has already loaded, so a
+// CDN that keeps trickling requests (Google Fonts, icon webfonts, the Tailwind
+// Play CDN) only costs `timeoutMs` of extra settle time instead of failing the
+// whole navigation. Resolves (never rejects) — returns true if the network
+// actually settled, false if it timed out or the wait wasn't supported.
+//
+// Puppeteer: `page.waitForNetworkIdle({ idleTime, timeout })`.
+// Playwright: `page.waitForLoadState('networkidle', { timeout })`.
+export async function waitForNetworkIdle(
+  page: Page,
+  engine: EngineName,
+  timeoutMs: number,
+): Promise<boolean> {
+  try {
+    if (engine === 'playwright') {
+      await page.waitForLoadState('networkidle', { timeout: timeoutMs });
+    } else {
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: timeoutMs });
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Patterns thrown by puppeteer / playwright when the browser binary is
 // missing or wasn't downloaded into the cache the engine looks at. Lives in
 // one place so the diagnostic helper below stays in sync with what the

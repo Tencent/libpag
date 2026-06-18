@@ -226,11 +226,14 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLAnimationBuilder.cpp
             src/pagx/html/importer/HTMLAnimationBuilder.h
             src/pagx/html/importer/HTMLBoxAttributes.h
+            src/pagx/html/importer/HTMLCssCascade.cpp
+            src/pagx/html/importer/HTMLCssCascade.h
             src/pagx/html/importer/HTMLDetail.cpp
             src/pagx/html/importer/HTMLDetail.h
             src/pagx/html/importer/HTMLDiagnosticSink.cpp
             src/pagx/html/importer/HTMLDiagnosticSink.h
             src/pagx/html/importer/HTMLElementEmitter.cpp
+            src/pagx/html/importer/HTMLFlexInferencePass.cpp
             src/pagx/html/importer/HTMLIdAllocator.cpp
             src/pagx/html/importer/HTMLIdAllocator.h
             src/pagx/html/importer/HTMLImageResources.cpp
@@ -238,24 +241,25 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLImporter.cpp
             src/pagx/html/importer/HTMLInlineSvgEmitter.cpp
             src/pagx/html/importer/HTMLInlineSvgEmitter.h
-            src/pagx/html/importer/HTMLStyleCascade.cpp
-            src/pagx/html/importer/HTMLStyleCascade.h
             src/pagx/html/importer/HTMLLayerBuilder.cpp
             src/pagx/html/importer/HTMLLayerBuilder.h
-            src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
-            src/pagx/html/importer/HTMLTextFragmentBuilder.h
-            src/pagx/html/importer/HTMLValueParser.cpp
-            src/pagx/html/importer/HTMLValueParser.h
             src/pagx/html/importer/HTMLParserContext.cpp
             src/pagx/html/importer/HTMLParserContext.h
+            src/pagx/html/importer/HTMLStyleCascade.cpp
+            src/pagx/html/importer/HTMLStyleCascade.h
+            src/pagx/html/importer/HTMLSubsetPropertyTable.cpp
+            src/pagx/html/importer/HTMLSubsetPropertyTable.h
             src/pagx/html/importer/HTMLSubsetTransformer.cpp
+            src/pagx/html/importer/HTMLSubsetTransformer.h
+            src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
+            src/pagx/html/importer/HTMLTextFragmentBuilder.h
+            src/pagx/html/importer/HTMLTransformContext.h
             src/pagx/html/importer/HTMLTransformPasses.cpp
             src/pagx/html/importer/HTMLTransformPasses.h
-            src/pagx/html/importer/HTMLTransformContext.h
-            src/pagx/html/importer/HTMLCssCascade.cpp
-            src/pagx/html/importer/HTMLCssCascade.h
-            src/pagx/html/importer/HTMLSubsetPropertyTable.cpp
-            src/pagx/html/importer/HTMLSubsetPropertyTable.h)
+            src/pagx/html/importer/HTMLTransformPassUtils.cpp
+            src/pagx/html/importer/HTMLTransformPassUtils.h
+            src/pagx/html/importer/HTMLValueParser.cpp
+            src/pagx/html/importer/HTMLValueParser.h)
     endif ()
 
     if (PAG_BUILD_PPT)
@@ -266,8 +270,10 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 
-    # HTML exporter
+    # HTML exporter (importer subtree is wired separately above so PAG_BUILD_HTML can keep
+    # it out of non-HTML builds)
     file(GLOB_RECURSE HTML_EXPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/*.*)
+    list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)

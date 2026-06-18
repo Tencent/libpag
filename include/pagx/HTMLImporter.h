@@ -85,7 +85,7 @@ class HTMLImporter {
     bool autoNormalize = true;
 
     /**
-     * When true, the auto-normalizer also runs the `AbsoluteToFlexInference` pass, which
+     * When true, the auto-normalizer also runs the `HTMLFlexInference` pass, which
      * recovers `display: flex` semantics from a tree where every visual element is
      * `position: absolute` with explicit `left/top/width/height` (the canonical output of
      * `tools/html-snapshot/snapshot.js`). Containers whose children form a clean 1D row or
@@ -108,7 +108,17 @@ class HTMLImporter {
      * Note: only the contents at call time are copied; the pointer does not need to outlive
      * the returned document.
      */
-    FontConfig* fontConfig = nullptr;
+    const FontConfig* fontConfig = nullptr;
+
+    /**
+     * Anchor directory used to resolve relative `<img src="...">` paths when parsing from
+     * in-memory bytes (`Parse(const uint8_t*, size_t, ...)` / `ParseString`). The file-based
+     * `Parse(const std::string&, ...)` overload derives this from the input file's parent
+     * directory and ignores this option. Empty (default) means "no base path"; relative
+     * sources then pass through unchanged, which only works when every `<img>` already uses
+     * an absolute path or `data:` URI (the canonical output of `tools/html-snapshot`).
+     */
+    std::string basePath = {};
 
     Options() {
     }
@@ -128,7 +138,10 @@ class HTMLImporter {
                                              const Options& options = Options());
 
   /**
-   * Parses an HTML string and creates a PAGX Document.
+   * Parses an HTML string and creates a PAGX Document. The content is treated as a UTF-8
+   * encoded byte sequence (matching `XMLDOM::Make`); embedded NUL bytes are permitted as long
+   * as the underlying XML parser accepts them. Other encodings (UTF-16, GBK, …) must be
+   * transcoded to UTF-8 before being passed in.
    */
   static std::shared_ptr<PAGXDocument> ParseString(const std::string& htmlContent,
                                                    const Options& options = Options());

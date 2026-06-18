@@ -147,8 +147,14 @@ export async function saveDownloadedImages(
 
   await fsp.mkdir(outDir, { recursive: true });
 
+  // Two-pass shape so the disk writes can run in parallel without racing on
+  // the dedupe set. First pass: synchronously hash + filter out duplicates,
+  // and resolve the destination path for each surviving entry. Second pass:
+  // fan out the writes via `Promise.all` so a corpus with hundreds of images
+  // doesn't pay one fsync at a time.
+  type Pending = { url: string; filePath: string; buffer: Buffer };
   const seenHashes = new Set<string>();
-  const saved: SavedImage[] = [];
+  const pending: Pending[] = [];
   for (const [url, value] of entries) {
     try {
       // Accept either the `{ buffer, contentType }` shape the capture listener
@@ -168,13 +174,22 @@ export async function saveDownloadedImages(
       const ext = pickExt(contentType, buffer);
       const fileName = contentFileName(url, hash, ext);
       const filePath = path.join(outDir, fileName);
-      if (!fs.existsSync(filePath)) {
-        await writeFileAtomic(filePath, buffer);
-      }
-      saved.push({ url, path: filePath });
+      pending.push({ url, filePath, buffer });
     } catch (err) {
       log(`failed to save image ${url}: ${errMessage(err)}`);
     }
   }
-  return saved;
+
+  const results = await Promise.all(pending.map(async ({ url, filePath, buffer }) => {
+    try {
+      if (!fs.existsSync(filePath)) {
+        await writeFileAtomic(filePath, buffer);
+      }
+      return { url, path: filePath } as SavedImage;
+    } catch (err) {
+      log(`failed to save image ${url}: ${errMessage(err)}`);
+      return null;
+    }
+  }));
+  return results.filter((r): r is SavedImage => r !== null);
 }

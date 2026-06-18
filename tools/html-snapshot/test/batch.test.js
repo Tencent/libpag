@@ -165,3 +165,142 @@ describe('runBatch — dryRun', () => {
     expect(fs.existsSync(outRoot)).toBe(true);
   });
 });
+
+// Live-run tests for runBatch. Cover the path that actually opens a browser
+// (mocked) and feeds each HTML through `runHtmlToPagx`. Exercising this needs
+// browser-engine.launchBrowser to return a stub handle and pipeline.runHtmlToPagx
+// to be replaced with a counting fake — we use jest.doMock so the real modules
+// are still loaded by every other test file.
+describe('runBatch — live execution (mocked engine + pipeline)', () => {
+  function withCapturedIO(fn) {
+    const realOut = process.stdout.write.bind(process.stdout);
+    const realErr = process.stderr.write.bind(process.stderr);
+    const out = [];
+    const err = [];
+    process.stdout.write = (s) => { out.push(String(s)); return true; };
+    process.stderr.write = (s) => { err.push(String(s)); return true; };
+    return Promise.resolve(fn())
+      .finally(() => {
+        process.stdout.write = realOut;
+        process.stderr.write = realErr;
+      })
+      .then((r) => ({ result: r, stdout: out.join(''), stderr: err.join('') }));
+  }
+
+  // Reload `dist/lib/batch` after mocking its two collaborators so tests in
+  // this `describe` can swap behaviour per case without polluting the cache
+  // for other suites.
+  function loadBatchWith({ runHtmlToPagx, launchBrowser, browserClose }) {
+    jest.resetModules();
+    jest.doMock('../dist/lib/browser-engine', () => {
+      const real = jest.requireActual('../dist/lib/browser-engine');
+      return {
+        ...real,
+        launchBrowser: launchBrowser || (async () => ({
+          browser: { close: browserClose || (async () => {}) },
+          engine: 'puppeteer',
+        })),
+      };
+    });
+    jest.doMock('../dist/lib/pipeline', () => {
+      const real = jest.requireActual('../dist/lib/pipeline');
+      return {
+        ...real,
+        runHtmlToPagx: runHtmlToPagx || (async () => ({ subsetHtml: '', pagx: '', png: null, fonts: [] })),
+      };
+    });
+    return require('../dist/lib/batch');
+  }
+
+  afterEach(() => {
+    jest.dontMock('../dist/lib/browser-engine');
+    jest.dontMock('../dist/lib/pipeline');
+    jest.resetModules();
+  });
+
+  test('processes each html, closes the browser, and reports the totals', async () => {
+    touch('a.html');
+    touch('sub/b.htm');
+    touch('skip.subset.html');
+    let closeCalls = 0;
+    const seen = [];
+    const { runBatch: liveRun } = loadBatchWith({
+      runHtmlToPagx: async (opts) => {
+        seen.push(opts.input);
+        return { subsetHtml: '', pagx: opts.outputDir + '/' + opts.outputName + '.pagx', png: null, fonts: [] };
+      },
+      browserClose: async () => { closeCalls++; },
+    });
+    const { result, stdout } = await withCapturedIO(() => liveRun({
+      inputDir: dir,
+      pagxBin: '/p',
+      scriptDir: dir,
+    }));
+    expect(result).toEqual({ processed: 2, skipped: 0, failed: 0, total: 2 });
+    expect(stdout).toMatch(/\[1\/2\] process /);
+    expect(stdout).toMatch(/\[2\/2\] process /);
+    expect(stdout).toMatch(/Summary: processed=2 skipped=0 failed=0 total=2/);
+    expect(closeCalls).toBe(1);
+    expect(seen).toHaveLength(2);
+  });
+
+  test('skipExisting marks pre-existing .pagx targets without invoking the pipeline', async () => {
+    touch('a.html');
+    touch('b.html');
+    fs.writeFileSync(path.join(dir, 'a.pagx'), '');
+    let pipelineCalls = 0;
+    const { runBatch: liveRun } = loadBatchWith({
+      runHtmlToPagx: async () => { pipelineCalls++; return { subsetHtml: '', pagx: '', png: null, fonts: [] }; },
+    });
+    const { result, stdout } = await withCapturedIO(() => liveRun({
+      inputDir: dir,
+      pagxBin: '/p',
+      scriptDir: dir,
+      skipExisting: true,
+    }));
+    expect(result).toEqual({ processed: 1, skipped: 1, failed: 0, total: 2 });
+    expect(stdout).toMatch(/\[1\/2\] skip      a\.html/);
+    expect(pipelineCalls).toBe(1);
+  });
+
+  test('PipelineStepError surfaces with the step label in stderr', async () => {
+    touch('a.html');
+    const { PipelineStepError } = require('../dist/lib/pipeline');
+    const { runBatch: liveRun } = loadBatchWith({
+      runHtmlToPagx: async () => {
+        throw new PipelineStepError('snapshot failed', { step: 'snapshot', code: 1, stderr: 'boom' });
+      },
+    });
+    const { result, stderr } = await withCapturedIO(() => liveRun({
+      inputDir: dir, pagxBin: '/p', scriptDir: dir,
+    }));
+    expect(result.failed).toBe(1);
+    expect(result.processed).toBe(0);
+    expect(stderr).toMatch(/failed: a\.html: snapshot failed/);
+  });
+
+  test('non-pipeline errors fall through with their message', async () => {
+    touch('a.html');
+    const { runBatch: liveRun } = loadBatchWith({
+      runHtmlToPagx: async () => { throw new Error('weird non-pipeline'); },
+    });
+    const { result, stderr } = await withCapturedIO(() => liveRun({
+      inputDir: dir, pagxBin: '/p', scriptDir: dir,
+    }));
+    expect(result.failed).toBe(1);
+    expect(stderr).toMatch(/failed: a\.html: weird non-pipeline/);
+  });
+
+  test('logs a browser-close error without changing the result', async () => {
+    touch('a.html');
+    const { runBatch: liveRun } = loadBatchWith({
+      runHtmlToPagx: async () => ({ subsetHtml: '', pagx: '', png: null, fonts: [] }),
+      browserClose: async () => { throw new Error('close exploded'); },
+    });
+    const { result, stderr } = await withCapturedIO(() => liveRun({
+      inputDir: dir, pagxBin: '/p', scriptDir: dir,
+    }));
+    expect(result.processed).toBe(1);
+    expect(stderr).toMatch(/browser close error: close exploded/);
+  });
+});

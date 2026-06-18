@@ -191,7 +191,7 @@ function contentFileName(meta: FontMeta, hash: string): string {
 export function makeFontCaptureListener(
   engine: EngineName,
   cache: Map<string, Buffer>,
-  log: CaptureLogger,
+  log: CaptureLogger | null,
 ): CaptureResponseListener {
   return makeCaptureListener<Buffer>({
     resourceType: 'font',
@@ -224,29 +224,51 @@ export async function saveDownloadedFonts(
 
   await fsp.mkdir(outDir, { recursive: true });
 
-  const seenHashes = new Set<string>();
-  const saved: SavedFont[] = [];
-  for (const [url, raw] of entries) {
+  // Decompress + hash in parallel: WOFF2 → SFNT decoding is non-trivial CPU
+  // work and the original loop did it one at a time. Each entry is wrapped
+  // in its own try so a single bad font doesn't poison the batch.
+  type Decoded = { url: string; sfnt: Buffer; hash: string; meta: ReturnType<typeof readFontMeta> };
+  const decoded = await Promise.all(entries.map(async ([url, raw]): Promise<Decoded | null> => {
     try {
       const sfnt = await toSfnt(raw);
-      if (!sfnt || !sfnt.length) continue;
+      if (!sfnt || !sfnt.length) return null;
       const hash = crypto.createHash('sha1').update(sfnt).digest('hex');
-      if (seenHashes.has(hash)) continue;
-      seenHashes.add(hash);
       const meta = readFontMeta(sfnt);
-      const fileName = contentFileName(meta, hash);
-      const filePath = path.join(outDir, fileName);
-      // Content-addressed name ⇒ an existing file with this name already holds
-      // the same bytes, so skip the rewrite (and the duplicate download cost
-      // on disk). Otherwise stage + atomically rename so parallel cases never
-      // observe a partial file.
+      return { url, sfnt, hash, meta };
+    } catch (err) {
+      log(`failed to save font ${url}: ${errMessage(err)}`);
+      return null;
+    }
+  }));
+
+  // Dedupe by content hash sequentially so the order in which fonts win the
+  // unique slot is deterministic (mirrors the previous loop's behaviour).
+  type Pending = { url: string; sfnt: Buffer; filePath: string; meta: ReturnType<typeof readFontMeta> };
+  const seenHashes = new Set<string>();
+  const pending: Pending[] = [];
+  for (const item of decoded) {
+    if (!item) continue;
+    if (seenHashes.has(item.hash)) continue;
+    seenHashes.add(item.hash);
+    const fileName = contentFileName(item.meta, item.hash);
+    const filePath = path.join(outDir, fileName);
+    pending.push({ url: item.url, sfnt: item.sfnt, filePath, meta: item.meta });
+  }
+
+  // Content-addressed name ⇒ an existing file with this name already holds
+  // the same bytes, so skip the rewrite (and the duplicate download cost on
+  // disk). Otherwise stage + atomically rename so parallel cases never
+  // observe a partial file.
+  const results = await Promise.all(pending.map(async ({ url, sfnt, filePath, meta }) => {
+    try {
       if (!fs.existsSync(filePath)) {
         await writeFileAtomic(filePath, sfnt);
       }
-      saved.push({ url, path: filePath, family: meta.family, style: meta.style });
+      return { url, path: filePath, family: meta.family, style: meta.style } as SavedFont;
     } catch (err) {
       log(`failed to save font ${url}: ${errMessage(err)}`);
+      return null;
     }
-  }
-  return saved;
+  }));
+  return results.filter((r): r is SavedFont => r !== null);
 }

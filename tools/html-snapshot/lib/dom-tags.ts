@@ -21,3 +21,14 @@ export const DROP_TAG_NAMES: readonly string[] = [
   'map', 'area', 'source', 'track', 'param',
   'form',
 ];
+
+// Pre-serialised forms of `DROP_TAG_NAMES`. The browser-side payload of both
+// the snapshot pipeline and the icon-font pre-pass reconstructs the set from
+// these literals (lower-case for `el.tagName.toLowerCase()` matching, upper-
+// case for `el.tagName` matching since DOM hands back upper-case names). They
+// are computed once at module load and reused so each call site doesn't keep
+// running `JSON.stringify(...)` and `.map(s => s.toUpperCase())` over the
+// same constant array on every payload build.
+export const DROP_TAG_NAMES_JSON: string = JSON.stringify(DROP_TAG_NAMES);
+export const DROP_TAGS_UPPER_JSON: string =
+  JSON.stringify(DROP_TAG_NAMES.map((s) => s.toUpperCase()));

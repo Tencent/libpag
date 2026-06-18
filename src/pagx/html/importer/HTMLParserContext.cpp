@@ -20,14 +20,34 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
-#include "pagx/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
 
 using namespace pagx::html;
+
+namespace {
+
+// Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
+// All importer-controlled transformer behaviour funnels through here so adding a new shared
+// option only edits one location instead of being mirrored at every parseDOM() call site.
+HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Options& opts) {
+  HTMLSubsetTransformer::Options result = {};
+  result.strict = opts.strict;
+  result.preserveUnknownElements = opts.preserveUnknownElements;
+  result.canvasWidth = opts.targetWidth;
+  result.canvasHeight = opts.targetHeight;
+  result.inferFlexFromAbsolute = opts.inferFlexFromAbsolute;
+  return result;
+}
+
+}  // namespace
 
 //==================================================================================================
 // HTMLParserContext: top-level traversal
@@ -52,6 +72,12 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
   _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
+  // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
+  // honour the caller-supplied base path here. The file entry point overrides this with
+  // the input file's parent directory.
+  if (!_options.basePath.empty()) {
+    _imageResources->setBasePath(_options.basePath);
+  }
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {
@@ -88,13 +114,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
   // through `_diagnostics` so they end up on PAGXDocument::errors once the document exists.
   if (_options.autoNormalize) {
-    HTMLSubsetTransformer::Options topts = {};
-    topts.strict = _options.strict;
-    topts.preserveUnknownElements = _options.preserveUnknownElements;
-    topts.canvasWidth = _options.targetWidth;
-    topts.canvasHeight = _options.targetHeight;
-    topts.inferFlexFromAbsolute = _options.inferFlexFromAbsolute;
-    auto report = HTMLSubsetTransformer::Transform(root, topts);
+    auto report = HTMLSubsetTransformer::Transform(root, DeriveTransformerOptions(_options));
     for (auto& diag : report.diagnostics) {
       std::string formatted = diag.message;
       if (!diag.code.empty()) {
@@ -133,7 +153,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // may live in a class rule, and resolveCanvasSize() routes through getResolvedStyle() which
   // depends on _cssClassRules / _cssElementRules being populated.
   if (head) {
-    collectStyles(head);
+    _styleCascade->collectStyles(head);
   }
 
   // Resolve the canvas size. Without one we cannot make a usable document, so this is a
@@ -218,7 +238,8 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
 }
 
 //==================================================================================================
-// Diagnostics — thin forwarders to `_diagnostics` so existing call sites keep their syntax.
+// Diagnostics — short forwarders to `_diagnostics`, kept for the very common warn/hardError
+// call sites where the unique_ptr-deref boilerplate would dominate the surrounding code.
 //==================================================================================================
 
 void HTMLParserContext::warn(const std::string& message) {
@@ -227,28 +248,6 @@ void HTMLParserContext::warn(const std::string& message) {
 
 void HTMLParserContext::hardError(const std::string& message) {
   _diagnostics->hardError(message);
-}
-
-//==================================================================================================
-// Style cascade — thin forwarders to `_styleCascade` so existing call sites keep their syntax.
-//==================================================================================================
-
-void HTMLParserContext::collectStyles(const std::shared_ptr<DOMNode>& head) {
-  _styleCascade->collectStyles(head);
-}
-
-const std::unordered_map<std::string, std::string>& HTMLParserContext::getResolvedStyle(
-    const std::shared_ptr<DOMNode>& node) {
-  return _styleCascade->getResolvedStyle(node);
-}
-
-HTMLBoxAttributes HTMLParserContext::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
-  return _styleCascade->computeBoxAttributes(element);
-}
-
-HTMLInheritedStyle HTMLParserContext::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                                            const HTMLInheritedStyle& parent) {
-  return _styleCascade->resolveInheritedStyle(element, parent);
 }
 
 //==================================================================================================
@@ -261,7 +260,7 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
   // Reuse getResolvedStyle so the body's resolved property map is parsed once and cached
   // for later computeBoxAttributes() in convertBody. This also means class rules and element rules
   // (collected just before this call) participate in canvas-size resolution.
-  const auto& props = getResolvedStyle(body);
+  const auto& props = _styleCascade->getResolvedStyle(body);
   float bodyW = _valueParser->parseAbsoluteLengthPx(LookupProperty(props, "width"));
   float bodyH = _valueParser->parseAbsoluteLengthPx(LookupProperty(props, "height"));
   bool haveBody = !std::isnan(bodyW) && !std::isnan(bodyH) && bodyW > 0 && bodyH > 0;
@@ -280,7 +279,7 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 }
 
 //==================================================================================================
-// ID handling — thin forwarders to `_idAllocator`.
+// ID assignment with animation registration hook.
 //==================================================================================================
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
@@ -288,81 +287,11 @@ void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMN
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
   if (layer != nullptr && element != nullptr) {
-    const auto& style = getResolvedStyle(element);
+    const auto& style = _styleCascade->getResolvedStyle(element);
     if (style.count("animation") > 0 || style.count("animation-name") > 0) {
       _pendingAnimations.emplace_back(element, layer);
     }
   }
-}
-
-std::string HTMLParserContext::generateUniqueId(const std::string& prefix) {
-  return _idAllocator->generateUnique(prefix);
-}
-
-bool HTMLParserContext::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  return HTMLLayerBuilder::hasBackgroundVisuals(box);
-}
-
-bool HTMLParserContext::requiresInnerHost(const HTMLBoxAttributes& box) {
-  return HTMLLayerBuilder::requiresInnerHost(box);
-}
-
-Layer* HTMLParserContext::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
-  return _layerBuilder->createInnerHost(outer, box);
-}
-
-//==================================================================================================
-// Layer-side helpers — thin forwarders to `_layerBuilder`.
-//==================================================================================================
-
-void HTMLParserContext::applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box) {
-  _layerBuilder->applySizeAndPosition(layer, box);
-}
-
-void HTMLParserContext::applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box) {
-  _layerBuilder->applyLayoutAttributes(layer, box);
-}
-
-bool HTMLParserContext::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
-  return _layerBuilder->applyBackgroundVisuals(layer, box);
-}
-
-void HTMLParserContext::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                                          const std::shared_ptr<DOMNode>& element) {
-  _layerBuilder->applyBoxTransform(layer, box, element);
-}
-
-void HTMLParserContext::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                                             const HTMLBoxAttributes& box) {
-  _layerBuilder->applyLayerAttributes(layer, element, box);
-}
-
-Element* HTMLParserContext::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
-  return _layerBuilder->buildBackgroundGeometry(box);
-}
-
-Fill* HTMLParserContext::buildSolidFill(const Color& color) {
-  return _layerBuilder->buildSolidFill(color);
-}
-
-ColorSource* HTMLParserContext::parseGradientByValue(const std::string& value) {
-  return _layerBuilder->parseGradientByValue(value);
-}
-
-Layer* HTMLParserContext::maybeSplitBoxShadowFromClip(Layer* inner) {
-  return _layerBuilder->maybeSplitBoxShadowFromClip(inner);
-}
-
-Layer* HTMLParserContext::wrapForMargin(Layer* inner, const HTMLBoxAttributes& box) {
-  return _layerBuilder->wrapForMargin(inner, box);
-}
-
-void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& textColor,
-                                               const Color& decorationColor,
-                                               bool decorationColorDiffers, float bottom,
-                                               float centerY) {
-  _layerBuilder->emitTextDecorationLine(host, textColor, decorationColor, decorationColorDiffers,
-                                        bottom, centerY);
 }
 
 //==================================================================================================
@@ -371,8 +300,8 @@ void HTMLParserContext::emitTextDecorationLine(Layer* host, const Color& textCol
 
 Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, float canvasW,
                                       float canvasH) {
-  HTMLInheritedStyle inherited = resolveInheritedStyle(body, HTMLInheritedStyle{});
-  HTMLBoxAttributes box = computeBoxAttributes(body);
+  HTMLInheritedStyle inherited = _styleCascade->resolveInheritedStyle(body, HTMLInheritedStyle{});
+  HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(body);
 
   auto layer = _document->makeNode<Layer>();
   layer->width = canvasW;
@@ -380,22 +309,22 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   layer->percentWidth = NAN;
   layer->percentHeight = NAN;
 
-  bool hasBgVisuals = hasBackgroundVisuals(box);
+  bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
-    applyBackgroundVisuals(layer, box);
+    _layerBuilder->applyBackgroundVisuals(layer, box);
   }
-  applyLayerAttributes(layer, body, box);
+  _layerBuilder->applyLayerAttributes(layer, body, box);
 
   // Hoist any `box-shadow` off the clipped layer so `overflow: hidden` does not also clip the
   // shadow. `wrapper` is `layer` when no split happens.
-  Layer* wrapper = maybeSplitBoxShadowFromClip(layer);
+  Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
   Layer* contentHost = layer;
   bool needsInnerHost = hasBgVisuals && (box.paddingSet || box.displayFlex);
   if (needsInnerHost) {
-    contentHost = createInnerHost(layer, box);
+    contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
-    applyLayoutAttributes(layer, box);
+    _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
   auto child = body->getFirstChild();
@@ -447,19 +376,19 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return layer;
   }
   if (tag == "svg") {
-    HTMLBoxAttributes box = computeBoxAttributes(element);
-    return wrapForMargin(convertInlineSvg(element, box, inherited), box);
+    HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
-    HTMLBoxAttributes box = computeBoxAttributes(element);
-    return wrapForMargin(convertImage(element, box), box);
+    HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
-  HTMLInheritedStyle childInherited = resolveInheritedStyle(element, inherited);
-  HTMLBoxAttributes box = computeBoxAttributes(element);
+  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(element, inherited);
+  HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
 
   if (IsContainerTag(tag)) {
-    return wrapForMargin(convertContainer(element, box, childInherited, depth), box);
+    return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
   }
   if (IsTextLeafTag(tag)) {
     // HTML allows mixed content: a <span> / <p> may contain inline-block children
@@ -474,9 +403,10 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       break;
     }
     if (hasBlockChild) {
-      return wrapForMargin(convertContainer(element, box, childInherited, depth), box);
+      return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth),
+                                          box);
     }
-    return wrapForMargin(convertTextLeaf(element, box, childInherited), box);
+    return _layerBuilder->wrapForMargin(convertTextLeaf(element, box, childInherited), box);
   }
   if (_options.preserveUnknownElements) {
     warn("html: unknown element '" + tag + "' preserved as placeholder");
@@ -491,18 +421,18 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
 Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& element,
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited, int depth) {
-  bool hasBgVisuals = hasBackgroundVisuals(box);
-  bool needsInner = hasBgVisuals && requiresInnerHost(box);
+  bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
+  bool needsInner = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
 
   auto layer = _document->makeNode<Layer>();
-  applySizeAndPosition(layer, box);
-  applyLayerAttributes(layer, element, box);
+  _layerBuilder->applySizeAndPosition(layer, box);
+  _layerBuilder->applyLayerAttributes(layer, element, box);
 
   if (hasBgVisuals) {
-    applyBackgroundVisuals(layer, box);
+    _layerBuilder->applyBackgroundVisuals(layer, box);
   }
 
-  applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box, element);
 
   // Must run after applyBackgroundVisuals(): the fold reuses the rounded Rectangle just
   // emitted into `layer->contents` as the image's fill geometry.
@@ -514,13 +444,13 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // cut the shadow. `wrapper` is `layer` when no split happens; both children added below
   // and the layout-host machinery continue to operate on `layer` (now potentially the
   // inner of the split).
-  Layer* wrapper = maybeSplitBoxShadowFromClip(layer);
+  Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
   Layer* contentHost = layer;
   if (needsInner) {
-    contentHost = createInnerHost(layer, box);
+    contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
-    applyLayoutAttributes(layer, box);
+    _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
   // CSS border-box: layout-flow content sits inside the border edge, so reserve the

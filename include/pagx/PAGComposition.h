@@ -30,6 +30,7 @@ class PAGTimeline;
 class PAGScene;
 class PAGXDocument;
 class Composition;
+class Node;
 struct RuntimeBinding;
 
 /**
@@ -99,6 +100,34 @@ class PAGComposition : public PAGLayer {
   // searching this composition's children and recursing into descendant composition children.
   // Returns nullptr if no persistent node owns the layer (internal sub-layer).
   std::shared_ptr<PAGLayer> findChildForLayer(const tgfx::Layer* hitLayer);
+
+ private:
+  // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
+  // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
+  // visited carries the source compositions on the current ancestor path: when this method recurses
+  // into a child composition, the child's own source is inserted before recursing and erased on
+  // return, so any newly added layer that references an ancestor composition is detected at the top
+  // of MakeChild rather than one frame deeper.
+  void refreshNodes(const std::vector<Node*>& dirtyNodes,
+                    std::unordered_set<const Composition*>& visited);
+
+  // Reconciles this composition's runtime children with the given source layer list: reuses
+  // children whose source layer still maps to a tgfx layer (handles stay valid), builds newly added
+  // layers into the binding, removes runtime children whose source layer is gone, and reorders the
+  // parent's tgfx children to match the document order. visited is the ancestor path of source
+  // compositions; the caller must include this composition's own source so MakeChild rejects a
+  // newly added layer that points back to this composition or any ancestor at the top of the call.
+  void syncChildren(const std::vector<Layer*>& sourceLayers,
+                    std::unordered_set<const Composition*>& visited);
+
+  // Rebuilds this composition's timelines from the owner layer's animation drivers, discarding any
+  // existing ones first so removed drivers or animations simply stop driving. Used at build time and
+  // when a timeline node changes. The root composition has no owner layer and spawns no timelines.
+  void spawnTimelines(const std::shared_ptr<PAGScene>& scene);
+
+  // Resets the timelines of this composition and all descendant compositions. Called when an edit
+  // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
+  void resetTimelines();
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.

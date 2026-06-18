@@ -28,6 +28,17 @@
 #include "pagx/types/Padding.h"
 #include "pagx/xml/XMLDOM.h"
 
+namespace pagx {
+
+/**
+ * Maximum nesting depth tolerated during HTML traversal. Mirrors the SVG importer. Lives here
+ * (rather than next to `HTMLBoxAttributes`) so transformer passes that have no notion of box
+ * attributes can still reach the limit through `HTMLDetail.h`.
+ */
+static constexpr int MAX_HTML_RECURSION_DEPTH = 128;
+
+}  // namespace pagx
+
 namespace pagx::html {
 
 // ----- String helpers -----------------------------------------------------------------------

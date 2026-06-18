@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLIdAllocator.h"
-#include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/xml/XMLDOM.h"

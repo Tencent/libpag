@@ -39,30 +39,14 @@
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BlurFilter.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/nodes/ConicGradient.h"
-#include "pagx/nodes/DropShadowFilter.h"
-#include "pagx/nodes/DropShadowStyle.h"
-#include "pagx/nodes/Ellipse.h"
-#include "pagx/nodes/Fill.h"
-#include "pagx/nodes/Group.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/nodes/InnerShadowStyle.h"
-#include "pagx/nodes/Layer.h"
-#include "pagx/nodes/LinearGradient.h"
-#include "pagx/nodes/RadialGradient.h"
-#include "pagx/nodes/Rectangle.h"
-#include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/Text.h"
-#include "pagx/nodes/TextBox.h"
 #include "pagx/types/Color.h"
-#include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
+
+class Image;
+class Layer;
+struct DOMNode;
+class XMLDOM;
 
 /**
  * Internal HTML parser implementation. Builds a PAGXDocument from an HTML DOM, applying
@@ -87,9 +71,6 @@ class HTMLParserContext {
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   // High-level traversal --------------------------------------------------------------
-  // CSS rule collection from `<head>`. Thin forwarder to `_styleCascade->collectStyles`.
-  void collectStyles(const std::shared_ptr<DOMNode>& head);
-
   // body / canvas size detection
   bool resolveCanvasSize(const std::shared_ptr<DOMNode>& body, float& outW, float& outH);
 
@@ -130,55 +111,11 @@ class HTMLParserContext {
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
 
-  // Style / property helpers ----------------------------------------------------------
-  // Style cascade ----------------------------------------------------------------------
-  // Thin forwarders to `_styleCascade` so existing in-class call sites keep their syntax.
-  // Implementation lives in `HTMLStyleCascade`.
-  const std::unordered_map<std::string, std::string>& getResolvedStyle(
-      const std::shared_ptr<DOMNode>& node);
-  HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
-  HTMLInheritedStyle resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLInheritedStyle& parent);
-
-  // Reads element id (or generates a unique one on collision) and assigns it to `layer`.
-  // Thin forwarder to `_idAllocator->assign` so existing call sites across the four
-  // implementation TUs keep their syntax.
+  // Reserves the element's `id` on the allocator, then records the element when it carries an
+  // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
+  // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
+  // their final outer Layer through this helper to ensure animation capture is exhaustive.
   void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
-
-  // Returns a fresh id of the form `<prefix><n>` that does not collide with any reserved id.
-  // Thin forwarder to `_idAllocator->generateUnique`.
-  std::string generateUniqueId(const std::string& prefix);
-
-  // Returns the property's resolved value, or `fallback`. Looks up inline style, class
-  // rules, element defaults (in that priority), respecting CSS rules.
-  std::string getStyleProperty(const std::shared_ptr<DOMNode>& node, const std::string& property,
-                               const std::string& fallback = "");
-
-  // Layer-side helpers ----------------------------------------------------------------
-  // Thin forwarders to `_layerBuilder` so existing in-class call sites (incl. element-conversion
-  // paths in `HTMLElementEmitter.cpp`) keep their syntax.
-  void applySizeAndPosition(Layer* layer, const HTMLBoxAttributes& box);
-  void applyLayoutAttributes(Layer* layer, const HTMLBoxAttributes& box);
-  bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
-  void applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                         const std::shared_ptr<DOMNode>& element);
-  void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                            const HTMLBoxAttributes& box);
-  Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
-  Fill* buildSolidFill(const Color& color);
-  ColorSource* parseGradientByValue(const std::string& value);
-  Layer* maybeSplitBoxShadowFromClip(Layer* inner);
-  Layer* wrapForMargin(Layer* inner, const HTMLBoxAttributes& box);
-  Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
-  void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
-                              bool decorationColorDiffers, float bottom, float centerY);
-  static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
-  static bool requiresInnerHost(const HTMLBoxAttributes& box);
-
-  // Value parsing -----------------------------------------------------------------------
-  // CSS string-to-typed-value conversion lives in `HTMLValueParser` (see member field
-  // `_valueParser`). The parser borrows `_diagnostics`, `_canvasWidth/_canvasHeight` and
-  // `_document` so callers don't have to thread the context through every call.
 
   // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
@@ -191,14 +128,9 @@ class HTMLParserContext {
   // import directive content.
   std::string serializeSvg(const std::shared_ptr<DOMNode>& svgNode);
 
-  // ID handling ------------------------------------------------------------------------
-  // (Implementation lives in `HTMLIdAllocator`; the forwarders above provide the existing
-  // call-site syntax.)
-
   // Diagnostics ------------------------------------------------------------------------
-  // Thin forwarders to `_diagnostics` for in-class call sites. Kept as members so the four
-  // implementation TUs (HTMLParserContext.cpp / HTMLStyleResolver.cpp / HTMLLayerBuilder.cpp /
-  // HTMLValueParser.cpp) need not reach across to the sink directly.
+  // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
+  // sites where the unique_ptr-deref boilerplate would dominate the surrounding code.
   void warn(const std::string& message);
   void hardError(const std::string& message);
 

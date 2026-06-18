@@ -19,6 +19,7 @@
 #include "pagx/PAGTimeline.h"
 #include <algorithm>
 #include <cstdint>
+#include "pagx/PAGScene.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -182,10 +183,21 @@ void PAGTimeline::apply(float mix) {
   if (clamped <= 0.0f) {
     return;
   }
+  // A null binding marks a top-level timeline: resolve the owning scene's current root binding now,
+  // so it tracks a runtime-tree rebuild that replaced the scene's binding. A non-null binding is a
+  // fixed composition binding co-owned with that composition.
+  RuntimeBinding* effectiveBinding = binding;
+  if (effectiveBinding == nullptr) {
+    auto scene = owner.lock();
+    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
+  }
+  if (effectiveBinding == nullptr) {
+    return;
+  }
   if (!resolved) {
     resolveTargets();
   }
-  ApplyResolved(resolvedTargets, animation, binding, currentTimeUs, clamped);
+  ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
 }
 
 bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {

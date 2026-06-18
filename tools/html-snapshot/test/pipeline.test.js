@@ -522,4 +522,204 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(result.png).toBeNull();
     expect(fs.existsSync(result.pagx)).toBe(true);
   });
+
+  test('skips render when doRender=false but resolve still runs', async () => {
+    const inputHtml = path.join(dir, 'p.html');
+    fs.writeFileSync(inputHtml, '<html></html>');
+    const fakePagx = makeFakePagx({ allowRender: false });
+    let resolveCalls = 0;
+    // Parse argv on every invocation to count the resolve runs.
+    const argvLog = path.join(dir, 'pagx.argv');
+    const wrapper = makeArgvCapturingScript({ argvPath: argvLog });
+    void wrapper;
+    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
+    const result = await runHtmlToPagx({
+      input: inputHtml,
+      outputDir: path.join(dir, 'r-out'),
+      pagxBin: fakePagx.path,
+      scriptDir: dir,
+      doRender: false,
+      snapshotImpl,
+      log: () => {},
+    });
+    expect(result.png).toBeNull();
+    expect(fs.existsSync(result.pagx)).toBe(true);
+    resolveCalls = fakePagx.callsByCmd.resolve;
+    expect(resolveCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  test('throws when pagx import succeeds but the .pagx file is not on disk', async () => {
+    const inputHtml = path.join(dir, 'q.html');
+    fs.writeFileSync(inputHtml, '<html></html>');
+    // Wrapper that returns 0 from `import` without writing the output file.
+    const wrapper = path.join(dir, 'noimport.sh');
+    fs.writeFileSync(wrapper, '#!/bin/sh\nexit 0\n');
+    fs.chmodSync(wrapper, 0o755);
+    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
+    const realErr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = () => true;
+    try {
+      await expect(runHtmlToPagx({
+        input: inputHtml,
+        outputDir: path.join(dir, 'q-out'),
+        pagxBin: wrapper,
+        scriptDir: dir,
+        snapshotImpl,
+        log: () => {},
+      })).rejects.toMatchObject({ name: 'PipelineStepError', step: 'pagx import' });
+    } finally {
+      process.stderr.write = realErr;
+    }
+  });
+
+  test('downloadFonts logs when no fonts were captured and runs font embed when faces are present', async () => {
+    const inputHtml = path.join(dir, 'fpage.html');
+    fs.writeFileSync(inputHtml, '<html></html>');
+    const fakePagx = makeFakePagx();
+
+    // Case A: empty font dir → "no web fonts were captured" log.
+    let logsA = [];
+    const snapImplA = async (a) => {
+      // The pipeline pre-creates the font dir via the snapshot child; mimic
+      // that here so collectFontFallbacks finds the directory but no entries.
+      fs.mkdirSync(a.fontDir, { recursive: true });
+      fs.writeFileSync(a.output, '<html/>');
+      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
+    };
+    await runHtmlToPagx({
+      input: inputHtml,
+      outputDir: path.join(dir, 'fa-out'),
+      pagxBin: fakePagx.path,
+      scriptDir: dir,
+      downloadFonts: true,
+      doResolve: false,
+      snapshotImpl: snapImplA,
+      log: (l) => logsA.push(l),
+    });
+    expect(logsA.some((l) => /no web fonts were captured/.test(l))).toBe(true);
+
+    // Case B: embedFonts=true with a real font dir → font-embed step runs.
+    fakePagx.callsByCmd.resolve = 0;
+    fakePagx.callsByCmd.font = 0;
+    const snapImplB = async (a) => {
+      fs.mkdirSync(a.fontDir, { recursive: true });
+      fs.writeFileSync(path.join(a.fontDir, 'Real.ttf'), 'fake');
+      fs.writeFileSync(a.output, '<html/>');
+      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
+    };
+    const result = await runHtmlToPagx({
+      input: inputHtml,
+      outputDir: path.join(dir, 'fb-out'),
+      pagxBin: fakePagx.path,
+      scriptDir: dir,
+      embedFonts: true,
+      doRender: false,
+      snapshotImpl: snapImplB,
+      log: () => {},
+    });
+    expect(result.fonts).toHaveLength(1);
+    expect(fakePagx.callsByCmd.font).toBe(1);
+  });
+
+  test('keepSubsetHtml=false writes the subset to a temp dir', async () => {
+    const inputHtml = path.join(dir, 't.html');
+    fs.writeFileSync(inputHtml, '<html></html>');
+    const fakePagx = makeFakePagx();
+    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
+    const outDir = path.join(dir, 't-out');
+    const result = await runHtmlToPagx({
+      input: inputHtml,
+      outputDir: outDir,
+      pagxBin: fakePagx.path,
+      scriptDir: dir,
+      keepSubsetHtml: false,
+      doResolve: false,
+      snapshotImpl,
+      log: () => {},
+    });
+    // The subset path leaves `outDir` (it lands in os.tmpdir()) and is rm'd at
+    // the end of the run, so it must NOT exist on disk after we return.
+    expect(result.subsetHtml).not.toContain(outDir);
+    expect(fs.existsSync(result.subsetHtml)).toBe(false);
+    // The pagx file itself stays put under the requested outputDir.
+    expect(fs.existsSync(result.pagx)).toBe(true);
+  });
+
+  test('URL inputs default outputDir to cwd and require outputName', async () => {
+    const fakePagx = makeFakePagx();
+    const cwd = process.cwd();
+    const tempCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pipeline-cwd-'));
+    process.chdir(tempCwd);
+    try {
+      const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
+      const result = await runHtmlToPagx({
+        input: 'https://example.com/p',
+        outputName: 'remote',
+        pagxBin: fakePagx.path,
+        scriptDir: dir,
+        doResolve: false,
+        snapshotImpl,
+        log: () => {},
+      });
+      expect(path.dirname(result.pagx)).toBe(fs.realpathSync(tempCwd));
+      expect(path.basename(result.pagx)).toBe('remote.pagx');
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(tempCwd, { recursive: true, force: true });
+    }
+  });
 });
+
+// ----- helpers used by the runHtmlToPagx tests above -----
+
+// Build a single fake-pagx wrapper that handles every subcommand the pipeline
+// invokes (import, resolve, font, render). Tracks per-command call counts so
+// tests can assert which steps actually ran. `allowRender: false` makes the
+// `render` subcommand exit non-zero — useful for asserting that doRender=false
+// really skips the call instead of swallowing a failure.
+function makeFakePagx({ allowRender = true } = {}) {
+  const id = Math.random().toString(36).slice(2);
+  const file = path.join(dir, `fake-pagx-${id}.sh`);
+  const log = path.join(dir, `fake-pagx-${id}.log`);
+  fs.writeFileSync(file, [
+    '#!/bin/sh',
+    'cmd="$1"; shift',
+    `printf '%s\\n' "$cmd" >> ${JSON.stringify(log)}`,
+    'out=""',
+    'while [ "$#" -gt 0 ]; do',
+    '  case "$1" in',
+    '    --output) out="$2"; shift;;',
+    '  esac',
+    '  shift',
+    'done',
+    'case "$cmd" in',
+    '  import) [ -n "$out" ] && echo -n "<pag/>" > "$out" ;;',
+    '  resolve) : ;;',
+    '  font) : ;;',                          // font-embed: subcommand is `font embed`
+    `  render) ${allowRender ? '[ -n "$out" ] && echo -n "PNG" > "$out"' : 'exit 99'} ;;`,
+    'esac',
+  ].join('\n'));
+  fs.chmodSync(file, 0o755);
+  // Read the per-command call counts on demand from the wrapper's log file.
+  // Returning a Proxy lets tests reset a specific count by assigning 0; the
+  // assignment truncates the on-disk log so the next read returns the fresh
+  // state. (We don't allow setting non-zero values — tests don't need that.)
+  const handle = {
+    path: file,
+    get callsByCmd() {
+      const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '';
+      const out = { import: 0, resolve: 0, font: 0, render: 0 };
+      for (const line of text.split('\n')) {
+        if (line && Object.prototype.hasOwnProperty.call(out, line)) out[line]++;
+      }
+      return new Proxy(out, {
+        set(target, prop, val) {
+          target[prop] = val;
+          if (val === 0) fs.writeFileSync(log, '');
+          return true;
+        },
+      });
+    },
+  };
+  return handle;
+}

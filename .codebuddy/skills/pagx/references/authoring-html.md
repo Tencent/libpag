@@ -87,8 +87,8 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 ## 7. Charts
 
 - Chart libraries that draw on `<canvas>` (ECharts, Chart.js, D3-canvas) are captured as a static
-  bitmap, so charts survive as a picture. Give the page enough settle time if the chart animates in
-  (`--wait-ms`, see `pipeline.md`).
+  bitmap, so charts survive as a picture. If the chart animates in, give the page enough settle time
+  by raising the converter's `--wait-ms` option.
 - SVG-based charts (many D3 setups) convert as vectors, which is sharper — prefer them when
   available.
 

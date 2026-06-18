@@ -54,6 +54,24 @@ function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 }
 
+// Recursively delete every *.map file under `dir`. Source maps are never needed
+// at runtime; shipping them only bloats the published package. Returns the
+// number of files removed.
+function stripSourceMaps(dir) {
+  if (!fs.existsSync(dir)) return 0;
+  let removed = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      removed += stripSourceMaps(full);
+    } else if (entry.name.endsWith('.map')) {
+      fs.rmSync(full);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 function main() {
   if (!fs.existsSync(TOOL_DIR)) {
     die(`source tool not found at ${TOOL_DIR}`);
@@ -80,6 +98,11 @@ function main() {
   // 3. Copy the CLI driver and the compiled output.
   fs.copyFileSync(path.join(TOOL_DIR, 'snapshot.js'), path.join(DEST_DIR, 'snapshot.js'));
   fs.cpSync(distDir, path.join(DEST_DIR, 'dist'), { recursive: true });
+
+  // 3a. Strip the compiled TypeScript source maps. Their `sources` point at the
+  //     original `.ts` files (e.g. ../../lib/errors.ts) which are not shipped,
+  //     so the maps are dead weight for an installed package — drop them.
+  say(`stripped ${stripSourceMaps(path.join(DEST_DIR, 'dist'))} TypeScript source map(s) from dist/`);
 
   // 4. Generate a minimal package.json pinning only the pure-JS runtime deps.
   const toolPkg = JSON.parse(fs.readFileSync(path.join(TOOL_DIR, 'package.json'), 'utf8'));
@@ -111,6 +134,10 @@ function main() {
 
   // Drop the generated lockfile if npm wrote one despite --no-package-lock.
   fs.rmSync(path.join(DEST_DIR, 'package-lock.json'), { force: true });
+
+  // 6. Strip source maps the runtime deps ship (e.g. opentype.js's ~2 MB of
+  //    *.map). They are never used at runtime and only bloat the package.
+  say(`stripped ${stripSourceMaps(path.join(DEST_DIR, 'node_modules'))} source map(s) from node_modules/`);
 
   say('done');
 }

@@ -179,19 +179,48 @@ function parseServerArgs(argv) {
   return opts;
 }
 
+// How long the server will wait for the next chunk of an in-flight POST
+// body. Node's default has no idle timeout on the request stream, so a
+// "slowloris"-style client that sends one byte every 30 seconds could pin
+// a connection (and the browser pipeline behind it) indefinitely. 30 s is
+// generous enough for a stalled WAN burst yet short enough to free the
+// socket before the request piles up against `activeRequests`.
+const REQUEST_IDLE_TIMEOUT_MS = 30000;
+
 // Read the full request body, rejecting once the cumulative size exceeds
 // `maxBytes`. Node's `http` doesn't enforce body limits by default, so a
 // runaway POST would otherwise pin RAM until the browser pipeline blew up
 // further downstream.
 //
-// When the limit is hit, we *drain* the rest of the body instead of
+// When the size limit is hit, we *drain* the rest of the body instead of
 // destroying the request. Destroying mid-flight leaves the client with a
 // "Connection reset by peer" — readers see no status line at all. Draining
 // keeps the connection alive long enough to flush a proper 413 from
 // handleSnapshot. The cost is a few wasted bytes on the socket; the
 // upside is a clean error contract over the wire.
+//
+// An idle timeout is enforced on the underlying socket so a slow/silent
+// client cannot hold the connection (and one slot of `activeRequests`)
+// open forever. Once the body finishes (or the limit is hit and we drain)
+// the timeout is reset to zero so keep-alive connections aren't disturbed.
 function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      if (req.socket) req.socket.setTimeout(0);
+      fn(value);
+    };
+    if (req.socket) {
+      req.socket.setTimeout(REQUEST_IDLE_TIMEOUT_MS);
+      req.socket.once('timeout', () => {
+        // Destroy here — by definition the client has gone silent, so
+        // there is no clean response path to keep alive.
+        req.destroy();
+        settle(reject, new HttpError(408, `request body idle for ${REQUEST_IDLE_TIMEOUT_MS}ms`));
+      });
+    }
     // Honor an advisory Content-Length first so a 100 GB POST doesn't
     // have to dribble the whole payload before we say no.
     const declared = Number(req.headers['content-length']);
@@ -199,8 +228,8 @@ function readBody(req, maxBytes) {
       // Still consume the body so the keep-alive socket can be reused
       // (otherwise some clients hang waiting for FIN).
       req.resume();
-      req.on('end', () => reject(new HttpError(413, `request body exceeds ${maxBytes} bytes`)));
-      req.on('error', reject);
+      req.on('end', () => settle(reject, new HttpError(413, `request body exceeds ${maxBytes} bytes`)));
+      req.on('error', (err) => settle(reject, err));
       return;
     }
     let total = 0;
@@ -220,12 +249,12 @@ function readBody(req, maxBytes) {
     });
     req.on('end', () => {
       if (overflow) {
-        reject(new HttpError(413, `request body exceeds ${maxBytes} bytes`));
+        settle(reject, new HttpError(413, `request body exceeds ${maxBytes} bytes`));
       } else {
-        resolve(Buffer.concat(chunks));
+        settle(resolve, Buffer.concat(chunks));
       }
     });
-    req.on('error', reject);
+    req.on('error', (err) => settle(reject, err));
   });
 }
 

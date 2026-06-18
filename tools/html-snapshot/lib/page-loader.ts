@@ -15,6 +15,7 @@ import {
   mapWaitUntil,
   addCookies,
   addInitScript,
+  waitForNetworkIdle,
   type Browser,
   type BrowserResponse,
   type CookieParam,
@@ -30,6 +31,36 @@ import {
 // function would just toString() back to the same value on every call.
 const ROOT_HAS_CHILDREN_SCRIPT =
   'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
+
+// Many corpus pages mount a React app via `@babel/standalone` loaded from a CDN
+// with `<script type="text/babel" data-presets="react">`. Recent Babel releases
+// flipped `@babel/preset-react`'s default `runtime` from `classic` to
+// `automatic`. Under the automatic runtime JSX compiles to
+// `import { jsx } from "react/jsx-runtime"`, and Babel injects that output as a
+// plain (non-module) <script>, so the browser throws "Cannot use import
+// statement outside a module" — the app never mounts and the body collapses to
+// zero height. We can't pin the CDN version, so force the classic runtime by
+// wrapping the `react` preset before Babel's DOMContentLoaded transform runs.
+// Registering the listener from an init script (document_start) guarantees it
+// fires before Babel's own handler, and the patch is a no-op on pages that
+// never define `window.Babel`.
+const BABEL_CLASSIC_RUNTIME_SHIM = `(function () {
+  function patch() {
+    try {
+      var B = window.Babel;
+      var preset = B && B.availablePresets && B.availablePresets.react;
+      if (typeof preset !== 'function' || preset.__classicRuntimePatched) return;
+      var wrapped = function (api, opts) {
+        opts = opts || {};
+        if (opts.runtime === undefined) opts.runtime = 'classic';
+        return preset(api, opts);
+      };
+      wrapped.__classicRuntimePatched = true;
+      B.availablePresets.react = wrapped;
+    } catch (e) { /* leave the page untouched if Babel's shape changed */ }
+  }
+  document.addEventListener('DOMContentLoaded', patch, true);
+})();`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ConsoleListener = (msg: any) => void;
@@ -91,6 +122,9 @@ export async function openAndSettlePage(
   // inline scripts see the helper bundles already on `window`. Each entry
   // is a self-contained source string (callers prepare it with
   // `windowAttachScript` from lib/browser-snapshot.ts / lib/icon-font.ts).
+  // Always register the Babel classic-runtime shim first so it is in place
+  // before any caller-supplied init scripts and before the page's own scripts.
+  await addInitScript(page, engine, BABEL_CLASSIC_RUNTIME_SHIM);
   for (const script of initScripts) {
     if (script) await addInitScript(page, engine, script);
   }
@@ -107,7 +141,50 @@ export async function openAndSettlePage(
     await addCookies(page, engine, scoped);
   }
 
-  await page.goto(url, { waitUntil: mapWaitUntil(engine, 'networkidle'), timeout: 30000 });
+  // Navigate gating on `load` (document + all subresources fetched), not
+  // `networkidle`. `networkidle` is fragile: it resolves only after the
+  // network stays quiet for ~500ms, which is easily defeated by pages that
+  // keep connections open or stream a long tail of external requests (CDN
+  // keep-alive, Google Fonts, icon webfonts, the Tailwind Play CDN, image
+  // hosts). Worse, when many pages load concurrently the shared CDNs saturate
+  // and even reaching `<body>` can blow past the 30s deadline — a
+  // parser-blocking `<script src="cdn…">` placed after slow stylesheets stalls
+  // the parser, so the timeout fallback would see no body and fail the whole
+  // render. `load` is reliable under that contention and guarantees a body.
+  try {
+    await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: 30000 });
+  } catch (err) {
+    // A navigation *timeout* should still not fail the whole render: the
+    // document is usually parsed and painted well before every last subresource
+    // resolves, so fall back to whatever is rendered as long as a body exists
+    // and let the waitForRoot + waitMs steps below give async apps time to
+    // mount. Anything that is not a timeout (a genuinely broken navigation) is
+    // re-thrown.
+    const msg = err && (err as Error).message ? (err as Error).message : String(err);
+    if (!/timeout/i.test(msg)) throw err;
+    let hasBody = await page.evaluate(() => !!document.body).catch(() => false);
+    if (!hasBody) {
+      // No `<body>` yet usually means a parser-blocking `<script src="cdn…">`
+      // queued behind slow external stylesheets stalled the HTML parser before
+      // it reached `<body>` (common under high concurrency when shared CDNs are
+      // saturated). The document is still live — give the parser a bounded
+      // extra window to finish rather than failing the whole render, then
+      // re-check. Only if the body never materialises is this a genuine dead
+      // navigation worth re-throwing.
+      hasBody = await page
+        .waitForSelector('body', { timeout: 15000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!hasBody) throw err;
+    }
+  }
+
+  // Best-effort settle: give the network a short, bounded chance to go quiet so
+  // late `@font-face` fetches and SPA XHRs land before we screenshot. This is
+  // non-fatal — `waitForNetworkIdle` resolves either way — so a chatty CDN only
+  // costs the settle budget instead of failing navigation the way a
+  // `networkidle`-gated `goto` would.
+  await waitForNetworkIdle(page, engine, 5000);
 
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });

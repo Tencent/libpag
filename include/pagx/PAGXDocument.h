@@ -35,9 +35,10 @@ class LayoutContext;
 class PAGScene;
 
 /**
- * PAGXDocument is the root container for a PAGX document.
- * It contains resources and layers. This is a pure data structure class.
- * Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and
+ * font configuration of a parsed/authored document, and tracks the live PAGScene instances
+ * created from it so post-build edits issued through `notifyChange()` can be broadcast to
+ * each scene. Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
@@ -146,10 +147,6 @@ class PAGXDocument : public Node {
    * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
    * so glyph-level fallback can pick them up at layout time). Callers may also register
    * additional typefaces or fallbacks directly before invoking `applyLayout`.
-   *
-   * Note: `applyLayout(const FontConfig*)` with a non-null argument REPLACES this config
-   * wholesale. Pass `nullptr` (or merge the contents of this config into your own first)
-   * to preserve importer-injected fallback fonts across the layout call.
    */
   FontConfig& fontConfig() {
     return fontConfig_;
@@ -160,15 +157,16 @@ class PAGXDocument : public Node {
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
-   * constraints. Must be called before rendering or font embedding. This method should only
-   * be called once per document — repeated calls may produce incorrect results because
-   * measurement data is cached and some layout operations permanently modify source geometry.
+   * constraints. Must be called before rendering or font embedding. Re-running layout on an
+   * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
+   * reset branch discards the cached layout outputs first so nodes are re-measured from their
+   * current fields.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
-   *                   REPLACES the internal config (importer-injected fallback fonts on the
-   *                   internal config are discarded — merge them in via `fontConfig()` first
-   *                   if you want them preserved). Pass nullptr to use the previously set
-   *                   config, which is the right choice for HTML-imported documents that
-   *                   want to keep the importer's fallback stack.
+   *                   its typefaces and fallback fonts are MERGED into the internal config —
+   *                   importer-injected fallback fonts (e.g. from the HTML importer) are
+   *                   preserved, and the caller's entries layer on top with caller-supplied
+   *                   registered typefaces winning on key conflicts. Pass nullptr to use the
+   *                   internal config unchanged.
    */
   void applyLayout(const FontConfig* fontConfig = nullptr);
 
@@ -195,14 +193,40 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Performs internal bookkeeping for live PAGScene instances created from this document after the
-   * given nodes have been mutated. Currently this only prunes expired live-scene references; it
-   * does not yet rebuild or refresh any rendered content. Runtime rebuild dispatch to live scenes
-   * is not implemented yet.
-   * @param dirtyNodes the nodes whose fields were mutated. Pointers must reference nodes still
-   * owned by this document. Null entries are ignored. Passing an empty list is a no-op.
+   * Reflects post-build edits to the given nodes in every scene created from this document, while
+   * preserving existing layer handles wherever possible. Pass a container node to reflect changes
+   * to its child list; editing an animation, animation object, or channel applies the new timeline
+   * data to subsequent playback.
+   *
+   * When an edit changes a node's "@id" reference (e.g. AnimationObject.target, Fill.color), mark
+   * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
+   * refreshes the nodes it is given.
+   *
+   * Editing an external composition: call notifyChange on the document that owns the edited nodes.
+   * Scenes that embed this document as an external composition are refreshed automatically. A node
+   * may only be notified through its owning document; foreign nodes (e.g. a node owned by a child
+   * externalDoc when notifyChange is called on the parent) are skipped, leaving the rest of the
+   * dirty list to refresh as usual. Use ownsNode() if the caller does not statically know which
+   * document owns a given node.
+   * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Pointers must reference
+   * nodes still owned by this document. Null entries and foreign nodes are skipped. Passing an
+   * empty list (or one whose entries are all skipped) is a no-op.
+   * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
+   * fonts, text, geometry) or a child list changed. Pass true to re-run layout before refreshing;
+   * pass false for a cheaper render-only refresh, only safe for edits that do not affect layout
+   * (e.g. alpha, color). Callers that mutate via SetNodeChannel can derive the right value from
+   * RequiresLayout(NodeType, channel); structural add/remove must pass true.
    */
-  void notifyChange(const std::vector<Node*>& dirtyNodes);
+  void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged);
+
+  /**
+   * Returns true if the node belongs to this document. A node belongs to exactly one document;
+   * passing a node owned by a different document to notifyChange has no effect on this document's
+   * scenes. Use this to dispatch a multi-document edit to the right owners, or to validate a node's
+   * origin before notifying.
+   * @param node the node to check; null returns false.
+   */
+  bool ownsNode(const Node* node) const;
 
   NodeType nodeType() const override {
     return NodeType::Document;
@@ -235,6 +259,7 @@ class PAGXDocument : public Node {
   friend class PAGXExporter;
   friend class TextLayoutContext;
   friend class PAGScene;
+  friend class PAGComposition;
 };
 
 }  // namespace pagx

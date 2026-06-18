@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/HTMLSubsetTransformer.h"
+#include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -107,8 +107,9 @@ class HTMLTransformContext {
 };
 
 /**
- * Base class for transformer pipeline stages. Forward-declared in `pagx/HTMLSubsetTransformer.h`
- * to keep the public header thin; full definition lives here.
+ * Base class for transformer pipeline stages. Forward-declared in `HTMLSubsetTransformer.h`
+ * (sibling internal header) so `Builder::addPass` can take a `unique_ptr<HTMLTransformPass>`
+ * without pulling the full pass-context dependency in; full definition lives here.
  */
 class HTMLTransformPass {
  public:

@@ -116,4 +116,48 @@ describe('saveDownloadedImages', () => {
     const saved = await saveDownloadedImages(map, outDir);
     expect(saved).toEqual([]);
   });
+
+  test('reuses an existing on-disk file (skips the rewrite)', async () => {
+    const map = new Map([['https://x/a.png', { buffer: PNG, contentType: 'image/png' }]]);
+    const first = await saveDownloadedImages(map, outDir);
+    expect(first).toHaveLength(1);
+    fs.writeFileSync(first[0].path, 'REPLACED');
+    const second = await saveDownloadedImages(map, outDir);
+    expect(second).toHaveLength(1);
+    expect(second[0].path).toBe(first[0].path);
+    expect(fs.readFileSync(first[0].path, 'utf8')).toBe('REPLACED');
+  });
+
+  test('logs and drops images whose write fails', async () => {
+    const logs = [];
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.chmodSync(outDir, 0o500);
+    try {
+      const map = new Map([['https://x/locked.png', { buffer: PNG, contentType: 'image/png' }]]);
+      const saved = await saveDownloadedImages(map, outDir, (m) => logs.push(m));
+      expect(saved).toEqual([]);
+      expect(logs.join('\n')).toMatch(/failed to save image/);
+    } finally {
+      fs.chmodSync(outDir, 0o700);
+    }
+  });
+});
+
+describe('baseNameFromUrl — odd URLs', () => {
+  const { baseNameFromUrl: bnfu } = require('../dist/lib/image-download');
+
+  test('extracts the basename from a URL whose path is segmented', () => {
+    expect(bnfu('https://cdn.example/a/b/c/Photo-1.PNG?v=2')).toBe('Photo-1');
+  });
+
+  test('handles a malformed URL via the fallback branch', () => {
+    // Invalid scheme syntax — `new URL(...)` throws; the catch picks up
+    // `path.basename(...)` on the raw input instead.
+    expect(bnfu('://nope/abc.png')).toBe('abc');
+  });
+
+  test('returns "image" for a falsy / empty url', () => {
+    expect(bnfu('')).toBe('image');
+    expect(bnfu(undefined)).toBe('image');
+  });
 });
