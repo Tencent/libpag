@@ -300,8 +300,8 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   std::unordered_set<std::string> chain = {};
   std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
   std::unordered_set<PAGXDocument*> layoutDirtyDocs = {};
-  bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes,
-                                   layoutDirtyDocs);
+  bool found =
+      LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes, layoutDirtyDocs);
   if (found) {
     for (auto& entry : docDirtyNodes) {
       entry.first->notifyChange(entry.second,

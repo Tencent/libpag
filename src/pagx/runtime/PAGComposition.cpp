@@ -86,7 +86,8 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   // returns an empty root. Build a minimal tgfx slot layer so the PAGComposition has a valid
   // runtimeLayer for syncChildren to attach children into later.
   if (composition->runtimeLayer == nullptr) {
-    composition->runtimeLayer = LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get());
+    composition->runtimeLayer =
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get());
   }
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
