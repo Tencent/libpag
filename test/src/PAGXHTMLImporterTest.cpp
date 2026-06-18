@@ -2520,6 +2520,103 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
   EXPECT_FALSE(wrapper->children.empty());
 }
 
+// Snapshot pipeline pattern: the html-snapshot tool wraps every replaced element
+// in an extra `<div>` (see `renderBoxedReplaced` in `tools/html-snapshot/lib/
+// browser-snapshot.ts`) so border overlays can be hosted alongside the image.
+// When the authored CSS already wraps the `<img>` in a `border-radius;overflow:
+// hidden` round-clip, the resulting subset HTML has the round-clip wrapper, the
+// snapshot wrapper, and the image stacked three deep. The fold has to skip the
+// transparent layout-only wrapper(s) and still recognise the round-clip pattern
+// — otherwise rounded avatars render as squares.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsThroughLayoutOnlyDiv) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px;overflow:hidden">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  EXPECT_FALSE(wrapper->clipToBounds);
+  auto* rect = FindElementOfType<pagx::Rectangle>(wrapper);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_GT(rect->roundness, 0.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_NE(pattern->image->filePath.find("avatar.png"), std::string::npos);
+}
+
+// Two stacked layout-only wrappers between the round-clip container and the
+// `<img>` still fold — covers authored markup that adds an extra positioning
+// `<div>` on top of the snapshot wrapper.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsThroughTwoLayoutOnlyDivs) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px">
+          <div style="position:absolute;left:0;top:0;width:64px;height:64px;overflow:hidden">
+            <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+          </div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  EXPECT_FALSE(wrapper->clipToBounds);
+  auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+  ASSERT_NE(fill, nullptr);
+  ASSERT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+}
+
+// Negative: the intermediate wrapper must be visually transparent. A
+// `background-color` on it would paint a square fill that the rounded outer
+// outline cannot clip in PAGX (the only clip primitive is rectangular), so the
+// fold must keep the standard nested layout in that case.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithBackground) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:64px;height:64px;background-color:#000">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->children.empty());
+}
+
+// Negative: an intermediate wrapper that does not exactly cover the outer
+// content box would shift the image out from under the rounded outline. The
+// fold has to bail so the image renders inside its own child layer at the
+// authored position.
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithSizeMismatch) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;width:48px;height:48px">
+          <img src="avatar.png" style="position:absolute;left:0;top:0;width:48px;height:48px"/>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->children.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RepeatedImageSourceDeduplicated) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:80px">
