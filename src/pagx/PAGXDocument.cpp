@@ -114,7 +114,7 @@ static bool LoadFileDataInChain(
     PAGXDocument* root, PAGXDocument* document, const std::string& filePath,
     std::shared_ptr<Data> data, std::unordered_set<std::string>& chain,
     std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes,
-    bool& needsLayout) {
+    std::unordered_set<PAGXDocument*>& layoutDirtyDocs) {
   bool found = false;
   // First pass is read-only over nodes: handle Image nodes inline (they never append to nodes) and
   // snapshot Layer pointers. Layer resolution must be deferred because LoadExternalComposition calls
@@ -137,7 +137,7 @@ static bool LoadFileDataInChain(
     bool loadedComposition = LoadExternalComposition(root, document, layer, filePath, data, chain);
     if (loadedComposition) {
       docDirtyNodes[document].push_back(layer);
-      needsLayout = true;
+      layoutDirtyDocs.insert(document);
       found = true;
     }
     if (!loadedComposition && layer->externalDoc != nullptr) {
@@ -147,7 +147,7 @@ static bool LoadFileDataInChain(
       // an ancestor's marker. insert().second is true exactly when this frame added the path.
       bool inserted = chain.insert(layer->compositionFilePath).second;
       found = LoadFileDataInChain(root, layer->externalDoc.get(), filePath, data, chain,
-                                  docDirtyNodes, needsLayout) ||
+                                  docDirtyNodes, layoutDirtyDocs) ||
               found;
       if (inserted) {
         chain.erase(layer->compositionFilePath);
@@ -299,12 +299,13 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   }
   std::unordered_set<std::string> chain = {};
   std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
-  bool needsLayout = false;
+  std::unordered_set<PAGXDocument*> layoutDirtyDocs = {};
   bool found = LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes,
-                                   needsLayout);
+                                   layoutDirtyDocs);
   if (found) {
     for (auto& entry : docDirtyNodes) {
-      entry.first->notifyChange(entry.second, needsLayout);
+      entry.first->notifyChange(entry.second,
+                                layoutDirtyDocs.find(entry.first) != layoutDirtyDocs.end());
     }
   }
   return found;
