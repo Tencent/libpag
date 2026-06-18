@@ -1,8 +1,16 @@
 {
-  "name": "pagx-viewer",
-  "version": "1.0.0",
-  "description": "PAGX File Viewer",
+  "name": "@tencent/pagx-viewer-miniprogram",
+  "version": "1.9.6",
+  "description": "PAGX Viewer for WeChat Miniprogram",
   "type": "module",
+  "main": "lib/pagx-viewer.js",
+  "typings": "types/pagx/wechat/ts/pagx.d.ts",
+  "files": [
+    "lib",
+    "types",
+    "CHANGELOG.md",
+    "GETTING_STARTED.md"
+  ],
   "scripts": {
     "clean": "rimraf --glob .pagx-viewer.wasm.md5",
     "build:js": "rollup -c ./script/rollup.wx.js &&  node script/copy-files.js  &&  tsc -p ./tsconfig.type.json ",

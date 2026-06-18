@@ -17,8 +17,9 @@ pagx/wechat/
 ├── wasm/                # Raw CMake output (pagx-viewer.wasm, pagx-viewer.js)
 ├── lib/                 # Final bundled JS + compressed wasm (.br)
 ├── wx_demo/             # Sample WeChat Mini Program consuming the viewer
-├── pagx-viewer-miniprogram/  # Stand-alone mini program package
-└── package.json
+├── GETTING_STARTED.md   # Quick-start guide and full API reference for consumers
+├── CHANGELOG.md         # Release history
+└── package.json         # Build config + npm publish config
 ```
 
 ## Prerequisites

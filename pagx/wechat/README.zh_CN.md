@@ -17,8 +17,9 @@ pagx/wechat/
 ├── wasm/                # CMake 原始产物（pagx-viewer.wasm、pagx-viewer.js）
 ├── lib/                 # 打包后的 JS 与压缩 wasm（.br）
 ├── wx_demo/             # 使用 viewer 的小程序示例
-├── pagx-viewer-miniprogram/  # 独立的小程序分包
-└── package.json
+├── GETTING_STARTED.md   # 快速开始指南与完整 API 参考
+├── CHANGELOG.md         # 版本发布历史
+└── package.json         # 构建配置 + npm 发布配置
 ```
 
 ## 环境要求
