@@ -63,6 +63,13 @@ class PAGLayer {
   std::string name() const;
 
   /**
+   * Returns the unique identifier of the source node this layer was built from, matching the node's
+   * "id" attribute in the PAGX document. Returns an empty string if the source node has no id (for
+   * example, the root composition or a node created without one).
+   */
+  std::string id() const;
+
+  /**
    * Returns the matrix that maps this layer's local coordinate space to the surface coordinate
    * space, reflecting the layer's current on-screen position (including any animation applied so
    * far). Use it to map points or bounds from the layer onto the surface. Returns the identity

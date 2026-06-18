@@ -311,12 +311,6 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
     }
   }
 
-  char qtResourceCmd[cmdBufSize] = {0};
-  CopyQtResource(qtResourceCmd, sizeof(qtResourceCmd));
-  if (strlen(qtResourceCmd) > 0) {
-    adminCommands << QString::fromUtf8(qtResourceCmd).trimmed();
-  }
-
   if (adminCommands.isEmpty()) {
     return userPluginSuccess;
   }
@@ -351,14 +345,6 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 
   QString fullCommand = adminCommands.join(" && ");
   return executeWithPrivileges(fullCommand);
-}
-
-void PluginInstaller::CopyQtResource(char cmd[], int cmdSize) const {
-  NSString* copyQtShellPath = [[NSBundle mainBundle] pathForResource:@"copy_qt_resource"
-                                                              ofType:@"sh"];
-  if (copyQtShellPath != nil) {
-    snprintf(cmd + strlen(cmd), cmdSize - strlen(cmd), "sh '%s'\n", [copyQtShellPath UTF8String]);
-  }
 }
 
 void PluginInstaller::DeleteQtResource(char cmd[], int cmdSize) const {
