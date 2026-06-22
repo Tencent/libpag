@@ -1063,6 +1063,7 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
+      _result.binding.setWriter(node, "color", WritePainterColor<tgfx::FillStyle>);
       _result.binding.setWriter(
           node, "alpha",
           WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>);
@@ -1106,6 +1107,7 @@ class LayerBuilderContext {
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
     }
+    _result.binding.setWriter(node, "color", WritePainterColor<tgfx::StrokeStyle>);
     _result.binding.setWriter(node, "width",
                               WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
                                               &tgfx::StrokeStyle::setStrokeWidth>);
@@ -1128,6 +1130,22 @@ class LayerBuilderContext {
       return;
     }
     auto* solid = static_cast<tgfx::SolidColor*>(object);
+    auto target = ToTGFX(*v);
+    solid->setColor(MixTGFXColor(solid->color(), target, mix));
+  }
+
+  template <typename PainterType>
+  static void WritePainterColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* painter = static_cast<PainterType*>(object);
+    auto colorSource = painter->colorSource();
+    auto* solid = static_cast<tgfx::SolidColor*>(colorSource.get());
+    if (solid == nullptr) {
+      return;
+    }
     auto target = ToTGFX(*v);
     solid->setColor(MixTGFXColor(solid->color(), target, mix));
   }
