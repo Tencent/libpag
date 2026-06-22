@@ -129,6 +129,7 @@ class PAGAnimator {
             Log.e("libpag", "PAGAnimator.play() The scale of animator duration is turned off!");
             Listener listener = weakListener.get();
             if (listener != null) {
+                listener.onAnimationStart(this);
                 listener.onAnimationUpdate(this);
                 listener.onAnimationEnd(this);
             }
