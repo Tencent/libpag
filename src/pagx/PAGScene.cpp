@@ -176,7 +176,7 @@ void PAGScene::buildNestedViewModels(PAGComposition* rootComp) {
       }
       if (!compSchema->dataBinds.empty())
         childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),
-                                         childComp->binding.get(), document.get());
+                                         childComp->binding.get(), childComp->document);
     }
     buildNestedViewModels(childComp);
   }
