@@ -395,4 +395,20 @@ void PAGComposition::refreshPlainContainerChildren(
   }
 }
 
+std::shared_ptr<PAGViewModel> PAGComposition::viewModel() {
+  return compositionViewModel;
+}
+
+void PAGComposition::updateDataBinds(float mix) {
+  if (dataBindRuntime != nullptr) {
+    dataBindRuntime->syncBack(binding.get());
+    dataBindRuntime->update(binding.get(), mix);
+  }
+  for (auto& child : children) {
+    if (child != nullptr && child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->updateDataBinds(mix);
+    }
+  }
+}
+
 }  // namespace pagx

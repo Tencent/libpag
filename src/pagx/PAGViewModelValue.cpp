@@ -128,6 +128,7 @@ void PAGViewModelValueString::value(const std::string& v) {
   } else {
     notifyObservers();
   }
+  notifyDependents();
 }
 
 void PAGViewModelValueBoolean::value(bool v) {

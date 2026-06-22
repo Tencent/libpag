@@ -195,6 +195,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 
+  bool suppressNotify = false;
+  std::vector<PAGViewModelValue*> pendingNotifications = {};
+
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 

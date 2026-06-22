@@ -42,6 +42,7 @@ namespace pagx {
 class DataBindRuntime {
  public:
   DataBindRuntime() = default;
+  ~DataBindRuntime();
 
   void bind(const std::vector<DataBind*>& binds, DataContext* context,
             RuntimeBinding* binding, PAGXDocument* doc);

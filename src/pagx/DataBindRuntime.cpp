@@ -35,6 +35,16 @@
 
 namespace pagx {
 
+// ---- Destructor — cleanup dependents ---------------------------------------
+
+DataBindRuntime::~DataBindRuntime() {
+  for (auto& entry : entries) {
+    if (entry.source != nullptr) {
+      entry.source->removeDependent(this);
+    }
+  }
+}
+
 // ---- Source path parsing -----------------------------------------------------
 
 static std::vector<std::string> parseSourcePath(const std::string& source) {
