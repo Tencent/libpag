@@ -1063,7 +1063,9 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
-      _result.binding.setWriter(node, "color", WritePainterColor<tgfx::FillStyle>);
+      if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+        _result.binding.setWriter(node, "color", WritePainterColor<tgfx::FillStyle>);
+      }
       _result.binding.setWriter(
           node, "alpha",
           WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>);
@@ -1107,7 +1109,9 @@ class LayerBuilderContext {
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
     }
-    _result.binding.setWriter(node, "color", WritePainterColor<tgfx::StrokeStyle>);
+    if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+      _result.binding.setWriter(node, "color", WritePainterColor<tgfx::StrokeStyle>);
+    }
     _result.binding.setWriter(node, "width",
                               WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
                                               &tgfx::StrokeStyle::setStrokeWidth>);
