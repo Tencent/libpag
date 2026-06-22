@@ -22,6 +22,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/Fill.h"
@@ -1402,6 +1403,64 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataReflectsSchema) {
   auto& custom = pd->customData();
   EXPECT_EQ(custom.at("min"), "0");
   EXPECT_EQ(custom.at("max"), "200");
+}
+
+// ========== Nested composition DataBind ==========
+
+PAGX_TEST(PAGXViewModelTest, VMContextConnection) {
+  // Verify that vmContext on a Layer correctly connects the parent ViewModel's
+  // ViewModel-typed property to the child composition's ViewModel instance.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // Root VM with a ViewModel-typed property.
+  auto* rootVM = doc->makeNode<pagx::ViewModel>("RootVM");
+  auto* vmSlot = doc->makeNode<pagx::ViewModelProperty>();
+  vmSlot->name = "childSlot";
+  vmSlot->propertyType = pagx::ViewModelPropertyType::ViewModel;
+  rootVM->properties.push_back(vmSlot);
+  doc->viewModel = rootVM;
+
+  // Child composition with its own ViewModel.
+  auto* childComp = doc->makeNode<pagx::Composition>("ChildComp");
+  childComp->width = 200;
+  childComp->height = 200;
+  auto* childVM = doc->makeNode<pagx::ViewModel>("ChildVM");
+  auto* childProp = doc->makeNode<pagx::ViewModelProperty>();
+  childProp->name = "label";
+  childProp->propertyType = pagx::ViewModelPropertyType::String;
+  childProp->defaultString = "hello";
+  childVM->properties.push_back(childProp);
+  childComp->viewModel = childVM;
+
+  auto childLayer = doc->makeNode<pagx::Layer>("childText");
+  childLayer->width = 200;
+  childLayer->height = 200;
+  childComp->layers.push_back(childLayer);
+
+  // Root layer that references the child composition with vmContext set.
+  auto rootLayer = doc->makeNode<pagx::Layer>("rootLayer");
+  rootLayer->width = 200;
+  rootLayer->height = 200;
+  rootLayer->composition = childComp;
+  rootLayer->vmContext = "$vm.childSlot";
+  doc->layers.push_back(rootLayer);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+
+  // The root VM's childSlot property should now reference the child VM.
+  auto rootVm = scene->viewModel();
+  ASSERT_NE(rootVm, nullptr);
+  auto slot = rootVm->propertyViewModel("childSlot");
+  ASSERT_NE(slot, nullptr);
+  auto refInstance = slot->referenceViewModelInstance();
+  ASSERT_NE(refInstance, nullptr);
+
+  // Verify the child VM's property is accessible through the reference.
+  auto label = refInstance->propertyString("label");
+  ASSERT_NE(label, nullptr);
+  EXPECT_EQ(label->value(), "hello");
 }
 
 }  // namespace pag
