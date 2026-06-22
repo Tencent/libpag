@@ -28,6 +28,7 @@
 
 namespace tgfx {
 class DisplayList;
+class Layer;
 }  // namespace tgfx
 
 namespace pagx {
@@ -97,10 +98,13 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
    * callers must advance the scene (or its timelines) beforehand.
-   * @param surface the destination surface.
+   * @param surface    the destination surface.
+   * @param autoClear  if true (the default), the surface is cleared to transparent before drawing.
+   *                   Set to false to overlay the scene content on top of the existing surface
+   *                   content.
    * @return true if the surface was redrawn, false if surface is null or there is no content.
    */
-  bool draw(const std::shared_ptr<PAGSurface>& surface);
+  bool draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear = true);
 
   /**
    * Returns the document canvas width.
@@ -148,8 +152,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
  private:
   PAGScene();
 
-  // Intended dispatch target for PAGXDocument::notifyChange; wiring is not yet implemented.
+  // Dispatch target for PAGXDocument::notifyChange. Refreshes the runtime tree in place for edits to
+  // this document's own nodes; rebuilds the whole tree when the edit comes from an embedded external
+  // document (its nodes are not owned by this scene's document).
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
+
+  // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
+  // tree first. Used at creation and when an embedded external document changes (an external
+  // composition is built into the tree once and cannot be patched in place).
+  void buildRuntimeTree();
 
   RuntimeBinding* mutableBinding();
 
@@ -169,9 +180,12 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
-  std::unique_ptr<tgfx::DisplayList> displayList = {};
+  std::unique_ptr<tgfx::DisplayList> displayList;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
+
+  // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
+  std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
   friend class PAGTimeline;

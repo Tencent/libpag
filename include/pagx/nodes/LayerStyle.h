@@ -24,7 +24,7 @@
 namespace pagx {
 
 /**
- * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle).
+ * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle).
  */
 class LayerStyle : public Node {
  public:

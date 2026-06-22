@@ -20,15 +20,15 @@
 
 #include <emscripten/bind.h>
 #include <deque>
-#include "GridBackground.h"
-#include "LayerBuilder.h"
+#include "pag/gpu.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
-#include "tgfx/core/Color.h"
-#include "tgfx/core/Surface.h"
+#include "pagx/types/Color.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
 
@@ -78,36 +78,40 @@ class PAGXView {
   }
 
  private:
-  void applyCenteringTransform();
-  void syncSurfaceSize(tgfx::Context* context, int canvasWidth, int canvasHeight);
+  void updateContentTransform();
+  void applyDisplayTransform();
+  void applySceneDisplayOptions();
+  bool ensureWindow();
+  void syncSurfaceSize(int canvasWidth, int canvasHeight);
+  void advanceTimelines(double frameStartMs);
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
   int calculateTargetTileRefinement(float zoom) const;
 
   std::string canvasID = {};
-  std::shared_ptr<tgfx::Window> window = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
-  tgfx::DisplayList displayList = {};
-  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<PAGSurface> pagSurface = nullptr;
+  std::shared_ptr<PAGScene> scene = nullptr;
+  std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  double lastAnimationTimeMs = -1.0;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
+  float contentScale = 1.0f;
+  float contentOffsetX = 0.0f;
+  float contentOffsetY = 0.0f;
+  float userZoom = 1.0f;
+  float userOffsetX = 0.0f;
+  float userOffsetY = 0.0f;
   FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
 
-  // Background layer cache
-  std::shared_ptr<GridBackgroundLayer> backgroundLayer = nullptr;
-  int lastBackgroundWidth = 0;
-  int lastBackgroundHeight = 0;
-  float lastBackgroundDensity = 0.0f;
-
-  // Custom background color (when useCustomBackgroundColor is true)
   bool useCustomBackgroundColor = false;
-  tgfx::Color customBackgroundColor = tgfx::Color::Transparent();
+  Color customBackgroundColor = {};
 
   // Performance monitoring
   struct FrameRecord {

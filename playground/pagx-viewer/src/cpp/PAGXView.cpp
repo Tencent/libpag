@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXView.h"
+#include <GLES3/gl3.h>
 #include <emscripten/html5.h>
 #include <algorithm>
+#include <cstdint>
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -85,10 +87,6 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 }
 
 PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
-  displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
-  displayList.setMaxTileCount(512);
-  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
@@ -117,6 +115,10 @@ void PAGXView::loadPAGX(const val& pagxData) {
 
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
+  scene = nullptr;
+  defaultTimeline = nullptr;
+  lastRecording = nullptr;
+  lastAnimationTimeMs = -1.0;
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -152,68 +154,83 @@ void PAGXView::buildLayers() {
   ResolveAllImagePatternMatrices(document.get());
   ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
-  contentLayer = LayerBuilder::Build(document.get());
-  if (!contentLayer) {
+  scene = PAGScene::Make(document);
+  if (scene == nullptr) {
     return;
   }
-  pagxWidth = document->width;
-  pagxHeight = document->height;
-  displayList.root()->removeChildren();
-  displayList.root()->addChild(contentLayer);
-  applyCenteringTransform();
+  defaultTimeline = scene->getDefaultTimeline();
+  lastAnimationTimeMs = -1.0;
+  pagxWidth = scene->width();
+  pagxHeight = scene->height();
+  applySceneDisplayOptions();
+  updateContentTransform();
   presentImmediately = true;
 }
 
+void PAGXView::advanceTimelines(double frameStartMs) {
+  int64_t deltaUs = 0;
+  if (lastAnimationTimeMs >= 0.0) {
+    deltaUs = static_cast<int64_t>(std::max(0.0, frameStartMs - lastAnimationTimeMs) * 1000.0);
+  }
+  lastAnimationTimeMs = frameStartMs;
+  if (deltaUs <= 0) {
+    return;
+  }
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->advanceAndApply(deltaUs);
+  }
+  if (scene != nullptr) {
+    scene->advanceAndApply(deltaUs);
+  }
+}
+
 void PAGXView::updateSize() {
-  if (window == nullptr) {
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-  }
-  if (window == nullptr) {
-    return;
-  }
-  auto device = window->getDevice();
-  if (device == nullptr) {
-    return;
-  }
-  auto context = device->lockContext();
-  if (context == nullptr) {
+  if (!ensureWindow()) {
     return;
   }
   int canvasWidth = 0;
   int canvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
-  syncSurfaceSize(context, canvasWidth, canvasHeight);
-  device->unlock();
+  syncSurfaceSize(canvasWidth, canvasHeight);
 }
 
-// Rebuilds the render surface when the canvas drawing-buffer size has changed.
-// Must be called while the GL context is locked. Used by both updateSize() and
-// draw() so that size changes driven purely by the JS side (e.g. a host-layer
-// ResizeObserver only adjusting canvas.width/height) are absorbed on the next
-// render tick without requiring an explicit updateSize() call.
-void PAGXView::syncSurfaceSize(tgfx::Context* context, int canvasWidth, int canvasHeight) {
-  if (window == nullptr || context == nullptr) {
+bool PAGXView::ensureWindow() {
+  if (window == nullptr) {
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+  }
+  return window != nullptr && window->getDevice() != nullptr;
+}
+
+void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
+  if (!ensureWindow() || canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
-  if (canvasWidth <= 0 || canvasHeight <= 0) {
+  if (pagSurface != nullptr && lastSurfaceWidth == canvasWidth &&
+      lastSurfaceHeight == canvasHeight) {
     return;
   }
-  if (surface != nullptr && surface->width() == canvasWidth && surface->height() == canvasHeight) {
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
     return;
   }
-  surface = nullptr;
-  surface = tgfx::Surface::MakeFrom(context, window);
-  if (surface == nullptr) {
+  pag::GLFrameBufferInfo frameBufferInfo = {};
+  frameBufferInfo.id = 0;
+  frameBufferInfo.format = GL_RGBA8;
+  pag::BackendRenderTarget renderTarget(frameBufferInfo, canvasWidth, canvasHeight);
+  pagSurface = PAGSurface::MakeFrom(renderTarget, pag::ImageOrigin::BottomLeft);
+  device->unlock();
+  if (pagSurface == nullptr) {
     return;
   }
-  lastSurfaceWidth = surface->width();
-  lastSurfaceHeight = surface->height();
-  applyCenteringTransform();
+  lastSurfaceWidth = canvasWidth;
+  lastSurfaceHeight = canvasHeight;
+  updateContentTransform();
   presentImmediately = true;
 }
 
-void PAGXView::applyCenteringTransform() {
-  if (lastSurfaceWidth <= 0 || lastSurfaceHeight <= 0 || !contentLayer) {
+void PAGXView::updateContentTransform() {
+  if (lastSurfaceWidth <= 0 || lastSurfaceHeight <= 0) {
     return;
   }
   if (pagxWidth <= 0 || pagxHeight <= 0) {
@@ -221,19 +238,39 @@ void PAGXView::applyCenteringTransform() {
   }
   float scaleX = static_cast<float>(lastSurfaceWidth) / pagxWidth;
   float scaleY = static_cast<float>(lastSurfaceHeight) / pagxHeight;
-  float scale = std::min(scaleX, scaleY);
-  float offsetX = (static_cast<float>(lastSurfaceWidth) - pagxWidth * scale) * 0.5f;
-  float offsetY = (static_cast<float>(lastSurfaceHeight) - pagxHeight * scale) * 0.5f;
-  auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
-  matrix.preScale(scale, scale);
-  contentLayer->setMatrix(matrix);
+  contentScale = std::min(scaleX, scaleY);
+  contentOffsetX = (static_cast<float>(lastSurfaceWidth) - pagxWidth * contentScale) * 0.5f;
+  contentOffsetY = (static_cast<float>(lastSurfaceHeight) - pagxHeight * contentScale) * 0.5f;
+  applyDisplayTransform();
+}
+
+void PAGXView::applyDisplayTransform() {
+  if (scene == nullptr) {
+    return;
+  }
+  scene->getDisplayOptions()->setZoomScale(contentScale * userZoom);
+  scene->getDisplayOptions()->setContentOffset(contentOffsetX * userZoom + userOffsetX,
+                                               contentOffsetY * userZoom + userOffsetY);
+}
+
+void PAGXView::applySceneDisplayOptions() {
+  if (scene == nullptr) {
+    return;
+  }
+  auto options = scene->getDisplayOptions();
+  options->setRenderMode(PAGRenderMode::Tiled);
+  options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
+  options->setMaxTileCount(512);
+  options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
-  if (zoom <= 1.0f) {
-    displayList.setSubtreeCacheMaxSize(1024);
-  } else {
-    displayList.setSubtreeCacheMaxSize(0);
+  if (scene != nullptr) {
+    if (zoom <= 1.0f) {
+      scene->getDisplayOptions()->setSubtreeCacheMaxSize(1024);
+    } else {
+      scene->getDisplayOptions()->setSubtreeCacheMaxSize(0);
+    }
   }
 
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
@@ -251,102 +288,72 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
     lastZoomUpdateTimestampMs = emscripten_get_now();
   }
 
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
+  userZoom = zoom;
+  userOffsetX = offsetX;
+  userOffsetY = offsetY;
+  applyDisplayTransform();
+  presentImmediately = true;
   lastZoom = zoom;
 }
 
 void PAGXView::setBackgroundColor(float red, float green, float blue, float alpha) {
   useCustomBackgroundColor = true;
-  customBackgroundColor = tgfx::Color{std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
-                                      std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
+  customBackgroundColor = {std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
+                           std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
+  if (scene != nullptr) {
+    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
+  }
   presentImmediately = true;
 }
 
 void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
-  customBackgroundColor = tgfx::Color::Transparent();
+  customBackgroundColor = {};
+  if (scene != nullptr) {
+    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
+  }
   presentImmediately = true;
 }
 
 void PAGXView::draw() {
-  if (window == nullptr) {
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-  }
-  if (window == nullptr) {
+  if (!ensureWindow() || scene == nullptr) {
     return;
   }
   double frameStartMs = emscripten_get_now();
-  bool hasContentChanged = displayList.hasContentChanged();
-  bool hasLastRecording = (lastRecording != nullptr);
-  bool needsInitialFrame =
-      presentImmediately || (!useCustomBackgroundColor && backgroundLayer == nullptr);
-  // Detect size change before the early-return so a pure JS-driven resize
-  // (only canvas.width/height changed, no content dirty) still triggers a
-  // redraw. The actual surface rebuild happens inside syncSurfaceSize() while
-  // the GL context is locked.
+  advanceTimelines(frameStartMs);
   int currentCanvasWidth = 0;
   int currentCanvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
-  bool sizeChanged = (surface == nullptr && currentCanvasWidth > 0 && currentCanvasHeight > 0) ||
-                     (surface != nullptr && (surface->width() != currentCanvasWidth ||
-                                             surface->height() != currentCanvasHeight));
-  if (!hasContentChanged && !hasLastRecording && !needsInitialFrame && !sizeChanged) {
+  syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
+  if (pagSurface == nullptr) {
     return;
   }
-  auto device = window->getDevice();
-  if (device == nullptr) {
-    return;
-  }
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  syncSurfaceSize(context, currentCanvasWidth, currentCanvasHeight);
-  if (surface == nullptr) {
-    device->unlock();
-    return;
-  }
-  auto canvas = surface->getCanvas();
-
   if (useCustomBackgroundColor) {
-    canvas->clear(customBackgroundColor);
+    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   } else {
-    canvas->clear();
-    auto density = currentCanvasWidth > 0 ? static_cast<float>(surface->width()) /
-                                                static_cast<float>(currentCanvasWidth)
-                                          : 1.0f;
-    int bgWidth = surface->width();
-    int bgHeight = surface->height();
-    if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
-        std::abs(density - lastBackgroundDensity) > 0.001f) {
-      backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
-      lastBackgroundWidth = bgWidth;
-      lastBackgroundHeight = bgHeight;
-      lastBackgroundDensity = density;
-    }
-    backgroundLayer->draw(canvas);
+    scene->getDisplayOptions()->setBackgroundColor({});
   }
-
-  displayList.render(surface.get(), false);
-  auto recording = context->flush();
-  if (presentImmediately) {
-    presentImmediately = false;
-    lastRecording = nullptr;
-    if (recording) {
-      context->submit(std::move(recording));
+  scene->draw(pagSurface, true);
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context != nullptr) {
+    auto recording = context->flush();
+    if (presentImmediately) {
+      presentImmediately = false;
+      lastRecording = nullptr;
+      if (recording) {
+        context->submit(std::move(recording));
+      }
+    } else if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      lastRecording = std::move(recording);
+    } else {
+      if (recording) {
+        context->submit(std::move(recording));
+      }
     }
-  } else if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    lastRecording = std::move(recording);
-  } else {
-    // Prime the pipeline on the first frame: no previous recording is cached yet, so submit the
-    // current one immediately to avoid a blank frame before the delayed-present pipeline kicks in.
-    if (recording) {
-      context->submit(std::move(recording));
-    }
+    device->unlock();
   }
-  device->unlock();
 
   double frameEndMs = emscripten_get_now();
   double frameDurationMs = frameEndMs - frameStartMs;
@@ -365,7 +372,9 @@ void PAGXView::draw() {
       if (!lastFrameSlow) {
         int targetCount = calculateTargetTileRefinement(lastZoom);
         currentMaxTilesRefinedPerFrame = targetCount;
-        displayList.setMaxTilesRefinedPerFrame(targetCount);
+        if (scene != nullptr) {
+          scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+        }
         tryUpgradeTimestampMs = 0.0;
       } else {
         tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
@@ -382,7 +391,9 @@ void PAGXView::onZoomEnd() {
   }
   isZooming = false;
   currentMaxTilesRefinedPerFrame = 1;
-  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  if (scene != nullptr) {
+    scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  }
   tryUpgradeTimestampMs = emscripten_get_now() + InitialUpgradeDelayMs;
 }
 
@@ -429,7 +440,9 @@ void PAGXView::updateAdaptiveTileRefinement() {
   int targetCount = calculateTargetTileRefinement(lastZoom);
   if (targetCount != currentMaxTilesRefinedPerFrame) {
     currentMaxTilesRefinedPerFrame = targetCount;
-    displayList.setMaxTilesRefinedPerFrame(targetCount);
+    if (scene != nullptr) {
+      scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+    }
   }
 }
 

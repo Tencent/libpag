@@ -647,6 +647,7 @@ async function loadWasm(): Promise<void> {
         throw new Error('Failed to create PAGXView');
     }
     playgroundState.pagxView = pagxView;
+    pagxView.setBackgroundColor("F5F5F5");
     updateSize();
     pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;

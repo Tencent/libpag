@@ -127,8 +127,12 @@ static pag::Effect* GetDisplacementMapEffect(const AEGP_StreamRefH& streamHandle
   auto effect = new pag::DisplacementMapEffect();
 
   effect->displacementMapLayer = new pag::Layer();
-  effect->displacementMapLayer->id =
-      GetProperty(streamHandle, "ADBE Displacement Map-0001", AEStreamParser::LayerIDParser)->value;
+  auto idProperty =
+      GetProperty(streamHandle, "ADBE Displacement Map-0001", AEStreamParser::LayerIDParser);
+  if (idProperty != nullptr) {
+    effect->displacementMapLayer->id = idProperty->value;
+    delete idProperty;
+  }
   if (effect->displacementMapLayer->id <= 0) {
     delete effect->displacementMapLayer;
     effect->displacementMapLayer = nullptr;
@@ -147,6 +151,16 @@ static pag::Effect* GetDisplacementMapEffect(const AEGP_StreamRefH& streamHandle
       GetProperty(streamHandle, "ADBE Displacement Map-0007", AEStreamParser::BooleanParser);
   effect->expandOutput =
       GetProperty(streamHandle, "ADBE Displacement Map-0008", AEStreamParser::BooleanParser);
+  if (effect->useForHorizontalDisplacement == nullptr ||
+      effect->maxHorizontalDisplacement == nullptr ||
+      effect->useForVerticalDisplacement == nullptr || effect->maxVerticalDisplacement == nullptr ||
+      effect->displacementMapBehavior == nullptr || effect->edgeBehavior == nullptr ||
+      effect->expandOutput == nullptr) {
+    delete effect->displacementMapLayer;
+    effect->displacementMapLayer = nullptr;
+    delete effect;
+    return nullptr;
+  }
   return effect;
 }
 
@@ -290,6 +304,9 @@ static void InitEffect(const AEGP_StreamRefH& streamHandle, pag::Effect* effect)
   AEGP_StreamRefH builtInParams = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, streamHandle, numParams - 1,
                                                              &builtInParams);
+  if (builtInParams == nullptr) {
+    return;
+  }
   Suites->DynamicStreamSuite4()->AEGP_GetMatchName(builtInParams, matchName);
   if (strcmp(matchName, "ADBE Effect Built In Params") != 0) {
     Suites->StreamSuite4()->AEGP_DisposeStream(builtInParams);
@@ -297,21 +314,28 @@ static void InitEffect(const AEGP_StreamRefH& streamHandle, pag::Effect* effect)
   }
   AEGP_StreamRefH masks = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, builtInParams, 0, &masks);
-  A_long numMasks = 0;
-  Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(masks, &numMasks);
-  for (int i = 0; i < numMasks; i++) {
-    AEGP_StreamRefH maskReference = nullptr;
-    Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, masks, i, &maskReference);
-    auto maskID = GetValue(maskReference, AEStreamParser::MaskIDParser);
-    auto mask = new pag::MaskData();
-    mask->id = maskID;
-    Suites->StreamSuite4()->AEGP_DisposeStream(maskReference);
-    effect->maskReferences.push_back(mask);
+  if (masks != nullptr) {
+    A_long numMasks = 0;
+    Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(masks, &numMasks);
+    for (int i = 0; i < numMasks; i++) {
+      AEGP_StreamRefH maskReference = nullptr;
+      Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, masks, i,
+                                                                 &maskReference);
+      if (maskReference == nullptr) {
+        continue;
+      }
+      auto maskID = GetValue(maskReference, AEStreamParser::MaskIDParser);
+      auto mask = new pag::MaskData();
+      mask->id = maskID;
+      Suites->StreamSuite4()->AEGP_DisposeStream(maskReference);
+      effect->maskReferences.push_back(mask);
+    }
+    Suites->StreamSuite4()->AEGP_DisposeStream(masks);
   }
-  Suites->StreamSuite4()->AEGP_DisposeStream(masks);
   effect->effectOpacity = GetProperty(builtInParams, 1, AEStreamParser::Opacity0_100Parser);
   Suites->StreamSuite4()->AEGP_DisposeStream(builtInParams);
-  if (!effect->effectOpacity->animatable() && effect->effectOpacity->value == pag::Opaque) {
+  if (effect->effectOpacity != nullptr && !effect->effectOpacity->animatable() &&
+      effect->effectOpacity->value == pag::Opaque) {
     delete effect->effectOpacity;
     effect->effectOpacity = nullptr;
   }
@@ -433,6 +457,9 @@ std::vector<pag::Effect*> GetEffects(const AEGP_LayerH& layerHandle) {
 
 static void GetTextBackground(const AEGP_StreamRefH& streamHandle,
                               pag::Property<pag::TextDocumentHandle>* textDocument) {
+  if (textDocument == nullptr) {
+    return;
+  }
   auto backgroundColor =
       GetValue(streamHandle, "ADBE Text Background-0001", AEStreamParser::ColorParser);
   auto backgroundAlpha =
@@ -481,7 +508,7 @@ static pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle,
 
   if (!(type == AEEffectType::ImageFillRuleV2 &&
         tagLevel >= static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) &&
-      imageFillRule->timeRemap->animatable()) {
+      imageFillRule->timeRemap != nullptr && imageFillRule->timeRemap->animatable()) {
     auto timeRemap = imageFillRule->timeRemap;
     for (auto& keyFrame : static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
       keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;

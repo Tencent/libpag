@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGSurface.h"
+#include "base/utils/TGFXCast.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/OffscreenDrawable.h"
+#include "pagx/runtime/RenderTargetDrawable.h"
+#include "pagx/runtime/TextureDrawable.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -33,6 +37,21 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
     return nullptr;
   }
   return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
+}
+
+std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& texture,
+                                                 pag::ImageOrigin origin) {
+  auto device = tgfx::GLDevice::Current();
+  auto drawable = TextureDrawable::MakeFrom(device, pag::ToTGFX(texture), pag::ToTGFX(origin));
+  return MakeFrom(drawable);
+}
+
+std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget& renderTarget,
+                                                 pag::ImageOrigin origin) {
+  auto device = tgfx::GLDevice::Current();
+  auto drawable =
+      RenderTargetDrawable::MakeFrom(device, pag::ToTGFX(renderTarget), pag::ToTGFX(origin));
+  return MakeFrom(drawable);
 }
 
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
