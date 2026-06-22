@@ -4,6 +4,7 @@
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/ObserverHandle.h"
+#include "pagx/PropertyData.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
@@ -1370,6 +1371,37 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   ASSERT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->valueType(), pagx::ViewModelValueType::String);
   EXPECT_EQ(static_cast<const pagx::PAGViewModelValueString*>(resolved)->value(), "dark");
+}
+
+// ========== PropertyData ==========
+
+PAGX_TEST(PAGXViewModelTest, PropertyDataReflectsSchema) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "score";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 100.0f;
+  prop->customData["min"] = "0";
+  prop->customData["max"] = "200";
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto val = vm->propertyNumber("score");
+  ASSERT_NE(val, nullptr);
+
+  auto pd = val->propertyData();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->type(), pagx::PropertyData::Type::Number);
+  EXPECT_EQ(pd->name(), "score");
+  auto& custom = pd->customData();
+  EXPECT_EQ(custom.at("min"), "0");
+  EXPECT_EQ(custom.at("max"), "200");
 }
 
 }  // namespace pag
