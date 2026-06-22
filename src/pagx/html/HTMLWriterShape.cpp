@@ -2207,7 +2207,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
         out.openTag("path");
         out.addAttr("d", firstPathD);
-        applySVGFill(out, fill, x0, y0, sw, sh, false);
+        applySVGFill(out, fill, x0, y0, sw, sh);
         applySVGStroke(out, stroke);
         out.closeTagSelfClosing();
         for (size_t i = 1; i < geos.size(); i++) {
@@ -2287,10 +2287,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTagStart();
     out.openTag("path");
     out.addAttr("d", mergedPath);
-    if (fillRule != "nonzero") {
+    bool hasMergeFillRule = fillRule != "nonzero";
+    if (hasMergeFillRule) {
       out.addAttr("fill-rule", fillRule);
     }
-    applySVGFill(out, fill, x0, y0, sw, sh, false);
+    applySVGFill(out, fill, x0, y0, sw, sh,
+                 !hasMergeFillRule && mergeMode == MergePathMode::Append);
     applySVGStroke(out, stroke);
     out.closeTagSelfClosing();
     out.closeTag();

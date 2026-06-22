@@ -282,7 +282,7 @@ CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/drop_shadow_styles.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/drop_shadow_styles.pagx"), options);
   ASSERT_FALSE(html.empty());
   size_t filterCount = 0;
   for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
@@ -296,7 +296,7 @@ CLI_TEST(PAGXHtmlTest, ParentDropShadowWithShadowedChildAvoidsWrapperFilter) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/parent_child_drop_shadow.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/parent_child_drop_shadow.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"parent\"");
@@ -335,7 +335,8 @@ CLI_TEST(PAGXHtmlTest, RectangleStrokeRoundnessIsClampedToBounds) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/rectangle_stroke_roundness.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/rectangle_stroke_roundness.pagx"),
+      options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("rx=\"18\""), std::string::npos);
   EXPECT_NE(html.find("ry=\"18\""), std::string::npos);
@@ -365,7 +366,7 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
   EXPECT_NE(html.find("<path"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, FillRuleIsScopedAwayFromMergePathFillAttributes) {
+CLI_TEST(PAGXHtmlTest, MergePathAvoidsDuplicateFillRuleAttributes) {
   auto html = LoadXMLAndConvert(R"(
 <pagx width="120" height="120">
   <Layer left="0" right="0" top="0" bottom="0">
@@ -399,11 +400,11 @@ CLI_TEST(PAGXHtmlTest, FillRuleIsScopedAwayFromMergePathFillAttributes) {
 
   auto appendTag = FindTagContaining(html, "fill=\"#8B5CF6\"");
   ASSERT_FALSE(appendTag.empty());
-  EXPECT_EQ(appendTag.find("fill-rule"), std::string::npos);
+  EXPECT_EQ(CountOccurrences(appendTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
 
   auto intersectTag = FindTagContaining(html, "fill=\"#F59E0B\"");
   ASSERT_FALSE(intersectTag.empty());
-  EXPECT_EQ(intersectTag.find("fill-rule"), std::string::npos);
+  EXPECT_EQ(CountOccurrences(intersectTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
 
   auto xorTag = FindTagContaining(html, "fill=\"#10B981\"");
   ASSERT_FALSE(xorTag.empty());
@@ -573,7 +574,7 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
 
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
   auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/low_units_per_em_font.pagx"));
+      ProjectPath::Absolute("resources/pagx_to_html/unit/low_units_per_em_font.pagx"));
   ASSERT_NE(doc, nullptr);
   const pagx::Font* font = nullptr;
   for (const auto& node : doc->nodes) {
@@ -602,7 +603,7 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
 
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
   auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/custom_cff_charset_strings.pagx"));
+      ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
   ASSERT_NE(doc, nullptr);
   const pagx::Font* font = nullptr;
   for (const auto& node : doc->nodes) {
@@ -629,7 +630,7 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/glyph_run_embedded_font.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/glyph_run_embedded_font.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("@font-face"), std::string::npos);
   EXPECT_NE(html.find("pagx-font-"), std::string::npos);
@@ -641,7 +642,7 @@ CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/mixed_glyph_run_fonts.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/mixed_glyph_run_fonts.pagx"), options);
   ASSERT_FALSE(html.empty());
   size_t bulletFontCount = 0;
   for (size_t pos = 0; (pos = html.find("pagx-font-f0", pos)) != std::string::npos; pos++) {
@@ -660,7 +661,7 @@ CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/single_group_text_box.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/single_group_text_box.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("word-wrap:break-word"), std::string::npos);
   EXPECT_NE(html.find("line-height:20px"), std::string::npos);
@@ -671,7 +672,8 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/single_auto_size_glyph_run.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/single_auto_size_glyph_run.pagx"),
+      options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
   EXPECT_EQ(html.find("智能模式"), std::string::npos);
@@ -684,7 +686,7 @@ CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/rich_text_newline_group.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/rich_text_newline_group.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto titlePos = html.find("Title");
@@ -703,7 +705,7 @@ CLI_TEST(PAGXHtmlTest, UniformGradientTextFallsBackToSolidColor) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/uniform_gradient_text.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/uniform_gradient_text.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("Done"), std::string::npos);
   EXPECT_NE(html.find("#999999"), std::string::npos);
@@ -762,7 +764,7 @@ CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/scroll_rect_flex_flow.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/scroll_rect_flex_flow.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto offsetStylePos = html.find("style=\"position:relative;left:-5px;top:-7px");
@@ -785,7 +787,7 @@ CLI_TEST(PAGXHtmlTest, FixedFlexItemKeepsDeclaredWidthInScrollRectLayout) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/fixed_flex_item_scroll.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/fixed_flex_item_scroll.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"fixed\"");
@@ -804,7 +806,7 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/vertical_text_box_height.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/vertical_text_box_height.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"description\"");
@@ -822,7 +824,8 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/vertical_scroll_rect_height.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/vertical_scroll_rect_height.pagx"),
+      options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"scroller\"");
@@ -839,7 +842,7 @@ CLI_TEST(PAGXHtmlTest, FlexItemWithChildLayerKeepsMeasuredWidth) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/flex_child_layer_width.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/flex_child_layer_width.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"wrapper\"");
@@ -856,7 +859,7 @@ CLI_TEST(PAGXHtmlTest, CompositionLayerWithFilterKeepsDeclaredSize) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/composition_filter_size.pagx"), options);
+      ProjectPath::Absolute("resources/pagx_to_html/unit/composition_filter_size.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"iconLayer\"");
