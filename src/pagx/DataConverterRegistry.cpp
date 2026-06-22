@@ -26,91 +26,85 @@
 namespace pagx {
 
 DataConverterRegistry::DataConverterRegistry() {
-  // ---- secondsToFrames ----
-  // Converts seconds (float) to frames (float) using frameRate parameter.
-  registerConverter("secondsToFrames", [](const KeyValue& input,
-                                          const std::unordered_map<std::string, std::string>& params) -> KeyValue {
-    if (!std::holds_alternative<float>(input)) {
-      return input;
-    }
-    float seconds = std::get<float>(input);
-    float frameRate = 30.0f;
-    auto it = params.find("frameRate");
-    if (it != params.end()) {
-      frameRate = std::strtof(it->second.c_str(), nullptr);
-    }
-    return KeyValue{seconds * frameRate};
-  });
-
-  // ---- priceFormat ----
-  // Formats a number (float) to a string with optional prefix/suffix/decimals.
-  // Output is a string value (e.g., "$5999.00").
-  registerConverter("priceFormat", [](const KeyValue& input,
-                                       const std::unordered_map<std::string, std::string>& params) -> KeyValue {
-    float value = 0.0f;
-    if (std::holds_alternative<float>(input)) {
-      value = std::get<float>(input);
-    } else if (std::holds_alternative<int>(input)) {
-      value = static_cast<float>(std::get<int>(input));
-    } else {
-      return input;
-    }
-    std::string prefix = "";
-    std::string suffix = "";
-    int decimals = 0;
-    auto it = params.find("prefix");
-    if (it != params.end()) prefix = it->second;
-    it = params.find("suffix");
-    if (it != params.end()) suffix = it->second;
-    it = params.find("decimals");
-    if (it != params.end()) decimals = std::atoi(it->second.c_str());
-
-    std::ostringstream oss;
-    oss << prefix;
-    oss << std::fixed << std::setprecision(decimals) << value;
-    oss << suffix;
-    return KeyValue{oss.str()};
-  });
-
-  // ---- Inverse converters (syncBack direction) ----
-
-  registerInverseConverter("secondsToFrames",
-      [](const KeyValue& input,
-         const std::unordered_map<std::string, std::string>& params) -> KeyValue {
-        if (!std::holds_alternative<float>(input)) return input;
-        float frames = std::get<float>(input);
-        float frameRate = 30.0f;
-        auto it = params.find("frameRate");
-        if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
-        return KeyValue{frames / frameRate};
-      });
-
-  registerInverseConverter("priceFormat",
-      [](const KeyValue& input,
-         const std::unordered_map<std::string, std::string>& params) -> KeyValue {
-        std::string str;
-        if (std::holds_alternative<std::string>(input)) {
-          str = std::get<std::string>(input);
-        } else if (std::holds_alternative<float>(input)) {
-          return input;
-        } else {
-          return input;
-        }
-        // Strip known prefix and suffix, parse remainder as float.
-        auto it = params.find("prefix");
-        if (it != params.end() && str.find(it->second) == 0)
-          str = str.substr(it->second.size());
-        it = params.find("suffix");
-        if (it != params.end() && str.size() >= it->second.size() &&
-            str.compare(str.size() - it->second.size(), it->second.size(), it->second) == 0)
-          str = str.substr(0, str.size() - it->second.size());
-        return KeyValue{std::strtof(str.c_str(), nullptr)};
-      });
+  registerConverter("secondsToFrames", ConvertSecondsToFrames);
+  registerConverter("priceFormat", ConvertPriceFormat);
+  registerInverseConverter("secondsToFrames", ConvertInverseSecondsToFrames);
+  registerInverseConverter("priceFormat", ConvertInversePriceFormat);
 }
 
 DataConverterRegistry& DataConverterRegistry::instance() {
   static DataConverterRegistry registry;
   return registry;
+}
+
+KeyValue DataConverterRegistry::ConvertSecondsToFrames(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) {
+    return input;
+  }
+  float seconds = std::get<float>(input);
+  float frameRate = 30.0f;
+  auto it = params.find("frameRate");
+  if (it != params.end()) {
+    frameRate = std::strtof(it->second.c_str(), nullptr);
+  }
+  return KeyValue{seconds * frameRate};
+}
+
+KeyValue DataConverterRegistry::ConvertPriceFormat(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  float value = 0.0f;
+  if (std::holds_alternative<float>(input)) {
+    value = std::get<float>(input);
+  } else if (std::holds_alternative<int>(input)) {
+    value = static_cast<float>(std::get<int>(input));
+  } else {
+    return input;
+  }
+  std::string prefix = "";
+  std::string suffix = "";
+  int decimals = 0;
+  auto it = params.find("prefix");
+  if (it != params.end()) prefix = it->second;
+  it = params.find("suffix");
+  if (it != params.end()) suffix = it->second;
+  it = params.find("decimals");
+  if (it != params.end()) decimals = std::atoi(it->second.c_str());
+
+  std::ostringstream oss;
+  oss << prefix;
+  oss << std::fixed << std::setprecision(decimals) << value;
+  oss << suffix;
+  return KeyValue{oss.str()};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float frames = std::get<float>(input);
+  float frameRate = 30.0f;
+  auto it = params.find("frameRate");
+  if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
+  return KeyValue{frames / frameRate};
+}
+
+KeyValue DataConverterRegistry::ConvertInversePriceFormat(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  std::string str;
+  if (std::holds_alternative<std::string>(input)) {
+    str = std::get<std::string>(input);
+  } else if (std::holds_alternative<float>(input)) {
+    return input;
+  } else {
+    return input;
+  }
+  auto it = params.find("prefix");
+  if (it != params.end() && str.find(it->second) == 0) str = str.substr(it->second.size());
+  it = params.find("suffix");
+  if (it != params.end() && str.size() >= it->second.size() &&
+      str.compare(str.size() - it->second.size(), it->second.size(), it->second) == 0)
+    str = str.substr(0, str.size() - it->second.size());
+  return KeyValue{std::strtof(str.c_str(), nullptr)};
 }
 
 void DataConverterRegistry::registerConverter(const std::string& typeName, ConverterFn fn) {
@@ -121,8 +115,7 @@ void DataConverterRegistry::registerInverseConverter(const std::string& typeName
   inverseConverters[typeName] = std::move(fn);
 }
 
-KeyValue DataConverterRegistry::apply(const DataConverter* converter,
-                                      const KeyValue& input) const {
+KeyValue DataConverterRegistry::apply(const DataConverter* converter, const KeyValue& input) const {
   if (converter == nullptr || converter->converterType.empty()) {
     return input;
   }

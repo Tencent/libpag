@@ -150,6 +150,8 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
    */
   void removeObserver(int id);
 
+  static bool ObserverHasId(const ObserverEntry& entry, int id);
+
   friend class ObserverHandle;
   friend class PAGViewModel;
   friend class PAGScene;

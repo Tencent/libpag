@@ -1,10 +1,9 @@
 #include <sstream>
 #include "base/PAGTest.h"
+#include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
-#include "pagx/DataBindRuntime.h"
 #include "pagx/ObserverHandle.h"
-#include "renderer/LayerBuilder.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
@@ -31,6 +30,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pag {
@@ -1272,9 +1272,8 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeNullDataBindSafety) {
   ASSERT_NE(scene, nullptr);
 
   auto runtime = std::make_unique<pagx::DataBindRuntime>();
-  auto ctx = scene->viewModel() != nullptr
-                 ? std::make_shared<pagx::DataContext>(scene->viewModel())
-                 : nullptr;
+  auto ctx = scene->viewModel() != nullptr ? std::make_shared<pagx::DataContext>(scene->viewModel())
+                                           : nullptr;
   std::vector<pagx::DataBind*> binds = {db};
   auto binding = std::make_unique<pagx::RuntimeBinding>();
   runtime->bind(binds, ctx.get(), binding.get(), doc.get());

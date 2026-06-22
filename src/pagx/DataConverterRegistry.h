@@ -35,8 +35,8 @@ class DataConverter;
  */
 class DataConverterRegistry {
  public:
-  using ConverterFn = std::function<KeyValue(const KeyValue& input,
-                                             const std::unordered_map<std::string, std::string>& params)>;
+  using ConverterFn = std::function<KeyValue(
+      const KeyValue& input, const std::unordered_map<std::string, std::string>& params)>;
 
   static DataConverterRegistry& instance();
 
@@ -66,6 +66,15 @@ class DataConverterRegistry {
   DataConverterRegistry();
   std::unordered_map<std::string, ConverterFn> converters = {};
   std::unordered_map<std::string, ConverterFn> inverseConverters = {};
+
+  static KeyValue ConvertSecondsToFrames(
+      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertPriceFormat(const KeyValue& input,
+                                     const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertInverseSecondsToFrames(
+      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertInversePriceFormat(
+      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
 };
 
 }  // namespace pagx

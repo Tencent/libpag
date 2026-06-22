@@ -99,6 +99,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   std::shared_ptr<PAGComposition> rootComposition() const;
 
+  /**
+   * Returns the root ViewModel for this scene, or nullptr if the document has no ViewModel schema.
+   */
   std::shared_ptr<PAGViewModel> viewModel();
 
   /**
