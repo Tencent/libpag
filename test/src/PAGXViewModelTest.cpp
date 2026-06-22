@@ -1457,11 +1457,27 @@ PAGX_TEST(PAGXViewModelTest, NestedCompositionDataBind) {
   ASSERT_EQ(rootComp->children.size(), 1u);
   auto nestedComp = static_cast<pagx::PAGComposition*>(rootComp->children[0].get());
   ASSERT_NE(nestedComp, nullptr);
-
-  // The LOGI output above will tell us exactly what's happening.
-  // If compositionViewModel is null, the debug logs will show which check failed.
+  ASSERT_NE(nestedComp->dataBindRuntime, nullptr);
   auto childVm = nestedComp->compositionViewModel;
   ASSERT_NE(childVm, nullptr);
+  auto opacityProp = childVm->propertyNumber("opacity");
+  ASSERT_NE(opacityProp, nullptr);
+
+  // Verify the DataBind actually drives the child layer's alpha.
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+
+  // Get the tgfx layer through the same path as root-level tests.
+  auto nestedChild = nestedComp->children[0];
+  ASSERT_NE(nestedChild, nullptr);
+  auto tgfxRect = nestedChild->runtimeLayer;
+  ASSERT_NE(tgfxRect, nullptr);
+
+  // Set opacity to 0.3 via ViewModel, verify it propagates to the nested layer.
+  opacityProp->value(0.3f);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxRect->alpha(), 0.3f);
 }
 
 // ========== vmContext connection ==========
