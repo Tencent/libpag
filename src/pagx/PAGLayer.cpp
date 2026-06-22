@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGLayer.h"
+#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/nodes/Layer.h"
 #include "renderer/LayerBuilder.h"
@@ -28,9 +29,17 @@ namespace pagx {
 PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
                    const std::shared_ptr<PAGScene>& scene)
     : node(node), runtimeLayer(std::move(runtimeLayer)), rootScene(scene) {
+  if (scene != nullptr && this->runtimeLayer != nullptr) {
+    scene->layerRegistry[this->runtimeLayer.get()] = this;
+  }
 }
 
-PAGLayer::~PAGLayer() = default;
+PAGLayer::~PAGLayer() {
+  auto scene = rootScene.lock();
+  if (scene != nullptr && runtimeLayer != nullptr) {
+    scene->layerRegistry.erase(runtimeLayer.get());
+  }
+}
 
 LayerType PAGLayer::layerType() const {
   return LayerType::Layer;
@@ -85,6 +94,28 @@ Rect PAGLayer::getBounds() const {
   // Bounds relative to the layer's own coordinate space, i.e. before its own transform is applied.
   auto bounds = runtimeLayer->getBounds(runtimeLayer.get());
   return FromTGFX(bounds);
+}
+
+void PAGLayer::advance(int64_t deltaMicroseconds) {
+  for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
+    child->advance(deltaMicroseconds);
+  }
+}
+
+void PAGLayer::apply(float mix) {
+  for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
+    child->apply(mix);
+  }
+}
+
+void PAGLayer::forEachComposition(void (*visitor)(PAGComposition*)) {
+  for (auto& child : children) {
+    if (child != nullptr) {
+      child->forEachComposition(visitor);
+    }
+  }
 }
 
 }  // namespace pagx
