@@ -2664,16 +2664,16 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
 
-  auto viewModelAttr = GetAttribute(root, "viewModel");
-  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
-    doc->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
-    if (!doc->viewModel) ReportError(doc, root, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
-  }
-
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
   if (child) {
     ParseResources(child.get(), doc);
+  }
+
+  auto viewModelAttr = GetAttribute(root, "viewModel");
+  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
+    doc->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
+    if (!doc->viewModel) ReportError(doc, root, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
   }
 
   // Second pass: Parse Layers.

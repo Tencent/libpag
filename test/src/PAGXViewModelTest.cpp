@@ -532,4 +532,71 @@ PAGX_TEST(PAGXViewModelTest, ObserverRecursivePrevention) {
 
 
 
+// ========== notifyDependents: all value types trigger DataBind dirty ==========
+PAGX_TEST(PAGXViewModelTest, StringValueTriggersDataBindSync) {
+  auto doc = pagx::PAGXDocument::Make(200, 200); auto* s = doc->makeNode<pagx::ViewModel>("T");
+  auto* p = doc->makeNode<pagx::ViewModelProperty>();
+  p->name="name";p->propertyType=pagx::ViewModelPropertyType::String;p->defaultString="A";s->properties.push_back(p);
+  doc->viewModel=s; auto l=doc->makeNode<pagx::Layer>("r");l->width=200;l->height=200;
+  auto r=doc->makeNode<pagx::Rectangle>();r->size.width=200;r->size.height=200;
+  auto f=doc->makeNode<pagx::Fill>();auto c=doc->makeNode<pagx::SolidColor>();f->color=c;
+  auto g=doc->makeNode<pagx::Group>();g->elements.push_back(r);g->elements.push_back(f);l->contents.push_back(g);doc->layers.push_back(l);
+  auto db=doc->makeNode<pagx::DataBind>();db->source="$vm.name";db->target="@r";db->channel="name";doc->dataBinds.push_back(db);
+  auto sc = pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(sc,nullptr); auto vm=sc->viewModel();ASSERT_NE(vm,nullptr);
+  auto v=vm->propertyString("name");ASSERT_NE(v,nullptr);EXPECT_EQ(v->value(),"A");
+  v->value("B");auto sf=pagx::PAGSurface::MakeOffscreen(200,200);ASSERT_NE(sf,nullptr);
+  EXPECT_TRUE(sc->draw(sf));EXPECT_EQ(v->value(),"B");
+}
+
+PAGX_TEST(PAGXViewModelTest, BooleanValueTriggersDataBindSync) {
+  auto doc = pagx::PAGXDocument::Make(200, 200); auto* s = doc->makeNode<pagx::ViewModel>("T");
+  auto* p = doc->makeNode<pagx::ViewModelProperty>();
+  p->name="vis";p->propertyType=pagx::ViewModelPropertyType::Boolean;p->defaultBoolean=true;s->properties.push_back(p);
+  doc->viewModel=s; auto l=doc->makeNode<pagx::Layer>("r");l->width=200;l->height=200;
+  auto r=doc->makeNode<pagx::Rectangle>();r->size.width=200;r->size.height=200;
+  auto f=doc->makeNode<pagx::Fill>();auto c=doc->makeNode<pagx::SolidColor>();f->color=c;
+  auto g=doc->makeNode<pagx::Group>();g->elements.push_back(r);g->elements.push_back(f);l->contents.push_back(g);doc->layers.push_back(l);
+  auto db=doc->makeNode<pagx::DataBind>();db->source="$vm.vis";db->target="@r";db->channel="visible";doc->dataBinds.push_back(db);
+  auto sc = pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(sc,nullptr); auto vm=sc->viewModel();ASSERT_NE(vm,nullptr);
+  auto v=vm->propertyBoolean("vis");ASSERT_NE(v,nullptr);EXPECT_EQ(v->value(),true);
+  v->value(false);auto sf=pagx::PAGSurface::MakeOffscreen(200,200);ASSERT_NE(sf,nullptr);
+  EXPECT_TRUE(sc->draw(sf));EXPECT_EQ(v->value(),false);
+}
+
+PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
+  auto doc = pagx::PAGXDocument::Make(200, 200); auto* s = doc->makeNode<pagx::ViewModel>("T");
+  auto* p = doc->makeNode<pagx::ViewModelProperty>();
+  p->name="bg";p->propertyType=pagx::ViewModelPropertyType::Color;p->defaultColor=pagx::Color{1,0,0,1};s->properties.push_back(p);
+  doc->viewModel=s; auto l=doc->makeNode<pagx::Layer>("r");l->width=200;l->height=200;
+  auto r=doc->makeNode<pagx::Rectangle>();r->size.width=200;r->size.height=200;
+  auto f=doc->makeNode<pagx::Fill>();auto c=doc->makeNode<pagx::SolidColor>();f->color=c;
+  auto g=doc->makeNode<pagx::Group>();g->elements.push_back(r);g->elements.push_back(f);l->contents.push_back(g);doc->layers.push_back(l);
+  auto db=doc->makeNode<pagx::DataBind>();db->source="$vm.bg";db->target="@r";db->channel="color";doc->dataBinds.push_back(db);
+  auto sc = pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(sc,nullptr); auto vm=sc->viewModel();ASSERT_NE(vm,nullptr);
+  auto v=vm->propertyColor("bg");ASSERT_NE(v,nullptr);EXPECT_FLOAT_EQ(v->value().red,1.0f);
+  v->value(pagx::Color{0,1,0,1});auto sf=pagx::PAGSurface::MakeOffscreen(200,200);ASSERT_NE(sf,nullptr);
+  EXPECT_TRUE(sc->draw(sf));EXPECT_FLOAT_EQ(v->value().green,1.0f);
+}
+
+PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
+  auto doc = pagx::PAGXDocument::Make(200, 200); auto* s = doc->makeNode<pagx::ViewModel>("T");
+  auto* p = doc->makeNode<pagx::ViewModelProperty>();
+  p->name="img";p->propertyType=pagx::ViewModelPropertyType::Image;p->defaultImage="a.png";s->properties.push_back(p);
+  doc->viewModel=s; auto l=doc->makeNode<pagx::Layer>("r");l->width=200;l->height=200;
+  auto r=doc->makeNode<pagx::Rectangle>();r->size.width=200;r->size.height=200;
+  auto f=doc->makeNode<pagx::Fill>();auto c=doc->makeNode<pagx::SolidColor>();f->color=c;
+  auto g=doc->makeNode<pagx::Group>();g->elements.push_back(r);g->elements.push_back(f);l->contents.push_back(g);doc->layers.push_back(l);
+  auto db=doc->makeNode<pagx::DataBind>();db->source="$vm.img";db->target="@r";db->channel="image";doc->dataBinds.push_back(db);
+  auto sc = pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(sc,nullptr); auto vm=sc->viewModel();ASSERT_NE(vm,nullptr);
+  auto v=vm->propertyImage("img");ASSERT_NE(v,nullptr);EXPECT_EQ(v->value(),"a.png");
+  v->value("b.png");auto sf=pagx::PAGSurface::MakeOffscreen(200,200);ASSERT_NE(sf,nullptr);
+  EXPECT_TRUE(sc->draw(sf));EXPECT_EQ(v->value(),"b.png");
+}
+
+
+
 }  // namespace pag

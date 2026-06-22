@@ -395,10 +395,6 @@ void PAGComposition::refreshPlainContainerChildren(
   }
 }
 
-std::shared_ptr<PAGViewModel> PAGComposition::viewModel() {
-  return compositionViewModel;
-}
-
 void PAGComposition::updateDataBinds(float mix) {
   if (dataBindRuntime != nullptr) {
     dataBindRuntime->syncBack(binding.get());
