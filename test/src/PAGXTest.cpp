@@ -10820,4 +10820,152 @@ PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_after"));
 }
 
+PAGX_TEST(PAGXTest, GetRequiredFonts) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  // No fonts yet.
+  EXPECT_TRUE(doc->getRequiredFonts().empty());
+
+  // Add a Text node directly.
+  auto* text1 = doc->makeNode<pagx::Text>("text1");
+  text1->fontFamily = "Arial";
+  text1->fontStyle = "Bold";
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts[0].first, "Arial");
+  EXPECT_EQ(fonts[0].second, "Bold");
+
+  // Same font, different node — deduplicated.
+  auto* text2 = doc->makeNode<pagx::Text>("text2");
+  text2->fontFamily = "Arial";
+  text2->fontStyle = "Bold";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 1u);
+
+  // Different font style.
+  auto* text3 = doc->makeNode<pagx::Text>("text3");
+  text3->fontFamily = "Arial";
+  text3->fontStyle = "Italic";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 2u);
+
+  // Different font family.
+  auto* text4 = doc->makeNode<pagx::Text>("text4");
+  text4->fontFamily = "Times New Roman";
+  text4->fontStyle = "Regular";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 3u);
+
+  // Empty fontFamily is skipped.
+  auto* text5 = doc->makeNode<pagx::Text>("text5");
+  text5->fontFamily = "";
+  text5->fontStyle = "Whatever";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 3u);
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsNestedInGroupAndTextBox) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // Text inside Group inside Layer.
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* textInGroup = doc->makeNode<pagx::Text>();
+  textInGroup->fontFamily = "Helvetica";
+  textInGroup->fontStyle = "Regular";
+  group->elements = {textInGroup};
+
+  // Text inside TextBox inside same Layer.
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  auto* textInTextBox = doc->makeNode<pagx::Text>();
+  textInTextBox->fontFamily = "Courier";
+  textInTextBox->fontStyle = "Bold";
+  textBox->elements = {textInTextBox};
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {group, textBox};
+  doc->layers = {layer};
+
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 2u);
+  EXPECT_EQ(fonts[0].first, "Courier");
+  EXPECT_EQ(fonts[1].first, "Helvetica");
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsFromComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto* comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 200;
+  comp->height = 200;
+  auto* compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->contents = {};
+  comp->layers = {compLayer};
+
+  auto* textInComp = doc->makeNode<pagx::Text>();
+  textInComp->fontFamily = "System";
+  textInComp->fontStyle = "Regular";
+  compLayer->contents = {textInComp};
+
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts[0].first, "System");
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto rootFamily = typeface->fontFamily();
+  auto rootStyle = typeface->fontStyle();
+
+  // Root document text using real typeface.
+  auto* rootText = doc->makeNode<pagx::Text>();
+  rootText->text = "Hello";
+  rootText->fontFamily = rootFamily;
+  rootText->fontStyle = rootStyle;
+  rootText->fontSize = 24;
+  rootText->position = {10, 50};
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(fill->color)->color = {0.2f, 0.2f, 0.8f, 1.0f};
+  auto* rootLayer = doc->makeNode<pagx::Layer>();
+  rootLayer->contents = {rootText, fill};
+  doc->layers = {rootLayer};
+
+  // External document with a different string font.
+  auto* slotLayer = doc->makeNode<pagx::Layer>();
+  slotLayer->compositionFilePath = "external.pagx";
+  doc->layers.push_back(slotLayer);
+
+  std::string externalXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"extLayer\">\n"
+      "    <Text text=\"World\" fontFamily=\"Helvetica\" fontStyle=\"Regular\""
+      " fontSize=\"24\" position=\"10,50\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#CC3333\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+
+  EXPECT_TRUE(doc->loadFileData("external.pagx", MakePAGXData(externalXML)));
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  // After loading, both fonts appear.
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 2u);
+
+  // Register typeface and run full pipeline.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerTypeface(typeface);
+  doc->applyLayout(&fontConfig);
+  EXPECT_TRUE(doc->embed());
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Render and verify text is correctly shaped with the registered font.
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/GetRequiredFontsCrossDocument"));
+}
+
 }  // namespace pag

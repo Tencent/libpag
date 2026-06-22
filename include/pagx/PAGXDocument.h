@@ -178,6 +178,16 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
+   * Returns the set of unique (fontFamily, fontStyle) pairs required by Text nodes in this
+   * document and all loaded external composition documents (externalDoc). Call after all
+   * external file data has been loaded via loadFileData() to get complete results. The caller
+   * can use this list to register typeface with FontConfig before applyLayout() or embed().
+   * Empty fontFamily entries are skipped.
+   * @return deduplicated list of (fontFamily, fontStyle) pairs. Results are sorted.
+   */
+  std::vector<std::pair<std::string, std::string>> getRequiredFonts() const;
+
+  /**
    * Reflects post-build edits to the given nodes in every scene created from this document. Layer
    * handles are preserved wherever possible. Pass a container node to reflect changes to its child
    * list; an animation, animation object, or channel to apply new timeline data.

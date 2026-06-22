@@ -34,6 +34,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "renderer/FontEmbedder.h"
@@ -331,6 +332,34 @@ void PAGXDocument::clearEmbed() {
       static_cast<Font*>(node.get())->resetRenderCache();
     }
   }
+}
+
+static void AppendRequiredFonts(const PAGXDocument* document,
+                                std::vector<std::pair<std::string, std::string>>* outPairs) {
+  if (document == nullptr || outPairs == nullptr) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Text) {
+      auto* text = static_cast<Text*>(node.get());
+      if (!text->fontFamily.empty()) {
+        outPairs->emplace_back(text->fontFamily, text->fontStyle);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        AppendRequiredFonts(layer->externalDoc.get(), outPairs);
+      }
+    }
+  }
+}
+
+std::vector<std::pair<std::string, std::string>> PAGXDocument::getRequiredFonts() const {
+  std::vector<std::pair<std::string, std::string>> pairs = {};
+  AppendRequiredFonts(this, &pairs);
+  std::sort(pairs.begin(), pairs.end());
+  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+  return pairs;
 }
 
 namespace {
