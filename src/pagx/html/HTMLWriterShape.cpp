@@ -1286,7 +1286,7 @@ std::string HTMLWriter::getOrCreatePathDef(const std::string& d) {
 }
 
 void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, float bboxY,
-                              float bboxW, float bboxH) {
+                              float bboxW, float bboxH, bool emitFillRule) {
   if (!fill) {
     out.addAttr("fill", "none");
     return;
@@ -1299,7 +1299,7 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, f
   if (ea < 1.0f) {
     out.addAttr("fill-opacity", CssFloatToString(ea));
   }
-  if (fill->fillRule == FillRule::EvenOdd) {
+  if (emitFillRule && fill->fillRule == FillRule::EvenOdd) {
     out.addAttr("fill-rule", "evenodd");
   }
 }
@@ -2207,7 +2207,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         }
         out.openTag("path");
         out.addAttr("d", firstPathD);
-        applySVGFill(out, fill, x0, y0, sw, sh);
+        applySVGFill(out, fill, x0, y0, sw, sh, false);
         applySVGStroke(out, stroke);
         out.closeTagSelfClosing();
         for (size_t i = 1; i < geos.size(); i++) {
@@ -2290,7 +2290,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (fillRule != "nonzero") {
       out.addAttr("fill-rule", fillRule);
     }
-    applySVGFill(out, fill, x0, y0, sw, sh);
+    applySVGFill(out, fill, x0, y0, sw, sh, false);
     applySVGStroke(out, stroke);
     out.closeTagSelfClosing();
     out.closeTag();

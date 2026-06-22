@@ -552,7 +552,7 @@ class HTMLWriter {
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,
-                    float bboxW = 0, float bboxH = 0);
+                    float bboxW = 0, float bboxH = 0, bool emitFillRule = true);
   void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
 
   // Returns the ID for a path definition in the global <defs>. If the d-string was already
