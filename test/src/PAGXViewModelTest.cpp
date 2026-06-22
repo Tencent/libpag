@@ -1466,13 +1466,16 @@ PAGX_TEST(PAGXViewModelTest, NestedCompositionDataBind) {
   // Verify the DataBind actually drives the child layer's alpha.
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
-  EXPECT_TRUE(scene->draw(surface));
 
   // Get the tgfx layer through the same path as root-level tests.
   auto nestedChild = nestedComp->children[0];
   ASSERT_NE(nestedChild, nullptr);
   auto tgfxRect = nestedChild->runtimeLayer;
   ASSERT_NE(tgfxRect, nullptr);
+
+  // First draw should apply the ViewModel default (1.0) to the layer.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxRect->alpha(), 1.0f);
 
   // Set opacity to 0.3 via ViewModel, verify it propagates to the nested layer.
   opacityProp->value(0.3f);

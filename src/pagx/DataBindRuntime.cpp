@@ -97,8 +97,8 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.onceApplied = false;
     entries.push_back(entry);
 
-    // Once needs an immediate first application.
-    if (db->flags == DataBindFlags::Once) {
+    // Mark dirty so the default value is applied on the first draw.
+    if (toTarget) {
       markDirty(db);
     }
   }
