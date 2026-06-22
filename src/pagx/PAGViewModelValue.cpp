@@ -66,12 +66,6 @@ void PAGViewModelValue::advanced() {
   dirty = false;
 }
 
-// ---- PropertyData ------------------------------------------------------------
-
-PropertyData* PAGViewModelValue::propertyData() const {
-  return cachedPropertyData;
-}
-
 // ---- Dependent tracking (DataBindRuntime) -----------------------------------
 
 void PAGViewModelValue::notifyDependents() {

@@ -40,9 +40,8 @@ class PAGViewModelValueNumber : public PAGViewModelValue {
    */
   void value(float v);
 
-  float propertyValue = 0.0f;
-
  private:
+  float propertyValue = 0.0f;
 
   friend class PAGViewModel;
   friend class PAGScene;

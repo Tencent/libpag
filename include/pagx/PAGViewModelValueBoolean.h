@@ -39,9 +39,8 @@ class PAGViewModelValueBoolean : public PAGViewModelValue {
    */
   void value(bool v);
 
-  bool propertyValue = false;
-
  private:
+  bool propertyValue = false;
 
   friend class PAGViewModel;
   friend class PAGScene;

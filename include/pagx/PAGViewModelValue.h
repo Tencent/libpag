@@ -81,12 +81,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
     return type;
   }
 
-  /**
-   * Returns the PropertyData reflection metadata for this property, or nullptr if the schema
-   * did not define customData for this property. Lazy-created on first access.
-   */
-  PropertyData* propertyData() const;
-
   void setScene(const std::shared_ptr<PAGScene>& scn) {
     scene = scn;
   }
@@ -134,7 +128,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   };
   std::vector<ObserverEntry> observers = {};
   int nextObserverId = 1;
-  mutable PropertyData* cachedPropertyData = nullptr;
   std::vector<DataBindRuntime*> dependents = {};
 
   /**

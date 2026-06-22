@@ -1512,6 +1512,9 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
         }
       } else if (child->name == "Animations") {
         ParseAnimations(child.get(), &comp->animations, doc);
+      } else if (child->name == "DataBind") {
+        auto bind = ParseDataBind(child.get(), doc);
+        if (bind) comp->dataBinds.push_back(bind);
       } else {
         ReportError(doc, child.get(),
                     "Element '" + child->name +
@@ -2723,7 +2726,8 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         vm->properties.push_back(prop);
       }
     } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
-      (void)ParseDataConverter(child.get(), doc);
+      // Inline DataConverter inside ViewModel without an @id cannot be referenced
+      // by Property.dataConverter attributes. Skip silently.
     }
     child = child->nextSibling;
   }
