@@ -163,7 +163,8 @@ class PAGXDocument : public Node {
    *
    * @param filePath the external file path to match against Image nodes
    * @param decodedImage the pre-decoded tgfx::Image to attach
-   * @return the first matching Image node, or nullptr if no match was found.
+   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
+   * if no match was found.
    */
   Image* loadDecodedImage(const std::string& filePath, std::shared_ptr<tgfx::Image> decodedImage);
 
@@ -183,7 +184,8 @@ class PAGXDocument : public Node {
    *
    * @param filePath the external file path to match against Image nodes
    * @param thumbnailImage the pre-decoded low-resolution preview tgfx::Image to attach
-   * @return the first matching Image node, or nullptr if no match was found.
+   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
+   * if no match was found.
    */
   Image* loadDecodedImageAsThumbnail(const std::string& filePath,
                                      std::shared_ptr<tgfx::Image> thumbnailImage);
@@ -196,7 +198,8 @@ class PAGXDocument : public Node {
    * preserved so the node can be re-attached later when a new full-quality version arrives.
    *
    * @param filePath the external file path to match against Image nodes
-   * @return the first matching Image node, or nullptr if no match was found.
+   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
+   * if no match was found.
    */
   Image* clearDecodedImage(const std::string& filePath);
 
@@ -206,7 +209,8 @@ class PAGXDocument : public Node {
    * so a new thumbnail can be attached via loadDecodedImageAsThumbnail().
    *
    * @param filePath the external file path to match against Image nodes
-   * @return the first matching Image node, or nullptr if no match was found.
+   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
+   * if no match was found.
    */
   Image* clearThumbnailImage(const std::string& filePath);
 
@@ -225,7 +229,9 @@ class PAGXDocument : public Node {
    * filePath in the future will need their own lookup helpers.
    *
    * @param imageFilePath the Image node filePath to match against
-   * @return the list of Layers referencing the given image filePath, empty when no match
+   * @return the list of Layers referencing the given image filePath, empty when no match.
+   * Returned reference is invalidated by the next notifyChange() call; copy if you need to retain
+   * it.
    */
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
 

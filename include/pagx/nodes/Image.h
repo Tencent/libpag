@@ -57,8 +57,9 @@ class Image : public Node {
    * Low-resolution preview tgfx::Image used as a fallback when decodedImage is unavailable
    * (initial load not yet complete, or the full-resolution texture has been evicted under memory
    * pressure). When non-null, the renderer falls back to this so the affected fill area shows a
-   * blurry preview rather than a blank rectangle. Populated via PAGXDocument::loadDecodedImage()
-   * with a thumbnail-quality image. Platforms that do not use progressive image loading leave it
+   * blurry preview rather than a blank rectangle. Populated via
+   * PAGXDocument::loadDecodedImageAsThumbnail() with a thumbnail-quality image. Platforms that do
+   * not use progressive image loading leave it
    * null.
    */
   std::shared_ptr<tgfx::Image> thumbnailImage = nullptr;

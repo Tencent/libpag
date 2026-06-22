@@ -44,12 +44,19 @@ inline tgfx::Color ParseHexColor(const std::string& hex) {
   if (hex.empty() || hex[0] != '#') {
     return DefaultBackgroundColor();
   }
-  if (hex.size() == 4) {
+  if (hex.size() == 4 || hex.size() == 5) {
     int r = ParseHexDigit(hex[1]);
     int g = ParseHexDigit(hex[2]);
     int b = ParseHexDigit(hex[3]);
     if (r < 0 || g < 0 || b < 0) {
       return DefaultBackgroundColor();
+    }
+    if (hex.size() == 5) {
+      int a = ParseHexDigit(hex[4]);
+      if (a < 0) {
+        return DefaultBackgroundColor();
+      }
+      return tgfx::Color::FromRGBA(r * 17, g * 17, b * 17, a * 17);
     }
     return tgfx::Color::FromRGBA(r * 17, g * 17, b * 17);
   }
