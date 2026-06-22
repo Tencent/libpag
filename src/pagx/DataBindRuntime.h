@@ -31,7 +31,7 @@ class PAGViewModelValue;
 class PAGXDocument;
 struct RuntimeBinding;
 class Node;
-}
+}  // namespace pagx
 
 namespace tgfx {
 class Layer;
@@ -44,8 +44,8 @@ class DataBindRuntime {
   DataBindRuntime() = default;
   ~DataBindRuntime();
 
-  void bind(const std::vector<DataBind*>& binds, DataContext* context,
-            RuntimeBinding* binding, PAGXDocument* doc);
+  void bind(const std::vector<DataBind*>& binds, DataContext* context, RuntimeBinding* binding,
+            PAGXDocument* doc);
 
   void markDirty(DataBind* bind);
   void markDirtyForValue(PAGViewModelValue* value);
@@ -58,6 +58,7 @@ class DataBindRuntime {
   struct BindingEntry {
     DataBind* dataBind = nullptr;
     PAGViewModelValue* source = nullptr;
+    std::weak_ptr<PAGViewModelValue> sourceGuard = {};
     const Node* targetNode = nullptr;
     std::string channel = {};
     bool isToSource = false;   // ToSource or TwoWay
@@ -68,8 +69,7 @@ class DataBindRuntime {
   std::vector<DataBind*> dirtyBinds = {};
   std::vector<BindingEntry> entries = {};
 
-  static float readTargetFloat(tgfx::Layer* layer, const std::string& channel,
-                               float fallback);
+  static float readTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
 };
 
 }  // namespace pagx

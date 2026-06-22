@@ -51,6 +51,9 @@ PAGViewModelValue* DataContext::resolve(const std::vector<std::string>& path) co
   std::shared_ptr<PAGViewModel> currentVM = vm;
   for (size_t i = start; i < path.size(); i++) {
     if (currentVM == nullptr) {
+      if (parentContext != nullptr) {
+        return parentContext->resolve(path);
+      }
       break;
     }
     auto* value = currentVM->findProperty(path[i]);

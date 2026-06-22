@@ -19,6 +19,8 @@
 #include "pagx/DataBindRuntime.h"
 #include <algorithm>
 #include <sstream>
+#include "pagx/DataContext.h"
+#include "pagx/DataConverterRegistry.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
@@ -26,8 +28,6 @@
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/DataContext.h"
-#include "pagx/DataConverterRegistry.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
@@ -41,7 +41,7 @@ namespace pagx {
 
 DataBindRuntime::~DataBindRuntime() {
   for (auto& entry : entries) {
-    if (entry.source != nullptr) {
+    if (entry.source != nullptr && entry.sourceGuard.lock() != nullptr) {
       entry.source->removeDependent(this);
     }
   }
@@ -83,13 +83,13 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     }
     sourceValue->addDependent(this);
 
-    bool toSource = db->flags == DataBindFlags::ToSource ||
-                    db->flags == DataBindFlags::TwoWay;
+    bool toSource = db->flags == DataBindFlags::ToSource || db->flags == DataBindFlags::TwoWay;
     bool toTarget = db->flags != DataBindFlags::ToSource;
 
     BindingEntry entry;
     entry.dataBind = db;
     entry.source = sourceValue;
+    entry.sourceGuard = sourceValue->weak_from_this();
     entry.targetNode = targetNode;
     entry.channel = db->channel;
     entry.isToSource = toSource;
@@ -171,7 +171,8 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         break;
       }
     }
-    if (entry == nullptr || entry->source == nullptr || entry->targetNode == nullptr) {
+    if (entry == nullptr || entry->source == nullptr || entry->targetNode == nullptr ||
+        entry->dataBind == nullptr) {
       continue;
     }
     // ToSource only: no ViewModel → layer direction.
