@@ -31,9 +31,8 @@
 
 namespace pag {
 
-static std::string LoadAndConvert(const std::string& pagxPath,
-                                  const pagx::HTMLExportOptions& options = {}) {
-  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+static std::string ConvertToHTML(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                 const pagx::HTMLExportOptions& options = {}) {
   if (doc == nullptr) {
     return "";
   }
@@ -42,6 +41,39 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   // collisions (e.g. dgc0.png from two different samples) are harmless.
   auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
   return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
+}
+
+static std::string LoadAndConvert(const std::string& pagxPath,
+                                  const pagx::HTMLExportOptions& options = {}) {
+  return ConvertToHTML(pagx::PAGXImporter::FromFile(pagxPath), options);
+}
+
+static std::string LoadXMLAndConvert(const std::string& xml,
+                                     const pagx::HTMLExportOptions& options = {}) {
+  return ConvertToHTML(pagx::PAGXImporter::FromXML(xml), options);
+}
+
+static std::string FindTagContaining(const std::string& html, const std::string& marker) {
+  auto markerPos = html.find(marker);
+  if (markerPos == std::string::npos) {
+    return "";
+  }
+  auto tagStart = html.rfind('<', markerPos);
+  auto tagEnd = html.find('>', markerPos);
+  if (tagStart == std::string::npos || tagEnd == std::string::npos || tagEnd < tagStart) {
+    return "";
+  }
+  return html.substr(tagStart, tagEnd - tagStart + 1);
+}
+
+static size_t CountOccurrences(const std::string& text, const std::string& needle) {
+  size_t count = 0;
+  size_t pos = 0;
+  while ((pos = text.find(needle, pos)) != std::string::npos) {
+    count++;
+    pos += needle.size();
+  }
+  return count;
 }
 
 static std::vector<std::string> GetHtmlTestFiles() {
@@ -331,6 +363,51 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_path.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("<path"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, FillRuleIsScopedAwayFromMergePathFillAttributes) {
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="120" height="120">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Path data="M10,10 L50,10 L50,50 L10,50 Z M20,20 L40,20 L40,40 L20,40 Z"/>
+    <Fill color="#EC4899" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="30,80" size="40,40"/>
+    <Ellipse position="50,80" size="40,40"/>
+    <MergePath mode="append"/>
+    <Fill color="#8B5CF6" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,30" size="40,40"/>
+    <Ellipse position="100,30" size="40,40"/>
+    <MergePath mode="intersect"/>
+    <Fill color="#F59E0B" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,80" size="40,40"/>
+    <Ellipse position="100,80" size="40,40"/>
+    <MergePath mode="xor"/>
+    <Fill color="#10B981" fillRule="evenOdd"/>
+  </Layer>
+</pagx>)");
+  ASSERT_FALSE(html.empty());
+
+  auto standaloneTag = FindTagContaining(html, "fill=\"#EC4899\"");
+  ASSERT_FALSE(standaloneTag.empty());
+  EXPECT_EQ(CountOccurrences(standaloneTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
+
+  auto appendTag = FindTagContaining(html, "fill=\"#8B5CF6\"");
+  ASSERT_FALSE(appendTag.empty());
+  EXPECT_EQ(appendTag.find("fill-rule"), std::string::npos);
+
+  auto intersectTag = FindTagContaining(html, "fill=\"#F59E0B\"");
+  ASSERT_FALSE(intersectTag.empty());
+  EXPECT_EQ(intersectTag.find("fill-rule"), std::string::npos);
+
+  auto xorTag = FindTagContaining(html, "fill=\"#10B981\"");
+  ASSERT_FALSE(xorTag.empty());
+  EXPECT_EQ(CountOccurrences(xorTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
 }
 
 // =============================================================================
