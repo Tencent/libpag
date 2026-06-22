@@ -27,8 +27,10 @@
 #include "pagx/PAGViewModelValueString.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/DataContext.h"
+#include "pagx/DataConverterRegistry.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
@@ -181,6 +183,9 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
       continue;
     }
     auto keyValue = valueToKeyValue(entry->source);
+    if (entry->source->converter != nullptr) {
+      keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
+    }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
     if (entry->dataBind->flags == DataBindFlags::Once) {
       entry->onceApplied = true;

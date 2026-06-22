@@ -115,6 +115,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   ViewModelValueType type = ViewModelValueType::Number;
   std::weak_ptr<PAGScene> scene = {};
   bool notifying = false;
+  class DataConverter* converter = nullptr;
 
   /**
    * Notifies all registered dependent DataBindRuntime instances that this value changed.

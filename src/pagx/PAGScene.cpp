@@ -102,7 +102,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       case ViewModelPropertyType::Image: { auto v = std::make_shared<PAGViewModelValueImage>(); v->propertyValue = prop->defaultImage; v->type = ViewModelValueType::Image; value = std::move(v); break; }
       case ViewModelPropertyType::ViewModel: { auto v = std::make_shared<PAGViewModelValueViewModel>(); v->type = ViewModelValueType::ViewModel; value = std::move(v); break; }
     }
-    if (value) { value->propertyName = prop->name; value->setScene(scene); vm->propertyMap[prop->name] = value; vm->propertyList.push_back(value); }
+    if (value) { value->propertyName = prop->name; value->setScene(scene); value->converter = prop->dataConverter; vm->propertyMap[prop->name] = value; vm->propertyList.push_back(value); }
   }
   return vm;
 }

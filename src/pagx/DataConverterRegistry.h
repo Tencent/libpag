@@ -1,0 +1,59 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include "pagx/nodes/Channel.h"
+
+namespace pagx {
+
+class DataConverter;
+
+/**
+ * DataConverterRegistry manages named DataConverter implementations. Converters
+ * transform KeyValue inputs into KeyValue outputs based on user-defined parameters.
+ * Built-in converters are registered automatically; custom converters can be added
+ * via registerConverter().
+ */
+class DataConverterRegistry {
+ public:
+  using ConverterFn = std::function<KeyValue(const KeyValue& input,
+                                             const std::unordered_map<std::string, std::string>& params)>;
+
+  static DataConverterRegistry& instance();
+
+  /**
+   * Registers a converter function under the given type name.
+   */
+  void registerConverter(const std::string& typeName, ConverterFn fn);
+
+  /**
+   * Applies the converter identified by converterType with given params to the input value.
+   * Returns the input unchanged if no converter matches or if converter is null.
+   */
+  KeyValue apply(const DataConverter* converter, const KeyValue& input) const;
+
+ private:
+  DataConverterRegistry();
+  std::unordered_map<std::string, ConverterFn> converters = {};
+};
+
+}  // namespace pagx

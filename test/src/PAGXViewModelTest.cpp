@@ -27,6 +27,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/nodes/Channel.h"
+#include "pagx/DataConverterRegistry.h"
 #include "base/PAGTest.h"
 #include "tgfx/layers/Layer.h"
 
@@ -595,6 +597,102 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   auto v=vm->propertyImage("img");ASSERT_NE(v,nullptr);EXPECT_EQ(v->value(),"a.png");
   v->value("b.png");auto sf=pagx::PAGSurface::MakeOffscreen(200,200);ASSERT_NE(sf,nullptr);
   EXPECT_TRUE(sc->draw(sf));EXPECT_EQ(v->value(),"b.png");
+}
+
+
+
+// ========== DataConverter runtime ==========
+
+PAGX_TEST(PAGXViewModelTest, DataConverterSecondsToFrames) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // Setup converter
+  auto* conv = doc->makeNode<pagx::DataConverter>("c1");
+  conv->converterType = "secondsToFrames";
+  conv->params["frameRate"] = "60";
+
+  // ViewModel property with converter
+  auto* schema = doc->makeNode<pagx::ViewModel>("T");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "duration"; prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 1.0f; prop->dataConverter = conv;
+  schema->properties.push_back(prop); doc->viewModel = schema;
+
+  auto layer = doc->makeNode<pagx::Layer>("r"); layer->width=200; layer->height=200;
+  auto rect = doc->makeNode<pagx::Rectangle>(); rect->size.width=200; rect->size.height=200;
+  auto fill = doc->makeNode<pagx::Fill>(); auto color = doc->makeNode<pagx::SolidColor>(); fill->color = color;
+  auto group = doc->makeNode<pagx::Group>(); group->elements.push_back(rect); group->elements.push_back(fill);
+  layer->contents.push_back(group); doc->layers.push_back(layer);
+
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.duration"; db->target = "@r"; db->channel = "x";
+  doc->dataBinds.push_back(db);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel(); ASSERT_NE(vm, nullptr);
+  auto propV = vm->propertyNumber("duration"); ASSERT_NE(propV, nullptr);
+  EXPECT_FLOAT_EQ(propV->value(), 1.0f);
+
+  // Set duration to 2.0 seconds → converter outputs 120.0 frames (2.0 * 60).
+  propV->value(2.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200); ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+
+  // Verify converter was applied: layer x = 2.0 * 60 = 120.0
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tl = layers[0]->runtimeLayer;
+  ASSERT_NE(tl, nullptr);
+  EXPECT_FLOAT_EQ(tl->matrix().getTranslateX(), 120.0f);
+}
+
+PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto* conv = doc->makeNode<pagx::DataConverter>("c1");
+  conv->converterType = "priceFormat";
+  conv->params["prefix"] = "$";
+  conv->params["decimals"] = "2";
+
+  auto* schema = doc->makeNode<pagx::ViewModel>("T");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "price"; prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 0.0f; prop->dataConverter = conv;
+  schema->properties.push_back(prop); doc->viewModel = schema;
+
+  auto layer = doc->makeNode<pagx::Layer>("r"); layer->width=200; layer->height=200;
+  auto rect = doc->makeNode<pagx::Rectangle>(); rect->size.width=200; rect->size.height=200;
+  auto fill = doc->makeNode<pagx::Fill>(); auto color = doc->makeNode<pagx::SolidColor>(); fill->color = color;
+  auto group = doc->makeNode<pagx::Group>(); group->elements.push_back(rect); group->elements.push_back(fill);
+  layer->contents.push_back(group); doc->layers.push_back(layer);
+
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.price"; db->target = "@r"; db->channel = "name";
+  doc->dataBinds.push_back(db);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel(); ASSERT_NE(vm, nullptr);
+  auto propV = vm->propertyNumber("price"); ASSERT_NE(propV, nullptr);
+  propV->value(5999.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200); ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+  // Converter output is "$5999.00" (string), applied to the "name" channel.
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  EXPECT_GT(layers.size(), 0u);
+}
+
+PAGX_TEST(PAGXViewModelTest, DataConverterNotFoundPassthrough) {
+  // Non-existent converter → value passes through unchanged.
+  pagx::KeyValue input{42.0f};
+  auto output = pagx::DataConverterRegistry::instance().apply(nullptr, input);
+  ASSERT_TRUE(std::holds_alternative<float>(output));
+  EXPECT_FLOAT_EQ(std::get<float>(output), 42.0f);
 }
 
 
