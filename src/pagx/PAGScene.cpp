@@ -193,6 +193,8 @@ void PAGScene::buildViewModels() {
       _rootComposition->dataBindRuntime->bind(document->dataBinds,
                                               _rootComposition->dataContext.get(),
                                               _rootComposition->binding.get(), document.get());
+  }
+  if (_rootComposition != nullptr) {
     buildNestedViewModels(_rootComposition.get());
   }
 }

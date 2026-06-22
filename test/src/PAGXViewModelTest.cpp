@@ -1407,6 +1407,65 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataReflectsSchema) {
 
 // ========== Nested composition DataBind ==========
 
+PAGX_TEST(PAGXViewModelTest, NestedCompositionDataBind) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // Child composition: ViewModel + Layer + DataBind.
+  auto* childComp = doc->makeNode<pagx::Composition>("ChildComp");
+  childComp->width = 200;
+  childComp->height = 200;
+  auto* childVM = doc->makeNode<pagx::ViewModel>("ChildVM");
+  auto* vmProp = doc->makeNode<pagx::ViewModelProperty>();
+  vmProp->name = "opacity";
+  vmProp->propertyType = pagx::ViewModelPropertyType::Number;
+  vmProp->defaultNumber = 1.0f;
+  childVM->properties.push_back(vmProp);
+  childComp->viewModel = childVM;
+  auto* childLayer = doc->makeNode<pagx::Layer>("childRect");
+  childLayer->width = 100;
+  childLayer->height = 100;
+  auto* childRect = doc->makeNode<pagx::Rectangle>();
+  childRect->size.width = 100;
+  childRect->size.height = 100;
+  auto* childFill = doc->makeNode<pagx::Fill>();
+  auto* childColor = doc->makeNode<pagx::SolidColor>();
+  childColor->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  childFill->color = childColor;
+  auto* childGroup = doc->makeNode<pagx::Group>();
+  childGroup->elements.push_back(childRect);
+  childGroup->elements.push_back(childFill);
+  childLayer->contents.push_back(childGroup);
+  childComp->layers.push_back(childLayer);
+  auto* childBind = doc->makeNode<pagx::DataBind>();
+  childBind->source = "$vm.opacity";
+  childBind->target = "@childRect";
+  childBind->channel = "alpha";
+  childComp->dataBinds.push_back(childBind);
+
+  // Slot layer referencing child composition.
+  auto* slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = childComp;
+  slot->width = 200;
+  slot->height = 200;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_EQ(rootComp->children.size(), 1u);
+  auto nestedComp = static_cast<pagx::PAGComposition*>(rootComp->children[0].get());
+  ASSERT_NE(nestedComp, nullptr);
+
+  // The LOGI output above will tell us exactly what's happening.
+  // If compositionViewModel is null, the debug logs will show which check failed.
+  auto childVm = nestedComp->compositionViewModel;
+  ASSERT_NE(childVm, nullptr);
+}
+
+// ========== vmContext connection ==========
+
 PAGX_TEST(PAGXViewModelTest, VMContextConnection) {
   // Verify that vmContext on a Layer correctly connects the parent ViewModel's
   // ViewModel-typed property to the child composition's ViewModel instance.
