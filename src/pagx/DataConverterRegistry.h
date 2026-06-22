@@ -30,8 +30,7 @@ class DataConverter;
 /**
  * DataConverterRegistry manages named DataConverter implementations. Converters
  * transform KeyValue inputs into KeyValue outputs based on user-defined parameters.
- * Built-in converters are registered automatically; custom converters can be added
- * via registerConverter().
+ * Built-in converters are registered automatically.
  */
 class DataConverterRegistry {
  public:
