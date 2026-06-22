@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -26,9 +27,8 @@
 namespace pagx {
 
 /**
- * PropertyData exposes reflection metadata for a ViewModel property at runtime. It mirrors the
- * schema-level ViewModelProperty node so that business layers can auto-generate UI controls
- * without hardcoding property names or types.
+ * PropertyData exposes reflection metadata for a ViewModel property at runtime. The engine
+ * populates all fields from the schema — business code only reads them, never writes.
  *
  * Use type() to identify the concrete subclass, then static_cast to the derived type to access
  * type-specific fields. Subclasses are listed below.
@@ -74,8 +74,8 @@ class PropertyData {
 };
 
 /**
- * Reflection metadata for a Number property. Adds min/max range values for UI controls
- * like sliders and progress bars.
+ * Reflection metadata for a Number property. Includes the default value and optional
+ * min/max constraints for UI controls like sliders.
  */
 class NumberPropertyData : public PropertyData {
  public:
@@ -84,14 +84,19 @@ class NumberPropertyData : public PropertyData {
   }
 
   /**
-   * The minimum allowed value for this property. Default is 0.0.
+   * The default numeric value from the schema, or nullopt if not specified.
    */
-  float minValue = 0.0f;
+  std::optional<float> defaultValue = std::nullopt;
 
   /**
-   * The maximum allowed value for this property. Default is 0.0 (unbounded).
+   * The minimum allowed value, or nullopt if not specified in the schema.
    */
-  float maxValue = 0.0f;
+  std::optional<float> minValue = std::nullopt;
+
+  /**
+   * The maximum allowed value, or nullopt if not specified in the schema.
+   */
+  std::optional<float> maxValue = std::nullopt;
 };
 
 /**
@@ -102,6 +107,11 @@ class StringPropertyData : public PropertyData {
   StringPropertyData() {
     propertyType = Type::String;
   }
+
+  /**
+   * The default string value from the schema, or nullopt if not specified.
+   */
+  std::optional<std::string> defaultValue = std::nullopt;
 };
 
 /**
@@ -112,6 +122,11 @@ class BooleanPropertyData : public PropertyData {
   BooleanPropertyData() {
     propertyType = Type::Boolean;
   }
+
+  /**
+   * The default boolean value from the schema, or nullopt if not specified.
+   */
+  std::optional<bool> defaultValue = std::nullopt;
 };
 
 /**
@@ -122,6 +137,11 @@ class ColorPropertyData : public PropertyData {
   ColorPropertyData() {
     propertyType = Type::Color;
   }
+
+  /**
+   * The default color value from the schema, or nullopt if not specified.
+   */
+  std::optional<Color> defaultValue = std::nullopt;
 };
 
 /**
@@ -144,14 +164,13 @@ class ViewModelPropertyData : public PropertyData {
   }
 
   /**
-   * The id of the referenced ViewModel schema.
+   * The id of the referenced ViewModel schema from viewModelRef.
    */
-  std::string viewModelRef = {};
+  std::string viewModelId = {};
 };
 
 /**
  * Reflection metadata for an Enum property. Stores the list of allowed string values.
- * The runtime value is the integer index into this list.
  */
 class EnumPropertyData : public PropertyData {
  public:
@@ -160,14 +179,13 @@ class EnumPropertyData : public PropertyData {
   }
 
   /**
-   * The list of allowed enum string values. The runtime integer value is the index.
+   * The list of allowed enum string values from the schema's options attribute.
    */
   std::vector<std::string> options = {};
 };
 
 /**
- * Reflection metadata for a Trigger property. Triggers are boolean-like values that
- * fire once and auto-reset.
+ * Reflection metadata for a Trigger property.
  */
 class TriggerPropertyData : public PropertyData {
  public:

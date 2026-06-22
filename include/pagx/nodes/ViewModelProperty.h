@@ -77,6 +77,16 @@ class ViewModelProperty : public Node {
   float defaultNumber = 0.0f;
 
   /**
+   * Minimum allowed value for Number properties. Default is 0.0 (no constraint).
+   */
+  float minValue = 0.0f;
+
+  /**
+   * Maximum allowed value for Number properties. Default is 0.0 (no constraint).
+   */
+  float maxValue = 0.0f;
+
+  /**
    * Default string value, used when propertyType is String.
    */
   std::string defaultString = {};

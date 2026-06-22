@@ -159,24 +159,38 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       switch (prop->propertyType) {
         case ViewModelPropertyType::Number: {
           auto d = std::make_shared<NumberPropertyData>();
+          d->defaultValue = prop->defaultNumber;
+          if (prop->minValue != 0.0f) d->minValue = prop->minValue;
+          if (prop->maxValue != 0.0f) d->maxValue = prop->maxValue;
           pd = d;
           break;
         }
-        case ViewModelPropertyType::String:
-          pd = std::make_shared<StringPropertyData>();
+        case ViewModelPropertyType::String: {
+          auto d = std::make_shared<StringPropertyData>();
+          d->defaultValue = prop->defaultString;
+          pd = d;
           break;
-        case ViewModelPropertyType::Boolean:
-          pd = std::make_shared<BooleanPropertyData>();
+        }
+        case ViewModelPropertyType::Boolean: {
+          auto d = std::make_shared<BooleanPropertyData>();
+          d->defaultValue = prop->defaultBoolean;
+          pd = d;
           break;
-        case ViewModelPropertyType::Color:
-          pd = std::make_shared<ColorPropertyData>();
+        }
+        case ViewModelPropertyType::Color: {
+          auto d = std::make_shared<ColorPropertyData>();
+          d->defaultValue = prop->defaultColor;
+          pd = d;
           break;
-        case ViewModelPropertyType::Image:
-          pd = std::make_shared<ImagePropertyData>();
+        }
+        case ViewModelPropertyType::Image: {
+          auto d = std::make_shared<ImagePropertyData>();
+          pd = d;
           break;
+        }
         case ViewModelPropertyType::ViewModel: {
           auto d = std::make_shared<ViewModelPropertyData>();
-          if (prop->viewModelRef != nullptr) d->viewModelRef = prop->viewModelRef->id;
+          if (prop->viewModelRef != nullptr) d->viewModelId = prop->viewModelRef->id;
           pd = d;
           break;
         }
@@ -186,9 +200,11 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
           pd = d;
           break;
         }
-        case ViewModelPropertyType::Trigger:
-          pd = std::make_shared<TriggerPropertyData>();
+        case ViewModelPropertyType::Trigger: {
+          auto d = std::make_shared<TriggerPropertyData>();
+          pd = d;
           break;
+        }
       }
       pd->propertyName = prop->name;
       pd->customDataMap = prop->customData;

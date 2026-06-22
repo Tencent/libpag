@@ -1295,6 +1295,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             case ViewModelPropertyType::Trigger:
               break;
           }
+          if (prop->propertyType == ViewModelPropertyType::Number) {
+            if (prop->minValue != 0.0f) xml.addAttribute("min", prop->minValue);
+            if (prop->maxValue != 0.0f) xml.addAttribute("max", prop->maxValue);
+          }
           if (!prop->enumOptions.empty()) {
             std::string opts;
             for (size_t i = 0; i < prop->enumOptions.size(); i++) {

@@ -70,10 +70,10 @@ class DataConverterRegistry {
       const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
   static KeyValue ConvertPriceFormat(const KeyValue& input,
                                      const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertRangeMapper(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertDegsToRads(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertRangeMapper(const KeyValue& input,
+                                     const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertDegsToRads(const KeyValue& input,
+                                    const std::unordered_map<std::string, std::string>& params);
   static KeyValue ConvertInverseSecondsToFrames(
       const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
   static KeyValue ConvertInversePriceFormat(

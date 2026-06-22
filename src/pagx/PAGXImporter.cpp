@@ -21,10 +21,10 @@
 #include <climits>
 #include <cmath>
 #include <cstdlib>
-#include <sstream>
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
@@ -2741,6 +2741,8 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         } else if (typeStr == "Trigger" || typeStr == "trigger") {
           prop->propertyType = ViewModelPropertyType::Trigger;
         }
+        prop->minValue = GetFloatAttribute(child.get(), "min", prop->minValue, doc);
+        prop->maxValue = GetFloatAttribute(child.get(), "max", prop->maxValue, doc);
         auto optionsStr = GetAttribute(child.get(), "options");
         if (!optionsStr.empty()) {
           std::istringstream iss(optionsStr);

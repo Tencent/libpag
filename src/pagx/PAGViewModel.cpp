@@ -22,8 +22,7 @@ namespace pagx {
 
 // ---- Typed property accessors ------------------------------------------------
 
-std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(
-    const std::string& name) {
+std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(const std::string& name) {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
@@ -31,8 +30,7 @@ std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(
   return std::dynamic_pointer_cast<PAGViewModelValueNumber>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(
-    const std::string& name) {
+std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(const std::string& name) {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
@@ -40,8 +38,7 @@ std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(
   return std::dynamic_pointer_cast<PAGViewModelValueString>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(
-    const std::string& name) {
+std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(const std::string& name) {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
@@ -49,8 +46,7 @@ std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(
   return std::dynamic_pointer_cast<PAGViewModelValueBoolean>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(
-    const std::string& name) {
+std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::string& name) {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
@@ -58,8 +54,7 @@ std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(
   return std::dynamic_pointer_cast<PAGViewModelValueColor>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(
-    const std::string& name) {
+std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(const std::string& name) {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;

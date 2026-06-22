@@ -22,8 +22,7 @@
 
 namespace pagx {
 
-SuppressDelegation::SuppressDelegation(const std::shared_ptr<PAGScene>& scn)
-    : scene(scn) {
+SuppressDelegation::SuppressDelegation(const std::shared_ptr<PAGScene>& scn) : scene(scn) {
   auto s = scn;
   if (s != nullptr) {
     wasAlreadySuppressed = s->suppressNotify;

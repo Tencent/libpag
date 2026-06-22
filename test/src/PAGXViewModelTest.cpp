@@ -4,7 +4,6 @@
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/ObserverHandle.h"
-#include "pagx/PropertyData.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
@@ -18,6 +17,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PropertyData.h"
 #include "pagx/SuppressDelegation.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -1407,6 +1407,36 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataReflectsSchema) {
   // Verify the subclass is correct via type + static_cast.
   auto numberPd = std::static_pointer_cast<pagx::NumberPropertyData>(pd);
   ASSERT_NE(numberPd, nullptr);
+  ASSERT_TRUE(numberPd->defaultValue.has_value());
+  EXPECT_FLOAT_EQ(*numberPd->defaultValue, 100.0f);
+}
+
+PAGX_TEST(PAGXViewModelTest, PropertyDataNumberWithMinMax) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "speed";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 1.0f;
+  prop->minValue = 0.5f;
+  prop->maxValue = 2.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  auto speedPd = vm->propertyNumber("speed")->propertyData();
+  ASSERT_NE(speedPd, nullptr);
+  auto numberPd = std::static_pointer_cast<pagx::NumberPropertyData>(speedPd);
+  ASSERT_NE(numberPd, nullptr);
+  ASSERT_TRUE(numberPd->defaultValue.has_value());
+  EXPECT_FLOAT_EQ(*numberPd->defaultValue, 1.0f);
+  ASSERT_TRUE(numberPd->minValue.has_value());
+  EXPECT_FLOAT_EQ(*numberPd->minValue, 0.5f);
+  ASSERT_TRUE(numberPd->maxValue.has_value());
+  EXPECT_FLOAT_EQ(*numberPd->maxValue, 2.0f);
 }
 
 // Verify Enum and ViewModel PropertyData subclasses.
