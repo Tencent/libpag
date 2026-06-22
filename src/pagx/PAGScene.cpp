@@ -136,6 +136,20 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         value = std::move(v);
         break;
       }
+      case ViewModelPropertyType::Enum: {
+        auto v = std::make_shared<PAGViewModelValueNumber>();
+        v->propertyValue = 0.0f;
+        v->type = ViewModelValueType::Enum;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::Trigger: {
+        auto v = std::make_shared<PAGViewModelValueBoolean>();
+        v->propertyValue = false;
+        v->type = ViewModelValueType::Trigger;
+        value = std::move(v);
+        break;
+      }
     }
     if (value) {
       value->propertyName = prop->name;

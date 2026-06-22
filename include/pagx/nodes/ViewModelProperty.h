@@ -37,7 +37,9 @@ enum class ViewModelPropertyType {
   Boolean,
   Color,
   Image,
-  ViewModel
+  ViewModel,
+  Enum,
+  Trigger
 };
 
 /**
@@ -94,6 +96,12 @@ class ViewModelProperty : public Node {
    * (e.g. "assets/hero.png") or a data URI.
    */
   std::string defaultImage = {};
+
+  /**
+   * Allowed string values for Enum properties. Each value maps to its index (0-based).
+   * Ignored for other property types.
+   */
+  std::vector<std::string> enumOptions = {};
 
   NodeType nodeType() const override {
     return NodeType::ViewModelProperty;

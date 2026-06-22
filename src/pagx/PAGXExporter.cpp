@@ -116,6 +116,10 @@ static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
       return "Image";
     case ViewModelPropertyType::ViewModel:
       return "ViewModel";
+    case ViewModelPropertyType::Enum:
+      return "Enum";
+    case ViewModelPropertyType::Trigger:
+      return "Trigger";
   }
   return "Number";
 }
@@ -1287,6 +1291,17 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
               if (prop->viewModelRef)
                 xml.addAttribute("viewModelRef", "@" + prop->viewModelRef->id);
               break;
+            case ViewModelPropertyType::Enum:
+            case ViewModelPropertyType::Trigger:
+              break;
+          }
+          if (!prop->enumOptions.empty()) {
+            std::string opts;
+            for (size_t i = 0; i < prop->enumOptions.size(); i++) {
+              if (i > 0) opts += ",";
+              opts += prop->enumOptions[i];
+            }
+            xml.addAttribute("options", opts);
           }
           if (prop->dataConverter) xml.addAttribute("dataConverter", "@" + prop->dataConverter->id);
           WriteCustomData(xml, prop);

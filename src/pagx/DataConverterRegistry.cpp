@@ -28,8 +28,12 @@ namespace pagx {
 DataConverterRegistry::DataConverterRegistry() {
   registerConverter("secondsToFrames", ConvertSecondsToFrames);
   registerConverter("priceFormat", ConvertPriceFormat);
+  registerConverter("rangeMapper", ConvertRangeMapper);
+  registerConverter("degsToRads", ConvertDegsToRads);
   registerInverseConverter("secondsToFrames", ConvertInverseSecondsToFrames);
   registerInverseConverter("priceFormat", ConvertInversePriceFormat);
+  registerInverseConverter("rangeMapper", ConvertInverseRangeMapper);
+  registerInverseConverter("degsToRads", ConvertInverseDegsToRads);
 }
 
 DataConverterRegistry& DataConverterRegistry::instance() {
@@ -105,6 +109,60 @@ KeyValue DataConverterRegistry::ConvertInversePriceFormat(
       str.compare(str.size() - it->second.size(), it->second.size(), it->second) == 0)
     str = str.substr(0, str.size() - it->second.size());
   return KeyValue{std::strtof(str.c_str(), nullptr)};
+}
+
+KeyValue DataConverterRegistry::ConvertRangeMapper(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float value = std::get<float>(input);
+  float inputMin = 0.0f;
+  float inputMax = 1.0f;
+  float outputMin = 0.0f;
+  float outputMax = 100.0f;
+  auto it = params.find("inputMin");
+  if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("inputMax");
+  if (it != params.end()) inputMax = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMin");
+  if (it != params.end()) outputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMax");
+  if (it != params.end()) outputMax = std::strtof(it->second.c_str(), nullptr);
+  if (inputMax == inputMin) return KeyValue{outputMin};
+  float t = (value - inputMin) / (inputMax - inputMin);
+  return KeyValue{outputMin + t * (outputMax - outputMin)};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float value = std::get<float>(input);
+  float inputMin = 0.0f;
+  float inputMax = 1.0f;
+  float outputMin = 0.0f;
+  float outputMax = 100.0f;
+  auto it = params.find("inputMin");
+  if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("inputMax");
+  if (it != params.end()) inputMax = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMin");
+  if (it != params.end()) outputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMax");
+  if (it != params.end()) outputMax = std::strtof(it->second.c_str(), nullptr);
+  if (outputMax == outputMin) return KeyValue{inputMin};
+  float t = (value - outputMin) / (outputMax - outputMin);
+  return KeyValue{inputMin + t * (inputMax - inputMin)};
+}
+
+KeyValue DataConverterRegistry::ConvertDegsToRads(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
+  if (!std::holds_alternative<float>(input)) return input;
+  return KeyValue{std::get<float>(input) * 0.0174533f};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseDegsToRads(
+    const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
+  if (!std::holds_alternative<float>(input)) return input;
+  return KeyValue{std::get<float>(input) / 0.0174533f};
 }
 
 void DataConverterRegistry::registerConverter(const std::string& typeName, ConverterFn fn) {

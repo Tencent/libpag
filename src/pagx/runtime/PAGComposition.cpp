@@ -18,12 +18,12 @@
 
 #include "pagx/PAGComposition.h"
 #include <unordered_map>
-#include "pagx/PAGViewModel.h"
-#include "pagx/DataBindRuntime.h"
 #include <unordered_set>
+#include "pagx/DataBindRuntime.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -44,6 +44,10 @@ PAGComposition::~PAGComposition() = default;
 
 LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
+}
+
+std::shared_ptr<PAGViewModel> PAGComposition::viewModel() const {
+  return compositionViewModel;
 }
 
 void PAGComposition::advance(int64_t deltaMicroseconds) {

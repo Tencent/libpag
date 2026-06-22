@@ -21,6 +21,7 @@
 #include <climits>
 #include <cmath>
 #include <cstdlib>
+#include <sstream>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -37,6 +38,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -71,8 +74,6 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
-#include "pagx/nodes/DataBind.h"
-#include "pagx/nodes/DataConverter.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
@@ -1500,7 +1501,9 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
   auto viewModelAttr = GetAttribute(node, "viewModel");
   if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
     comp->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
-    if (!comp->viewModel) ReportError(doc, node, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
+    if (!comp->viewModel)
+      ReportError(doc, node,
+                  "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
   }
   auto child = node->firstChild;
   while (child) {
@@ -2676,7 +2679,9 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   auto viewModelAttr = GetAttribute(root, "viewModel");
   if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
     doc->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
-    if (!doc->viewModel) ReportError(doc, root, "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
+    if (!doc->viewModel)
+      ReportError(doc, root,
+                  "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
   }
 
   // Second pass: Parse Layers.
@@ -2713,16 +2718,43 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
       if (prop) {
         prop->name = GetAttribute(child.get(), "name");
         auto typeStr = GetAttribute(child.get(), "type");
-        if (typeStr == "Number" || typeStr == "number") { prop->propertyType = ViewModelPropertyType::Number; prop->defaultNumber = GetFloatAttribute(child.get(), "default", prop->defaultNumber, doc); }
-        else if (typeStr == "String" || typeStr == "string") { prop->propertyType = ViewModelPropertyType::String; prop->defaultString = GetAttribute(child.get(), "default"); }
-        else if (typeStr == "Boolean" || typeStr == "boolean") { prop->propertyType = ViewModelPropertyType::Boolean; prop->defaultBoolean = GetBoolAttribute(child.get(), "default", prop->defaultBoolean, doc); }
-        else if (typeStr == "Color" || typeStr == "color") { prop->propertyType = ViewModelPropertyType::Color; prop->defaultColor = GetColorAttribute(child.get(), "default", doc); }
-        else if (typeStr == "Image" || typeStr == "image") { prop->propertyType = ViewModelPropertyType::Image; prop->defaultImage = GetAttribute(child.get(), "default"); }
-        else if (typeStr == "ViewModel" || typeStr == "viewModel") { prop->propertyType = ViewModelPropertyType::ViewModel; }
+        if (typeStr == "Number" || typeStr == "number") {
+          prop->propertyType = ViewModelPropertyType::Number;
+          prop->defaultNumber = GetFloatAttribute(child.get(), "default", prop->defaultNumber, doc);
+        } else if (typeStr == "String" || typeStr == "string") {
+          prop->propertyType = ViewModelPropertyType::String;
+          prop->defaultString = GetAttribute(child.get(), "default");
+        } else if (typeStr == "Boolean" || typeStr == "boolean") {
+          prop->propertyType = ViewModelPropertyType::Boolean;
+          prop->defaultBoolean =
+              GetBoolAttribute(child.get(), "default", prop->defaultBoolean, doc);
+        } else if (typeStr == "Color" || typeStr == "color") {
+          prop->propertyType = ViewModelPropertyType::Color;
+          prop->defaultColor = GetColorAttribute(child.get(), "default", doc);
+        } else if (typeStr == "Image" || typeStr == "image") {
+          prop->propertyType = ViewModelPropertyType::Image;
+          prop->defaultImage = GetAttribute(child.get(), "default");
+        } else if (typeStr == "ViewModel" || typeStr == "viewModel") {
+          prop->propertyType = ViewModelPropertyType::ViewModel;
+        } else if (typeStr == "Enum" || typeStr == "enum") {
+          prop->propertyType = ViewModelPropertyType::Enum;
+        } else if (typeStr == "Trigger" || typeStr == "trigger") {
+          prop->propertyType = ViewModelPropertyType::Trigger;
+        }
+        auto optionsStr = GetAttribute(child.get(), "options");
+        if (!optionsStr.empty()) {
+          std::istringstream iss(optionsStr);
+          std::string token;
+          while (std::getline(iss, token, ',')) {
+            if (!token.empty()) prop->enumOptions.push_back(token);
+          }
+        }
         auto converterId = GetAttribute(child.get(), "dataConverter");
-        if (!converterId.empty() && converterId[0] == '@') prop->dataConverter = doc->findNode<DataConverter>(converterId.substr(1));
+        if (!converterId.empty() && converterId[0] == '@')
+          prop->dataConverter = doc->findNode<DataConverter>(converterId.substr(1));
         auto vmRef = GetAttribute(child.get(), "viewModelRef");
-        if (!vmRef.empty() && vmRef[0] == '@') prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
+        if (!vmRef.empty() && vmRef[0] == '@')
+          prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
         vm->properties.push_back(prop);
       }
     } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
@@ -2744,9 +2776,12 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc, bool isRo
   auto flagsStr = GetAttribute(node, "flags");
   if (!flagsStr.empty()) {
     if (flagsStr == "ToTarget" || flagsStr == "toTarget") bind->flags = DataBindFlags::ToTarget;
-    else if (flagsStr == "ToSource" || flagsStr == "toSource") bind->flags = DataBindFlags::ToSource;
-    else if (flagsStr == "TwoWay" || flagsStr == "twoWay") bind->flags = DataBindFlags::TwoWay;
-    else if (flagsStr == "Once" || flagsStr == "once") bind->flags = DataBindFlags::Once;
+    else if (flagsStr == "ToSource" || flagsStr == "toSource")
+      bind->flags = DataBindFlags::ToSource;
+    else if (flagsStr == "TwoWay" || flagsStr == "twoWay")
+      bind->flags = DataBindFlags::TwoWay;
+    else if (flagsStr == "Once" || flagsStr == "once")
+      bind->flags = DataBindFlags::Once;
   }
   (void)doc;
   return bind;

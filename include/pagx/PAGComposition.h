@@ -51,6 +51,12 @@ class PAGComposition : public PAGLayer {
   void advance(int64_t deltaMicroseconds) override;
   void apply(float mix = 1.0f) override;
 
+  /**
+   * Returns the ViewModel instance for this composition, or nullptr if the composition has no
+   * ViewModel schema.
+   */
+  std::shared_ptr<PAGViewModel> viewModel() const;
+
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
   // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,

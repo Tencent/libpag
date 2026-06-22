@@ -148,6 +148,10 @@ static KeyValue valueToKeyValue(PAGViewModelValue* value) {
     }
     case ViewModelValueType::Image:
       return KeyValue{static_cast<PAGViewModelValueImage*>(value)->value()};
+    case ViewModelValueType::Enum:
+      return KeyValue{static_cast<PAGViewModelValueNumber*>(value)->value()};
+    case ViewModelValueType::Trigger:
+      return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
     default:
       return KeyValue{0.0f};
   }

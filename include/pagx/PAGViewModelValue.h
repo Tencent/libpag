@@ -36,7 +36,7 @@ class DataBindRuntime;
 /**
  * ViewModelValueType enumerates the runtime value types of a PAGViewModelValue.
  */
-enum class ViewModelValueType { Number, String, Boolean, Color, Image, ViewModel };
+enum class ViewModelValueType { Number, String, Boolean, Color, Image, ViewModel, Enum, Trigger };
 
 /**
  * PAGViewModelValue is the base class for typed ViewModel property values. Each value holds the
