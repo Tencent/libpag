@@ -1029,7 +1029,7 @@ bool MergeAdjacentShellLayersRecursive(PAGXDocument* doc, std::vector<Layer*>& l
 
 bool MergeAdjacentShellLayers(PAGXDocument* doc, std::vector<Layer*>& topLevel,
                               const std::unordered_set<const Layer*>& maskRefs) {
-  return MergeAdjacentShellLayersRecursive(doc, topLevel, /*parentHasLayout=*/false, maskRefs);
+  return MergeAdjacentShellLayersRecursive(doc, topLevel, false, maskRefs);
 }
 
 // ----------------------------------------------------------------------------
@@ -1521,7 +1521,7 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
       }
     }
     if (options.pruneEmpty) {
-      changed |= PruneEmptyTopLevel(layers, /*parentHasLayout=*/false, maskRefs);
+      changed |= PruneEmptyTopLevel(layers, false, maskRefs);
     }
     if (options.unwrapRedundantFirstGroup) {
       for (auto* layer : layers) {
