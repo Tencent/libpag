@@ -2814,7 +2814,7 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
-  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0);
+  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, 0);
 }
 
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform,
@@ -2876,7 +2876,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // scrollRect clip to a middle <g> wrapper below; otherwise the second
   // attribute would silently overwrite the first.
   bool needsScrollMiddleWrapper = layer->hasScrollRect && needsContourClip;
-  writeLayerGroupAttributes(out, layer, /*emitScrollClipHere=*/!needsScrollMiddleWrapper);
+  writeLayerGroupAttributes(out, layer, !needsScrollMiddleWrapper);
 
   bool hasContent =
       !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;

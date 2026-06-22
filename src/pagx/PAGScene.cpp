@@ -192,10 +192,18 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
     return {};
   }
-  if (_rootComposition != nullptr) {
-    return _rootComposition->getLayersUnderPoint(rootX, rootY);
+  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
+    return {};
   }
-  return {};
+  std::vector<std::shared_ptr<PAGLayer>> result = {};
+  auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  for (const auto& hitLayer : hitLayers) {
+    auto it = layerRegistry.find(hitLayer.get());
+    if (it != layerRegistry.end() && it->second->layerType() == LayerType::Layer) {
+      result.push_back(it->second->shared_from_this());
+    }
+  }
+  return result;
 }
 
 Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
@@ -254,12 +262,23 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     buildRuntimeTree();
     return;
   }
+  // The document node itself (NodeType::Document) triggers a full rebuild so changes to
+  // PAGXDocument::width/height are reflected in the root runtime layer. Must be checked AFTER
+  // the foreign-node path above so a Document node from an external document does not bypass
+  // the foreign rebuild branch.
+  for (auto* node : dirtyNodes) {
+    if (node != nullptr && node->nodeType() == NodeType::Document) {
+      buildRuntimeTree();
+      return;
+    }
+  }
   if (_rootComposition != nullptr) {
     // The root composition has no source Composition node (it represents the document body), so the
     // ancestor path begins empty. refreshNodes pushes each child composition's source as it
     // descends.
+    std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
     std::unordered_set<const Composition*> visited = {};
-    _rootComposition->refreshNodes(dirtyNodes, visited);
+    _rootComposition->refreshNodes(dirtyNodes, dirtySet, visited);
   }
   // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
   // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather
