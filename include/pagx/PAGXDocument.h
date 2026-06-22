@@ -142,9 +142,10 @@ class PAGXDocument : public Node {
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
-   * Must be called before creating any PAGScene from this document: PAGScene::Make() builds its
-   * runtime tree once, so external compositions resolved after a scene exists will not appear in
-   * that scene.
+   * For performance, load all external file data before creating any PAGScene from this document.
+   * If called after a PAGScene exists, changes are reflected in existing scenes via notifyChange.
+   * When structural nodes (e.g. composition layers) are loaded, applyLayout() is triggered as part
+   * of the propagation, so the document is laid out even if no scene exists yet.
    * @param filePath the external file path to match against Image nodes or composition layers
    * @param data the file content to embed or parse
    * @return true if a matching node was found and its data was loaded successfully
