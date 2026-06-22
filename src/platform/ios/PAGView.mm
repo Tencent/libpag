@@ -68,9 +68,14 @@
 
 - (void)dealloc {
   [animator cancel];
+  {
+    std::lock_guard<std::mutex> autoLock(lock);
+    [pagPlayer release];
+    pagPlayer = nil;
+    [pagSurface release];
+    pagSurface = nil;
+  }
   [animator release];
-  [pagPlayer release];
-  [pagSurface release];
   [filePath release];
   [listeners release];
   [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -221,6 +226,10 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
+  std::lock_guard<std::mutex> autoLock(lock);
+  if (pagPlayer == nil) {
+    return;
+  }
   [pagPlayer setProgress:progress];
   if (_isVisible) {
     [animator setDuration:[pagPlayer duration]];
