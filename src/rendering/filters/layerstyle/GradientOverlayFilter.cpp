@@ -82,10 +82,7 @@ bool GradientOverlayFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> so
   tgfx::Paint paint;
   paint.setShader(shader);
   auto rect = tgfx::Rect::MakeWH(width, height);
-  canvas->save();
-  canvas->scale(1.f / _filterScale.x, 1.f / _filterScale.y);
   canvas->drawRect(rect, paint);
-  canvas->restore();
   return true;
 }
 
