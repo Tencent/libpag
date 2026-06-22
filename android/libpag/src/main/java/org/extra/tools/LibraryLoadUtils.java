@@ -34,8 +34,16 @@ public class LibraryLoadUtils {
         try {
             Application app = (Application) Class.forName("android.app.ActivityThread")
                     .getMethod("currentApplication").invoke(null, (Object[]) null);
-            appContext = app.getApplicationContext();
+            if (app != null) {
+                appContext = app.getApplicationContext();
+            }
         } catch (Exception e) {
+            Log.e(TAG, "loadLibrary: failed to get Application via reflection", e);
+        }
+
+        if (appContext == null) {
+            Log.e(TAG, "loadLibrary: appContext is null, cannot load library: " + libName);
+            return;
         }
 
         loadLibrary(appContext, libName);

@@ -46,14 +46,26 @@ class DataConverterRegistry {
   void registerConverter(const std::string& typeName, ConverterFn fn);
 
   /**
-   * Applies the converter identified by converterType with given params to the input value.
-   * Returns the input unchanged if no converter matches or if converter is null.
+   * Registers an inverse converter for the forward direction. Used during syncBack()
+   * to convert layer values back to ViewModel domain values.
+   */
+  void registerInverseConverter(const std::string& typeName, ConverterFn fn);
+
+  /**
+   * Applies the forward converter. Returns input unchanged if no converter matches.
    */
   KeyValue apply(const DataConverter* converter, const KeyValue& input) const;
+
+  /**
+   * Applies the inverse converter. Used in syncBack() direction.
+   * Returns input unchanged if no inverse converter is registered.
+   */
+  KeyValue applyInverse(const DataConverter* converter, const KeyValue& input) const;
 
  private:
   DataConverterRegistry();
   std::unordered_map<std::string, ConverterFn> converters = {};
+  std::unordered_map<std::string, ConverterFn> inverseConverters = {};
 };
 
 }  // namespace pagx

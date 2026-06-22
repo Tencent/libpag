@@ -701,4 +701,25 @@ PAGX_TEST(PAGXViewModelTest, DataConverterNotFoundPassthrough) {
 
 
 
+PAGX_TEST(PAGXViewModelTest, DataConverterInverseSecondsToFrames) {
+  auto conv = std::unique_ptr<pagx::DataConverter>(new pagx::DataConverter());
+  conv->converterType = "secondsToFrames";
+  conv->params["frameRate"] = "60";
+
+  pagx::KeyValue input{120.0f};
+  auto output = pagx::DataConverterRegistry::instance().applyInverse(conv.get(), input);
+  ASSERT_TRUE(std::holds_alternative<float>(output));
+  EXPECT_FLOAT_EQ(std::get<float>(output), 2.0f);
+}
+
+PAGX_TEST(PAGXViewModelTest, DataConverterInversePassthrough) {
+  // No registered inverse → value unchanged.
+  pagx::KeyValue input{99.0f};
+  auto output = pagx::DataConverterRegistry::instance().applyInverse(nullptr, input);
+  ASSERT_TRUE(std::holds_alternative<float>(output));
+  EXPECT_FLOAT_EQ(std::get<float>(output), 99.0f);
+}
+
+
+
 }  // namespace pag

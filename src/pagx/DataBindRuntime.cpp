@@ -238,7 +238,10 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
       continue;
     }
     float current = readTargetFloat(layer.get(), entry.channel, 0.0f);
-    writeVmFromFloat(entry.source, current);
+    // Apply inverse converter for syncBack direction (layer value → VM domain).
+    KeyValue kv{current};
+    kv = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
+    writeVmFromFloat(entry.source, std::get<float>(kv));
   }
 }
 

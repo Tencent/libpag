@@ -71,6 +71,41 @@ DataConverterRegistry::DataConverterRegistry() {
     oss << suffix;
     return KeyValue{oss.str()};
   });
+
+  // ---- Inverse converters (syncBack direction) ----
+
+  registerInverseConverter("secondsToFrames",
+      [](const KeyValue& input,
+         const std::unordered_map<std::string, std::string>& params) -> KeyValue {
+        if (!std::holds_alternative<float>(input)) return input;
+        float frames = std::get<float>(input);
+        float frameRate = 30.0f;
+        auto it = params.find("frameRate");
+        if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
+        return KeyValue{frames / frameRate};
+      });
+
+  registerInverseConverter("priceFormat",
+      [](const KeyValue& input,
+         const std::unordered_map<std::string, std::string>& params) -> KeyValue {
+        std::string str;
+        if (std::holds_alternative<std::string>(input)) {
+          str = std::get<std::string>(input);
+        } else if (std::holds_alternative<float>(input)) {
+          return input;
+        } else {
+          return input;
+        }
+        // Strip known prefix and suffix, parse remainder as float.
+        auto it = params.find("prefix");
+        if (it != params.end() && str.find(it->second) == 0)
+          str = str.substr(it->second.size());
+        it = params.find("suffix");
+        if (it != params.end() && str.size() >= it->second.size() &&
+            str.compare(str.size() - it->second.size(), it->second.size(), it->second) == 0)
+          str = str.substr(0, str.size() - it->second.size());
+        return KeyValue{std::strtof(str.c_str(), nullptr)};
+      });
 }
 
 DataConverterRegistry& DataConverterRegistry::instance() {
@@ -82,6 +117,10 @@ void DataConverterRegistry::registerConverter(const std::string& typeName, Conve
   converters[typeName] = std::move(fn);
 }
 
+void DataConverterRegistry::registerInverseConverter(const std::string& typeName, ConverterFn fn) {
+  inverseConverters[typeName] = std::move(fn);
+}
+
 KeyValue DataConverterRegistry::apply(const DataConverter* converter,
                                       const KeyValue& input) const {
   if (converter == nullptr || converter->converterType.empty()) {
@@ -89,6 +128,18 @@ KeyValue DataConverterRegistry::apply(const DataConverter* converter,
   }
   auto it = converters.find(converter->converterType);
   if (it == converters.end()) {
+    return input;
+  }
+  return it->second(input, converter->params);
+}
+
+KeyValue DataConverterRegistry::applyInverse(const DataConverter* converter,
+                                             const KeyValue& input) const {
+  if (converter == nullptr || converter->converterType.empty()) {
+    return input;
+  }
+  auto it = inverseConverters.find(converter->converterType);
+  if (it == inverseConverters.end()) {
     return input;
   }
   return it->second(input, converter->params);
