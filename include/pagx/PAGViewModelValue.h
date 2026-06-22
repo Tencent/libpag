@@ -81,6 +81,14 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
     return type;
   }
 
+  /**
+   * Returns the PropertyData reflection metadata for this property, or nullptr if the schema
+   * did not define customData for this property. Created during ViewModel instantiation.
+   */
+  std::shared_ptr<PropertyData> propertyData() const {
+    return pd;
+  }
+
   void setScene(const std::shared_ptr<PAGScene>& scn) {
     scene = scn;
   }
@@ -100,8 +108,13 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   PAGViewModelValue() = default;
 
   /**
-   * Notifies all registered observers that this value has changed. Called automatically by
-   * subclasses after updating their stored value, unless SuppressDelegation is active.
+   * Notifies registered observers or defers notification if SuppressDelegation is active.
+   * Subclasses call this after updating their stored value.
+   */
+  void notifyValueChanged();
+
+  /**
+   * Notifies all registered observers that this value has changed.
    */
   void notifyObservers();
 
@@ -116,6 +129,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   std::weak_ptr<PAGScene> scene = {};
   bool notifying = false;
   class DataConverter* converter = nullptr;
+  std::shared_ptr<PropertyData> pd;
 
   /**
    * Notifies all registered dependent DataBindRuntime instances that this value changed.

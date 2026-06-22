@@ -49,21 +49,22 @@ class SuppressDelegation {
   SuppressDelegation(const SuppressDelegation&) = delete;
   SuppressDelegation& operator=(const SuppressDelegation&) = delete;
 
+ private:
   /**
    * Returns true if the given scene is currently suppressing observer notifications.
    */
   static bool isSuppressed(const std::shared_ptr<PAGScene>& scene);
 
   /**
-   * Adds a value to the scene's pending notification list. Safe to call when no suppression
-   * is active (no-op).
+   * Adds a value to the scene's pending notification list.
    */
   static void addPendingNotification(const std::shared_ptr<PAGScene>& scene,
                                      PAGViewModelValue* value);
 
- private:
   std::weak_ptr<PAGScene> scene;
   bool wasAlreadySuppressed = false;
+
+  friend class PAGViewModelValue;
 };
 
 }  // namespace pagx

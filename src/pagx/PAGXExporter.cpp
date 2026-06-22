@@ -30,6 +30,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -61,8 +63,6 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
-#include "pagx/nodes/DataBind.h"
-#include "pagx/nodes/DataConverter.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
@@ -103,10 +103,34 @@ static std::string FloatListToString(const std::vector<float>& values) {
   return FloatListToString(values.data(), values.size());
 }
 static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
-  switch(t){case ViewModelPropertyType::Number:return"Number";case ViewModelPropertyType::String:return"String";case ViewModelPropertyType::Boolean:return"Boolean";case ViewModelPropertyType::Color:return"Color";case ViewModelPropertyType::Image:return"Image";case ViewModelPropertyType::ViewModel:return"ViewModel";}return"Number";
+  switch (t) {
+    case ViewModelPropertyType::Number:
+      return "Number";
+    case ViewModelPropertyType::String:
+      return "String";
+    case ViewModelPropertyType::Boolean:
+      return "Boolean";
+    case ViewModelPropertyType::Color:
+      return "Color";
+    case ViewModelPropertyType::Image:
+      return "Image";
+    case ViewModelPropertyType::ViewModel:
+      return "ViewModel";
+  }
+  return "Number";
 }
 static std::string DataBindFlagsToString(DataBindFlags f) {
-  switch(f){case DataBindFlags::ToTarget:return"ToTarget";case DataBindFlags::ToSource:return"ToSource";case DataBindFlags::TwoWay:return"TwoWay";case DataBindFlags::Once:return"Once";}return"ToTarget";
+  switch (f) {
+    case DataBindFlags::ToTarget:
+      return "ToTarget";
+    case DataBindFlags::ToSource:
+      return "ToSource";
+    case DataBindFlags::TwoWay:
+      return "TwoWay";
+    case DataBindFlags::Once:
+      return "Once";
+  }
+  return "ToTarget";
 }
 
 static std::string PointListToString(const std::vector<Point>& points) {
@@ -1161,7 +1185,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addRequiredAttribute("height", comp->height);
       if (comp->viewModel != nullptr) xml.addAttribute("viewModel", "@" + comp->viewModel->id);
       WriteCustomData(xml, node);
-      if (comp->layers.empty() && comp->animations.empty()) {
+      if (comp->layers.empty() && comp->animations.empty() && comp->dataBinds.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
@@ -1169,6 +1193,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           WriteLayer(xml, layer, options);
         }
         WriteAnimations(xml, comp->animations);
+        for (const auto& bind : comp->dataBinds) {
+          WriteResource(xml, bind, options);
+        }
         xml.closeElement();
       }
       break;
@@ -1222,19 +1249,87 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::RadialGradient:
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
-    case NodeType::ImagePattern: { WriteColorSource(xml, static_cast<const ColorSource*>(node)); break; }
+    case NodeType::ImagePattern: {
+      WriteColorSource(xml, static_cast<const ColorSource*>(node));
+      break;
+    }
     case NodeType::ViewModel: {
-      auto vm = static_cast<const ViewModel*>(node); xml.openElement("ViewModel");
-      if (!vm->id.empty()) xml.addAttribute("id", vm->id); WriteCustomData(xml, node);
-      if (vm->properties.empty()) { xml.closeElementSelfClosing(); }
-      else { xml.closeElementStart();
-        for (const auto& prop : vm->properties) { xml.openElement("Property"); xml.addAttribute("name", prop->name); xml.addAttribute("type", ViewModelPropertyTypeToString(prop->propertyType));
-          switch(prop->propertyType){case ViewModelPropertyType::Number:xml.addAttribute("default",prop->defaultNumber);break;case ViewModelPropertyType::String:xml.addAttribute("default",prop->defaultString);break;case ViewModelPropertyType::Boolean:xml.addAttribute("default",prop->defaultBoolean);break;case ViewModelPropertyType::Color:xml.addAttribute("default",ColorToHexString(prop->defaultColor,prop->defaultColor.alpha<1.0f));break;case ViewModelPropertyType::Image:xml.addAttribute("default",prop->defaultImage);break;case ViewModelPropertyType::ViewModel:if(prop->viewModelRef)xml.addAttribute("viewModelRef","@"+prop->viewModelRef->id);break;}
-          if(prop->dataConverter)xml.addAttribute("dataConverter","@"+prop->dataConverter->id);
-          WriteCustomData(xml,prop);xml.closeElementSelfClosing();}xml.closeElement();}break;}
-    case NodeType::ViewModelProperty: break;
-    case NodeType::DataBind: { auto bind = static_cast<const DataBind*>(node); xml.openElement("DataBind"); xml.addAttribute("source",bind->source);xml.addAttribute("target",bind->target);xml.addAttribute("channel",bind->channel);if(bind->flags!=DataBindFlags::ToTarget)xml.addAttribute("flags",DataBindFlagsToString(bind->flags));WriteCustomData(xml,node);xml.closeElementSelfClosing();break;}
-    case NodeType::DataConverter: { auto conv = static_cast<const DataConverter*>(node); xml.openElement("DataConverter"); xml.addAttribute("id",conv->id);xml.addAttribute("type",conv->converterType);WriteCustomData(xml,node);if(conv->params.empty()){xml.closeElementSelfClosing();}else{xml.closeElementStart();for(const auto&[k,v]:conv->params){xml.openElement("Param");xml.addAttribute("name",k);xml.addAttribute("value",v);xml.closeElementSelfClosing();}xml.closeElement();}break;}
+      auto vm = static_cast<const ViewModel*>(node);
+      xml.openElement("ViewModel");
+      if (!vm->id.empty()) xml.addAttribute("id", vm->id);
+      WriteCustomData(xml, node);
+      if (vm->properties.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& prop : vm->properties) {
+          xml.openElement("Property");
+          xml.addAttribute("name", prop->name);
+          xml.addAttribute("type", ViewModelPropertyTypeToString(prop->propertyType));
+          switch (prop->propertyType) {
+            case ViewModelPropertyType::Number:
+              xml.addAttribute("default", prop->defaultNumber);
+              break;
+            case ViewModelPropertyType::String:
+              xml.addAttribute("default", prop->defaultString);
+              break;
+            case ViewModelPropertyType::Boolean:
+              xml.addAttribute("default", prop->defaultBoolean);
+              break;
+            case ViewModelPropertyType::Color:
+              xml.addAttribute(
+                  "default", ColorToHexString(prop->defaultColor, prop->defaultColor.alpha < 1.0f));
+              break;
+            case ViewModelPropertyType::Image:
+              xml.addAttribute("default", prop->defaultImage);
+              break;
+            case ViewModelPropertyType::ViewModel:
+              if (prop->viewModelRef)
+                xml.addAttribute("viewModelRef", "@" + prop->viewModelRef->id);
+              break;
+          }
+          if (prop->dataConverter) xml.addAttribute("dataConverter", "@" + prop->dataConverter->id);
+          WriteCustomData(xml, prop);
+          xml.closeElementSelfClosing();
+        }
+        xml.closeElement();
+      }
+      break;
+    }
+    case NodeType::ViewModelProperty:
+      break;
+    case NodeType::DataBind: {
+      auto bind = static_cast<const DataBind*>(node);
+      xml.openElement("DataBind");
+      xml.addAttribute("source", bind->source);
+      xml.addAttribute("target", bind->target);
+      xml.addAttribute("channel", bind->channel);
+      if (bind->flags != DataBindFlags::ToTarget)
+        xml.addAttribute("flags", DataBindFlagsToString(bind->flags));
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::DataConverter: {
+      auto conv = static_cast<const DataConverter*>(node);
+      xml.openElement("DataConverter");
+      xml.addAttribute("id", conv->id);
+      xml.addAttribute("type", conv->converterType);
+      WriteCustomData(xml, node);
+      if (conv->params.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& [k, v] : conv->params) {
+          xml.openElement("Param");
+          xml.addAttribute("name", k);
+          xml.addAttribute("value", v);
+          xml.closeElementSelfClosing();
+        }
+        xml.closeElement();
+      }
+      break;
+    }
     default:
       break;
   }
@@ -1400,7 +1495,9 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     WriteLayer(xml, layer, options);
   }
   WriteAnimations(xml, doc.animations);
-  for (const auto& bind : doc.dataBinds) { WriteResource(xml, bind, options); }
+  for (const auto& bind : doc.dataBinds) {
+    WriteResource(xml, bind, options);
+  }
 
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;

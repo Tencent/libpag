@@ -40,13 +40,21 @@ ObserverHandle PAGViewModelValue::addObserver(Observer observer) {
 }
 
 void PAGViewModelValue::removeObserver(int id) {
-  observers.erase(
-      std::remove_if(observers.begin(), observers.end(),
-                     [id](const ObserverEntry& e) { return e.id == id; }),
-      observers.end());
+  observers.erase(std::remove_if(observers.begin(), observers.end(),
+                                 [id](const ObserverEntry& e) { return e.id == id; }),
+                  observers.end());
 }
 
 // ---- Observer notification ---------------------------------------------------
+
+void PAGViewModelValue::notifyValueChanged() {
+  auto s = scene.lock();
+  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
+    SuppressDelegation::addPendingNotification(s, this);
+  } else {
+    notifyObservers();
+  }
+}
 
 void PAGViewModelValue::notifyObservers() {
   if (notifying) {
@@ -89,8 +97,7 @@ void PAGViewModelValue::addDependent(DataBindRuntime* runtime) {
 }
 
 void PAGViewModelValue::removeDependent(DataBindRuntime* runtime) {
-  dependents.erase(std::remove(dependents.begin(), dependents.end(), runtime),
-                   dependents.end());
+  dependents.erase(std::remove(dependents.begin(), dependents.end(), runtime), dependents.end());
 }
 
 // ---- Typed value setters -----------------------------------------------------
@@ -101,12 +108,7 @@ void PAGViewModelValueNumber::value(float v) {
   }
   propertyValue = v;
   dirty = true;
-  auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
-  } else {
-    notifyObservers();
-  }
+  notifyValueChanged();
   notifyDependents();
 }
 
@@ -116,12 +118,7 @@ void PAGViewModelValueString::value(const std::string& v) {
   }
   propertyValue = v;
   dirty = true;
-  auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
-  } else {
-    notifyObservers();
-  }
+  notifyValueChanged();
   notifyDependents();
 }
 
@@ -131,12 +128,7 @@ void PAGViewModelValueBoolean::value(bool v) {
   }
   propertyValue = v;
   dirty = true;
-  auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
-  } else {
-    notifyObservers();
-  }
+  notifyValueChanged();
 }
 
 void PAGViewModelValueColor::value(const Color& v) {
@@ -146,12 +138,7 @@ void PAGViewModelValueColor::value(const Color& v) {
   }
   propertyValue = v;
   dirty = true;
-  auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
-  } else {
-    notifyObservers();
-  }
+  notifyValueChanged();
 }
 
 void PAGViewModelValueImage::value(const std::string& v) {
@@ -160,12 +147,7 @@ void PAGViewModelValueImage::value(const std::string& v) {
   }
   propertyValue = v;
   dirty = true;
-  auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
-  } else {
-    notifyObservers();
-  }
+  notifyValueChanged();
 }
 
 // ---- ObserverHandle ----------------------------------------------------------

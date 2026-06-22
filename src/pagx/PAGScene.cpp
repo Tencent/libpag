@@ -17,19 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
-#include "pagx/PAGViewModel.h"
+#include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
-#include "base/utils/Log.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGSurface.h"
+#include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PropertyData.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/Layer.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
-#include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
@@ -85,7 +86,6 @@ void PAGScene::buildRuntimeTree() {
   buildViewModels();
 }
 
-
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
     ViewModel* schema, const std::shared_ptr<PAGScene>& scene) {
   if (schema == nullptr) return nullptr;
@@ -95,14 +95,60 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
     if (prop == nullptr) continue;
     std::shared_ptr<PAGViewModelValue> value = nullptr;
     switch (prop->propertyType) {
-      case ViewModelPropertyType::Number: { auto v = std::make_shared<PAGViewModelValueNumber>(); v->propertyValue = prop->defaultNumber; v->type = ViewModelValueType::Number; value = std::move(v); break; }
-      case ViewModelPropertyType::String: { auto v = std::make_shared<PAGViewModelValueString>(); v->propertyValue = prop->defaultString; v->type = ViewModelValueType::String; value = std::move(v); break; }
-      case ViewModelPropertyType::Boolean: { auto v = std::make_shared<PAGViewModelValueBoolean>(); v->propertyValue = prop->defaultBoolean; v->type = ViewModelValueType::Boolean; value = std::move(v); break; }
-      case ViewModelPropertyType::Color: { auto v = std::make_shared<PAGViewModelValueColor>(); v->propertyValue = prop->defaultColor; v->type = ViewModelValueType::Color; value = std::move(v); break; }
-      case ViewModelPropertyType::Image: { auto v = std::make_shared<PAGViewModelValueImage>(); v->propertyValue = prop->defaultImage; v->type = ViewModelValueType::Image; value = std::move(v); break; }
-      case ViewModelPropertyType::ViewModel: { auto v = std::make_shared<PAGViewModelValueViewModel>(); v->type = ViewModelValueType::ViewModel; value = std::move(v); break; }
+      case ViewModelPropertyType::Number: {
+        auto v = std::make_shared<PAGViewModelValueNumber>();
+        v->propertyValue = prop->defaultNumber;
+        v->type = ViewModelValueType::Number;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::String: {
+        auto v = std::make_shared<PAGViewModelValueString>();
+        v->propertyValue = prop->defaultString;
+        v->type = ViewModelValueType::String;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::Boolean: {
+        auto v = std::make_shared<PAGViewModelValueBoolean>();
+        v->propertyValue = prop->defaultBoolean;
+        v->type = ViewModelValueType::Boolean;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::Color: {
+        auto v = std::make_shared<PAGViewModelValueColor>();
+        v->propertyValue = prop->defaultColor;
+        v->type = ViewModelValueType::Color;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::Image: {
+        auto v = std::make_shared<PAGViewModelValueImage>();
+        v->propertyValue = prop->defaultImage;
+        v->type = ViewModelValueType::Image;
+        value = std::move(v);
+        break;
+      }
+      case ViewModelPropertyType::ViewModel: {
+        auto v = std::make_shared<PAGViewModelValueViewModel>();
+        v->type = ViewModelValueType::ViewModel;
+        value = std::move(v);
+        break;
+      }
     }
-    if (value) { value->propertyName = prop->name; value->setScene(scene); value->converter = prop->dataConverter; vm->propertyMap[prop->name] = value; vm->propertyList.push_back(value); }
+    if (value) {
+      value->propertyName = prop->name;
+      value->setScene(scene);
+      value->converter = prop->dataConverter;
+      auto pd = std::shared_ptr<PropertyData>(new PropertyData());
+      pd->propertyType = prop->propertyType;
+      pd->propertyName = prop->name;
+      pd->customDataMap = prop->customData;
+      value->pd = std::move(pd);
+      vm->propertyMap[prop->name] = value;
+      vm->propertyList.push_back(value);
+    }
   }
   return vm;
 }
@@ -150,7 +196,6 @@ void PAGScene::buildViewModels() {
     buildNestedViewModels(_rootComposition.get());
   }
 }
-
 
 PAGScene::~PAGScene() {
   if (document != nullptr) {
