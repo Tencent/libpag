@@ -543,8 +543,7 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
-  processVectorScope(out, walked, transform, alpha, filters, styles, parentTextBox, accumulator,
-                     /*scopeStart=*/0);
+  processVectorScope(out, walked, transform, alpha, filters, styles, parentTextBox, accumulator, 0);
 }
 
 // Rasterize the entire layer (including its sub-tree) to a single embedded PNG
