@@ -18,7 +18,6 @@
 
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
@@ -41,16 +40,6 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   // Shared tmp asset dir for all string-assertion tests. Individual tests assert HTML text
   // content only; the PNG files written here are not validated, so cross-test filename
   // collisions (e.g. dgc0.png from two different samples) are harmless.
-  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
-  return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
-}
-
-static std::string LoadXMLAndConvert(const std::string& xml,
-                                     const pagx::HTMLExportOptions& options = {}) {
-  auto doc = pagx::PAGXImporter::FromXML(xml);
-  if (doc == nullptr) {
-    return "";
-  }
   auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
   return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
 }
@@ -260,16 +249,8 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
 CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="160" height="120">
-  <Layer width="100" height="80" matrix="1,0,0,1,30,20">
-    <Rectangle position="50,40" size="100,80" roundness="12"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="5" blurX="10" blurY="10" color="#0000001A" showBehindLayer="false"/>
-    <DropShadowStyle offsetY="5" blurX="5" blurY="5" color="#0000001A" showBehindLayer="false"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/drop_shadow_styles.pagx"), options);
   ASSERT_FALSE(html.empty());
   size_t filterCount = 0;
   for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
@@ -282,20 +263,8 @@ CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
 CLI_TEST(PAGXHtmlTest, ParentDropShadowWithShadowedChildAvoidsWrapperFilter) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="240" height="200">
-  <Layer id="parent" width="180" height="140" matrix="1,0,0,1,30,30">
-    <Rectangle position="90,70" size="180,140" roundness="12"/>
-    <Fill color="#FFFFFF"/>
-    <DropShadowStyle offsetY="5" blurX="10" blurY="10" color="#0000001A" showBehindLayer="false"/>
-    <Layer id="child" width="80" height="50" matrix="1,0,0,1,50,70">
-      <Rectangle position="40,25" size="80,50" roundness="8"/>
-      <Fill color="#1E1E1E"/>
-      <DropShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000033" showBehindLayer="false"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/parent_child_drop_shadow.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"parent\"");
@@ -333,15 +302,8 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
 CLI_TEST(PAGXHtmlTest, RectangleStrokeRoundnessIsClampedToBounds) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="240" height="60">
-  <Layer width="224" height="36">
-    <Rectangle position="112,18" size="224,36" roundness="80"/>
-    <Fill color="#FFFFFF"/>
-    <Stroke color="#EDEDED" width="2" align="inside" placement="foreground"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/rectangle_stroke_roundness.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("rx=\"18\""), std::string::npos);
   EXPECT_NE(html.find("ry=\"18\""), std::string::npos);
@@ -533,21 +495,8 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
 }
 
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
-  const std::string xml = R"(
-<pagx width="64" height="32">
-  <Resources>
-    <Font id="bad" unitsPerEm="1">
-      <Glyph advance="1" path="M 0,0 L 1,0 L 1,-1 L 0,-1 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="64" height="32">
-    <Text>
-      <GlyphRun font="@bad" fontSize="16" glyphs="1" x="8" y="24"/>
-    </Text>
-    <Fill color="#111111"/>
-  </Layer>
-</pagx>)";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/low_units_per_em_font.pagx"));
   ASSERT_NE(doc, nullptr);
   const pagx::Font* font = nullptr;
   for (const auto& node : doc->nodes) {
@@ -575,31 +524,8 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
 }
 
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
-  std::ostringstream glyphs;
-  std::ostringstream runGlyphs;
-  for (int i = 0; i < 391; i++) {
-    glyphs << "      <Glyph advance=\"1\" path=\"M 0,0 L 1,0 L 1,-1 L 0,-1 Z\"/>\n";
-    if (i > 0) {
-      runGlyphs << ',';
-    }
-    runGlyphs << i + 1;
-  }
-  auto xml = std::string(R"(
-<pagx width="64" height="32">
-  <Resources>
-    <Font id="large" unitsPerEm="1">
-)") + glyphs.str() +
-             R"(    </Font>
-  </Resources>
-  <Layer width="64" height="32">
-    <Text>
-      <GlyphRun font="@large" fontSize="16" glyphs=")" +
-             runGlyphs.str() + R"(" x="8" y="24"/>
-    </Text>
-    <Fill color="#111111"/>
-  </Layer>
-</pagx>)";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/custom_cff_charset_strings.pagx"));
   ASSERT_NE(doc, nullptr);
   const pagx::Font* font = nullptr;
   for (const auto& node : doc->nodes) {
@@ -625,22 +551,8 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
 CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="160" height="48">
-  <Resources>
-    <Font id="shapes" unitsPerEm="1000">
-      <Glyph advance="700" path="M 0,0 L 700,0 L 700,-700 L 0,-700 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="160" height="48">
-    <Text text="搜索" fontFamily="PingFang SC" fontSize="16">
-      <GlyphRun font="@shapes" fontSize="16" glyphs="1,1" x="10" y="24"
-                xOffsets="0,18" bounds="0,0,32,22"/>
-    </Text>
-    <Fill color="#111111"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/glyph_run_embedded_font.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("@font-face"), std::string::npos);
   EXPECT_NE(html.find("pagx-font-"), std::string::npos);
@@ -651,27 +563,8 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
 CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="120" height="40">
-  <Resources>
-    <Font id="bullet" unitsPerEm="1000">
-      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
-    </Font>
-    <Font id="text" unitsPerEm="1000">
-      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
-      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="120" height="40">
-    <Text text="•AB" fontFamily="PingFang SC" fontSize="16">
-      <GlyphRun font="@bullet" fontSize="16" glyphs="1" x="0" y="24" bounds="0,0,8,16"/>
-      <GlyphRun font="@text" fontSize="16" glyphs="1,2" x="16" y="24"
-                xOffsets="0,16" bounds="16,0,32,16"/>
-    </Text>
-    <Fill color="#111111"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/mixed_glyph_run_fonts.pagx"), options);
   ASSERT_FALSE(html.empty());
   size_t bulletFontCount = 0;
   for (size_t pos = 0; (pos = html.find("pagx-font-f0", pos)) != std::string::npos; pos++) {
@@ -689,27 +582,8 @@ CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
 CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="120" height="80">
-  <Resources>
-    <Font id="shapes" unitsPerEm="1000">
-      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="120" height="80">
-    <Group>
-      <Text text="abcdefgh" fontFamily="PingFang SC" fontSize="14">
-        <GlyphRun font="@shapes" fontSize="14" glyphs="1,1,1,1" y="17"
-                  xOffsets="0,14,28,42"/>
-        <GlyphRun font="@shapes" fontSize="14" glyphs="1,1,1,1" y="37"
-                  xOffsets="0,14,28,42"/>
-      </Text>
-      <Fill color="#111111"/>
-    </Group>
-    <TextBox width="56" lineHeight="20"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/single_group_text_box.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("word-wrap:break-word"), std::string::npos);
   EXPECT_NE(html.find("line-height:20px"), std::string::npos);
@@ -719,25 +593,8 @@ CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
 CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="96" height="32">
-  <Resources>
-    <Font id="shapes" unitsPerEm="1000">
-      <Glyph advance="500" path="M 0,0 L 500,0 L 500,-500 L 0,-500 Z"/>
-    </Font>
-  </Resources>
-  <Layer width="48" height="20" data-text-auto-resize="width-and-height">
-    <Group>
-      <Text text="智能模式" fontFamily="PingFang SC" fontSize="12">
-        <GlyphRun font="@shapes" fontSize="12" glyphs="1,1,1,1" y="14.32"
-                  xOffsets="0,12,24,36" bounds="0,0,48,20"/>
-      </Text>
-      <Fill color="#111111"/>
-    </Group>
-    <TextBox textAlign="center" paragraphAlign="middle" lineHeight="20" data-max-lines="1"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/single_auto_size_glyph_run.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
   EXPECT_EQ(html.find("智能模式"), std::string::npos);
@@ -749,25 +606,8 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
 CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="240" height="80">
-  <Layer width="240" height="80">
-    <Group>
-      <Text text="Title" fontFamily="PingFang SC" fontSize="14"/>
-      <Fill color="#111111"/>
-    </Group>
-    <Group>
-      <Text text="&#10;" fontFamily="PingFang SC" fontSize="14"/>
-      <Fill color="#111111"/>
-    </Group>
-    <Group>
-      <Text text="Option" fontFamily="PingFang SC" fontSize="14"/>
-      <Fill color="#111111"/>
-    </Group>
-    <TextBox width="200" lineHeight="24"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/rich_text_newline_group.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto titlePos = html.find("Title");
@@ -785,22 +625,8 @@ CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
 CLI_TEST(PAGXHtmlTest, UniformGradientTextFallsBackToSolidColor) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="160" height="48">
-  <Layer width="160" height="48">
-    <Group>
-      <Text text="Done" fontFamily="PingFang SC" fontSize="14"/>
-      <Fill>
-        <LinearGradient matrix="2,0,0,2,0,0">
-          <ColorStop offset="0" color="#999999"/>
-          <ColorStop offset="1" color="#999999"/>
-        </LinearGradient>
-      </Fill>
-    </Group>
-    <TextBox lineHeight="24"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/uniform_gradient_text.pagx"), options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("Done"), std::string::npos);
   EXPECT_NE(html.find("#999999"), std::string::npos);
@@ -858,21 +684,8 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
 CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="320" height="120">
-  <Layer id="clip" width="300" height="100" layout="horizontal" gap="12"
-         alignment="stretch" scrollRect="5,7,300,100">
-    <Layer id="first" width="80" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#FF0000"/>
-    </Layer>
-    <Layer id="second" width="90" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#00FF00"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/scroll_rect_flex_flow.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto offsetStylePos = html.find("style=\"position:relative;left:-5px;top:-7px");
@@ -894,21 +707,8 @@ CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
 CLI_TEST(PAGXHtmlTest, FixedFlexItemKeepsDeclaredWidthInScrollRectLayout) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="340" height="120">
-  <Layer id="clip" width="300" height="100" layout="horizontal" gap="0"
-         alignment="start" scrollRect="0,0,300,100">
-    <Layer id="fixed" width="120" height="100" flex="1">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#FF0000"/>
-    </Layer>
-    <Layer id="wide" width="240" height="100">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#00FF00"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/fixed_flex_item_scroll.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"fixed\"");
@@ -926,27 +726,8 @@ CLI_TEST(PAGXHtmlTest, FixedFlexItemKeepsDeclaredWidthInScrollRectLayout) {
 CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="260" height="160">
-  <Layer id="stack" width="220" layout="vertical" gap="8" alignment="start">
-    <Layer id="title" width="220" height="20">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#EEEEEE"/>
-    </Layer>
-    <Layer id="description" width="220" flex="1" data-text-auto-resize="none">
-      <Group>
-        <Text text="Line one&#10;Line two" fontFamily="PingFang SC" fontSize="14"/>
-        <Fill color="#111111"/>
-      </Group>
-      <TextBox width="220" height="48" lineHeight="24"/>
-    </Layer>
-    <Layer id="footer" width="220" height="20">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#DDDDDD"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/vertical_text_box_height.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"description\"");
@@ -963,26 +744,8 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
 CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="260" height="160">
-  <Layer id="stack" width="220" layout="vertical" alignment="start">
-    <Layer id="header" width="220" height="20">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#EEEEEE"/>
-    </Layer>
-    <Layer id="scroller" width="220" layout="horizontal" alignment="center" scrollRect="0,0,220,40">
-      <Layer id="item" width="40" height="40" includeInLayout="false">
-        <Rectangle left="0" right="0" top="0" bottom="0"/>
-        <Fill color="#00FF00"/>
-      </Layer>
-    </Layer>
-    <Layer id="footer" width="220" height="20">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#DDDDDD"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/vertical_scroll_rect_height.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"scroller\"");
@@ -998,26 +761,8 @@ CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
 CLI_TEST(PAGXHtmlTest, FlexItemWithChildLayerKeepsMeasuredWidth) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="240" height="80">
-  <Layer id="row" width="200" height="40" layout="horizontal" arrangement="spaceBetween">
-    <Layer id="first" width="40" height="40">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#FF0000"/>
-    </Layer>
-    <Layer id="wrapper" height="40">
-      <Layer id="inner" width="40" height="40">
-        <Rectangle left="0" right="0" top="0" bottom="0"/>
-        <Fill color="#00FF00"/>
-      </Layer>
-    </Layer>
-    <Layer id="last" width="40" height="40">
-      <Rectangle left="0" right="0" top="0" bottom="0"/>
-      <Fill color="#0000FF"/>
-    </Layer>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/flex_child_layer_width.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"wrapper\"");
@@ -1033,21 +778,8 @@ CLI_TEST(PAGXHtmlTest, FlexItemWithChildLayerKeepsMeasuredWidth) {
 CLI_TEST(PAGXHtmlTest, CompositionLayerWithFilterKeepsDeclaredSize) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="80" height="80">
-  <Resources>
-    <Composition id="icon" width="20" height="20">
-      <Layer>
-        <Rectangle position="10,10" size="20,20"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-    </Composition>
-  </Resources>
-  <Layer id="iconLayer" width="20" height="20" composition="@icon" matrix="1,0,0,1,10,10">
-    <DropShadowStyle offsetY="1" blurX="1" blurY="1" color="#00000033" showBehindLayer="false"/>
-  </Layer>
-</pagx>)",
-                                options);
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/composition_filter_size.pagx"), options);
   ASSERT_FALSE(html.empty());
 
   auto idPos = html.find("id=\"iconLayer\"");
