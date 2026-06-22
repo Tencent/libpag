@@ -155,8 +155,41 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       value->propertyName = prop->name;
       value->setScene(scene);
       value->converter = prop->dataConverter;
-      auto pd = std::shared_ptr<PropertyData>(new PropertyData());
-      pd->propertyType = prop->propertyType;
+      std::shared_ptr<PropertyData> pd;
+      switch (prop->propertyType) {
+        case ViewModelPropertyType::Number: {
+          auto d = std::make_shared<NumberPropertyData>();
+          pd = d;
+          break;
+        }
+        case ViewModelPropertyType::String:
+          pd = std::make_shared<StringPropertyData>();
+          break;
+        case ViewModelPropertyType::Boolean:
+          pd = std::make_shared<BooleanPropertyData>();
+          break;
+        case ViewModelPropertyType::Color:
+          pd = std::make_shared<ColorPropertyData>();
+          break;
+        case ViewModelPropertyType::Image:
+          pd = std::make_shared<ImagePropertyData>();
+          break;
+        case ViewModelPropertyType::ViewModel: {
+          auto d = std::make_shared<ViewModelPropertyData>();
+          if (prop->viewModelRef != nullptr) d->viewModelRef = prop->viewModelRef->id;
+          pd = d;
+          break;
+        }
+        case ViewModelPropertyType::Enum: {
+          auto d = std::make_shared<EnumPropertyData>();
+          d->options = prop->enumOptions;
+          pd = d;
+          break;
+        }
+        case ViewModelPropertyType::Trigger:
+          pd = std::make_shared<TriggerPropertyData>();
+          break;
+      }
       pd->propertyName = prop->name;
       pd->customDataMap = prop->customData;
       value->pd = std::move(pd);

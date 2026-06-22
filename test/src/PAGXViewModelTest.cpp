@@ -1403,6 +1403,49 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataReflectsSchema) {
   auto& custom = pd->customData();
   EXPECT_EQ(custom.at("min"), "0");
   EXPECT_EQ(custom.at("max"), "200");
+
+  // Verify the subclass is correct via type + static_cast.
+  auto numberPd = std::static_pointer_cast<pagx::NumberPropertyData>(pd);
+  ASSERT_NE(numberPd, nullptr);
+}
+
+// Verify Enum and ViewModel PropertyData subclasses.
+PAGX_TEST(PAGXViewModelTest, PropertyDataSubclassReflectsType) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+
+  auto* enumProp = doc->makeNode<pagx::ViewModelProperty>();
+  enumProp->name = "theme";
+  enumProp->propertyType = pagx::ViewModelPropertyType::Enum;
+  enumProp->enumOptions = {"dark", "light", "auto"};
+  schema->properties.push_back(enumProp);
+
+  auto* vmProp = doc->makeNode<pagx::ViewModelProperty>();
+  vmProp->name = "child";
+  vmProp->propertyType = pagx::ViewModelPropertyType::ViewModel;
+  schema->properties.push_back(vmProp);
+
+  doc->viewModel = schema;
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+
+  auto enumPd = vm->propertyNumber("theme")->propertyData();
+  ASSERT_NE(enumPd, nullptr);
+  EXPECT_EQ(enumPd->type(), pagx::PropertyData::Type::Enum);
+  auto enumData = std::static_pointer_cast<pagx::EnumPropertyData>(enumPd);
+  ASSERT_NE(enumData, nullptr);
+  EXPECT_EQ(enumData->options.size(), 3u);
+  EXPECT_EQ(enumData->options[0], "dark");
+  EXPECT_EQ(enumData->options[2], "auto");
+
+  auto vmPd = vm->propertyViewModel("child")->propertyData();
+  ASSERT_NE(vmPd, nullptr);
+  EXPECT_EQ(vmPd->type(), pagx::PropertyData::Type::ViewModel);
+  auto vmData = std::static_pointer_cast<pagx::ViewModelPropertyData>(vmPd);
+  ASSERT_NE(vmData, nullptr);
 }
 
 // ========== Nested composition DataBind ==========
