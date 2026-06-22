@@ -181,10 +181,10 @@ static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* 
   } else if (node->nodeType() == NodeType::Stroke) {
     colorSource = static_cast<Stroke*>(node)->color;
   }
-  auto* solid = colorSource ? static_cast<SolidColor*>(colorSource) : nullptr;
-  if (solid == nullptr) {
+  if (colorSource == nullptr || colorSource->nodeType() != NodeType::SolidColor) {
     return false;
   }
+  auto* solid = static_cast<SolidColor*>(colorSource);
   if (getOut == nullptr && setIn == nullptr) {
     solid->color = Default<SolidColor>().color;
     return true;
