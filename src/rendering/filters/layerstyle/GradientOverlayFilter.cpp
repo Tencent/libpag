@@ -27,8 +27,7 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point&,
-                                   const tgfx::Point&) {
+void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point&, const tgfx::Point&) {
   opacity = layerStyle->opacity->getValueAt(layerFrame);
   colors = layerStyle->colors->getValueAt(layerFrame);
   angle = layerStyle->angle->getValueAt(layerFrame);
