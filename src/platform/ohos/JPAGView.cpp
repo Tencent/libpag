@@ -911,6 +911,7 @@ void JPAGView::onSurfaceDestroyed() {
 }
 
 void JPAGView::release() {
+  XComponentHandler::RemoveListener(id);
   // A memory leak may occur if the timer is not cancelled upon release.
   if (animator) {
     animator->cancel();
