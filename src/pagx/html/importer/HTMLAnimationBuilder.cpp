@@ -952,9 +952,8 @@ bool HTMLAnimationBuilder::buildForElement(
           transformStops.push_back({time, m});
           if (!pureTranslate) transformAllPureTranslate = false;
         } else if (!warnedTransform) {
-          _diagnostics.warn(
-              "html: unsupported 'transform' value '" + Trim(val) +
-              "' in @keyframes; dropped [subset:animation-unsupported-property]");
+          _diagnostics.warn("html: unsupported 'transform' value '" + Trim(val) +
+                            "' in @keyframes; dropped [subset:animation-unsupported-property]");
           warnedTransform = true;
         }
       } else if (prop == "color" || prop == "background-color") {
