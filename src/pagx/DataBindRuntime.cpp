@@ -90,9 +90,6 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.targetNode = targetNode;
     entry.channel = db->channel;
     entries.push_back(entry);
-
-    // Mark dirty so the default value is applied on the first draw.
-    markDirty(db);
   }
 }
 
