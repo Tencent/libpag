@@ -283,6 +283,10 @@ std::string BuildPolystarPath(const Polystar* ps) {
 // Compute signed area of a path to determine winding direction.
 // Positive = clockwise, negative = counter-clockwise.
 namespace {
+// The shoelace sum stores twice the signed area in squared SVG coordinate units. Keep this
+// threshold tiny so only degenerate contour noise is ignored, not real thin geometry.
+static constexpr float CONTOUR_AREA_EPSILON = 1.0f / (1 << 12);
+
 struct SignedAreaVisitor {
   float area = 0.0f;
   Point startPoint = {};
@@ -396,9 +400,9 @@ static std::string EnsureContoursDirection(const PathData& pathData, bool clockw
     if (contour.closed) {
       area += (cur.x * contour.startPoint.y - contour.startPoint.x * cur.y);
     }
-    bool isCW = area > 0;
+    bool keepOriginalDirection = std::abs(area) <= CONTOUR_AREA_EPSILON || (area > 0) == clockwise;
 
-    if (isCW == clockwise) {
+    if (keepOriginalDirection) {
       // Emit contour as-is.
       result += "M" + CssFloatToString(contour.startPoint.x) + " " +
                 CssFloatToString(contour.startPoint.y);
