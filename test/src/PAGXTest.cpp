@@ -40,7 +40,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
-#include "pagx/PAGXTypeface.h"
+#include "pagx/PAGTypeface.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
@@ -158,27 +158,27 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static std::vector<std::shared_ptr<pagx::PAGXTypeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<pagx::PAGXTypeface>> result = {};
+static std::vector<std::shared_ptr<pagx::PAGTypeface>> CreateFallbackTypefaces() {
+  std::vector<std::shared_ptr<pagx::PAGTypeface>> result = {};
   auto regularTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
   if (regularTypeface) {
-    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(regularTypeface));
+    result.push_back(pagx::PAGTypeface::MakeFromTypeface(regularTypeface));
   }
   auto emojiTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
   if (emojiTypeface) {
-    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(emojiTypeface));
+    result.push_back(pagx::PAGTypeface::MakeFromTypeface(emojiTypeface));
   }
   auto hebrewTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
   if (hebrewTypeface) {
-    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(hebrewTypeface));
+    result.push_back(pagx::PAGTypeface::MakeFromTypeface(hebrewTypeface));
   }
   return result;
 }
 
-static std::vector<std::shared_ptr<pagx::PAGXTypeface>> GetFallbackTypefaces() {
+static std::vector<std::shared_ptr<pagx::PAGTypeface>> GetFallbackTypefaces() {
   static auto typefaces = CreateFallbackTypefaces();
   return typefaces;
 }
@@ -2352,7 +2352,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -2398,7 +2398,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -4802,7 +4802,7 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
 
   doc->applyLayout(&fontConfig);
 
@@ -4902,7 +4902,7 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   // Target width = 400 - 50 - 50 = 300.
@@ -4977,7 +4977,7 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5022,7 +5022,7 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5060,7 +5060,7 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -5111,7 +5111,7 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5165,7 +5165,7 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   layer->contents = {standalone, fill1, textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   // Standalone Text: textBounds should have positive width and height.
@@ -5296,7 +5296,7 @@ PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   EXPECT_TRUE(doc->embed());
@@ -5327,7 +5327,7 @@ PAGX_TEST(PAGXTest, DocumentClearEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5362,7 +5362,7 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5944,7 +5944,7 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   object->channels.push_back(yProp);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto file = pagx::PAGScene::Make(doc);
@@ -7871,7 +7871,7 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
@@ -10965,7 +10965,7 @@ PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
 
   // Register typeface and run full pipeline.
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   EXPECT_TRUE(doc->embed());
 

@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
-#include "pagx/PAGXTypeface.h"
+#include "pagx/PAGTypeface.h"
 
 namespace pagx {
 
@@ -43,8 +43,8 @@ struct FontConfig::Data {
     }
   };
 
-  std::unordered_map<FontKey, std::shared_ptr<PAGXTypeface>, FontKeyHash> registeredTypefaces = {};
-  std::vector<std::shared_ptr<PAGXTypeface>> fallbackTypefaces = {};
+  std::unordered_map<FontKey, std::shared_ptr<PAGTypeface>, FontKeyHash> registeredTypefaces = {};
+  std::vector<std::shared_ptr<PAGTypeface>> fallbackTypefaces = {};
 };
 
 }  // namespace pagx

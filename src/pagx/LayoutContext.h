@@ -29,7 +29,7 @@ class Typeface;
 
 namespace pagx {
 
-class PAGXTypeface;
+class PAGTypeface;
 
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
@@ -57,7 +57,7 @@ class LayoutContext {
   void ensureSystemFallbacks();
 
   FontConfig* fontConfig = nullptr;
-  std::vector<std::shared_ptr<PAGXTypeface>> systemFallbacks = {};
+  std::vector<std::shared_ptr<PAGTypeface>> systemFallbacks = {};
   bool systemFallbacksLoaded = false;
 };
 

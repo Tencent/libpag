@@ -23,7 +23,7 @@
 
 namespace pagx {
 
-class PAGXTypeface;
+class PAGTypeface;
 
 /**
  * FontConfig manages registered and fallback typefaces for font lookup.
@@ -41,20 +41,20 @@ class FontConfig {
   FontConfig& operator=(FontConfig&& other) noexcept;
 
   /**
-   * Registers a PAGXTypeface for exact (fontFamily, fontStyle) lookup. The lookup key is read
-   * from the PAGXTypeface's fontFamily()/fontStyle(). Use this for fonts explicitly provided by
+   * Registers a PAGTypeface for exact (fontFamily, fontStyle) lookup. The lookup key is read
+   * from the PAGTypeface's fontFamily()/fontStyle(). Use this for fonts explicitly provided by
    * the application.
-   * @param typeface The PAGXTypeface to register. Construct via PAGXTypeface::MakeFromPath,
+   * @param typeface The PAGTypeface to register. Construct via PAGTypeface::MakeFromPath,
    *                 MakeFromName, or MakeFromTypeface.
    */
-  void registerTypeface(std::shared_ptr<PAGXTypeface> typeface);
+  void registerTypeface(std::shared_ptr<PAGTypeface> typeface);
 
   /**
-   * Adds a fallback PAGXTypeface used when a character is not found in the primary font
+   * Adds a fallback PAGTypeface used when a character is not found in the primary font
    * (either registered or system). Typefaces are tried in order.
-   * @param typeface The fallback PAGXTypeface.
+   * @param typeface The fallback PAGTypeface.
    */
-  void addFallbackTypeface(std::shared_ptr<PAGXTypeface> typeface);
+  void addFallbackTypeface(std::shared_ptr<PAGTypeface> typeface);
 
  private:
   struct Data;

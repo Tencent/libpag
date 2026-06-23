@@ -39,7 +39,7 @@ FontConfig& FontConfig::operator=(const FontConfig& other) {
 FontConfig::FontConfig(FontConfig&& other) noexcept = default;
 FontConfig& FontConfig::operator=(FontConfig&& other) noexcept = default;
 
-void FontConfig::registerTypeface(std::shared_ptr<PAGXTypeface> typeface) {
+void FontConfig::registerTypeface(std::shared_ptr<PAGTypeface> typeface) {
   if (typeface == nullptr) {
     return;
   }
@@ -49,7 +49,7 @@ void FontConfig::registerTypeface(std::shared_ptr<PAGXTypeface> typeface) {
   data->registeredTypefaces[key] = std::move(typeface);
 }
 
-void FontConfig::addFallbackTypeface(std::shared_ptr<PAGXTypeface> typeface) {
+void FontConfig::addFallbackTypeface(std::shared_ptr<PAGTypeface> typeface) {
   if (typeface == nullptr) {
     return;
   }

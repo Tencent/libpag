@@ -22,7 +22,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/PAGXTypeface.h"
+#include "pagx/PAGTypeface.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/FontRenderCache.h"
@@ -74,7 +74,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   authoredDoc->layers.push_back(layer);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
   authoredDoc->applyLayout(&fontConfig);
   if (!pagx::FontEmbedder().embed(authoredDoc.get())) {
     return nullptr;
@@ -105,7 +105,7 @@ static pagx::Font* FindFirstEmbeddedFont(pagx::PAGXDocument* doc) {
   return nullptr;
 }
 
-CLI_TEST(PAGXTypefaceCacheTest, BuildPopulatesFontTypeface) {
+CLI_TEST(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   if (doc == nullptr) {
     GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
@@ -121,7 +121,7 @@ CLI_TEST(PAGXTypefaceCacheTest, BuildPopulatesFontTypeface) {
   EXPECT_TRUE(CachedTypeface(fontNode) != nullptr);
 }
 
-CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
+CLI_TEST(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   if (doc == nullptr) {
     GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
@@ -140,7 +140,7 @@ CLI_TEST(PAGXTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
       << "second LayerBuilder::Build should hit the cache, not rebuild the typeface";
 }
 
-CLI_TEST(PAGXTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
+CLI_TEST(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   auto docA = MakeReloadedEmbeddedTextDocument();
   auto docB = MakeReloadedEmbeddedTextDocument();
   if (docA == nullptr || docB == nullptr) {
@@ -156,7 +156,7 @@ CLI_TEST(PAGXTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   EXPECT_EQ(CachedTypeface(fontB), nullptr);
 }
 
-CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
+CLI_TEST(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   if (doc == nullptr) {
     GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
@@ -174,7 +174,7 @@ CLI_TEST(PAGXTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   EXPECT_TRUE(weak.expired());
 }
 
-CLI_TEST(PAGXTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
+CLI_TEST(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   if (doc == nullptr) {
     GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";

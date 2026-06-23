@@ -16,39 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXTypeface.h"
+#include "pagx/PAGTypeface.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-std::shared_ptr<PAGXTypeface> PAGXTypeface::MakeFromPath(const std::string& path, int ttcIndex,
+std::shared_ptr<PAGTypeface> PAGTypeface::MakeFromPath(const std::string& path, int ttcIndex,
                                                          const std::string& fontFamily,
                                                          const std::string& fontStyle) {
-  return std::shared_ptr<PAGXTypeface>(new PAGXTypeface(path, ttcIndex, fontFamily, fontStyle));
+  return std::shared_ptr<PAGTypeface>(new PAGTypeface(path, ttcIndex, fontFamily, fontStyle));
 }
 
-std::shared_ptr<PAGXTypeface> PAGXTypeface::MakeFromName(const std::string& fontFamily,
+std::shared_ptr<PAGTypeface> PAGTypeface::MakeFromName(const std::string& fontFamily,
                                                          const std::string& fontStyle) {
-  return std::shared_ptr<PAGXTypeface>(new PAGXTypeface(fontFamily, fontStyle));
+  return std::shared_ptr<PAGTypeface>(new PAGTypeface(fontFamily, fontStyle));
 }
 
-std::shared_ptr<PAGXTypeface> PAGXTypeface::MakeFromTypeface(
+std::shared_ptr<PAGTypeface> PAGTypeface::MakeFromTypeface(
     std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGXTypeface>(new PAGXTypeface(std::move(typeface)));
+  return std::shared_ptr<PAGTypeface>(new PAGTypeface(std::move(typeface)));
 }
 
-const std::string& PAGXTypeface::fontFamily() const {
+const std::string& PAGTypeface::fontFamily() const {
   return _fontFamily;
 }
 
-const std::string& PAGXTypeface::fontStyle() const {
+const std::string& PAGTypeface::fontStyle() const {
   return _fontStyle;
 }
 
-std::shared_ptr<tgfx::Typeface> PAGXTypeface::getTypeface() const {
+std::shared_ptr<tgfx::Typeface> PAGTypeface::getTypeface() const {
   if (_typeface == nullptr) {
     if (source == Source::Path) {
       _typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
@@ -59,16 +59,16 @@ std::shared_ptr<tgfx::Typeface> PAGXTypeface::getTypeface() const {
   return _typeface;
 }
 
-PAGXTypeface::PAGXTypeface(std::string path, int ttcIndex, std::string family, std::string style)
+PAGTypeface::PAGTypeface(std::string path, int ttcIndex, std::string family, std::string style)
     : source(Source::Path), path(std::move(path)), ttcIndex(ttcIndex),
       _fontFamily(std::move(family)), _fontStyle(std::move(style)) {
 }
 
-PAGXTypeface::PAGXTypeface(std::string family, std::string style)
+PAGTypeface::PAGTypeface(std::string family, std::string style)
     : source(Source::Name), _fontFamily(std::move(family)), _fontStyle(std::move(style)) {
 }
 
-PAGXTypeface::PAGXTypeface(std::shared_ptr<tgfx::Typeface> typeface)
+PAGTypeface::PAGTypeface(std::shared_ptr<tgfx::Typeface> typeface)
     : source(Source::Typeface), _typeface(std::move(typeface)) {
   if (_typeface != nullptr) {
     _fontFamily = _typeface->fontFamily();

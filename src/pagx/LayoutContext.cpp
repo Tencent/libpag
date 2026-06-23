@@ -19,7 +19,7 @@
 #include "LayoutContext.h"
 #include "FontConfigData.h"
 #include "SystemFonts.h"
-#include "pagx/PAGXTypeface.h"
+#include "pagx/PAGTypeface.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -154,7 +154,7 @@ void LayoutContext::ensureSystemFallbacks() {
   auto locations = SystemFonts::FallbackTypefaces();
   for (auto& loc : locations) {
     systemFallbacks.push_back(
-        PAGXTypeface::MakeFromPath(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle));
+        PAGTypeface::MakeFromPath(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle));
   }
 }
 

@@ -33,7 +33,7 @@ namespace pagx {
  * avoiding tgfx leakage through the public FontConfig API while preserving full font capabilities
  * (shaping, embedding, glyph lookup) for internal layout/render use.
  */
-class PAGXTypeface {
+class PAGTypeface {
  public:
   /**
    * Creates from a font file path. The given fontFamily/fontStyle are used as the registration
@@ -44,7 +44,7 @@ class PAGXTypeface {
    * @param fontFamily The font family name used for FontConfig lookup.
    * @param fontStyle The font style name used for FontConfig lookup.
    */
-  static std::shared_ptr<PAGXTypeface> MakeFromPath(const std::string& path, int ttcIndex,
+  static std::shared_ptr<PAGTypeface> MakeFromPath(const std::string& path, int ttcIndex,
                                                     const std::string& fontFamily,
                                                     const std::string& fontStyle);
 
@@ -54,7 +54,7 @@ class PAGXTypeface {
    * @param fontFamily The system font family name.
    * @param fontStyle The system font style name.
    */
-  static std::shared_ptr<PAGXTypeface> MakeFromName(const std::string& fontFamily,
+  static std::shared_ptr<PAGTypeface> MakeFromName(const std::string& fontFamily,
                                                     const std::string& fontStyle);
 
   /**
@@ -65,7 +65,7 @@ class PAGXTypeface {
    * runtime text shaping via FontConfig.
    * @param typeface The pre-built tgfx::Typeface to wrap.
    */
-  static std::shared_ptr<PAGXTypeface> MakeFromTypeface(std::shared_ptr<tgfx::Typeface> typeface);
+  static std::shared_ptr<PAGTypeface> MakeFromTypeface(std::shared_ptr<tgfx::Typeface> typeface);
 
   /**
    * Returns the registration family name. For MakeFromPath/MakeFromName this is the name passed
@@ -89,9 +89,9 @@ class PAGXTypeface {
  private:
   enum class Source { Path, Name, Typeface };
 
-  PAGXTypeface(std::string path, int ttcIndex, std::string family, std::string style);
-  explicit PAGXTypeface(std::string family, std::string style);
-  explicit PAGXTypeface(std::shared_ptr<tgfx::Typeface> typeface);
+  PAGTypeface(std::string path, int ttcIndex, std::string family, std::string style);
+  explicit PAGTypeface(std::string family, std::string style);
+  explicit PAGTypeface(std::shared_ptr<tgfx::Typeface> typeface);
 
   Source source;
   std::string path;
