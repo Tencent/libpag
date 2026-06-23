@@ -47,7 +47,9 @@ on Windows; override with `PAGX_HTML_SNAPSHOT_CACHE`). Set `PAGX_HTML_SNAPSHOT_N
 disable the auto-install and have the launcher print the manual command instead. The one-shot
 `html2pagx` wrapper and the warm HTTP server below require the repo (Case B).
 
-**Inside the repo.** `scripts/setup.sh` automates this; run it once. Manually, the requirements are:
+**Inside the repo.** `scripts/setup.js` automates this; run it once (`node
+.codebuddy/skills/pagx/scripts/setup.js`). It runs on node, so the same command works on
+macOS / Linux / Windows, and prints `setup: ready` on success. Manually, the requirements are:
 
 - **node** on `PATH`.
 - **pagx** CLI: `npm install -g @libpag/pagx` (or build the repo's `cmake-build-debug/pagx` and
@@ -72,6 +74,9 @@ dependency is missing.
 ```bash
 tools/html-snapshot/html2pagx <input.html | http(s)://url> [options]
 ```
+
+On native Windows, invoke it through `node` (the shebang/executable bit is a Unix concept):
+`node tools/html-snapshot/html2pagx <input.html> [options]`.
 
 | Flag | Use |
 |------|-----|
