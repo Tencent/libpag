@@ -1378,7 +1378,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto childContainerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   childContainerVal->propertyName = "container";
   childContainerVal->type = pagx::ViewModelValueType::ViewModel;
-  // referenceViewModelInstance is intentionally left null.
+  // referenceInstance is intentionally left null.
   childVM->propertyMap["container"] = childContainerVal;
 
   auto childCtx = std::make_shared<pagx::DataContext>(childVM);
