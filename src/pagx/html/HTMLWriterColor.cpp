@@ -31,6 +31,7 @@
 
 namespace pagx {
 
+using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 
 // Maps a point from a Gradient's own coordinate space to the PAGX pixel coordinate space
@@ -53,7 +54,16 @@ static bool ResolveUniformGradientColor(const Gradient* gradient, Color* color) 
   }
   auto firstColor = gradient->colorStops.front()->color;
   for (auto* stop : gradient->colorStops) {
-    if (!stop || stop->color != firstColor) {
+    // Tolerance-based channel comparison: stops that are nominally the same color but differ
+    // by float-level noise (e.g. from sRGB<->linear conversion in the import/interpolation
+    // pipeline) must still be treated as uniform, otherwise the gradient fill disappears when
+    // buildLinearGradientCSS also gives up on matrix-with-translation gradients. colorSpace is
+    // kept exact since distinct spaces with equal components are genuinely different colors.
+    if (!stop || stop->color.colorSpace != firstColor.colorSpace ||
+        !FloatNearlyEqual(stop->color.red, firstColor.red) ||
+        !FloatNearlyEqual(stop->color.green, firstColor.green) ||
+        !FloatNearlyEqual(stop->color.blue, firstColor.blue) ||
+        !FloatNearlyEqual(stop->color.alpha, firstColor.alpha)) {
       return false;
     }
   }
