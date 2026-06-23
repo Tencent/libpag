@@ -667,6 +667,109 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
+// CSS Color 4 `color()` functional notation. Chrome's getComputedStyle frequently emits this
+// form even when the source is plain rgba(); previously every channel value fell through to
+// opaque black, which broke HUD-style designs that relied on the captured alpha.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionSrgbWithAlphaRecognized) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(srgb 0.156863 0.878431 0.815686 / 0.6)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("unrecognised color"), std::string::npos);
+  }
+  auto* div = doc->layers.front()->children.front();
+  pagx::Color expected;
+  expected.red = 0.156863f;
+  expected.green = 0.878431f;
+  expected.blue = 0.815686f;
+  expected.alpha = 0.6f;
+  expected.colorSpace = pagx::ColorSpace::SRGB;
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), expected));
+}
+
+// `color(srgb r g b)` without alpha must default to opaque, matching CSS Color 4 semantics.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionSrgbWithoutAlphaIsOpaque) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(srgb 1 0 0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0xFF0000)));
+}
+
+// Non-sRGB color spaces are downgraded with a dedicated diagnostic instead of the generic
+// "unrecognised color value" message so users can tell which feature is missing.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionNonSrgbWarnsAndFallsBack) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(display-p3 0.5 0.2 0.9)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("color()") != std::string::npos && msg.find("non-sRGB") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x000000)));
+}
+
+// `radial-gradient(closest-side, ...)` used to be misparsed: the leading size keyword fell
+// through to `parseColor`, producing both a bogus diagnostic and an opaque-black first stop.
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithSizeKeyword) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:radial-gradient(closest-side, #FFFFFF 0%, #000000 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("unrecognised color value 'closest-side'"), std::string::npos);
+  }
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  ASSERT_EQ(rg->colorStops.size(), 2u);
+  EXPECT_TRUE(ColorNear(rg->colorStops.front()->color, HexColor(0xFFFFFF)));
+  EXPECT_TRUE(ColorNear(rg->colorStops.back()->color, HexColor(0x000000)));
+}
+
+// CSS `repeating-linear-gradient(...)` cannot be expressed natively in PAGX, but instead of
+// dropping it to a black background we render the non-repeating variant so the dominant color
+// survives and emit a diagnostic explaining the degradation.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientDegradesToSingleGradient) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:repeating-linear-gradient(90deg, #FF0000 0px, #FF0000 4px, #0000FF 4px, #0000FF 8px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("repeating-linear-gradient") != std::string::npos &&
+        msg.find("non-repeating") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_GE(lg->colorStops.size(), 2u);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">

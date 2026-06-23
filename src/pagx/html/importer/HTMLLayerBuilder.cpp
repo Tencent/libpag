@@ -166,6 +166,30 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value) {
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
     return _valueParser.parseConicGradient(trimmed);
   }
+  // CSS `repeating-*-gradient(...)` forms. PAGX has no tile/repeat axis on its gradient
+  // nodes, so we cannot reproduce the tiled effect natively. Falling back to the non-repeating
+  // variant preserves the dominant color and direction (e.g. a teal scanline overlay collapses
+  // into a single teal-to-transparent stripe instead of being dropped to opaque black). The
+  // caller still emits a "background-image not supported" diagnostic via a separate code path
+  // for cases where even this degraded version fails to parse.
+  static constexpr size_t kRepeatingPrefixLen = 10;  // length of "repeating-"
+  auto warnDowngrade = [&](ColorSource* color) -> ColorSource* {
+    if (color != nullptr) {
+      _diagnostics.warn("html: " + lower.substr(0, lower.find('(')) +
+                        " is not supported as a repeating pattern; "
+                        "rendered as a single non-repeating gradient instead");
+    }
+    return color;
+  };
+  if (lower.compare(0, 26, "repeating-linear-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseLinearGradient(trimmed.substr(kRepeatingPrefixLen)));
+  }
+  if (lower.compare(0, 26, "repeating-radial-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseRadialGradient(trimmed.substr(kRepeatingPrefixLen)));
+  }
+  if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseConicGradient(trimmed.substr(kRepeatingPrefixLen)));
+  }
   return nullptr;
 }
 

@@ -130,6 +130,23 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return hsl;
     }
   }
+  // CSS Color 4 `color()` functional notation. Chrome's getComputedStyle normalises authored
+  // colors mixed with currentColor or color-mix into this form even when the source is plain
+  // rgba(), so any captured `background-color: rgba(...)` may surface here as
+  // `color(srgb 0.15 0.88 0.81 / 0.6)`. Without this path the value falls through to opaque
+  // black, which manifests as solid black borders/glows in PAGX renders of complex HUDs.
+  if (lowered.compare(0, 6, "color(") == 0) {
+    Color colorFn = {};
+    if (ParseCSSColorFunction(value, colorFn)) {
+      return colorFn;
+    }
+    // Reach here only when the value is well-formed CSS but uses a color space we cannot map
+    // to PAGX's sRGB pipeline. Emitting a dedicated diagnostic prevents users from chasing
+    // the generic "unrecognised color value" message which would suggest a typo instead.
+    _diagnostics.warn("html: color() with non-sRGB color space '" + value +
+                      "' is not supported; falling back to opaque black");
+    return {0, 0, 0, 1, ColorSpace::SRGB};
+  }
   // Named color
   const auto& named = NamedColors();
   auto it = named.find(lowered);
@@ -334,10 +351,36 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
-  // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
+  // CSS Color 4 lets the first comma-separated segment declare the gradient shape (`circle`,
+  // `ellipse`), an explicit size (`closest-side`, `farthest-side`, `closest-corner`,
+  // `farthest-corner`, or two <length-percentage>s), and the center via `at <position>`. We
+  // ignore the geometry for now — the gradient is mapped onto the box like a normalized 50%
+  // disc — but we must recognise the header so its tokens are not parsed as the first color
+  // stop. The earlier check only saw the literal words "circle"/"ellipse"/"at", which let the
+  // common `radial-gradient(closest-side, …)` form fall through and produced a bogus
+  // "unrecognised color value 'closest-side'" diagnostic followed by an opaque-black stop.
+  static constexpr const char* kShapeKeywords[] = {
+      "circle",       "ellipse",        " at ",          "at ",
+      "closest-side", "closest-corner", "farthest-side", "farthest-corner",
+  };
   std::string first = ToLower(Trim(parts[0]));
-  if (first.find("circle") != std::string::npos || first.find("ellipse") != std::string::npos ||
-      first.find("at") != std::string::npos) {
+  auto looksLikeShapeHeader = [&]() {
+    for (const char* kw : kShapeKeywords) {
+      if (first.find(kw) != std::string::npos) return true;
+    }
+    // Two-number form e.g. "60% 40%" / "120px 90px" (followed optionally by "at ..."). A pure
+    // numeric/length token would never start a valid color stop in CSS, so treat any leading
+    // segment that begins with a digit, sign or dot as the shape header. Authors who wrote a
+    // single bare number per color stop hit `parseGradientStops`'s offset handling, which
+    // expects the offset to follow the color, not precede it — so the leading-digit form is
+    // unambiguous here.
+    if (!first.empty()) {
+      char c = first[0];
+      if (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9')) return true;
+    }
+    return false;
+  };
+  if (looksLikeShapeHeader()) {
     stopStart = 1;
   }
   GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
