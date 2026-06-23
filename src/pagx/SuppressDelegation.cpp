@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/SuppressDelegation.h"
+#include <unordered_set>
 #include "pagx/PAGScene.h"
 #include "pagx/PAGViewModelValue.h"
 
@@ -39,41 +40,15 @@ SuppressDelegation::~SuppressDelegation() {
   }
   s->suppressNotify = false;
   auto& pending = s->pendingNotifications;
-  // Deduplicate and notify each value once.
-  bool duplicates = false;
-  for (size_t i = 0; i < pending.size(); i++) {
-    for (size_t j = i + 1; j < pending.size(); j++) {
-      if (pending[i] == pending[j]) {
-        duplicates = true;
-        break;
-      }
+  // Deduplicate with a set while preserving the original pending order for notify.
+  std::unordered_set<PAGViewModelValue*> seen = {};
+  seen.reserve(pending.size());
+  for (auto* value : pending) {
+    if (value == nullptr) {
+      continue;
     }
-  }
-  if (!duplicates) {
-    for (auto* value : pending) {
-      if (value != nullptr) {
-        value->notifyObservers();
-      }
-    }
-  } else {
-    // Simple dedup: use a vector for the notify pass.
-    std::vector<PAGViewModelValue*> unique = {};
-    unique.reserve(pending.size());
-    for (auto* value : pending) {
-      if (value == nullptr) {
-        continue;
-      }
-      bool found = false;
-      for (auto* u : unique) {
-        if (u == value) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        unique.push_back(value);
-        value->notifyObservers();
-      }
+    if (seen.insert(value).second) {
+      value->notifyObservers();
     }
   }
   pending.clear();
