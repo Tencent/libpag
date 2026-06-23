@@ -229,6 +229,10 @@ class LayerBuilderContext {
     _needsRuntimeData = value;
   }
 
+  void setDocument(const PAGXDocument* document) {
+    _document = document;
+  }
+
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
   // their own independent layerMap. The returned LayerBuildResult.root is a fresh container layer
   // populated with the composition's child layers. Per-slot mask resolution still runs on the
@@ -1604,7 +1608,9 @@ class LayerBuilderContext {
     std::shared_ptr<tgfx::Image> image = nullptr;
     bool isBackendTexture = false;
     // Priority 1: query the provider for a platform-decoded image.
-    if (auto provider = document->imageResourceProvider()) {
+    if (document == nullptr) {
+      // No document context available; skip provider lookup.
+    } else if (auto* provider = document->imageResourceProvider()) {
       if (!imageNode->filePath.empty()) {
         image = provider->resolveImage(imageNode->filePath);
         if (image) {
@@ -2821,22 +2827,26 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   return context.buildSubtree(composition);
 }
 
-bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                       const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return false;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.refreshLayerInPlace(node, binding);
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
-                                                          RuntimeBinding* binding) {
+                                                          RuntimeBinding* binding,
+                                                          const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.buildLayerInto(node, binding);
 }
 

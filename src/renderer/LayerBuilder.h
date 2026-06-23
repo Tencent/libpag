@@ -365,9 +365,11 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
+   * @param document The owning document, used to resolve image resources via the provider.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
-  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding);
+  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                  const PAGXDocument* document);
 
   /**
    * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
@@ -377,9 +379,11 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
+   * @param document The owning document, used to resolve image resources via the provider.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
-  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding);
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
+                                                     const PAGXDocument* document);
 };
 
 /**
