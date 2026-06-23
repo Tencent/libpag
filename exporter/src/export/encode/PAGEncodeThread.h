@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <pag/types.h>
 #include <tgfx/core/Buffer.h>
 #include <QThread>
+#include <atomic>
 #include "VideoEncoder.h"
 
 namespace exporter {
