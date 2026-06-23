@@ -372,8 +372,8 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'Resources'."
                       " Expected: Image, PathData, Composition, Font,"
-                      " SolidColor, LinearGradient, RadialGradient,"
-                      " ConicGradient, DiamondGradient, ImagePattern.");
+                      " ViewModel, DataConverter, SolidColor, LinearGradient,"
+                      " RadialGradient, ConicGradient, DiamondGradient, ImagePattern.");
     }
   }
 }
