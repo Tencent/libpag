@@ -91,10 +91,10 @@ automatically on the first conversion that needs it (Step 3), into a per-user ca
 shown on screen. Requires `node` on PATH.
 
 **Case B — inside the libpag repository (contributor).** Run the setup script from anywhere inside
-the repo:
+the repo (it runs on `node`, so it works the same on macOS / Linux / Windows):
 
 ```bash
-bash .codebuddy/skills/pagx/scripts/setup.sh
+node .codebuddy/skills/pagx/scripts/setup.js
 ```
 
 Expected output ends with `setup: ready`. It checks `node` and `pagx`, installs the snapshot tool's
@@ -151,6 +151,12 @@ imports it to PAGX, resolves it, and renders a preview PNG:
 
 ```bash
 tools/html-snapshot/html2pagx <name>.html --embed-fonts
+```
+
+On native Windows (where the shebang/executable bit does not apply), invoke it through `node`:
+
+```powershell
+node tools/html-snapshot/html2pagx <name>.html --embed-fonts
 ```
 
 - Output: `<name>.subset.html` (the flattened intermediate), `<name>.pagx` (the result), and

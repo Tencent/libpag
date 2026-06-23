@@ -3,17 +3,35 @@
   "version": "0.3.24",
   "description": "PAGX command-line tool for validation, rendering, optimization and formatting",
   "license": "Apache-2.0",
+  "keywords": [
+    "pagx",
+    "pag",
+    "libpag",
+    "animation",
+    "vector",
+    "cli",
+    "render"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Tencent/libpag"
+    "url": "https://github.com/Tencent/libpag",
+    "directory": "cli/npm"
+  },
+  "bugs": {
+    "url": "https://github.com/Tencent/libpag/issues"
   },
   "homepage": "https://github.com/Tencent/libpag#readme",
+  "engines": {
+    "node": ">=16.7.0"
+  },
   "bin": {
     "pagx": "bin/pagx.js"
   },
   "scripts": {
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
-    "prepack": "node scripts/build-html-snapshot.js"
+    "check:binaries": "node scripts/check-binaries.js",
+    "prepack": "node scripts/build-html-snapshot.js",
+    "prepublishOnly": "node scripts/check-binaries.js"
   },
   "os": [
     "darwin",

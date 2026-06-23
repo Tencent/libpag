@@ -272,7 +272,12 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
         depth--;
       if (depth > 0) end++;
     }
-    if (end >= value.size()) break;
+    if (end >= value.size()) {
+      // The opener at `paren` never matched a closer. Warn and stop so callers see a
+      // diagnostic instead of silently dropping the remainder of the chain.
+      _diagnostics.warn("html: unmatched '(' in filter '" + value + "'; remainder ignored");
+      break;
+    }
     std::string args = value.substr(paren + 1, end - paren - 1);
     FilterStep step;
     step.raw = value.substr(start, end - start + 1);
@@ -377,7 +382,18 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
     if (tokens.size() >= 2) {
       const std::string& off = tokens[1];
       if (!off.empty() && off.back() == '%') {
-        offset = std::strtof(off.c_str(), nullptr) / 100.0f;
+        // Validate the percent token end-to-end so '50%' parses while 'abc%' is rejected.
+        // strtof silently returns 0 on a leading non-digit, which would otherwise be treated
+        // as a valid 0% offset and shift the entire gradient stop layout.
+        char* endPtr = nullptr;
+        float pct = std::strtof(off.c_str(), &endPtr);
+        if (endPtr != nullptr && endPtr != off.c_str() &&
+            static_cast<size_t>(endPtr - off.c_str()) == off.size() - 1) {
+          offset = pct / 100.0f;
+        } else {
+          _diagnostics.warn("html: malformed gradient stop offset '" + off +
+                            "'; inferring position");
+        }
       } else if (interpretAngularOffset && !off.empty() && off.find("deg") != std::string::npos) {
         offset = ParseAngle(off) / 360.0f;
       } else if (!interpretAngularOffset) {
