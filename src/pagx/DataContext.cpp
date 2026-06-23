@@ -35,6 +35,9 @@ std::shared_ptr<PAGViewModel> DataContext::viewModelInstance() const {
 }
 
 PAGViewModelValue* DataContext::resolve(const std::vector<std::string>& path) const {
+  // ViewModel-typed values are containers for nested properties, not bindable leaf
+  // values. Descending into the reference and returning nullptr at the end of a
+  // ViewModel-only path is intentional: only concrete leaf values are bindable.
   if (path.empty() || vm == nullptr) {
     return nullptr;
   }
