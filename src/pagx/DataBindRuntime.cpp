@@ -242,6 +242,11 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     if (layer == nullptr) {
       continue;
     }
+    // syncBack only supports float-readable channels. Skipping unsupported channels
+    // avoids writing the readTargetFloat fallback (0.0f) into the VM.
+    if (entry.channel != "alpha" && entry.channel != "x" && entry.channel != "y") {
+      continue;
+    }
     float current = readTargetFloat(layer.get(), entry.channel, 0.0f);
     // Apply inverse converter for syncBack direction (layer value → VM domain).
     KeyValue kv{current};
