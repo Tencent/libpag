@@ -22,13 +22,13 @@
 namespace pagx {
 
 std::shared_ptr<PAGTypeface> PAGTypeface::MakeFromPath(const std::string& path, int ttcIndex,
-                                                         const std::string& fontFamily,
-                                                         const std::string& fontStyle) {
+                                                       const std::string& fontFamily,
+                                                       const std::string& fontStyle) {
   return std::shared_ptr<PAGTypeface>(new PAGTypeface(path, ttcIndex, fontFamily, fontStyle));
 }
 
 std::shared_ptr<PAGTypeface> PAGTypeface::MakeFromName(const std::string& fontFamily,
-                                                         const std::string& fontStyle) {
+                                                       const std::string& fontStyle) {
   return std::shared_ptr<PAGTypeface>(new PAGTypeface(fontFamily, fontStyle));
 }
 

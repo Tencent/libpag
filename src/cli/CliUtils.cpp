@@ -19,8 +19,8 @@
 #include "cli/CliUtils.h"
 #include <fstream>
 #include <iostream>
-#include "pagx/PAGXImporter.h"
 #include "pagx/PAGTypeface.h"
+#include "pagx/PAGXImporter.h"
 
 namespace pagx::cli {
 

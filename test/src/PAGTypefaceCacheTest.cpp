@@ -19,10 +19,10 @@
 #include <memory>
 #include "base/PAGTest.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGTypeface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/PAGTypeface.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/FontRenderCache.h"

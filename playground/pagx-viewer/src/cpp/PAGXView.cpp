@@ -21,8 +21,8 @@
 #include <emscripten/html5.h>
 #include <algorithm>
 #include <cstdint>
-#include "pagx/PAGXImporter.h"
 #include "pagx/PAGTypeface.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
