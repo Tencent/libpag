@@ -1521,7 +1521,7 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
       } else {
         ReportError(doc, child.get(),
                     "Element '" + child->name +
-                        "' is not allowed in 'Composition'. Expected: Layer, Animations.");
+                        "' is not allowed in 'Composition'. Expected: Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
