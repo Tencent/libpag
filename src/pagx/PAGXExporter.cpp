@@ -123,19 +123,6 @@ static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
   }
   return "Number";
 }
-static std::string DataBindDirectionToString(DataBindDirection f) {
-  switch (f) {
-    case DataBindDirection::ToTarget:
-      return "ToTarget";
-    case DataBindDirection::ToSource:
-      return "ToSource";
-    case DataBindDirection::TwoWay:
-      return "TwoWay";
-    case DataBindDirection::Once:
-      return "Once";
-  }
-  return "ToTarget";
-}
 
 static std::string PointListToString(const std::vector<Point>& points) {
   std::string result = {};
@@ -1323,8 +1310,6 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("source", bind->source);
       xml.addAttribute("target", bind->target);
       xml.addAttribute("channel", bind->channel);
-      if (bind->flags != DataBindDirection::ToTarget)
-        xml.addAttribute("flags", DataBindDirectionToString(bind->flags));
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

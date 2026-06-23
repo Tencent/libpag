@@ -2786,18 +2786,6 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
   bind->source = GetAttribute(node, "source");
   bind->target = GetAttribute(node, "target");
   bind->channel = GetAttribute(node, "channel");
-  auto flagsStr = GetAttribute(node, "flags");
-  if (!flagsStr.empty()) {
-    if (flagsStr == "ToTarget" || flagsStr == "toTarget") bind->flags = DataBindDirection::ToTarget;
-    else if (flagsStr == "ToSource" || flagsStr == "toSource")
-      bind->flags = DataBindDirection::ToSource;
-    else if (flagsStr == "TwoWay" || flagsStr == "twoWay")
-      bind->flags = DataBindDirection::TwoWay;
-    else if (flagsStr == "Once" || flagsStr == "once")
-      bind->flags = DataBindDirection::Once;
-    else
-      ReportError(doc, node, "Invalid value '" + flagsStr + "' for 'flags' attribute.");
-  }
   return bind;
 }
 

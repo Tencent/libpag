@@ -83,25 +83,16 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     }
     sourceValue->addDependent(this);
 
-    bool toSource =
-        db->flags == DataBindDirection::ToSource || db->flags == DataBindDirection::TwoWay;
-    bool toTarget = db->flags != DataBindDirection::ToSource;
-
     BindingEntry entry;
     entry.dataBind = db;
     entry.source = sourceValue;
     entry.sourceGuard = sourceValue->weak_from_this();
     entry.targetNode = targetNode;
     entry.channel = db->channel;
-    entry.isToSource = toSource;
-    entry.isToTarget = toTarget;
-    entry.onceApplied = false;
     entries.push_back(entry);
 
     // Mark dirty so the default value is applied on the first draw.
-    if (toTarget) {
-      markDirty(db);
-    }
+    markDirty(db);
   }
 }
 
@@ -180,22 +171,11 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         entry->targetNode == nullptr || entry->dataBind == nullptr) {
       continue;
     }
-    // ToSource only: no ViewModel → layer direction.
-    if (!entry->isToTarget) {
-      continue;
-    }
-    // Once: skip after first application.
-    if (entry->dataBind->flags == DataBindDirection::Once && entry->onceApplied) {
-      continue;
-    }
     auto keyValue = valueToKeyValue(entry->source);
     if (entry->source->converter != nullptr) {
       keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
     }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
-    if (entry->dataBind->flags == DataBindDirection::Once) {
-      entry->onceApplied = true;
-    }
   }
 }
 
@@ -236,7 +216,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     return;
   }
   for (auto& entry : entries) {
-    if (!entry.isToSource || entry.source == nullptr || entry.sourceGuard.lock() == nullptr ||
+    if (entry.source == nullptr || entry.sourceGuard.lock() == nullptr ||
         entry.targetNode == nullptr) {
       continue;
     }

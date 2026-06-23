@@ -60,9 +60,6 @@ class DataBindRuntime {
     std::weak_ptr<PAGViewModelValue> sourceGuard = {};
     const Node* targetNode = nullptr;
     std::string channel = {};
-    bool isToSource = false;   // ToSource or TwoWay
-    bool isToTarget = true;    // false for pure ToSource
-    bool onceApplied = false;  // Once flag: applied once, skip thereafter
   };
 
   std::vector<DataBind*> dirtyBinds = {};
