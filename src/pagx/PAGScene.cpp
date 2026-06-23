@@ -239,7 +239,7 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
         auto propName = sourceLayer->vmContext;
         if (propName.find("$vm.") == 0) propName = propName.substr(4);
         auto prop = parentComp->compositionViewModel->propertyViewModel(propName);
-        if (prop) prop->referenceViewModelInstance = childVM;
+        if (prop) prop->referenceInstance = childVM;
       }
       if (!compSchema->dataBinds.empty())
         childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),

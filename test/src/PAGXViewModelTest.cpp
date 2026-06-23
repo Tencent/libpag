@@ -1364,7 +1364,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto containerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   containerVal->propertyName = "container";
   containerVal->type = pagx::ViewModelValueType::ViewModel;
-  containerVal->referenceViewModelInstance = nestedVM;
+  containerVal->referenceInstance = nestedVM;
   parentScene->viewModel()->propertyMap["container"] = containerVal;
 
   // Child VM: has a ViewModel-typed property "container" with null reference.
