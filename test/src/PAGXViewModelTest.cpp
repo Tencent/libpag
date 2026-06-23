@@ -1105,6 +1105,9 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
   EXPECT_EQ(v->value(), "b.png");
+  // TODO: verify target layer image channel. No "image" writer is registered on the Layer target
+  // or any other node, so the DataBind is a no-op and the target image source cannot be observed.
+  // The source assertion above is kept as a secondary check.
 }
 
 // ========== DataConverter runtime ==========
