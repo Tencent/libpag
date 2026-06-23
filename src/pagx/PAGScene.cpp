@@ -243,7 +243,7 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
       }
       if (!compSchema->dataBinds.empty())
         childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),
-                                         childComp->binding.get(), childComp->document);
+                                         childComp->document);
     }
     buildNestedViewModels(childComp);
   }
@@ -258,8 +258,7 @@ void PAGScene::buildViewModels() {
     _rootComposition->dataContext = std::make_shared<DataContext>(rootViewModel);
     if (!document->dataBinds.empty())
       _rootComposition->dataBindRuntime->bind(document->dataBinds,
-                                              _rootComposition->dataContext.get(),
-                                              _rootComposition->binding.get(), document.get());
+                                              _rootComposition->dataContext.get(), document.get());
   }
   if (_rootComposition != nullptr) {
     buildNestedViewModels(_rootComposition.get());
