@@ -539,7 +539,7 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::TwoWay;
+  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -598,7 +598,7 @@ PAGX_TEST(PAGXViewModelTest, ToTargetOnlyNoSyncBack) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::ToTarget;
+  db->flags = pagx::DataBindDirection::ToTarget;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -669,7 +669,7 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::TwoWay;
+  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -729,7 +729,7 @@ PAGX_TEST(PAGXViewModelTest, OnceFlagAppliedOnceOnly) {
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::Once;
+  db->flags = pagx::DataBindDirection::Once;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -777,7 +777,7 @@ PAGX_TEST(PAGXViewModelTest, ToSourceDoesNotApplyVMToLayer) {
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::ToSource;
+  db->flags = pagx::DataBindDirection::ToSource;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -835,7 +835,7 @@ PAGX_TEST(PAGXViewModelTest, ToSourceSyncsAnimationToVM) {
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
-  db->flags = pagx::DataBindFlags::ToSource;
+  db->flags = pagx::DataBindDirection::ToSource;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
