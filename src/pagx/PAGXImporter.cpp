@@ -2755,11 +2755,19 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
           }
         }
         auto converterId = GetAttribute(child.get(), "dataConverter");
-        if (!converterId.empty() && converterId[0] == '@')
+        if (!converterId.empty() && converterId[0] == '@') {
           prop->dataConverter = doc->findNode<DataConverter>(converterId.substr(1));
+          if (!prop->dataConverter)
+            ReportError(doc, child.get(),
+                        "Resource '" + converterId + "' not found for 'dataConverter' attribute.");
+        }
         auto vmRef = GetAttribute(child.get(), "viewModelRef");
-        if (!vmRef.empty() && vmRef[0] == '@')
+        if (!vmRef.empty() && vmRef[0] == '@') {
           prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
+          if (!prop->viewModelRef)
+            ReportError(doc, child.get(),
+                        "Resource '" + vmRef + "' not found for 'viewModelRef' attribute.");
+        }
         vm->properties.push_back(prop);
       }
     } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
