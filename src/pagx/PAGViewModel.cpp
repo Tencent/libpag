@@ -27,7 +27,11 @@ std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(const std:
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueNumber>(it->second);
+  const auto type = it->second->valueType();
+  if (type != ViewModelValueType::Number && type != ViewModelValueType::Enum) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueNumber>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(const std::string& name) {
@@ -35,7 +39,10 @@ std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(const std:
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueString>(it->second);
+  if (it->second->valueType() != ViewModelValueType::String) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueString>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(const std::string& name) {
@@ -43,7 +50,11 @@ std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(const st
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueBoolean>(it->second);
+  const auto type = it->second->valueType();
+  if (type != ViewModelValueType::Boolean && type != ViewModelValueType::Trigger) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueBoolean>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::string& name) {
@@ -51,7 +62,10 @@ std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::s
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueColor>(it->second);
+  if (it->second->valueType() != ViewModelValueType::Color) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueColor>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(const std::string& name) {
@@ -59,7 +73,10 @@ std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(const std::s
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueImage>(it->second);
+  if (it->second->valueType() != ViewModelValueType::Image) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueImage>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueViewModel> PAGViewModel::propertyViewModel(
@@ -68,7 +85,10 @@ std::shared_ptr<PAGViewModelValueViewModel> PAGViewModel::propertyViewModel(
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  return std::dynamic_pointer_cast<PAGViewModelValueViewModel>(it->second);
+  if (it->second->valueType() != ViewModelValueType::ViewModel) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueViewModel>(it->second);
 }
 
 // ---- Reflection --------------------------------------------------------------
