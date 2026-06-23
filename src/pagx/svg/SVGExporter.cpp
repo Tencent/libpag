@@ -344,25 +344,27 @@ class SVGWriterContext {
   std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
   bool layerParentMapReady = false;
 
-  // (mask layer, def kind) → def-id cache. A single mask Layer can be referenced by many owners
+  // (mask layer, MaskType) → def-id cache. A single mask Layer can be referenced by many owners
   // (PAGX allows it explicitly), and PR feedback showed that without this cache `<mask>` /
   // `<clipPath>` definitions get re-emitted into <defs> on every reference, producing duplicate
-  // `id` values in <defs> with undefined browser behaviour. The `kind` byte separates the
-  // alpha-/luminance-mask emission from a clipPath emission of the same mask layer (different
-  // tag, different content writer); without it a layer used in both modes would collide. The
-  // cache fast-paths every subsequent reference: same Layer + same kind reuses the original
-  // def-id and skips the second `<mask>`/`<clipPath>` emission entirely.
-  enum class MaskDefKind : uint8_t { Mask, ClipPath };
+  // `id` values in <defs> with undefined browser behaviour. The MaskType axis matters because
+  // the three values map to materially different SVG output: Alpha and Luminance both emit
+  // `<mask>` but differ in `mask-type` (alpha uses the alpha channel, luminance uses brightness
+  // and is the SVG default), while Contour emits `<clipPath>` (geometry-only inside/outside
+  // test). Sharing the cache slot across MaskTypes would silently route a luminance owner to an
+  // alpha mask (or vice versa) and a contour owner to a path mask — no warning, wrong render.
+  // The cache fast-paths every subsequent reference: same Layer + same MaskType reuses the
+  // original def-id and skips the second emission entirely.
   struct MaskDefKey {
     const Layer* layer;
-    MaskDefKind kind;
+    MaskType maskType;
     bool operator==(const MaskDefKey& other) const {
-      return layer == other.layer && kind == other.kind;
+      return layer == other.layer && maskType == other.maskType;
     }
   };
   struct MaskDefKeyHash {
     size_t operator()(const MaskDefKey& k) const noexcept {
-      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.kind) << 1);
+      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.maskType) << 1);
     }
   };
   std::unordered_map<MaskDefKey, std::string, MaskDefKeyHash> emittedMaskDefs = {};
@@ -531,8 +533,7 @@ class SVGWriter {
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
-  std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
-                                 ContentWriter writer, MaskType maskType = MaskType::Contour);
+  std::string writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
@@ -1702,24 +1703,50 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
-                                          const char* idPrefix, ContentWriter writer,
-                                          MaskType maskType) {
-  // Reuse a previously-emitted def for the same (maskLayer, kind). Without this cache, a single
-  // mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements with the
-  // same id in <defs>, which is undefined per the SVG spec — browsers typically use the first
-  // and silently ignore the rest, but a regression that changes the emission order would
-  // re-wire all owners to a different copy. The kind enum separates mask emission from clipPath
-  // emission of the same layer; a layer used in both roles will get one id per role.
-  SVGWriterContext::MaskDefKind kind = (std::strcmp(tag, "clipPath") == 0)
-                                           ? SVGWriterContext::MaskDefKind::ClipPath
-                                           : SVGWriterContext::MaskDefKind::Mask;
-  SVGWriterContext::MaskDefKey key{maskLayer, kind};
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
+  // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
+  // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements with
+  // the same id in <defs>, which is undefined per the SVG spec — browsers typically use the
+  // first and silently ignore the rest, but a regression that changes the emission order would
+  // re-wire all owners to a different copy.
+  //
+  // MaskType participates in the key because the three values map to materially different SVG
+  // output: Alpha and Luminance both emit `<mask>` but differ in `mask-type` (alpha channel vs
+  // luminance, which is the SVG default), while Contour emits `<clipPath>` (geometry-only
+  // inside/outside test). Without keying on MaskType, the second reference for a layer used in
+  // two roles would silently inherit the first role's def — a luminance owner would render an
+  // alpha mask, or a contour owner would receive a path mask — with no warning.
+  bool isClipPath = (maskType == MaskType::Contour);
+  const char* tag = isClipPath ? "clipPath" : "mask";
+  const char* idPrefix = isClipPath ? "clip" : "mask";
+  ContentWriter writer =
+      isClipPath ? &SVGWriter::writeClipPathContent : &SVGWriter::writeMaskContent;
+
+  SVGWriterContext::MaskDefKey key{maskLayer, maskType};
   auto cached = _context->emittedMaskDefs.find(key);
   if (cached != _context->emittedMaskDefs.end()) {
     return cached->second;
   }
-  std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
+  // When `maskLayer->id` is non-empty, multiple MaskType uses of the same layer would otherwise
+  // collide on the same defId. Disambiguate by suffixing the layer id with a MaskType-specific
+  // tag so each (layer, maskType) pair has a unique element id in <defs>.
+  std::string defId;
+  if (maskLayer->id.empty()) {
+    defId = generateId(idPrefix);
+  } else {
+    defId = maskLayer->id;
+    switch (maskType) {
+      case MaskType::Alpha:
+        defId += "_a";
+        break;
+      case MaskType::Luminance:
+        defId += "_l";
+        break;
+      case MaskType::Contour:
+        defId += "_c";
+        break;
+    }
+  }
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
@@ -1806,7 +1833,7 @@ std::string SVGWriter::writeMaskDef(const Layer* maskLayer, const Layer* owner, 
         "' across parent boundaries; SVG <mask> emission skipped to avoid silent misplacement.");
     return "";
   }
-  return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent, maskType);
+  return writeMaskOrClipDef(maskLayer, maskType);
 }
 
 std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* owner) {
@@ -1816,7 +1843,7 @@ std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* own
                "misplacement.");
     return "";
   }
-  return writeMaskOrClipDef(maskLayer, "clipPath", "clip", &SVGWriter::writeClipPathContent);
+  return writeMaskOrClipDef(maskLayer, MaskType::Contour);
 }
 
 const Layer* SVGWriter::findLayerParent(const Layer* layer) {
