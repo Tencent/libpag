@@ -353,6 +353,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   displayList->render(tgfxSurface.get(), autoClear);
   drawable->present(context);
   device->unlock();
+  if (rootViewModel != nullptr) rootViewModel->advancedAll();
   return true;
 }
 
