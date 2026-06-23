@@ -23,20 +23,17 @@
 #include "pagx/types/Data.h"
 #include "pagx/nodes/Node.h"
 
-namespace tgfx {
-class Image;
-}
-
 namespace pagx {
 
 /**
  * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI.
+ * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
+ * managed externally via ImageResourceProvider, not stored on this node.
  */
 class Image : public Node {
  public:
   /**
-   * Image binary data (decoded from base64).
+   * Image binary data (decoded from base64 or loaded via loadFileData).
    */
   std::shared_ptr<Data> data = nullptr;
 
@@ -44,25 +41,6 @@ class Image : public Node {
    * External file path (mutually exclusive with data, data has priority).
    */
   std::string filePath = {};
-
-  /**
-   * A pre-decoded tgfx::Image provided by the host runtime via PAGXDocument::loadDecodedImage().
-   * When non-null, the renderer uses this directly and skips encoded-bytes decoding. Typically
-   * populated by platforms where synchronous codec decoding is expensive and an async native
-   * decoder is preferred. Platforms that do not use this flow leave it null.
-   */
-  std::shared_ptr<tgfx::Image> decodedImage = nullptr;
-
-  /**
-   * Low-resolution preview tgfx::Image used as a fallback when decodedImage is unavailable
-   * (initial load not yet complete, or the full-resolution texture has been evicted under memory
-   * pressure). When non-null, the renderer falls back to this so the affected fill area shows a
-   * blurry preview rather than a blank rectangle. Populated via
-   * PAGXDocument::loadDecodedImageAsThumbnail() with a thumbnail-quality image. Platforms that do
-   * not use progressive image loading leave it
-   * null.
-   */
-  std::shared_ptr<tgfx::Image> thumbnailImage = nullptr;
 
   NodeType nodeType() const override {
     return NodeType::Image;

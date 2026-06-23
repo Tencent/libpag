@@ -58,8 +58,8 @@ using ImageOriginalSizeMap = std::unordered_map<std::string, std::pair<float, fl
 
 // Resolves a single ImagePattern's transform matrix from its customData and actual image
 // dimensions. Idempotent: the original paint transform / matrix is cached in customData on
-// first call, so repeated invocations after decodedImage changes recompute against the current
-// image size rather than re-baking the previously baked matrix.
+// first call, so repeated invocations after provider state changes recompute against the
+// current image size rather than re-baking the previously baked matrix.
 //
 // Two formats are supported:
 //   1. Legacy CoCraft format (customData carries image-scale-mode, node-width/height,
@@ -75,7 +75,8 @@ using ImageOriginalSizeMap = std::unordered_map<std::string, std::pair<float, fl
 //      fall back to origSizeMap[filePath] populated by the host via setImageOriginalSize();
 //      if both are unavailable the authored matrix is left unchanged.
 bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
-                               const ImageOriginalSizeMap* origSizeMap = nullptr);
+                               const ImageOriginalSizeMap* origSizeMap = nullptr,
+                               pagx::ImageResourceProvider* provider = nullptr);
 
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().

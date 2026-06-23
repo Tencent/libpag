@@ -24,14 +24,11 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/ImageResourceProvider.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
-
-namespace tgfx {
-class Image;
-}
 
 namespace pagx {
 
@@ -133,9 +130,8 @@ class PAGXDocument : public Node {
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
    * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
-   * whose decoded image has already been supplied (via loadDecodedImage) or that already have a
-   * thumbnail attached (via loadDecodedImageAsThumbnail) are also excluded so the same resource is
-   * not fetched twice.
+   * for which the current ImageResourceProvider already holds a decoded counterpart are also
+   * excluded so the same resource is not fetched twice.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -153,67 +149,20 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
-   * Attaches an already-decoded tgfx::Image to Image nodes matching the given file path. The
-   * decoded image is produced by the caller via a platform-specific path (for example, a WeChat
-   * mini-program decoding through OffscreenCanvas and then wrapping via tgfx::NativeCodec). When
-   * set, the renderer uses this image directly, bypassing the encoded-bytes codec path.
+   * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
+   * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
+   * decoded counterpart. The renderer queries the provider during layer building via
+   * resolveImage().
    *
-   * Unlike loadFileData(), this method preserves the filePath on the node so the same path can be
-   * matched again (for example, when replacing a low-resolution placeholder with a higher-quality
-   * version). getExternalFilePaths() will still exclude the node while decodedImage is non-null.
-   *
-   * @param filePath the external file path to match against Image nodes
-   * @param decodedImage the pre-decoded tgfx::Image to attach
-   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
-   * if no match was found.
+   * Passing nullptr removes the provider; the renderer will use only embedded data / file paths.
+   * @param provider the platform-specific image resource provider, or nullptr to remove.
    */
-  Image* loadDecodedImage(const std::string& filePath, std::shared_ptr<tgfx::Image> decodedImage);
+  void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
 
   /**
-   * Attaches a low-resolution preview tgfx::Image to Image nodes matching the given file path.
-   * The renderer uses this image only as a fallback when the full-resolution decodedImage is
-   * absent (initial load not yet complete, or evicted under memory pressure). The full-quality
-   * counterpart is loadDecodedImage(); the two writes target distinct fields on the Image node
-   * and do not overwrite each other.
-   *
-   * Like loadDecodedImage(), this method preserves the filePath on the node so the same path
-   * can be matched again later (for example, to replace the thumbnail with a higher-quality
-   * version on subsequent attaches). Once a thumbnail has been attached, getExternalFilePaths()
-   * stops returning the matching path — the host is expected to drive the eventual full-quality
-   * upload through its own progressive flow rather than via another getExternalFilePaths()
-   * round-trip.
-   *
-   * @param filePath the external file path to match against Image nodes
-   * @param thumbnailImage the pre-decoded low-resolution preview tgfx::Image to attach
-   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
-   * if no match was found.
+   * Returns the current image resource provider, or nullptr if none is set.
    */
-  Image* loadDecodedImageAsThumbnail(const std::string& filePath,
-                                     std::shared_ptr<tgfx::Image> thumbnailImage);
-
-  /**
-   * Clears the decodedImage field on every Image node matching the given file path. Used by the
-   * full-quality LRU eviction path: dropping the host's tgfx::Image cache entry must be paired
-   * with detaching the same image from its document nodes so subsequent renders fall back to
-   * the thumbnail (or render empty if no thumbnail is attached). The filePath itself is
-   * preserved so the node can be re-attached later when a new full-quality version arrives.
-   *
-   * @param filePath the external file path to match against Image nodes
-   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
-   * if no match was found.
-   */
-  Image* clearDecodedImage(const std::string& filePath);
-
-  /**
-   * Clears the thumbnailImage field on every Image node matching the given file path. Used by
-   * the thumbnail budget eviction path. As with clearDecodedImage(), the filePath is preserved
-   * so a new thumbnail can be attached via loadDecodedImageAsThumbnail().
-   *
-   * @param filePath the external file path to match against Image nodes
-   * @return the first matching Image node (all matching nodes are updated regardless), or nullptr
-   * if no match was found.
-   */
-  Image* clearThumbnailImage(const std::string& filePath);
+  std::shared_ptr<ImageResourceProvider> imageResourceProvider() const;
 
   /**
    * Returns every Layer whose fill/stroke references an ImagePattern backed by an Image node
@@ -336,17 +285,11 @@ class PAGXDocument : public Node {
 
   void registerNode(Node* node, const std::string& id);
 
-  // Assigns `value` to the given Image member field on every Image node whose filePath matches,
-  // returning the first matching node (or nullptr). Shared implementation for the
-  // load/clear decodedImage/thumbnailImage entry points.
-  Image* setImageFieldByFilePath(const std::string& filePath,
-                                 std::shared_ptr<tgfx::Image> Image::*field,
-                                 std::shared_ptr<tgfx::Image> value);
-
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
+  std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};

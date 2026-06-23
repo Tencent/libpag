@@ -610,6 +610,7 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
+    _document = &document;
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
@@ -650,8 +651,7 @@ class LayerBuilderContext {
   }
 
   // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
-  // conversion goes through getOrCreateImage() again and picks up the updated decodedImage /
-  // data pointer.
+  // conversion goes through getOrCreateImage() again and re-queries the provider.
   void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
     if (filePath.empty()) {
       return;
@@ -1244,8 +1244,8 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
       // an opaque SolidColor here would paint a black placeholder over every shape that uses an
-      // ImagePattern before its decoded image is supplied via loadDecodedImage(); leaving the
-      // fill empty keeps those shapes transparent until the image is ready.
+      // ImagePattern before its image is resolved via the provider; leaving the fill empty keeps
+      // those shapes transparent until the image is ready.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
       }
@@ -1283,8 +1283,8 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
       // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
-      // an ImagePattern before its decoded image is supplied via loadDecodedImage(); leaving the
-      // stroke empty keeps those shapes transparent until the image is ready, matching convertFill.
+      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // keeps those shapes transparent until the image is ready, matching convertFill.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
       }
@@ -1565,7 +1565,7 @@ class LayerBuilderContext {
     }
 
     auto imageNode = node->image;
-    auto image = getOrCreateImage(imageNode);
+    auto image = getOrCreateImage(imageNode, _document);
     if (!image) {
       // Image data is missing for this node (never loaded or decode failed); paint nothing
       // rather than falling back to an opaque color that would be visibly wrong.
@@ -1588,46 +1588,46 @@ class LayerBuilderContext {
     return pattern;
   }
 
-  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode) {
+  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode,
+                                                const PAGXDocument* document) {
     auto it = _imageCache.find(imageNode);
     if (it != _imageCache.end()) {
       return it->second;
     }
-    // Fallback chain. Earlier sources have priority; the host runtime is responsible for
-    // refreshing the chain via PAGXDocument::loadDecodedImage / loadDecodedImageAsThumbnail
-    // (and the corresponding clear*) plus rebuildForFilePath when the renderer should pick up
-    // a new asset. Sources fall into two camps:
-    //   1. Backend-texture images (decodedImage / thumbnailImage): already mipmapped at upload
-    //      time by the host's createBackendTexture helper. Re-wrapping with makeMipmapped(true)
-    //      here would force tgfx to allocate a parallel mipmapped texture and copy the pixels,
-    //      wasting GPU memory. Use as-is.
+    // Resolution chain. Two camps of sources exist:
+    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
+    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
+    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
     //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    bool isAdoptedBackendTexture = false;
-    if (imageNode->decodedImage) {
-      // Full-quality host-decoded image. Skip all codec paths and reuse directly.
-      image = imageNode->decodedImage;
-      isAdoptedBackendTexture = true;
-    } else if (imageNode->thumbnailImage) {
-      // Full-quality counterpart is missing (initial load not complete, or evicted under
-      // memory pressure). Fall back to the low-resolution preview so the affected fill area
-      // shows a blurry but non-empty image until the full texture arrives.
-      image = imageNode->thumbnailImage;
-      isAdoptedBackendTexture = true;
-    } else if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
-    } else if (imageNode->filePath.find("data:") == 0) {
-      image = ImageFromDataURI(imageNode->filePath);
-    } else if (!imageNode->filePath.empty()) {
-      image = tgfx::Image::MakeFromFile(imageNode->filePath);
+    bool isBackendTexture = false;
+    // Priority 1: query the provider for a platform-decoded image.
+    if (auto provider = document->imageResourceProvider()) {
+      if (!imageNode->filePath.empty()) {
+        image = provider->resolveImage(imageNode->filePath);
+        if (image) {
+          isBackendTexture = true;
+        }
+      }
     }
-    if (image && !isAdoptedBackendTexture) {
+    // Priority 2: fallback to standard decoding chain.
+    if (!image) {
+      if (imageNode->data) {
+        image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        image = ImageFromDataURI(imageNode->filePath);
+      } else if (!imageNode->filePath.empty()) {
+        image = tgfx::Image::MakeFromFile(imageNode->filePath);
+      }
+    }
+    if (image && !isBackendTexture) {
       image = image->makeMipmapped(true);
     }
-    // Only memoize successful results. A null entry would cache the absence of a decoded image
-    // forever, so a later loadDecodedImage() on the same node would never take effect.
+    // Only memoize successful results. A null entry would cache the absence of a provider-
+    // resolved image forever, so a later provider update would never take effect after
+    // invalidation.
     if (image) {
       _imageCache[imageNode] = image;
     }
@@ -2686,6 +2686,7 @@ class LayerBuilderContext {
   // as long as the document's node vector is not structurally modified. If the document undergoes
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
+  const PAGXDocument* _document = nullptr;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -2770,7 +2771,7 @@ size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
     return 0;
   }
   // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
-  // into convertImagePattern() picks up the freshly attached decodedImage / data pointer.
+  // into convertImagePattern() re-queries the provider for the updated image.
   impl->context.invalidateImagesByFilePath(*impl->document, filePath);
 
   const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);

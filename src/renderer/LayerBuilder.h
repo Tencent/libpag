@@ -390,9 +390,9 @@ class LayerBuilder {
  * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
  *
  * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
- * cycle), and then call rebuildForFilePath() whenever a new decoded image has been attached to
- * the document via PAGXDocument::loadDecodedImage(). Destroying the session releases all cached
- * layer/image state.
+ * cycle), and then call rebuildForFilePath() whenever the ImageResourceProvider's state changes
+ * for a given filePath (new image attached or evicted). Destroying the session releases all
+ * cached layer/image state.
  *
  * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
  * for the entire lifetime of this session. The session stores a non-owning pointer to the
@@ -420,10 +420,10 @@ class LayerBuilderSession {
   /**
    * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
    * ImagePattern backed by an Image node whose filePath matches the given value. Call this
-   * after PAGXDocument::loadDecodedImage() so the pending ImagePattern nodes pick up the new
-   * tgfx::Image. A single filePath may match multiple Image nodes and each Image node may be
-   * referenced by multiple Layers, which in turn may have been duplicated by Composition
-   * instancing; all such copies are refreshed in one call.
+   * after the ImageResourceProvider's state changes for the path so the renderer re-queries
+   * the provider and picks up the new tgfx::Image. A single filePath may match multiple Image
+   * nodes and each Image node may be referenced by multiple Layers, which in turn may have
+   * been duplicated by Composition instancing; all such copies are refreshed in one call.
    * @return The number of tgfx layers whose contents were regenerated. Zero means no layer
    *         currently references the given filePath (or the document has not been built yet).
    */

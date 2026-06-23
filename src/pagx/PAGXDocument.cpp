@@ -38,7 +38,6 @@
 #include "pagx/nodes/TextPath.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
-#include "tgfx/core/Image.h"
 
 namespace pagx {
 
@@ -58,13 +57,20 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
   if (document == nullptr || paths == nullptr) {
     return;
   }
+  auto provider = document->imageResourceProvider();
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
-      if (image->data == nullptr && image->decodedImage == nullptr &&
-          image->thumbnailImage == nullptr && IsExternalFilePath(image->filePath)) {
-        paths->push_back(image->filePath);
+      if (image->data != nullptr) {
+        continue;
       }
+      if (!IsExternalFilePath(image->filePath)) {
+        continue;
+      }
+      if (provider && provider->hasImage(image->filePath)) {
+        continue;
+      }
+      paths->push_back(image->filePath);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
@@ -572,51 +578,12 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
-Image* PAGXDocument::setImageFieldByFilePath(const std::string& filePath,
-                                             std::shared_ptr<tgfx::Image> Image::*field,
-                                             std::shared_ptr<tgfx::Image> value) {
-  if (filePath.empty()) {
-    return nullptr;
-  }
-  Image* firstMatch = nullptr;
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->filePath != filePath) {
-      continue;
-    }
-    image->*field = value;
-    if (firstMatch == nullptr) {
-      firstMatch = image;
-    }
-  }
-  return firstMatch;
+void PAGXDocument::setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider) {
+  _imageResourceProvider = std::move(provider);
 }
 
-Image* PAGXDocument::loadDecodedImage(const std::string& filePath,
-                                      std::shared_ptr<tgfx::Image> decodedImage) {
-  if (decodedImage == nullptr) {
-    return nullptr;
-  }
-  return setImageFieldByFilePath(filePath, &Image::decodedImage, std::move(decodedImage));
-}
-
-Image* PAGXDocument::loadDecodedImageAsThumbnail(const std::string& filePath,
-                                                 std::shared_ptr<tgfx::Image> thumbnailImage) {
-  if (thumbnailImage == nullptr) {
-    return nullptr;
-  }
-  return setImageFieldByFilePath(filePath, &Image::thumbnailImage, std::move(thumbnailImage));
-}
-
-Image* PAGXDocument::clearDecodedImage(const std::string& filePath) {
-  return setImageFieldByFilePath(filePath, &Image::decodedImage, nullptr);
-}
-
-Image* PAGXDocument::clearThumbnailImage(const std::string& filePath) {
-  return setImageFieldByFilePath(filePath, &Image::thumbnailImage, nullptr);
+std::shared_ptr<ImageResourceProvider> PAGXDocument::imageResourceProvider() const {
+  return _imageResourceProvider;
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into

@@ -32,6 +32,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "PAGXImageResourceProvider.h"
 #include "utils/StringParser.h"
 #include "LayerBuilder.h"
 
@@ -43,21 +44,21 @@ namespace pagx {
 
 /**
  * Quality tier for an externally supplied native image attached via
- * PAGXView::attachNativeImage(). The two tiers map to distinct slots on each Image node and obey
+ * PAGXView::attachNativeImage(). The two tiers are managed by PAGXImageResourceProvider and obey
  * different lifecycle rules:
  *
- *   - Thumbnail: low-resolution preview (typically <= 256x256). Written to Image::thumbnailImage.
- *     Acts as a fallback when the full-resolution texture is missing or has been evicted, so the
- *     affected fill area never goes blank during progressive loading or memory pressure.
- *     Thumbnails are not subject to per-frame LRU eviction; they are only dropped when an
- *     incoming attachNativeImage() would push the thumbnail bucket over its byte budget, in
- *     which case the oldest thumbnails are silently dropped to make room.
+ *   - Thumbnail: low-resolution preview (typically <= 256x256). Stored in the provider's
+ *     thumbnail cache. Acts as a fallback when the full-resolution texture is missing or has
+ *     been evicted, so the affected fill area never goes blank during progressive loading or
+ *     memory pressure. Thumbnails are not subject to per-frame LRU eviction; they are only
+ *     dropped when an incoming attachNativeImage() would push the thumbnail bucket over its
+ *     byte budget, in which case the oldest thumbnails are silently dropped to make room.
  *
- *   - Full: full-resolution texture. Written to Image::decodedImage. Subject to per-frame LRU
- *     eviction once the full bucket exceeds its byte budget; evicted paths fire the
- *     onTextureEvict callback so the host can drop its own cached copy. Layers whose full
- *     texture has been evicted automatically fall back to the corresponding thumbnailImage on
- *     the next draw, keeping the fill visible until a new full texture arrives.
+ *   - Full: full-resolution texture. Stored in the provider's full-quality cache. Subject to
+ *     per-frame LRU eviction once the full bucket exceeds its byte budget; evicted paths fire
+ *     the onTextureEvict callback so the host can drop its own cached copy. Layers whose full
+ *     texture has been evicted automatically fall back to the corresponding thumbnail on the
+ *     next draw, keeping the fill visible until a new full texture arrives.
  */
 enum class ImageQuality : uint8_t {
   Thumbnail = 0,
@@ -137,8 +138,8 @@ class PAGXView {
    * new asset shows up on the same frame.
    *
    * The quality argument selects which slot on the Image node receives the result:
-   *   - ImageQuality::Thumbnail writes to Image::thumbnailImage (fallback rendering).
-   *   - ImageQuality::Full writes to Image::decodedImage (primary rendering).
+   *   - ImageQuality::Thumbnail stores in the provider's thumbnail cache (fallback rendering).
+   *   - ImageQuality::Full stores in the provider's full-quality cache (primary rendering).
    *
    * Both quality tiers may be attached for the same filePath at different times; they live in
    * distinct caches and do not overwrite each other. Can be called both before and after
@@ -159,9 +160,9 @@ class PAGXView {
    * view. The handler object is expected to expose two methods (both optional; missing methods
    * are silently skipped):
    *
-   *   - onTextureRequest(filePath: string): called for paths whose full-quality decodedImage
+   *   - onTextureRequest(filePath: string): called for paths whose full-quality image
    *     was previously attached and then evicted by the LRU sweep, until a new
-   *     attachNativeImage(Full) lands. Initial-attachment paths (decodedImage never present)
+   *     attachNativeImage(Full) lands. Initial-attachment paths (full image never present)
    *     are NOT surfaced here — those are owned by the host's own progressive image flow,
    *     bootstrapped from getExternalFilePaths(). The host should respond by downloading +
    *     decoding the asset and calling attachNativeImage(filePath, source, ImageQuality.Full);
@@ -169,7 +170,7 @@ class PAGXView {
    *     re-request only if the asset is evicted again later. To prevent per-frame spam, each
    *     evicted path is only emitted once until the host responds via attachNativeImage(Full);
    *     hosts that drop a request without responding will not see it re-fired (and the renderer
-   *     will keep falling back to thumbnailImage indefinitely).
+   *     will keep falling back to thumbnail indefinitely).
    *
    *   - onTextureEvict(filePaths: string[]): called once per draw with every full-quality path
    *     that was just dropped by the LRU sweep. The host can use this hint to release the
@@ -403,6 +404,7 @@ class PAGXView {
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::shared_ptr<PAGXDocument> document = nullptr;
+  std::shared_ptr<PAGXImageResourceProvider> imageProvider = nullptr;
 
   // Gesture-freeze pipeline. During active pan/zoom we bypass displayList.render() and
   // composite fitSnapshot (whole document at zoom=1, blurry when zoomed in but always fills
@@ -530,7 +532,7 @@ class PAGXView {
   // starts with a fresh request budget.
   std::unordered_set<std::string> inFlightFullRequests = {};
 
-  // Paths whose full-quality decodedImage was previously attached and then evicted by the LRU
+  // Paths whose full-quality image was previously attached and then evicted by the LRU
   // sweep. The renderer uses this set to distinguish "never attached" from "attached and
   // evicted" — only the latter should drive new onTextureRequest events, because the former is
   // already covered by the host's initial getExternalFilePaths() / attachNativeImage flow and
@@ -583,8 +585,8 @@ class PAGXView {
   // looking at disappear. Off-viewport candidates are sorted by distance from the viewport
   // center descending (farther first), modeled on tgfx's tiled rasterization which uses the
   // same focal-distance ordering. For each evicted path: removes the cache entry (releasing
-  // the adopted backend texture), clears the matching Image node's decodedImage, and rebuilds
-  // the affected layers so the next frame falls back to thumbnailImage.
+  // the adopted backend texture), removes the full image from the provider, and rebuilds
+  // the affected layers so the next frame falls back to thumbnail.
   //
   // When every cache entry is inside the protected viewport the budget is allowed to overflow
   // temporarily — evicting a visible texture would only cause it to be re-fetched and re-
@@ -620,7 +622,7 @@ class PAGXView {
   uint64_t evictOldestThumbnailsUntilFits(uint64_t neededBytes);
 
   // Walks every Image node and emits onTextureRequest(filePath) for paths that are referenced
-  // by the document but currently lack a full-quality decodedImage and have not already been
+  // by the document but currently lack a full-quality image in the provider and have not already been
   // requested in a previous draw. Triggered once per draw after the LRU sweep so freshly
   // evicted paths immediately re-enter the in-flight set on the same frame.
   void scanAndRequestMissingTextures();
