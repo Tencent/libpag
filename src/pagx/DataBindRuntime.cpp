@@ -83,7 +83,8 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     }
     sourceValue->addDependent(this);
 
-    bool toSource = db->flags == DataBindDirection::ToSource || db->flags == DataBindDirection::TwoWay;
+    bool toSource =
+        db->flags == DataBindDirection::ToSource || db->flags == DataBindDirection::TwoWay;
     bool toTarget = db->flags != DataBindDirection::ToSource;
 
     BindingEntry entry;
