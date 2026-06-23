@@ -64,9 +64,9 @@ static std::vector<std::string> parseSourcePath(const std::string& source) {
 // ---- bind --------------------------------------------------------------------
 
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
-                           RuntimeBinding* binding, PAGXDocument* doc) {
+                           PAGXDocument* doc) {
   for (auto* db : binds) {
-    if (db == nullptr || context == nullptr || binding == nullptr || doc == nullptr) {
+    if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
     }
     auto path = parseSourcePath(db->source);

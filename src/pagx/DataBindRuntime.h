@@ -44,8 +44,7 @@ class DataBindRuntime {
   DataBindRuntime() = default;
   ~DataBindRuntime();
 
-  void bind(const std::vector<DataBind*>& binds, DataContext* context, RuntimeBinding* binding,
-            PAGXDocument* doc);
+  void bind(const std::vector<DataBind*>& binds, DataContext* context, PAGXDocument* doc);
 
   void markDirty(DataBind* bind);
   void markDirtyForValue(PAGViewModelValue* value);
