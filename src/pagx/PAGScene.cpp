@@ -379,7 +379,7 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
   return rootViewModel;
 }
 
-void PAGScene::flushDataBinds() const {
+void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
 }
 
@@ -412,7 +412,6 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   if (scene.get() != this) {
     return {};
   }
-  flushDataBinds();
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
   auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
   Matrix rootToSurface = {};
