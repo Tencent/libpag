@@ -106,7 +106,7 @@ void PAGViewModel::advancedAll() {
     value->advanced();
     if (value->valueType() == ViewModelValueType::ViewModel) {
       const auto& vmValue = std::static_pointer_cast<PAGViewModelValueViewModel>(value);
-      const auto& child = vmValue->referenceViewModelInstance();
+      const auto& child = vmValue->referenceViewModel();
       if (child != nullptr) {
         child->advancedAll();
       }

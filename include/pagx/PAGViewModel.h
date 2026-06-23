@@ -47,7 +47,7 @@ class ViewModel;
  *   auto vm = scene->viewModel();
  *   vm->propertyNumber("speed")->value(2.0f);
  *   vm->propertyColor("theme")->value(pagx::Color{1, 0, 0, 1});
- *   vm->propertyViewModel("logo")->referenceViewModelInstance();
+ *   vm->propertyViewModel("logo")->referenceViewModel();
  */
 class PAGViewModel {
  public:

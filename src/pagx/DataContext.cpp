@@ -70,7 +70,7 @@ PAGViewModelValue* DataContext::resolve(const std::vector<std::string>& path) co
     // Check if value is a nested ViewModel reference. If so, descend into it.
     if (value->valueType() == ViewModelValueType::ViewModel) {
       auto* vmValue = static_cast<PAGViewModelValueViewModel*>(value);
-      currentVM = vmValue->referenceViewModelInstance();
+      currentVM = vmValue->referenceViewModel();
     } else if (i == path.size() - 1) {
       // Last segment and a leaf value — found.
       return value;
