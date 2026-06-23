@@ -84,8 +84,8 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
 const std::string& PAGImage::source() const {
   return _source;
 }
-PAGImage::PAGImage(std::shared_ptr<void> image, std::string source)
-    : _image(std::move(image)), _source(std::move(source)) {
+PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
+    : _tgfxImage(std::move(image)), _source(std::move(source)) {
 }
 
 }  // namespace pagx

@@ -22,6 +22,10 @@
 #include <string>
 #include "pagx/types/Data.h"
 
+namespace tgfx {
+class Image;
+}
+
 namespace pagx {
 
 class LayerBuilder;
@@ -61,8 +65,8 @@ class PAGImage {
   const std::string& source() const;
 
  private:
-  PAGImage(std::shared_ptr<void> image, std::string source);
-  std::shared_ptr<void> _image = nullptr;
+  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
+  std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
   std::string _source = {};
 
   friend class LayerBuilder;

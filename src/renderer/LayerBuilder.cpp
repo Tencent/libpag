@@ -2522,6 +2522,6 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
 
 namespace pagx {
 std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
-  return image ? std::static_pointer_cast<tgfx::Image>(image->_image) : nullptr;
+  return image ? image->_tgfxImage : nullptr;
 }
 }  // namespace pagx
