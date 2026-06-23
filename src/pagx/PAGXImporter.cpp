@@ -154,7 +154,7 @@ static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
 static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc);
 static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc);
-static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc, bool isRootDocument = false);
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc);
 static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc);
 static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc);
 static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc);
@@ -2696,7 +2696,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
       } else if (child->name == "Animations") {
         ParseAnimations(child.get(), &doc->animations, doc);
       } else if (child->name == "DataBind") {
-        auto bind = ParseDataBind(child.get(), doc, true);
+        auto bind = ParseDataBind(child.get(), doc);
         if (bind) doc->dataBinds.push_back(bind);
       } else if (child->name != "Resources") {
         ReportError(doc, child.get(),
@@ -2768,8 +2768,7 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
   return vm;
 }
 
-static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc, bool isRootDocument) {
-  (void)isRootDocument;
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
   auto bind = makeNodeFromXML<DataBind>(node, doc);
   if (!bind) return nullptr;
   bind->source = GetAttribute(node, "source");
