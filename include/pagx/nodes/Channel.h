@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -28,12 +29,15 @@
 
 namespace pagx {
 
+class PAGImage;
+
 /**
  * KeyValue is the value carried by a Channel's keyframes. Its std::variant alternatives are
  * ordered to match ChannelValueType, so the active alternative index equals the corresponding
  * ChannelValueType value.
  */
-using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix>;
+using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix,
+                               std::shared_ptr<PAGImage>>;
 
 /**
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
@@ -47,6 +51,7 @@ enum class ChannelValueType : uint8_t {
   ImageRef = 4,
   Color = 5,
   Matrix = 6,
+  PAGImage = 7,
 };
 
 /**

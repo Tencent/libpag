@@ -1141,6 +1141,15 @@ class LayerBuilderContext {
     solid->setColor(MixTGFXColor(solid->color(), target, mix));
   }
 
+  static void WriteImagePatternImage(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<std::shared_ptr<PAGImage>>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* pattern = static_cast<tgfx::ImagePattern*>(object);
+    pattern->setImage(LayerBuilder::GetTGFXImage(*v));
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
@@ -1384,6 +1393,7 @@ class LayerBuilderContext {
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
       _result.binding.set(node, pattern);
+      _result.binding.setWriter(node, "image", WriteImagePatternImage);
       if (imageNode) {
         _result.binding.trackImage(imageNode, node);
       }
@@ -2508,4 +2518,10 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   return context.buildLayerInto(node, binding);
 }
 
+}  // namespace pagx
+
+namespace pagx {
+std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
+}
 }  // namespace pagx

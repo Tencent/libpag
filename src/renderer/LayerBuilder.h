@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "tgfx/layers/Layer.h"
@@ -317,6 +318,12 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
+  /**
+   * Returns the tgfx::Image wrapped by a PAGImage. For internal use by channel writers that need
+   * to apply the image to a runtime object.
+   */
+  static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from. Must have had applyLayout() called.

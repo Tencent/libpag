@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -18,31 +18,33 @@
 
 #pragma once
 
-#include <string>
+#include <memory>
+#include "pagx/PAGImage.h"
 #include "pagx/PAGViewModelValue.h"
 
 namespace pagx {
 
 /**
- * PAGViewModelValueImage holds an image ViewModel property value. The value is an image resource
- * identifier (path, data URI, or resource reference) that resolves to an Image node.
+ * PAGViewModelValueImage holds an image ViewModel property value. The value is a PAGImage object
+ * wrapping a decoded image, so DataBind writers receive a ready-to-render image without per-frame
+ * decoding.
  */
 class PAGViewModelValueImage : public PAGViewModelValue {
  public:
   /**
-   * Returns the current image reference string.
+   * Returns the current image value, or nullptr if none is set.
    */
-  const std::string& value() const {
+  std::shared_ptr<PAGImage> value() const {
     return propertyValue;
   }
 
   /**
-   * Sets the image reference. Setting the same value is a no-op.
+   * Sets the image value. Setting the same value is a no-op.
    */
-  void value(const std::string& v);
+  void value(std::shared_ptr<PAGImage> v);
 
  private:
-  std::string propertyValue = {};
+  std::shared_ptr<PAGImage> propertyValue = nullptr;
 
   friend class PAGViewModel;
   friend class PAGScene;

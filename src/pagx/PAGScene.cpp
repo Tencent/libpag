@@ -20,6 +20,7 @@
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
+#include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
@@ -129,7 +130,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       }
       case ViewModelPropertyType::Image: {
         auto v = std::make_shared<PAGViewModelValueImage>();
-        v->propertyValue = prop->defaultImage;
+        v->propertyValue = PAGImage::MakeFromPath(prop->defaultImage);
         v->type = ViewModelValueType::Image;
         value = std::move(v);
         break;

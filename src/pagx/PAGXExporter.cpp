@@ -278,6 +278,8 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
     case ChannelValueType::Matrix:
       WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
       break;
+    case ChannelValueType::PAGImage:
+      break;
   }
 }
 

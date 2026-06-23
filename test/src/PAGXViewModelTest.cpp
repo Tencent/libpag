@@ -4,6 +4,7 @@
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/ObserverHandle.h"
+#include "pagx/PAGImage.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
@@ -27,6 +28,8 @@
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
@@ -105,14 +108,21 @@ PAGX_TEST(PAGXViewModelTest, ColorPropertyReadWrite) {
   EXPECT_FLOAT_EQ(color->value().red, 1.0f);
 }
 PAGX_TEST(PAGXViewModelTest, ImagePropertyReadWrite) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto scene = MakeScene(doc.get(), "TestVM", 5);
   auto vm = scene->viewModel();
   auto img = vm->propertyImage("image");
   ASSERT_NE(img, nullptr);
-  EXPECT_EQ(img->value(), "");
-  img->value("assets/hero.png");
-  EXPECT_EQ(img->value(), "assets/hero.png");
+  EXPECT_EQ(img->value(), nullptr);
+  auto pagImage = pagx::PAGImage::MakeFromPath(redPNG);
+  ASSERT_NE(pagImage, nullptr);
+  img->value(pagImage);
+  EXPECT_EQ(img->value(), pagImage);
+  EXPECT_EQ(img->value()->source(), redPNG);
 }
 PAGX_TEST(PAGXViewModelTest, SameValueNoOp) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
@@ -907,12 +917,20 @@ PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
 }
 
 PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  const std::string greenPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQB7CYF4AAAAAElFTkSuQ"
+      "mCC";
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* s = doc->makeNode<pagx::ViewModel>("T");
   auto* p = doc->makeNode<pagx::ViewModelProperty>();
   p->name = "img";
   p->propertyType = pagx::ViewModelPropertyType::Image;
-  p->defaultImage = "a.png";
+  p->defaultImage = redPNG;
   s->properties.push_back(p);
   doc->viewModel = s;
   auto l = doc->makeNode<pagx::Layer>("r");
@@ -921,9 +939,12 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   auto r = doc->makeNode<pagx::Rectangle>();
   r->size.width = 200;
   r->size.height = 200;
+  auto imgNode = doc->makeNode<pagx::Image>("imgRes");
+  imgNode->filePath = redPNG;
+  auto pattern = doc->makeNode<pagx::ImagePattern>("bgImg");
+  pattern->image = imgNode;
   auto f = doc->makeNode<pagx::Fill>();
-  auto c = doc->makeNode<pagx::SolidColor>();
-  f->color = c;
+  f->color = pattern;
   auto g = doc->makeNode<pagx::Group>();
   g->elements.push_back(r);
   g->elements.push_back(f);
@@ -931,7 +952,7 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   doc->layers.push_back(l);
   auto db = doc->makeNode<pagx::DataBind>();
   db->source = "$vm.img";
-  db->target = "@r";
+  db->target = "@bgImg";
   db->channel = "image";
   doc->dataBinds.push_back(db);
   auto sc = pagx::PAGScene::Make(
@@ -941,17 +962,20 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   ASSERT_NE(vm, nullptr);
   auto v = vm->propertyImage("img");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value(), "a.png");
-  v->value("b.png");
+  ASSERT_NE(v->value(), nullptr);
+  EXPECT_EQ(v->value()->source(), redPNG);
+  auto greenImage = pagx::PAGImage::MakeFromPath(greenPNG);
+  ASSERT_NE(greenImage, nullptr);
+  v->value(greenImage);
   auto sf = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
-  EXPECT_EQ(v->value(), "b.png");
-  // TODO: "image" writer is not yet implemented. The plan is to use
-  // tgfx::ImagePattern::setImage() (already added to tgfx) to swap the runtime image when the VM
-  // image property changes. This requires DataBindRuntime to load a tgfx::Image from the VM string
-  // value (file path or resource id) and call pattern->setImage() on the target. Tracked as a
-  // follow-up task.
+  EXPECT_EQ(v->value(), greenImage);
+  std::array<uint8_t, 200 * 200 * 4> pixels = {};
+  ASSERT_TRUE(sf->readPixels(pixels.data(), 200 * 4));
+  auto& px = *reinterpret_cast<uint32_t*>(pixels.data() + (100 * 200 + 100) * 4);
+  EXPECT_NEAR((px >> 8) & 0xFF, 255, 5);
+  EXPECT_NEAR(px & 0xFF, 0, 5);
 }
 
 // ========== DataConverter runtime ==========

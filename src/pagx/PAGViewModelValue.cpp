@@ -148,11 +148,11 @@ void PAGViewModelValueColor::value(const Color& v) {
   notifyDependents();
 }
 
-void PAGViewModelValueImage::value(const std::string& v) {
+void PAGViewModelValueImage::value(std::shared_ptr<PAGImage> v) {
   if (propertyValue == v) {
     return;
   }
-  propertyValue = v;
+  propertyValue = std::move(v);
   dirty = true;
   notifyValueChanged();
   notifyDependents();
