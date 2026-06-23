@@ -875,7 +875,7 @@ PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
   r->size.width = 200;
   r->size.height = 200;
   auto f = doc->makeNode<pagx::Fill>();
-  auto c = doc->makeNode<pagx::SolidColor>();
+  auto c = doc->makeNode<pagx::SolidColor>("fillColor");
   f->color = c;
   auto g = doc->makeNode<pagx::Group>();
   g->elements.push_back(r);
@@ -884,7 +884,7 @@ PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
   doc->layers.push_back(l);
   auto db = doc->makeNode<pagx::DataBind>();
   db->source = "$vm.bg";
-  db->target = "@r";
+  db->target = "@fillColor";
   db->channel = "color";
   doc->dataBinds.push_back(db);
   auto sc = pagx::PAGScene::Make(
@@ -899,10 +899,11 @@ PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
   auto sf = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
-  EXPECT_FLOAT_EQ(v->value().green, 1.0f);
-  // TODO: verify target layer color channel. The "color" writer is registered on SolidColor nodes,
-  // not on the Layer target, so this DataBind (target="@r") is a no-op and the target fill color
-  // cannot be observed. The source assertion above is kept as a secondary check.
+  std::array<uint8_t, 200 * 200 * 4> pixels = {};
+  ASSERT_TRUE(sf->readPixels(pixels.data(), 200 * 4));
+  auto& px = *reinterpret_cast<uint32_t*>(pixels.data() + (100 * 200 + 100) * 4);
+  EXPECT_EQ((px >> 8) & 0xFF, 255u);
+  EXPECT_EQ(px & 0xFF, 0u);
 }
 
 PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
