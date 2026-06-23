@@ -2783,6 +2783,8 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
       bind->flags = DataBindFlags::TwoWay;
     else if (flagsStr == "Once" || flagsStr == "once")
       bind->flags = DataBindFlags::Once;
+    else
+      ReportError(doc, node, "Invalid value '" + flagsStr + "' for 'flags' attribute.");
   }
   return bind;
 }
