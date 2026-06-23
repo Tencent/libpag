@@ -165,6 +165,9 @@ class Layer : public Node, public LayoutNode {
    */
   std::vector<std::unique_ptr<Timeline>> timelines = {};
 
+  /**
+   * The ViewModel binding context path used to resolve DataBind sources (e.g. "$vm.propertyName").
+   */
   std::string vmContext = {};
 
   /**

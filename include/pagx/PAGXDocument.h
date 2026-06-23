@@ -70,7 +70,13 @@ class PAGXDocument : public Node {
    */
   std::vector<Animation*> animations = {};
 
+  /**
+   * The ViewModel schema bound to this document.
+   */
   ViewModel* viewModel = nullptr;
+  /**
+   * DataBind nodes that bind ViewModel properties to this document's layers.
+   */
   std::vector<DataBind*> dataBinds = {};
 
   /**

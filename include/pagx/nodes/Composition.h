@@ -53,7 +53,13 @@ class Composition : public Node {
    * The animations contained in this composition.
    */
   std::vector<Animation*> animations = {};
+  /**
+   * The ViewModel schema bound to this composition.
+   */
   ViewModel* viewModel = nullptr;
+  /**
+   * DataBind nodes that bind ViewModel properties to this composition's layers.
+   */
   std::vector<DataBind*> dataBinds = {};
 
   NodeType nodeType() const override {
