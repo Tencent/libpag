@@ -9,7 +9,7 @@
   <Layer width="48" height="20" data-text-auto-resize="width-and-height">
     <Group>
       <Text text="智能模式" fontFamily="PingFang SC" fontSize="12">
-        <GlyphRun font="@shapes" fontSize="12" glyphs="1,1,1,1" y="14.32"
+        <GlyphRun font="@shapes" fontSize="12" glyphs="1,1,1,1" y="14"
                   xOffsets="0,12,24,36" bounds="0,0,48,20"/>
       </Text>
       <Fill color="#111111"/>

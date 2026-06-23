@@ -677,7 +677,7 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
   EXPECT_EQ(html.find("智能模式"), std::string::npos);
-  EXPECT_NE(html.find("top:2.32px"), std::string::npos);
+  EXPECT_NE(html.find("top:2px"), std::string::npos);
   EXPECT_NE(html.find("line-height:1"), std::string::npos);
   EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
 }
