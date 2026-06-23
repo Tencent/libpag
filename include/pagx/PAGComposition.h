@@ -147,7 +147,6 @@ class PAGComposition : public PAGLayer {
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-  std::vector<std::shared_ptr<PAGLayer>> children = {};
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
   std::unique_ptr<DataBindRuntime> dataBindRuntime = {};
   std::shared_ptr<DataContext> dataContext = nullptr;
