@@ -965,6 +965,9 @@ PAGX_TEST(PAGXViewModelTest, StringValueTriggersDataBindSync) {
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
   EXPECT_EQ(v->value(), "B");
+  // TODO: verify target layer name channel. No "name" writer is registered on the Layer target
+  // (bindLayerChannels only registers alpha/visible/blendMode), so the DataBind is a no-op and the
+  // target layer state cannot be observed. The source assertion above is kept as a secondary check.
 }
 
 PAGX_TEST(PAGXViewModelTest, BooleanValueTriggersDataBindSync) {
