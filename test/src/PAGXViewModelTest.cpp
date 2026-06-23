@@ -947,9 +947,11 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
   EXPECT_EQ(v->value(), "b.png");
-  // TODO: verify target layer image channel. No "image" writer is registered on the Layer target
-  // or any other node, so the DataBind is a no-op and the target image source cannot be observed.
-  // The source assertion above is kept as a secondary check.
+  // TODO: "image" writer is not yet implemented. The plan is to use
+  // tgfx::ImagePattern::setImage() (already added to tgfx) to swap the runtime image when the VM
+  // image property changes. This requires DataBindRuntime to load a tgfx::Image from the VM string
+  // value (file path or resource id) and call pattern->setImage() on the target. Tracked as a
+  // follow-up task.
 }
 
 // ========== DataConverter runtime ==========
