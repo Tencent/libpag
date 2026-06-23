@@ -2701,7 +2701,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
       } else if (child->name != "Resources") {
         ReportError(doc, child.get(),
                     "Element '" + child->name +
-                        "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations.");
+                        "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
