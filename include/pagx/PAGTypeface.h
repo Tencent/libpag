@@ -27,6 +27,8 @@ class Typeface;
 
 namespace pagx {
 
+class LayoutContext;
+
 /**
  * Owns a font source (file path, system name, or pre-built tgfx::Typeface) and lazily loads the
  * underlying tgfx::Typeface on demand. This is the pagx-side font handle stored by FontConfig,
@@ -37,8 +39,7 @@ class PAGTypeface {
  public:
   /**
    * Creates from a font file path. The given fontFamily/fontStyle are used as the registration
-   * name for FontConfig lookup; the underlying tgfx::Typeface is lazy-loaded via MakeFromPath on
-   * first getTypeface() call.
+   * name for FontConfig lookup; the underlying tgfx::Typeface is lazy-loaded on first use.
    * @param path The font file path.
    * @param ttcIndex The face index within a TTC font collection.
    * @param fontFamily The font family name used for FontConfig lookup.
@@ -49,8 +50,7 @@ class PAGTypeface {
                                                     const std::string& fontStyle);
 
   /**
-   * Creates from a system font name. The underlying tgfx::Typeface is lazy-loaded via
-   * MakeFromName on first getTypeface() call.
+   * Creates from a system font name. The underlying tgfx::Typeface is lazy-loaded on first use.
    * @param fontFamily The system font family name.
    * @param fontStyle The system font style name.
    */
@@ -79,14 +79,12 @@ class PAGTypeface {
    */
   const std::string& fontStyle() const;
 
-  /**
-   * Returns the underlying tgfx::Typeface, lazy-loading on first call for MakeFromPath/MakeFromName.
-   * For internal layout/render use (LayoutContext). Callers that use this method must include
-   * tgfx/core/Typeface.h themselves.
-   */
+ private:
+  friend class LayoutContext;
+
+  // Returns the underlying tgfx::Typeface, lazy-loading on first call for MakeFromPath/MakeFromName.
   std::shared_ptr<tgfx::Typeface> getTypeface() const;
 
- private:
   enum class Source { Path, Name, Typeface };
 
   PAGTypeface(std::string path, int ttcIndex, std::string family, std::string style);
