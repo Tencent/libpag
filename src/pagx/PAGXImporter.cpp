@@ -1519,9 +1519,10 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
         auto bind = ParseDataBind(child.get(), doc);
         if (bind) comp->dataBinds.push_back(bind);
       } else {
-        ReportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'Composition'. Expected: Layer, Animations, DataBind.");
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name +
+                "' is not allowed in 'Composition'. Expected: Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
@@ -2699,9 +2700,10 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
         auto bind = ParseDataBind(child.get(), doc);
         if (bind) doc->dataBinds.push_back(bind);
       } else if (child->name != "Resources") {
-        ReportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations, DataBind.");
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name +
+                "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
@@ -2741,8 +2743,7 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         } else if (typeStr == "Trigger" || typeStr == "trigger") {
           prop->propertyType = ViewModelPropertyType::Trigger;
         } else {
-          ReportError(doc, child.get(),
-                      "Invalid value '" + typeStr + "' for 'type' attribute.");
+          ReportError(doc, child.get(), "Invalid value '" + typeStr + "' for 'type' attribute.");
         }
         prop->minValue = GetFloatAttribute(child.get(), "min", prop->minValue, doc);
         prop->maxValue = GetFloatAttribute(child.get(), "max", prop->maxValue, doc);
