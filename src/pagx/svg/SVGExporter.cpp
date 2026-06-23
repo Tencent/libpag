@@ -336,39 +336,6 @@ class SVGWriterContext {
   std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
   std::vector<const Font*> woff2FontOrder = {};
 
-  // Layer → owning parent layer mapping. Built once per export from the document tree (see
-  // BuildLayerParentMap) and used to detect when a mask reference crosses a parent boundary —
-  // in that case the SVG output approximates `mask->matrix` only and may diverge from the
-  // PAGX renderer's mask->getRelativeMatrix3D(owner). The map is empty until the first call to
-  // ensureLayerParentMap.
-  std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
-  bool layerParentMapReady = false;
-
-  // (mask layer, MaskType) → def-id cache. A single mask Layer can be referenced by many owners
-  // (PAGX allows it explicitly), and PR feedback showed that without this cache `<mask>` /
-  // `<clipPath>` definitions get re-emitted into <defs> on every reference, producing duplicate
-  // `id` values in <defs> with undefined browser behaviour. The MaskType axis matters because
-  // the three values map to materially different SVG output: Alpha and Luminance both emit
-  // `<mask>` but differ in `mask-type` (alpha uses the alpha channel, luminance uses brightness
-  // and is the SVG default), while Contour emits `<clipPath>` (geometry-only inside/outside
-  // test). Sharing the cache slot across MaskTypes would silently route a luminance owner to an
-  // alpha mask (or vice versa) and a contour owner to a path mask — no warning, wrong render.
-  // The cache fast-paths every subsequent reference: same Layer + same MaskType reuses the
-  // original def-id and skips the second emission entirely.
-  struct MaskDefKey {
-    const Layer* layer;
-    MaskType maskType;
-    bool operator==(const MaskDefKey& other) const {
-      return layer == other.layer && maskType == other.maskType;
-    }
-  };
-  struct MaskDefKeyHash {
-    size_t operator()(const MaskDefKey& k) const noexcept {
-      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.maskType) << 1);
-    }
-  };
-  std::unordered_map<MaskDefKey, std::string, MaskDefKeyHash> emittedMaskDefs = {};
-
  private:
   int nextDefId = 0;
 };
@@ -533,20 +500,14 @@ class SVGWriter {
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
-  std::string writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType);
+  std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
+                                 ContentWriter writer, MaskType maskType = MaskType::Contour);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
                                      const Matrix& parentMatrix = {});
-  std::string writeMaskDef(const Layer* maskLayer, const Layer* owner,
-                           MaskType maskType = MaskType::Alpha);
-  std::string writeClipPathDef(const Layer* maskLayer, const Layer* owner);
-  // Lazily builds and caches `_context->layerParentMap` covering the entire document tree on the
-  // first call, then returns the parent layer of `layer` (or nullptr for top-level layers / layers
-  // not reachable from any composition). Used by the mask/clip emission to detect cross-parent
-  // mask references — the SVG output assumes the mask shares the owner's parent space and would
-  // misposition the mask otherwise.
-  const Layer* findLayerParent(const Layer* layer);
+  std::string writeMaskDef(const Layer* maskLayer, MaskType maskType = MaskType::Alpha);
+  std::string writeClipPathDef(const Layer* maskLayer);
   // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
   // Caller wires the id onto the group as clip-path="url(#...)".
   std::string writeScrollRectClipDef(const Layer* layer);
@@ -1703,50 +1664,10 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
-  // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
-  // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements with
-  // the same id in <defs>, which is undefined per the SVG spec — browsers typically use the
-  // first and silently ignore the rest, but a regression that changes the emission order would
-  // re-wire all owners to a different copy.
-  //
-  // MaskType participates in the key because the three values map to materially different SVG
-  // output: Alpha and Luminance both emit `<mask>` but differ in `mask-type` (alpha channel vs
-  // luminance, which is the SVG default), while Contour emits `<clipPath>` (geometry-only
-  // inside/outside test). Without keying on MaskType, the second reference for a layer used in
-  // two roles would silently inherit the first role's def — a luminance owner would render an
-  // alpha mask, or a contour owner would receive a path mask — with no warning.
-  bool isClipPath = (maskType == MaskType::Contour);
-  const char* tag = isClipPath ? "clipPath" : "mask";
-  const char* idPrefix = isClipPath ? "clip" : "mask";
-  ContentWriter writer =
-      isClipPath ? &SVGWriter::writeClipPathContent : &SVGWriter::writeMaskContent;
-
-  SVGWriterContext::MaskDefKey key{maskLayer, maskType};
-  auto cached = _context->emittedMaskDefs.find(key);
-  if (cached != _context->emittedMaskDefs.end()) {
-    return cached->second;
-  }
-  // When `maskLayer->id` is non-empty, multiple MaskType uses of the same layer would otherwise
-  // collide on the same defId. Disambiguate by suffixing the layer id with a MaskType-specific
-  // tag so each (layer, maskType) pair has a unique element id in <defs>.
-  std::string defId;
-  if (maskLayer->id.empty()) {
-    defId = generateId(idPrefix);
-  } else {
-    defId = maskLayer->id;
-    switch (maskType) {
-      case MaskType::Alpha:
-        defId += "_a";
-        break;
-      case MaskType::Luminance:
-        defId += "_l";
-        break;
-      case MaskType::Contour:
-        defId += "_c";
-        break;
-    }
-  }
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
+                                          const char* idPrefix, ContentWriter writer,
+                                          MaskType maskType) {
+  std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
@@ -1762,7 +1683,6 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   if (!paintDefsStr.empty()) {
     _defs->addRawContent(paintDefsStr);
   }
-  _context->emittedMaskDefs[key] = defId;
   return defId;
 }
 
@@ -1818,78 +1738,12 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
   }
 }
 
-std::string SVGWriter::writeMaskDef(const Layer* maskLayer, const Layer* owner, MaskType maskType) {
-  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
-    // PAGX renders mask geometry in the owner's parent space via mask->getRelativeMatrix3D(owner),
-    // which walks the chain mask -> common-ancestor -> owner-parent. The SVG output here only
-    // applies the mask layer's own matrix (BuildLayerTransform), which silently coincides with
-    // the renderer's matrix when mask and owner share a parent — and silently diverges otherwise.
-    // Rather than emit a visibly-misplaced <mask> the user has no way to spot, suppress this
-    // mask entirely so the owner falls back to "no mask" rendering. The accompanying warning
-    // surfaces the suppression to CI / log readers. A follow-up PR can carry the full chain
-    // matrix to restore correctness.
-    addWarning(
-        "mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-        "' across parent boundaries; SVG <mask> emission skipped to avoid silent misplacement.");
-    return "";
-  }
-  return writeMaskOrClipDef(maskLayer, maskType);
+std::string SVGWriter::writeMaskDef(const Layer* maskLayer, MaskType maskType) {
+  return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent, maskType);
 }
 
-std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* owner) {
-  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
-    addWarning("mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-               "' across parent boundaries; SVG <clipPath> emission skipped to avoid silent "
-               "misplacement.");
-    return "";
-  }
-  return writeMaskOrClipDef(maskLayer, MaskType::Contour);
-}
-
-const Layer* SVGWriter::findLayerParent(const Layer* layer) {
-  if (layer == nullptr || _doc == nullptr) {
-    return nullptr;
-  }
-  if (!_context->layerParentMapReady) {
-    auto& map = _context->layerParentMap;
-    // Walk every Composition's layer subtree once. PAGX layers can appear under
-    // Layer::children or Layer::composition->layers; both relations form parent edges.
-    // `visited` provides two guarantees: (1) idempotent parent assignment when the same Layer
-    // appears in multiple subtrees (shared-resource references — legal in PAGX), so the parent
-    // of `child` is locked to the first walk that reached it rather than overwritten by
-    // hash-order-dependent later walks; (2) cycle safety, so a bug in the importer that
-    // produced a `composition -> layer -> composition` self-reference cannot blow the stack.
-    std::unordered_set<const Layer*> visited;
-    std::function<void(const Layer*)> visit = [&](const Layer* parent) {
-      if (!visited.insert(parent).second) {
-        return;
-      }
-      for (const auto* child : parent->children) {
-        if (map.find(child) == map.end()) {
-          map[child] = parent;
-        }
-        visit(child);
-      }
-      if (parent->composition != nullptr) {
-        for (const auto* compLayer : parent->composition->layers) {
-          if (map.find(compLayer) == map.end()) {
-            map[compLayer] = parent;
-          }
-          visit(compLayer);
-        }
-      }
-    };
-    for (const auto& nodePtr : _doc->nodes) {
-      if (nodePtr->nodeType() != NodeType::Layer) {
-        continue;
-      }
-      auto* topLayer = static_cast<Layer*>(nodePtr.get());
-      visit(topLayer);
-    }
-    _context->layerParentMapReady = true;
-  }
-  auto it = _context->layerParentMap.find(layer);
-  return it == _context->layerParentMap.end() ? nullptr : it->second;
+std::string SVGWriter::writeClipPathDef(const Layer* maskLayer) {
+  return writeMaskOrClipDef(maskLayer, "clipPath", "clip", &SVGWriter::writeClipPathContent);
 }
 
 //==============================================================================
@@ -3424,19 +3278,12 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   if (layer->mask != nullptr) {
     if (layer->maskType == MaskType::Contour) {
       // Contour masking uses <clipPath> which only supports geometry clipping.
-      auto clipId = writeClipPathDef(layer->mask, layer);
-      // Empty id signals that writeClipPathDef suppressed emission (e.g. cross-parent reference);
-      // emitting `clip-path="url(#)"` would be a hard error in browsers, so skip the attribute and
-      // let the owner render unclipped. The accompanying warning already surfaces the suppression.
-      if (!clipId.empty()) {
-        out.addAttribute("clip-path", "url(#" + clipId + ")");
-      }
+      auto clipId = writeClipPathDef(layer->mask);
+      out.addAttribute("clip-path", "url(#" + clipId + ")");
     } else {
       // Alpha and Luminance masking use <mask> which supports alpha channel.
-      auto maskId = writeMaskDef(layer->mask, layer, layer->maskType);
-      if (!maskId.empty()) {
-        out.addAttribute("mask", "url(#" + maskId + ")");
-      }
+      auto maskId = writeMaskDef(layer->mask, layer->maskType);
+      out.addAttribute("mask", "url(#" + maskId + ")");
     }
   }
 }
