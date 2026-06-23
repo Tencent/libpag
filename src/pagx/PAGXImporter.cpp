@@ -2740,6 +2740,9 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
           prop->propertyType = ViewModelPropertyType::Enum;
         } else if (typeStr == "Trigger" || typeStr == "trigger") {
           prop->propertyType = ViewModelPropertyType::Trigger;
+        } else {
+          ReportError(doc, child.get(),
+                      "Invalid value '" + typeStr + "' for 'type' attribute.");
         }
         prop->minValue = GetFloatAttribute(child.get(), "min", prop->minValue, doc);
         prop->maxValue = GetFloatAttribute(child.get(), "max", prop->maxValue, doc);
