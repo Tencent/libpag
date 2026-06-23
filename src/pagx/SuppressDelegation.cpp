@@ -56,7 +56,7 @@ SuppressDelegation::~SuppressDelegation() {
       }
     }
   } else {
-    // Simple dedup: use a set for the notify pass.
+    // Simple dedup: use a vector for the notify pass.
     std::vector<PAGViewModelValue*> unique = {};
     unique.reserve(pending.size());
     for (auto* value : pending) {
