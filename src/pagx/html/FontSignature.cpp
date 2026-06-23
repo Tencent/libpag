@@ -105,23 +105,9 @@ FontSignature CollectUniformSignature(const std::vector<Element*>& contents) {
   return sig;
 }
 
-std::string EscapeCssFontFamily(const std::string& family) {
-  std::string out;
-  out.reserve(family.size());
-  for (char c : family) {
-    // Drop control characters (including NUL, \n, \r, \t) and the characters that would let an
-    // attacker escape the single-quoted font-family value into the surrounding CSS context.
-    auto uc = static_cast<unsigned char>(c);
-    if (uc < 0x20 || c == ';' || c == '}' || c == '{' || c == '<' || c == '>') {
-      continue;
-    }
-    if (c == '\\' || c == '\'') {
-      out += '\\';
-    }
-    out += c;
-  }
-  return out;
-}
+// EscapeCssFontFamily moved to pagx/utils/ExporterUtils.h so SVGExporter can share the same
+// implementation. The declaration in FontSignature.h re-exports the symbol from the utils
+// header for backwards compatibility with html/* call sites.
 
 std::string FontSignatureToCss(const FontSignature& sig) {
   std::string css;

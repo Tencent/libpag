@@ -85,10 +85,12 @@ std::string FontSignatureToCss(const FontSignature& sig);
 
 /**
  * Escapes a font-family value for safe emission inside a CSS declaration wrapped in single
- * quotes. Backslash-escapes single quotes and backslashes, and strips characters that would
- * allow escaping the CSS context (';', '}', '<', '>') or control characters. The returned
- * string is intended to be used as the content between single quotes in
- * "font-family:'<escaped>'". Empty input yields an empty output.
+ * quotes. Implementation lives in pagx/utils/ExporterUtils.h so the SVG exporter shares the
+ * same definition; the declaration is re-exported here for the html call sites that already
+ * include FontSignature.h. Backslash-escapes single quotes and backslashes, and strips
+ * characters that would allow escaping the CSS context (';', '}', '<', '>') or control
+ * characters. The returned string is intended to be used as the content between single quotes
+ * in "font-family:'<escaped>'". Empty input yields an empty output.
  */
 std::string EscapeCssFontFamily(const std::string& family);
 

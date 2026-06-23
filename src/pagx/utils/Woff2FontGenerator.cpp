@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/Woff2FontGenerator.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 #include <woff2/encode.h>
 #include <algorithm>
 #include <cmath>
@@ -476,8 +476,11 @@ static std::vector<uint8_t> BuildOS2(const Font* font, uint16_t numGlyphs) {
   WriteTag(table, "    ");      // achVendID
   WriteU16(table, 0);           // fsSelection
   WriteU16(table, 0xE000);      // usFirstCharIndex
-  WriteU16(table,
-           static_cast<uint16_t>(std::min(0xFFFFu, 0xE000u + numGlyphs - 2u)));  // usLastCharIndex
+  // Clamp to the PUA BMP segment end (0xF8FF) so we never declare a charIndex outside the
+  // segment we actually map. BuildWoff2FromFont rejects fonts whose glyph count exceeds the
+  // segment, so this clamp is defensive only.
+  uint32_t lastChar = 0xE000u + static_cast<uint32_t>(numGlyphs) - 2u;
+  WriteU16(table, static_cast<uint16_t>(std::min(0xF8FFu, lastChar)));  // usLastCharIndex
   auto upm = static_cast<int16_t>(font->unitsPerEm);
   WriteI16(table, upm);                         // sTypoAscender
   WriteI16(table, 0);                           // sTypoDescender
@@ -526,8 +529,12 @@ static std::vector<uint8_t> BuildCmap(uint16_t numGlyphs) {
   WriteU16(table, entrySelector);
   WriteU16(table, rangeShift);
 
-  // endCode array
-  uint16_t endCode = static_cast<uint16_t>(0xE000 + mappedCount - 1);
+  // endCode array. mappedCount is bounded above by kMaxPUAGlyphCount in BuildWoff2FromFont, so
+  // (0xE000 + mappedCount - 1) cannot exceed 0xF8FF. The clamp here is defensive in case the
+  // bound is ever loosened — without it, mappedCount > 8192 would wrap uint16_t and produce a
+  // segment that overlaps the sentinel 0xFFFF, breaking cmap lookup entirely.
+  uint32_t endCode32 = 0xE000u + static_cast<uint32_t>(mappedCount) - 1u;
+  uint16_t endCode = static_cast<uint16_t>(std::min(0xF8FFu, endCode32));
   WriteU16(table, endCode);  // segment 1 end
   WriteU16(table, 0xFFFF);   // sentinel end
 
@@ -968,7 +975,25 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
     return result;
   }
 
-  // Detect font type: vector (path) or bitmap (image)
+  // PUA BMP segment 0xE000–0xF8FF holds 6400 codepoints. We map glyph IDs 1..N to that range
+  // 1:1, so the maximum glyph count we can encode in a single-segment cmap is 6400. Returning
+  // empty here lets the caller fall back to the per-glyph <path> rendering path; quietly
+  // truncating instead would silently drop glyphs at the tail of a CJK subset.
+  constexpr size_t kMaxPUAGlyphCount = 0xF900u - 0xE000u;  // 6400
+  if (font->glyphs.size() > kMaxPUAGlyphCount) {
+    return result;
+  }
+
+  // Detect font type: vector (path) or bitmap (image). The PAGX Glyph contract is that path and
+  // image are mutually exclusive, but the importer does not enforce it. Inspect every glyph here
+  // to reject fonts that mix vector and bitmap glyphs (and to reject null glyph entries) — the
+  // table builders below assume a single, uniform type for the whole font, so a mismatched glyph
+  // would silently corrupt either CBDT/CBLC (bitmap path) or CFF (vector path) tables.
+  for (auto* glyph : font->glyphs) {
+    if (glyph == nullptr) {
+      return result;
+    }
+  }
   bool isBitmapFont = (font->glyphs[0]->image != nullptr);
 
   // Validate: all glyphs must be the same type. For vector fonts, glyphs without
@@ -976,6 +1001,13 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
   for (auto* glyph : font->glyphs) {
     if (isBitmapFont) {
       if (glyph->image == nullptr || glyph->image->data == nullptr) {
+        return result;
+      }
+    } else {
+      // Vector font: a stray glyph carrying an image breaks the CFF assumption that every glyph
+      // is a path. Reject so the caller falls back to the per-glyph rendering path that handles
+      // mixed types correctly.
+      if (glyph->image != nullptr) {
         return result;
       }
     }

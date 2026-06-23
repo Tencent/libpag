@@ -26,7 +26,6 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
-#include "pagx/html/Woff2FontGenerator.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -47,6 +46,7 @@
 #include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/SelectorTypes.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 
 namespace pagx {
 
@@ -83,17 +83,6 @@ std::string Matrix3DToCSS(const Matrix3D& m);
 const char* BlendModeToMixBlendMode(BlendMode mode);
 
 std::string LayerTransformCSS(const Layer* layer);
-
-/**
- * HTML-local wrapper around pagx::BuildGroupMatrix that negates the `group->skew` angle so the
- * resulting shear matches tgfx native rendering (VectorGroup::ApplySkew uses
- * `DegreesToRadians(-skew)`). The shared pagx::BuildGroupMatrix follows the SVG matrix sign
- * convention asserted by main's PAGXSVGTest.SVGExport_GroupSkew, so we cannot fix the sign at
- * that layer without breaking the SVG / PPT exporters and their pinned test expectations. Use
- * this wrapper everywhere the HTML exporter would have called BuildGroupMatrix on a Group node
- * (path bake in flattenGroup, transform emission in writeGroup, etc.).
- */
-Matrix BuildGroupMatrixForHTML(const Group* group);
 
 const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);
