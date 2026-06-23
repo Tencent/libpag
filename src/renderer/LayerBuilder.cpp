@@ -1140,18 +1140,13 @@ class LayerBuilderContext {
 
   template <typename PainterType>
   static void WritePainterColor(void* object, const KeyValue& value, float mix) {
-    auto* v = std::get_if<Color>(&value);
-    if (v == nullptr) {
-      return;
-    }
     auto* painter = static_cast<PainterType*>(object);
     auto colorSource = painter->colorSource();
     auto* solid = static_cast<tgfx::SolidColor*>(colorSource.get());
     if (solid == nullptr) {
       return;
     }
-    auto target = ToTGFX(*v);
-    solid->setColor(MixTGFXColor(solid->color(), target, mix));
+    WriteSolidColor(solid, value, mix);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
