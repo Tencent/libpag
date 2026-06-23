@@ -41,25 +41,12 @@ const std::string& LookupResolved(const PropertyMap& props, const std::string& k
 // Lower-cased trimmed view of a resolved property.
 std::string LookupResolvedLower(const PropertyMap& props, const std::string& key);
 
-// Reads a property from a resolved style map, returning empty when missing. Thin wrapper
-// over `LookupProperty` (in HTMLDetail) to keep the rich call sites in flex-related passes
-// uniform with `LookupResolvedLower`.
-const std::string& LookupResolved(const PropertyMap& props, const std::string& key);
-
-// Lower-cased trimmed view of a resolved property.
-std::string LookupResolvedLower(const PropertyMap& props, const std::string& key);
-
 // Common walker entry-point guard. Returns true (caller must `return` immediately) when the
 // node is null/non-element or the recursion depth limit has been reached. On the depth path a
 // `subset:max-depth` warning is emitted whose body cites `phase` so authors can tell which
 // pass aborted the descent.
 bool ShouldSkipWalkerNode(const std::shared_ptr<DOMNode>& node, int depth,
                           HTMLTransformContext& ctx, const char* phase);
-
-// Returns true for nodes whose subtree the cascade / property-filter / layout / emit passes
-// treat as opaque. Currently only `<svg>` qualifies; its attributes are forwarded verbatim by
-// the importer (the SVG resolver runs as a separate pipeline).
-bool IsOpaqueSubtreeRoot(const std::shared_ptr<DOMNode>& node);
 
 // Returns true for nodes whose subtree the cascade / property-filter / layout / emit passes
 // treat as opaque. Currently only `<svg>` qualifies; its attributes are forwarded verbatim by

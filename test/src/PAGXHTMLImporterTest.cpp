@@ -5881,4 +5881,133 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyCollapseAccountsForChildMarg
   EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
 }
 
+//==================================================================================================
+// FontConfig — merge semantics + applyLayout(&config) integration
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, FontConfigMergePreservesExistingFallbacks) {
+  pagx::FontConfig a;
+  a.addFallbackFont("", 0, "Importer-Injected", "Regular");
+
+  pagx::FontConfig b;
+  b.addFallbackFont("/path/to/User.ttf", 0, "User-Provided", "Regular");
+
+  a.merge(b);
+
+  auto names = a.fallbackFamilyNames();
+  ASSERT_EQ(names.size(), 2u);
+  EXPECT_EQ(names[0], "Importer-Injected");
+  EXPECT_EQ(names[1], "User-Provided");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontConfigMergeDedupesIdenticalFallbacks) {
+  // Re-running applyLayout(&config) with the same caller config must not let merge()
+  // accumulate the same fallback entries — otherwise long edit sessions would grow the
+  // fallback list unboundedly. The dedup key covers (path, family, style, ttcIndex).
+  pagx::FontConfig a;
+  a.addFallbackFont("", 0, "Importer-Injected", "Regular");
+
+  pagx::FontConfig caller;
+  caller.addFallbackFont("/path/to/User.ttf", 0, "User-Provided", "Regular");
+  caller.addFallbackFont("/path/to/User.ttf", 0, "User-Provided", "Regular");
+
+  a.merge(caller);
+  a.merge(caller);
+  a.merge(caller);
+
+  auto names = a.fallbackFamilyNames();
+  size_t userCount = static_cast<size_t>(std::count(names.begin(), names.end(), "User-Provided"));
+  size_t importerCount =
+      static_cast<size_t>(std::count(names.begin(), names.end(), "Importer-Injected"));
+  EXPECT_EQ(userCount, 1u);
+  EXPECT_EQ(importerCount, 1u);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ApplyLayoutWithCallerConfigMergesImporterFallbacks) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="font-family:Inter;width:50px;height:50px">hi</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+
+  auto namesBefore = doc->fontConfig().fallbackFamilyNames();
+  EXPECT_NE(std::find(namesBefore.begin(), namesBefore.end(), "Inter"), namesBefore.end());
+
+  pagx::FontConfig caller;
+  caller.addFallbackFont("", 0, "Caller-Font", "Regular");
+  doc->applyLayout(&caller);
+
+  auto namesAfter = doc->fontConfig().fallbackFamilyNames();
+  EXPECT_NE(std::find(namesAfter.begin(), namesAfter.end(), "Inter"), namesAfter.end())
+      << "importer-injected fallback was dropped after applyLayout(&caller) — H3 regression";
+  EXPECT_NE(std::find(namesAfter.begin(), namesAfter.end(), "Caller-Font"), namesAfter.end());
+
+  // Re-running applyLayout with the same caller config must not multiply caller fallbacks.
+  doc->applyLayout(&caller);
+  auto namesRepeat = doc->fontConfig().fallbackFamilyNames();
+  size_t callerCount =
+      static_cast<size_t>(std::count(namesRepeat.begin(), namesRepeat.end(), "Caller-Font"));
+  EXPECT_EQ(callerCount, 1u);
+}
+
+//==================================================================================================
+// HTMLValueParser — malformed hex color and gradient stop diagnostics
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, RawMalformedHexColorWarnsAndFallsBack) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="color:#FG0000;width:50px;height:50px">x</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "malformed hex color"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawMalformedHexColorShortFormWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="color:#GFF;width:50px;height:50px">x</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "malformed hex color"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnrecognisedHexLengthFallsThroughToUnrecognised) {
+  // Lengths 2/3/6/7 ints aren't recognised hex widths, so parser falls through to the
+  // "unrecognised color value" branch rather than the "malformed hex color" branch.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <p style="color:#12345678901;width:50px;height:50px">x</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "unrecognised color value"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawMalformedGradientStopOffsetWarns) {
+  // The offset token sits in the second slot, after the color. `red abc%` exercises the
+  // percent-validation path because `abc%` ends in '%' and is consumed as an offset rather
+  // than misclassified as a color.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-image:linear-gradient(red, blue 50%, green abc%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "malformed gradient stop offset"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawUnmatchedFilterParenthesisWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;filter:blur(5px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "unmatched '(' in filter"));
+}
+
 }  // namespace pag
