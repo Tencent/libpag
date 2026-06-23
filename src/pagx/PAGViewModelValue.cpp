@@ -66,7 +66,9 @@ void PAGViewModelValue::notifyObservers() {
   }
   dirty = true;
   notifying = true;
-  for (const auto& entry : observers) {
+  // Snapshot observers: callbacks may addObserver/removeObserver and invalidate the live vector.
+  auto snapshot = observers;
+  for (const auto& entry : snapshot) {
     entry.callback();
   }
   notifying = false;
