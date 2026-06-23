@@ -89,10 +89,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
     return pd;
   }
 
-  void setScene(const std::shared_ptr<PAGScene>& scn) {
-    scene = scn;
-  }
-
   /**
    * Registers a DataBindRuntime as a dependent of this value. When the value changes, the
    * runtime's markDirty() is called for the associated DataBind node.
@@ -151,6 +147,14 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   void removeObserver(int id);
 
   static bool ObserverHasId(const ObserverEntry& entry, int id);
+
+  /**
+   * Sets the owning PAGScene for this value. Called once by PAGScene during ViewModel
+   * instantiation; used to route change notifications back to the scene.
+   */
+  void setScene(const std::shared_ptr<PAGScene>& scene) {
+    this->scene = scene;
+  }
 
   friend class ObserverHandle;
   friend class PAGViewModel;
