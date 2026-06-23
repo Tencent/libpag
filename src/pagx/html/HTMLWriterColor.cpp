@@ -31,6 +31,7 @@
 
 namespace pagx {
 
+using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 
 // Maps a point from a Gradient's own coordinate space to the PAGX pixel coordinate space
@@ -45,6 +46,31 @@ static Point MapGradientPoint(const Point& p, bool fitsToGeometry, float boxLeft
     return p;
   }
   return {p.x * boxWidth + boxLeft, p.y * boxHeight + boxTop};
+}
+
+static bool ResolveUniformGradientColor(const Gradient* gradient, Color* color) {
+  if (!gradient || gradient->colorStops.empty() || !gradient->colorStops.front()) {
+    return false;
+  }
+  auto firstColor = gradient->colorStops.front()->color;
+  for (auto* stop : gradient->colorStops) {
+    // Tolerance-based channel comparison: stops that are nominally the same color but differ
+    // by float-level noise (e.g. from sRGB<->linear conversion in the import/interpolation
+    // pipeline) must still be treated as uniform, otherwise the gradient fill disappears when
+    // buildLinearGradientCSS also gives up on matrix-with-translation gradients. colorSpace is
+    // kept exact since distinct spaces with equal components are genuinely different colors.
+    if (!stop || stop->color.colorSpace != firstColor.colorSpace ||
+        !FloatNearlyEqual(stop->color.red, firstColor.red) ||
+        !FloatNearlyEqual(stop->color.green, firstColor.green) ||
+        !FloatNearlyEqual(stop->color.blue, firstColor.blue) ||
+        !FloatNearlyEqual(stop->color.alpha, firstColor.alpha)) {
+      return false;
+    }
+  }
+  if (color) {
+    *color = firstColor;
+  }
+  return true;
 }
 
 std::string HTMLWriter::buildLinearGradientCSS(const LinearGradient* g, float boxLeft, float boxTop,
@@ -249,11 +275,25 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
       return ColorToHex(sc->color);
     }
     case NodeType::LinearGradient: {
+      auto gradient = static_cast<const LinearGradient*>(src);
+      auto css = buildLinearGradientCSS(gradient, boxLeft, boxTop, boxWidth, boxHeight);
+      if (!css.empty()) {
+        if (outAlpha) {
+          *outAlpha = 1.0f;
+        }
+        return css;
+      }
+      Color color;
+      if (ResolveUniformGradientColor(gradient, &color)) {
+        if (outAlpha) {
+          *outAlpha = color.alpha;
+        }
+        return ColorToHex(color);
+      }
       if (outAlpha) {
         *outAlpha = 1.0f;
       }
-      return buildLinearGradientCSS(static_cast<const LinearGradient*>(src), boxLeft, boxTop,
-                                    boxWidth, boxHeight);
+      return {};
     }
     case NodeType::RadialGradient: {
       if (outAlpha) {

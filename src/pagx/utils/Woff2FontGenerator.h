@@ -30,11 +30,15 @@ struct Woff2FontResult {
   std::vector<uint8_t> woff2Data;
   std::string familyName;
   std::string relativeUrl;
+  // Exported OpenType unitsPerEm read back from the generated SFNT head table.
+  uint16_t unitsPerEm = 0;
+  // Scale applied to PAGX font design values before writing them into the generated font.
+  float designScale = 1.0f;
 };
 
 /**
- * Builds a WOFF2 font file from a PAGX Font node containing vector glyph outlines. Returns an
- * empty result if the font contains any bitmap glyphs or has no glyphs.
+ * Builds a WOFF2 font file from a PAGX Font node containing vector outlines or bitmap glyphs.
+ * Returns an empty result if the font has no glyphs or contains incompatible glyph data.
  */
 Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId);
 

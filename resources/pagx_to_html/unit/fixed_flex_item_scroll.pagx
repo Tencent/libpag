@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: fixed flex item keeps declared width inside scrollRect layout. -->
+<pagx width="340" height="120">
+  <Layer id="clip" width="300" height="100" layout="horizontal" gap="0"
+         alignment="start" scrollRect="0,0,300,100">
+    <Layer id="fixed" width="120" height="100" flex="1">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="wide" width="240" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>
