@@ -112,9 +112,11 @@ class PAGXView {
   std::shared_ptr<PAGXDocument> document = nullptr;
 
   bool useCustomBackgroundColor = false;
+  bool backgroundDirty = true;
   Color customBackgroundColor = {};
 
   // Checkerboard background cache
+  float deviceDensity = 1.0f;
   std::shared_ptr<GridBackgroundLayer> backgroundLayer = nullptr;
   int lastBackgroundWidth = 0;
   int lastBackgroundHeight = 0;

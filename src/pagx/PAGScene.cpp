@@ -161,13 +161,14 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     device->unlock();
     return false;
   }
-  if (_backgroundLayer != nullptr) {
+  if (_backgroundLayer != nullptr && autoClear) {
     auto canvas = tgfxSurface->getCanvas();
-    if (autoClear) {
-      canvas->clear();
-    }
+    canvas->clear();
     _backgroundLayer->draw(canvas);
+    auto savedColor = displayList->backgroundColor();
+    displayList->setBackgroundColor(tgfx::Color::Transparent());
     displayList->render(tgfxSurface.get(), false);
+    displayList->setBackgroundColor(savedColor);
   } else {
     displayList->render(tgfxSurface.get(), autoClear);
   }

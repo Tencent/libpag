@@ -164,6 +164,7 @@ void PAGXView::buildLayers() {
   pagxHeight = scene->height();
   applySceneDisplayOptions();
   updateContentTransform();
+  backgroundDirty = true;
   presentImmediately = true;
 }
 
@@ -192,6 +193,11 @@ void PAGXView::updateSize() {
   int canvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &canvasWidth, &canvasHeight);
   syncSurfaceSize(canvasWidth, canvasHeight);
+  auto newDensity = static_cast<float>(emscripten_get_device_pixel_ratio());
+  if (std::abs(newDensity - deviceDensity) > 0.001f) {
+    deviceDensity = newDensity;
+    backgroundDirty = true;
+  }
 }
 
 bool PAGXView::ensureWindow() {
@@ -225,6 +231,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   }
   lastSurfaceWidth = canvasWidth;
   lastSurfaceHeight = canvasHeight;
+  backgroundDirty = true;
   updateContentTransform();
   presentImmediately = true;
 }
@@ -300,18 +307,14 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
   useCustomBackgroundColor = true;
   customBackgroundColor = {std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
                            std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
-  if (scene != nullptr) {
-    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
-  }
+  backgroundDirty = true;
   presentImmediately = true;
 }
 
 void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
   customBackgroundColor = {0, 0, 0, 0};
-  if (scene != nullptr) {
-    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
-  }
+  backgroundDirty = true;
   presentImmediately = true;
 }
 
@@ -328,24 +331,24 @@ void PAGXView::draw() {
   if (pagSurface == nullptr) {
     return;
   }
-  if (useCustomBackgroundColor) {
-    scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
-    scene->setBackgroundLayer(nullptr);
-  } else {
-    scene->getDisplayOptions()->setBackgroundColor({0, 0, 0, 0});
-    auto density = currentCanvasWidth > 0 ? static_cast<float>(lastSurfaceWidth) /
-                                                static_cast<float>(currentCanvasWidth)
-                                          : 1.0f;
-    int bgWidth = lastSurfaceWidth;
-    int bgHeight = lastSurfaceHeight;
-    if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
-        std::abs(density - lastBackgroundDensity) > 0.001f) {
-      backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
-      lastBackgroundWidth = bgWidth;
-      lastBackgroundHeight = bgHeight;
-      lastBackgroundDensity = density;
+  if (backgroundDirty) {
+    if (useCustomBackgroundColor) {
+      scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
+      scene->setBackgroundLayer(nullptr);
+    } else {
+      auto density = deviceDensity;
+      int bgWidth = lastSurfaceWidth;
+      int bgHeight = lastSurfaceHeight;
+      if (!backgroundLayer || bgWidth != lastBackgroundWidth || bgHeight != lastBackgroundHeight ||
+          std::abs(density - lastBackgroundDensity) > 0.001f) {
+        backgroundLayer = GridBackgroundLayer::Make(bgWidth, bgHeight, density);
+        lastBackgroundWidth = bgWidth;
+        lastBackgroundHeight = bgHeight;
+        lastBackgroundDensity = density;
+      }
+      scene->setBackgroundLayer(backgroundLayer);
     }
-    scene->setBackgroundLayer(backgroundLayer);
+    backgroundDirty = false;
   }
   scene->draw(pagSurface, true);
   auto device = window->getDevice();

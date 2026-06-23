@@ -188,7 +188,9 @@ class PAGDisplayOptions {
   Color getBackgroundColor() const;
 
   /**
-   * Sets the background color drawn behind the runtime layer tree.
+   * Sets the background color drawn behind the runtime layer tree. Note that when a background
+   * layer is set on PAGScene, the background color is automatically ignored during rendering.
+   * To use background color, ensure the background layer is removed (set to nullptr) first.
    * @param color background color in PAGX color representation.
    */
   void setBackgroundColor(const Color& color);

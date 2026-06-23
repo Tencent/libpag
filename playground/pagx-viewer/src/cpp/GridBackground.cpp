@@ -37,8 +37,8 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
                     backgroundPaint);
 
   tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-  // Use fixed logical size (32px) so the grid looks the same on all screens.
-  int logicalTileSize = 32;
+  // Use fixed logical size (16px) so the grid looks the same on all screens.
+  int logicalTileSize = 16;
   int tileSize = static_cast<int>(static_cast<float>(logicalTileSize) * density);
   if (tileSize <= 0) {
     tileSize = logicalTileSize;

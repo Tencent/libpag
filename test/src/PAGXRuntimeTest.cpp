@@ -27,6 +27,8 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -40,6 +42,43 @@
 #endif
 
 namespace pag {
+
+class CheckerboardLayer : public tgfx::Layer {
+ public:
+  static std::shared_ptr<CheckerboardLayer> Make(int width, int height, int tileSize) {
+    return std::shared_ptr<CheckerboardLayer>(new CheckerboardLayer(width, height, tileSize));
+  }
+
+ protected:
+  void onUpdateContent(tgfx::LayerRecorder* recorder) override {
+    tgfx::LayerPaint whitePaint(tgfx::Color::White());
+    recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                      whitePaint);
+    tgfx::LayerPaint grayPaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.0f});
+    for (int y = 0; y < height; y += tileSize) {
+      bool draw = (y / tileSize) % 2 == 1;
+      for (int x = 0; x < width; x += tileSize) {
+        if (draw) {
+          recorder->addRect(
+              tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(tileSize), static_cast<float>(tileSize)),
+              grayPaint);
+        }
+        draw = !draw;
+      }
+    }
+  }
+
+ private:
+  CheckerboardLayer(int width, int height, int tileSize)
+      : width(width), height(height), tileSize(tileSize) {
+    invalidateContent();
+  }
+
+  int width = 0;
+  int height = 0;
+  int tileSize = 10;
+};
 
 /**
  * Test case: PAGScene registers itself with the source document on creation and unregisters on
@@ -405,6 +444,91 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   context = device->lockContext();
   glDeleteFramebuffers(1, &fbo);
   glDeleteTextures(1, &textureInfo.id);
+}
+
+/**
+ * Test case: setBackgroundLayer draws the custom layer behind scene content when autoClear is true.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneSetBackgroundLayer) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = pagx::Color{1, 0, 0, 1, pagx::ColorSpace::SRGB};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  // Draw without backgroundLayer.
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/BackgroundLayer_none"));
+
+  // Set a checkerboard layer as background.
+  auto bgLayer = CheckerboardLayer::Make(100, 100, 10);
+  scene->setBackgroundLayer(bgLayer);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/BackgroundLayer_checkerboard"));
+
+  // Pass nullptr to remove backgroundLayer.
+  scene->setBackgroundLayer(nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/BackgroundLayer_removed"));
+}
+
+/**
+ * Test case: backgroundLayer is skipped when autoClear is false.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneBackgroundLayerAutoClearFalse) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = pagx::Color{1, 0, 0, 1, pagx::ColorSpace::SRGB};
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  // Set a checkerboard layer as background.
+  auto bgLayer = CheckerboardLayer::Make(100, 100, 10);
+  scene->setBackgroundLayer(bgLayer);
+
+  // Draw with autoClear=true: checkerboard should be visible behind content.
+  ASSERT_TRUE(scene->draw(surface, true));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/BackgroundLayerAutoClear_true"));
+
+  // Use a fresh surface to verify autoClear=false skips the backgroundLayer.
+  auto surface2 = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface2 != nullptr);
+  ASSERT_TRUE(scene->draw(surface2, false));
+  EXPECT_TRUE(Baseline::Compare(surface2, "PAGXRuntimeTest/BackgroundLayerAutoClear_false"));
 }
 
 }  // namespace pag

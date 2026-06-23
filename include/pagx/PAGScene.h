@@ -152,8 +152,13 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Sets a custom tgfx::Layer to be drawn behind the scene content. The background layer is drawn
    * in surface coordinates (not affected by zoomScale or contentOffset) after the surface is
-   * cleared and before the display list is rendered. Pass nullptr to remove a previously set
-   * background layer.
+   * cleared and before the display list is rendered. It is only drawn when autoClear is true in
+   * draw(); when autoClear is false, the background layer is skipped to preserve existing surface
+   * content. Note that only the layer's content (from onUpdateContent) is drawn; properties like
+   * matrix, alpha, blendMode, and visibility set on the layer itself are not applied. When the
+   * background layer is active, the background color set via PAGDisplayOptions is automatically
+   * ignored during rendering to prevent it from obscuring the background layer. Pass nullptr to
+   * remove a previously set background layer and restore background color behavior.
    * @param layer the layer to draw as background, or nullptr to remove.
    */
   void setBackgroundLayer(std::shared_ptr<tgfx::Layer> layer);
