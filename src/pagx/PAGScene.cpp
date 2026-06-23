@@ -73,6 +73,10 @@ void PAGScene::buildRuntimeTree() {
   if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
     _rootComposition->runtimeLayer->removeFromParent();
   }
+  // A rebuild drops the previous runtime tree and rebuilds view models, so any pending notifications
+  // held as raw pointers would dangle. Drop them and exit any active SuppressDelegation scope.
+  pendingNotifications.clear();
+  suppressNotify = false;
   timelinesByAnimation.clear();
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
