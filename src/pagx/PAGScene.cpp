@@ -220,9 +220,9 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
   return vm;
 }
 
-void PAGScene::buildNestedViewModels(PAGComposition* rootComp) {
-  if (rootComp == nullptr) return;
-  for (auto& child : rootComp->children) {
+void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
+  if (parentComp == nullptr) return;
+  for (auto& child : parentComp->children) {
     if (child == nullptr || child->layerType() != LayerType::Composition) continue;
     auto* childComp = static_cast<PAGComposition*>(child.get());
     const auto* sourceLayer = childComp->node;
@@ -233,12 +233,12 @@ void PAGScene::buildNestedViewModels(PAGComposition* rootComp) {
       childComp->compositionViewModel = childVM;
       childComp->dataBindRuntime = std::make_unique<DataBindRuntime>();
       auto dataCtx = std::make_shared<DataContext>(childVM);
-      if (rootComp->dataContext != nullptr) dataCtx->parent(rootComp->dataContext);
+      if (parentComp->dataContext != nullptr) dataCtx->parent(parentComp->dataContext);
       childComp->dataContext = dataCtx;
-      if (rootComp->compositionViewModel != nullptr && !sourceLayer->vmContext.empty()) {
+      if (parentComp->compositionViewModel != nullptr && !sourceLayer->vmContext.empty()) {
         auto propName = sourceLayer->vmContext;
         if (propName.find("$vm.") == 0) propName = propName.substr(4);
-        auto prop = rootComp->compositionViewModel->propertyViewModel(propName);
+        auto prop = parentComp->compositionViewModel->propertyViewModel(propName);
         if (prop) prop->referenceInstance = childVM;
       }
       if (!compSchema->dataBinds.empty())

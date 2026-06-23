@@ -171,7 +171,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // composition is built into the tree once and cannot be patched in place).
   void buildRuntimeTree();
   void buildViewModels();
-  void buildNestedViewModels(PAGComposition* rootComp);
+  void buildNestedViewModels(PAGComposition* parentComp);
   static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
   void flushDataBinds() const;
 
