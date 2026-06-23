@@ -1466,7 +1466,7 @@ PAGX_TEST(PAGXViewModelTest, VMContextConnection) {
   ASSERT_NE(rootVm, nullptr);
   auto slot = rootVm->propertyViewModel("childSlot");
   ASSERT_NE(slot, nullptr);
-  auto refInstance = slot->referenceViewModelInstance();
+  auto refInstance = slot->referenceViewModel();
   ASSERT_NE(refInstance, nullptr);
 
   // Verify the child VM's property is accessible through the reference.
