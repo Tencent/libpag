@@ -34,8 +34,9 @@ PAGEncodeThread::PAGEncodeThread(QObject* parent) : QThread(parent) {
 }
 
 PAGEncodeThread::~PAGEncodeThread() {
-  if (encoder != nullptr) {
-    encoder->close();
+  if (!inputFinished) {
+    inputFinished = true;
+    Q_EMIT closeSignal();
   }
   quit();
   wait();
