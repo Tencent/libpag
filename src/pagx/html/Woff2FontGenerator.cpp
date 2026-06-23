@@ -1118,6 +1118,12 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
     return result;
   }
 
+  // CFF INDEX count and numGlyphs fields are Card16 (max 65535). Reject oversized fonts
+  // to prevent silent uint16_t wraparound that would produce invalid WOFF2 data.
+  if (font->glyphs.size() > 65534) {
+    return result;
+  }
+
   // Detect font type: vector (path) or bitmap (image)
   bool isBitmapFont = (font->glyphs[0]->image != nullptr);
 
