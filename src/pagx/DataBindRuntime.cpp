@@ -175,8 +175,8 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         break;
       }
     }
-    if (entry == nullptr || entry->source == nullptr || entry->targetNode == nullptr ||
-        entry->dataBind == nullptr) {
+    if (entry == nullptr || entry->source == nullptr || entry->sourceGuard.lock() == nullptr ||
+        entry->targetNode == nullptr || entry->dataBind == nullptr) {
       continue;
     }
     // ToSource only: no ViewModel → layer direction.
@@ -235,7 +235,8 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     return;
   }
   for (auto& entry : entries) {
-    if (!entry.isToSource || entry.source == nullptr || entry.targetNode == nullptr) {
+    if (!entry.isToSource || entry.source == nullptr || entry.sourceGuard.lock() == nullptr ||
+        entry.targetNode == nullptr) {
       continue;
     }
     auto layer = binding->get<tgfx::Layer>(entry.targetNode);
