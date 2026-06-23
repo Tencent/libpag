@@ -1059,6 +1059,9 @@ PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
   EXPECT_FLOAT_EQ(v->value().green, 1.0f);
+  // TODO: verify target layer color channel. The "color" writer is registered on SolidColor nodes,
+  // not on the Layer target, so this DataBind (target="@r") is a no-op and the target fill color
+  // cannot be observed. The source assertion above is kept as a secondary check.
 }
 
 PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
