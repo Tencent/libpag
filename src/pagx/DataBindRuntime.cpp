@@ -220,6 +220,17 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
         entry.targetNode == nullptr) {
       continue;
     }
+    // Skip dirty bindings — VM has pending changes that update() will apply.
+    bool isDirty = false;
+    for (auto* dirty : dirtyBinds) {
+      if (dirty == entry.dataBind) {
+        isDirty = true;
+        break;
+      }
+    }
+    if (isDirty) {
+      continue;
+    }
     auto layer = binding->get<tgfx::Layer>(entry.targetNode);
     if (layer == nullptr) {
       continue;
