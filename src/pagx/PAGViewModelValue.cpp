@@ -133,16 +133,17 @@ void PAGViewModelValueBoolean::value(bool v) {
   propertyValue = v;
   dirty = true;
   notifyValueChanged();
+  notifyDependents();
 }
 
 void PAGViewModelValueColor::value(const Color& v) {
-  if (propertyValue.red == v.red && propertyValue.green == v.green &&
-      propertyValue.blue == v.blue && propertyValue.alpha == v.alpha) {
+  if (propertyValue == v) {
     return;
   }
   propertyValue = v;
   dirty = true;
   notifyValueChanged();
+  notifyDependents();
 }
 
 void PAGViewModelValueImage::value(const std::string& v) {
@@ -152,6 +153,7 @@ void PAGViewModelValueImage::value(const std::string& v) {
   propertyValue = v;
   dirty = true;
   notifyValueChanged();
+  notifyDependents();
 }
 
 // ---- ObserverHandle ----------------------------------------------------------
