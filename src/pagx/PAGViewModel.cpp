@@ -101,6 +101,19 @@ const std::string& PAGViewModel::viewModelId() const {
   return id;
 }
 
+void PAGViewModel::advancedAll() {
+  for (const auto& value : propertyList) {
+    value->advanced();
+    if (value->valueType() == ViewModelValueType::ViewModel) {
+      const auto& vmValue = std::static_pointer_cast<PAGViewModelValueViewModel>(value);
+      const auto& child = vmValue->referenceViewModelInstance();
+      if (child != nullptr) {
+        child->advancedAll();
+      }
+    }
+  }
+}
+
 PAGViewModelValue* PAGViewModel::findProperty(const std::string& name) const {
   auto it = propertyMap.find(name);
   return it != propertyMap.end() ? it->second.get() : nullptr;

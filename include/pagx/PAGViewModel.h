@@ -98,6 +98,14 @@ class PAGViewModel {
    */
   const std::string& viewModelId() const;
 
+  /**
+   * Resets the dirty flag of every property in this ViewModel, and for nested ViewModel-typed
+   * properties recursively resets the referenced child ViewModel as well. Intended to be called
+   * once per frame after all DataBinds have been applied, so that hasChanged() reflects only
+   * changes that occur within the next frame.
+   */
+  void advancedAll();
+
  private:
   PAGViewModel() = default;
 
