@@ -36,11 +36,11 @@ class PAGViewModelValueViewModel : public PAGViewModelValue {
    * Returns the referenced nested PAGViewModel instance, or nullptr if none is set.
    */
   std::shared_ptr<PAGViewModel> referenceViewModelInstance() const {
-    return referenceInstance;
+    return referenceViewModelInstance;
   }
 
  private:
-  std::shared_ptr<PAGViewModel> referenceInstance = nullptr;
+  std::shared_ptr<PAGViewModel> referenceViewModelInstance = nullptr;
 
   friend class PAGViewModel;
   friend class PAGScene;

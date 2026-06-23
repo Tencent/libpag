@@ -1297,7 +1297,7 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeNullDataBindSafety) {
                                            : nullptr;
   std::vector<pagx::DataBind*> binds = {db};
   auto binding = std::make_unique<pagx::RuntimeBinding>();
-  runtime->bind(binds, ctx.get(), binding.get(), doc.get());
+  runtime->bind(binds, ctx.get(), doc.get());
   EXPECT_FALSE(runtime->entries.empty());
 
   // After binding, nullify dataBind on one entry to simulate document lifetime ending.
@@ -1364,7 +1364,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto containerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   containerVal->propertyName = "container";
   containerVal->type = pagx::ViewModelValueType::ViewModel;
-  containerVal->referenceInstance = nestedVM;
+  containerVal->referenceViewModelInstance = nestedVM;
   parentScene->viewModel()->propertyMap["container"] = containerVal;
 
   // Child VM: has a ViewModel-typed property "container" with null reference.
@@ -1378,7 +1378,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto childContainerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   childContainerVal->propertyName = "container";
   childContainerVal->type = pagx::ViewModelValueType::ViewModel;
-  // referenceInstance is intentionally left null.
+  // referenceViewModelInstance is intentionally left null.
   childVM->propertyMap["container"] = childContainerVal;
 
   auto childCtx = std::make_shared<pagx::DataContext>(childVM);
