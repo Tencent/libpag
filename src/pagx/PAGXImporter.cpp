@@ -1000,15 +1000,19 @@ static Fill* ParseFill(const DOMNode* node, PAGXDocument* doc) {
   if (!fill) {
     return nullptr;
   }
-  fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    fill->color = childColor;
+  } else {
+    fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   fill->alpha = GetFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
   fill->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   fill->fillRule = GET_ENUM(node, "fillRule", "winding", doc, FillRule);
   fill->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    fill->color = childColor;
-  }
   return fill;
 }
 
@@ -1017,7 +1021,15 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
   if (!stroke) {
     return nullptr;
   }
-  stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    stroke->color = childColor;
+  } else {
+    stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   stroke->width = GetFloatAttribute(node, "width", Default<Stroke>().width, doc);
   stroke->alpha = GetFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
   stroke->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
@@ -1033,10 +1045,6 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
       GetBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
   stroke->align = GET_ENUM(node, "align", "center", doc, StrokeAlign);
   stroke->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    stroke->color = childColor;
-  }
   return stroke;
 }
 

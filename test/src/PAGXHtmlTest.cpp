@@ -23,7 +23,7 @@
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/html/Woff2FontGenerator.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/nodes/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "utils/Baseline.h"

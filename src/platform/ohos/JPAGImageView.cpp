@@ -873,6 +873,7 @@ napi_value JPAGImageView::getCurrentPixelMap(napi_env env) {
 }
 
 void JPAGImageView::release() {
+  XComponentHandler::RemoveListener(id);
   // A memory leak may occur if the timer is not cancelled upon release.
   if (_animator) {
     _animator->cancel();
