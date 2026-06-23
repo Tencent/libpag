@@ -906,6 +906,7 @@ void JPAGView::onSurfaceDestroyed() {
 }
 
 void JPAGView::release() {
+  XComponentHandler::RemoveListener(id);
   std::lock_guard lock_guard(locker);
   if (progressCallback != nullptr) {
     napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
