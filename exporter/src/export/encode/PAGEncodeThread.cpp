@@ -28,11 +28,15 @@ PAGEncodeThread::PAGEncodeThread(QObject* parent) : QThread(parent) {
           &PAGEncodeThread::encodeHeadersInternal, Qt::QueuedConnection);
   connect(this, &PAGEncodeThread::encodeFrameSignal, this, &PAGEncodeThread::encodeFrameInternal,
           Qt::QueuedConnection);
+  connect(this, &PAGEncodeThread::closeSignal, this, &PAGEncodeThread::closeInternal,
+          Qt::QueuedConnection);
   start();
 }
 
 PAGEncodeThread::~PAGEncodeThread() {
-  encoder->close();
+  if (encoder != nullptr) {
+    encoder->close();
+  }
   quit();
   wait();
 }
@@ -43,6 +47,10 @@ bool PAGEncodeThread::isValid() const {
 
 void PAGEncodeThread::close() {
   inputFinished = true;
+  Q_EMIT closeSignal();
+}
+
+void PAGEncodeThread::closeInternal() {
   if (encoder != nullptr) {
     encoder->close();
   }
