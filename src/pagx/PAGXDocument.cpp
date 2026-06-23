@@ -260,6 +260,40 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   nodeMap[id] = node;
 }
 
+void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
+  for (auto it = nodeMap.begin(); it != nodeMap.end();) {
+    if (toRemove.count(it->second) > 0) {
+      it = nodeMap.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  size_t writeIdx = 0;
+  for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
+    if (toRemove.count(nodes[readIdx].get()) == 0) {
+      nodes[writeIdx++] = std::move(nodes[readIdx]);
+    }
+  }
+  nodes.resize(writeIdx);
+}
+
+void PAGXDocument::setNodeId(Node* node, const std::string& id) {
+  if (node == nullptr) {
+    return;
+  }
+  if (!node->id.empty()) {
+    auto it = nodeMap.find(node->id);
+    if (it != nodeMap.end() && it->second == node) {
+      nodeMap.erase(it);
+    }
+  }
+  registerNode(node, id);
+}
+
+void PAGXDocument::resetLayoutState() {
+  layoutApplied = false;
+}
+
 static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   for (auto* layer : layers) {
     if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
@@ -563,6 +597,25 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
     } else {
       ++it;
     }
+  }
+}
+
+void PAGXDocument::loadFileDataMap(
+    const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap) {
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (image->data != nullptr || image->filePath.empty()) {
+      continue;
+    }
+    auto it = fileDataMap.find(image->filePath);
+    if (it == fileDataMap.end()) {
+      continue;
+    }
+    image->data = it->second;
+    image->filePath = {};
   }
 }
 

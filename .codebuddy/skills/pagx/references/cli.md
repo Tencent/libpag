@@ -246,50 +246,62 @@ element, an error is reported.
 
 ## pagx font
 
-Font operations with two subcommands: `info` (query metrics) and `embed` (embed into PAGX).
-
-### pagx font info
-
-Query font identity and metrics from a font file or system font.
+Query font identity and metrics from a font file or system font, or enumerate installed
+system font families.
 
 ```bash
-pagx font info --file ./CustomFont.ttf
-pagx font info --file ./CustomFont.ttf --size 24
-pagx font info --name "PingFang SC,Bold"
-pagx font info --name "Arial" --size 24 --json
+pagx font --file ./CustomFont.ttf
+pagx font --file ./CustomFont.ttf --size 24
+pagx font --name "PingFang SC,Bold"
+pagx font --name "Arial" --size 24 --json
+pagx font --list
+pagx font --list --json
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--file <path>` | Font file path |
-| `--name <family[,style]>` | System font by name (e.g., `"Arial"` or `"Arial,Bold"`) |
+| `--file <path>` | Query a font file |
+| `--name <family[,style]>` | Query a system font (e.g., `"Arial"` or `"Arial,Bold"`) |
 | `--size <pt>` | Font size in points (default: 12, the PAGX spec default) |
-| `--json` | JSON output |
+| `--json` | Output in JSON format |
+| `--list` | List every installed system font family |
 
-Either `--file` or `--name` is required (mutually exclusive).
+Exactly one of `--file`, `--name`, or `--list` is required. `--list` cannot be combined
+with `--file` or `--name`; `--file` and `--name` are mutually exclusive.
 
 Returns typeface info (fontFamily, fontStyle, glyphsCount, unitsPerEm, hasColor, hasOutlines)
 and all FontMetrics fields at the specified size (top, ascent, descent, bottom, leading, xMin,
 xMax, xHeight, capHeight, underlineThickness, underlinePosition).
 
-### pagx font embed
+The retired `pagx font info` and `pagx font embed` subcommands now error out with a redirect
+message; use `pagx font ...` for font queries and `pagx embed` for font embedding.
 
-Embed fonts into a PAGX file by performing text layout and glyph extraction.
+---
+
+## pagx embed
+
+Embed font glyphs and images into a PAGX file for self-contained output. Font embedding extracts glyph data from laid-out text; image embedding inlines external image files as base64. Font nodes with a `file` attribute are automatically discovered and registered for text shaping — no `--font-file` flag needed.
 
 ```bash
-pagx font embed input.pagx
-pagx font embed -o out.pagx input.pagx
-pagx font embed --file a.ttf --file b.ttf input.pagx
-pagx font embed --file a.ttf --fallback "PingFang SC" --fallback b.otf input.pagx
+pagx embed input.pagx                                    # embed fonts + images (overwrite)
+pagx embed -o out.pagx input.pagx                        # embed fonts + images to new file
+pagx embed --skip-fonts input.pagx                       # embed images only
+pagx embed --skip-images input.pagx                      # embed fonts only
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
-| `--file <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--skip-fonts` | Skip font embedding |
+| `--skip-images` | Skip image embedding |
+| `-h, --help` | Show this help message |
 
-`--file` and `--fallback` work the same as in `pagx render`.
+Fonts are resolved in the following order:
+1. Font nodes with `file` attribute are loaded and registered by their internal family name
+2. `--fallback` fonts are tried when a character is not found in the primary font
+
+Image embedding inlines external file references (Image nodes with `filePath`) as base64 data. See the Font `file` attribute in `attributes.md` for details on external font references.
 
 ---
 

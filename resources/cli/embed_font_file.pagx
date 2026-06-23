@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="200">
+  <Layer>
+    <TextBox textAlign="center">
+      <Text text="Hello PAGX" fontFamily="Noto Sans SC" fontSize="32"/>
+      <Fill color="#000000"/>
+    </TextBox>
+  </Layer>
+  <Resources>
+    <Font id="noto" file="NotoSansSC-Regular.otf" unitsPerEm="1000"/>
+  </Resources>
+</pagx>

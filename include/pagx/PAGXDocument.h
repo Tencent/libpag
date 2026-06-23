@@ -144,11 +144,21 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
+   * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches
+   * a key in the map in a single pass over the nodes. More efficient than calling loadFileData
+   * individually for each file when embedding multiple images.
+   * @param fileDataMap a map from file path to the file content to embed
+   */
+  void loadFileDataMap(
+      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+
+  /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. Re-running layout on an
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
-   * current fields.
+   * current fields. Before re-embedding a document that already has embedded fonts, call
+   * clearEmbed() so layout uses fresh shaping data.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -253,10 +263,15 @@ class PAGXDocument : public Node {
   // O(1) containment check for ownsNode(), maintained alongside nodes.
   std::unordered_set<const Node*> nodeSet = {};
 
+  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+  void setNodeId(Node* node, const std::string& id);
+  void resetLayoutState();
+
   // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
+  friend class FontEmbedder;
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;

@@ -506,6 +506,25 @@ PAGX_TEST(PAGXTest, FontGlyphNodes) {
 }
 
 /**
+ * Test case: Font fileOriginal is preserved when importing XML content directly.
+ */
+PAGX_TEST(PAGXTest, FontFileOriginalFromXML) {
+  auto xml = R"(<pagx width="100" height="100">
+  <Resources>
+    <Font id="noto" file="fonts/NotoSansSC-Regular.otf"/>
+  </Resources>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  auto font = doc->findNode<pagx::Font>("noto");
+  ASSERT_TRUE(font != nullptr);
+  EXPECT_EQ(font->file, "fonts/NotoSansSC-Regular.otf");
+  EXPECT_EQ(font->fileOriginal, "fonts/NotoSansSC-Regular.otf");
+}
+
+/**
  * Test case: GlyphRun node with horizontal positioning
  */
 PAGX_TEST(PAGXTest, GlyphRunHorizontal) {
