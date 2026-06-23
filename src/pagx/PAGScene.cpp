@@ -371,7 +371,7 @@ void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
   }
 }
 
-std::shared_ptr<PAGViewModel> PAGScene::viewModel() {
+std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
   return rootViewModel;
 }
 

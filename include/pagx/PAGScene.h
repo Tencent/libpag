@@ -102,7 +102,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the root ViewModel for this scene, or nullptr if the document has no ViewModel schema.
    */
-  std::shared_ptr<PAGViewModel> viewModel();
+  std::shared_ptr<PAGViewModel> viewModel() const;
 
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
