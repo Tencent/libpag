@@ -3840,4 +3840,226 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MultipleGlyphRunFontSizesFallToPath) {
   EXPECT_NE(svg.find("<path"), std::string::npos);
 }
 
+/**
+ * A single mask Layer referenced by two owners under different MaskType values must produce
+ * two distinct <mask> defs with the correct mask-type attribute on each. Sharing one cache
+ * slot across MaskTypes silently routes the second owner to the wrong mask channel (alpha
+ * vs luminance).
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerDifferentMaskTypesEmitDistinctDefs) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "sharedMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* alphaOwner = doc->makeNode<pagx::Layer>();
+  alphaOwner->mask = maskLayer;
+  alphaOwner->maskType = pagx::MaskType::Alpha;
+  auto* alphaRect = doc->makeNode<pagx::Rectangle>();
+  alphaRect->position = {50, 50};
+  alphaRect->size = {100, 100};
+  alphaOwner->contents.push_back(alphaRect);
+  alphaOwner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  doc->layers.push_back(alphaOwner);
+
+  auto* lumOwner = doc->makeNode<pagx::Layer>();
+  lumOwner->mask = maskLayer;
+  lumOwner->maskType = pagx::MaskType::Luminance;
+  auto* lumRect = doc->makeNode<pagx::Rectangle>();
+  lumRect->position = {160, 50};
+  lumRect->size = {100, 100};
+  lumOwner->contents.push_back(lumRect);
+  lumOwner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.9f, 0.6f, 0.2f));
+  doc->layers.push_back(lumOwner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+
+  // Exactly two <mask> elements emitted, one per MaskType.
+  size_t maskOpenCount = 0;
+  size_t pos = 0;
+  while ((pos = svg.find("<mask ", pos)) != std::string::npos) {
+    ++maskOpenCount;
+    pos += 6;
+  }
+  EXPECT_EQ(maskOpenCount, 2u);
+
+  // Both ids derive from the same layer id but carry MaskType-specific suffixes so the def ids
+  // don't collide in <defs>.
+  auto alphaIdPos = svg.find("id=\"sharedMask_a\"");
+  auto lumIdPos = svg.find("id=\"sharedMask_l\"");
+  ASSERT_NE(alphaIdPos, std::string::npos);
+  ASSERT_NE(lumIdPos, std::string::npos);
+
+  // The alpha def carries mask-type:alpha; the luminance def does not (luminance is the SVG
+  // default for <mask> and no style attribute is emitted).
+  auto alphaTagEnd = svg.find('>', alphaIdPos);
+  ASSERT_NE(alphaTagEnd, std::string::npos);
+  auto alphaTag = svg.substr(alphaIdPos, alphaTagEnd - alphaIdPos);
+  EXPECT_NE(alphaTag.find("mask-type:alpha"), std::string::npos);
+
+  auto lumTagEnd = svg.find('>', lumIdPos);
+  ASSERT_NE(lumTagEnd, std::string::npos);
+  auto lumTag = svg.substr(lumIdPos, lumTagEnd - lumIdPos);
+  EXPECT_EQ(lumTag.find("mask-type:alpha"), std::string::npos);
+
+  // Each owner references its own def id.
+  EXPECT_NE(svg.find("mask=\"url(#sharedMask_a)\""), std::string::npos);
+  EXPECT_NE(svg.find("mask=\"url(#sharedMask_l)\""), std::string::npos);
+}
+
+/**
+ * A mask Layer referenced by multiple owners under the same MaskType must produce exactly one
+ * <mask> def. The cache reuses the existing def id rather than re-emitting a duplicate-id
+ * element into <defs>.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerSameMaskTypeReusesSingleDef) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "alphaMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  for (int i = 0; i < 3; ++i) {
+    auto* owner = doc->makeNode<pagx::Layer>();
+    owner->mask = maskLayer;
+    owner->maskType = pagx::MaskType::Alpha;
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {static_cast<float>(50 + i * 60), 50};
+    rect->size = {80, 80};
+    owner->contents.push_back(rect);
+    owner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+    doc->layers.push_back(owner);
+  }
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+
+  size_t maskOpenCount = 0;
+  size_t pos = 0;
+  while ((pos = svg.find("<mask ", pos)) != std::string::npos) {
+    ++maskOpenCount;
+    pos += 6;
+  }
+  EXPECT_EQ(maskOpenCount, 1u);
+
+  // All three owners reference the same def id.
+  size_t refCount = 0;
+  pos = 0;
+  while ((pos = svg.find("mask=\"url(#alphaMask_a)\"", pos)) != std::string::npos) {
+    ++refCount;
+    pos += 1;
+  }
+  EXPECT_EQ(refCount, 3u);
+}
+
+/**
+ * A mask Layer used as both Alpha mask and Contour clipPath must produce one <mask> def AND
+ * one <clipPath> def. Sharing the cache across roles would have suppressed the second def or
+ * routed the contour owner to the wrong element type.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerMaskAndContourEmitDistinctDefs) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "dualMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* alphaOwner = doc->makeNode<pagx::Layer>();
+  alphaOwner->mask = maskLayer;
+  alphaOwner->maskType = pagx::MaskType::Alpha;
+  auto* alphaRect = doc->makeNode<pagx::Rectangle>();
+  alphaRect->position = {50, 50};
+  alphaRect->size = {100, 100};
+  alphaOwner->contents.push_back(alphaRect);
+  alphaOwner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  doc->layers.push_back(alphaOwner);
+
+  auto* contourOwner = doc->makeNode<pagx::Layer>();
+  contourOwner->mask = maskLayer;
+  contourOwner->maskType = pagx::MaskType::Contour;
+  auto* contourRect = doc->makeNode<pagx::Rectangle>();
+  contourRect->position = {160, 50};
+  contourRect->size = {100, 100};
+  contourOwner->contents.push_back(contourRect);
+  contourOwner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.9f, 0.6f, 0.2f));
+  doc->layers.push_back(contourOwner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+
+  EXPECT_NE(svg.find("id=\"dualMask_a\""), std::string::npos);
+  EXPECT_NE(svg.find("id=\"dualMask_c\""), std::string::npos);
+  EXPECT_NE(svg.find("mask=\"url(#dualMask_a)\""), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#dualMask_c)\""), std::string::npos);
+}
+
+/**
+ * When a mask Layer and its owner live under different parent layers, the SVG output places
+ * the mask using mask->matrix only — diverging from the PAGX renderer's
+ * mask->getRelativeMatrix3D(owner) chain walk. The exporter must surface a warning so the
+ * divergence is visible to CI / log readers, while still emitting the <mask> def so the
+ * owner is not silently dropped from the SVG.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+
+  auto* topA = doc->makeNode<pagx::Layer>();
+  topA->id = "topA";
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "crossParentMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {50, 50};
+  maskRect->size = {80, 80};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+  topA->children.push_back(maskLayer);
+  doc->layers.push_back(topA);
+
+  auto* topB = doc->makeNode<pagx::Layer>();
+  topB->id = "topB";
+  auto* owner = doc->makeNode<pagx::Layer>();
+  owner->id = "crossParentOwner";
+  owner->mask = maskLayer;
+  owner->maskType = pagx::MaskType::Alpha;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {120, 120};
+  rect->size = {100, 100};
+  owner->contents.push_back(rect);
+  owner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  topB->children.push_back(owner);
+  doc->layers.push_back(topB);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+
+  // The cross-parent reference must be flagged for CI / log visibility.
+  bool sawCrossParentWarning = false;
+  for (const auto& w : warnings) {
+    if (w.find("crossParentMask") != std::string::npos &&
+        w.find("crossParentOwner") != std::string::npos &&
+        w.find("across parent boundaries") != std::string::npos) {
+      sawCrossParentWarning = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(sawCrossParentWarning);
+
+  // Emission is preserved (warning-only, not skip): the <mask> def appears in <defs> and the
+  // owner still carries the mask attribute. A regression that silently drops the def would
+  // leave the SVG without `<mask id=...>` and the owner without its `mask=` attribute.
+  EXPECT_NE(svg.find("id=\"crossParentMask_a\""), std::string::npos);
+  EXPECT_NE(svg.find("mask=\"url(#crossParentMask_a)\""), std::string::npos);
+}
+
 }  // namespace pag
