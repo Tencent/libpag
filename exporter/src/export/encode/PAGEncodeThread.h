@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <pag/types.h>
 #include <tgfx/core/Buffer.h>
 #include <QThread>
@@ -61,7 +62,7 @@ class PAGEncodeThread : public QThread {
   Q_SLOT void closeInternal();
 
   bool valid = true;
-  bool inputFinished = false;
+  std::atomic<bool> inputFinished = false;
   int64_t needEncodeNum = 0;
   int64_t hasEncodedNum = 0;
   int32_t alphaStartX = 0;
