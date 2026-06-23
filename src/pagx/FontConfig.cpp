@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -18,42 +18,8 @@
 
 #include "pagx/FontConfig.h"
 #include "FontConfigData.h"
-#include "tgfx/core/Typeface.h"
 
 namespace pagx {
-
-TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface)
-    : typeface(std::move(typeface)) {
-  if (this->typeface != nullptr) {
-    fontFamily = this->typeface->fontFamily();
-    fontStyle = this->typeface->fontStyle();
-  }
-}
-
-TypefaceHolder::TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily,
-                               std::string fontStyle)
-    : path(std::move(path)), fontFamily(std::move(fontFamily)), fontStyle(std::move(fontStyle)),
-      ttcIndex(ttcIndex) {
-}
-
-std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
-  if (typeface == nullptr) {
-    if (!path.empty()) {
-      typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
-    } else if (!fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
-    }
-  }
-  return typeface;
-}
-
-const std::string& TypefaceHolder::getFontFamily() const {
-  return fontFamily;
-}
-
-const std::string& TypefaceHolder::getFontStyle() const {
-  return fontStyle;
-}
 
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
 }
@@ -73,7 +39,7 @@ FontConfig& FontConfig::operator=(const FontConfig& other) {
 FontConfig::FontConfig(FontConfig&& other) noexcept = default;
 FontConfig& FontConfig::operator=(FontConfig&& other) noexcept = default;
 
-void FontConfig::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
+void FontConfig::registerTypeface(std::shared_ptr<PAGXTypeface> typeface) {
   if (typeface == nullptr) {
     return;
   }
@@ -83,15 +49,11 @@ void FontConfig::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   data->registeredTypefaces[key] = std::move(typeface);
 }
 
-void FontConfig::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
-  for (auto& tf : typefaces) {
-    data->fallbackTypefaces.emplace_back(std::move(tf));
+void FontConfig::addFallbackTypeface(std::shared_ptr<PAGXTypeface> typeface) {
+  if (typeface == nullptr) {
+    return;
   }
-}
-
-void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
-                                 const std::string& fontFamily, const std::string& fontStyle) {
-  data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
+  data->fallbackTypefaces.push_back(std::move(typeface));
 }
 
 }  // namespace pagx

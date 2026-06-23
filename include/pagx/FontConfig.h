@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -20,13 +20,10 @@
 
 #include <memory>
 #include <string>
-#include <vector>
-
-namespace tgfx {
-class Typeface;
-}
 
 namespace pagx {
+
+class PAGXTypeface;
 
 /**
  * FontConfig manages registered and fallback typefaces for font lookup.
@@ -44,27 +41,20 @@ class FontConfig {
   FontConfig& operator=(FontConfig&& other) noexcept;
 
   /**
-   * Registers a typeface for exact family+style lookup.
-   * Typically used for fonts explicitly provided by the application.
+   * Registers a PAGXTypeface for exact (fontFamily, fontStyle) lookup. The lookup key is read
+   * from the PAGXTypeface's fontFamily()/fontStyle(). Use this for fonts explicitly provided by
+   * the application.
+   * @param typeface The PAGXTypeface to register. Construct via PAGXTypeface::MakeFromPath,
+   *                 MakeFromName, or MakeFromTypeface.
    */
-  void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface);
+  void registerTypeface(std::shared_ptr<PAGXTypeface> typeface);
 
   /**
-   * Adds fallback typefaces used when a character is not found in the primary font
+   * Adds a fallback PAGXTypeface used when a character is not found in the primary font
    * (either registered or system). Typefaces are tried in order.
+   * @param typeface The fallback PAGXTypeface.
    */
-  void addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
-
-  /**
-   * Adds a deferred fallback font that will be loaded on demand when needed.
-   * Supports both file-based loading and name-based system font lookup.
-   * @param path The font file path (empty if using fontFamily for name-based loading).
-   * @param ttcIndex The face index within a TTC font collection.
-   * @param fontFamily The font family name for matching and name-based loading.
-   * @param fontStyle The font style name (e.g. "Regular", "Bold").
-   */
-  void addFallbackFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
-                       const std::string& fontStyle);
+  void addFallbackTypeface(std::shared_ptr<PAGXTypeface> typeface);
 
  private:
   struct Data;

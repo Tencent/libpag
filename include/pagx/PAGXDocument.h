@@ -24,6 +24,7 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
@@ -183,9 +184,9 @@ class PAGXDocument : public Node {
    * external file data has been loaded via loadFileData() to get complete results. The caller
    * can use this list to register typeface with FontConfig before applyLayout() or embed().
    * Empty fontFamily entries are skipped.
-   * @return deduplicated list of (fontFamily, fontStyle) pairs. Results are sorted.
+   * @return deduplicated list of PAGFont. Results are sorted.
    */
-  std::vector<std::pair<std::string, std::string>> getRequiredFonts() const;
+  std::vector<PAGFont> getRequiredFonts() const;
 
   /**
    * Reflects post-build edits to the given nodes in every scene created from this document. Layer

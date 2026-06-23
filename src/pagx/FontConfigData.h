@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -18,11 +18,12 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGXTypeface.h"
 
 namespace pagx {
 
@@ -42,9 +43,8 @@ struct FontConfig::Data {
     }
   };
 
-  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces =
-      {};
-  std::vector<TypefaceHolder> fallbackTypefaces = {};
+  std::unordered_map<FontKey, std::shared_ptr<PAGXTypeface>, FontKeyHash> registeredTypefaces = {};
+  std::vector<std::shared_ptr<PAGXTypeface>> fallbackTypefaces = {};
 };
 
 }  // namespace pagx

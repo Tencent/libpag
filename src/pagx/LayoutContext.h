@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -21,7 +21,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
 
 namespace tgfx {
@@ -29,6 +28,8 @@ class Typeface;
 }
 
 namespace pagx {
+
+class PAGXTypeface;
 
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
@@ -56,7 +57,7 @@ class LayoutContext {
   void ensureSystemFallbacks();
 
   FontConfig* fontConfig = nullptr;
-  std::vector<TypefaceHolder> systemFallbacks = {};
+  std::vector<std::shared_ptr<PAGXTypeface>> systemFallbacks = {};
   bool systemFallbacksLoaded = false;
 };
 

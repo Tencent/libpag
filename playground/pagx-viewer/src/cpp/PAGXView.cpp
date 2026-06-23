@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXTypeface.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
@@ -90,22 +91,20 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
     if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
+      fontConfig.addFallbackTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
     }
   }
   auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
     auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
     if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
+      fontConfig.addFallbackTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
     }
   }
-  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {

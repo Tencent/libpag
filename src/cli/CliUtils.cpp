@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXTypeface.h"
 
 namespace pagx::cli {
 
@@ -44,20 +45,17 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
       return false;
     }
-    fontConfig->registerTypeface(typeface);
+    fontConfig->registerTypeface(PAGXTypeface::MakeFromTypeface(typeface));
   }
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : fallbacks) {
     auto typeface = ResolveFallbackTypeface(fallbackStr);
     if (typeface == nullptr) {
       std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
       return false;
     }
-    fontConfig->registerTypeface(typeface);
-    fallbackTypefaces.push_back(typeface);
-  }
-  if (!fallbackTypefaces.empty()) {
-    fontConfig->addFallbackTypefaces(std::move(fallbackTypefaces));
+    auto pagxTypeface = PAGXTypeface::MakeFromTypeface(typeface);
+    fontConfig->registerTypeface(pagxTypeface);
+    fontConfig->addFallbackTypeface(pagxTypeface);
   }
   return true;
 }

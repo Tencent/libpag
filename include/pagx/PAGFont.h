@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -18,30 +18,34 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
-
-namespace tgfx {
-class Typeface;
-}
 
 namespace pagx {
 
-class TypefaceHolder {
+/**
+ * Describes a font requirement by (fontFamily, fontStyle). Returned by
+ * PAGXDocument::getRequiredFonts() to enumerate which fonts a document references. The caller
+ * resolves each entry to a font file and registers it with FontConfig before applyLayout() or
+ * embed().
+ */
+class PAGFont {
  public:
-  explicit TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface);
-  TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily, std::string fontStyle);
+  PAGFont() = default;
+  PAGFont(std::string family, std::string style)
+      : fontFamily(std::move(family)), fontStyle(std::move(style)) {}
 
-  std::shared_ptr<tgfx::Typeface> getTypeface();
-  const std::string& getFontFamily() const;
-  const std::string& getFontStyle() const;
+  std::string fontFamily;
+  std::string fontStyle;
 
- private:
-  std::string path = {};
-  std::string fontFamily = {};
-  std::string fontStyle = {};
-  int ttcIndex = 0;
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+  bool operator==(const PAGFont& other) const {
+    return fontFamily == other.fontFamily && fontStyle == other.fontStyle;
+  }
+  bool operator<(const PAGFont& other) const {
+    if (fontFamily != other.fontFamily) {
+      return fontFamily < other.fontFamily;
+    }
+    return fontStyle < other.fontStyle;
+  }
 };
 
 }  // namespace pagx

@@ -40,6 +40,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/PAGXTypeface.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
@@ -157,27 +158,27 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<Typeface>> result = {};
+static std::vector<std::shared_ptr<pagx::PAGXTypeface>> CreateFallbackTypefaces() {
+  std::vector<std::shared_ptr<pagx::PAGXTypeface>> result = {};
   auto regularTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
   if (regularTypeface) {
-    result.push_back(regularTypeface);
+    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(regularTypeface));
   }
   auto emojiTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
   if (emojiTypeface) {
-    result.push_back(emojiTypeface);
+    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(emojiTypeface));
   }
   auto hebrewTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
   if (hebrewTypeface) {
-    result.push_back(hebrewTypeface);
+    result.push_back(pagx::PAGXTypeface::MakeFromTypeface(hebrewTypeface));
   }
   return result;
 }
 
-static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
+static std::vector<std::shared_ptr<pagx::PAGXTypeface>> GetFallbackTypefaces() {
   static auto typefaces = CreateFallbackTypefaces();
   return typefaces;
 }
@@ -252,7 +253,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   // Create FontConfig for text layout
   pagx::FontConfig svgFontConfig;
-  svgFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (auto& tf : GetFallbackTypefaces()) {
+    svgFontConfig.addFallbackTypeface(tf);
+  }
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -582,7 +585,9 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   doc->layers.push_back(layer);
 
   pagx::FontConfig embedFontConfig;
-  embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (auto& tf : GetFallbackTypefaces()) {
+    embedFontConfig.addFallbackTypeface(tf);
+  }
   doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -766,7 +771,9 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
                              std::filesystem::copy_options::overwrite_existing);
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (auto& tf : GetFallbackTypefaces()) {
+    fontConfig.addFallbackTypeface(tf);
+  }
 
   for (const auto& [name, xmlContent] : patterns) {
     auto key = prefix + name;
@@ -829,7 +836,9 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   std::sort(files.begin(), files.end());
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (auto& tf : GetFallbackTypefaces()) {
+    fontConfig.addFallbackTypeface(tf);
+  }
 
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
@@ -2343,7 +2352,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -2389,7 +2398,7 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -4793,7 +4802,7 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
 
   doc->applyLayout(&fontConfig);
 
@@ -4893,7 +4902,7 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   // Target width = 400 - 50 - 50 = 300.
@@ -4968,7 +4977,7 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5013,7 +5022,7 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5051,7 +5060,7 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -5102,7 +5111,7 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5156,7 +5165,7 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   layer->contents = {standalone, fill1, textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   // Standalone Text: textBounds should have positive width and height.
@@ -5287,7 +5296,7 @@ PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   EXPECT_TRUE(doc->embed());
@@ -5318,7 +5327,7 @@ PAGX_TEST(PAGXTest, DocumentClearEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5353,7 +5362,7 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5935,7 +5944,7 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   object->channels.push_back(yProp);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
 
   auto file = pagx::PAGScene::Make(doc);
@@ -7855,12 +7864,14 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   constexpr int canvasH = 470;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (auto& tf : GetFallbackTypefaces()) {
+    fontConfig.addFallbackTypeface(tf);
+  }
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
@@ -10831,8 +10842,8 @@ PAGX_TEST(PAGXTest, GetRequiredFonts) {
   text1->fontStyle = "Bold";
   auto fonts = doc->getRequiredFonts();
   ASSERT_EQ(fonts.size(), 1u);
-  EXPECT_EQ(fonts[0].first, "Arial");
-  EXPECT_EQ(fonts[0].second, "Bold");
+  EXPECT_EQ(fonts[0].fontFamily, "Arial");
+  EXPECT_EQ(fonts[0].fontStyle, "Bold");
 
   // Same font, different node — deduplicated.
   auto* text2 = doc->makeNode<pagx::Text>("text2");
@@ -10882,8 +10893,8 @@ PAGX_TEST(PAGXTest, GetRequiredFontsNestedInGroupAndTextBox) {
 
   auto fonts = doc->getRequiredFonts();
   ASSERT_EQ(fonts.size(), 2u);
-  EXPECT_EQ(fonts[0].first, "Courier");
-  EXPECT_EQ(fonts[1].first, "Helvetica");
+  EXPECT_EQ(fonts[0].fontFamily, "Courier");
+  EXPECT_EQ(fonts[1].fontFamily, "Helvetica");
 }
 
 PAGX_TEST(PAGXTest, GetRequiredFontsFromComposition) {
@@ -10903,7 +10914,7 @@ PAGX_TEST(PAGXTest, GetRequiredFontsFromComposition) {
 
   auto fonts = doc->getRequiredFonts();
   ASSERT_EQ(fonts.size(), 1u);
-  EXPECT_EQ(fonts[0].first, "System");
+  EXPECT_EQ(fonts[0].fontFamily, "System");
 }
 
 PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
@@ -10954,7 +10965,7 @@ PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
 
   // Register typeface and run full pipeline.
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerTypeface(pagx::PAGXTypeface::MakeFromTypeface(typeface));
   doc->applyLayout(&fontConfig);
   EXPECT_TRUE(doc->embed());
 

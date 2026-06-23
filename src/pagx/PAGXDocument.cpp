@@ -334,32 +334,31 @@ void PAGXDocument::clearEmbed() {
   }
 }
 
-static void AppendRequiredFonts(const PAGXDocument* document,
-                                std::vector<std::pair<std::string, std::string>>* outPairs) {
-  if (document == nullptr || outPairs == nullptr) {
+static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFont>* outFonts) {
+  if (document == nullptr || outFonts == nullptr) {
     return;
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Text) {
       auto* text = static_cast<Text*>(node.get());
       if (!text->fontFamily.empty()) {
-        outPairs->emplace_back(text->fontFamily, text->fontStyle);
+        outFonts->emplace_back(text->fontFamily, text->fontStyle);
       }
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        AppendRequiredFonts(layer->externalDoc.get(), outPairs);
+        AppendRequiredFonts(layer->externalDoc.get(), outFonts);
       }
     }
   }
 }
 
-std::vector<std::pair<std::string, std::string>> PAGXDocument::getRequiredFonts() const {
-  std::vector<std::pair<std::string, std::string>> pairs = {};
-  AppendRequiredFonts(this, &pairs);
-  std::sort(pairs.begin(), pairs.end());
-  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-  return pairs;
+std::vector<PAGFont> PAGXDocument::getRequiredFonts() const {
+  std::vector<PAGFont> fonts = {};
+  AppendRequiredFonts(this, &fonts);
+  std::sort(fonts.begin(), fonts.end());
+  fonts.erase(std::unique(fonts.begin(), fonts.end()), fonts.end());
+  return fonts;
 }
 
 namespace {

@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -19,6 +19,7 @@
 #include "LayoutContext.h"
 #include "FontConfigData.h"
 #include "SystemFonts.h"
+#include "pagx/PAGXTypeface.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -55,7 +56,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     key.style = fontStyle.empty() ? "Regular" : fontStyle;
     auto it = fontConfig->data->registeredTypefaces.find(key);
     if (it != fontConfig->data->registeredTypefaces.end()) {
-      return it->second;
+      return it->second->getTypeface();
     }
 
     // Stage 2: Family-name match in registered typefaces (prefer Regular style)
@@ -70,7 +71,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
       bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
                        (priority == bestPriority && pair.first.style < bestStyle);
       if (preferred) {
-        bestTypeface = pair.second;
+        bestTypeface = pair.second->getTypeface();
         bestPriority = priority;
         bestStyle = pair.first.style;
       }
@@ -83,8 +84,8 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   // Stage 3: Family-name match in user fallback typefaces
   if (!fontFamily.empty()) {
     for (auto& holder : fontConfig->data->fallbackTypefaces) {
-      if (holder.getFontFamily() == fontFamily) {
-        return holder.getTypeface();
+      if (holder->fontFamily() == fontFamily) {
+        return holder->getTypeface();
       }
     }
   }
@@ -92,7 +93,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 #ifdef PAG_BUILD_FOR_WEB
   // Stage 4: On web, prefer the first registered fallback typeface over browser fonts.
   if (!fontConfig->data->fallbackTypefaces.empty()) {
-    return fontConfig->data->fallbackTypefaces.front().getTypeface();
+    return fontConfig->data->fallbackTypefaces.front()->getTypeface();
   }
 #endif
 
@@ -108,8 +109,8 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   if (!fontFamily.empty()) {
     ensureSystemFallbacks();
     for (auto& holder : systemFallbacks) {
-      if (holder.getFontFamily() == fontFamily) {
-        return holder.getTypeface();
+      if (holder->fontFamily() == fontFamily) {
+        return holder->getTypeface();
       }
     }
   }
@@ -122,7 +123,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
   if (fontConfig != nullptr) {
     // Search user-registered fallback fonts first.
     for (auto& holder : fontConfig->data->fallbackTypefaces) {
-      auto typeface = holder.getTypeface();
+      auto typeface = holder->getTypeface();
       if (typeface == nullptr || typeface.get() == primaryTypeface) {
         continue;
       }
@@ -134,7 +135,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
   // Search system fallback fonts.
   ensureSystemFallbacks();
   for (auto& holder : systemFallbacks) {
-    auto typeface = holder.getTypeface();
+    auto typeface = holder->getTypeface();
     if (typeface == nullptr || typeface.get() == primaryTypeface) {
       continue;
     }
@@ -152,7 +153,8 @@ void LayoutContext::ensureSystemFallbacks() {
   systemFallbacksLoaded = true;
   auto locations = SystemFonts::FallbackTypefaces();
   for (auto& loc : locations) {
-    systemFallbacks.emplace_back(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle);
+    systemFallbacks.push_back(
+        PAGXTypeface::MakeFromPath(loc.path, loc.ttcIndex, loc.fontFamily, loc.fontStyle));
   }
 }
 
