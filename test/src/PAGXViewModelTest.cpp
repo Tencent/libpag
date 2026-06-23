@@ -1002,12 +1002,17 @@ PAGX_TEST(PAGXViewModelTest, BooleanValueTriggersDataBindSync) {
   ASSERT_NE(vm, nullptr);
   auto v = vm->propertyBoolean("vis");
   ASSERT_NE(v, nullptr);
+  auto layers = sc->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
   EXPECT_EQ(v->value(), true);
+  EXPECT_EQ(tgfxLayer->visible(), true);
   v->value(false);
   auto sf = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
-  EXPECT_EQ(v->value(), false);
+  EXPECT_EQ(tgfxLayer->visible(), false);
 }
 
 PAGX_TEST(PAGXViewModelTest, ColorValueTriggersDataBindSync) {
