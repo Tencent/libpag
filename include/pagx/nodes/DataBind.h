@@ -25,9 +25,10 @@
 namespace pagx {
 
 /**
- * DataBindFlags controls the direction of a data binding.
+ * DataBindDirection controls the direction of a data binding. Values form a discrete enum
+ * (not bit-flags); each binding uses exactly one direction.
  */
-enum class DataBindFlags : uint8_t {
+enum class DataBindDirection : uint8_t {
   /**
    * Data flows from ViewModel to render node (read-only binding).
    */
@@ -43,7 +44,7 @@ enum class DataBindFlags : uint8_t {
   /**
    * Data is applied once on initialization and never updated afterward.
    */
-  Once = 4
+  Once = 3
 };
 
 /**
@@ -71,9 +72,9 @@ class DataBind : public Node {
   std::string channel = {};
 
   /**
-   * The binding direction flags. Default is ToTarget (ViewModel → render node).
+   * The binding direction. Default is ToTarget (ViewModel → render node).
    */
-  DataBindFlags flags = DataBindFlags::ToTarget;
+  DataBindDirection flags = DataBindDirection::ToTarget;
 
   NodeType nodeType() const override {
     return NodeType::DataBind;

@@ -83,8 +83,8 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     }
     sourceValue->addDependent(this);
 
-    bool toSource = db->flags == DataBindFlags::ToSource || db->flags == DataBindFlags::TwoWay;
-    bool toTarget = db->flags != DataBindFlags::ToSource;
+    bool toSource = db->flags == DataBindDirection::ToSource || db->flags == DataBindDirection::TwoWay;
+    bool toTarget = db->flags != DataBindDirection::ToSource;
 
     BindingEntry entry;
     entry.dataBind = db;
@@ -184,7 +184,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
       continue;
     }
     // Once: skip after first application.
-    if (entry->dataBind->flags == DataBindFlags::Once && entry->onceApplied) {
+    if (entry->dataBind->flags == DataBindDirection::Once && entry->onceApplied) {
       continue;
     }
     auto keyValue = valueToKeyValue(entry->source);
@@ -192,7 +192,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
       keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
     }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
-    if (entry->dataBind->flags == DataBindFlags::Once) {
+    if (entry->dataBind->flags == DataBindDirection::Once) {
       entry->onceApplied = true;
     }
   }
