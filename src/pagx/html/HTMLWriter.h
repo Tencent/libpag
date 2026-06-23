@@ -461,7 +461,7 @@ class HTMLWriter {
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
   // layer's <div> is emitted.
   void emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop);
-  std::string emitDropShadowFilterDef(const DropShadowStyle* ds);
+  std::string emitDropShadowFilterDef(const std::vector<const DropShadowStyle*>& dropShadows);
   std::string emitInnerShadowFilterDef(const InnerShadowStyle* is);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
@@ -492,17 +492,14 @@ class HTMLWriter {
                          const TextBox* tb, float alpha);
   void writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const TextPath* textPath,
                      const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
-  // Renders a Text node whose glyphRuns hold embedded vector/bitmap shapes (not real text).
-  // Only call when text->text is empty or text->fontFamily is empty. Real text must go through
-  // the CSS span path in writeText to preserve gradient fills and layout semantics.
+  // Renders a Text node from its embedded GlyphRuns using generated WOFF2 glyphs. Prefer the
+  // normal CSS span path when text semantics/layout must stay browser-native.
   void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                 const Stroke* stroke, float alpha);
-  // WOFF2 path: renders embedded vector glyphs as <span> elements referencing a generated
-  // @font-face WOFF2 font, using PUA Unicode characters. Falls through to the SVG <path>
-  // path in writeEmbeddedShapeGlyphs when no WOFF2 font is available for this Font resource.
+  // WOFF2 path: renders embedded glyph runs as <span> elements referencing generated @font-face
+  // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
-                                      const Stroke* stroke, float alpha,
-                                      const Woff2FontResult& fontResult);
+                                      const Stroke* stroke, float alpha);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
@@ -544,7 +541,7 @@ class HTMLWriter {
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,
-                    float bboxW = 0, float bboxH = 0);
+                    float bboxW = 0, float bboxH = 0, bool emitFillRule = true);
   void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
 
   // Returns the ID for a path definition in the global <defs>. If the d-string was already

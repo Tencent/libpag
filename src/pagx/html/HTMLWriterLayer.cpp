@@ -63,14 +63,40 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
   positionSet = true;
 }
 
+static bool ContainsOnlyLineBreaks(const std::string& text) {
+  if (text.empty()) {
+    return false;
+  }
+  for (auto c : text) {
+    if (c != '\n') {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool CanWriteEmbeddedGlyphText(const Text* text, const HTMLWriterContext* context) {
+  if (text == nullptr || text->glyphRuns.empty()) {
+    return false;
+  }
+  for (auto* run : text->glyphRuns) {
+    if (run && run->font && context->woff2Fonts.find(run->font) != context->woff2Fonts.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // CollectRichTextSpans pre-scans an element list to pull out every Group that should be hoisted
 // into the enclosing TextBox as a single <span> child instead of being rendered as a stand-alone
 // DOM wrapper. A Group qualifies when its children are exactly one Text plus at least one
 // Fill/Stroke (and nothing else); see HTMLWriter.h for the RichTextSpan struct itself.
 
 // Outputs of the first pre-scan pass: hasUpcomingRepeater, the first TextBox seen, the rich
-// text spans pulled from sibling Groups, and the derived useRichText flag (true when there is
-// a TextBox with no inline elements but at least two qualifying sibling Groups).
+// text spans pulled from sibling Groups, and the derived useRichText flag. Multiple qualifying
+// Groups indicate exporter-created rich text spans. A single Group is only rich text when the
+// TextBox carries an authored layout boundary; auto-size preshaped labels rely on GlyphRun
+// positions instead.
 struct RichTextScanResult {
   bool hasUpcomingRepeater = false;
   const TextBox* preScannedTextBox = nullptr;
@@ -118,6 +144,17 @@ struct GroupSpanCollector {
   }
 };
 
+static bool TextBoxHasAuthoredLayoutBoundary(const TextBox* textBox) {
+  if (!textBox) {
+    return false;
+  }
+  return !std::isnan(textBox->width) || !std::isnan(textBox->height) ||
+         textBox->overflow == Overflow::Hidden ||
+         textBox->customData.count("paragraph-spacing") > 0 ||
+         textBox->customData.count("line-types") > 0 ||
+         textBox->customData.count("text-truncation") > 0;
+}
+
 static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elements) {
   RichTextScanResult r;
   int richTextGroupCount = 0;
@@ -151,7 +188,10 @@ static RichTextScanResult CollectRichTextSpans(const std::vector<Element*>& elem
       }
     }
   }
-  r.useRichText = r.preScannedTextBox != nullptr && richTextGroupCount >= 2;
+  r.useRichText =
+      r.preScannedTextBox != nullptr &&
+      (richTextGroupCount >= 2 ||
+       (richTextGroupCount == 1 && TextBoxHasAuthoredLayoutBoundary(r.preScannedTextBox)));
   return r;
 }
 
@@ -1077,6 +1117,19 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       size_t leadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
       EmitBetweenSpanBreaks(out, prevTrailingBreaks, leadingBreaks, prevFontSize, spanFontSize,
                             isFirstSpan);
+      if (ContainsOnlyLineBreaks(span.text->text)) {
+        prevTrailingBreaks = 0;
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
+      if (CanWriteEmbeddedGlyphText(span.text, _ctx)) {
+        writeEmbeddedShapeGlyphs(out, span.text, span.fill, span.stroke, 1.0f);
+        prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
       // Detect single-span horizontal justify-with-\n upfront — when true, we emit
       // a <div> per \n-segment instead of a single <span>...<br>... so each segment
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
@@ -1237,6 +1290,17 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     size_t rtLeadingBreaks = HTMLBuilder::CountLeadingBreaks(span.text->text);
     EmitBetweenSpanBreaks(out, rtPrevTrailingBreaks, rtLeadingBreaks, rtPrevFontSize,
                           rtSpanFontSize, false);
+    if (ContainsOnlyLineBreaks(span.text->text)) {
+      rtPrevTrailingBreaks = 0;
+      rtPrevFontSize = rtSpanFontSize;
+      continue;
+    }
+    if (CanWriteEmbeddedGlyphText(span.text, _ctx)) {
+      writeEmbeddedShapeGlyphs(out, span.text, span.fill, span.stroke, 1.0f);
+      rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+      rtPrevFontSize = rtSpanFontSize;
+      continue;
+    }
     out.openTag("span");
     out.addAttr("style", spanStyle);
     std::string rtSpanText = span.text->text;
@@ -1534,11 +1598,17 @@ void HTMLWriter::emitBlendAndIsolation(std::string& style, const Layer* layer) {
 // HTMLWriter – layer style filter helpers
 //==============================================================================
 
-std::string HTMLWriter::emitDropShadowFilterDef(const DropShadowStyle* ds) {
-  std::string signature = "dss:" + CssFloatToString(ds->offsetX) + "," +
-                          CssFloatToString(ds->offsetY) + "," + CssFloatToString(ds->blurX) + "," +
-                          CssFloatToString(ds->blurY) + "," + ColorToRGBA(ds->color) + "," +
-                          (ds->showBehindLayer ? "1" : "0");
+std::string HTMLWriter::emitDropShadowFilterDef(
+    const std::vector<const DropShadowStyle*>& dropShadows) {
+  if (dropShadows.empty()) {
+    return {};
+  }
+  std::string signature = "dss:" + std::to_string(dropShadows.size());
+  for (auto* ds : dropShadows) {
+    signature += "|" + CssFloatToString(ds->offsetX) + "," + CssFloatToString(ds->offsetY) + "," +
+                 CssFloatToString(ds->blurX) + "," + CssFloatToString(ds->blurY) + "," +
+                 ColorToRGBA(ds->color) + "," + (ds->showBehindLayer ? "1" : "0");
+  }
   std::string fid = lookupFilterId(signature);
   if (fid.empty()) {
     fid = _ctx->nextId("filter");
@@ -1550,68 +1620,74 @@ std::string HTMLWriter::emitDropShadowFilterDef(const DropShadowStyle* ds) {
     _defs->addAttr("height", "200%");
     _defs->addAttr("color-interpolation-filters", "sRGB");
     _defs->closeTagStart();
-    // Saturate SourceAlpha into a binary silhouette so both the shadow shape and the
-    // erase mask below operate on the layer contour, as required by the spec
-    // (§5.3.1: "Computes shadow shape based on opaque layer content"; showBehindLayer=false
-    // "use layer contour as erase mask"). Without this, semi-transparent fills would
-    // produce a weaker shadow and leave partially-visible shadow inside the layer.
+    // Saturate SourceAlpha once and feed every DropShadowStyle from that same contour. CSS filter
+    // chains would otherwise feed the previous shadow output into the next shadow's SourceAlpha,
+    // while tgfx draws every layer style from the original layer-style source.
     _defs->openTag("feColorMatrix");
     _defs->addAttr("in", "SourceAlpha");
     _defs->addAttr("type", "matrix");
     _defs->addAttr("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0");
     _defs->addAttr("result", "opaqueAlpha");
     _defs->closeTagSelfClosing();
-    _defs->openTag("feGaussianBlur");
-    _defs->addAttr("in", "opaqueAlpha");
-    _defs->addAttr("stdDeviation", CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
-    _defs->addAttr("result", "blur");
-    _defs->closeTagSelfClosing();
-    _defs->openTag("feOffset");
-    _defs->addAttr("in", "blur");
-    if (!FloatNearlyZero(ds->offsetX)) {
-      _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+
+    std::vector<std::string> shadowResults;
+    shadowResults.reserve(dropShadows.size());
+    for (size_t i = 0; i < dropShadows.size(); i++) {
+      auto* ds = dropShadows[i];
+      std::string suffix = std::to_string(i);
+      std::string blurResult = "blur" + suffix;
+      std::string offsetResult = "off" + suffix;
+      std::string shadowResult = "shadow" + suffix;
+      _defs->openTag("feGaussianBlur");
+      _defs->addAttr("in", "opaqueAlpha");
+      _defs->addAttr("stdDeviation",
+                     CssFloatToString(ds->blurX) + " " + CssFloatToString(ds->blurY));
+      _defs->addAttr("result", blurResult);
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feOffset");
+      _defs->addAttr("in", blurResult);
+      if (!FloatNearlyZero(ds->offsetX)) {
+        _defs->addAttr("dx", CssFloatToString(ds->offsetX));
+      }
+      if (!FloatNearlyZero(ds->offsetY)) {
+        _defs->addAttr("dy", CssFloatToString(ds->offsetY));
+      }
+      _defs->addAttr("result", offsetResult);
+      _defs->closeTagSelfClosing();
+      _defs->openTag("feColorMatrix");
+      _defs->addAttr("in", offsetResult);
+      _defs->addAttr("type", "matrix");
+      _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
+                                   CssFloatToString(ds->color.green) + " 0 0 0 0 " +
+                                   CssFloatToString(ds->color.blue) + " 0 0 0 " +
+                                   CssFloatToString(ds->color.alpha) + " 0");
+      _defs->addAttr("result", shadowResult);
+      _defs->closeTagSelfClosing();
+      if (!ds->showBehindLayer) {
+        std::string clippedResult = "shadowClipped" + suffix;
+        _defs->openTag("feComposite");
+        _defs->addAttr("in", shadowResult);
+        _defs->addAttr("in2", "opaqueAlpha");
+        _defs->addAttr("operator", "out");
+        _defs->addAttr("result", clippedResult);
+        _defs->closeTagSelfClosing();
+        shadowResults.push_back(clippedResult);
+      } else {
+        shadowResults.push_back(shadowResult);
+      }
     }
-    if (!FloatNearlyZero(ds->offsetY)) {
-      _defs->addAttr("dy", CssFloatToString(ds->offsetY));
+
+    _defs->openTag("feMerge");
+    _defs->closeTagStart();
+    for (const auto& result : shadowResults) {
+      _defs->openTag("feMergeNode");
+      _defs->addAttr("in", result);
+      _defs->closeTagSelfClosing();
     }
-    _defs->addAttr("result", "off");
+    _defs->openTag("feMergeNode");
+    _defs->addAttr("in", "SourceGraphic");
     _defs->closeTagSelfClosing();
-    _defs->openTag("feColorMatrix");
-    _defs->addAttr("in", "off");
-    _defs->addAttr("type", "matrix");
-    _defs->addAttr("values", "0 0 0 0 " + CssFloatToString(ds->color.red) + " 0 0 0 0 " +
-                                 CssFloatToString(ds->color.green) + " 0 0 0 0 " +
-                                 CssFloatToString(ds->color.blue) + " 0 0 0 " +
-                                 CssFloatToString(ds->color.alpha) + " 0");
-    _defs->addAttr("result", "shadow");
-    _defs->closeTagSelfClosing();
-    if (!ds->showBehindLayer) {
-      _defs->openTag("feComposite");
-      _defs->addAttr("in", "shadow");
-      _defs->addAttr("in2", "opaqueAlpha");
-      _defs->addAttr("operator", "out");
-      _defs->addAttr("result", "shadowClipped");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "shadowClipped");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "SourceGraphic");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
-    } else {
-      _defs->openTag("feMerge");
-      _defs->closeTagStart();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "shadow");
-      _defs->closeTagSelfClosing();
-      _defs->openTag("feMergeNode");
-      _defs->addAttr("in", "SourceGraphic");
-      _defs->closeTagSelfClosing();
-      _defs->closeTag();
-    }
+    _defs->closeTag();
     _defs->closeTag();
     registerFilterId(signature, fid);
   }
@@ -1730,6 +1806,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   bool isFlexContainer = (layer->layout != LayoutMode::None);
+  bool needScrollRectWrapper = layer->hasScrollRect;
 
   std::string style;
   style.reserve(300);
@@ -1750,16 +1827,41 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     } else if (parentLayout == LayoutMode::Vertical) {
       mainAxisDeclared = !std::isnan(layer->height) || !std::isnan(layer->percentHeight);
     }
-    if (layer->flex > 0 && !mainAxisDeclared) {
-      style += "flex:" + CssFloatToString(layer->flex);
-    }
-    // When the layer has absolute-positioned contents (Text, shapes), it needs explicit size
-    // so that contents' coordinates are correct. Use pagx explicit size first, then fall back
-    // to layout-resolved size. Skip the main-axis dimension when flex > 0 to let flex work.
-    bool needsSize = !layer->contents.empty() || !layer->styles.empty();
+    // When the layer owns rendered content or child layers, it needs explicit size so that CSS
+    // flexbox measures it from PAGX layout bounds instead of ignoring absolute-positioned DOM.
+    bool needsSize = !layer->contents.empty() || !layer->styles.empty() ||
+                     layer->composition != nullptr || !layer->children.empty() ||
+                     needScrollRectWrapper;
     auto bounds = needsSize ? layer->layoutBounds() : Rect{};
+    float resolvedMainSize = NAN;
+    if (parentLayout == LayoutMode::Horizontal) {
+      resolvedMainSize = bounds.width;
+    } else if (parentLayout == LayoutMode::Vertical) {
+      resolvedMainSize = bounds.height;
+    }
+    bool mainAxisResolved = !std::isnan(resolvedMainSize) && resolvedMainSize > 0;
+    // PAGX can resolve a flex child's main-axis size from its TextBox/content even when the raw
+    // width/height attribute is unset. CSS `flex:N` uses a 0% flex-basis and can collapse that
+    // resolved size inside auto-sized flex parents, so keep such children at their resolved size.
+    bool emitFlexGrow = layer->flex > 0 && !mainAxisDeclared && !mainAxisResolved;
+    if (emitFlexGrow) {
+      style += "flex:" + CssFloatToString(layer->flex);
+    } else {
+      // PAGX has no negative free-space shrink pass. Fixed/measured flex children keep their
+      // main-axis size and may overflow into the parent's scrollRect clip, while CSS flex items
+      // default to flex-shrink:1 and would compress those children back into the visible area.
+      style += "flex-shrink:0";
+    }
     float outputW = !std::isnan(layer->width) ? layer->width : (needsSize ? bounds.width : NAN);
     float outputH = !std::isnan(layer->height) ? layer->height : (needsSize ? bounds.height : NAN);
+    if (needScrollRectWrapper) {
+      if ((std::isnan(outputW) || outputW <= 0) && layer->scrollRect.width > 0) {
+        outputW = layer->scrollRect.width;
+      }
+      if ((std::isnan(outputH) || outputH <= 0) && layer->scrollRect.height > 0) {
+        outputH = layer->scrollRect.height;
+      }
+    }
     if (!std::isnan(outputW) && outputW > 0) {
       if (!style.empty()) {
         style += ';';
@@ -1778,6 +1880,17 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         style += ';';
       }
       style += "position:relative";
+    }
+    // Flex items normally have their position controlled by the parent flexbox, but they may
+    // still carry a non-identity matrix (e.g. a 180° rotation that cancels a parent rotation).
+    // Without emitting the transform here, the visual cancellation is lost and contents appear
+    // mirrored/flipped.
+    std::string flexTransform = LayerTransformCSS(layer);
+    if (!flexTransform.empty()) {
+      if (!style.empty()) {
+        style += ';';
+      }
+      style += "transform:" + flexTransform + ";transform-origin:0 0";
     }
   } else {
     style += "position:absolute";
@@ -1923,7 +2036,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     _ctx->savedChildLayerOffsetY = _ctx->childLayerOffsetY;
     // The legacy branch below handled non-Repeater layers and still runs when `repeater` is
     // null. When a Repeater was present and sized the div above, skip this fallback.
-    if (!repeater && (isFlexContainer || !layer->contents.empty())) {
+    if (!repeater && (isFlexContainer || !layer->contents.empty() ||
+                      layer->composition != nullptr || !layer->children.empty())) {
       auto bounds = layer->layoutBounds();
       if (bounds.width > 0) {
         style += ";width:" + CssFloatToString(bounds.width) + "px";
@@ -1934,9 +2048,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  std::string scrollRectContentStyle;
   // Flex container properties
   if (isFlexContainer) {
-    emitFlexContainerStyle(style, layer, isFlexItem);
+    if (needScrollRectWrapper) {
+      emitFlexContainerStyle(scrollRectContentStyle, layer, isFlexItem);
+      auto bounds = layer->layoutBounds();
+      if (bounds.width > 0 && scrollRectContentStyle.find("width:") == std::string::npos) {
+        scrollRectContentStyle += ";width:" + CssFloatToString(bounds.width) + "px";
+      }
+      if (bounds.height > 0 && scrollRectContentStyle.find("height:") == std::string::npos) {
+        scrollRectContentStyle += ";height:" + CssFloatToString(bounds.height) + "px";
+      }
+    } else {
+      emitFlexContainerStyle(style, layer, isFlexItem);
+    }
   }
 
   if (layer->preserve3D) {
@@ -2023,6 +2149,15 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // that paint their own filters (otherwise those descendants leak into the shadow's alpha
   // source and darken/widen the shadow beyond the layer silhouette).
   std::vector<std::string> pendingSiblingShadows;
+  std::vector<const DropShadowStyle*> pendingFilterDropShadows;
+  bool hasNestedDomContent = !layer->children.empty() || layer->composition != nullptr;
+  auto appendBoxShadow = [&boxShadowValue](const DropShadowStyle* ds) {
+    if (!boxShadowValue.empty()) {
+      boxShadowValue += ", ";
+    }
+    boxShadowValue += CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
+                      "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+  };
 
   for (auto* ls : layer->styles) {
     bool hasBlendMode = ls->blendMode != BlendMode::Normal;
@@ -2030,16 +2165,27 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
       if (hasBlendMode) {
+        if (!pendingFilterDropShadows.empty()) {
+          std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+          if (!filterValues.empty()) filterValues += ' ';
+          filterValues += filterRef;
+          pendingFilterDropShadows.clear();
+        }
         belowStyles.push_back({NodeType::DropShadowStyle, ls});
       } else if (ds->blurX == ds->blurY && ds->showBehindLayer && hasBackdropBlurFill &&
                  boxShadowValue.empty()) {
         std::string radius = LayerBoxShadowBorderRadius(layer);
         if (!radius.empty()) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
           // box-shadow fallback: preserves the sibling backdrop-filter sampling path. Also
           // propagate group opacity down to children, because `opacity < 1` on the layer div
           // would re-introduce the stacking context we just eliminated.
-          boxShadowValue = CssFloatToString(ds->offsetX) + "px " + CssFloatToString(ds->offsetY) +
-                           "px " + CssFloatToString(ds->blurX) + "px " + ColorToRGBA(ds->color);
+          appendBoxShadow(ds);
           boxShadowBorderRadius = radius;
           suppressGroupOpacity = true;
           continue;
@@ -2048,15 +2194,37 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         // because it reads source alpha as-is, so semi-transparent fills produce proportionally
         // weaker shadows while PAGX's shadow shape comes from a saturated opaque silhouette.
       }
+      if (!hasBlendMode && !ds->showBehindLayer && ds->blurX == ds->blurY && hasNestedDomContent) {
+        std::string radius = LayerBoxShadowBorderRadius(layer);
+        if (!radius.empty() && FindLayerShadowShape(layer).valid) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
+          appendBoxShadow(ds);
+          if (boxShadowBorderRadius.empty()) {
+            boxShadowBorderRadius = radius;
+          }
+          continue;
+        }
+      }
       // Sibling-div shadow path: emit one <div> that reproduces the layer's primary fill shape
       // (Rectangle/Ellipse), tinted with the shadow color and CSS-blurred. Avoids the
       // filter-cascade darkening that a `filter:url(...)` on the layer div suffers when the
-      // layer has children painting their own filters. Only showBehindLayer=true is covered —
-      // false requires an erase-mask that CSS has no direct equivalent for, so it continues
-      // down the SVG filter path.
+      // layer has children painting their own filters. For showBehindLayer=false, a simple
+      // full-cover Rectangle/Ellipse can use CSS box-shadow on the layer box; non-box shapes
+      // still fall through to the SVG filter path.
       if (!hasBlendMode && ds->showBehindLayer) {
         ShadowShape shape = FindLayerShadowShape(layer);
         if (shape.valid) {
+          if (!pendingFilterDropShadows.empty()) {
+            std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+            if (!filterValues.empty()) filterValues += ' ';
+            filterValues += filterRef;
+            pendingFilterDropShadows.clear();
+          }
           std::string style =
               "position:absolute;left:" + CssFloatToString(shape.left + ds->offsetX) +
               "px;top:" + CssFloatToString(shape.top + ds->offsetY) +
@@ -2076,12 +2244,14 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           continue;
         }
       }
-      {
-        std::string filterRef = emitDropShadowFilterDef(ds);
+      pendingFilterDropShadows.push_back(ds);
+    } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
+      if (!pendingFilterDropShadows.empty()) {
+        std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
         if (!filterValues.empty()) filterValues += ' ';
         filterValues += filterRef;
+        pendingFilterDropShadows.clear();
       }
-    } else if (ls->nodeType() == NodeType::InnerShadowStyle) {
       auto is = static_cast<const InnerShadowStyle*>(ls);
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
@@ -2091,10 +2261,21 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         filterValues += filterRef;
       }
     } else if (ls->nodeType() == NodeType::BackgroundBlurStyle) {
+      if (!pendingFilterDropShadows.empty()) {
+        std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+        if (!filterValues.empty()) filterValues += ' ';
+        filterValues += filterRef;
+        pendingFilterDropShadows.clear();
+      }
       if (hasBlendMode) {
         belowStyles.push_back({NodeType::BackgroundBlurStyle, ls});
       }
     }
+  }
+  if (!pendingFilterDropShadows.empty()) {
+    std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
+    if (!filterValues.empty()) filterValues += ' ';
+    filterValues += filterRef;
   }
 
   if (!filterValues.empty()) {
@@ -2119,8 +2300,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       style += ";opacity:" + CssFloatToString(layerAlpha);
     }
   }
-
-  bool needScrollRectWrapper = layer->hasScrollRect;
 
   if (layer->mask != nullptr) {
     if (layer->maskType == MaskType::Contour) {
@@ -2298,8 +2477,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
                              "px;height:" + CssFloatToString(sr.height) + "px;overflow:hidden");
     out.closeTagStart();
     out.openTag("div");
-    out.addAttr("style", "position:relative;left:" + CssFloatToString(-sr.x) +
-                             "px;top:" + CssFloatToString(-sr.y) + "px");
+    std::string contentStyle = "position:relative;left:" + CssFloatToString(-sr.x) +
+                               "px;top:" + CssFloatToString(-sr.y) + "px";
+    contentStyle += scrollRectContentStyle;
+    out.addAttr("style", contentStyle);
     out.closeTagStart();
   }
 
