@@ -806,10 +806,9 @@ PAGX_TEST(PAGXViewModelTest, StringValueTriggersDataBindSync) {
   auto sf = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(sf, nullptr);
   EXPECT_TRUE(sc->draw(sf));
-  EXPECT_EQ(v->value(), "B");
-  // TODO: verify target layer name channel. No "name" writer is registered on the Layer target
-  // (bindLayerChannels only registers alpha/visible/blendMode), so the DataBind is a no-op and the
-  // target layer state cannot be observed. The source assertion above is kept as a secondary check.
+  auto layers = sc->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  EXPECT_EQ(layers[0]->runtimeLayer->name(), "B");
 }
 
 PAGX_TEST(PAGXViewModelTest, BooleanValueTriggersDataBindSync) {

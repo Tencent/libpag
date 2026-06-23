@@ -675,12 +675,21 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
   }
 
+  static void WriteLayerName(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<std::string>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::Layer*>(object)->setName(*v);
+  }
+
   // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
   // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
     _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
     _result.binding.setWriter(node, "visible", WriteLayerVisible);
     _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
+    _result.binding.setWriter(node, "name", WriteLayerName);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
