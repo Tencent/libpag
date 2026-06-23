@@ -51,8 +51,12 @@ file(GLOB_RECURSE PAGX_ANIMATION_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/p
 file(GLOB_RECURSE PAGX_NODES_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/nodes/*.cpp)
 file(GLOB_RECURSE PAGX_RUNTIME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/runtime/*.cpp)
 file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/utils/*.cpp)
+# Woff2FontGenerator depends on the woff2 library which is only needed for HTML/SVG export.
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "Woff2FontGenerator\\.cpp$")
 file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/xml/*.cpp)
-file(GLOB_RECURSE PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/svg/*.cpp)
+# Only SVGPathParser is needed (used by PAGXImporter for path data). SVG/HTML exporters are not
+# used in the wechat viewer and depend on woff2 which is not available in this build.
+set(PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/svg/SVGPathParser.cpp)
 if (NOT TARGET pagx)
     add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_ANIMATION_SOURCES} ${PAGX_NODES_SOURCES} ${PAGX_RUNTIME_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
     target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
