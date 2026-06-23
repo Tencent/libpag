@@ -2784,7 +2784,6 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
     else if (flagsStr == "Once" || flagsStr == "once")
       bind->flags = DataBindFlags::Once;
   }
-  (void)doc;
   return bind;
 }
 
