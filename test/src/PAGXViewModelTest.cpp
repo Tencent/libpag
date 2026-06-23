@@ -303,16 +303,15 @@ PAGX_TEST(PAGXViewModelTest, DataBindXMLImport) {
   ASSERT_NE(comp, nullptr);
   EXPECT_EQ(comp->dataBinds.size(), 1u);
 }
-PAGX_TEST(PAGXViewModelTest, DataBindFlagsXMLRoundTrip) {
+PAGX_TEST(PAGXViewModelTest, DataBindXMLRoundTrip) {
   std::string xml = VMXml(
       "    <ViewModel id=\"MainVM\">\n      <Property name=\"title\" type=\"String\"/>\n    "
       "</ViewModel>\n    <Composition id=\"Main\" width=\"400\" height=\"300\">\n      <Layer "
       "id=\"textLayer\" name=\"Text\"/>\n      <DataBind source=\"$vm.title\" "
-      "target=\"@textLayer\" channel=\"text\" flags=\"Once\"/>\n    </Composition>\n");
+      "target=\"@textLayer\" channel=\"text\"/>\n    </Composition>\n");
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_NE(doc, nullptr);
-  std::string exp = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(exp.find("flags=\"Once\""), std::string::npos);
+  pagx::PAGXExporter::ToXML(*doc);
 }
 
 PAGX_TEST(PAGXViewModelTest, HasChangedFlag) {
@@ -539,7 +538,6 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -557,65 +555,6 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_NEAR(alphaProp->value(), 0.5f, 0.01f);
-}
-
-PAGX_TEST(PAGXViewModelTest, ToTargetOnlyNoSyncBack) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
-  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
-  prop->name = "alpha";
-  prop->propertyType = pagx::ViewModelPropertyType::Number;
-  prop->defaultNumber = 1.0f;
-  schema->properties.push_back(prop);
-  doc->viewModel = schema;
-  auto layer = doc->makeNode<pagx::Layer>("rect");
-  layer->width = 200;
-  layer->height = 200;
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 200;
-  rect->size.height = 200;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto color = doc->makeNode<pagx::SolidColor>();
-  fill->color = color;
-  auto group = doc->makeNode<pagx::Group>();
-  group->elements.push_back(rect);
-  group->elements.push_back(fill);
-  layer->contents.push_back(group);
-  doc->layers.push_back(layer);
-  auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 60;
-  anim->frameRate = 60;
-  doc->animations.push_back(anim);
-  auto* object = doc->makeNode<pagx::AnimationObject>();
-  object->target = "rect";
-  anim->objects.push_back(object);
-  auto* aChan = doc->makeNode<pagx::TypedChannel<float>>();
-  aChan->name = "alpha";
-  aChan->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::None, {}, {}});
-  aChan->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::None, {}, {}});
-  object->channels.push_back(aChan);
-  auto db = doc->makeNode<pagx::DataBind>();
-  db->source = "$vm.alpha";
-  db->target = "@rect";
-  db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::ToTarget;
-  doc->dataBinds.push_back(db);
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
-  ASSERT_NE(scene, nullptr);
-  auto vm = scene->viewModel();
-  ASSERT_NE(vm, nullptr);
-  auto alphaProp = vm->propertyNumber("alpha");
-  ASSERT_NE(alphaProp, nullptr);
-  EXPECT_FLOAT_EQ(alphaProp->value(), 1.0f);
-  auto timeline = scene->getDefaultTimeline();
-  ASSERT_NE(timeline, nullptr);
-  timeline->setCurrentTime(500000);
-  timeline->apply();
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface, nullptr);
-  EXPECT_TRUE(scene->draw(surface));
-  EXPECT_FLOAT_EQ(alphaProp->value(), 1.0f);
 }
 
 PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
@@ -669,7 +608,6 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -700,103 +638,8 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   EXPECT_EQ(obs, 0);
 }
 
-// ========== Once ==========
-PAGX_TEST(PAGXViewModelTest, OnceFlagAppliedOnceOnly) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto* schema = doc->makeNode<pagx::ViewModel>("T");
-  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
-  prop->name = "alpha";
-  prop->propertyType = pagx::ViewModelPropertyType::Number;
-  prop->defaultNumber = 1.0f;
-  schema->properties.push_back(prop);
-  doc->viewModel = schema;
-  auto layer = doc->makeNode<pagx::Layer>("r");
-  layer->width = 200;
-  layer->height = 200;
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 200;
-  rect->size.height = 200;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto color = doc->makeNode<pagx::SolidColor>();
-  color->color = {1.0f, 0, 0, 1};
-  fill->color = color;
-  auto group = doc->makeNode<pagx::Group>();
-  group->elements.push_back(rect);
-  group->elements.push_back(fill);
-  layer->contents.push_back(group);
-  doc->layers.push_back(layer);
-  auto db = doc->makeNode<pagx::DataBind>();
-  db->source = "$vm.alpha";
-  db->target = "@r";
-  db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::Once;
-  doc->dataBinds.push_back(db);
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
-  ASSERT_NE(scene, nullptr);
-  auto layers = scene->getLayersUnderPoint(100, 100);
-  ASSERT_GT(layers.size(), 0u);
-  auto tl = layers[0]->runtimeLayer;
-  ASSERT_NE(tl, nullptr);
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface, nullptr);
-  EXPECT_TRUE(scene->draw(surface));
-  EXPECT_FLOAT_EQ(tl->alpha(), 1.0f);
-  auto vm = scene->viewModel();
-  ASSERT_NE(vm, nullptr);
-  vm->propertyNumber("alpha")->value(0.3f);
-  EXPECT_TRUE(scene->draw(surface));
-  EXPECT_FLOAT_EQ(tl->alpha(), 1.0f);
-}
-
-// ========== ToSource ==========
-PAGX_TEST(PAGXViewModelTest, ToSourceDoesNotApplyVMToLayer) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto* schema = doc->makeNode<pagx::ViewModel>("T");
-  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
-  prop->name = "alpha";
-  prop->propertyType = pagx::ViewModelPropertyType::Number;
-  prop->defaultNumber = 1.0f;
-  schema->properties.push_back(prop);
-  doc->viewModel = schema;
-  auto layer = doc->makeNode<pagx::Layer>("r");
-  layer->width = 200;
-  layer->height = 200;
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 200;
-  rect->size.height = 200;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto color = doc->makeNode<pagx::SolidColor>();
-  fill->color = color;
-  auto group = doc->makeNode<pagx::Group>();
-  group->elements.push_back(rect);
-  group->elements.push_back(fill);
-  layer->contents.push_back(group);
-  doc->layers.push_back(layer);
-  auto db = doc->makeNode<pagx::DataBind>();
-  db->source = "$vm.alpha";
-  db->target = "@r";
-  db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::ToSource;
-  doc->dataBinds.push_back(db);
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
-  ASSERT_NE(scene, nullptr);
-  auto layers = scene->getLayersUnderPoint(100, 100);
-  ASSERT_GT(layers.size(), 0u);
-  auto tl = layers[0]->runtimeLayer;
-  ASSERT_NE(tl, nullptr);
-  auto vm = scene->viewModel();
-  ASSERT_NE(vm, nullptr);
-  vm->propertyNumber("alpha")->value(0.3f);
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface, nullptr);
-  EXPECT_TRUE(scene->draw(surface));
-  EXPECT_FLOAT_EQ(tl->alpha(), 1.0f);
-}
-
-// ========== ToSource: animation → VM sync ==========
-PAGX_TEST(PAGXViewModelTest, ToSourceSyncsAnimationToVM) {
+// ========== animation → VM sync ==========
+PAGX_TEST(PAGXViewModelTest, SyncsAnimationToVM) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("T");
   auto* prop = doc->makeNode<pagx::ViewModelProperty>();
@@ -835,7 +678,6 @@ PAGX_TEST(PAGXViewModelTest, ToSourceSyncsAnimationToVM) {
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::ToSource;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
