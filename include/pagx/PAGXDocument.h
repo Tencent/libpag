@@ -160,9 +160,10 @@ class PAGXDocument : public Node {
   void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
 
   /**
-   * Returns the current image resource provider, or nullptr if none is set.
+   * Returns the current image resource provider, or nullptr if none is set. The returned pointer
+   * is a non-owning reference whose lifetime is managed by this document.
    */
-  std::shared_ptr<ImageResourceProvider> imageResourceProvider() const;
+  ImageResourceProvider* imageResourceProvider() const;
 
   /**
    * Returns every Layer whose fill/stroke references an ImagePattern backed by an Image node

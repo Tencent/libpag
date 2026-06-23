@@ -377,7 +377,7 @@ void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
   if (!document) {
     return;
   }
-  auto provider = document->imageResourceProvider().get();
+  auto* provider = document->imageResourceProvider();
   for (const auto& nodePtr : document->nodes) {
     if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
       continue;
@@ -393,7 +393,7 @@ size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
   if (!document || filePath.empty()) {
     return 0;
   }
-  auto provider = document->imageResourceProvider().get();
+  auto* provider = document->imageResourceProvider();
   size_t updated = 0;
   for (const auto& nodePtr : document->nodes) {
     if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
