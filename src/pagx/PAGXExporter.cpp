@@ -1260,7 +1260,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::ViewModel: {
       auto vm = static_cast<const ViewModel*>(node);
       xml.openElement("ViewModel");
-      if (!vm->id.empty()) xml.addAttribute("id", vm->id);
+      xml.addAttribute("id", vm->id);
       WriteCustomData(xml, node);
       if (vm->properties.empty()) {
         xml.closeElementSelfClosing();
