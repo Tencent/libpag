@@ -123,15 +123,15 @@ static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
   }
   return "Number";
 }
-static std::string DataBindFlagsToString(DataBindFlags f) {
+static std::string DataBindDirectionToString(DataBindDirection f) {
   switch (f) {
-    case DataBindFlags::ToTarget:
+    case DataBindDirection::ToTarget:
       return "ToTarget";
-    case DataBindFlags::ToSource:
+    case DataBindDirection::ToSource:
       return "ToSource";
-    case DataBindFlags::TwoWay:
+    case DataBindDirection::TwoWay:
       return "TwoWay";
-    case DataBindFlags::Once:
+    case DataBindDirection::Once:
       return "Once";
   }
   return "ToTarget";
@@ -1323,8 +1323,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("source", bind->source);
       xml.addAttribute("target", bind->target);
       xml.addAttribute("channel", bind->channel);
-      if (bind->flags != DataBindFlags::ToTarget)
-        xml.addAttribute("flags", DataBindFlagsToString(bind->flags));
+      if (bind->flags != DataBindDirection::ToTarget)
+        xml.addAttribute("flags", DataBindDirectionToString(bind->flags));
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
