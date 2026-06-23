@@ -1231,6 +1231,11 @@ PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
   // Converter output is "$5999.00" (string), applied to the "name" channel.
+  auto& registry = pagx::DataConverterRegistry::instance();
+  pagx::KeyValue priceInput{5999.0f};
+  auto priceOutput = registry.apply(conv, priceInput);
+  ASSERT_TRUE(std::holds_alternative<std::string>(priceOutput));
+  EXPECT_EQ(std::get<std::string>(priceOutput), "$5999.00");
   auto layers = scene->getLayersUnderPoint(100, 100);
   EXPECT_GT(layers.size(), 0u);
 }
