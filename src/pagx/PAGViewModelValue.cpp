@@ -163,7 +163,7 @@ void PAGViewModelValueImage::value(const std::string& v) {
 ObserverHandle::ObserverHandle() = default;
 
 ObserverHandle::ObserverHandle(std::shared_ptr<PAGViewModelValue> src, int id)
-    : source(src), observerId(id) {
+    : source(std::move(src)), observerId(id) {
 }
 
 ObserverHandle::~ObserverHandle() {
