@@ -38,11 +38,18 @@ class LayerBuilder;
 class PAGImage {
  public:
   /**
-   * Creates a PAGImage from a file path or a data URI (e.g. "data:image/png;base64,...").
-   * @param path a file path or data URI.
+   * Creates a PAGImage from a file path.
+   * @param path a file path.
    * @return a PAGImage, or nullptr if the image could not be decoded.
    */
   static std::shared_ptr<PAGImage> MakeFromPath(const std::string& path);
+
+  /**
+   * Creates a PAGImage from a data URI (e.g. "data:image/png;base64,...").
+   * @param dataURI a data URI string.
+   * @return a PAGImage, or nullptr if the image could not be decoded.
+   */
+  static std::shared_ptr<PAGImage> MakeFromDataURI(const std::string& dataURI);
 
   /**
    * Creates a PAGImage from raw encoded image data (PNG, JPEG, WebP, etc.).

@@ -118,7 +118,7 @@ PAGX_TEST(PAGXViewModelTest, ImagePropertyReadWrite) {
   auto img = vm->propertyImage("image");
   ASSERT_NE(img, nullptr);
   EXPECT_EQ(img->value(), nullptr);
-  auto pagImage = pagx::PAGImage::MakeFromPath(redPNG);
+  auto pagImage = pagx::PAGImage::MakeFromDataURI(redPNG);
   ASSERT_NE(pagImage, nullptr);
   img->value(pagImage);
   EXPECT_EQ(img->value(), pagImage);
@@ -964,7 +964,7 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   ASSERT_NE(v, nullptr);
   ASSERT_NE(v->value(), nullptr);
   EXPECT_EQ(v->value()->source(), redPNG);
-  auto greenImage = pagx::PAGImage::MakeFromPath(greenPNG);
+  auto greenImage = pagx::PAGImage::MakeFromDataURI(greenPNG);
   ASSERT_NE(greenImage, nullptr);
   v->value(greenImage);
   auto sf = pagx::PAGSurface::MakeOffscreen(200, 200);

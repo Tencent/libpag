@@ -51,16 +51,22 @@ static std::shared_ptr<tgfx::Image> DecodeDataURI(const std::string& dataURI) {
 }
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromPath(const std::string& path) {
-  std::shared_ptr<tgfx::Image> image = nullptr;
-  if (path.find("data:") == 0) {
-    image = DecodeDataURI(path);
-  } else if (!path.empty()) {
-    image = tgfx::Image::MakeFromFile(path);
+  if (path.empty()) {
+    return nullptr;
   }
+  auto image = tgfx::Image::MakeFromFile(path);
   if (image == nullptr) {
     return nullptr;
   }
   return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), path));
+}
+
+std::shared_ptr<PAGImage> PAGImage::MakeFromDataURI(const std::string& dataURI) {
+  auto image = DecodeDataURI(dataURI);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), dataURI));
 }
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& data) {

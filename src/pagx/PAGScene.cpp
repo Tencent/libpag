@@ -130,7 +130,11 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       }
       case ViewModelPropertyType::Image: {
         auto v = std::make_shared<PAGViewModelValueImage>();
-        v->propertyValue = PAGImage::MakeFromPath(prop->defaultImage);
+        if (prop->defaultImage.find("data:") == 0) {
+          v->propertyValue = PAGImage::MakeFromDataURI(prop->defaultImage);
+        } else if (!prop->defaultImage.empty()) {
+          v->propertyValue = PAGImage::MakeFromPath(prop->defaultImage);
+        }
         v->type = ViewModelValueType::Image;
         value = std::move(v);
         break;
