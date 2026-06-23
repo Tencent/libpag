@@ -27,6 +27,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -329,7 +330,11 @@ class SVGWriterContext {
   // every embedded vector Font resource. emitGeometryWithFs checks this mapping to decide whether
   // to render Text via the WOFF2 <text> path or fall back to the SVG <path> outline path.
   // The relativeUrl field stores a `data:font/woff2;base64,...` URI so each SVG is self-contained.
+  // `woff2FontOrder` records the registration order so @font-face rules are emitted
+  // deterministically across runs — iterating the unordered_map directly would expose pointer-hash
+  // ordering which varies with ASLR and breaks byte-stable SVG diffs.
   std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
+  std::vector<const Font*> woff2FontOrder = {};
 
   // Layer → owning parent layer mapping. Built once per export from the document tree (see
   // BuildLayerParentMap) and used to detect when a mask reference crosses a parent boundary —
@@ -338,6 +343,29 @@ class SVGWriterContext {
   // ensureLayerParentMap.
   std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
   bool layerParentMapReady = false;
+
+  // (mask layer, def kind) → def-id cache. A single mask Layer can be referenced by many owners
+  // (PAGX allows it explicitly), and PR feedback showed that without this cache `<mask>` /
+  // `<clipPath>` definitions get re-emitted into <defs> on every reference, producing duplicate
+  // `id` values in <defs> with undefined browser behaviour. The `kind` byte separates the
+  // alpha-/luminance-mask emission from a clipPath emission of the same mask layer (different
+  // tag, different content writer); without it a layer used in both modes would collide. The
+  // cache fast-paths every subsequent reference: same Layer + same kind reuses the original
+  // def-id and skips the second `<mask>`/`<clipPath>` emission entirely.
+  enum class MaskDefKind : uint8_t { Mask, ClipPath };
+  struct MaskDefKey {
+    const Layer* layer;
+    MaskDefKind kind;
+    bool operator==(const MaskDefKey& other) const {
+      return layer == other.layer && kind == other.kind;
+    }
+  };
+  struct MaskDefKeyHash {
+    size_t operator()(const MaskDefKey& k) const noexcept {
+      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.kind) << 1);
+    }
+  };
+  std::unordered_map<MaskDefKey, std::string, MaskDefKeyHash> emittedMaskDefs = {};
 
  private:
   int nextDefId = 0;
@@ -1677,6 +1705,20 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
                                           const char* idPrefix, ContentWriter writer,
                                           MaskType maskType) {
+  // Reuse a previously-emitted def for the same (maskLayer, kind). Without this cache, a single
+  // mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements with the
+  // same id in <defs>, which is undefined per the SVG spec — browsers typically use the first
+  // and silently ignore the rest, but a regression that changes the emission order would
+  // re-wire all owners to a different copy. The kind enum separates mask emission from clipPath
+  // emission of the same layer; a layer used in both roles will get one id per role.
+  SVGWriterContext::MaskDefKind kind = (std::strcmp(tag, "clipPath") == 0)
+                                           ? SVGWriterContext::MaskDefKind::ClipPath
+                                           : SVGWriterContext::MaskDefKind::Mask;
+  SVGWriterContext::MaskDefKey key{maskLayer, kind};
+  auto cached = _context->emittedMaskDefs.find(key);
+  if (cached != _context->emittedMaskDefs.end()) {
+    return cached->second;
+  }
   std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
@@ -1693,6 +1735,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
   if (!paintDefsStr.empty()) {
     _defs->addRawContent(paintDefsStr);
   }
+  _context->emittedMaskDefs[key] = defId;
   return defId;
 }
 
@@ -1750,18 +1793,28 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
 
 std::string SVGWriter::writeMaskDef(const Layer* maskLayer, const Layer* owner, MaskType maskType) {
   if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
+    // PAGX renders mask geometry in the owner's parent space via mask->getRelativeMatrix3D(owner),
+    // which walks the chain mask -> common-ancestor -> owner-parent. The SVG output here only
+    // applies the mask layer's own matrix (BuildLayerTransform), which silently coincides with
+    // the renderer's matrix when mask and owner share a parent — and silently diverges otherwise.
+    // Rather than emit a visibly-misplaced <mask> the user has no way to spot, suppress this
+    // mask entirely so the owner falls back to "no mask" rendering. The accompanying warning
+    // surfaces the suppression to CI / log readers. A follow-up PR can carry the full chain
+    // matrix to restore correctness.
     addWarning(
         "mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-        "' across parent boundaries; SVG <mask> placement may diverge from the PAGX renderer.");
+        "' across parent boundaries; SVG <mask> emission skipped to avoid silent misplacement.");
+    return "";
   }
   return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent, maskType);
 }
 
 std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* owner) {
   if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
-    addWarning(
-        "mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-        "' across parent boundaries; SVG <clipPath> placement may diverge from the PAGX renderer.");
+    addWarning("mask layer '" + maskLayer->id + "' references owner '" + owner->id +
+               "' across parent boundaries; SVG <clipPath> emission skipped to avoid silent "
+               "misplacement.");
+    return "";
   }
   return writeMaskOrClipDef(maskLayer, "clipPath", "clip", &SVGWriter::writeClipPathContent);
 }
@@ -1774,14 +1827,27 @@ const Layer* SVGWriter::findLayerParent(const Layer* layer) {
     auto& map = _context->layerParentMap;
     // Walk every Composition's layer subtree once. PAGX layers can appear under
     // Layer::children or Layer::composition->layers; both relations form parent edges.
+    // `visited` provides two guarantees: (1) idempotent parent assignment when the same Layer
+    // appears in multiple subtrees (shared-resource references — legal in PAGX), so the parent
+    // of `child` is locked to the first walk that reached it rather than overwritten by
+    // hash-order-dependent later walks; (2) cycle safety, so a bug in the importer that
+    // produced a `composition -> layer -> composition` self-reference cannot blow the stack.
+    std::unordered_set<const Layer*> visited;
     std::function<void(const Layer*)> visit = [&](const Layer* parent) {
+      if (!visited.insert(parent).second) {
+        return;
+      }
       for (const auto* child : parent->children) {
-        map[child] = parent;
+        if (map.find(child) == map.end()) {
+          map[child] = parent;
+        }
         visit(child);
       }
       if (parent->composition != nullptr) {
         for (const auto* compLayer : parent->composition->layers) {
-          map[compLayer] = parent;
+          if (map.find(compLayer) == map.end()) {
+            map[compLayer] = parent;
+          }
           visit(compLayer);
         }
       }
@@ -3332,11 +3398,18 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
     if (layer->maskType == MaskType::Contour) {
       // Contour masking uses <clipPath> which only supports geometry clipping.
       auto clipId = writeClipPathDef(layer->mask, layer);
-      out.addAttribute("clip-path", "url(#" + clipId + ")");
+      // Empty id signals that writeClipPathDef suppressed emission (e.g. cross-parent reference);
+      // emitting `clip-path="url(#)"` would be a hard error in browsers, so skip the attribute and
+      // let the owner render unclipped. The accompanying warning already surfaces the suppression.
+      if (!clipId.empty()) {
+        out.addAttribute("clip-path", "url(#" + clipId + ")");
+      }
     } else {
       // Alpha and Luminance masking use <mask> which supports alpha channel.
       auto maskId = writeMaskDef(layer->mask, layer, layer->maskType);
-      out.addAttribute("mask", "url(#" + maskId + ")");
+      if (!maskId.empty()) {
+        out.addAttribute("mask", "url(#" + maskId + ")");
+      }
     }
   }
 }
@@ -3422,11 +3495,13 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
       // Skip bitmap fonts based on the first glyph: SVG <text> + CBDT works in browsers but not
       // in Inkscape / Preview, and per-glyph scales/skews still need the <image> path. Sticking
       // to vector fonts keeps the WOFF2 path coverage portable and predictable. The first-glyph
-      // check is a fast-path filter only; BuildWoff2FromFont below performs a full type-uniformity
-      // sweep over every glyph and returns empty when the font mixes path/image entries (or
-      // exceeds the PUA capacity), at which point the empty-result branch falls back to the
-      // per-glyph rendering path.
-      if (font->glyphs[0]->image || !font->glyphs[0]->path) {
+      // check is a fast-path filter ONLY on the bitmap dimension — we deliberately do NOT
+      // reject a missing `path` here, because vector fonts are allowed to have blank/space
+      // glyphs (e.g. .notdef) whose Glyph.path is null. BuildWoff2FromFont below performs a full
+      // type-uniformity sweep over every glyph and returns empty when the font mixes path/image
+      // entries (or exceeds the PUA capacity), at which point the empty-result branch falls back
+      // to the per-glyph rendering path.
+      if (font->glyphs[0]->image != nullptr) {
         continue;
       }
       std::string fontId = "f" + std::to_string(context.woff2Fonts.size());
@@ -3437,6 +3512,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
       result.relativeUrl = "data:font/woff2;base64,";
       result.relativeUrl += Base64Encode(result.woff2Data.data(), result.woff2Data.size());
       context.woff2Fonts[font] = std::move(result);
+      context.woff2FontOrder.push_back(font);
     }
   }
 
@@ -3467,7 +3543,11 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // rules in <defs> avoids a second top-level emission point.
   std::string fontFaceRules;
   if (!context.woff2Fonts.empty()) {
-    for (const auto& [font, result] : context.woff2Fonts) {
+    // Walk woff2FontOrder rather than the unordered_map directly so the emitted @font-face rules
+    // come out in registration order regardless of pointer-hash distribution. Without this,
+    // identical PAGX inputs would produce byte-different SVGs across runs / platforms.
+    for (const auto* font : context.woff2FontOrder) {
+      const auto& result = context.woff2Fonts[font];
       // Mirror HTMLExporter::writeWoff2FontFaceRules: route the family name through
       // EscapeCssFontFamily so a hostile or accidental special character in `familyName` cannot
       // break out of the single-quoted CSS context. The current generator only ever produces

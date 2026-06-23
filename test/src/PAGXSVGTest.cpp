@@ -20,6 +20,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include "cli/CommandVerify.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
@@ -3134,6 +3135,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_PerGlyphScaleFallback) {
   // @font-face is still produced — the WOFF2 pre-pass runs per Font, not per GlyphRun.
   EXPECT_NE(svg.find("@font-face"), std::string::npos);
   EXPECT_NE(svg.find("<path"), std::string::npos);
+  // The fallback's defining contract is "no <text> element". Without this, a regression where
+  // writeTextAsFont starts ignoring `scales` and emits a (visually wrong) <text> would still
+  // pass the @font-face + <path> assertions above because both can appear via other paths.
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_per_glyph_scale_fallback.svg");
 }
 
@@ -3177,6 +3182,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_GradientFillFallback) {
   EXPECT_NE(svg.find("@font-face"), std::string::npos);
   EXPECT_NE(svg.find("<linearGradient"), std::string::npos);
   EXPECT_NE(svg.find("<path"), std::string::npos);
+  // Same as PerGlyphScaleFallback: assert <text> is absent so a regression that lets a gradient-
+  // filled GlyphRun escape as <text> (and silently lose the glyph-clipped gradient) is caught.
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_gradient_fallback.svg");
 }
 
@@ -3225,9 +3233,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_MultipleFontsUnique) {
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   // Two @font-face rules must appear, with distinct generated family-names. fontId is assigned
   // by `"f" + std::to_string(woff2Fonts.size())`, so the first registered font yields
-  // `pagx-font-f0` and the second yields `pagx-font-f1`. Iteration order over the underlying
-  // hash map is not stable, so assert presence of both names instead of expecting them in any
-  // particular order.
+  // `pagx-font-f0` and the second yields `pagx-font-f1`. With deterministic emission order in
+  // place we could check positions too, but the assertion below only requires both ids to
+  // appear at least once.
   size_t fontFaceCount = 0;
   for (size_t pos = svg.find("@font-face"); pos != std::string::npos;
        pos = svg.find("@font-face", pos + 1)) {
@@ -3240,10 +3248,35 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_MultipleFontsUnique) {
   // intact. A regression that emitted both <text> blocks under the same family would leave one
   // of them visually empty (the wrong cmap returns GID 0 for the PUA codepoints).
   size_t textCount = 0;
+  std::set<std::string> textFamilies;
   for (size_t pos = svg.find("<text"); pos != std::string::npos; pos = svg.find("<text", pos + 1)) {
     ++textCount;
+    // Locate the font-family attribute that belongs to THIS <text> opening tag: the search must
+    // stop at the tag's closing `>` so a later element's font-family is not mistakenly picked
+    // up. <text> tags here are always written with attributes and self-close inside the tag
+    // header, so scanning for `>` is sufficient.
+    auto tagEnd = svg.find('>', pos);
+    if (tagEnd == std::string::npos) {
+      continue;
+    }
+    auto attrPos = svg.find("font-family=\"", pos);
+    if (attrPos == std::string::npos || attrPos > tagEnd) {
+      continue;
+    }
+    auto valStart = attrPos + std::strlen("font-family=\"");
+    auto valEnd = svg.find('"', valStart);
+    if (valEnd == std::string::npos || valEnd > tagEnd) {
+      continue;
+    }
+    textFamilies.insert(svg.substr(valStart, valEnd - valStart));
   }
   EXPECT_EQ(textCount, 2u);
+  // Both <text> elements must reference distinct family names. Without this, a regression that
+  // shadowed the per-Font lookup with `woff2Fonts.begin()` (or any single-font default) would
+  // emit `<text font-family="pagx-font-f0">` twice while the f1 @font-face declaration sat
+  // unused — the textCount + fontFaceCount + substring presence checks above would all still
+  // pass.
+  EXPECT_EQ(textFamilies.size(), 2u);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_multiple_unique.svg");
 }
 
@@ -3641,6 +3674,169 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathOnEllipse) {
   layer->contents.push_back(stroke);
   doc->layers.push_back(layer);
   auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+// ===========================================================================
+// Regression tests for PR-feedback fixes: lock down the behaviours so future
+// edits cannot silently undo them.
+// ===========================================================================
+
+/**
+ * SVG painter alpha must come from the Painter's enclosing scope, NOT from the geometry's
+ * accumulated alpha at the moment it propagated upward. Earlier code attached `entry.alpha`
+ * (the alpha in effect when the geometry was collected) to each emit, so a Painter sitting
+ * OUTSIDE a 50%-alpha Group would multiply 0.5 onto the geometry that bubbled up from inside —
+ * making the outer red Fill render at half opacity even though the Painter's own scope has
+ * alpha=1. The fix: emitGeometryWithFs receives the Painter's scope alpha as an explicit
+ * argument, and applies that. Regression: if entry.alpha sneaks back in, the outer fill would
+ * be emitted with `fill-opacity="0.5"` or equivalent.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupIgnoreGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->alpha = 0.5f;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  group->elements.push_back(rect);
+  layer->contents.push_back(group);
+  // Painter lives in the layer scope, OUTSIDE the group. With the fix, its alpha is the layer's
+  // alpha (1.0). Without the fix, the rect's `entry.alpha = 0.5` (captured inside the group)
+  // gets multiplied in.
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f));
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The fill emits `fill="rgb(255,0,0)"`. Any fill-opacity attribute at all would indicate the
+  // painter took on the group's 0.5 alpha. Both writeRectangle's `fill-opacity` and the inline
+  // `;opacity:0.5` style spellings would trigger the regression, so check both shapes.
+  EXPECT_EQ(svg.find("fill-opacity"), std::string::npos);
+  EXPECT_EQ(svg.find("opacity:0.5"), std::string::npos);
+  EXPECT_EQ(svg.find("opacity=\"0.5\""), std::string::npos);
+}
+
+/**
+ * Layers with a mask and a non-identity transform split into an outer <g> carrying the mask
+ * attribute and an inner <g> carrying the transform. SVG resolves `mask` in the referencing
+ * element's user coordinate system, so a layer-level transform on the same <g> as `mask=` would
+ * drag the mask along with it — visibly drifting from where the renderer places it (which is
+ * the owner's PARENT space). The fix: outer wraps mask+opacity+filter only, inner takes the
+ * transform. Regression: if the split collapses back, the mask attribute would appear on the
+ * same <g> as `translate(...)`.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskOuterTransformIsolation) {
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* user = doc->makeNode<pagx::Layer>();
+  user->mask = maskLayer;
+  user->maskType = pagx::MaskType::Alpha;
+  // Non-identity transform: position the layer 50 pixels right and down.
+  user->matrix = pagx::Matrix::Translate(50, 50);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  user->contents.push_back(rect);
+  user->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  doc->layers.push_back(user);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The outer <g> must carry the mask attribute and NOT the transform; an inner <g> takes the
+  // transform. Locate the mask attribute and assert the same opening tag has no `transform=`.
+  auto maskAttr = svg.find("mask=\"url(#mask");
+  ASSERT_NE(maskAttr, std::string::npos);
+  // Find the surrounding <g opener and its closing `>`. The transform attribute, if present,
+  // must NOT belong to that opener.
+  auto tagStart = svg.rfind("<g", maskAttr);
+  auto tagEnd = svg.find('>', maskAttr);
+  ASSERT_NE(tagStart, std::string::npos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto outerTag = svg.substr(tagStart, tagEnd - tagStart);
+  EXPECT_EQ(outerTag.find("transform="), std::string::npos);
+  // And the inner wrapper must exist with the layer's matrix. SVG serializes affine transforms
+  // as `matrix(a,b,c,d,tx,ty)`; a pure translation by (50,50) becomes `matrix(1,0,0,1,50,50)`.
+  EXPECT_NE(svg.find("matrix(1,0,0,1,50,50)"), std::string::npos);
+}
+
+/**
+ * A Foreground-placement Painter buried inside a nested Group must still trigger the layer's
+ * second paint pass. The fix moved `hasForeground` from a shallow contents-list scan to a
+ * deep traversal (HasForegroundPainter in ExporterUtils) that walks Group / TextBox children.
+ * Regression: if the recursion is dropped, `hasForeground` returns false, the second pass is
+ * skipped, and the inner Foreground Fill applies to nothing — the rect renders un-filled
+ * (default black) instead of red.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_NestedGroupForegroundPainter) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  group->elements.push_back(rect);
+  auto* fgFill = MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f);
+  fgFill->placement = pagx::LayerPlacement::Foreground;
+  group->elements.push_back(fgFill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The rect must be filled red. Colors are serialized as `#RRGGBB` (sRGB hex). Without the
+  // deep-foreground detection, the second pass is skipped and the rect either emits with default
+  // fill (`#000000`) or not at all.
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+}
+
+/**
+ * A Text whose GlyphRuns disagree on `fontSize` cannot be expressed by a single <text> element
+ * (SVG <text> assigns one font-size to all glyphs). The fix: writeTextAsFont returns false on
+ * mismatched sizes so the caller falls back to writeTextAsPath, which emits one <path> per
+ * glyph at the correct authored scale. Regression: if the fontSize-uniformity check is
+ * removed, both runs render at one size — the larger run is squashed onto the smaller's
+ * font-size attribute, producing visibly mis-scaled glyphs.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_MultipleGlyphRunFontSizesFallToPath) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->fontSize = 24;
+  auto* run1 = doc->makeNode<pagx::GlyphRun>();
+  run1->font = font;
+  run1->fontSize = 12;
+  run1->glyphs = {1};
+  run1->xOffsets = {0};
+  run1->y = 50;
+  text->glyphRuns.push_back(run1);
+  auto* run2 = doc->makeNode<pagx::GlyphRun>();
+  run2->font = font;
+  run2->fontSize = 24;
+  run2->glyphs = {1};
+  run2->xOffsets = {30};
+  run2->y = 50;
+  text->glyphRuns.push_back(run2);
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFillSVG(doc.get(), 0.1f, 0.1f, 0.1f));
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // No <text> element — falling back to <path> per glyph at the authored size.
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
   EXPECT_NE(svg.find("<path"), std::string::npos);
 }
 

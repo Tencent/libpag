@@ -209,6 +209,15 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_SkewOnly) {
   group->skew = 30.0f;
   auto m = pagx::BuildGroupMatrix(group);
   EXPECT_FALSE(m.isIdentity());
+  // Lock the sign convention. The native renderer (ShapeRenderer::SkewFromAxis) feeds
+  // `DegreesToRadians(-skew)` into the shear matrix; with skewAxis=0 and a positive `skew`,
+  // the resulting m.c is tan(-skew) < 0. SVG/PPT/HTML all share the same convention. A
+  // regression that flips back to `+skew` (the legacy convention) would make m.c positive and
+  // produce shear in the opposite direction — visually obvious in renders but invisible to
+  // !isIdentity() alone, so assert the sign explicitly.
+  EXPECT_LT(m.c, 0.0f);
+  constexpr float kRad = static_cast<float>(M_PI) / 180.0f;
+  EXPECT_NEAR(m.c, std::tan(-group->skew * kRad), 1e-5f);
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_AnchorPositionScaleRotation) {
