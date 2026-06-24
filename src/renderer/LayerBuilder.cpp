@@ -2737,7 +2737,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   }
 
   LayerBuilderContext context;
-  context.setImageProvider(document->imageResourceProvider());
+  context.setImageProvider(document->_imageResourceProvider.get());
   return context.build(*document);
 }
 
@@ -2754,7 +2754,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   }
 
   LayerBuilderContext context;
-  context.setImageProvider(document->imageResourceProvider());
+  context.setImageProvider(document->_imageResourceProvider.get());
   return context.buildWithMap(*document);
 }
 
@@ -2784,7 +2784,7 @@ LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
     return {};
   }
   impl->document = document;
-  impl->context.setImageProvider(document->imageResourceProvider());
+  impl->context.setImageProvider(document->_imageResourceProvider.get());
   return impl->context.buildWithMap(*document);
 }
 
@@ -2851,7 +2851,7 @@ LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
-  context.setImageProvider(document->imageResourceProvider());
+  context.setImageProvider(document->_imageResourceProvider.get());
   return context.buildWithMap(*document);
 }
 
@@ -2874,7 +2874,7 @@ bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* bindin
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
   if (document) {
-    context.setImageProvider(document->imageResourceProvider());
+    context.setImageProvider(document->_imageResourceProvider.get());
   }
   return context.refreshLayerInPlace(node, binding);
 }
@@ -2889,7 +2889,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
   if (document) {
-    context.setImageProvider(document->imageResourceProvider());
+    context.setImageProvider(document->_imageResourceProvider.get());
   }
   return context.buildLayerInto(node, binding);
 }

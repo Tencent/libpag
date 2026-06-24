@@ -582,10 +582,6 @@ void PAGXDocument::setImageResourceProvider(std::shared_ptr<ImageResourceProvide
   _imageResourceProvider = std::move(provider);
 }
 
-ImageResourceProvider* PAGXDocument::imageResourceProvider() const {
-  return _imageResourceProvider.get();
-}
-
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
 // `index`, scoped to the owning `layer`.
 static void RecordImagePattern(

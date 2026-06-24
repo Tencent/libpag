@@ -251,7 +251,6 @@ class PAGXDocument : public Node {
  private:
   PAGXDocument() = default;
 
-  ImageResourceProvider* imageResourceProvider() const;
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
