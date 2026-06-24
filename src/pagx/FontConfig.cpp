@@ -177,13 +177,11 @@ bool FontConfig::registerSystemFont(const std::string& fontFamily, const std::st
   if (typeface == nullptr) {
     return false;
   }
-  auto family = typeface->fontFamily();
-  auto style = typeface->fontStyle();
   Data::FontKey key = {};
-  key.family = family;
-  key.style = style;
+  key.family = fontFamily;
+  key.style = fontStyle;
   data->registeredTypefaces.insert_or_assign(
-      key, TypefaceHolder(std::move(typeface), std::move(family), std::move(style)));
+      key, TypefaceHolder(std::move(typeface), fontFamily, fontStyle));
   return true;
 }
 
@@ -197,9 +195,7 @@ bool FontConfig::addFallbackSystemFont(const std::string& fontFamily,
   if (typeface == nullptr) {
     return false;
   }
-  auto family = typeface->fontFamily();
-  auto style = typeface->fontStyle();
-  data->fallbackTypefaces.emplace_back(std::move(typeface), std::move(family), std::move(style));
+  data->fallbackTypefaces.emplace_back(std::move(typeface), fontFamily, fontStyle);
   return true;
 }
 

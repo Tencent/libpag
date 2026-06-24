@@ -182,7 +182,7 @@ class PAGXDocument : public Node {
    * Returns the set of unique (fontFamily, fontStyle) pairs required by Text nodes in this
    * document and all loaded external composition documents (externalDoc). Call after all
    * external file data has been loaded via loadFileData() to get complete results. The caller
-   * can use this list to register typeface with FontConfig before applyLayout() or embed().
+   * can use this list to register fonts with FontConfig before applyLayout() or embed().
    * Empty fontFamily entries are skipped.
    * @return deduplicated list of PAGFont. Results are sorted.
    */

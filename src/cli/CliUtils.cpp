@@ -19,7 +19,6 @@
 #include "cli/CliUtils.h"
 #include <fstream>
 #include <iostream>
-#include "pagx/PAGFont.h"
 #include "pagx/PAGXImporter.h"
 
 namespace pagx::cli {
@@ -40,7 +39,12 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
-    fontConfig->registerFont(fontFile, 0);
+    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
+    if (typeface == nullptr) {
+      std::cerr << command << ": failed to load font '" << fontFile << "'\n";
+      return false;
+    }
+    fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());
   }
   for (const auto& fallbackStr : fallbacks) {
     bool isFilePath = fallbackStr.find('/') != std::string::npos;
