@@ -1040,24 +1040,27 @@ PAGX_TEST(PAGXViewModelTest, DataConverterSecondsToFrames) {
   ASSERT_NE(propV, nullptr);
   EXPECT_FLOAT_EQ(propV->value(), 1.0f);
 
-  // Set duration to 2.0 seconds → converter outputs 120.0 frames (2.0 * 60).
+  // Set duration to 2.0 seconds; converter outputs 120.0 frames (2.0 * 60).
   propV->value(2.0f);
+
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
 
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
 
-  // Verify converter was applied by checking the converter registry directly.
+  // Verify the converter output reached the layer through the DataBind pipeline.
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 120.0f);
+
+  // Independently verify the converter output via the registry.
   auto& registry = pagx::DataConverterRegistry::instance();
   pagx::KeyValue input{2.0f};
   auto output = registry.apply(conv, input);
   ASSERT_TRUE(std::holds_alternative<float>(output));
   EXPECT_FLOAT_EQ(std::get<float>(output), 120.0f);
-
-  // Also verify the draw pipeline doesn't crash with converter applied.
-  auto surface2 = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface2, nullptr);
-  EXPECT_TRUE(scene->draw(surface2));
 }
 
 PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
