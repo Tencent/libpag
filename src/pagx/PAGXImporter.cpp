@@ -2774,8 +2774,8 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         vm->properties.push_back(prop);
       }
     } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
-      // Inline DataConverter inside ViewModel without an @id cannot be referenced
-      // by Property.dataConverter attributes. Skip silently.
+      // All DataConverter children nested inside a ViewModel are skipped; DataConverters must be
+      // top-level Resources to be referenceable by Property.dataConverter attributes.
     }
     child = child->nextSibling;
   }

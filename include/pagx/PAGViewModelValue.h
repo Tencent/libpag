@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace pagx {
@@ -54,9 +52,10 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   virtual ~PAGViewModelValue() = default;
 
   /**
-   * Adds an observer callback that is invoked synchronously when the value changes.
-   * Returns an ObserverHandle; the observer is automatically removed when the handle is destroyed
-   * or detached.
+   * Adds an observer callback that is invoked when the value changes. Notification is immediate
+   * unless a SuppressDelegation scope is active, in which case it is coalesced and delivered at
+   * scope exit. Returns an ObserverHandle; the observer is automatically removed when the handle
+   * is destroyed or detached.
    */
   ObserverHandle addObserver(Observer observer);
 
@@ -150,15 +149,8 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   int nextObserverId = 1;
   std::vector<DataBindRuntime*> dependents = {};
 
-  /**
-   * Removes the observer with the given id. Called by ObserverHandle::detach().
-   */
   void removeObserver(int id);
 
-  /**
-   * Sets the owning PAGScene for this value. Called once by PAGScene during ViewModel
-   * instantiation; used to route change notifications back to the scene.
-   */
   void setScene(const std::shared_ptr<PAGScene>& scene) {
     this->scene = scene;
   }

@@ -28,7 +28,8 @@ class PAGViewModelValue;
 /**
  * SuppressDelegation suppresses observer notifications for ViewModel value changes within a scope.
  * Property writes during the scope still mark DataBinds dirty (so rendering reflects the latest
- * data), but observer callbacks are coalesced into a single notification on destruction.
+ * data), but observer callbacks are coalesced so that each changed value's observers fire at most
+ * once, at scope exit.
  *
  * Single-level only: creating another SuppressDelegation while one is active on the same scene
  * is a no-op for the inner guard.
@@ -49,14 +50,8 @@ class SuppressDelegation {
   SuppressDelegation& operator=(const SuppressDelegation&) = delete;
 
  private:
-  /**
-   * Returns true if the given scene is currently suppressing observer notifications.
-   */
   static bool isSuppressed(const std::shared_ptr<PAGScene>& scene);
 
-  /**
-   * Adds a value to the scene's pending notification list.
-   */
   static void addPendingNotification(const std::shared_ptr<PAGScene>& scene,
                                      PAGViewModelValue* value);
 

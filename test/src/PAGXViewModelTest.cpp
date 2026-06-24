@@ -1,4 +1,3 @@
-#include <sstream>
 #include "base/PAGTest.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -32,7 +31,6 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "pagx/nodes/Text.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "renderer/LayerBuilder.h"
@@ -106,6 +104,9 @@ PAGX_TEST(PAGXViewModelTest, ColorPropertyReadWrite) {
   pagx::Color red = {1.0f, 0.0f, 0.0f, 1.0f};
   color->value(red);
   EXPECT_FLOAT_EQ(color->value().red, 1.0f);
+  EXPECT_FLOAT_EQ(color->value().green, 0.0f);
+  EXPECT_FLOAT_EQ(color->value().blue, 0.0f);
+  EXPECT_FLOAT_EQ(color->value().alpha, 1.0f);
 }
 PAGX_TEST(PAGXViewModelTest, ImagePropertyReadWrite) {
   const std::string redPNG =
@@ -1252,12 +1253,6 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   parentScene->viewModel()->propertyMap["container"] = containerVal;
 
   // Child VM: has a ViewModel-typed property "container" with null reference.
-  auto* childSchema = doc->makeNode<pagx::ViewModel>("Child");
-  auto* childProp = doc->makeNode<pagx::ViewModelProperty>();
-  childProp->name = "container";
-  childProp->propertyType = pagx::ViewModelPropertyType::ViewModel;
-  childSchema->properties.push_back(childProp);
-
   auto childVM = std::shared_ptr<pagx::PAGViewModel>(new pagx::PAGViewModel());
   auto childContainerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   childContainerVal->propertyName = "container";

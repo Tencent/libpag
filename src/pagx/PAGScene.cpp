@@ -74,8 +74,13 @@ void PAGScene::buildRuntimeTree() {
   if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
     _rootComposition->runtimeLayer->removeFromParent();
   }
-  // A rebuild drops the previous runtime tree and rebuilds view models, so any pending notifications
-  // held as raw pointers would dangle. Drop them and exit any active SuppressDelegation scope.
+  // A rebuild destroys the previous runtime tree and recreates all view models, so any pending
+  // notifications held as raw PAGViewModelValue* would dangle. We therefore intentionally drop the
+  // pending list and force-exit any active SuppressDelegation scope here. This means that if a
+  // rebuild happens inside an active SuppressDelegation guard, its deferred observer notifications
+  // are silently discarded (the guard's destructor later finds an empty list): the values they
+  // referenced are being destroyed, so re-dispatching them is unsafe. Callers must not rely on
+  // deferred notifications surviving a runtime-tree rebuild.
   pendingNotifications.clear();
   suppressNotify = false;
   timelinesByAnimation.clear();

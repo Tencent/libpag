@@ -52,8 +52,9 @@ class ViewModel;
 class PAGViewModel {
  public:
   /**
-   * Returns the number-typed property with the given name. Returns nullptr if no such property
-   * exists or its type does not match.
+   * Returns the number-typed property with the given name. Enum-typed properties are also returned
+   * via this accessor, since an Enum is backed by a number value. Returns nullptr if no such
+   * property exists or its type does not match.
    */
   std::shared_ptr<PAGViewModelValueNumber> propertyNumber(const std::string& name);
 
@@ -64,8 +65,9 @@ class PAGViewModel {
   std::shared_ptr<PAGViewModelValueString> propertyString(const std::string& name);
 
   /**
-   * Returns the boolean-typed property with the given name. Returns nullptr if no such property
-   * exists or its type does not match.
+   * Returns the boolean-typed property with the given name. Trigger-typed properties are also
+   * returned via this accessor, since a Trigger is backed by a boolean value. Returns nullptr if
+   * no such property exists or its type does not match.
    */
   std::shared_ptr<PAGViewModelValueBoolean> propertyBoolean(const std::string& name);
 
@@ -94,9 +96,9 @@ class PAGViewModel {
   std::vector<std::shared_ptr<PAGViewModelValue>> properties() const;
 
   /**
-   * Returns the ViewModel id as declared in the schema, or an empty string if none.
+   * Returns the id of this ViewModel as declared in the schema, or an empty string if none.
    */
-  const std::string& viewModelId() const;
+  const std::string& id() const;
 
   /**
    * Resets the dirty flag of every property in this ViewModel, and for nested ViewModel-typed
@@ -109,13 +111,9 @@ class PAGViewModel {
  private:
   PAGViewModel() = default;
 
-  /**
-   * Internal lookup: returns the raw PAGViewModelValue pointer for the given property name,
-   * or nullptr if not found. Used by DataContext for path resolution.
-   */
   PAGViewModelValue* findProperty(const std::string& name) const;
 
-  std::string id = {};
+  std::string _id = {};
   std::unordered_map<std::string, std::shared_ptr<PAGViewModelValue>> propertyMap = {};
   std::vector<std::shared_ptr<PAGViewModelValue>> propertyList = {};
 

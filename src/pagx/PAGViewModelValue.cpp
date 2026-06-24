@@ -42,7 +42,8 @@ ObserverHandle PAGViewModelValue::addObserver(Observer observer) {
 void PAGViewModelValue::removeObserver(int id) {
   for (auto it = observers.begin(); it != observers.end();) {
     if (it->id == id) {
-      it = observers.erase(it);
+      observers.erase(it);
+      break;
     } else {
       ++it;
     }

@@ -1305,8 +1305,6 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       }
       break;
     }
-    case NodeType::ViewModelProperty:
-      break;
     case NodeType::DataBind: {
       auto bind = static_cast<const DataBind*>(node);
       xml.openElement("DataBind");

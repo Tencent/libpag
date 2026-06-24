@@ -18,6 +18,7 @@
 
 #include "pagx/PAGImage.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/core/Image.h"
 
 namespace pagx {
@@ -38,7 +39,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromDataURI(const std::string& dataURI) 
   if (data == nullptr) {
     return nullptr;
   }
-  auto tgfxData = tgfx::Data::MakeWithCopy(data->data(), data->size());
+  auto tgfxData = ToTGFXData(data);
   auto image = tgfx::Image::MakeFromEncoded(tgfxData);
   if (image == nullptr) {
     return nullptr;
@@ -50,7 +51,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
   if (data == nullptr || data->size() == 0) {
     return nullptr;
   }
-  auto tgfxData = tgfx::Data::MakeWithCopy(data->data(), data->size());
+  auto tgfxData = ToTGFXData(data);
   auto image = tgfx::Image::MakeFromEncoded(tgfxData);
   if (image == nullptr) {
     return nullptr;

@@ -27,13 +27,13 @@ namespace pagx {
 /**
  * DataConverter transforms ViewModel property values before they are applied to render node
  * channels. A converter carries a type name (e.g. "secondsToFrames") and a set of parameters.
- * The runtime DataBind engine invokes the converter through a registered converter factory.
+ * The runtime DataBind engine invokes the converter through a registered converter function.
  */
 class DataConverter : public Node {
  public:
   /**
    * The converter type identifier (e.g. "secondsToFrames", "priceFormat"). Runtime converter
-   * factories are registered by this name.
+   * functions are registered by this name.
    */
   std::string converterType = {};
 
