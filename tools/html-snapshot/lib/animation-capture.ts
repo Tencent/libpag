@@ -507,9 +507,17 @@ export function pagxBuildCanonicalAnimation(
     String(cap.iterations) === 'infinite';
   const iter = infinite ? 'infinite' : cap.iterations || 1;
   const dir = cap.direction || 'normal';
+  // `backwards` so the element holds the 0% keyframe state during `animation-delay`
+  // (a finite intro starts hidden until its delay elapses) instead of CSS's default
+  // `none`, which would show the inline base style during the delay and again after
+  // the iteration finishes — collapsing every animated element to its final visual
+  // state immediately and freezing the timeline. The post-active value still falls
+  // back to the inline base style, which the snapshot writer reads at capture time
+  // and which matches what the original CSS animation (default fill-mode: none)
+  // returned to after a single iteration. See spec/html_subset.md §13.
   const animationShorthand =
     name + ' ' + durSec + 's ' + pagxNormalizeTiming(cap.timing) + ' ' +
-    delaySec + 's ' + iter + ' ' + dir;
+    delaySec + 's ' + iter + ' ' + dir + ' backwards';
   return { name, keyframesCss, animationShorthand };
 }
 

@@ -593,6 +593,13 @@ function appendAnimation(parts, computed) {
     'animation-iteration-count',
     'animation-direction',
     'animation-delay',
+    // Forward `animation-fill-mode` so the importer can hold the 0%-keyframe
+    // state during the delay (and the 100% state after the active window when
+    // `forwards`/`both`) instead of falling back to the inline base style.
+    // The capture pass writes `backwards` into the canonical shorthand so this
+    // longhand resolves to a non-default value; without it, every finite
+    // animation would visually collapse onto its post-active state at t=0.
+    'animation-fill-mode',
   ];
   for (const prop of longhands) {
     const v = (computed.getPropertyValue(prop) || '').trim();

@@ -371,13 +371,13 @@ describe('pagxBuildCanonicalAnimation', () => {
     expect(out.keyframesCss).toContain('@keyframes pagxAnim0');
     expect(out.keyframesCss).toContain('0% { opacity: 0; transform: translate(0px, 0px); }');
     expect(out.keyframesCss).toContain('100% { opacity: 1; transform: translate(40px, 0px); }');
-    expect(out.animationShorthand).toBe('pagxAnim0 2s linear 0s infinite normal');
+    expect(out.animationShorthand).toBe('pagxAnim0 2s linear 0s infinite normal backwards');
   });
 
   test('finite iteration count is preserved verbatim', () => {
     const finite = Object.assign({}, cap, { iterations: 3 });
     const out = pagxBuildCanonicalAnimation(finite, 1, PAGX_ANIM_PREFIX);
-    expect(out.animationShorthand).toBe('pagxAnim1 2s linear 0s 3 normal');
+    expect(out.animationShorthand).toBe('pagxAnim1 2s linear 0s 3 normal backwards');
   });
 
   test('returns null when no subset declarations survive', () => {
