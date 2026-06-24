@@ -140,11 +140,6 @@ export function filterKnownWarnings(stderr: string | null | undefined): string {
 export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
-  /**
-   * Deprecated/no-op: the importer always recovers `display:flex` from the absolute snapshot
-   * now (the per-call flag was removed). Kept for call-site compatibility.
-   */
-  inferFlex?: boolean;
   log?: ((msg: string) => void) | null;
 }
 
@@ -156,7 +151,6 @@ export interface RunPagxImportOptions {
 // `opts`:
 //   pagxBin    — absolute path to the `pagx` CLI (required)
 //   html       — snapshot HTML payload (required)
-//   inferFlex  — deprecated/no-op (flex inference is always on in the importer)
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
 export async function runPagxImport(

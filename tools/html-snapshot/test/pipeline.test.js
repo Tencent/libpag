@@ -255,20 +255,6 @@ describe('runPagxImportToFile', () => {
     expect(joined).toMatch(/real warning: keep me/);
     expect(joined).not.toMatch(/position: absolute on text leaf/);
   });
-
-  test('never passes --html-infer-flex, even with the deprecated inferFlex=false', async () => {
-    const argvPath = path.join(dir, 'argv.bin');
-    const envPath = path.join(dir, 'env.bin');
-    const wrapper = makeArgvCapturingScript({ argvPath, envPath });
-    await runPagxImportToFile({
-      pagxBin: wrapper,
-      subsetHtml: '/in',
-      pagxFile: '/out',
-      inferFlex: false,
-    });
-    expect(readArgv(argvPath)).not.toContain('--html-infer-flex');
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('0');
-  });
 });
 
 describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {

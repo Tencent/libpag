@@ -64,7 +64,6 @@ Options (any unknown flag is forwarded to snapshot.js):
   --scale <N>                Render scale factor (default: 1)
   --no-render                Stop after pagx resolve; do not produce PNG
   --no-resolve               Stop after pagx import; do not run resolve/render
-  --no-infer-flex            Disable AbsoluteToFlexInference (default: on)
   --no-subset-html           Do not write <input>.subset.html (use a temp file
                              that is removed after import); default keeps it
   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
@@ -120,7 +119,6 @@ function parseArgs(argv) {
     scale: 1,
     doResolve: true,
     doRender: true,
-    inferFlex: true,
     keepSubsetHtml: true,
     inlineIconFonts: true,
     downloadFonts: false,
@@ -188,9 +186,6 @@ function parseArgs(argv) {
       case '--no-resolve':
         opts.doResolve = false;
         opts.doRender = false;
-        break;
-      case '--no-infer-flex':
-        opts.inferFlex = false;
         break;
       case '--no-subset-html':
         opts.keepSubsetHtml = false;
@@ -375,7 +370,6 @@ async function main() {
         scale: opts.scale,
         doResolve: opts.doResolve,
         doRender: opts.doRender,
-        inferFlex: opts.inferFlex,
         keepSubsetHtml: opts.keepSubsetHtml,
         embedFonts: opts.embedFonts,
         downloadFonts: opts.downloadFonts,
@@ -419,7 +413,6 @@ async function main() {
       scale: opts.scale,
       doResolve: opts.doResolve,
       doRender: opts.doRender,
-      inferFlex: opts.inferFlex,
       keepSubsetHtml: opts.keepSubsetHtml,
       embedFonts: opts.embedFonts,
       downloadFonts: opts.downloadFonts,

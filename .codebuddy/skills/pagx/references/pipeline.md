@@ -94,7 +94,6 @@ On native Windows, invoke it through `node` (the shebang/executable bit is a Uni
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 (keeps the `.pagx` small) |
 | `--no-render` | Stop after resolve (no PNG) |
 | `--no-resolve` | Stop after import (no resolve/render) |
-| `--no-infer-flex` | Disable flex inference (keep pure absolute layout) |
 | `--no-subset-html` | Do not keep `<input>.subset.html` |
 | `--pagx-bin <path>` | Path to the `pagx` binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
 | `--browser-engine <name>` | `puppeteer` (default) or `playwright` |

@@ -383,7 +383,7 @@ Endpoints:
   convenience route for "fetch this URL and snapshot it". No body required.
   Same response semantics as `POST /snapshot`. Supported query params:
   `url` (required), `format`, `viewportWidth`, `viewportHeight`, `waitMs`,
-  `selector`, `inlineIconFonts`, `inferFlex` (booleans accept any of
+  `selector`, `inlineIconFonts` (booleans accept any of
   `true`/`false`/`1`/`0`).
 - `GET /health` — `200 { status, engine, pagxBin, pagxBinExists, activeRequests }`.
 
@@ -396,7 +396,6 @@ Endpoints:
 | `waitMs` | number | `800` | Extra settle delay after networkidle |
 | `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
 | `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
-| `inferFlex` | boolean | `true` | _PAGX output only_; deprecated/no-op — `pagx import` always recovers flex now |
 | `cookies` | `[{name, value}]` | — | _URL inputs only_; scoped to the target URL |
 | `headers` | `[[key, value]]` or `{key: value}` | — | _URL inputs only_; extra request headers |
 
@@ -460,8 +459,7 @@ curl -s -H 'Content-Type: application/json' \
      -H 'Accept: application/json' \
      --data '{
        "html": "<!doctype html><html><body><h1>hi</h1></body></html>",
-       "format": "both",
-       "options": { "inferFlex": true }
+       "format": "both"
      }' \
      http://127.0.0.1:8787/snapshot
 # → {"width":1400,"height":900,"html":"<!DOCTYPE html>…","pagx":"<?xml …"}

@@ -138,7 +138,6 @@ export interface RunBatchOptions {
   scale?: number;
   doResolve?: boolean;
   doRender?: boolean;
-  inferFlex?: boolean;
   keepSubsetHtml?: boolean;
   embedFonts?: boolean;
   downloadFonts?: boolean;
@@ -240,7 +239,6 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           scale: opts.scale,
           doResolve: opts.doResolve,
           doRender: opts.doRender,
-          inferFlex: opts.inferFlex,
           keepSubsetHtml: opts.keepSubsetHtml,
           embedFonts: opts.embedFonts,
           downloadFonts: opts.downloadFonts,

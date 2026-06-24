@@ -45,14 +45,14 @@
  *       - Accept: application/json (any
  *         single-format request)           → { html|pagx, width, height }.
  *     The `options` object accepts: viewportWidth, viewportHeight, waitMs,
- *     selector, inlineIconFonts, inferFlex, plus cookies / headers for URL
- *     inputs (all optional). `inferFlex` only applies to PAGX output.
+ *     selector, inlineIconFonts, plus cookies / headers for URL inputs
+ *     (all optional).
  *
  *   GET /snapshot?url=<http(s)-url>&format=html|pagx|both&...options
  *     Convenience route for "fetch this page and snapshot it" — no body
  *     required. Same response semantics as POST. Supported query params:
  *       url (required), format, viewportWidth, viewportHeight, waitMs,
- *       selector, inlineIconFonts, inferFlex.
+ *       selector, inlineIconFonts.
  *
  *   GET /health
  *     200 { status: "ok", engine, pagxBin, pagxBinExists, activeRequests }
@@ -130,8 +130,7 @@ Endpoints:
                            requires Accept: application/json.
   GET  /snapshot?url=…   — fetch the URL and run the same pipeline (no body).
                            Optional query params: format, viewportWidth,
-                           viewportHeight, waitMs, selector, inlineIconFonts,
-                           inferFlex.
+                           viewportHeight, waitMs, selector, inlineIconFonts.
   GET  /health           — liveness probe.`);
 }
 
@@ -433,7 +432,6 @@ function parseGetSource(req) {
   setNumberParam(params, queryOptions, 'waitMs');
   setStringParam(params, queryOptions, 'selector');
   setBoolParam(params, queryOptions, 'inlineIconFonts');
-  setBoolParam(params, queryOptions, 'inferFlex');
   const format = normaliseFormat(params.get('format'));
   return { url, options: queryOptions, format };
 }
@@ -446,11 +444,6 @@ function parseGetSource(req) {
 // `cookies` and `headers` are only honoured for URL-source requests; the
 // snapshot pipeline ignores them for file:// URLs and forwarding them
 // would only confuse the caller. The flag is plumbed via `forUrl`.
-//
-// `inferFlex` is special: it does not affect the snapshot pipeline itself,
-// only the downstream `pagx import` step. It is now deprecated/no-op — the
-// importer always recovers flex — but the resolved value is still returned
-// out-of-band (and forwarded to runPagxImport) for backward compatibility.
 function resolveOptions(reqOptions, forUrl) {
   const out = {};
   const r = reqOptions || {};
@@ -473,17 +466,6 @@ function resolveOptions(reqOptions, forUrl) {
   return out;
 }
 
-// Pull the PAGX-specific knobs out of the request's `options` object. Kept
-// separate from `resolveOptions` because they don't belong in the snapshot
-// pipeline's argument set — they only matter for the `pagx import` step.
-function resolvePagxOptions(reqOptions) {
-  const r = reqOptions || {};
-  // `inferFlex` defaults to true (matching html2pagx). Only flip it when the
-  // caller passes an explicit boolean false; a non-boolean value is ignored.
-  const inferFlex = r.inferFlex === false ? false : true;
-  return { inferFlex };
-}
-
 // Common pipeline path for both POST and GET. `source` is the descriptor
 // returned by parsePostSource / parseGetSource; it carries exactly one of
 // `html` or `url`, plus a normalised `format` selector. We resolve options,
@@ -495,7 +477,6 @@ async function handleSnapshot(req, res, ctx, source) {
   try {
     const isUrlSource = typeof source.url === 'string';
     const runOpts = resolveOptions(source.options, isUrlSource);
-    const pagxOpts = resolvePagxOptions(source.options);
     const format = source.format || DEFAULT_FORMAT;
     const wantsPagx = format === 'pagx' || format === 'both';
     const wantsHtml = format === 'html' || format === 'both';
@@ -529,7 +510,6 @@ async function handleSnapshot(req, res, ctx, source) {
         pagx = await runPagxImport({
           pagxBin: ctx.opts.pagxBin,
           html: result.html,
-          inferFlex: pagxOpts.inferFlex,
           log: (msg) => log(`pagx: ${msg}`),
         });
       } catch (err) {

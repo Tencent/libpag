@@ -190,7 +190,6 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
   pagxBin?: string;
   subsetHtml?: string;
   pagxFile?: string;
-  inferFlex?: boolean;
   log?: (line: string) => void;
 }
 
@@ -326,7 +325,6 @@ export interface RunHtmlToPagxOptions {
   scale?: number;
   doResolve?: boolean;
   doRender?: boolean;
-  inferFlex?: boolean;
   keepSubsetHtml?: boolean;
   embedFonts?: boolean;
   downloadFonts?: boolean;
@@ -458,7 +456,6 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       pagxBin,
       subsetHtml,
       pagxFile,
-      inferFlex: opts.inferFlex !== false,
       log: (line: string) => process.stderr.write(line + '\n'),
     });
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
