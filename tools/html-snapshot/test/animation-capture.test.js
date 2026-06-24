@@ -61,6 +61,17 @@ describe('pagxExtractTranslate', () => {
   test('keeps only the translate part of a compound transform', () => {
     expect(pagxExtractTranslate('translate(8px, 9px) rotate(45deg)')).toBe('translate(8px, 9px)');
   });
+
+  test('resolves percent translate against the box dimensions', () => {
+    expect(pagxExtractTranslate('translate(-50%, 0px)', { width: 200, height: 80 }))
+      .toBe('translate(-100px, 0px)');
+    expect(pagxExtractTranslate('translateY(25%)', { width: 100, height: 80 }))
+      .toBe('translate(0px, 20px)');
+  });
+
+  test('forwards percent translate verbatim when no box is provided', () => {
+    expect(pagxExtractTranslate('translate(-50%, 0px)')).toBe('translate(-50%, 0px)');
+  });
 });
 
 describe('pagxPickProp', () => {

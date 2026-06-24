@@ -92,7 +92,20 @@ export interface PagxAnimDescriptor {
 // still carries its net translation in the e/f components, and the importer's
 // own transform handling deliberately keeps that translate while dropping
 // scale/rotation. Returns null only when there is no translation to play.
-export function pagxExtractTranslate(transformStr: string): string | null {
+//
+// `box` (optional): the element's used box size. When provided, percentage
+// translations (`translate(-50%, 0)` — common for marquee idioms) are resolved
+// to absolute pixels per the CSS spec (x relative to box.width, y relative to
+// box.height). The PAGX importer rejects percent values in @keyframes
+// (`ParseTransformMatrix` requires absolute lengths and would drop the entire
+// keyframe transform with a diagnostic), so resolving here is the only way the
+// motion survives. When `box` is omitted (e.g. unit-test contexts), percent
+// tokens are forwarded verbatim — preserving the previous behaviour and
+// surfacing the importer's diagnostic if such a value is ever fed in.
+export function pagxExtractTranslate(
+  transformStr: string,
+  box?: { width: number; height: number } | null,
+): string | null {
   const s = (transformStr || '').trim().toLowerCase();
   if (!s || s === 'none') return null;
   let m = s.match(/^matrix\(([^)]+)\)$/);
@@ -114,6 +127,21 @@ export function pagxExtractTranslate(transformStr: string): string | null {
     }
     return null;
   }
+  // Resolve a single translate axis token (e.g. "-50%", "12px", "8") to a CSS
+  // length string. `basisPx` is the box dimension to resolve percentages
+  // against (width for x, height for y); when null we cannot resolve the
+  // percentage, so the original token is preserved verbatim.
+  function resolveAxis(token: string | null, basisPx: number | null): string {
+    const t = (token || '').trim();
+    if (!t) return '0px';
+    if (t.endsWith('%')) {
+      if (basisPx == null || !isFinite(basisPx)) return t;
+      const pct = parseFloat(t);
+      if (!isFinite(pct)) return t;
+      return (pct / 100 * basisPx) + 'px';
+    }
+    return t;
+  }
   let tx: string | null = null;
   let ty: string | null = null;
   let hadTranslate = false;
@@ -131,7 +159,9 @@ export function pagxExtractTranslate(transformStr: string): string | null {
     }
   }
   if (!hadTranslate) return null;
-  return 'translate(' + (tx || '0px') + ', ' + (ty || '0px') + ')';
+  const wPx = box && isFinite(box.width) ? box.width : null;
+  const hPx = box && isFinite(box.height) ? box.height : null;
+  return 'translate(' + resolveAxis(tx, wPx) + ', ' + resolveAxis(ty, hPx) + ')';
 }
 
 export function pagxPickProp(
@@ -145,14 +175,20 @@ export function pagxPickProp(
 }
 
 // Reduce a raw property bag (WAAPI keyframe or computed-style sample) to the
-// tracked, runtime-playable subset (kebab-cased keys).
-export function pagxNormalizeProps(raw: Record<string, unknown>): Record<string, string> {
+// tracked, runtime-playable subset (kebab-cased keys). `box` is forwarded to
+// `pagxExtractTranslate` so percentage translations (e.g. `translate(-50%)`)
+// resolve to absolute pixels — the importer rejects percent values in
+// @keyframes.
+export function pagxNormalizeProps(
+  raw: Record<string, unknown>,
+  box?: { width: number; height: number } | null,
+): Record<string, string> {
   const out: Record<string, string> = {};
   const op = pagxPickProp(raw, 'opacity', 'opacity');
   if (op != null) out['opacity'] = op;
   const tr = pagxPickProp(raw, 'transform', 'transform');
   if (tr != null && tr !== 'none') {
-    const t = pagxExtractTranslate(tr);
+    const t = pagxExtractTranslate(tr, box);
     if (t) out['transform'] = t;
   }
   const col = pagxPickProp(raw, 'color', 'color');
@@ -578,8 +614,12 @@ export function pagxCollectWAAPI(captured: unknown[], seen: Set<Element>): void 
       const durationMs = typeof ct.duration === 'number' ? ct.duration : 0;
       if (!durationMs || durationMs <= 0) continue;
       const norm: Array<{ offset: number | null; props: Record<string, string> }> = [];
+      // Used box dimensions of the animated element. Forwarded to
+      // pagxNormalizeProps so percent translates resolve to absolute pixels.
+      const tgtRect = (target as HTMLElement).getBoundingClientRect();
+      const tgtBox = { width: tgtRect.width, height: tgtRect.height };
       for (const kf of effect.getKeyframes()) {
-        const props = pagxNormalizeProps(kf);
+        const props = pagxNormalizeProps(kf, tgtBox);
         if (Object.keys(props).length === 0) continue;
         const offset = kf.computedOffset != null ? kf.computedOffset : kf.offset;
         norm.push({ offset: offset != null ? offset : null, props });
@@ -615,6 +655,13 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
     const rule = idx[nameRaw];
     if (!rule || !rule.cssRules) continue;
     const norm: PagxAnimStop[] = [];
+    // Used box dimensions of the animated element. Forwarded to
+    // pagxNormalizeProps so author-percent translates (`translate(-50%)`,
+    // common for marquee/track idioms) become absolute pixels — the importer
+    // rejects percent values in @keyframes and would otherwise drop the
+    // entire keyframe transform with a diagnostic.
+    const elRect = (el as HTMLElement).getBoundingClientRect();
+    const elBox = { width: elRect.width, height: elRect.height };
     for (const kf of Array.prototype.slice.call(rule.cssRules)) {
       const offsets = (kf.keyText || '').split(',');
       const props = pagxNormalizeProps({
@@ -622,7 +669,7 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
         transform: kf.style.transform,
         color: kf.style.color,
         backgroundColor: kf.style.backgroundColor,
-      });
+      }, elBox);
       if (Object.keys(props).length === 0) continue;
       for (const o of offsets) {
         const off = pagxOffsetFromKeyText(o);
