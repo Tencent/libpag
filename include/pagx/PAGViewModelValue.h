@@ -112,6 +112,13 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   void notifyValueChanged();
 
   /**
+   * Dispatches change notification after a subclass updates its stored value. When fromVM is
+   * true, marks this value dirty and notifies both observers and dependent DataBindRuntimes.
+   * When fromVM is false, notifies observers only.
+   */
+  void notifyChanged(bool fromVM);
+
+  /**
    * Notifies all registered observers that this value has changed.
    */
   void notifyObservers();

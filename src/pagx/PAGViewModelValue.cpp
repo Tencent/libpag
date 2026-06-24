@@ -64,7 +64,6 @@ void PAGViewModelValue::notifyObservers() {
   if (notifying) {
     return;  // Prevent recursive notification (Rive parity).
   }
-  dirty = true;
   notifying = true;
   // Snapshot observers: callbacks may addObserver/removeObserver and invalidate the live vector.
   auto snapshot = observers;
@@ -72,6 +71,16 @@ void PAGViewModelValue::notifyObservers() {
     entry.callback();
   }
   notifying = false;
+}
+
+void PAGViewModelValue::notifyChanged(bool fromVM) {
+  if (fromVM) {
+    dirty = true;
+    notifyValueChanged();
+    notifyDependents();
+  } else {
+    notifyValueChanged();
+  }
 }
 
 // ---- Dirty lifecycle ---------------------------------------------------------
@@ -109,13 +118,15 @@ void PAGViewModelValue::removeDependent(DataBindRuntime* runtime) {
 // ---- Typed value setters -----------------------------------------------------
 
 void PAGViewModelValueNumber::value(float v) {
+  setValueInternal(v, true);
+}
+
+void PAGViewModelValueNumber::setValueInternal(float v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }
   propertyValue = v;
-  dirty = true;
-  notifyValueChanged();
-  notifyDependents();
+  notifyChanged(fromVM);
 }
 
 void PAGViewModelValueString::value(const std::string& v) {
@@ -123,19 +134,19 @@ void PAGViewModelValueString::value(const std::string& v) {
     return;
   }
   propertyValue = v;
-  dirty = true;
-  notifyValueChanged();
-  notifyDependents();
+  notifyChanged(true);
 }
 
 void PAGViewModelValueBoolean::value(bool v) {
+  setValueInternal(v, true);
+}
+
+void PAGViewModelValueBoolean::setValueInternal(bool v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }
   propertyValue = v;
-  dirty = true;
-  notifyValueChanged();
-  notifyDependents();
+  notifyChanged(fromVM);
 }
 
 void PAGViewModelValueColor::value(const Color& v) {
@@ -143,9 +154,7 @@ void PAGViewModelValueColor::value(const Color& v) {
     return;
   }
   propertyValue = v;
-  dirty = true;
-  notifyValueChanged();
-  notifyDependents();
+  notifyChanged(true);
 }
 
 void PAGViewModelValueImage::value(std::shared_ptr<PAGImage> v) {
@@ -153,9 +162,7 @@ void PAGViewModelValueImage::value(std::shared_ptr<PAGImage> v) {
     return;
   }
   propertyValue = std::move(v);
-  dirty = true;
-  notifyValueChanged();
-  notifyDependents();
+  notifyChanged(true);
 }
 
 // ---- ObserverHandle ----------------------------------------------------------

@@ -65,6 +65,7 @@ class DataBindRuntime {
   std::vector<BindingEntry> entries = {};
 
   static float ReadTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
+  static void WriteVmFromFloat(PAGViewModelValue* value, float f);
 };
 
 }  // namespace pagx

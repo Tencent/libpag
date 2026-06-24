@@ -39,11 +39,19 @@ class PAGViewModelValueBoolean : public PAGViewModelValue {
    */
   void value(bool v);
 
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(bool v, bool fromVM);
+
  private:
   bool propertyValue = false;
 
   friend class PAGViewModel;
   friend class PAGScene;
+  friend class DataBindRuntime;
 };
 
 }  // namespace pagx

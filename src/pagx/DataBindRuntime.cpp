@@ -195,16 +195,17 @@ float DataBindRuntime::ReadTargetFloat(tgfx::Layer* layer, const std::string& ch
   return layer->matrix().getTranslateY();
 }
 
-static void WriteVmFromFloat(PAGViewModelValue* value, float f) {
-  // Use the normal setter to notify observers (consistent with Rive's TwoWay).
-  // The same-value check in value() prevents unnecessary dirty/loop.
+void DataBindRuntime::WriteVmFromFloat(PAGViewModelValue* value, float f) {
+  // syncBack writeback: route through setValueInternal(v, false) so observers are notified
+  // (two-way binding semantics) but dirty/dependents are not triggered, preventing a shared
+  // source from causing other bindings to be wrongly skipped in the same syncBack pass.
   if (value == nullptr) {
     return;
   }
   if (value->valueType() == ViewModelValueType::Number) {
-    static_cast<PAGViewModelValueNumber*>(value)->value(f);
+    static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(f, false);
   } else if (value->valueType() == ViewModelValueType::Boolean) {
-    static_cast<PAGViewModelValueBoolean*>(value)->value(f != 0.0f);
+    static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(f != 0.0f, false);
   }
 }
 
