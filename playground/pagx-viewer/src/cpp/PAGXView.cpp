@@ -21,7 +21,7 @@
 #include <emscripten/html5.h>
 #include <algorithm>
 #include <cstdint>
-#include "pagx/PAGTypeface.h"
+#include "pagx/PAGFont.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -93,17 +93,11 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      fontConfig.addFallbackTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
-    }
+    fontConfig.addFallbackFont(fontData->data(), fontData->size(), 0);
   }
   auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      fontConfig.addFallbackTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
-    }
+    fontConfig.addFallbackFont(emojiFontData->data(), emojiFontData->size(), 0);
   }
 }
 

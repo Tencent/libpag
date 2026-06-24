@@ -18,18 +18,18 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
+#include "pagx/PAGFont.h"
 
 namespace pagx {
 
-class PAGTypeface;
-
 /**
- * FontConfig manages registered and fallback typefaces for font lookup.
- * This decouples font configuration from text layout and layout computation,
- * allowing multiple components (LayoutContext, TextLayout, LayerBuilder) to share the same font
- * registry. Font lookup is performed by LayoutContext using the data stored here.
+ * FontConfig manages registered and fallback typefaces for font lookup. This decouples font
+ * configuration from text layout and layout computation, allowing multiple components
+ * (LayoutContext, TextLayout, LayerBuilder) to share the same font registry. Font lookup is
+ * performed by LayoutContext using the data stored here.
  */
 class FontConfig {
  public:
@@ -41,20 +41,115 @@ class FontConfig {
   FontConfig& operator=(FontConfig&& other) noexcept;
 
   /**
-   * Registers a PAGTypeface for exact (fontFamily, fontStyle) lookup. The lookup key is read
-   * from the PAGTypeface's fontFamily()/fontStyle(). Use this for fonts explicitly provided by
-   * the application.
-   * @param typeface The PAGTypeface to register. Construct via PAGTypeface::MakeFromPath,
-   *                 MakeFromName, or MakeFromTypeface.
+   * Registers a font from a file path with an explicit registration key. Use this when the
+   * registration name comes from a PAGFont (e.g. returned by PAGXDocument::getRequiredFonts()).
+   * @param font The PAGFont describing the registration (fontFamily, fontStyle).
+   * @param path The font file path.
+   * @param ttcIndex The face index within a TTC font collection.
    */
-  void registerTypeface(std::shared_ptr<PAGTypeface> typeface);
+  void registerFont(const PAGFont& font, const std::string& path, int ttcIndex);
 
   /**
-   * Adds a fallback PAGTypeface used when a character is not found in the primary font
-   * (either registered or system). Typefaces are tried in order.
-   * @param typeface The fallback PAGTypeface.
+   * Registers a font from an in-memory buffer with an explicit registration key.
+   * @param font The PAGFont describing the registration (fontFamily, fontStyle).
+   * @param data Pointer to the font data.
+   * @param length Size of the font data in bytes.
+   * @param ttcIndex The face index within a TTC font collection.
    */
-  void addFallbackTypeface(std::shared_ptr<PAGTypeface> typeface);
+  void registerFont(const PAGFont& font, const void* data, size_t length, int ttcIndex);
+
+  /**
+   * Registers a font from a file path. When fontFamily is empty, the registration key is read
+   * from the font file itself; otherwise the provided (fontFamily, fontStyle) is used.
+   * @param path The font file path.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The registration family name. Empty to read from the font file.
+   * @param fontStyle The registration style name. Empty to read from the font file.
+   */
+  void registerFont(const std::string& path, int ttcIndex,
+                    const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
+   * Registers a font from an in-memory buffer. When fontFamily is empty, the registration key is
+   * read from the font data itself; otherwise the provided (fontFamily, fontStyle) is used.
+   * @param data Pointer to the font data.
+   * @param length Size of the font data in bytes.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The registration family name. Empty to read from the font data.
+   * @param fontStyle The registration style name. Empty to read from the font data.
+   */
+  void registerFont(const void* data, size_t length, int ttcIndex,
+                    const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
+   * Adds a fallback font from a file path with an explicit (fontFamily, fontStyle). Used when a
+   * character is not found in primary fonts.
+   * @param font The PAGFont describing the fallback (fontFamily, fontStyle).
+   * @param path The font file path.
+   * @param ttcIndex The face index within a TTC font collection.
+   */
+  void addFallbackFont(const PAGFont& font, const std::string& path, int ttcIndex);
+
+  /**
+   * Adds a fallback font from an in-memory buffer with an explicit (fontFamily, fontStyle).
+   * @param font The PAGFont describing the fallback (fontFamily, fontStyle).
+   * @param data Pointer to the font data.
+   * @param length Size of the font data in bytes.
+   * @param ttcIndex The face index within a TTC font collection.
+   */
+  void addFallbackFont(const PAGFont& font, const void* data, size_t length, int ttcIndex);
+
+  /**
+   * Adds a fallback font from a file path. When fontFamily is empty, the (fontFamily, fontStyle)
+   * is read from the font file itself; otherwise the provided values are used.
+   * @param path The font file path.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The fallback family name. Empty to read from the font file.
+   * @param fontStyle The fallback style name. Empty to read from the font file.
+   */
+  void addFallbackFont(const std::string& path, int ttcIndex,
+                       const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
+   * Adds a fallback font from an in-memory buffer. When fontFamily is empty, the
+   * (fontFamily, fontStyle) is read from the font data itself; otherwise the provided values are
+   * used.
+   * @param data Pointer to the font data.
+   * @param length Size of the font data in bytes.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The fallback family name. Empty to read from the font data.
+   * @param fontStyle The fallback style name. Empty to read from the font data.
+   */
+  void addFallbackFont(const void* data, size_t length, int ttcIndex,
+                       const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
+   * Registers a system font by name. Returns false if the system does not have a matching font.
+   * @param fontFamily The system font family name.
+   * @param fontStyle The system font style name.
+   */
+  bool registerFont(const std::string& fontFamily, const std::string& fontStyle);
+
+  /**
+   * Registers a system font by name. Returns false if the system does not have a matching font.
+   * @param font The PAGFont describing the system font (fontFamily, fontStyle).
+   */
+  bool registerFont(const PAGFont& font);
+
+  /**
+   * Adds a system fallback font by name. Returns false if the system does not have a matching
+   * font.
+   * @param fontFamily The system font family name.
+   * @param fontStyle The system font style name.
+   */
+  bool addFallbackFont(const std::string& fontFamily, const std::string& fontStyle);
+
+  /**
+   * Adds a system fallback font by name. Returns false if the system does not have a matching
+   * font.
+   * @param font The PAGFont describing the system fallback (fontFamily, fontStyle).
+   */
+  bool addFallbackFont(const PAGFont& font);
 
  private:
   struct Data;

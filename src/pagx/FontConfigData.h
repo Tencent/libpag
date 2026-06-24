@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
-#include "pagx/PAGTypeface.h"
 
 namespace pagx {
 
@@ -43,8 +42,8 @@ struct FontConfig::Data {
     }
   };
 
-  std::unordered_map<FontKey, std::shared_ptr<PAGTypeface>, FontKeyHash> registeredTypefaces = {};
-  std::vector<std::shared_ptr<PAGTypeface>> fallbackTypefaces = {};
+  std::unordered_map<FontKey, TypefaceHolder, FontKeyHash> registeredTypefaces = {};
+  std::vector<TypefaceHolder> fallbackTypefaces = {};
 };
 
 }  // namespace pagx

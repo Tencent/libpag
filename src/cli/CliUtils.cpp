@@ -19,7 +19,7 @@
 #include "cli/CliUtils.h"
 #include <fstream>
 #include <iostream>
-#include "pagx/PAGTypeface.h"
+#include "pagx/PAGFont.h"
 #include "pagx/PAGXImporter.h"
 
 namespace pagx::cli {
@@ -40,22 +40,28 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
-    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
-    if (typeface == nullptr) {
-      std::cerr << command << ": failed to load font '" << fontFile << "'\n";
-      return false;
-    }
-    fontConfig->registerTypeface(PAGTypeface::MakeFromTypeface(typeface));
+    fontConfig->registerFont(fontFile, 0);
   }
   for (const auto& fallbackStr : fallbacks) {
-    auto typeface = ResolveFallbackTypeface(fallbackStr);
-    if (typeface == nullptr) {
-      std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      return false;
+    bool isFilePath = fallbackStr.find('/') != std::string::npos;
+    if (!isFilePath) {
+      auto dot = fallbackStr.rfind('.');
+      if (dot != std::string::npos) {
+        auto ext = fallbackStr.substr(dot);
+        isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
+                     ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
+      }
     }
-    auto pagxTypeface = PAGTypeface::MakeFromTypeface(typeface);
-    fontConfig->registerTypeface(pagxTypeface);
-    fontConfig->addFallbackTypeface(pagxTypeface);
+    if (isFilePath) {
+      fontConfig->addFallbackFont(fallbackStr, 0);
+    } else {
+      auto commaPos = fallbackStr.find(',');
+      auto family = commaPos != std::string::npos ? fallbackStr.substr(0, commaPos) : fallbackStr;
+      auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
+      if (!fontConfig->addFallbackFont(family, style)) {
+        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
+      }
+    }
   }
   return true;
 }

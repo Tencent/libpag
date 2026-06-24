@@ -19,7 +19,7 @@
 #include <memory>
 #include "base/PAGTest.h"
 #include "pagx/FontConfig.h"
-#include "pagx/PAGTypeface.h"
+#include "pagx/PAGFont.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -74,7 +74,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   authoredDoc->layers.push_back(layer);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(fontPath, 0, typeface->fontFamily(), typeface->fontStyle());
   authoredDoc->applyLayout(&fontConfig);
   if (!pagx::FontEmbedder().embed(authoredDoc.get())) {
     return nullptr;

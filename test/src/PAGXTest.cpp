@@ -29,11 +29,11 @@
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGFont.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
-#include "pagx/PAGTypeface.h"
 #include "pagx/PAGXChannelTable.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
@@ -158,29 +158,13 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static std::vector<std::shared_ptr<pagx::PAGTypeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<pagx::PAGTypeface>> result = {};
-  auto regularTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  if (regularTypeface) {
-    result.push_back(pagx::PAGTypeface::MakeFromTypeface(regularTypeface));
-  }
-  auto emojiTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-  if (emojiTypeface) {
-    result.push_back(pagx::PAGTypeface::MakeFromTypeface(emojiTypeface));
-  }
-  auto hebrewTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
-  if (hebrewTypeface) {
-    result.push_back(pagx::PAGTypeface::MakeFromTypeface(hebrewTypeface));
-  }
-  return result;
-}
-
-static std::vector<std::shared_ptr<pagx::PAGTypeface>> GetFallbackTypefaces() {
-  static auto typefaces = CreateFallbackTypefaces();
-  return typefaces;
+static const std::vector<std::string>& GetFallbackFontPaths() {
+  static const std::vector<std::string> paths = {
+      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
+      ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"),
+      ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"),
+  };
+  return paths;
 }
 
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
@@ -253,8 +237,8 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   // Create FontConfig for text layout
   pagx::FontConfig svgFontConfig;
-  for (auto& tf : GetFallbackTypefaces()) {
-    svgFontConfig.addFallbackTypeface(tf);
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    svgFontConfig.addFallbackFont(fontPath, 0);
   }
 
   for (const auto& svgPath : svgFiles) {
@@ -585,8 +569,8 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   doc->layers.push_back(layer);
 
   pagx::FontConfig embedFontConfig;
-  for (auto& tf : GetFallbackTypefaces()) {
-    embedFontConfig.addFallbackTypeface(tf);
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    embedFontConfig.addFallbackFont(fontPath, 0);
   }
   doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
@@ -771,8 +755,8 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
                              std::filesystem::copy_options::overwrite_existing);
 
   pagx::FontConfig fontConfig;
-  for (auto& tf : GetFallbackTypefaces()) {
-    fontConfig.addFallbackTypeface(tf);
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
   }
 
   for (const auto& [name, xmlContent] : patterns) {
@@ -836,8 +820,8 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   std::sort(files.begin(), files.end());
 
   pagx::FontConfig fontConfig;
-  for (auto& tf : GetFallbackTypefaces()) {
-    fontConfig.addFallbackTypeface(tf);
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
   }
 
   for (const auto& filePath : files) {
@@ -2352,7 +2336,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -2398,7 +2383,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -4802,7 +4788,8 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
 
   doc->applyLayout(&fontConfig);
 
@@ -4902,7 +4889,8 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   // Target width = 400 - 50 - 50 = 300.
@@ -4977,7 +4965,8 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5022,7 +5011,8 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5060,7 +5050,8 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -5111,7 +5102,8 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5165,7 +5157,8 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   layer->contents = {standalone, fill1, textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   // Standalone Text: textBounds should have positive width and height.
@@ -5296,7 +5289,8 @@ PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   EXPECT_TRUE(doc->embed());
@@ -5327,7 +5321,8 @@ PAGX_TEST(PAGXTest, DocumentClearEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5362,7 +5357,8 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5944,7 +5940,8 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   object->channels.push_back(yProp);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto file = pagx::PAGScene::Make(doc);
@@ -7864,14 +7861,15 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   constexpr int canvasH = 470;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
   pagx::FontConfig fontConfig;
-  for (auto& tf : GetFallbackTypefaces()) {
-    fontConfig.addFallbackTypeface(tf);
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
   }
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
@@ -10965,7 +10963,8 @@ PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
 
   // Register typeface and run full pipeline.
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(pagx::PAGTypeface::MakeFromTypeface(typeface));
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   EXPECT_TRUE(doc->embed());
 

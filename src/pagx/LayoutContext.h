@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
 
 namespace tgfx {
@@ -28,8 +29,6 @@ class Typeface;
 }
 
 namespace pagx {
-
-class PAGTypeface;
 
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
@@ -57,7 +56,7 @@ class LayoutContext {
   void ensureSystemFallbacks();
 
   FontConfig* fontConfig = nullptr;
-  std::vector<std::shared_ptr<PAGTypeface>> systemFallbacks = {};
+  std::vector<TypefaceHolder> systemFallbacks = {};
   bool systemFallbacksLoaded = false;
 };
 
