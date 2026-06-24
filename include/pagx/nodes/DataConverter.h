@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include <map>
 #include <string>
-#include <unordered_map>
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -40,7 +40,7 @@ class DataConverter : public Node {
   /**
    * The converter parameters as key-value pairs. Interpretation is converter-specific.
    */
-  std::unordered_map<std::string, std::string> params = {};
+  std::map<std::string, std::string> params = {};
 
   NodeType nodeType() const override {
     return NodeType::DataConverter;
