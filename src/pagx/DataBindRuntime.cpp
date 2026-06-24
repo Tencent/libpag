@@ -182,7 +182,7 @@ static bool IsFloatReadableChannel(const std::string& channel) {
   return channel == "alpha" || channel == "x" || channel == "y";
 }
 
-float DataBindRuntime::readTargetFloat(tgfx::Layer* layer, const std::string& channel,
+float DataBindRuntime::ReadTargetFloat(tgfx::Layer* layer, const std::string& channel,
                                        float fallback) {
   if (layer == nullptr || !IsFloatReadableChannel(channel)) {
     return fallback;
@@ -234,11 +234,11 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
       continue;
     }
     // syncBack only supports float-readable channels. Skipping unsupported channels
-    // avoids writing the readTargetFloat fallback (0.0f) into the VM.
+    // avoids writing the ReadTargetFloat fallback (0.0f) into the VM.
     if (!IsFloatReadableChannel(entry.channel)) {
       continue;
     }
-    float current = readTargetFloat(layer.get(), entry.channel, 0.0f);
+    float current = ReadTargetFloat(layer.get(), entry.channel, 0.0f);
     // Apply inverse converter for syncBack direction (layer value → VM domain).
     KeyValue kv{current};
     kv = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);

@@ -65,7 +65,7 @@ class DataBindRuntime {
   std::vector<DataBind*> dirtyBinds = {};
   std::vector<BindingEntry> entries = {};
 
-  static float readTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
+  static float ReadTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
 };
 
 }  // namespace pagx
