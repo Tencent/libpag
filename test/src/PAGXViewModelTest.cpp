@@ -321,7 +321,19 @@ PAGX_TEST(PAGXViewModelTest, DataBindXMLRoundTrip) {
       "target=\"@textLayer\" channel=\"text\"/>\n    </Composition>\n");
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_NE(doc, nullptr);
-  pagx::PAGXExporter::ToXML(*doc);
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
+  ASSERT_NE(roundTripped, nullptr);
+  ASSERT_NE(roundTripped->viewModel, nullptr);
+  EXPECT_EQ(roundTripped->viewModel->id, "MainVM");
+  ASSERT_EQ(roundTripped->viewModel->properties.size(), 1u);
+  EXPECT_EQ(roundTripped->viewModel->properties[0]->name, "title");
+  auto* comp = roundTripped->findNode<pagx::Composition>("Main");
+  ASSERT_NE(comp, nullptr);
+  ASSERT_EQ(comp->dataBinds.size(), 1u);
+  EXPECT_EQ(comp->dataBinds[0]->source, "$vm.title");
+  EXPECT_EQ(comp->dataBinds[0]->target, "@textLayer");
+  EXPECT_EQ(comp->dataBinds[0]->channel, "text");
 }
 
 PAGX_TEST(PAGXViewModelTest, HasChangedFlag) {
