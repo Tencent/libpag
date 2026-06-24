@@ -39,7 +39,8 @@ class PAGViewModelValueImage : public PAGViewModelValue {
   }
 
   /**
-   * Sets the image value. Setting the same value is a no-op.
+   * Sets the image value. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
    */
   void value(std::shared_ptr<PAGImage> v);
 

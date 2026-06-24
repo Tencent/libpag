@@ -35,7 +35,8 @@ class PAGViewModelValueBoolean : public PAGViewModelValue {
   }
 
   /**
-   * Sets the boolean value. Setting the same value is a no-op.
+   * Sets the boolean value. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
    */
   void value(bool v);
 

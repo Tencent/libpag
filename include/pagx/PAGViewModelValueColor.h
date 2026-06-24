@@ -36,7 +36,8 @@ class PAGViewModelValueColor : public PAGViewModelValue {
   }
 
   /**
-   * Sets the color value. Setting the same value is a no-op.
+   * Sets the color value. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
    */
   void value(const Color& v);
 

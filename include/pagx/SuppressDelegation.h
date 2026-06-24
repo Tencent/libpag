@@ -50,9 +50,9 @@ class SuppressDelegation {
   SuppressDelegation& operator=(const SuppressDelegation&) = delete;
 
  private:
-  static bool isSuppressed(const std::shared_ptr<PAGScene>& scene);
+  static bool IsSuppressed(const std::shared_ptr<PAGScene>& scene);
 
-  static void addPendingNotification(const std::shared_ptr<PAGScene>& scene,
+  static void AddPendingNotification(const std::shared_ptr<PAGScene>& scene,
                                      PAGViewModelValue* value);
 
   std::weak_ptr<PAGScene> scene;

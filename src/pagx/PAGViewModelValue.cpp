@@ -55,8 +55,8 @@ void PAGViewModelValue::removeObserver(int id) {
 
 void PAGViewModelValue::notifyValueChanged() {
   auto s = scene.lock();
-  if (s != nullptr && SuppressDelegation::isSuppressed(s)) {
-    SuppressDelegation::addPendingNotification(s, this);
+  if (s != nullptr && SuppressDelegation::IsSuppressed(s)) {
+    SuppressDelegation::AddPendingNotification(s, this);
   } else {
     notifyObservers();
   }

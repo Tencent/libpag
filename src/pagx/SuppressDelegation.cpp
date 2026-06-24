@@ -54,11 +54,11 @@ SuppressDelegation::~SuppressDelegation() {
   pending.clear();
 }
 
-bool SuppressDelegation::isSuppressed(const std::shared_ptr<PAGScene>& scene) {
+bool SuppressDelegation::IsSuppressed(const std::shared_ptr<PAGScene>& scene) {
   return scene != nullptr && scene->suppressNotify;
 }
 
-void SuppressDelegation::addPendingNotification(const std::shared_ptr<PAGScene>& scene,
+void SuppressDelegation::AddPendingNotification(const std::shared_ptr<PAGScene>& scene,
                                                 PAGViewModelValue* value) {
   if (scene != nullptr && value != nullptr) {
     scene->pendingNotifications.push_back(value);

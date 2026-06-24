@@ -363,7 +363,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   displayList->render(tgfxSurface.get(), autoClear);
   drawable->present(context);
   device->unlock();
-  advanceAllViewModels();
+  clearAllViewModelsDirty();
   return true;
 }
 
@@ -394,13 +394,13 @@ void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
 }
 
-void PAGScene::advanceAllViewModels() {
+void PAGScene::clearAllViewModelsDirty() {
   if (_rootComposition != nullptr) {
-    advanceCompositionTree(_rootComposition.get());
+    clearCompositionTreeDirty(_rootComposition.get());
   }
 }
 
-void PAGScene::advanceCompositionTree(PAGComposition* comp) {
+void PAGScene::clearCompositionTreeDirty(PAGComposition* comp) {
   if (comp == nullptr) {
     return;
   }
@@ -410,7 +410,7 @@ void PAGScene::advanceCompositionTree(PAGComposition* comp) {
   std::vector<PAGComposition*> childComps = {};
   PAGComposition::CollectChildCompositions(comp, childComps);
   for (auto* childComp : childComps) {
-    advanceCompositionTree(childComp);
+    clearCompositionTreeDirty(childComp);
   }
 }
 

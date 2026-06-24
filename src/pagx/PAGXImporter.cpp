@@ -2773,9 +2773,9 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         vm->properties.push_back(prop);
       }
     } else if (child->type == DOMNodeType::Element) {
-      ReportError(doc, child.get(),
-                  "Element '" + child->name +
-                      "' is not allowed in 'ViewModel'. Expected: Property.");
+      ReportError(
+          doc, child.get(),
+          "Element '" + child->name + "' is not allowed in 'ViewModel'. Expected: Property.");
     }
     child = child->nextSibling;
   }

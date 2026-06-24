@@ -36,7 +36,8 @@ class PAGViewModelValueString : public PAGViewModelValue {
   }
 
   /**
-   * Sets the string value. Setting the same value is a no-op.
+   * Sets the string value. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
    */
   void value(const std::string& v);
 
