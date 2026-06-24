@@ -49,7 +49,7 @@ DataConverterRegistry& DataConverterRegistry::instance() {
 }
 
 KeyValue DataConverterRegistry::ConvertSecondsToFrames(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) {
     return input;
   }
@@ -63,7 +63,7 @@ KeyValue DataConverterRegistry::ConvertSecondsToFrames(
 }
 
 KeyValue DataConverterRegistry::ConvertPriceFormat(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   float value = 0.0f;
   if (std::holds_alternative<float>(input)) {
     value = std::get<float>(input);
@@ -90,7 +90,7 @@ KeyValue DataConverterRegistry::ConvertPriceFormat(
 }
 
 KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float frames = std::get<float>(input);
   float frameRate = DEFAULT_FRAME_RATE;
@@ -100,7 +100,7 @@ KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
 }
 
 KeyValue DataConverterRegistry::ConvertInversePriceFormat(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   std::string str;
   if (std::holds_alternative<std::string>(input)) {
     str = std::get<std::string>(input);
@@ -119,7 +119,7 @@ KeyValue DataConverterRegistry::ConvertInversePriceFormat(
 }
 
 KeyValue DataConverterRegistry::ConvertRangeMapper(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float value = std::get<float>(input);
   float inputMin = DEFAULT_RANGE_INPUT_MIN;
@@ -140,7 +140,7 @@ KeyValue DataConverterRegistry::ConvertRangeMapper(
 }
 
 KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float value = std::get<float>(input);
   float inputMin = DEFAULT_RANGE_INPUT_MIN;
@@ -160,14 +160,14 @@ KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
   return KeyValue{inputMin + t * (inputMax - inputMin)};
 }
 
-KeyValue DataConverterRegistry::ConvertDegsToRads(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
+KeyValue DataConverterRegistry::ConvertDegsToRads(const KeyValue& input,
+                                                  const std::map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
   return KeyValue{std::get<float>(input) * DEG_TO_RAD};
 }
 
 KeyValue DataConverterRegistry::ConvertInverseDegsToRads(
-    const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
+    const KeyValue& input, const std::map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
   return KeyValue{std::get<float>(input) / DEG_TO_RAD};
 }
