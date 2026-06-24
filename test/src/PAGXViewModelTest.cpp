@@ -1120,7 +1120,8 @@ PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
   ASSERT_TRUE(std::holds_alternative<std::string>(priceOutput));
   EXPECT_EQ(std::get<std::string>(priceOutput), "$5999.00");
   auto layers = scene->getLayersUnderPoint(100, 100);
-  EXPECT_GT(layers.size(), 0u);
+  ASSERT_GT(layers.size(), 0u);
+  EXPECT_EQ(layers[0]->runtimeLayer->name(), "$5999.00");
 }
 
 PAGX_TEST(PAGXViewModelTest, DataConverterNotFoundPassthrough) {
