@@ -2740,6 +2740,7 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
           prop->propertyType = ViewModelPropertyType::ViewModel;
         } else if (typeStr == "Enum" || typeStr == "enum") {
           prop->propertyType = ViewModelPropertyType::Enum;
+          prop->defaultEnum = GetIntAttribute(child.get(), "default", prop->defaultEnum, doc);
         } else if (typeStr == "Trigger" || typeStr == "trigger") {
           prop->propertyType = ViewModelPropertyType::Trigger;
         } else {

@@ -345,7 +345,7 @@ PAGX_TEST(PAGXViewModelTest, HasChangedFlag) {
   EXPECT_FALSE(score->hasChanged());
   score->value(200.0f);
   EXPECT_TRUE(score->hasChanged());
-  score->advanced();
+  score->clearDirty();
   EXPECT_FALSE(score->hasChanged());
 }
 
@@ -1360,7 +1360,7 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataSubclassReflectsType) {
   auto vm = scene->viewModel();
   ASSERT_NE(vm, nullptr);
 
-  auto enumPd = vm->propertyNumber("theme")->propertyData();
+  auto enumPd = vm->propertyEnum("theme")->propertyData();
   ASSERT_NE(enumPd, nullptr);
   EXPECT_EQ(enumPd->type(), pagx::PropertyData::Type::Enum);
   auto enumData = std::static_pointer_cast<pagx::EnumPropertyData>(enumPd);
@@ -1374,6 +1374,39 @@ PAGX_TEST(PAGXViewModelTest, PropertyDataSubclassReflectsType) {
   EXPECT_EQ(vmPd->type(), pagx::PropertyData::Type::ViewModel);
   auto vmData = std::static_pointer_cast<pagx::ViewModelPropertyData>(vmPd);
   ASSERT_NE(vmData, nullptr);
+}
+
+// Verify Enum properties store and expose a zero-based integer option index.
+PAGX_TEST(PAGXViewModelTest, EnumValueIntStorage) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+
+  auto* enumProp = doc->makeNode<pagx::ViewModelProperty>();
+  enumProp->name = "theme";
+  enumProp->propertyType = pagx::ViewModelPropertyType::Enum;
+  enumProp->enumOptions = {"dark", "light", "auto"};
+  enumProp->defaultEnum = 2;
+  schema->properties.push_back(enumProp);
+
+  doc->viewModel = schema;
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+
+  auto theme = vm->propertyEnum("theme");
+  ASSERT_NE(theme, nullptr);
+  EXPECT_EQ(theme->valueType(), pagx::ViewModelValueType::Enum);
+  EXPECT_EQ(theme->value(), 2);
+  EXPECT_FALSE(theme->hasChanged());
+
+  theme->value(0);
+  EXPECT_EQ(theme->value(), 0);
+  EXPECT_TRUE(theme->hasChanged());
+
+  // A number accessor must not return an enum property.
+  EXPECT_EQ(vm->propertyNumber("theme"), nullptr);
 }
 
 // ========== Nested composition DataBind ==========

@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/nodes/Channel.h"
 
 namespace pagx {
 
@@ -65,7 +66,7 @@ class DataBindRuntime {
   std::vector<BindingEntry> entries = {};
 
   static float ReadTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
-  static void WriteVmFromFloat(PAGViewModelValue* value, float f);
+  static void WriteVmValue(PAGViewModelValue* value, const KeyValue& kv);
 };
 
 }  // namespace pagx

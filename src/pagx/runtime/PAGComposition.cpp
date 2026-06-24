@@ -180,6 +180,25 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
+void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+                                              std::vector<PAGComposition*>& outChildren) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto& child : layer->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() == LayerType::Composition) {
+      outChildren.push_back(static_cast<PAGComposition*>(child.get()));
+    } else {
+      // A plain layer container holds no view model of its own but may nest compositions; descend
+      // through it so those compositions are still reached.
+      CollectChildCompositions(child.get(), outChildren);
+    }
+  }
+}
+
 void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
                                   const std::unordered_set<const Node*>& dirtySet,
                                   std::unordered_set<const Composition*>& visited) {
@@ -404,10 +423,10 @@ void PAGComposition::updateDataBinds(float mix) {
     dataBindRuntime->syncBack(binding.get());
     dataBindRuntime->update(binding.get(), mix);
   }
-  for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->updateDataBinds(mix);
-    }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->updateDataBinds(mix);
   }
 }
 

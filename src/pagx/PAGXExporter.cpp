@@ -1282,12 +1282,14 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
                 xml.addAttribute("viewModelRef", "@" + prop->viewModelRef->id);
               break;
             case ViewModelPropertyType::Enum:
+              xml.addAttribute("default", prop->defaultEnum);
+              break;
             case ViewModelPropertyType::Trigger:
               break;
           }
           if (prop->propertyType == ViewModelPropertyType::Number) {
-            if (prop->minValue.has_value()) xml.addAttribute("min", *prop->minValue);
-            if (prop->maxValue.has_value()) xml.addAttribute("max", *prop->maxValue);
+            if (prop->minValue.has_value()) xml.addRequiredAttribute("min", *prop->minValue);
+            if (prop->maxValue.has_value()) xml.addRequiredAttribute("max", *prop->maxValue);
           }
           if (!prop->enumOptions.empty()) {
             std::string opts;

@@ -27,11 +27,21 @@ std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(const std:
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  const auto type = it->second->valueType();
-  if (type != ViewModelValueType::Number && type != ViewModelValueType::Enum) {
+  if (it->second->valueType() != ViewModelValueType::Number) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueNumber>(it->second);
+}
+
+std::shared_ptr<PAGViewModelValueEnum> PAGViewModel::propertyEnum(const std::string& name) {
+  auto it = propertyMap.find(name);
+  if (it == propertyMap.end()) {
+    return nullptr;
+  }
+  if (it->second->valueType() != ViewModelValueType::Enum) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueEnum>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(const std::string& name) {
@@ -97,20 +107,13 @@ std::vector<std::shared_ptr<PAGViewModelValue>> PAGViewModel::properties() const
   return propertyList;
 }
 
-const std::string& PAGViewModel::viewModelId() const {
-  return id;
+const std::string& PAGViewModel::id() const {
+  return _id;
 }
 
-void PAGViewModel::advancedAll() {
+void PAGViewModel::clearDirty() {
   for (const auto& value : propertyList) {
-    value->advanced();
-    if (value->valueType() == ViewModelValueType::ViewModel) {
-      const auto& vmValue = std::static_pointer_cast<PAGViewModelValueViewModel>(value);
-      const auto& child = vmValue->referenceViewModel();
-      if (child != nullptr) {
-        child->advancedAll();
-      }
-    }
+    value->clearDirty();
   }
 }
 

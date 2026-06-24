@@ -67,7 +67,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   }
 
   /**
-   * Returns true if the value has changed since the last frame-level advanced() call.
+   * Returns true if the value has changed since the last frame-level clearDirty() call.
    */
   bool hasChanged() const {
     return dirty;
@@ -87,17 +87,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   std::shared_ptr<PropertyData> propertyData() const {
     return pd;
   }
-
-  /**
-   * Registers a DataBindRuntime as a dependent of this value. When the value changes, the
-   * runtime's markDirty() is called for the associated DataBind node.
-   */
-  void addDependent(DataBindRuntime* runtime);
-
-  /**
-   * Removes a previously registered dependent.
-   */
-  void removeDependent(DataBindRuntime* runtime);
 
  protected:
   PAGViewModelValue() = default;
@@ -125,7 +114,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   /**
    * Resets the dirty flag. Called at the end of each frame after DataBinds have been applied.
    */
-  void advanced();
+  void clearDirty();
 
   std::string propertyName = {};
   bool dirty = false;
@@ -154,6 +143,10 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   void setScene(const std::shared_ptr<PAGScene>& scene) {
     this->scene = scene;
   }
+
+  void addDependent(DataBindRuntime* runtime);
+
+  void removeDependent(DataBindRuntime* runtime);
 
   friend class ObserverHandle;
   friend class PAGViewModel;

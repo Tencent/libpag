@@ -97,6 +97,13 @@ class PAGComposition : public PAGLayer {
                             const std::shared_ptr<PAGScene>& scene,
                             std::unordered_set<const Composition*>& visited);
 
+  // Collects the direct child compositions of a layer into outChildren, transparently descending
+  // through plain PAGLayer containers (which may nest compositions) but not into the child
+  // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
+  // update, view-model advance) so that compositions nested under plain container layers are not
+  // skipped.
+  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
+
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
   // visited carries the source compositions on the current ancestor path: when this method recurses

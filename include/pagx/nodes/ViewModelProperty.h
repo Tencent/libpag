@@ -113,6 +113,12 @@ class ViewModelProperty : public Node {
    */
   std::vector<std::string> enumOptions = {};
 
+  /**
+   * Default option index for Enum properties (0-based into enumOptions). Ignored for other
+   * property types.
+   */
+  int defaultEnum = 0;
+
   NodeType nodeType() const override {
     return NodeType::ViewModelProperty;
   }

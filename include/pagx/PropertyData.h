@@ -182,6 +182,11 @@ class EnumPropertyData : public PropertyData {
    * The list of allowed enum string values from the schema's options attribute.
    */
   std::vector<std::string> options = {};
+
+  /**
+   * The default option index (0-based into options) from the schema.
+   */
+  int defaultValue = 0;
 };
 
 /**

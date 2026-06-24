@@ -25,6 +25,7 @@
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
+#include "pagx/PAGViewModelValueEnum.h"
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
@@ -52,11 +53,16 @@ class ViewModel;
 class PAGViewModel {
  public:
   /**
-   * Returns the number-typed property with the given name. Enum-typed properties are also returned
-   * via this accessor, since an Enum is backed by a number value. Returns nullptr if no such
-   * property exists or its type does not match.
+   * Returns the number-typed property with the given name. Returns nullptr if no such property
+   * exists or its type does not match.
    */
   std::shared_ptr<PAGViewModelValueNumber> propertyNumber(const std::string& name);
+
+  /**
+   * Returns the enum-typed property with the given name. The value is a zero-based option index.
+   * Returns nullptr if no such property exists or its type does not match.
+   */
+  std::shared_ptr<PAGViewModelValueEnum> propertyEnum(const std::string& name);
 
   /**
    * Returns the string-typed property with the given name. Returns nullptr if no such property
@@ -100,18 +106,12 @@ class PAGViewModel {
    */
   const std::string& id() const;
 
-  /**
-   * Resets the dirty flag of every property in this ViewModel, and for nested ViewModel-typed
-   * properties recursively resets the referenced child ViewModel as well. Intended to be called
-   * once per frame after all DataBinds have been applied, so that hasChanged() reflects only
-   * changes that occur within the next frame.
-   */
-  void advancedAll();
-
  private:
   PAGViewModel() = default;
 
   PAGViewModelValue* findProperty(const std::string& name) const;
+
+  void clearDirty();
 
   std::string _id = {};
   std::unordered_map<std::string, std::shared_ptr<PAGViewModelValue>> propertyMap = {};

@@ -100,7 +100,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
     ViewModel* schema, const std::shared_ptr<PAGScene>& scene) {
   if (schema == nullptr) return nullptr;
   auto vm = std::shared_ptr<PAGViewModel>(new PAGViewModel());
-  vm->id = schema->id;
+  vm->_id = schema->id;
   for (auto* prop : schema->properties) {
     if (prop == nullptr) continue;
     std::shared_ptr<PAGViewModelValue> value = nullptr;
@@ -151,8 +151,8 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         break;
       }
       case ViewModelPropertyType::Enum: {
-        auto v = std::make_shared<PAGViewModelValueNumber>();
-        v->propertyValue = 0.0f;
+        auto v = std::make_shared<PAGViewModelValueEnum>();
+        v->propertyValue = prop->defaultEnum;
         v->type = ViewModelValueType::Enum;
         value = std::move(v);
         break;
@@ -211,6 +211,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         case ViewModelPropertyType::Enum: {
           auto d = std::make_shared<EnumPropertyData>();
           d->options = prop->enumOptions;
+          d->defaultValue = prop->defaultEnum;
           pd = d;
           break;
         }
@@ -232,9 +233,9 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
 
 void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
   if (parentComp == nullptr) return;
-  for (auto& child : parentComp->children) {
-    if (child == nullptr || child->layerType() != LayerType::Composition) continue;
-    auto* childComp = static_cast<PAGComposition*>(child.get());
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(parentComp, childComps);
+  for (auto* childComp : childComps) {
     const auto* sourceLayer = childComp->node;
     if (sourceLayer == nullptr || sourceLayer->composition == nullptr) continue;
     const auto* compSchema = sourceLayer->composition;
@@ -394,9 +395,6 @@ void PAGScene::flushDataBinds() {
 }
 
 void PAGScene::advanceAllViewModels() {
-  if (rootViewModel != nullptr) {
-    rootViewModel->advancedAll();
-  }
   if (_rootComposition != nullptr) {
     advanceCompositionTree(_rootComposition.get());
   }
@@ -407,13 +405,12 @@ void PAGScene::advanceCompositionTree(PAGComposition* comp) {
     return;
   }
   if (comp->compositionViewModel != nullptr) {
-    comp->compositionViewModel->advancedAll();
+    comp->compositionViewModel->clearDirty();
   }
-  for (auto& child : comp->children) {
-    if (child == nullptr || child->layerType() != LayerType::Composition) {
-      continue;
-    }
-    advanceCompositionTree(static_cast<PAGComposition*>(child.get()));
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(comp, childComps);
+  for (auto* childComp : childComps) {
+    advanceCompositionTree(childComp);
   }
 }
 

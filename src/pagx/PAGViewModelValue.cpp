@@ -23,6 +23,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
+#include "pagx/PAGViewModelValueEnum.h"
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
@@ -86,7 +87,7 @@ void PAGViewModelValue::notifyChanged(bool fromVM) {
 
 // ---- Dirty lifecycle ---------------------------------------------------------
 
-void PAGViewModelValue::advanced() {
+void PAGViewModelValue::clearDirty() {
   dirty = false;
 }
 
@@ -143,6 +144,18 @@ void PAGViewModelValueBoolean::value(bool v) {
 }
 
 void PAGViewModelValueBoolean::setValueInternal(bool v, bool fromVM) {
+  if (propertyValue == v) {
+    return;
+  }
+  propertyValue = v;
+  notifyChanged(fromVM);
+}
+
+void PAGViewModelValueEnum::value(int v) {
+  setValueInternal(v, true);
+}
+
+void PAGViewModelValueEnum::setValueInternal(int v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }

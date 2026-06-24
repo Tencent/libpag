@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/DataBindRuntime.h"
+#include <cmath>
 #include <sstream>
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
+#include "pagx/PAGViewModelValueEnum.h"
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
@@ -137,7 +139,7 @@ static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
     case ViewModelValueType::Image:
       return KeyValue{static_cast<PAGViewModelValueImage*>(value)->value()};
     case ViewModelValueType::Enum:
-      return KeyValue{static_cast<PAGViewModelValueNumber*>(value)->value()};
+      return KeyValue{static_cast<PAGViewModelValueEnum*>(value)->value()};
     case ViewModelValueType::Trigger:
       return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
     default:
@@ -195,17 +197,50 @@ float DataBindRuntime::ReadTargetFloat(tgfx::Layer* layer, const std::string& ch
   return layer->matrix().getTranslateY();
 }
 
-void DataBindRuntime::WriteVmFromFloat(PAGViewModelValue* value, float f) {
+static float KeyValueToFloat(const KeyValue& kv) {
+  if (auto* f = std::get_if<float>(&kv)) {
+    return *f;
+  }
+  if (auto* i = std::get_if<int>(&kv)) {
+    return static_cast<float>(*i);
+  }
+  return 0.0f;
+}
+
+static int KeyValueToInt(const KeyValue& kv) {
+  if (auto* i = std::get_if<int>(&kv)) {
+    return *i;
+  }
+  // A converter that outputs a float (or a writeback with no converter) is rounded to the nearest
+  // option index, since an enum value is an index into the option list.
+  if (auto* f = std::get_if<float>(&kv)) {
+    return static_cast<int>(std::lround(*f));
+  }
+  return 0;
+}
+
+void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv) {
   // syncBack writeback: route through setValueInternal(v, false) so observers are notified
   // (two-way binding semantics) but dirty/dependents are not triggered, preventing a shared
-  // source from causing other bindings to be wrongly skipped in the same syncBack pass.
+  // source from causing other bindings to be wrongly skipped in the same syncBack pass. The
+  // converter (if any) decides the value type; this picks the matching alternative per VM type.
   if (value == nullptr) {
     return;
   }
-  if (value->valueType() == ViewModelValueType::Number) {
-    static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(f, false);
-  } else if (value->valueType() == ViewModelValueType::Boolean) {
-    static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(f != 0.0f, false);
+  switch (value->valueType()) {
+    case ViewModelValueType::Number:
+      static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(KeyValueToFloat(kv), false);
+      break;
+    case ViewModelValueType::Boolean:
+    case ViewModelValueType::Trigger:
+      static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(KeyValueToFloat(kv) != 0.0f,
+                                                                      false);
+      break;
+    case ViewModelValueType::Enum:
+      static_cast<PAGViewModelValueEnum*>(value)->setValueInternal(KeyValueToInt(kv), false);
+      break;
+    default:
+      break;
   }
 }
 
@@ -242,7 +277,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     // Apply inverse converter for syncBack direction (layer value → VM domain).
     KeyValue kv{current};
     kv = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
-    WriteVmFromFloat(entry.source, std::get<float>(kv));
+    WriteVmValue(entry.source, kv);
   }
 }
 
