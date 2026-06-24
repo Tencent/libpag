@@ -396,7 +396,7 @@ Endpoints:
 | `waitMs` | number | `800` | Extra settle delay after networkidle |
 | `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
 | `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
-| `inferFlex` | boolean | `true` | _PAGX output only_; passes `--html-infer-flex` to `pagx import` |
+| `inferFlex` | boolean | `true` | _PAGX output only_; deprecated/no-op — `pagx import` always recovers flex now |
 | `cookies` | `[{name, value}]` | — | _URL inputs only_; scoped to the target URL |
 | `headers` | `[[key, value]]` or `{key: value}` | — | _URL inputs only_; extra request headers |
 
@@ -446,9 +446,9 @@ curl -s -H 'Content-Type: application/json' \
      }' \
      http://127.0.0.1:8787/snapshot > dashboard.subset.html
 
-# Pipe straight into pagx import:
-curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot \
-  | pagx import --format html --html-infer-flex --input - --output page.pagx
+# Save the subset, then import it (PAGX_HTML_SNAPSHOT=0 skips re-snapshotting it):
+curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot > page.subset.html
+PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
 
 # …or skip the local pagx step and ask the server to do it for you:
 curl -s --data-binary @page.html \

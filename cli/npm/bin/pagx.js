@@ -48,10 +48,10 @@ if (!binPath) {
   process.exit(1);
 }
 
-// Point the native binary's `--html-snapshot` bridge at the bundled snapshot
-// tool so `pagx import --html-snapshot` works without a libpag checkout. The
-// launcher lazily installs the headless browser on first use. A user-supplied
-// PAGX_HTML_SNAPSHOT_BIN always wins.
+// Point the native binary's html-snapshot bridge at the bundled snapshot
+// tool so `pagx import` of HTML works without a libpag checkout (HTML import
+// always renders through snapshot.js). The launcher lazily installs the
+// headless browser on first use. A user-supplied PAGX_HTML_SNAPSHOT_BIN always wins.
 //
 // The published package keeps this wrapper in `bin/` while `html-snapshot/`
 // lives at the package root, so check both layouts (sibling and parent).

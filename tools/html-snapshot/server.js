@@ -448,9 +448,9 @@ function parseGetSource(req) {
 // would only confuse the caller. The flag is plumbed via `forUrl`.
 //
 // `inferFlex` is special: it does not affect the snapshot pipeline itself,
-// only the downstream `pagx import` step (`--html-infer-flex`). The
-// resolved value is therefore returned out-of-band so the caller can pass
-// it to runPagxImport without tangling it into runSnapshot's option set.
+// only the downstream `pagx import` step. It is now deprecated/no-op — the
+// importer always recovers flex — but the resolved value is still returned
+// out-of-band (and forwarded to runPagxImport) for backward compatibility.
 function resolveOptions(reqOptions, forUrl) {
   const out = {};
   const r = reqOptions || {};

@@ -162,7 +162,7 @@ built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically 
 triggers the one-time browser download):
 
 ```bash
-pagx import --html-snapshot --html-infer-flex --input <name>.html --output <name>.pagx
+pagx import --input <name>.html --output <name>.pagx
 pagx resolve <name>.pagx
 pagx render <name>.pagx -o <name>.png   # preview; add --scale 2 for a crisp image
 ```

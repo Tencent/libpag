@@ -54,6 +54,7 @@ const DEFAULT_STEP_TIMEOUT_MS = 180000;
 export interface SpawnCaptureOptions {
   stderrPath?: string;
   timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface SpawnCaptureResult {
@@ -78,7 +79,10 @@ export function spawnCapture(
     const startedAt = Date.now();
     let child;
     try {
-      child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(cmd, args, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: opts.env || process.env,
+      });
     } catch (err) {
       const stderr = `\n${(err as Error).message || String(err)}`;
       if (stderrPath) {
@@ -194,13 +198,18 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
 export async function runPagxImportToFile(
   opts: RunPagxImportToFileOptions = {},
 ): Promise<SpawnCaptureResult> {
-  const { pagxBin, subsetHtml, pagxFile, inferFlex = true, stderrPath, log, timeoutMs } = opts;
+  const { pagxBin, subsetHtml, pagxFile, stderrPath, log, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html'];
-  if (inferFlex) args.push('--html-infer-flex');
-  const result = await spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
+  // Flex inference is always on inside the importer now. The subset is already rendered, so
+  // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
+  const result = await spawnCapture(pagxBin, args, {
+    stderrPath,
+    timeoutMs,
+    env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
+  });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
     if (filtered) log(filtered);

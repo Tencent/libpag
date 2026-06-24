@@ -7,7 +7,7 @@
 // The source of truth is `tools/html-snapshot/` in the repository. This script
 // compiles it and copies the runtime-only pieces into `cli/npm/html-snapshot/`
 // so that an external user who only `npm install`-ed the package (no git
-// checkout) can still run `pagx import --html-snapshot` — the native binary
+// checkout) can still run `pagx import` on HTML — the native binary
 // shells out to the bundled `snapshot.js` via `PAGX_HTML_SNAPSHOT_BIN`, which
 // the package's `bin/pagx.js` wrapper points at `html-snapshot/launch.js`.
 //

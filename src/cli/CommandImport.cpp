@@ -168,6 +168,24 @@ static std::string ResolveSnapshotBin() {
   return {};
 }
 
+// Whether the html-snapshot pre-pass runs before the HTML importer. Enabled by default; set
+// the `PAGX_HTML_SNAPSHOT` environment variable to a falsy value (`0`, `false`, `no`, `off`,
+// case-insensitive) to disable it. The html-snapshot tooling (`html2pagx`, the snapshot
+// server) sets this when it has already rendered the page to a flat subset and hands that
+// directly to the importer — a second in-importer snapshot would be redundant (and would
+// require a browser the tool already ran).
+static bool HTMLSnapshotEnabled() {
+  const char* env = std::getenv("PAGX_HTML_SNAPSHOT");
+  if (env == nullptr || env[0] == '\0') {
+    return true;
+  }
+  std::string value = env;
+  for (auto& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return !(value == "0" || value == "false" || value == "no" || value == "off");
+}
+
 struct SnapshotResult {
   std::string html = {};
   std::string error = {};
@@ -274,26 +292,40 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
                         const ImportFormatOptions& formatOptions, float targetWidth,
                         float targetHeight) {
   ImportResult result = {};
-  // URL inputs (http/https) are routed through html-snapshot, which is always enabled for
-  // HTML — the SVG/HTML importers can't fetch them on their own. Force the effective format
-  // to html for URLs (the extension heuristic would otherwise pick up nonsense like
+  // URL inputs (http/https) are routed through html-snapshot (the snapshot renderer fetches
+  // the page) — the SVG/HTML importers can't fetch them on their own. Force the effective
+  // format to html for URLs (the extension heuristic would otherwise pick up nonsense like
   // "com" from the hostname).
   bool isUrl = IsHttpUrl(filePath);
   std::string effectiveFormat =
       isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
+  bool snapshotEnabled = HTMLSnapshotEnabled();
+  if (isUrl && !snapshotEnabled) {
+    result.error =
+        "URL inputs require the html-snapshot pre-pass, but it is disabled via "
+        "PAGX_HTML_SNAPSHOT; the importer cannot fetch http(s) URLs itself";
+    return result;
+  }
   if (effectiveFormat == "svg") {
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    // HTML always runs through snapshot.js first: spawn it as a subprocess and feed its
-    // stdout (a flat, absolute-positioned subset HTML) straight to the importer. No temp
-    // file touches the disk; the HTML lives in this string for the duration of the call.
-    auto snap = RunHTMLSnapshot(filePath);
-    if (!snap.error.empty()) {
-      result.error = snap.error;
-      return result;
+    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
+    if (snapshotEnabled) {
+      // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
+      // subset HTML) straight to the importer. No temp file touches the disk; the HTML
+      // lives in this string for the duration of the call.
+      auto snap = RunHTMLSnapshot(filePath);
+      if (!snap.error.empty()) {
+        result.error = snap.error;
+        return result;
+      }
+      result.document = HTMLImporter::ParseString(snap.html, htmlOptions);
+    } else {
+      // Snapshot disabled (PAGX_HTML_SNAPSHOT): the caller already handed us a flat subset
+      // (e.g. html2pagx pre-snapshotted), so import the file directly.
+      result.document = HTMLImporter::Parse(filePath, htmlOptions);
     }
-    result.document = HTMLImporter::ParseString(snap.html, ToHTMLOptions(targetWidth, targetHeight));
   } else {
     result.error = "unsupported format '" + effectiveFormat + "'";
     return result;

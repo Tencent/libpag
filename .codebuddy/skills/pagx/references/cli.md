@@ -314,8 +314,7 @@ The output is optimized via `PAGXOptimizer` (PathData is inlined rather than sha
 result is close to hand-authored PAGX and can be polished further with the other CLI tools.
 
 Unsupported constructs are handled on a best-effort basis: offending elements/properties are
-skipped or downgraded and reported as warnings on stderr (use `--html-strict` to turn HTML
-warnings into hard errors).
+skipped or downgraded and reported as warnings on stderr.
 
 ```bash
 pagx import --input icon.svg                      # SVG to icon.pagx
@@ -326,7 +325,7 @@ pagx import --input page.html --output card.pagx  # HTML to card.pagx
 
 | Option | Description |
 |--------|-------------|
-| `--input <file\|url>` | Input file or URL to import (required; URL inputs require `--html-snapshot`) |
+| `--input <file\|url>` | Input file or URL to import (required) |
 | `--output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
 
@@ -338,40 +337,39 @@ pagx import --input page.html --output card.pagx  # HTML to card.pagx
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-### HTML options
+### HTML import behavior
 
-| Option | Description |
-|--------|-------------|
-| `--html-strict` | Treat HTML import warnings (unsupported elements/properties) as hard errors |
-| `--html-preserve-unknown` | Keep unknown HTML tags as empty Layers tagged `data-html-unknown="<tag>"` (debug) |
-| `--html-no-prefer-body-size` | Prefer the caller-provided target size over the `<body>` intrinsic/declared size |
-| `--html-no-normalize` | Skip the HTML subset normalizer (debug; importer then sees raw DOM) |
-| `--html-infer-flex` | Recover `display:flex` semantics from an absolute-positioned layout (lossy heuristic) |
-| `--html-snapshot` | Pre-render the input through `tools/html-snapshot/snapshot.js` before import |
-| `--html-snapshot-bin <path>` | Override the path to `snapshot.js` |
+HTML import behavior is fixed in code (there are no `--html-*` flags). Every HTML input is:
 
-By default the importer runs a subset normalizer that resolves the `<style>` cascade into
-inline styles, drops disallowed properties, and prunes unsupported elements so it only ever
-sees subset-compliant HTML. `--html-no-normalize` disables this (debug only).
+- **rendered through `tools/html-snapshot/snapshot.js`** (a headless browser) first, so
+  JS/React/Tailwind-driven pages are flattened into a static, absolute-positioned HTML subset
+  the importer understands;
+- **normalized** by the subset normalizer, which resolves the `<style>` cascade into inline
+  styles, drops disallowed properties, and prunes unsupported elements;
+- **flex-recovered** via flex inference, which recovers `display:flex` semantics from the
+  absolute-positioned snapshot output;
+- sized from the `<body>` intrinsic/declared size (preferred over any caller-provided target);
+- imported non-strictly — unsupported constructs become warnings, not hard errors.
 
-### HTML snapshot workflow
+The snapshot step requires `node` on `PATH` and a `snapshot.js` install. The script is located
+in this order:
 
-`--html-snapshot` pipes the input through a headless-browser renderer (`snapshot.js`) before
-importing. This is how JS/React/Tailwind-driven pages are flattened into a static,
-absolute-positioned HTML subset that the importer understands. It is typically paired with
-`--html-infer-flex` to recover flex layout from the absolute output. It requires `node` on
-`PATH` and a `snapshot.js` install; the script is located in this order:
-
-1. `--html-snapshot-bin <path>` (explicit override)
+1. relative `tools/html-snapshot/snapshot.js` from the current directory
 2. `PAGX_HTML_SNAPSHOT_BIN` environment variable
 3. Upward search from the current directory for `tools/html-snapshot/snapshot.js`
 
-URL inputs (`http://` / `https://`) are only valid with `--html-snapshot` (the importer
-cannot fetch URLs itself) and require an explicit `--output`.
+URL inputs (`http://` / `https://`) are imported the same way (the snapshot renderer fetches
+the page) and require an explicit `--output`.
+
+**Disabling the snapshot pre-pass.** Set `PAGX_HTML_SNAPSHOT=0` (also accepts
+`false`/`no`/`off`) to skip the browser step and import the HTML file directly — useful when the
+input is *already* a flat, subset-compliant snapshot (this is what the `html2pagx` tooling sets,
+since it renders the snapshot itself). With the pre-pass disabled, URL inputs are rejected (the
+importer cannot fetch them).
 
 ```bash
-pagx import --input app.html --html-snapshot --html-infer-flex      # React/Tailwind page
-pagx import --input https://example.com/demo --html-snapshot --output demo.pagx   # URL input
+pagx import --input app.html                                        # React/Tailwind page
+pagx import --input https://example.com/demo --output demo.pagx     # URL input
 ```
 
 ---

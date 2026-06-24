@@ -76,8 +76,8 @@ async function main() {
     });
 
     if (opts.outputToStdout) {
-      // Stdout mode (triggered by `-o -`, used by pagx's `--html-snapshot`
-      // integration): the HTML is the sole stdout payload, and the
+      // Stdout mode (triggered by `-o -`, used by pagx's html-snapshot
+      // bridge for HTML import): the HTML is the sole stdout payload, and the
       // "wrote ..." progress line goes to stderr so the parent process can
       // read stdout as a pure HTML string without parsing.
       process.stdout.write(result.html);

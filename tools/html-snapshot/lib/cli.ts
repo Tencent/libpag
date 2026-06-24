@@ -153,9 +153,9 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     // When true, the HTML is written to process.stdout and the
     // "wrote ..." log line is routed to process.stderr so the two
     // streams don't get mixed. Triggered by `-o -`. Used by pagx's
-    // `--html-snapshot` integration in src/cli/CommandImport.cpp so
-    // the importer can read the snapshot output through a pipe
-    // instead of a temp file on disk.
+    // html-snapshot bridge in src/cli/CommandImport.cpp so the importer
+    // can read the snapshot output through a pipe instead of a temp file
+    // on disk.
     outputToStdout: false,
     isUrl: false,
     viewportWidth: SNAPSHOT_DEFAULTS.viewportWidth,

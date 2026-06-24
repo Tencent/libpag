@@ -60,7 +60,6 @@ interface SpawnPagxImportArgs {
   pagxBin: string;
   htmlPath: string;
   outPath: string;
-  inferFlex: boolean;
 }
 
 interface SpawnPagxImportResult {
@@ -72,7 +71,7 @@ interface SpawnPagxImportResult {
 // just because pagx printed a warning — only the exit code and the
 // existence of the output file matter.
 function spawnPagxImport(
-  { pagxBin, htmlPath, outPath, inferFlex }: SpawnPagxImportArgs,
+  { pagxBin, htmlPath, outPath }: SpawnPagxImportArgs,
 ): Promise<SpawnPagxImportResult> {
   return new Promise<SpawnPagxImportResult>((resolve, reject) => {
     const args = [
@@ -81,15 +80,15 @@ function spawnPagxImport(
       '--input', htmlPath,
       '--output', outPath,
     ];
-    // `--html-infer-flex` recovers display:flex containers from the
-    // absolute-positioned snapshot. The html2pagx CLI enables it by
-    // default; we mirror that here unless the caller passes false.
-    if (inferFlex) args.push('--html-infer-flex');
-
+    // Flex inference is always on inside the importer now, so there is no flag
+    // to pass. We feed it the already-rendered subset HTML, so disable the
+    // importer's own snapshot pre-pass (PAGX_HTML_SNAPSHOT=0) — otherwise it
+    // would render our flat subset in a second browser pass.
     const child = spawn(pagxBin, args, {
       // stdin: not needed (input is a file path); stdout/stderr piped so we
       // can capture pagx's diagnostics for forwarding into our own log.
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
     });
 
     const stderrChunks: Buffer[] = [];
@@ -141,6 +140,10 @@ export function filterKnownWarnings(stderr: string | null | undefined): string {
 export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
+  /**
+   * Deprecated/no-op: the importer always recovers `display:flex` from the absolute snapshot
+   * now (the per-call flag was removed). Kept for call-site compatibility.
+   */
   inferFlex?: boolean;
   log?: ((msg: string) => void) | null;
 }
@@ -153,11 +156,11 @@ export interface RunPagxImportOptions {
 // `opts`:
 //   pagxBin    — absolute path to the `pagx` CLI (required)
 //   html       — snapshot HTML payload (required)
-//   inferFlex  — whether to pass --html-infer-flex (default: true)
+//   inferFlex  — deprecated/no-op (flex inference is always on in the importer)
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
 export async function runPagxImport(
-  { pagxBin, html, inferFlex = true, log }: RunPagxImportOptions = {},
+  { pagxBin, html, log }: RunPagxImportOptions = {},
 ): Promise<string> {
   if (typeof pagxBin !== 'string' || !pagxBin) {
     throw new PagxImportError('pagxBin is required');
@@ -174,7 +177,6 @@ export async function runPagxImport(
       pagxBin,
       htmlPath,
       outPath: pagxPath,
-      inferFlex,
     });
     if (log) {
       const filtered = filterKnownWarnings(stderr);
