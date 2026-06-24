@@ -146,8 +146,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
    */
   void removeObserver(int id);
 
-  static bool ObserverHasId(const ObserverEntry& entry, int id);
-
   /**
    * Sets the owning PAGScene for this value. Called once by PAGScene during ViewModel
    * instantiation; used to route change notifications back to the scene.

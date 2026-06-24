@@ -39,14 +39,14 @@ ObserverHandle PAGViewModelValue::addObserver(Observer observer) {
   return ObserverHandle(shared_from_this(), id);
 }
 
-bool PAGViewModelValue::ObserverHasId(const ObserverEntry& entry, int id) {
-  return entry.id == id;
-}
-
 void PAGViewModelValue::removeObserver(int id) {
-  observers.erase(std::remove_if(observers.begin(), observers.end(),
-                                 std::bind(ObserverHasId, std::placeholders::_1, id)),
-                  observers.end());
+  for (auto it = observers.begin(); it != observers.end();) {
+    if (it->id == id) {
+      it = observers.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 // ---- Observer notification ---------------------------------------------------
