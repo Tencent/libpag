@@ -357,7 +357,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   displayList->render(tgfxSurface.get(), autoClear);
   drawable->present(context);
   device->unlock();
-  if (rootViewModel != nullptr) rootViewModel->advancedAll();
+  advanceAllViewModels();
   return true;
 }
 
@@ -386,6 +386,30 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::advanceAllViewModels() {
+  if (rootViewModel != nullptr) {
+    rootViewModel->advancedAll();
+  }
+  if (_rootComposition != nullptr) {
+    advanceCompositionTree(_rootComposition.get());
+  }
+}
+
+void PAGScene::advanceCompositionTree(PAGComposition* comp) {
+  if (comp == nullptr) {
+    return;
+  }
+  if (comp->compositionViewModel != nullptr) {
+    comp->compositionViewModel->advancedAll();
+  }
+  for (auto& child : comp->children) {
+    if (child == nullptr || child->layerType() != LayerType::Composition) {
+      continue;
+    }
+    advanceCompositionTree(static_cast<PAGComposition*>(child.get()));
+  }
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,

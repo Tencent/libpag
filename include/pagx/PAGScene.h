@@ -174,6 +174,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void buildNestedViewModels(PAGComposition* parentComp);
   static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
   void flushDataBinds();
+  void advanceAllViewModels();
+  static void advanceCompositionTree(PAGComposition* comp);
 
   RuntimeBinding* mutableBinding();
 
