@@ -1257,6 +1257,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         xml.closeElementStart();
         for (const auto& prop : vm->properties) {
           xml.openElement("Property");
+          xml.addAttribute("id", prop->id);
           xml.addAttribute("name", prop->name);
           xml.addAttribute("type", ViewModelPropertyTypeToString(prop->propertyType));
           switch (prop->propertyType) {
