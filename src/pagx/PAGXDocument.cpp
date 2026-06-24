@@ -34,6 +34,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "renderer/FontEmbedder.h"
@@ -54,8 +55,9 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
 }
 
 static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceProvider* provider,
-                                    std::vector<std::string>* paths) {
-  if (document == nullptr || paths == nullptr) {
+                                    std::vector<std::string>* paths,
+                                    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
     return;
   }
   for (auto& node : document->nodes) {
@@ -76,7 +78,7 @@ static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceP
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), provider, paths);
+        AppendExternalFilePaths(layer->externalDoc.get(), provider, paths, visited);
       }
     }
   }
@@ -297,7 +299,8 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  AppendExternalFilePaths(this, _imageResourceProvider.get(), &paths);
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendExternalFilePaths(this, _imageResourceProvider.get(), &paths, visited);
   return paths;
 }
 
@@ -339,6 +342,35 @@ void PAGXDocument::clearEmbed() {
       static_cast<Font*>(node.get())->resetRenderCache();
     }
   }
+}
+
+static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFont>* outFonts,
+                                std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || outFonts == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Text) {
+      auto* text = static_cast<Text*>(node.get());
+      if (!text->fontFamily.empty()) {
+        outFonts->emplace_back(text->fontFamily, text->fontStyle);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        AppendRequiredFonts(layer->externalDoc.get(), outFonts, visited);
+      }
+    }
+  }
+}
+
+std::vector<PAGFont> PAGXDocument::getRequiredFonts() const {
+  std::vector<PAGFont> fonts = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendRequiredFonts(this, &fonts, visited);
+  std::sort(fonts.begin(), fonts.end());
+  fonts.erase(std::unique(fonts.begin(), fonts.end()), fonts.end());
+  return fonts;
 }
 
 namespace {

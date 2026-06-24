@@ -8558,6 +8558,7 @@
         "PAGSurfaceFromBackendTexture": "60a88e548"
     },
     "PAGXTest": {
+        "GetRequiredFontsCrossDocument": "8b84d883",
         "LayerBuilderAPIConsistency": "60a88e548",
         "NoiseFilterAllElements": "60a88e548",
         "NoiseFilterAnimation": {

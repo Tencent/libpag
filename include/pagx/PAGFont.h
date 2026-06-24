@@ -19,31 +19,33 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
-#include <vector>
-#include "TypefaceHolder.h"
-#include "pagx/FontConfig.h"
 
 namespace pagx {
 
-struct FontConfig::Data {
-  struct FontKey {
-    std::string family = {};
-    std::string style = {};
+/**
+ * Describes a font requirement by (fontFamily, fontStyle). Returned by
+ * PAGXDocument::getRequiredFonts() to enumerate which fonts a document references. The caller
+ * resolves each entry to a font file and registers it with FontConfig before applyLayout() or
+ * embed().
+ */
+class PAGFont {
+ public:
+  PAGFont() = default;
+  PAGFont(std::string family, std::string style)
+      : fontFamily(std::move(family)), fontStyle(std::move(style)) {}
 
-    bool operator==(const FontKey& other) const {
-      return family == other.family && style == other.style;
+  std::string fontFamily;
+  std::string fontStyle;
+
+  bool operator==(const PAGFont& other) const {
+    return fontFamily == other.fontFamily && fontStyle == other.fontStyle;
+  }
+  bool operator<(const PAGFont& other) const {
+    if (fontFamily != other.fontFamily) {
+      return fontFamily < other.fontFamily;
     }
-  };
-
-  struct FontKeyHash {
-    size_t operator()(const FontKey& key) const {
-      return std::hash<std::string>()(key.family) ^ (std::hash<std::string>()(key.style) << 1);
-    }
-  };
-
-  std::unordered_map<FontKey, TypefaceHolder, FontKeyHash> registeredTypefaces = {};
-  std::vector<TypefaceHolder> fallbackTypefaces = {};
+    return fontStyle < other.fontStyle;
+  }
 };
 
 }  // namespace pagx

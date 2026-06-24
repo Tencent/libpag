@@ -25,6 +25,7 @@
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/ImageResourceProvider.h"
+#include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
@@ -192,6 +193,16 @@ class PAGXDocument : public Node {
    * layout performs runtime shaping instead of reusing stale embedded data.
    */
   void clearEmbed();
+
+  /**
+   * Returns the set of unique (fontFamily, fontStyle) pairs required by Text nodes in this
+   * document and all loaded external composition documents (externalDoc). Call after all
+   * external file data has been loaded via loadFileData() to get complete results. The caller
+   * can use this list to register fonts with FontConfig before applyLayout() or embed().
+   * Empty fontFamily entries are skipped.
+   * @return deduplicated list of PAGFont. Results are sorted.
+   */
+  std::vector<PAGFont> getRequiredFonts() const;
 
   /**
    * Reflects post-build edits to the given nodes in every scene created from this document. Layer
