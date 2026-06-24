@@ -27,6 +27,12 @@
 'use strict';
 
 const fs = require('fs');
+
+// Fail fast with a copy-pasteable `npm install` / `npm run build` hint if `dist/` (the
+// compiled TypeScript this script loads below) hasn't been built yet. Must run before the
+// `require('./dist/...')` calls, which would otherwise throw an opaque MODULE_NOT_FOUND.
+require('./ensure-built').ensureBuilt();
+
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');

@@ -72,6 +72,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Fail fast with a copy-pasteable `npm install` / `npm run build` hint if `dist/` (the
+// compiled TypeScript this server loads below) hasn't been built yet. Must run before the
+// `require('./dist/...')` calls, which would otherwise throw an opaque MODULE_NOT_FOUND.
+require('./ensure-built').ensureBuilt();
+
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./dist/lib/browser-engine');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./dist/lib/pagx-runner');
