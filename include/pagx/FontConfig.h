@@ -26,10 +26,9 @@
 namespace pagx {
 
 /**
- * FontConfig manages registered and fallback typefaces for font lookup. This decouples font
- * configuration from text layout and layout computation, allowing multiple components
- * (LayoutContext, TextLayout, LayerBuilder) to share the same font registry. Font lookup is
- * performed by LayoutContext using the data stored here.
+ * FontConfig manages registered and fallback fonts for font lookup during text layout and
+ * rendering. It decouples font configuration from the layout process, allowing multiple components
+ * to share the same font registry.
  */
 class FontConfig {
  public:
