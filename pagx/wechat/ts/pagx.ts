@@ -16,40 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import './babel';
+import * as types from './types';
+import createPAG from '../wasm/pagx-viewer';
+import { PAGX } from './types';
+import { binding } from './binding';
 
-#include <memory>
-#include <string>
-#include "pagx/types/Data.h"
-#include "pagx/nodes/Node.h"
-
-namespace pagx {
+export interface moduleOption {
+  /**
+   * Link to wasm file.
+   */
+  locateFile?: (file: string) => string;
+}
 
 /**
- * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
- * managed externally via ImageResourceProvider, not stored on this node.
+ * Initialize PAGX webassembly module.
  */
-class Image : public Node {
- public:
-  /**
-   * Image binary data (decoded from base64 or loaded via loadFileData).
-   */
-  std::shared_ptr<Data> data = nullptr;
+const PAGXInit = (moduleOption: moduleOption = {}): Promise<types.PAGX> =>
+  createPAG(moduleOption)
+    .then((module: types.PAGX) => {
+      binding(module);
+      return module;
+    })
+    .catch((error: any) => {
+      console.error(error);
+      throw new Error('PAGXInit fail! Please check .wasm file path valid.');
+    });
 
-  /**
-   * External file path (mutually exclusive with data, data has priority).
-   */
-  std::string filePath = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Image;
-  }
-
- private:
-  Image() = default;
-
-  friend class PAGXDocument;
-};
-
-}  // namespace pagx
+export { PAGXInit, types };
+export { ImageQuality } from './pagx-view';
+export type { TextureEventHandler } from './pagx-view';

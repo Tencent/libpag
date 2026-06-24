@@ -53,22 +53,30 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
+static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceProvider* provider,
+                                    std::vector<std::string>* paths) {
   if (document == nullptr || paths == nullptr) {
     return;
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
-      if (image->data == nullptr && IsExternalFilePath(image->filePath)) {
-        paths->push_back(image->filePath);
+      if (image->data != nullptr) {
+        continue;
       }
+      if (!IsExternalFilePath(image->filePath)) {
+        continue;
+      }
+      if (provider && provider->hasImage(image->filePath)) {
+        continue;
+      }
+      paths->push_back(image->filePath);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), paths);
+        AppendExternalFilePaths(layer->externalDoc.get(), provider, paths);
       }
     }
   }
@@ -289,7 +297,7 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  AppendExternalFilePaths(this, &paths);
+  AppendExternalFilePaths(this, _imageResourceProvider.get(), &paths);
   return paths;
 }
 
@@ -470,6 +478,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (ownedDirty.empty()) {
     return;
   }
+  // Invalidate the filePath -> Layer index so the next query rebuilds it from the (possibly
+  // modified) tree topology. Edits may add/remove Image references or change filePath values.
+  layersByImageFilePathBuilt = false;
+  layersByImageFilePath.clear();
   // Resolve content nodes (Image, SolidColor, Gradient, Fill, Stroke, Group, Filter, Style, etc.)
   // to their owning Layers. refreshNodes only processes Layer nodes directly; non-Layer content
   // nodes are resolved here so callers can pass them to notifyChange without having to find the
@@ -564,6 +576,101 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
       ++it;
     }
   }
+}
+
+void PAGXDocument::setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider) {
+  _imageResourceProvider = std::move(provider);
+}
+
+// Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
+// `index`, scoped to the owning `layer`.
+static void RecordImagePattern(
+    const ColorSource* color, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!color || color->nodeType() != NodeType::ImagePattern) {
+    return;
+  }
+  const auto* pattern = static_cast<const ImagePattern*>(color);
+  if (!pattern->image || pattern->image->filePath.empty()) {
+    return;
+  }
+  (*index)[pattern->image->filePath].insert(layer);
+}
+
+// Records into `index` every Image node filePath referenced by an ImagePattern inside
+// `element`, scoped to the owning `layer`. The inner unordered_set deduplicates layers that
+// have multiple fills or strokes pointing at the same filePath so the resulting index keeps
+// each Layer exactly once per path.
+static void CollectImageFilePathsFromElement(
+    const Element* element, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!element || !layer) {
+    return;
+  }
+  switch (element->nodeType()) {
+    case NodeType::Fill:
+      RecordImagePattern(static_cast<const Fill*>(element)->color, layer, index);
+      break;
+    case NodeType::Stroke:
+      RecordImagePattern(static_cast<const Stroke*>(element)->color, layer, index);
+      break;
+    case NodeType::Group:
+    case NodeType::TextBox: {
+      const auto* group = static_cast<const Group*>(element);
+      for (const auto* child : group->elements) {
+        CollectImageFilePathsFromElement(child, layer, index);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void CollectImageFilePathsFromLayers(
+    const std::vector<Layer*>& layers,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index,
+    std::unordered_set<const Composition*>* visitedCompositions) {
+  for (const auto* layer : layers) {
+    if (!layer) {
+      continue;
+    }
+    for (const auto* element : layer->contents) {
+      CollectImageFilePathsFromElement(element, layer, index);
+    }
+    CollectImageFilePathsFromLayers(layer->children, index, visitedCompositions);
+    // A Composition may be referenced by many Layers; skip re-entry once we have already
+    // walked its inner layers to avoid quadratic blowups in documents that instance the
+    // same Composition repeatedly.
+    if (layer->composition && visitedCompositions->insert(layer->composition).second) {
+      CollectImageFilePathsFromLayers(layer->composition->layers, index, visitedCompositions);
+    }
+  }
+}
+
+const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
+    const std::string& imageFilePath) {
+  static const std::vector<const Layer*> empty;
+  if (imageFilePath.empty()) {
+    return empty;
+  }
+  if (!layersByImageFilePathBuilt) {
+    std::unordered_map<std::string, std::unordered_set<const Layer*>> tempIndex;
+    std::unordered_set<const Composition*> visitedCompositions;
+    CollectImageFilePathsFromLayers(layers, &tempIndex, &visitedCompositions);
+    layersByImageFilePath.clear();
+    layersByImageFilePath.reserve(tempIndex.size());
+    for (auto& [path, layerSet] : tempIndex) {
+      std::vector<const Layer*> layerList(layerSet.begin(), layerSet.end());
+      layersByImageFilePath.emplace(path, std::move(layerList));
+    }
+    layersByImageFilePathBuilt = true;
+  }
+  auto it = layersByImageFilePath.find(imageFilePath);
+  if (it == layersByImageFilePath.end()) {
+    return empty;
+  }
+  return it->second;
 }
 
 }  // namespace pagx

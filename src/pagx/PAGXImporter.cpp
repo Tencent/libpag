@@ -343,6 +343,7 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+
   // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
   child = node->firstChild;
   while (child) {

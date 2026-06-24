@@ -18,38 +18,28 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include "pagx/types/Data.h"
-#include "pagx/nodes/Node.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/core/Color.h"
 
 namespace pagx {
 
-/**
- * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
- * managed externally via ImageResourceProvider, not stored on this node.
- */
-class Image : public Node {
+class GridBackgroundLayer : public tgfx::Layer {
  public:
-  /**
-   * Image binary data (decoded from base64 or loaded via loadFileData).
-   */
-  std::shared_ptr<Data> data = nullptr;
+  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density);
 
-  /**
-   * External file path (mutually exclusive with data, data has priority).
-   */
-  std::string filePath = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Image;
-  }
+ protected:
+  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  Image() = default;
+  GridBackgroundLayer(int width, int height, float density);
 
-  friend class PAGXDocument;
+  int gridWidth = 0;
+  int gridHeight = 0;
+  float density = 1.f;
 };
+
+void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);
+
+void DrawSolidBackground(tgfx::Canvas* canvas, int width, int height, const tgfx::Color& color);
 
 }  // namespace pagx

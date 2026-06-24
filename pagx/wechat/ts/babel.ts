@@ -16,40 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+/* global globalThis */
+// Polyfills for WeChat Mini Program environment: registers WXWebAssembly as WebAssembly
+// and ensures globalThis/window are available for Emscripten module initialization.
 
-#include <memory>
-#include <string>
-#include "pagx/types/Data.h"
-#include "pagx/nodes/Node.h"
+declare const WXWebAssembly: typeof WebAssembly;
+declare const globalThis: any;
 
-namespace pagx {
+globalThis.WebAssembly = WXWebAssembly;
+globalThis.isWxWebAssembly = true;
+// eslint-disable-next-line no-global-assign
+window = globalThis;
 
-/**
- * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
- * managed externally via ImageResourceProvider, not stored on this node.
- */
-class Image : public Node {
- public:
-  /**
-   * Image binary data (decoded from base64 or loaded via loadFileData).
-   */
-  std::shared_ptr<Data> data = nullptr;
-
-  /**
-   * External file path (mutually exclusive with data, data has priority).
-   */
-  std::string filePath = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Image;
-  }
-
- private:
-  Image() = default;
-
-  friend class PAGXDocument;
-};
-
-}  // namespace pagx
+// Keep this file a module so the ambient `declare const globalThis` above stays module-scoped;
+// without an import/export it becomes a global script and clashes with the built-in globalThis.
+export {};
