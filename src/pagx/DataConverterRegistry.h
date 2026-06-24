@@ -19,8 +19,8 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
-#include <unordered_map>
 #include "pagx/nodes/Channel.h"
 
 namespace pagx {
@@ -34,8 +34,8 @@ class DataConverter;
  */
 class DataConverterRegistry {
  public:
-  using ConverterFn = std::function<KeyValue(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params)>;
+  using ConverterFn = std::function<KeyValue(const KeyValue& input,
+                                             const std::map<std::string, std::string>& params)>;
 
   static DataConverterRegistry& instance();
 
@@ -56,25 +56,25 @@ class DataConverterRegistry {
   void registerConverter(const std::string& typeName, ConverterFn fn);
   void registerInverseConverter(const std::string& typeName, ConverterFn fn);
 
-  std::unordered_map<std::string, ConverterFn> converters = {};
-  std::unordered_map<std::string, ConverterFn> inverseConverters = {};
+  std::map<std::string, ConverterFn> converters = {};
+  std::map<std::string, ConverterFn> inverseConverters = {};
 
-  static KeyValue ConvertSecondsToFrames(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
+  static KeyValue ConvertSecondsToFrames(const KeyValue& input,
+                                         const std::map<std::string, std::string>& params);
   static KeyValue ConvertPriceFormat(const KeyValue& input,
-                                     const std::unordered_map<std::string, std::string>& params);
+                                     const std::map<std::string, std::string>& params);
   static KeyValue ConvertRangeMapper(const KeyValue& input,
-                                     const std::unordered_map<std::string, std::string>& params);
+                                     const std::map<std::string, std::string>& params);
   static KeyValue ConvertDegsToRads(const KeyValue& input,
-                                    const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertInverseSecondsToFrames(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertInversePriceFormat(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertInverseRangeMapper(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
-  static KeyValue ConvertInverseDegsToRads(
-      const KeyValue& input, const std::unordered_map<std::string, std::string>& params);
+                                    const std::map<std::string, std::string>& params);
+  static KeyValue ConvertInverseSecondsToFrames(const KeyValue& input,
+                                                const std::map<std::string, std::string>& params);
+  static KeyValue ConvertInversePriceFormat(const KeyValue& input,
+                                            const std::map<std::string, std::string>& params);
+  static KeyValue ConvertInverseRangeMapper(const KeyValue& input,
+                                            const std::map<std::string, std::string>& params);
+  static KeyValue ConvertInverseDegsToRads(const KeyValue& input,
+                                           const std::map<std::string, std::string>& params);
 };
 
 }  // namespace pagx
