@@ -543,17 +543,26 @@ export function pagxBuildCanonicalAnimation(
     String(cap.iterations) === 'infinite';
   const iter = infinite ? 'infinite' : cap.iterations || 1;
   const dir = cap.direction || 'normal';
-  // `backwards` so the element holds the 0% keyframe state during `animation-delay`
-  // (a finite intro starts hidden until its delay elapses) instead of CSS's default
-  // `none`, which would show the inline base style during the delay and again after
-  // the iteration finishes — collapsing every animated element to its final visual
-  // state immediately and freezing the timeline. The post-active value still falls
-  // back to the inline base style, which the snapshot writer reads at capture time
-  // and which matches what the original CSS animation (default fill-mode: none)
-  // returned to after a single iteration. See spec/html_subset.md §13.
+  // `both` so the element holds the 0% keyframe state during `animation-delay`
+  // *and* its 100% keyframe state after a finite iteration finishes, instead
+  // of CSS's default `none` (which would show the inline base style during
+  // the delay and again after the iteration finishes — collapsing every
+  // animated element to its final visual state immediately and freezing the
+  // timeline). Using `both` rather than the narrower `backwards` matters
+  // specifically for the eval-animation harness: under `fill: none` /
+  // `backwards`, a finite animation drops out of `document.getAnimations()`
+  // once it crosses its end time, so a seek loop that pauses every animation
+  // and then drives `currentTime` finds nothing to drive on the post-active
+  // frames — the element re-collapses to its inline base for the rest of the
+  // sample grid. `both` keeps each finite animation alive in
+  // `getAnimations()` indefinitely so the harness can seek it to any point on
+  // the global timeline (matches the original page's CSS animations, which
+  // either authored `forwards` / `both` themselves or remain in
+  // `getAnimations()` because they never finish during the harness window).
+  // See spec/html_subset.md §13.
   const animationShorthand =
     name + ' ' + durSec + 's ' + pagxNormalizeTiming(cap.timing) + ' ' +
-    delaySec + 's ' + iter + ' ' + dir + ' backwards';
+    delaySec + 's ' + iter + ' ' + dir + ' both';
   return { name, keyframesCss, animationShorthand };
 }
 
@@ -982,6 +991,32 @@ export function pagxAnimMain(opts: {
     if (!built) continue;
     index++;
     css += built.keyframesCss + '\n';
+    // Pin a translate-only base transform onto the element's inline slot before
+    // installing the canonical pagxAnim* shorthand. The canonical keyframes only
+    // carry a translate channel (pagxExtractTranslate drops scale/rotate/skew —
+    // the runtime cannot play those), so any author-declared scale/rotate/skew
+    // base (e.g. `.loader-bar { transform: scaleX(0) }` paired with a
+    // `scaleX(0) -> scaleX(1)` keyframe animation, a common scanline / reveal
+    // idiom) must be neutralised on the element too. Otherwise, after the
+    // shorthand swap the element keeps its author scaleX(0) for the entire
+    // playback (the keyframe channel for transform is now pure translate, so
+    // the runtime never overrides the base) and the layer collapses to zero
+    // width / wrong rotation in the subset HTML and in `pagx render`. Reading
+    // the base under `animation: none !important` blocks both the original CSS
+    // animation and the just-installed inline pagxAnim* from contributing, so
+    // the resolved transform reflects only the static base. Inline-author
+    // transforms (set via `el.style.transform` directly) win over class rules,
+    // so this override doesn't lose any user intent the runtime could play.
+    const elRect = cap.el.getBoundingClientRect();
+    const elBox = { width: elRect.width, height: elRect.height };
+    const blocker = document.createElement('style');
+    blocker.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+    const blockerParent = document.head || document.documentElement;
+    if (blockerParent) blockerParent.appendChild(blocker);
+    void document.body.offsetHeight;
+    const baseT = pagxExtractTranslate(getComputedStyle(cap.el).transform || '', elBox);
+    if (blocker.parentNode) blocker.parentNode.removeChild(blocker);
+    cap.el.style.transform = baseT || 'none';
     cap.el.style.animation = built.animationShorthand;
     names.push(built.name);
   }
