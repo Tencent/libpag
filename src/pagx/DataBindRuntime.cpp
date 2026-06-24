@@ -133,7 +133,7 @@ static KeyValue valueToKeyValue(PAGViewModelValue* value) {
       return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
     case ViewModelValueType::Color: {
       auto c = static_cast<PAGViewModelValueColor*>(value)->value();
-      return KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+      return KeyValue{c};
     }
     case ViewModelValueType::Image:
       return KeyValue{static_cast<PAGViewModelValueImage*>(value)->value()};
