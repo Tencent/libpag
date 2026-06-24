@@ -373,11 +373,11 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
 }
 
 void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
-                                    const ImageOriginalSizeMap* origSizeMap) {
+                                    const ImageOriginalSizeMap* origSizeMap,
+                                    pagx::ImageResourceProvider* provider) {
   if (!document) {
     return;
   }
-  auto* provider = document->imageResourceProvider();
   for (const auto& nodePtr : document->nodes) {
     if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {
       continue;
@@ -389,11 +389,11 @@ void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
 
 size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
                                              const std::string& filePath,
-                                             const ImageOriginalSizeMap* origSizeMap) {
+                                             const ImageOriginalSizeMap* origSizeMap,
+                                             pagx::ImageResourceProvider* provider) {
   if (!document || filePath.empty()) {
     return 0;
   }
-  auto* provider = document->imageResourceProvider();
   size_t updated = 0;
   for (const auto& nodePtr : document->nodes) {
     if (!nodePtr || nodePtr->nodeType() != pagx::NodeType::ImagePattern) {

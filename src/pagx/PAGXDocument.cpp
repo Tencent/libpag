@@ -53,11 +53,11 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
+static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceProvider* provider,
+                                    std::vector<std::string>* paths) {
   if (document == nullptr || paths == nullptr) {
     return;
   }
-  auto provider = document->imageResourceProvider();
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
@@ -76,7 +76,7 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), paths);
+        AppendExternalFilePaths(layer->externalDoc.get(), provider, paths);
       }
     }
   }
@@ -297,7 +297,7 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  AppendExternalFilePaths(this, &paths);
+  AppendExternalFilePaths(this, _imageResourceProvider.get(), &paths);
   return paths;
 }
 

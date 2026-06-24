@@ -621,7 +621,8 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       externalTexturesTotalBytes += p.sizeBytes;
       // Refresh ImagePattern matrices against the newly attached image dimensions so
       // progressive thumbnail->full swaps stay aligned.
-      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
+      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
+                                            imageProvider.get());
       if (builderSession) {
         builderSession->rebuildForFilePath(p.filePath);
       }
@@ -647,7 +648,8 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       // (clamped to edge). ResolveImagePatternMatrix's source priority falls through to
       // the provider's thumbnail when full is absent so this stays correct after a later
       // Full attach overwrites the matrix to the full-resolution dimensions.
-      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes);
+      ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
+                                            imageProvider.get());
       // Regenerate the affected layers' vector contents so the newly attached thumbnail is
       // picked up by the cached layer tree.
       if (builderSession) {
@@ -737,7 +739,8 @@ void PAGXView::enforceFullBudget() {
     // attached; otherwise the fallback fill would sample outside the thumbnail's UV domain
     // and render blank (clamp-to-edge). When a replacement Full is later re-attached, the
     // upload path runs the same resolve again with the full-resolution dimensions.
-    ResolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes);
+    ResolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes,
+                                          imageProvider.get());
     if (builderSession) {
       builderSession->rebuildForFilePath(c.path);
     }
@@ -812,31 +815,28 @@ std::unordered_map<std::string, tgfx::Rect> PAGXView::computeFullPathBounds() co
   // of getImageBounds() for consistency.
   for (const auto& kv : externalTextures) {
     const auto& path = kv.first;
-    const auto& affectedLayers = document->findLayersByImageFilePath(path);
-    if (affectedLayers.empty()) {
+    auto tgfxLayers = builderSession->getTgfxLayersByImageFilePath(path);
+    if (tgfxLayers.empty()) {
       continue;
     }
     tgfx::Rect unionBounds = tgfx::Rect::MakeEmpty();
     bool hasAny = false;
-    for (const auto* pagxLayer : affectedLayers) {
-      auto tgfxLayers = builderSession->getTgfxLayers(pagxLayer);
-      for (const auto& tgfxLayer : tgfxLayers) {
-        if (!tgfxLayer) {
-          continue;
-        }
-        // tgfx caches bounds after the first getBounds() call, so repeated lookups across
-        // frames are O(1) — only the first eviction sweep on a freshly built layer tree
-        // pays the lazy compute cost.
-        auto bounds = tgfxLayer->getBounds(rootLayer);
-        if (bounds.isEmpty()) {
-          continue;
-        }
-        if (!hasAny) {
-          unionBounds = bounds;
-          hasAny = true;
-        } else {
-          unionBounds.join(bounds);
-        }
+    for (const auto& tgfxLayer : tgfxLayers) {
+      if (!tgfxLayer) {
+        continue;
+      }
+      // tgfx caches bounds after the first getBounds() call, so repeated lookups across
+      // frames are O(1) — only the first eviction sweep on a freshly built layer tree
+      // pays the lazy compute cost.
+      auto bounds = tgfxLayer->getBounds(rootLayer);
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      if (!hasAny) {
+        unionBounds = bounds;
+        hasAny = true;
+      } else {
+        unionBounds.join(bounds);
       }
     }
     if (hasAny) {
@@ -973,8 +973,8 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   auto count = filePathList["length"].as<unsigned>();
   for (unsigned i = 0; i < count; ++i) {
     std::string filePath = filePathList[i].as<std::string>();
-    const auto& affectedLayers = document->findLayersByImageFilePath(filePath);
-    if (affectedLayers.empty()) {
+    auto tgfxLayers = builderSession->getTgfxLayersByImageFilePath(filePath);
+    if (tgfxLayers.empty()) {
       result.set(filePath, val::null());
       continue;
     }
@@ -982,31 +982,28 @@ val PAGXView::getImageBounds(const val& filePathList) const {
     tgfx::Rect largestBounds = tgfx::Rect::MakeEmpty();
     float largestArea = 0.0f;
     bool hasAny = false;
-    for (const auto* pagxLayer : affectedLayers) {
-      auto tgfxLayers = builderSession->getTgfxLayers(pagxLayer);
-      for (const auto& tgfxLayer : tgfxLayers) {
-        if (!tgfxLayer) {
-          continue;
-        }
-        // First getBounds(rootLayer) for a given tgfx Layer triggers tgfx's lazy localBounds
-        // evaluation (walks down to content, multiplies up ancestor matrices); later calls
-        // hit the cached value.
-        auto bounds = tgfxLayer->getBounds(rootLayer);
-        if (bounds.isEmpty()) {
-          continue;
-        }
-        if (!hasAny) {
-          unionBounds = bounds;
+    for (const auto& tgfxLayer : tgfxLayers) {
+      if (!tgfxLayer) {
+        continue;
+      }
+      // First getBounds(rootLayer) for a given tgfx Layer triggers tgfx's lazy localBounds
+      // evaluation (walks down to content, multiplies up ancestor matrices); later calls
+      // hit the cached value.
+      auto bounds = tgfxLayer->getBounds(rootLayer);
+      if (bounds.isEmpty()) {
+        continue;
+      }
+      if (!hasAny) {
+        unionBounds = bounds;
+        largestBounds = bounds;
+        largestArea = bounds.width() * bounds.height();
+        hasAny = true;
+      } else {
+        unionBounds.join(bounds);
+        float area = bounds.width() * bounds.height();
+        if (area > largestArea) {
+          largestArea = area;
           largestBounds = bounds;
-          largestArea = bounds.width() * bounds.height();
-          hasAny = true;
-        } else {
-          unionBounds.join(bounds);
-          float area = bounds.width() * bounds.height();
-          if (area > largestArea) {
-            largestArea = area;
-            largestBounds = bounds;
-          }
         }
       }
     }
@@ -1187,7 +1184,7 @@ void PAGXView::buildLayers() {
   // to compute the final ImagePattern matrices. PAGX files generated by libpag embed image data
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
-  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
+  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes, imageProvider.get());
 
   document->applyLayout(&fontConfig);
   LogMemProbe("buildLayers.afterApplyLayout");

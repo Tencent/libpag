@@ -160,33 +160,6 @@ class PAGXDocument : public Node {
   void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
 
   /**
-   * Returns the current image resource provider, or nullptr if none is set. The returned pointer
-   * is a non-owning reference whose lifetime is managed by this document.
-   */
-  ImageResourceProvider* imageResourceProvider() const;
-
-  /**
-   * Returns every Layer whose fill/stroke references an ImagePattern backed by an Image node
-   * whose filePath matches the given value. The search follows nested Group elements and
-   * Composition references so repeated subtrees only surface their owning Layer once, but a
-   * Layer that references the same image filePath through multiple fills is returned exactly
-   * once.
-   *
-   * The lookup is served from a lazily built index over all Image-bearing ImagePattern nodes;
-   * the first call walks the entire document, later calls are O(1) hash lookups. The index is
-   * automatically invalidated by notifyChange() so structural edits (adding/removing Layers or
-   * changing Image filePath values) are reflected on the next query. Only Image nodes reachable
-   * through ImagePattern contribute to the index today, other node types that might gain a
-   * filePath in the future will need their own lookup helpers.
-   *
-   * @param imageFilePath the Image node filePath to match against
-   * @return the list of Layers referencing the given image filePath, empty when no match.
-   * Returned reference is invalidated by the next notifyChange() call; copy if you need to retain
-   * it.
-   */
-  const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
-
-  /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. Re-running layout on an
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
@@ -277,6 +250,10 @@ class PAGXDocument : public Node {
 
  private:
   PAGXDocument() = default;
+
+  ImageResourceProvider* imageResourceProvider() const;
+  const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
+
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
   // is detected and stops the recursion instead of overflowing the stack.
@@ -313,6 +290,8 @@ class PAGXDocument : public Node {
   friend class TextLayoutContext;
   friend class PAGScene;
   friend class PAGComposition;
+  friend class LayerBuilder;
+  friend class LayerBuilderSession;
 };
 
 }  // namespace pagx

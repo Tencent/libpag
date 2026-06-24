@@ -81,7 +81,8 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().
 void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
-                                    const ImageOriginalSizeMap* origSizeMap = nullptr);
+                                    const ImageOriginalSizeMap* origSizeMap = nullptr,
+                                    pagx::ImageResourceProvider* provider = nullptr);
 
 // Resolves ImagePattern transform matrices for every pattern whose backing Image node has the
 // given filePath. Returns the number of patterns whose matrix was refreshed. Intended for the
@@ -89,6 +90,7 @@ void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
 // baked pattern matrix must be recomputed against the new image dimensions.
 size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
                                              const std::string& filePath,
-                                             const ImageOriginalSizeMap* origSizeMap = nullptr);
+                                             const ImageOriginalSizeMap* origSizeMap = nullptr,
+                                             pagx::ImageResourceProvider* provider = nullptr);
 
 }  // namespace pagx

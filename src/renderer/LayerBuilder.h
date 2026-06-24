@@ -441,6 +441,14 @@ class LayerBuilderSession {
   void invalidateAllImages();
 
   /**
+   * Returns every tgfx::Layer that was produced for layers referencing the given image file
+   * path. Combines findLayersByImageFilePath() and getTgfxLayers() into a single call so
+   * callers do not need to handle internal pagx::Layer pointers.
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayersByImageFilePath(
+      const std::string& filePath) const;
+
+  /**
    * Returns every tgfx::Layer that was produced for the given pagx Layer during build(). A
    * pagx Layer may map to several tgfx layers when its owning Composition is instanced more
    * than once; the returned vector preserves build order.
