@@ -134,8 +134,8 @@ void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
     key.style = normalizedStyle;
     data->registeredTypefaces.insert_or_assign(
         key, TypefaceHolder(std::make_shared<const std::vector<uint8_t>>(
-                              static_cast<const uint8_t*>(bytes),
-                              static_cast<const uint8_t*>(bytes) + length),
+                                static_cast<const uint8_t*>(bytes),
+                                static_cast<const uint8_t*>(bytes) + length),
                             ttcIndex, fontFamily, normalizedStyle));
   }
 }
