@@ -178,9 +178,13 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
 
 // ---- syncBack (render node → ViewModel) --------------------------------------
 
+static bool IsFloatReadableChannel(const std::string& channel) {
+  return channel == "alpha" || channel == "x" || channel == "y";
+}
+
 float DataBindRuntime::readTargetFloat(tgfx::Layer* layer, const std::string& channel,
                                        float fallback) {
-  if (layer == nullptr) {
+  if (layer == nullptr || !IsFloatReadableChannel(channel)) {
     return fallback;
   }
   if (channel == "alpha") {
@@ -189,10 +193,7 @@ float DataBindRuntime::readTargetFloat(tgfx::Layer* layer, const std::string& ch
   if (channel == "x") {
     return layer->matrix().getTranslateX();
   }
-  if (channel == "y") {
-    return layer->matrix().getTranslateY();
-  }
-  return fallback;
+  return layer->matrix().getTranslateY();
 }
 
 static void writeVmFromFloat(PAGViewModelValue* value, float f) {
@@ -234,7 +235,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     }
     // syncBack only supports float-readable channels. Skipping unsupported channels
     // avoids writing the readTargetFloat fallback (0.0f) into the VM.
-    if (entry.channel != "alpha" && entry.channel != "x" && entry.channel != "y") {
+    if (!IsFloatReadableChannel(entry.channel)) {
       continue;
     }
     float current = readTargetFloat(layer.get(), entry.channel, 0.0f);
