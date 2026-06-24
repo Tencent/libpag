@@ -233,10 +233,6 @@ class LayerBuilderContext {
     _document = document;
   }
 
-  void setImageProvider(ImageResourceProvider* provider) {
-    _imageProvider = provider;
-  }
-
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
   // their own independent layerMap. The returned LayerBuildResult.root is a fresh container layer
   // populated with the composition's child layers. Per-slot mask resolution still runs on the
@@ -1628,8 +1624,9 @@ class LayerBuilderContext {
     std::shared_ptr<tgfx::Image> image = nullptr;
     bool isBackendTexture = false;
     // Priority 1: query the provider for a platform-decoded image.
-    if (_imageProvider && !imageNode->filePath.empty()) {
-      image = _imageProvider->resolveImage(imageNode->filePath);
+    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
+    if (provider && !imageNode->filePath.empty()) {
+      image = provider->resolveImage(imageNode->filePath);
       if (image) {
         isBackendTexture = true;
       }
@@ -2709,7 +2706,6 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
-  ImageResourceProvider* _imageProvider = nullptr;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -2737,7 +2733,6 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
   }
 
   LayerBuilderContext context;
-  context.setImageProvider(document->_imageResourceProvider.get());
   return context.build(*document);
 }
 
@@ -2754,7 +2749,6 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   }
 
   LayerBuilderContext context;
-  context.setImageProvider(document->_imageResourceProvider.get());
   return context.buildWithMap(*document);
 }
 
@@ -2784,7 +2778,6 @@ LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
     return {};
   }
   impl->document = document;
-  impl->context.setImageProvider(document->_imageResourceProvider.get());
   return impl->context.buildWithMap(*document);
 }
 
@@ -2851,7 +2844,6 @@ LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
-  context.setImageProvider(document->_imageResourceProvider.get());
   return context.buildWithMap(*document);
 }
 
@@ -2873,9 +2865,6 @@ bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* bindin
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
-  if (document) {
-    context.setImageProvider(document->_imageResourceProvider.get());
-  }
   return context.refreshLayerInPlace(node, binding);
 }
 
@@ -2888,9 +2877,6 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
-  if (document) {
-    context.setImageProvider(document->_imageResourceProvider.get());
-  }
   return context.buildLayerInto(node, binding);
 }
 

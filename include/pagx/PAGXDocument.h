@@ -289,7 +289,7 @@ class PAGXDocument : public Node {
   friend class TextLayoutContext;
   friend class PAGScene;
   friend class PAGComposition;
-  friend class LayerBuilder;
+  friend class LayerBuilderContext;
   friend class LayerBuilderSession;
 };
 
