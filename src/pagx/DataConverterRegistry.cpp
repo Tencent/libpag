@@ -25,6 +25,8 @@
 
 namespace pagx {
 
+static constexpr float DEG_TO_RAD = 0.0174532925f;
+
 DataConverterRegistry::DataConverterRegistry() {
   registerConverter("secondsToFrames", ConvertSecondsToFrames);
   registerConverter("priceFormat", ConvertPriceFormat);
@@ -156,13 +158,13 @@ KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
 KeyValue DataConverterRegistry::ConvertDegsToRads(
     const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
-  return KeyValue{std::get<float>(input) * 0.0174533f};
+  return KeyValue{std::get<float>(input) * DEG_TO_RAD};
 }
 
 KeyValue DataConverterRegistry::ConvertInverseDegsToRads(
     const KeyValue& input, const std::unordered_map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
-  return KeyValue{std::get<float>(input) / 0.0174533f};
+  return KeyValue{std::get<float>(input) / DEG_TO_RAD};
 }
 
 void DataConverterRegistry::registerConverter(const std::string& typeName, ConverterFn fn) {
