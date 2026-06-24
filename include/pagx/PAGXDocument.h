@@ -24,6 +24,7 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/ImageResourceProvider.h"
 #include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
@@ -34,6 +35,8 @@ namespace pagx {
 
 class LayoutContext;
 class PAGScene;
+class Image;
+class ImagePattern;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -127,7 +130,9 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
+   * for which the current ImageResourceProvider already holds a decoded counterpart are also
+   * excluded so the same resource is not fetched twice.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -143,6 +148,17 @@ class PAGXDocument : public Node {
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  /**
+   * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
+   * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
+   * decoded counterpart. The renderer queries the provider during layer building via
+   * resolveImage().
+   *
+   * Passing nullptr removes the provider; the renderer will use only embedded data / file paths.
+   * @param provider the platform-specific image resource provider, or nullptr to remove.
+   */
+  void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
@@ -245,6 +261,9 @@ class PAGXDocument : public Node {
 
  private:
   PAGXDocument() = default;
+
+  const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
+
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
   // is detected and stops the recursion instead of overflowing the stack.
@@ -258,6 +277,7 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
+  std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
@@ -268,11 +288,20 @@ class PAGXDocument : public Node {
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
+  // Lazily built index of Image node filePath -> pagx Layer list, used by
+  // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits
+  // may alter the tree topology or Image node filePath values. Also freed when the document is
+  // destroyed (on the next parsePAGX() call).
+  std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
+  bool layersByImageFilePathBuilt = false;
+
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
   friend class PAGScene;
   friend class PAGComposition;
+  friend class LayerBuilderContext;
+  friend class LayerBuilderSession;
 };
 
 }  // namespace pagx

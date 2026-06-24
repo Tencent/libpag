@@ -27,12 +27,13 @@ namespace pagx {
 
 /**
  * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI.
+ * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
+ * managed externally via ImageResourceProvider, not stored on this node.
  */
 class Image : public Node {
  public:
   /**
-   * Image binary data (decoded from base64).
+   * Image binary data (decoded from base64 or loaded via loadFileData).
    */
   std::shared_ptr<Data> data = nullptr;
 
