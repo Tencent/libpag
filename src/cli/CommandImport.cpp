@@ -59,8 +59,12 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
       options->htmlAutoNormalize = false;
     } else if (arg == "--html-infer-flex") {
       options->htmlInferFlex = true;
+    } else if (arg == "--html-no-infer-flex") {
+      options->htmlInferFlex = false;
     } else if (arg == "--html-snapshot") {
       options->htmlSnapshot = true;
+    } else if (arg == "--html-no-snapshot") {
+      options->htmlSnapshot = false;
     } else if (arg == "--html-snapshot-bin" && i + 1 < argc) {
       options->htmlSnapshotBin = argv[++i];
     }
@@ -145,14 +149,17 @@ static std::string ShellQuote(const std::string& value) {
 }
 
 // Resolve the path to `tools/html-snapshot/snapshot.js` for `--html-snapshot`. Resolution
-// order (first non-empty hit wins):
-//   1. `--html-snapshot-bin <path>` (explicit override),
+// order (first hit wins):
+//   1. `--html-snapshot-bin <path>` (explicit override) when it points at an existing file.
+//      The default value is the relative path `tools/html-snapshot/snapshot.js`; if that does
+//      not resolve from cwd we treat it as "not provided" and fall through to the search below.
 //   2. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
 //   3. Upward search from cwd for `tools/html-snapshot/snapshot.js` (max 8 levels — covers
 //      the common case of running `pagx` from anywhere under the repo).
 // Returns empty when nothing matched; the caller surfaces a clear error in that case.
 static std::string ResolveSnapshotBin(const std::string& explicitPath) {
-  if (!explicitPath.empty()) {
+  std::error_code existsEc;
+  if (!explicitPath.empty() && std::filesystem::exists(explicitPath, existsEc) && !existsEc) {
     return explicitPath;
   }
   if (const char* env = std::getenv("PAGX_HTML_SNAPSHOT_BIN")) {
@@ -390,15 +397,18 @@ static void PrintUsage() {
       << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
       << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
       << "  --html-no-normalize            Skip the HTML subset normalizer (debug)\n"
-      << "  --html-infer-flex              Recover display:flex from absolute layout (lossy)\n"
+      << "  --html-infer-flex              Recover display:flex from absolute layout (lossy;\n"
+      << "                                 default on)\n"
+      << "  --html-no-infer-flex           Disable display:flex recovery\n"
       << "  --html-snapshot                Pre-process the input through\n"
       << "                                 tools/html-snapshot/snapshot.js before import\n"
       << "                                 (renders JS/React-driven pages in a headless\n"
-      << "                                 browser; typically paired with --html-infer-flex).\n"
-      << "                                 Requires `node` on PATH and a snapshot.js install.\n"
-      << "  --html-snapshot-bin <path>     Override the path to snapshot.js\n"
-      << "                                 (default: $PAGX_HTML_SNAPSHOT_BIN, else search\n"
-      << "                                  upward from cwd for tools/html-snapshot/snapshot.js)\n"
+      << "                                 browser; default on). Requires `node` on PATH and\n"
+      << "                                 a snapshot.js install.\n"
+      << "  --html-no-snapshot             Disable the html-snapshot pre-pass\n"
+      << "  --html-snapshot-bin <path>     Override the path to snapshot.js (default:\n"
+      << "                                 tools/html-snapshot/snapshot.js, else\n"
+      << "                                 $PAGX_HTML_SNAPSHOT_BIN, else search upward from cwd)\n"
       << "\n"
       << "Examples:\n"
       << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
@@ -424,7 +434,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
                arg == "--svg-preserve-unknown" || arg == "--html-strict" ||
                arg == "--html-preserve-unknown" || arg == "--html-no-prefer-body-size" ||
                arg == "--html-no-normalize" || arg == "--html-infer-flex" ||
-               arg == "--html-snapshot") {
+               arg == "--html-no-infer-flex" || arg == "--html-snapshot" ||
+               arg == "--html-no-snapshot") {
       // Handled by ParseFormatOptions below.
     } else if (arg == "--html-snapshot-bin" && i + 1 < argc) {
       // Same — ParseFormatOptions will pick this up. We still need to skip the

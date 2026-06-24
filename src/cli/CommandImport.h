@@ -50,17 +50,17 @@ struct ImportFormatOptions {
   bool htmlAutoNormalize = true;
   /**
    * Recover `display: flex` semantics from a flat absolute-positioned input (typically
-   * `tools/html-snapshot/snapshot.js` output). Lossy heuristic; default false. Enable via
-   * `--html-infer-flex`.
+   * `tools/html-snapshot/snapshot.js` output). Lossy heuristic; default true. Disable via
+   * `--html-no-infer-flex`.
    */
-  bool htmlInferFlex = false;
+  bool htmlInferFlex = true;
 
   /**
    * Pre-process the HTML input through `tools/html-snapshot/snapshot.js` (a headless-browser
    * snapshotter) before handing it off to the HTML importer. Use this for JS/React-driven
    * pages that only materialise their DOM at runtime: the snapshot script renders the page
    * in Chromium and emits a flat, absolute-positioned HTML subset that the importer can
-   * consume directly. Default false. Enable via `--html-snapshot`.
+   * consume directly. Default true. Disable via `--html-no-snapshot`.
    *
    * Requires Node.js on PATH and a working snapshot.js install (run `npm install` inside
    * `tools/html-snapshot`). The snapshot script is located via, in order:
@@ -71,14 +71,15 @@ struct ImportFormatOptions {
    * The snapshot output is the canonical input for `inferFlexFromAbsolute`; the two options
    * are typically used together.
    */
-  bool htmlSnapshot = false;
+  bool htmlSnapshot = true;
 
   /**
-   * Path to the html-snapshot driver script (`tools/html-snapshot/snapshot.js`). Empty
-   * means "auto-detect" (see `htmlSnapshot` for the resolution order). CLI:
-   * `--html-snapshot-bin <path>`.
+   * Path to the html-snapshot driver script (`tools/html-snapshot/snapshot.js`). Defaults to
+   * the relative path `tools/html-snapshot/snapshot.js`; when it does not resolve as-is the
+   * resolver falls back to `PAGX_HTML_SNAPSHOT_BIN` and an upward search from cwd (see
+   * `htmlSnapshot`). CLI: `--html-snapshot-bin <path>`.
    */
-  std::string htmlSnapshotBin = {};
+  std::string htmlSnapshotBin = "tools/html-snapshot/snapshot.js";
 };
 
 /**
