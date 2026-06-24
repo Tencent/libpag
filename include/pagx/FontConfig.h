@@ -128,13 +128,13 @@ class FontConfig {
    * @param fontFamily The system font family name.
    * @param fontStyle The system font style name.
    */
-  bool registerFont(const std::string& fontFamily, const std::string& fontStyle);
+  bool registerSystemFont(const std::string& fontFamily, const std::string& fontStyle);
 
   /**
    * Registers a system font by name. Returns false if the system does not have a matching font.
    * @param font The PAGFont describing the system font (fontFamily, fontStyle).
    */
-  bool registerFont(const PAGFont& font);
+  bool registerSystemFont(const PAGFont& font);
 
   /**
    * Adds a system fallback font by name. Returns false if the system does not have a matching
@@ -142,14 +142,14 @@ class FontConfig {
    * @param fontFamily The system font family name.
    * @param fontStyle The system font style name.
    */
-  bool addFallbackFont(const std::string& fontFamily, const std::string& fontStyle);
+  bool addFallbackSystemFont(const std::string& fontFamily, const std::string& fontStyle);
 
   /**
    * Adds a system fallback font by name. Returns false if the system does not have a matching
    * font.
    * @param font The PAGFont describing the system fallback (fontFamily, fontStyle).
    */
-  bool addFallbackFont(const PAGFont& font);
+  bool addFallbackSystemFont(const PAGFont& font);
 
  private:
   struct Data;

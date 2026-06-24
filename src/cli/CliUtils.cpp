@@ -58,7 +58,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       auto commaPos = fallbackStr.find(',');
       auto family = commaPos != std::string::npos ? fallbackStr.substr(0, commaPos) : fallbackStr;
       auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
-      if (!fontConfig->addFallbackFont(family, style)) {
+      if (!fontConfig->addFallbackSystemFont(family, style)) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
       }
     }

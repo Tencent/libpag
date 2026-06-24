@@ -172,7 +172,7 @@ void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
   }
 }
 
-bool FontConfig::registerFont(const std::string& fontFamily, const std::string& fontStyle) {
+bool FontConfig::registerSystemFont(const std::string& fontFamily, const std::string& fontStyle) {
   auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   if (typeface == nullptr) {
     return false;
@@ -187,11 +187,12 @@ bool FontConfig::registerFont(const std::string& fontFamily, const std::string& 
   return true;
 }
 
-bool FontConfig::registerFont(const PAGFont& font) {
-  return registerFont(font.fontFamily, font.fontStyle);
+bool FontConfig::registerSystemFont(const PAGFont& font) {
+  return registerSystemFont(font.fontFamily, font.fontStyle);
 }
 
-bool FontConfig::addFallbackFont(const std::string& fontFamily, const std::string& fontStyle) {
+bool FontConfig::addFallbackSystemFont(const std::string& fontFamily,
+                                       const std::string& fontStyle) {
   auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   if (typeface == nullptr) {
     return false;
@@ -202,8 +203,8 @@ bool FontConfig::addFallbackFont(const std::string& fontFamily, const std::strin
   return true;
 }
 
-bool FontConfig::addFallbackFont(const PAGFont& font) {
-  return addFallbackFont(font.fontFamily, font.fontStyle);
+bool FontConfig::addFallbackSystemFont(const PAGFont& font) {
+  return addFallbackSystemFont(font.fontFamily, font.fontStyle);
 }
 
 }  // namespace pagx
