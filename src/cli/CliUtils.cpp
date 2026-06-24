@@ -57,13 +57,23 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       }
     }
     if (isFilePath) {
-      fontConfig->addFallbackFont(fallbackStr, 0);
+      // Register as both a main font (precise family match) and a fallback font, matching the
+      // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
+      auto typeface = tgfx::Typeface::MakeFromPath(fallbackStr);
+      if (typeface == nullptr) {
+        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
+      } else {
+        fontConfig->registerFont(fallbackStr, 0, typeface->fontFamily(), typeface->fontStyle());
+        fontConfig->addFallbackFont(fallbackStr, 0);
+      }
     } else {
       auto commaPos = fallbackStr.find(',');
       auto family = commaPos != std::string::npos ? fallbackStr.substr(0, commaPos) : fallbackStr;
       auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
-      if (!fontConfig->addFallbackSystemFont(family, style)) {
+      if (!fontConfig->registerSystemFont(family, style)) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
+      } else {
+        fontConfig->addFallbackSystemFont(family, style);
       }
     }
   }

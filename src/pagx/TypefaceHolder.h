@@ -38,7 +38,8 @@ namespace pagx {
 class TypefaceHolder {
  public:
   TypefaceHolder(std::string path, int ttcIndex, std::string family, std::string style);
-  TypefaceHolder(std::vector<uint8_t> bytes, int ttcIndex, std::string family, std::string style);
+  TypefaceHolder(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                 std::string family, std::string style);
   TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::string family, std::string style);
 
   std::shared_ptr<tgfx::Typeface> getTypeface();
@@ -47,7 +48,7 @@ class TypefaceHolder {
 
  private:
   std::string path = {};
-  std::vector<uint8_t> bytes = {};
+  std::shared_ptr<const std::vector<uint8_t>> bytes = {};
   int ttcIndex = 0;
   std::string fontFamily = {};
   std::string fontStyle = {};

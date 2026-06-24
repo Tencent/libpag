@@ -54,8 +54,9 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
-  if (document == nullptr || paths == nullptr) {
+static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths,
+                                    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
     return;
   }
   for (auto& node : document->nodes) {
@@ -69,7 +70,7 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), paths);
+        AppendExternalFilePaths(layer->externalDoc.get(), paths, visited);
       }
     }
   }
@@ -290,7 +291,8 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  AppendExternalFilePaths(this, &paths);
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendExternalFilePaths(this, &paths, visited);
   return paths;
 }
 
@@ -334,8 +336,9 @@ void PAGXDocument::clearEmbed() {
   }
 }
 
-static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFont>* outFonts) {
-  if (document == nullptr || outFonts == nullptr) {
+static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFont>* outFonts,
+                                std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || outFonts == nullptr || !visited.insert(document).second) {
     return;
   }
   for (auto& node : document->nodes) {
@@ -347,7 +350,7 @@ static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFon
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        AppendRequiredFonts(layer->externalDoc.get(), outFonts);
+        AppendRequiredFonts(layer->externalDoc.get(), outFonts, visited);
       }
     }
   }
@@ -355,7 +358,8 @@ static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFon
 
 std::vector<PAGFont> PAGXDocument::getRequiredFonts() const {
   std::vector<PAGFont> fonts = {};
-  AppendRequiredFonts(this, &fonts);
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendRequiredFonts(this, &fonts, visited);
   std::sort(fonts.begin(), fonts.end());
   fonts.erase(std::unique(fonts.begin(), fonts.end()), fonts.end());
   return fonts;
