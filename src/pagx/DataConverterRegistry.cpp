@@ -20,11 +20,14 @@
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
+#include "base/utils/MathUtil.h"
 #include "pagx/nodes/DataConverter.h"
 
 namespace pagx {
 
-static constexpr float DEG_TO_RAD = 0.0174532925f;
+using pag::DegreesToRadians;
+using pag::RadiansToDegrees;
+
 static constexpr float DEFAULT_FRAME_RATE = 30.0f;
 static constexpr float DEFAULT_RANGE_INPUT_MIN = 0.0f;
 static constexpr float DEFAULT_RANGE_INPUT_MAX = 1.0f;
@@ -95,6 +98,7 @@ KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
   float frameRate = DEFAULT_FRAME_RATE;
   auto it = params.find("frameRate");
   if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
+  if (frameRate == 0.0f) return input;
   return KeyValue{frames / frameRate};
 }
 
@@ -103,8 +107,6 @@ KeyValue DataConverterRegistry::ConvertInversePriceFormat(
   std::string str;
   if (std::holds_alternative<std::string>(input)) {
     str = std::get<std::string>(input);
-  } else if (std::holds_alternative<float>(input)) {
-    return input;
   } else {
     return input;
   }
@@ -162,13 +164,13 @@ KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
 KeyValue DataConverterRegistry::ConvertDegsToRads(const KeyValue& input,
                                                   const std::map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
-  return KeyValue{std::get<float>(input) * DEG_TO_RAD};
+  return KeyValue{DegreesToRadians(std::get<float>(input))};
 }
 
 KeyValue DataConverterRegistry::ConvertInverseDegsToRads(
     const KeyValue& input, const std::map<std::string, std::string>&) {
   if (!std::holds_alternative<float>(input)) return input;
-  return KeyValue{std::get<float>(input) / DEG_TO_RAD};
+  return KeyValue{RadiansToDegrees(std::get<float>(input))};
 }
 
 void DataConverterRegistry::registerConverter(const std::string& typeName, ConverterFn fn) {

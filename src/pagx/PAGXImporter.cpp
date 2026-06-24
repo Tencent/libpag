@@ -2746,10 +2746,8 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         } else {
           ReportError(doc, child.get(), "Invalid value '" + typeStr + "' for 'type' attribute.");
         }
-        auto minAttr = GetAttribute(child.get(), "min");
-        if (!minAttr.empty()) prop->minValue = std::strtof(minAttr.c_str(), nullptr);
-        auto maxAttr = GetAttribute(child.get(), "max");
-        if (!maxAttr.empty()) prop->maxValue = std::strtof(maxAttr.c_str(), nullptr);
+        prop->minValue = GetOptionalFloatAttribute(child.get(), "min", doc);
+        prop->maxValue = GetOptionalFloatAttribute(child.get(), "max", doc);
         auto optionsStr = GetAttribute(child.get(), "options");
         if (!optionsStr.empty()) {
           std::istringstream iss(optionsStr);
@@ -2774,9 +2772,10 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         }
         vm->properties.push_back(prop);
       }
-    } else if (child->type == DOMNodeType::Element && child->name == "DataConverter") {
-      // All DataConverter children nested inside a ViewModel are skipped; DataConverters must be
-      // top-level Resources to be referenceable by Property.dataConverter attributes.
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(doc, child.get(),
+                  "Element '" + child->name +
+                      "' is not allowed in 'ViewModel'. Expected: Property.");
     }
     child = child->nextSibling;
   }

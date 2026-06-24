@@ -81,8 +81,9 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   }
 
   /**
-   * Returns the PropertyData reflection metadata for this property, or nullptr if the schema
-   * did not define customData for this property. Created during ViewModel instantiation.
+   * Returns the PropertyData reflection metadata for this property, holding the schema-derived
+   * information such as the default value and the customData map. Created during ViewModel
+   * instantiation, so a schema-built value always has non-null PropertyData.
    */
   std::shared_ptr<PropertyData> propertyData() const {
     return pd;

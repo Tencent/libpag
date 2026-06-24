@@ -84,7 +84,7 @@ class NumberPropertyData : public PropertyData {
   }
 
   /**
-   * The default numeric value from the schema, or nullopt if not specified.
+   * The default numeric value from the schema.
    */
   std::optional<float> defaultValue = std::nullopt;
 
@@ -109,7 +109,7 @@ class StringPropertyData : public PropertyData {
   }
 
   /**
-   * The default string value from the schema, or nullopt if not specified.
+   * The default string value from the schema.
    */
   std::optional<std::string> defaultValue = std::nullopt;
 };
@@ -124,7 +124,7 @@ class BooleanPropertyData : public PropertyData {
   }
 
   /**
-   * The default boolean value from the schema, or nullopt if not specified.
+   * The default boolean value from the schema.
    */
   std::optional<bool> defaultValue = std::nullopt;
 };
@@ -139,7 +139,7 @@ class ColorPropertyData : public PropertyData {
   }
 
   /**
-   * The default color value from the schema, or nullopt if not specified.
+   * The default color value from the schema.
    */
   std::optional<Color> defaultValue = std::nullopt;
 };

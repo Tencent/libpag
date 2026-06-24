@@ -95,9 +95,7 @@ void PAGViewModelValue::clearDirty() {
 
 void PAGViewModelValue::notifyDependents() {
   for (auto* dep : dependents) {
-    if (dep != nullptr) {
-      dep->markDirtyForValue(this);
-    }
+    dep->markDirtyForValue(this);
   }
 }
 
