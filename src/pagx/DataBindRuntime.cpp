@@ -49,7 +49,7 @@ DataBindRuntime::~DataBindRuntime() {
 
 // ---- Source path parsing -----------------------------------------------------
 
-static std::vector<std::string> parseSourcePath(const std::string& source) {
+static std::vector<std::string> ParseSourcePath(const std::string& source) {
   std::vector<std::string> parts;
   std::istringstream stream(source);
   std::string token;
@@ -69,7 +69,7 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
     }
-    auto path = parseSourcePath(db->source);
+    auto path = ParseSourcePath(db->source);
     auto* sourceValue = context->resolve(path);
     if (sourceValue == nullptr) {
       continue;
@@ -120,7 +120,7 @@ void DataBindRuntime::markDirtyForValue(PAGViewModelValue* value) {
 
 // ---- update (ViewModel → render node) ----------------------------------------
 
-static KeyValue valueToKeyValue(PAGViewModelValue* value) {
+static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
   if (value == nullptr) {
     return KeyValue{0.0f};
   }
@@ -168,7 +168,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         entry->targetNode == nullptr || entry->dataBind == nullptr) {
       continue;
     }
-    auto keyValue = valueToKeyValue(entry->source);
+    auto keyValue = ValueToKeyValue(entry->source);
     if (entry->source->converter != nullptr) {
       keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
     }
@@ -196,7 +196,7 @@ float DataBindRuntime::readTargetFloat(tgfx::Layer* layer, const std::string& ch
   return layer->matrix().getTranslateY();
 }
 
-static void writeVmFromFloat(PAGViewModelValue* value, float f) {
+static void WriteVmFromFloat(PAGViewModelValue* value, float f) {
   // Use the normal setter to notify observers (consistent with Rive's TwoWay).
   // The same-value check in value() prevents unnecessary dirty/loop.
   if (value == nullptr) {
@@ -242,7 +242,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     // Apply inverse converter for syncBack direction (layer value → VM domain).
     KeyValue kv{current};
     kv = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
-    writeVmFromFloat(entry.source, std::get<float>(kv));
+    WriteVmFromFloat(entry.source, std::get<float>(kv));
   }
 }
 
