@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/DataBindRuntime.h"
-#include <algorithm>
 #include <sstream>
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
