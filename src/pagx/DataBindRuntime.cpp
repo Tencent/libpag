@@ -245,10 +245,4 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
   }
 }
 
-// ---- clearDirty --------------------------------------------------------------
-
-void DataBindRuntime::clearDirty() {
-  dirtyBinds.clear();
-}
-
 }  // namespace pagx

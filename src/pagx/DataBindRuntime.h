@@ -51,7 +51,6 @@ class DataBindRuntime {
 
   void update(RuntimeBinding* binding, float mix = 1.0f);
   void syncBack(RuntimeBinding* binding);
-  void clearDirty();
 
  private:
   struct BindingEntry {
