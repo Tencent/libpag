@@ -124,6 +124,20 @@ static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
   return "Number";
 }
 
+static std::string DataBindDirectionToString(DataBindDirection f) {
+  switch (f) {
+    case DataBindDirection::ToTarget:
+      return "ToTarget";
+    case DataBindDirection::ToSource:
+      return "ToSource";
+    case DataBindDirection::TwoWay:
+      return "TwoWay";
+    case DataBindDirection::Once:
+      return "Once";
+  }
+  return "ToTarget";
+}
+
 static std::string PointListToString(const std::vector<Point>& points) {
   std::string result = {};
   result.reserve(points.size() * 12);
@@ -279,6 +293,8 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
       break;
     case ChannelValueType::PAGImage:
+      // PAGImage channels carry a runtime-only decoded bitmap with no serializable form, so they
+      // are intentionally not written; there is no matching import path in ParseChannel.
       break;
   }
 }
@@ -1145,6 +1161,20 @@ static bool IsExportableResource(const Node* node) {
   }
 }
 
+// Escapes backslash and comma in an enum option value so the comma-joined "options" attribute can
+// be split unambiguously on import. Backslash becomes "\\" and comma becomes "\,".
+static std::string EscapeEnumOption(const std::string& option) {
+  std::string escaped;
+  escaped.reserve(option.size());
+  for (char c : option) {
+    if (c == '\\' || c == ',') {
+      escaped += '\\';
+    }
+    escaped += c;
+  }
+  return escaped;
+}
+
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Image: {
@@ -1295,7 +1325,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             std::string opts;
             for (size_t i = 0; i < prop->enumOptions.size(); i++) {
               if (i > 0) opts += ",";
-              opts += prop->enumOptions[i];
+              opts += EscapeEnumOption(prop->enumOptions[i]);
             }
             xml.addAttribute("options", opts);
           }
@@ -1313,6 +1343,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("source", bind->source);
       xml.addAttribute("target", bind->target);
       xml.addAttribute("channel", bind->channel);
+      if (bind->flags != DataBindDirection::ToTarget) {
+        xml.addAttribute("flags", DataBindDirectionToString(bind->flags));
+      }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

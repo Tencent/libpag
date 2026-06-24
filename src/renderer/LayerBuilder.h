@@ -53,6 +53,11 @@ struct RuntimeColorStop {
  */
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
+// Reads the current value of a channel back from a runtime object, returning it as a KeyValue.
+// Symmetric to RuntimeWriter; used by DataBind syncBack to flow animation-driven layer values back
+// into ViewModel properties.
+using RuntimeReader = KeyValue (*)(const void* object);
+
 struct RuntimeTarget {
   virtual ~RuntimeTarget() = default;
 
@@ -76,6 +81,12 @@ struct RuntimeTarget {
     }
   }
 
+  void setReader(const std::string& channel, RuntimeReader reader) {
+    if (!channel.empty() && reader != nullptr) {
+      readers[channel] = reader;
+    }
+  }
+
   // Returns true if this target can apply the given channel. Virtual so a subclass that intercepts
   // channels in apply() (LayerRuntimeTarget's x / y / matrix) reports them as handled even though
   // they are not in the writers map.
@@ -94,9 +105,22 @@ struct RuntimeTarget {
     return true;
   }
 
+  // Reads the current value of a channel back from the bound object. Virtual so a subclass
+  // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y). Returns
+  // false if no reader is registered for the channel or the object is null.
+  virtual bool read(const std::string& channel, KeyValue* out) const {
+    auto it = readers.find(channel);
+    if (it == readers.end() || object == nullptr || out == nullptr) {
+      return false;
+    }
+    *out = it->second(object.get());
+    return true;
+  }
+
  protected:
   std::shared_ptr<void> object = nullptr;
   std::unordered_map<std::string, RuntimeWriter> writers = {};
+  std::unordered_map<std::string, RuntimeReader> readers = {};
 };
 
 struct RuntimeBinding {
@@ -113,6 +137,13 @@ struct RuntimeBinding {
       return;
     }
     ensureTarget(node)->setWriter(channel, std::move(writer));
+  }
+
+  void setReader(const Node* node, const std::string& channel, RuntimeReader reader) {
+    if (node == nullptr) {
+      return;
+    }
+    ensureTarget(node)->setReader(channel, std::move(reader));
   }
 
   template <typename T>
@@ -235,6 +266,16 @@ struct RuntimeBinding {
     return it->second->apply(channel, value, mix);
   }
 
+  // Reads the current value of a node's channel back into out. Returns false if the node has no
+  // target or no reader for the channel. Used by DataBind syncBack.
+  bool read(const Node* node, const std::string& channel, KeyValue* out) const {
+    auto it = targets.find(node);
+    if (it == targets.end()) {
+      return false;
+    }
+    return it->second->read(channel, out);
+  }
+
   // Returns true if the node has a target that can apply the given channel. Used by tests to verify
   // every Animatable channel in the reflection registry has a matching runtime writer.
   bool hasWriter(const Node* node, const std::string& channel) const {
@@ -323,6 +364,14 @@ class LayerBuilder {
    * to apply the image to a runtime object.
    */
   static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+
+  /**
+   * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
+   * to write an animation-driven image back into an image-valued ViewModel property. The returned
+   * PAGImage carries only the decoded bitmap (no originating path or data URI), which is sufficient
+   * for re-rendering and for assigning the value to other ViewModel properties.
+   */
+  static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.

@@ -24,7 +24,6 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
-#include <sstream>
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
@@ -2710,6 +2709,34 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   }
 }
 
+// Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:
+// "\\" decodes to a literal backslash and "\," to a literal comma, so an option value containing a
+// comma round-trips correctly. A token is emitted on every comma boundary regardless of whether it
+// is empty, so empty option values are preserved and option indices stay aligned with export. An
+// empty options string yields no options (not a single empty one).
+static std::vector<std::string> SplitEnumOptions(const std::string& optionsStr) {
+  std::vector<std::string> options;
+  std::string current;
+  bool escaped = false;
+  bool inList = false;
+  for (char c : optionsStr) {
+    inList = true;
+    if (escaped) {
+      current += c;
+      escaped = false;
+    } else if (c == '\\') {
+      escaped = true;
+    } else if (c == ',') {
+      options.push_back(current);
+      current.clear();
+    } else {
+      current += c;
+    }
+  }
+  if (inList) options.push_back(current);
+  return options;
+}
+
 static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
   auto vm = makeNodeFromXML<ViewModel>(node, doc);
   if (!vm) return nullptr;
@@ -2750,10 +2777,17 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         prop->maxValue = GetOptionalFloatAttribute(child.get(), "max", doc);
         auto optionsStr = GetAttribute(child.get(), "options");
         if (!optionsStr.empty()) {
-          std::istringstream iss(optionsStr);
-          std::string token;
-          while (std::getline(iss, token, ',')) {
-            if (!token.empty()) prop->enumOptions.push_back(token);
+          prop->enumOptions = SplitEnumOptions(optionsStr);
+        }
+        // An out-of-range Enum default would otherwise be silently accepted and dereference past
+        // the option list at runtime.
+        if (prop->propertyType == ViewModelPropertyType::Enum) {
+          auto optionCount = static_cast<int>(prop->enumOptions.size());
+          if (prop->defaultEnum < 0 || prop->defaultEnum >= optionCount) {
+            ReportError(doc, child.get(),
+                        "Enum 'default' index " + std::to_string(prop->defaultEnum) +
+                            " is out of range for " + std::to_string(optionCount) + " option(s).");
+            prop->defaultEnum = optionCount > 0 ? (prop->defaultEnum < 0 ? 0 : optionCount - 1) : 0;
           }
         }
         auto converterId = GetAttribute(child.get(), "dataConverter");
@@ -2788,6 +2822,20 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
   bind->source = GetAttribute(node, "source");
   bind->target = GetAttribute(node, "target");
   bind->channel = GetAttribute(node, "channel");
+  auto flagsStr = GetAttribute(node, "flags");
+  if (!flagsStr.empty()) {
+    if (flagsStr == "ToTarget") {
+      bind->flags = DataBindDirection::ToTarget;
+    } else if (flagsStr == "ToSource") {
+      bind->flags = DataBindDirection::ToSource;
+    } else if (flagsStr == "TwoWay") {
+      bind->flags = DataBindDirection::TwoWay;
+    } else if (flagsStr == "Once") {
+      bind->flags = DataBindDirection::Once;
+    } else {
+      ReportError(doc, node, "Invalid value '" + flagsStr + "' for 'flags' attribute.");
+    }
+  }
   return bind;
 }
 

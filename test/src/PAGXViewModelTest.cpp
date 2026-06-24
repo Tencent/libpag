@@ -456,9 +456,9 @@ PAGX_TEST(PAGXViewModelTest, RenderWithViewModel) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
   auto* np = doc->makeNode<pagx::ViewModelProperty>();
-  np->name = "bgRed";
+  np->name = "bgAlpha";
   np->propertyType = pagx::ViewModelPropertyType::Number;
-  np->defaultNumber = 0.2f;
+  np->defaultNumber = 0.4f;
   schema->properties.push_back(np);
   doc->viewModel = schema;
   auto layer = doc->makeNode<pagx::Layer>("bg");
@@ -474,6 +474,11 @@ PAGX_TEST(PAGXViewModelTest, RenderWithViewModel) {
   group->elements.push_back(fill);
   layer->contents.push_back(group);
   doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.bgAlpha";
+  db->target = "@bg";
+  db->channel = "alpha";
+  doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
   ASSERT_NE(scene, nullptr);
@@ -481,6 +486,13 @@ PAGX_TEST(PAGXViewModelTest, RenderWithViewModel) {
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
+  // Verify the ViewModel actually drives the rendered layer: the bound bgAlpha default reaches the
+  // bg layer's alpha rather than the layer keeping its built-in default.
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.4f);
 }
 
 PAGX_TEST(PAGXViewModelTest, RenderWithSuppressDelegation) {
@@ -554,13 +566,14 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   anim->objects.push_back(object);
   auto* aChan = doc->makeNode<pagx::TypedChannel<float>>();
   aChan->name = "alpha";
-  aChan->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::None, {}, {}});
-  aChan->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+  aChan->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  aChan->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   object->channels.push_back(aChan);
   auto db = doc->makeNode<pagx::DataBind>();
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
+  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -576,6 +589,13 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   timeline->apply();
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel's configured default takes priority and is pushed to the target,
+  // so the animation value is not yet synced back.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(alphaProp->value(), 1.0f);
+  // Second frame: the binding is no longer dirty, so syncBack writes the animation value back into
+  // the ViewModel.
+  timeline->apply();
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_NEAR(alphaProp->value(), 0.5f, 0.01f);
 }
@@ -612,8 +632,8 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   anim1->objects.push_back(o1);
   auto* c1 = doc->makeNode<pagx::TypedChannel<float>>();
   c1->name = "alpha";
-  c1->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::None, {}, {}});
-  c1->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+  c1->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  c1->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   o1->channels.push_back(c1);
   auto anim2 = doc->makeNode<pagx::Animation>("a2");
   anim2->duration = 60;
@@ -624,13 +644,14 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   anim2->objects.push_back(o2);
   auto* c2 = doc->makeNode<pagx::TypedChannel<float>>();
   c2->name = "alpha";
-  c2->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::None, {}, {}});
-  c2->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+  c2->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  c2->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   o2->channels.push_back(c2);
   auto db = doc->makeNode<pagx::DataBind>();
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
+  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -654,9 +675,20 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   EXPECT_EQ(obs, 0);
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel default takes priority and is pushed to the target, so no syncBack
+  // writeback happens and the observer is not notified.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(obs, 0);
+  // Second frame: the binding is no longer dirty, so syncBack writes the animation value back into
+  // the ViewModel once, notifying the observer a single time.
+  t1->apply();
+  t2->apply();
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_EQ(obs, 1);
+  // Third frame: the value is unchanged, so the observer is not notified again.
   obs = 0;
+  t1->apply();
+  t2->apply();
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_EQ(obs, 0);
 }
@@ -694,13 +726,14 @@ PAGX_TEST(PAGXViewModelTest, SyncsAnimationToVM) {
   anim->objects.push_back(object);
   auto* aChan = doc->makeNode<pagx::TypedChannel<float>>();
   aChan->name = "alpha";
-  aChan->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::None, {}, {}});
-  aChan->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+  aChan->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  aChan->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   object->channels.push_back(aChan);
   auto db = doc->makeNode<pagx::DataBind>();
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
+  db->flags = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -716,8 +749,150 @@ PAGX_TEST(PAGXViewModelTest, SyncsAnimationToVM) {
   timeline->apply();
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel's configured default takes priority and is pushed to the target,
+  // so the animation value is not yet synced back.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(alphaProp->value(), 1.0f);
+  // Second frame: the binding is no longer dirty, so syncBack writes the animation value back into
+  // the ViewModel.
+  timeline->apply();
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_NEAR(alphaProp->value(), 0.5f, 0.01f);
+}
+
+// Verify syncBack writes a non-float channel (the layer name string) back into a String ViewModel
+// property, exercising the reader path added for full-type two-way binding.
+PAGX_TEST(PAGXViewModelTest, StringSyncBackToViewModel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "label";
+  prop->propertyType = pagx::ViewModelPropertyType::String;
+  prop->defaultString = "init";
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.label";
+  db->target = "@rect";
+  db->channel = "name";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto labelProp = vm->propertyString("label");
+  ASSERT_NE(labelProp, nullptr);
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel default "init" is pushed to the layer name.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(labelProp->value(), "init");
+  EXPECT_EQ(tgfxLayer->name(), "init");
+  // Drive the layer name externally, then draw again: syncBack reads the name back into the VM.
+  tgfxLayer->setName("changed");
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(labelProp->value(), "changed");
+}
+
+// Verify the DataBind flags (direction) attribute round-trips through XML export/import.
+PAGX_TEST(PAGXViewModelTest, DataBindFlagsRoundTrip) {
+  std::string xml = VMXml(
+      "    <ViewModel id=\"MainVM\">\n      <Property name=\"title\" type=\"String\"/>\n    "
+      "</ViewModel>\n    <Composition id=\"Main\" width=\"400\" height=\"300\">\n      <Layer "
+      "id=\"textLayer\" name=\"Text\"/>\n      <DataBind source=\"$vm.title\" "
+      "target=\"@textLayer\" channel=\"name\" flags=\"TwoWay\"/>\n    </Composition>\n");
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  auto* comp = doc->findNode<pagx::Composition>("Main");
+  ASSERT_NE(comp, nullptr);
+  ASSERT_EQ(comp->dataBinds.size(), 1u);
+  EXPECT_EQ(comp->dataBinds[0]->flags, pagx::DataBindDirection::TwoWay);
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
+  ASSERT_NE(roundTripped, nullptr);
+  auto* comp2 = roundTripped->findNode<pagx::Composition>("Main");
+  ASSERT_NE(comp2, nullptr);
+  ASSERT_EQ(comp2->dataBinds.size(), 1u);
+  EXPECT_EQ(comp2->dataBinds[0]->flags, pagx::DataBindDirection::TwoWay);
+}
+
+// Verify one ViewModel property bound to multiple targets (default ToTarget) drives every target,
+// and that a ToTarget binding never writes a target change back into the ViewModel.
+PAGX_TEST(PAGXViewModelTest, OneSourceToManyTargetsToTarget) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "alpha";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 1.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  for (int i = 0; i < 2; i++) {
+    auto layer = doc->makeNode<pagx::Layer>(i == 0 ? "rectA" : "rectB");
+    layer->width = 200;
+    layer->height = 200;
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->size.width = 200;
+    rect->size.height = 200;
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto color = doc->makeNode<pagx::SolidColor>();
+    fill->color = color;
+    auto group = doc->makeNode<pagx::Group>();
+    group->elements.push_back(rect);
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+    doc->layers.push_back(layer);
+    auto db = doc->makeNode<pagx::DataBind>();
+    db->source = "$vm.alpha";
+    db->target = i == 0 ? "@rectA" : "@rectB";
+    db->channel = "alpha";
+    doc->dataBinds.push_back(db);
+  }
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto alphaProp = vm->propertyNumber("alpha");
+  ASSERT_NE(alphaProp, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // The single ViewModel property drives both targets.
+  alphaProp->value(0.5f);
+  EXPECT_TRUE(scene->draw(surface));
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_EQ(rootComp->children.size(), 2u);
+  auto layerA = rootComp->children[0]->runtimeLayer;
+  auto layerB = rootComp->children[1]->runtimeLayer;
+  ASSERT_NE(layerA, nullptr);
+  ASSERT_NE(layerB, nullptr);
+  EXPECT_FLOAT_EQ(layerA->alpha(), 0.5f);
+  EXPECT_FLOAT_EQ(layerB->alpha(), 0.5f);
+  // Changing one target externally must NOT flow back into the ViewModel for ToTarget bindings.
+  layerA->setAlpha(0.2f);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(alphaProp->value(), 0.5f);
 }
 
 PAGX_TEST(PAGXViewModelTest, EmptyViewModelPropertiesReturnsEmpty) {
@@ -1407,6 +1582,30 @@ PAGX_TEST(PAGXViewModelTest, EnumValueIntStorage) {
 
   // A number accessor must not return an enum property.
   EXPECT_EQ(vm->propertyNumber("theme"), nullptr);
+}
+
+// Verify enum option values containing commas survive an XML export/import round trip via escaping.
+PAGX_TEST(PAGXViewModelTest, EnumOptionCommaRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+  auto* enumProp = doc->makeNode<pagx::ViewModelProperty>();
+  enumProp->name = "layout";
+  enumProp->propertyType = pagx::ViewModelPropertyType::Enum;
+  enumProp->enumOptions = {"one, two", "three", "a\\b"};
+  enumProp->defaultEnum = 0;
+  schema->properties.push_back(enumProp);
+  doc->viewModel = schema;
+
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
+  ASSERT_NE(roundTripped, nullptr);
+  ASSERT_NE(roundTripped->viewModel, nullptr);
+  ASSERT_EQ(roundTripped->viewModel->properties.size(), 1u);
+  auto* prop = roundTripped->viewModel->properties[0];
+  ASSERT_EQ(prop->enumOptions.size(), 3u);
+  EXPECT_EQ(prop->enumOptions[0], "one, two");
+  EXPECT_EQ(prop->enumOptions[1], "three");
+  EXPECT_EQ(prop->enumOptions[2], "a\\b");
 }
 
 // ========== Nested composition DataBind ==========

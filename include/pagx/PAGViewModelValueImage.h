@@ -44,11 +44,19 @@ class PAGViewModelValueImage : public PAGViewModelValue {
    */
   void value(std::shared_ptr<PAGImage> v);
 
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(std::shared_ptr<PAGImage> v, bool fromVM);
+
  private:
   std::shared_ptr<PAGImage> propertyValue = nullptr;
 
   friend class PAGViewModel;
   friend class PAGScene;
+  friend class DataBindRuntime;
 };
 
 }  // namespace pagx

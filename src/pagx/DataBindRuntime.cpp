@@ -19,6 +19,7 @@
 #include "pagx/DataBindRuntime.h"
 #include <cmath>
 #include <sstream>
+#include "base/utils/Log.h"
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/PAGViewModelValue.h"
@@ -34,7 +35,6 @@
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
-#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
@@ -73,6 +73,8 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     auto path = ParseSourcePath(db->source);
     auto* sourceValue = context->resolve(path);
     if (sourceValue == nullptr) {
+      LOGE("DataBind skipped: source '%s' did not resolve to a ViewModel property.",
+           db->source.c_str());
       continue;
     }
     const Node* targetNode = nullptr;
@@ -80,6 +82,7 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
       targetNode = doc->findNode(db->target.substr(1));
     }
     if (targetNode == nullptr) {
+      LOGE("DataBind skipped: target '%s' was not found in the document.", db->target.c_str());
       continue;
     }
     sourceValue->addDependent(this);
@@ -91,6 +94,13 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.targetNode = targetNode;
     entry.channel = db->channel;
     entries.push_back(entry);
+
+    // Mark dirty so the first update() applies the ViewModel's configured default to the target.
+    // Only ToTarget/TwoWay bindings drive the target, so a pure ToSource binding is not dirtied
+    // here (it only reads the target back into the ViewModel during syncBack).
+    if (entry.toTarget()) {
+      markDirty(db);
+    }
   }
 }
 
@@ -169,33 +179,26 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         entry->targetNode == nullptr || entry->dataBind == nullptr) {
       continue;
     }
+    // Pure ToSource bindings never drive the target.
+    if (!entry->toTarget()) {
+      continue;
+    }
+    // Once: apply the ViewModel value to the target a single time, then skip.
+    if (entry->dataBind->flags == DataBindDirection::Once && entry->onceApplied) {
+      continue;
+    }
     auto keyValue = ValueToKeyValue(entry->source);
     if (entry->source->converter != nullptr) {
       keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
     }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
+    if (entry->dataBind->flags == DataBindDirection::Once) {
+      entry->onceApplied = true;
+    }
   }
 }
 
 // ---- syncBack (render node → ViewModel) --------------------------------------
-
-static bool IsFloatReadableChannel(const std::string& channel) {
-  return channel == "alpha" || channel == "x" || channel == "y";
-}
-
-float DataBindRuntime::ReadTargetFloat(tgfx::Layer* layer, const std::string& channel,
-                                       float fallback) {
-  if (layer == nullptr || !IsFloatReadableChannel(channel)) {
-    return fallback;
-  }
-  if (channel == "alpha") {
-    return layer->alpha();
-  }
-  if (channel == "x") {
-    return layer->matrix().getTranslateX();
-  }
-  return layer->matrix().getTranslateY();
-}
 
 static float KeyValueToFloat(const KeyValue& kv) {
   if (auto* f = std::get_if<float>(&kv)) {
@@ -203,6 +206,11 @@ static float KeyValueToFloat(const KeyValue& kv) {
   }
   if (auto* i = std::get_if<int>(&kv)) {
     return static_cast<float>(*i);
+  }
+  // bool is a distinct KeyValue alternative; a Boolean/Trigger channel reads back as a bool, so
+  // map it explicitly to 1.0f/0.0f instead of falling through to the zero default.
+  if (auto* b = std::get_if<bool>(&kv)) {
+    return *b ? 1.0f : 0.0f;
   }
   return 0.0f;
 }
@@ -239,6 +247,21 @@ void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv)
     case ViewModelValueType::Enum:
       static_cast<PAGViewModelValueEnum*>(value)->setValueInternal(KeyValueToInt(kv), false);
       break;
+    case ViewModelValueType::String:
+      if (auto* s = std::get_if<std::string>(&kv)) {
+        static_cast<PAGViewModelValueString*>(value)->setValueInternal(*s, false);
+      }
+      break;
+    case ViewModelValueType::Color:
+      if (auto* c = std::get_if<Color>(&kv)) {
+        static_cast<PAGViewModelValueColor*>(value)->setValueInternal(*c, false);
+      }
+      break;
+    case ViewModelValueType::Image:
+      if (auto* img = std::get_if<std::shared_ptr<PAGImage>>(&kv)) {
+        static_cast<PAGViewModelValueImage*>(value)->setValueInternal(*img, false);
+      }
+      break;
     default:
       break;
   }
@@ -253,6 +276,10 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
         entry.targetNode == nullptr) {
       continue;
     }
+    // Only ToSource/TwoWay bindings flow target changes back to the ViewModel.
+    if (!entry.toSource()) {
+      continue;
+    }
     // Skip dirty bindings — VM has pending changes that update() will apply.
     bool isDirty = false;
     for (auto* dirty : dirtyBinds) {
@@ -264,20 +291,24 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     if (isDirty) {
       continue;
     }
-    auto layer = binding->get<tgfx::Layer>(entry.targetNode);
-    if (layer == nullptr) {
+    // Read the current channel value back from the target's runtime object. A channel with no
+    // registered reader (forward-only) returns false and is skipped, so the VM is not polluted.
+    KeyValue kv{};
+    if (!binding->read(entry.targetNode, entry.channel, &kv)) {
       continue;
     }
-    // syncBack only supports float-readable channels. Skipping unsupported channels
-    // avoids writing the ReadTargetFloat fallback (0.0f) into the VM.
-    if (!IsFloatReadableChannel(entry.channel)) {
+    // Change detection: only write back when the target value actually changed since the previous
+    // pass (or on the first pass, to establish a baseline). This keeps repeated syncBacks
+    // idempotent and, when one ViewModel property is bound to several targets, lets only the
+    // target that actually changed write back instead of every binding overwriting the source.
+    if (entry.hasLastTarget && entry.lastTargetValue == kv) {
       continue;
     }
-    float current = ReadTargetFloat(layer.get(), entry.channel, 0.0f);
+    entry.lastTargetValue = kv;
+    entry.hasLastTarget = true;
     // Apply inverse converter for syncBack direction (layer value → VM domain).
-    KeyValue kv{current};
-    kv = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
-    WriteVmValue(entry.source, kv);
+    auto vmValue = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
+    WriteVmValue(entry.source, vmValue);
   }
 }
 

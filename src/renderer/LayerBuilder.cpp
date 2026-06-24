@@ -168,6 +168,21 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return RuntimeTarget::hasWriter(channel);
   }
 
+  // Reads x / y back from the final composed layer matrix (translate components), mirroring the
+  // forward transform. Other channels fall through to the base reader table.
+  bool read(const std::string& channel, KeyValue* out) const override {
+    if (channel == "x" || channel == "y") {
+      const auto* layer = static_cast<const tgfx::Layer*>(rawObject());
+      if (layer == nullptr || out == nullptr) {
+        return false;
+      }
+      *out = KeyValue{channel == "x" ? layer->matrix().getTranslateX()
+                                     : layer->matrix().getTranslateY()};
+      return true;
+    }
+    return RuntimeTarget::read(channel, out);
+  }
+
   // Seeds the decomposed transform from the node's authored values so the first animated frame
   // mixes against the static baseline rather than an identity.
   void initTransform(float x, float y, const tgfx::Matrix& matrix) {
@@ -683,6 +698,23 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setName(*v);
   }
 
+  static KeyValue ReadLayerAlpha(const void* object) {
+    return KeyValue{static_cast<const tgfx::Layer*>(object)->alpha()};
+  }
+
+  static KeyValue ReadLayerVisible(const void* object) {
+    return KeyValue{static_cast<const tgfx::Layer*>(object)->visible()};
+  }
+
+  static KeyValue ReadLayerBlendMode(const void* object) {
+    auto mode = FromTGFX(static_cast<const tgfx::Layer*>(object)->blendMode());
+    return KeyValue{static_cast<int>(mode)};
+  }
+
+  static KeyValue ReadLayerName(const void* object) {
+    return KeyValue{static_cast<const tgfx::Layer*>(object)->name()};
+  }
+
   // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
   // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
@@ -690,6 +722,10 @@ class LayerBuilderContext {
     _result.binding.setWriter(node, "visible", WriteLayerVisible);
     _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
     _result.binding.setWriter(node, "name", WriteLayerName);
+    _result.binding.setReader(node, "alpha", ReadLayerAlpha);
+    _result.binding.setReader(node, "visible", ReadLayerVisible);
+    _result.binding.setReader(node, "blendMode", ReadLayerBlendMode);
+    _result.binding.setReader(node, "name", ReadLayerName);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
@@ -1150,6 +1186,17 @@ class LayerBuilderContext {
     pattern->setImage(LayerBuilder::GetTGFXImage(*v));
   }
 
+  static KeyValue ReadSolidColor(const void* object) {
+    auto c = static_cast<const tgfx::SolidColor*>(object)->color();
+    // tgfx::Color is always sRGB, so the read-back color is reported in sRGB color space.
+    return KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+  }
+
+  static KeyValue ReadImagePatternImage(const void* object) {
+    auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
+    return KeyValue{LayerBuilder::WrapTGFXImage(image)};
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
@@ -1162,6 +1209,7 @@ class LayerBuilderContext {
         if (tgfxSolid) {
           _result.binding.set(solid, tgfxSolid);
           _result.binding.setWriter(solid, "color", WriteSolidColor);
+          _result.binding.setReader(solid, "color", ReadSolidColor);
         }
         return tgfxSolid;
       }
@@ -1394,6 +1442,7 @@ class LayerBuilderContext {
     if (pattern) {
       _result.binding.set(node, pattern);
       _result.binding.setWriter(node, "image", WriteImagePatternImage);
+      _result.binding.setReader(node, "image", ReadImagePatternImage);
       if (imageNode) {
         _result.binding.trackImage(imageNode, node);
       }
@@ -2520,5 +2569,12 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
 
 std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
   return image ? image->_tgfxImage : nullptr;
+}
+
+std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
 }
 }  // namespace pagx

@@ -239,19 +239,25 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
     const auto* sourceLayer = childComp->node;
     if (sourceLayer == nullptr || sourceLayer->composition == nullptr) continue;
     const auto* compSchema = sourceLayer->composition;
+    std::shared_ptr<PAGViewModel> childVM = nullptr;
     if (compSchema->viewModel != nullptr) {
-      auto childVM = PAGScene::CreateViewModelFromSchema(compSchema->viewModel, shared_from_this());
+      childVM = PAGScene::CreateViewModelFromSchema(compSchema->viewModel, shared_from_this());
       childComp->compositionViewModel = childVM;
-      childComp->dataBindRuntime = std::make_unique<DataBindRuntime>();
-      auto dataCtx = std::make_shared<DataContext>(childVM);
-      if (parentComp->dataContext != nullptr) dataCtx->parent(parentComp->dataContext);
-      childComp->dataContext = dataCtx;
       if (parentComp->compositionViewModel != nullptr && !sourceLayer->vmContext.empty()) {
         auto propName = sourceLayer->vmContext;
         if (propName.find("$vm.") == 0) propName = propName.substr(4);
         auto prop = parentComp->compositionViewModel->propertyViewModel(propName);
         if (prop) prop->referenceInstance = childVM;
       }
+    }
+    // A nested Composition may carry DataBinds that reference a parent ViewModel property even when
+    // it has no ViewModel of its own. Build a DataContext (with null VM when absent) chained to the
+    // parent so resolve() can walk up to the parent VM.
+    if (compSchema->viewModel != nullptr || !compSchema->dataBinds.empty()) {
+      childComp->dataBindRuntime = std::make_unique<DataBindRuntime>();
+      auto dataCtx = std::make_shared<DataContext>(childVM);
+      if (parentComp->dataContext != nullptr) dataCtx->parent(parentComp->dataContext);
+      childComp->dataContext = dataCtx;
       if (!compSchema->dataBinds.empty())
         childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),
                                          childComp->document);

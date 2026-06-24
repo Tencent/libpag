@@ -130,11 +130,15 @@ void PAGViewModelValueNumber::setValueInternal(float v, bool fromVM) {
 }
 
 void PAGViewModelValueString::value(const std::string& v) {
+  setValueInternal(v, true);
+}
+
+void PAGViewModelValueString::setValueInternal(const std::string& v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }
   propertyValue = v;
-  notifyChanged(true);
+  notifyChanged(fromVM);
 }
 
 void PAGViewModelValueBoolean::value(bool v) {
@@ -162,19 +166,27 @@ void PAGViewModelValueEnum::setValueInternal(int v, bool fromVM) {
 }
 
 void PAGViewModelValueColor::value(const Color& v) {
+  setValueInternal(v, true);
+}
+
+void PAGViewModelValueColor::setValueInternal(const Color& v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }
   propertyValue = v;
-  notifyChanged(true);
+  notifyChanged(fromVM);
 }
 
 void PAGViewModelValueImage::value(std::shared_ptr<PAGImage> v) {
+  setValueInternal(std::move(v), true);
+}
+
+void PAGViewModelValueImage::setValueInternal(std::shared_ptr<PAGImage> v, bool fromVM) {
   if (propertyValue == v) {
     return;
   }
   propertyValue = std::move(v);
-  notifyChanged(true);
+  notifyChanged(fromVM);
 }
 
 // ---- ObserverHandle ----------------------------------------------------------

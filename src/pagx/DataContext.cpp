@@ -38,8 +38,13 @@ PAGViewModelValue* DataContext::resolve(const std::vector<std::string>& path) co
   // ViewModel-typed values are containers for nested properties, not bindable leaf
   // values. Descending into the reference and returning nullptr at the end of a
   // ViewModel-only path is intentional: only concrete leaf values are bindable.
-  if (path.empty() || vm == nullptr) {
+  if (path.empty()) {
     return nullptr;
+  }
+  // A context without its own ViewModel (e.g. a nested Composition that only carries DataBinds)
+  // resolves entirely through its parent chain.
+  if (vm == nullptr) {
+    return parentContext != nullptr ? parentContext->resolve(path) : nullptr;
   }
   // The first segment is expected to be "$vm". Skip it and resolve the rest.
   size_t start = 0;

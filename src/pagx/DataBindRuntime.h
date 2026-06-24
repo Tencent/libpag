@@ -22,20 +22,16 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/DataBind.h"
 
 namespace pagx {
 
-class DataBind;
 class DataContext;
 class PAGViewModelValue;
 class PAGXDocument;
 struct RuntimeBinding;
 class Node;
 }  // namespace pagx
-
-namespace tgfx {
-class Layer;
-}
 
 namespace pagx {
 
@@ -60,12 +56,24 @@ class DataBindRuntime {
     std::weak_ptr<PAGViewModelValue> sourceGuard = {};
     const Node* targetNode = nullptr;
     std::string channel = {};
+    bool onceApplied = false;       // Once: true after the single ViewModel → target application
+    KeyValue lastTargetValue = {};  // Cached target value from the previous syncBack pass
+    bool hasLastTarget = false;     // Whether lastTargetValue has been captured yet
+
+    // ToSource/TwoWay flow target changes back to the ViewModel.
+    bool toSource() const {
+      return dataBind->flags == DataBindDirection::ToSource ||
+             dataBind->flags == DataBindDirection::TwoWay;
+    }
+    // Everything except pure ToSource drives the target from the ViewModel.
+    bool toTarget() const {
+      return dataBind->flags != DataBindDirection::ToSource;
+    }
   };
 
   std::vector<DataBind*> dirtyBinds = {};
   std::vector<BindingEntry> entries = {};
 
-  static float ReadTargetFloat(tgfx::Layer* layer, const std::string& channel, float fallback);
   static void WriteVmValue(PAGViewModelValue* value, const KeyValue& kv);
 };
 

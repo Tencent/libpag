@@ -25,6 +25,34 @@
 namespace pagx {
 
 /**
+ * DataBindDirection controls the direction in which a data binding flows. Values form a discrete
+ * enum (not bit-flags); each binding uses exactly one direction.
+ */
+enum class DataBindDirection : uint8_t {
+  /**
+   * Data flows from the ViewModel to the render node (read-only binding). This is the default: a
+   * ToTarget binding never writes back to the ViewModel, so binding one ViewModel property to many
+   * targets is unambiguous.
+   */
+  ToTarget = 0,
+  /**
+   * Data flows from the render node back to the ViewModel (write-back binding). The ViewModel
+   * property is not driven onto the target.
+   */
+  ToSource = 1,
+  /**
+   * Data flows in both directions: the ViewModel drives the target, and target changes are written
+   * back to the ViewModel.
+   */
+  TwoWay = 2,
+  /**
+   * Data is applied from the ViewModel to the target once on initialization and never updated
+   * afterward.
+   */
+  Once = 3,
+};
+
+/**
  * DataBind connects a ViewModel property (source) to a render node channel (target). When the
  * source value changes, the target channel is updated accordingly. DataBind nodes are typically
  * declared inside a Composition and reference the composition's own render nodes via @id.
@@ -47,6 +75,11 @@ class DataBind : public Node {
    * The target channel name to apply the value to (e.g. "alpha", "text", "color").
    */
   std::string channel = {};
+
+  /**
+   * The binding direction. Default is ToTarget (ViewModel → render node, read-only).
+   */
+  DataBindDirection flags = DataBindDirection::ToTarget;
 
   NodeType nodeType() const override {
     return NodeType::DataBind;

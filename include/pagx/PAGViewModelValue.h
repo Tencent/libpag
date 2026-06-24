@@ -93,10 +93,9 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   PAGViewModelValue() = default;
 
   /**
-   * Notifies registered observers, or defers notification when SuppressDelegation is active on
-   * the owning scene. This does NOT notify dependent DataBindRuntime instances — callers must
-   * also invoke notifyDependents() for full change propagation to the DataBind update chain.
-   * Subclasses call this after updating their stored value.
+   * Internal primitive invoked by notifyChanged(): dispatches the registered observers, or defers
+   * them when SuppressDelegation is active on the owning scene. It does not touch the dirty flag or
+   * dependent DataBindRuntime instances; notifyChanged() orchestrates those for full propagation.
    */
   void notifyValueChanged();
 

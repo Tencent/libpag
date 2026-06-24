@@ -41,11 +41,19 @@ class PAGViewModelValueColor : public PAGViewModelValue {
    */
   void value(const Color& v);
 
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(const Color& v, bool fromVM);
+
  private:
   Color propertyValue = {};
 
   friend class PAGViewModel;
   friend class PAGScene;
+  friend class DataBindRuntime;
 };
 
 }  // namespace pagx
