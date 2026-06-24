@@ -348,8 +348,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    result.document =
-        HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
+    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
   } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;

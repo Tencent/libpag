@@ -2665,6 +2665,7 @@ PAG_TEST(PAGXHTMLImporterTest, TargetSizeOverridesBody) {
   pagx::HTMLImporter::Options opts;
   opts.targetWidth = 400.0f;
   opts.targetHeight = 200.0f;
+  opts.preferBodySize = false;
   std::string html = R"HTML(<html><body style="width:50px;height:50px"></body></html>)HTML";
   auto doc = pagx::HTMLImporter::ParseString(html, opts);
   ASSERT_NE(doc, nullptr);
