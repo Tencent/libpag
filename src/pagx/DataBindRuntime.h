@@ -46,13 +46,14 @@ class DataBindRuntime {
 
   void bind(const std::vector<DataBind*>& binds, DataContext* context, PAGXDocument* doc);
 
-  void markDirty(DataBind* bind);
   void markDirtyForValue(PAGViewModelValue* value);
 
   void update(RuntimeBinding* binding, float mix = 1.0f);
   void syncBack(RuntimeBinding* binding);
 
  private:
+  void markDirty(DataBind* bind);
+
   struct BindingEntry {
     DataBind* dataBind = nullptr;
     PAGViewModelValue* source = nullptr;
