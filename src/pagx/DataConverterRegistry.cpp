@@ -26,6 +26,11 @@
 namespace pagx {
 
 static constexpr float DEG_TO_RAD = 0.0174532925f;
+static constexpr float DEFAULT_FRAME_RATE = 30.0f;
+static constexpr float DEFAULT_RANGE_INPUT_MIN = 0.0f;
+static constexpr float DEFAULT_RANGE_INPUT_MAX = 1.0f;
+static constexpr float DEFAULT_RANGE_OUTPUT_MIN = 0.0f;
+static constexpr float DEFAULT_RANGE_OUTPUT_MAX = 100.0f;
 
 DataConverterRegistry::DataConverterRegistry() {
   registerConverter("secondsToFrames", ConvertSecondsToFrames);
@@ -49,7 +54,7 @@ KeyValue DataConverterRegistry::ConvertSecondsToFrames(
     return input;
   }
   float seconds = std::get<float>(input);
-  float frameRate = 30.0f;
+  float frameRate = DEFAULT_FRAME_RATE;
   auto it = params.find("frameRate");
   if (it != params.end()) {
     frameRate = std::strtof(it->second.c_str(), nullptr);
@@ -88,7 +93,7 @@ KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
     const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float frames = std::get<float>(input);
-  float frameRate = 30.0f;
+  float frameRate = DEFAULT_FRAME_RATE;
   auto it = params.find("frameRate");
   if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
   return KeyValue{frames / frameRate};
@@ -117,10 +122,10 @@ KeyValue DataConverterRegistry::ConvertRangeMapper(
     const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float value = std::get<float>(input);
-  float inputMin = 0.0f;
-  float inputMax = 1.0f;
-  float outputMin = 0.0f;
-  float outputMax = 100.0f;
+  float inputMin = DEFAULT_RANGE_INPUT_MIN;
+  float inputMax = DEFAULT_RANGE_INPUT_MAX;
+  float outputMin = DEFAULT_RANGE_OUTPUT_MIN;
+  float outputMax = DEFAULT_RANGE_OUTPUT_MAX;
   auto it = params.find("inputMin");
   if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
   it = params.find("inputMax");
@@ -138,10 +143,10 @@ KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
     const KeyValue& input, const std::unordered_map<std::string, std::string>& params) {
   if (!std::holds_alternative<float>(input)) return input;
   float value = std::get<float>(input);
-  float inputMin = 0.0f;
-  float inputMax = 1.0f;
-  float outputMin = 0.0f;
-  float outputMax = 100.0f;
+  float inputMin = DEFAULT_RANGE_INPUT_MIN;
+  float inputMax = DEFAULT_RANGE_INPUT_MAX;
+  float outputMin = DEFAULT_RANGE_OUTPUT_MIN;
+  float outputMax = DEFAULT_RANGE_OUTPUT_MAX;
   auto it = params.find("inputMin");
   if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
   it = params.find("inputMax");
