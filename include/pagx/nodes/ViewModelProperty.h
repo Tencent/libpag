@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
@@ -77,14 +78,14 @@ class ViewModelProperty : public Node {
   float defaultNumber = 0.0f;
 
   /**
-   * Minimum allowed value for Number properties. Default is 0.0 (no constraint).
+   * Minimum allowed value for Number properties. nullopt means no constraint.
    */
-  float minValue = 0.0f;
+  std::optional<float> minValue = std::nullopt;
 
   /**
-   * Maximum allowed value for Number properties. Default is 0.0 (no constraint).
+   * Maximum allowed value for Number properties. nullopt means no constraint.
    */
-  float maxValue = 0.0f;
+  std::optional<float> maxValue = std::nullopt;
 
   /**
    * Default string value, used when propertyType is String.

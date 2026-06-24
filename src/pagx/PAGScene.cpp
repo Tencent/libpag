@@ -169,8 +169,8 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         case ViewModelPropertyType::Number: {
           auto d = std::make_shared<NumberPropertyData>();
           d->defaultValue = prop->defaultNumber;
-          if (prop->minValue != 0.0f) d->minValue = prop->minValue;
-          if (prop->maxValue != 0.0f) d->maxValue = prop->maxValue;
+          if (prop->minValue.has_value()) d->minValue = prop->minValue;
+          if (prop->maxValue.has_value()) d->maxValue = prop->maxValue;
           pd = d;
           break;
         }

@@ -2745,8 +2745,10 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         } else {
           ReportError(doc, child.get(), "Invalid value '" + typeStr + "' for 'type' attribute.");
         }
-        prop->minValue = GetFloatAttribute(child.get(), "min", prop->minValue, doc);
-        prop->maxValue = GetFloatAttribute(child.get(), "max", prop->maxValue, doc);
+        auto minAttr = GetAttribute(child.get(), "min");
+        if (!minAttr.empty()) prop->minValue = std::strtof(minAttr.c_str(), nullptr);
+        auto maxAttr = GetAttribute(child.get(), "max");
+        if (!maxAttr.empty()) prop->maxValue = std::strtof(maxAttr.c_str(), nullptr);
         auto optionsStr = GetAttribute(child.get(), "options");
         if (!optionsStr.empty()) {
           std::istringstream iss(optionsStr);
