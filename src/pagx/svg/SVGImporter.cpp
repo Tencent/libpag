@@ -238,18 +238,15 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
 
-  // Apply content transform if needed. When there is exactly one converted layer, embed
-  // the transform as a Group inside that layer (avoids an extra wrapper layer). Otherwise,
-  // wrap all layers in a root layer with the transform matrix.
+  // Apply content transform if needed. The viewBox -> target mapping must affect both the
+  // converted layer's own contents AND any child layers (e.g. nested <g>) it owns. When there
+  // is exactly one converted layer, pre-multiply the transform onto that layer's matrix so the
+  // mapping covers the whole subtree without introducing an extra wrapper. Otherwise wrap all
+  // layers in a fresh root layer that carries the transform.
   if (needsContentTransform) {
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
-      auto* group = _document->makeNode<Group>();
-      group->elements = std::move(singleLayer->contents);
-      group->position = {contentMatrix.tx, contentMatrix.ty};
-      group->scale = {contentMatrix.a, contentMatrix.d};
-      singleLayer->contents.clear();
-      singleLayer->contents.push_back(group);
+      singleLayer->matrix = contentMatrix * singleLayer->matrix;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
