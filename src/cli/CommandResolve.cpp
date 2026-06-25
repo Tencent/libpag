@@ -123,7 +123,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   std::string resolvedFromDesc;
 
   if (hasImportSource) {
-    auto filePath = baseDir + layer->importDirective.source;
+    auto filePath = JoinPath(baseDir, layer->importDirective.source);
     result = ImportFile(filePath, layer->importDirective.format, formatOptions, layer->width,
                         layer->height);
     resolvedFromDesc = layer->importDirective.source;
