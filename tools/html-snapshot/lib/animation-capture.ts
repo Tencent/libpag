@@ -1144,38 +1144,26 @@ export function pagxCollectTransitions(captured: unknown[], seen: Set<Element>):
   });
 }
 
-// ===== In-browser orchestrator =====
+// ===== In-browser emitter =====
 //
-// Runs the collector priority chain, then rewrites every captured animation
-// into the canonical form: a `@keyframes` rule in <style id> and an inline
-// `animation` shorthand on the element.
-export function pagxAnimMain(opts: {
-  sampleCount: number;
-  maxElements: number;
-  prefix: string;
-  styleId: string;
-}): { count: number; names: string[] } {
-  const sampleCount = Math.max(2, opts.sampleCount || 24);
-  const maxElements = opts.maxElements || 4000;
-  const prefix = opts.prefix || 'pagxAnim';
-  const styleId = opts.styleId || '__pagx_anim_keyframes';
-
-  const captured: Array<{ el: HTMLElement } & PagxAnimDescriptor> = [];
-  const seen = new Set<Element>();
-  pagxCollectWAAPI(captured, seen);
-  pagxCollectCSS(captured, seen, maxElements);
-  pagxCollectGsap(captured, seen, sampleCount, maxElements);
-  pagxCollectAnime(captured, seen, sampleCount, maxElements);
-  // Runs last so elements already captured as @keyframes / WAAPI / library
-  // tweens keep that higher-fidelity result; only purely transition-driven
-  // motion (recorded early by pagxTransitionInstall) is added here.
-  pagxCollectTransitions(captured, seen);
-  if (captured.length === 0) return { count: 0, names: [] };
-
+// Turn a collected `captured[]` (each `{ el } & descriptor`) into the canonical
+// form the importer plays back: a `@keyframes <prefix><N>` rule injected into
+// `<style id=styleId>`, plus an inline `animation` shorthand on each element.
+// Shared by the instant orchestrator (`pagxAnimMain`) and the real-time
+// orchestrator (`pagxRealtimeMain`) so both paths emit byte-identical output.
+export function pagxEmitCaptured(
+  captured: Array<{ el: HTMLElement } & PagxAnimDescriptor>,
+  prefix: string,
+  styleId: string,
+): { count: number; names: string[] } {
   let css = '';
   let index = 0;
   const names: string[] = [];
   for (const cap of captured) {
+    // Skip elements that left the tree before emit (a real-time sample may have
+    // captured a node the page later removed): there is no host to attach to,
+    // and the snapshot walker would not see it anyway.
+    if (!cap.el || (cap.el as { isConnected?: boolean }).isConnected === false) continue;
     const built = pagxBuildCanonicalAnimation(cap, index, prefix);
     if (!built) continue;
     index++;
@@ -1222,6 +1210,179 @@ export function pagxAnimMain(opts: {
   return { count: names.length, names };
 }
 
+// ===== In-browser orchestrator (instant) =====
+//
+// Runs the collector priority chain at the current instant, then emits every
+// captured animation into the canonical form.
+export function pagxAnimMain(opts: {
+  sampleCount: number;
+  maxElements: number;
+  prefix: string;
+  styleId: string;
+}): { count: number; names: string[] } {
+  const sampleCount = Math.max(2, opts.sampleCount || 24);
+  const maxElements = opts.maxElements || 4000;
+  const prefix = opts.prefix || 'pagxAnim';
+  const styleId = opts.styleId || '__pagx_anim_keyframes';
+
+  const captured: Array<{ el: HTMLElement } & PagxAnimDescriptor> = [];
+  const seen = new Set<Element>();
+  pagxCollectWAAPI(captured, seen);
+  pagxCollectCSS(captured, seen, maxElements);
+  pagxCollectGsap(captured, seen, sampleCount, maxElements);
+  pagxCollectAnime(captured, seen, sampleCount, maxElements);
+  // Runs last so elements already captured as @keyframes / WAAPI / library
+  // tweens keep that higher-fidelity result; only purely transition-driven
+  // motion (recorded early by pagxTransitionInstall) is added here.
+  pagxCollectTransitions(captured, seen);
+  if (captured.length === 0) return { count: 0, names: [] };
+  return pagxEmitCaptured(captured, prefix, styleId);
+}
+
+// ===== Real-time (wall-clock) sampling =====
+//
+// `pagxSampleTimeline` (the GSAP / anime path) works by *seeking* a seekable
+// library clock. Pages driven by non-seekable mechanisms — raw `setTimeout`
+// chains, class toggles, auto-demo sequences, WAAPI `.animate()` on freshly
+// created nodes — expose no clock to seek, so the only way to observe their
+// motion is to let the page run in real time and read `getComputedStyle` at
+// fixed wall-clock intervals. This is generic: it makes no assumption about
+// what drives the motion, only that it changes one of the runtime-playable
+// channels (opacity / translate / color / background-color) on an element that
+// persists in the snapshot tree.
+//
+// Hard limits (representation, not sampling — see the module header): elements
+// created and destroyed mid-window have no stable host node to attach to and
+// are dropped; text-content changes, canvas pixel effects and layout-affecting
+// toggles fall outside the channel set and cannot be encoded regardless of how
+// densely we sample.
+
+// Replace null sample slots (element disconnected / unmeasured at that index)
+// by carrying the nearest non-null neighbour forward, then backward, so the
+// variation check and keyframe build see a complete, aligned series. A series
+// that is entirely empty collapses to empty bags (no variation → dropped).
+export function pagxFillSampleHoles(
+  samples: Array<Record<string, string | null> | null>,
+): Array<Record<string, string | null>> {
+  const n = samples.length;
+  const out: Array<Record<string, string | null> | null> = samples.slice();
+  let last: Record<string, string | null> | null = null;
+  for (let i = 0; i < n; i++) {
+    if (out[i] == null) out[i] = last;
+    else last = out[i];
+  }
+  let next: Record<string, string | null> | null = null;
+  for (let i = n - 1; i >= 0; i--) {
+    if (out[i] == null) out[i] = next;
+    else next = out[i];
+  }
+  return out.map((s) => s || {});
+}
+
+// In-page async collector: snapshot the candidate element set once, then read
+// the runtime-playable channels of every (still-connected) element at
+// `sampleCount` evenly-spaced wall-clock instants spanning `windowMs`. Each
+// element whose tracked channels vary across the window becomes a linearly
+// interpolated, RDP-decimated descriptor. Elements already in `seen` (claimed
+// by a higher-fidelity collector) are skipped.
+export async function pagxRealtimeCollect(
+  captured: unknown[],
+  seen: Set<Element>,
+  windowMs: number,
+  sampleCount: number,
+  maxElements: number,
+): Promise<void> {
+  const candidates = pagxCandidateElements(maxElements);
+  if (candidates.length === 0) return;
+  if (sampleCount < 2) sampleCount = 2;
+  const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+  const interval = windowMs / (sampleCount - 1);
+  const series = new Map<HTMLElement, Array<Record<string, string | null> | null>>();
+  for (const el of candidates) series.set(el, []);
+  for (let i = 0; i < sampleCount; i++) {
+    void document.body.offsetHeight; // force reflow so reads see the latest frame
+    for (const el of candidates) {
+      const arr = series.get(el);
+      if (!arr) continue;
+      if ((el as { isConnected?: boolean }).isConnected === false) {
+        arr.push(null);
+        continue;
+      }
+      const cs = getComputedStyle(el);
+      arr.push({
+        opacity: cs.opacity,
+        transform: pagxExtractTranslate(cs.transform),
+        color: cs.color,
+        'background-color': cs.backgroundColor,
+      });
+    }
+    if (i < sampleCount - 1) await sleep(interval);
+  }
+  for (const [el, raw] of series) {
+    if (seen.has(el)) continue;
+    if ((el as { isConnected?: boolean }).isConnected === false) continue;
+    const samples = pagxFillSampleHoles(raw);
+    if (samples.length < 2) continue;
+    const varying = pagxWhichVary(samples);
+    if (varying.length === 0) continue;
+    let norm: PagxAnimStop[] = [];
+    for (let i = 0; i < samples.length; i++) {
+      const offset = i / (samples.length - 1);
+      const props: Record<string, string> = {};
+      for (const pr of varying) {
+        const v = samples[i][pr];
+        if (v != null) props[pr] = v;
+      }
+      if (Object.keys(props).length > 0) norm.push({ offset, props });
+    }
+    if (norm.length < 2) continue;
+    norm = pagxDecimateStops(norm);
+    captured.push({
+      el,
+      keyframes: norm,
+      durationMs: windowMs,
+      delayMs: 0,
+      iterations: 1,
+      direction: 'normal',
+      timing: 'linear',
+    });
+    seen.add(el);
+  }
+}
+
+// ===== In-browser orchestrator (real-time) =====
+//
+// Runs the wall-clock sampler first (it owns timeline-driven motion and wins
+// per-element), then the instant collectors for any ambient declarative /
+// library animation still running at the end of the window (`seen` dedupes),
+// then emits everything in one canonical pass.
+export async function pagxRealtimeMain(opts: {
+  windowMs: number;
+  sampleCount: number;
+  maxElements: number;
+  prefix: string;
+  styleId: string;
+}): Promise<{ count: number; names: string[] }> {
+  const windowMs = Math.max(0, opts.windowMs || 0);
+  const sampleCount = Math.max(2, opts.sampleCount || 24);
+  const maxElements = opts.maxElements || 4000;
+  const prefix = opts.prefix || 'pagxAnim';
+  const styleId = opts.styleId || '__pagx_anim_keyframes';
+
+  const captured: Array<{ el: HTMLElement } & PagxAnimDescriptor> = [];
+  const seen = new Set<Element>();
+  if (windowMs > 0) {
+    await pagxRealtimeCollect(captured as unknown[], seen, windowMs, sampleCount, maxElements);
+  }
+  pagxCollectWAAPI(captured as unknown[], seen);
+  pagxCollectCSS(captured as unknown[], seen, maxElements);
+  pagxCollectGsap(captured as unknown[], seen, sampleCount, maxElements);
+  pagxCollectAnime(captured as unknown[], seen, sampleCount, maxElements);
+  pagxCollectTransitions(captured as unknown[], seen);
+  if (captured.length === 0) return { count: 0, names: [] };
+  return pagxEmitCaptured(captured, prefix, styleId);
+}
+
 // ===== Node-side wrapper =====
 
 // Functions concatenated into the in-page IIFE. Order is irrelevant: function
@@ -1256,7 +1417,16 @@ const PAGX_ANIM_FNS = [
   pagxGsapWindow,
   pagxCollectGsap,
   pagxCollectAnime,
+  pagxEmitCaptured,
   pagxAnimMain,
+];
+
+// Extra functions only the real-time payload needs, concatenated on top of
+// PAGX_ANIM_FNS. Kept separate so the instant payload stays unchanged.
+const PAGX_REALTIME_FNS = [
+  pagxFillSampleHoles,
+  pagxRealtimeCollect,
+  pagxRealtimeMain,
 ];
 
 // Init-script form: install the early `transitionrun` recorder so CSS
@@ -1314,6 +1484,70 @@ export async function capturePagxAnimationsOnPage(
     return result || { count: 0, names: [] };
   } catch (err) {
     logger(`animation capture failed: ${errMessage(err)}`);
+    return { count: 0, names: [] };
+  }
+}
+
+// Build the self-contained async IIFE evaluated in the page for the real-time
+// pass. Same helper-concatenation pattern as `buildAnimationCapturePayload`,
+// but the entry is `await pagxRealtimeMain(...)` so the page keeps running for
+// `windowMs` while the sampler reads computed styles.
+export function buildRealtimeCapturePayload(opts: {
+  windowMs: number;
+  sampleCount: number;
+  maxElements: number;
+}): string {
+  const src = PAGX_ANIM_FNS.concat(PAGX_REALTIME_FNS).map((fn) => fn.toString()).join('\n\n');
+  const callArg = JSON.stringify({
+    windowMs: opts.windowMs,
+    sampleCount: opts.sampleCount,
+    maxElements: opts.maxElements,
+    prefix: PAGX_ANIM_PREFIX,
+    styleId: PAGX_ANIM_STYLE_ID,
+  });
+  return `(async () => {\n${src}\nreturn await pagxRealtimeMain(${callArg});\n})()`;
+}
+
+export interface CaptureRuntimeAnimationsOptions {
+  // Wall-clock window (ms) the page is allowed to keep running while the sampler
+  // reads it. 0 (or less) disables the pass entirely.
+  windowMs: number;
+  // Explicit sample count. When omitted, derived from the window at ~20
+  // samples/s and clamped so a long window does not explode the
+  // O(samples × elements) probe.
+  sampleCount?: number;
+  maxElements?: number;
+  logger?: (msg: string) => void;
+}
+
+// Run the real-time capture pass against an already-loaded, still-running page.
+// Best-effort: any failure degrades to "no animations captured" and the
+// snapshot proceeds as a static frame. Mirrors `capturePagxAnimationsOnPage`
+// but spans `windowMs` of real time. Returns `{ count: 0 }` immediately when
+// disabled so callers can branch on the window alone.
+export async function captureRuntimeAnimationsOnPage(
+  page: Page,
+  opts: CaptureRuntimeAnimationsOptions,
+): Promise<CaptureAnimationsResult> {
+  const logger = typeof opts.logger === 'function' ? opts.logger : () => {};
+  const windowMs = Math.max(0, opts.windowMs || 0);
+  if (windowMs <= 0) return { count: 0, names: [] };
+  const sampleCount = opts.sampleCount && opts.sampleCount >= 2
+    ? Math.floor(opts.sampleCount)
+    : Math.min(240, Math.max(12, Math.round(windowMs / 50)));
+  try {
+    const payload = buildRealtimeCapturePayload({
+      windowMs,
+      sampleCount,
+      maxElements: opts.maxElements || 4000,
+    });
+    const result = (await page.evaluate(payload)) as CaptureAnimationsResult;
+    if (result && result.count > 0) {
+      logger(`captured ${result.count} runtime animation(s) over ${windowMs}ms / ${sampleCount} samples: ${result.names.join(', ')}`);
+    }
+    return result || { count: 0, names: [] };
+  } catch (err) {
+    logger(`runtime animation capture failed: ${errMessage(err)}`);
     return { count: 0, names: [] };
   }
 }

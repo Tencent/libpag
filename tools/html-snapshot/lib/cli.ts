@@ -34,6 +34,8 @@ export interface SnapshotCliOptions {
   headers: ParsedHeader[];
   inlineIconFonts: boolean;
   scrollReveal: boolean;
+  runtimeAnimWindowMs: number;
+  runtimeAnimSampleCount: number;
   downloadFonts: boolean;
   fontDir: string;
   fontManifest: string;
@@ -112,6 +114,17 @@ const FLAGS: FlagSpec[] = [
   // instead of dropped. Off by default — it adds a few seconds per page and is
   // a no-op for pages whose content is already visible at scroll (0,0).
   { names: ['--scroll-reveal'], takesArg: false, set: (o) => { o.scrollReveal = true; } },
+  // Capture animations by sampling the live, still-running page over this many
+  // milliseconds of wall-clock time, instead of the default single-instant
+  // pass. This is the only way to record motion driven by non-seekable
+  // mechanisms — raw setTimeout chains, class toggles, JS auto-demo sequences,
+  // WAAPI .animate() on freshly created nodes — which expose no clock the
+  // instant/seek-based collectors can read. 0 (default) = instant pass.
+  { names: ['--runtime-anim-window'], set: (o, v) => { o.runtimeAnimWindowMs = parseNumber('--runtime-anim-window', v, { min: 0 }); } },
+  // Explicit sample count across the real-time window. Default (0) auto-derives
+  // ~20 samples/s from the window, clamped to keep the O(samples × elements)
+  // probe bounded on large pages.
+  { names: ['--runtime-anim-samples'], set: (o, v) => { o.runtimeAnimSampleCount = parseNumber('--runtime-anim-samples', v, { min: 2 }); } },
   // Download every web font the page actually uses (each unicode-range
   // subset the browser fetched) and write it to disk as a plain SFNT
   // (TTF/OTF). Off by default. The files can then be handed to
@@ -184,6 +197,12 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     // reveal animations fire and lazy media loads. Off by default; toggle via
     // `--scroll-reveal`. See lib/snapshot-runner.ts's scrollThroughPage.
     scrollReveal: false,
+    // Real-time animation capture window (ms). 0 = disabled (use the single-
+    // instant pass). When > 0, lib/snapshot-runner.ts samples the live page
+    // over this window so non-seekable, JS-triggered motion is captured. See
+    // lib/animation-capture.ts's captureRuntimeAnimationsOnPage.
+    runtimeAnimWindowMs: 0,
+    runtimeAnimSampleCount: 0,
     // Web-font download: when true, every font file the browser fetched
     // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
     // downstream `pagx render`/`pagx font embed` can use the real typeface
@@ -337,6 +356,16 @@ Options:
                              Default: disabled. Use for pages that keep
                              below-the-fold sections hidden (opacity:0) until
                              scrolled into view.
+  --runtime-anim-window <ms> Capture animations by sampling the live, still-
+                             running page over <ms> of wall-clock time instead
+                             of a single instant. Records motion driven by
+                             setTimeout chains / class toggles / JS auto-demo
+                             sequences that the instant pass cannot see.
+                             Default: 0 (instant pass). Only opacity / translate
+                             / color / background-color on elements that persist
+                             in the snapshot tree can be captured.
+  --runtime-anim-samples <n> Sample count across --runtime-anim-window
+                             (default: auto, ~20 samples/s, clamped).
   --download-fonts           Save every web font the page uses (each
                              unicode-range subset the browser fetched) to disk
                              as a plain SFNT (TTF/OTF). Default: disabled. Hand

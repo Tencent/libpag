@@ -115,6 +115,8 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         fontDir: snapshotArgs.fontDir,
         downloadImages: snapshotArgs.downloadImages,
         imageDir: snapshotArgs.imageDir,
+        runtimeAnimWindowMs: snapshotArgs.runtimeAnimWindowMs,
+        runtimeAnimSampleCount: snapshotArgs.runtimeAnimSampleCount,
         log,
       });
       fs.writeFileSync(snapshotArgs.output, result.html, 'utf8');
@@ -148,6 +150,8 @@ export interface RunBatchOptions {
   imageDir?: string;
   inlineIconFonts?: boolean;
   scrollReveal?: boolean;
+  runtimeAnimWindowMs?: number;
+  runtimeAnimSampleCount?: number;
   cookies?: string[];
   headers?: string[];
   viewportWidth?: number;
@@ -252,6 +256,8 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
           scrollReveal: opts.scrollReveal,
+          runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
+          runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
           cookies: opts.cookies,
           headers: opts.headers,
           viewportWidth: opts.viewportWidth,
