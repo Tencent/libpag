@@ -178,6 +178,9 @@ void PAGViewModelValueColor::setValueInternal(const Color& v, bool fromVM) {
 }
 
 void PAGViewModelValueImage::value(std::shared_ptr<PAGImage> v) {
+  // Mark as business-assigned even when the value is unchanged: an explicit assignment (including
+  // clearing to null) claims ownership so a later resource load does not overwrite it.
+  userAssigned = true;
   setValueInternal(std::move(v), true);
 }
 

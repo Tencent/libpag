@@ -61,7 +61,8 @@ class DataBind : public Node {
  public:
   /**
    * The source path in the ViewModel data tree. Syntax: "$vm.propertyName" or
-   * "$vm.parent.child" for nested properties. Resolution walks the DataContext chain.
+   * "$vm.parent.child" for nested properties, resolved against the owning ViewModel and its
+   * parents.
    */
   std::string source = {};
 

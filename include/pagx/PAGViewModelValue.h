@@ -41,9 +41,9 @@ enum class ViewModelValueType { Number, String, Boolean, Color, Image, ViewModel
  * current data for one property in a runtime PAGViewModel instance. Subclasses add typed getters
  * and setters for Number, String, Boolean, Color, Image, and nested ViewModel properties.
  *
- * Changes are tracked via a simple dirty flag and propagated to registered observers (business-side
- * callbacks) and dependent DataBind objects (engine-side update chain). Setting the same value is
- * a no-op and produces no change notification.
+ * Changes are tracked via a dirty flag and propagated to registered observers (business-side
+ * callbacks) and to any data bindings that consume this property. Setting the same value is a
+ * no-op and produces no change notification.
  */
 class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue> {
  public:
@@ -93,15 +93,15 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   PAGViewModelValue() = default;
 
   /**
-   * Internal primitive invoked by notifyChanged(): dispatches the registered observers, or defers
-   * them when SuppressDelegation is active on the owning scene. It does not touch the dirty flag or
-   * dependent DataBindRuntime instances; notifyChanged() orchestrates those for full propagation.
+   * Invoked by notifyChanged(): dispatches the registered observers, or defers them when
+   * SuppressDelegation is active on the owning scene. It does not touch the dirty flag or notify
+   * dependent data bindings; notifyChanged() orchestrates those for full propagation.
    */
   void notifyValueChanged();
 
   /**
    * Dispatches change notification after a subclass updates its stored value. When fromVM is
-   * true, marks this value dirty and notifies both observers and dependent DataBindRuntimes.
+   * true, marks this value dirty and notifies both observers and dependent data bindings.
    * When fromVM is false, notifies observers only.
    */
   void notifyChanged(bool fromVM);
@@ -125,7 +125,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   std::shared_ptr<PropertyData> pd;
 
   /**
-   * Notifies all registered dependent DataBindRuntime instances that this value changed.
+   * Notifies the data bindings that depend on this value that it has changed.
    */
   void notifyDependents();
 

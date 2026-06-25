@@ -59,10 +59,10 @@ class PAGViewModelValueImage : public PAGViewModelValue {
   // The <Image> resource node this value was decoded from at build time (null if the property had
   // no default image). Used to re-decode when that resource changes (e.g. host loadFileData).
   Image* sourceImage = nullptr;
-  // The PAGImage produced by the last schema decode. A resource change only re-decodes while the
-  // current value still equals this baseline; once the business side assigns its own image,
-  // builtImage diverges and the override is preserved.
-  std::shared_ptr<PAGImage> builtImage = nullptr;
+  // True once the business side has assigned a value through the public value() setter. A resource
+  // change only re-decodes the schema default while this is false; an explicit assignment (even
+  // assigning null) marks the value as owned by the business side and is never overwritten.
+  bool userAssigned = false;
 
   friend class PAGViewModel;
   friend class PAGScene;

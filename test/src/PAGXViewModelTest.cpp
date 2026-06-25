@@ -30,6 +30,8 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -1530,6 +1532,40 @@ PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPreservesOverride) {
   EXPECT_EQ(imgProp->value(), custom);
 }
 
+// A business-side explicit clear-to-null must be preserved when the (unresolved external) default
+// resource loads later. The clear is intentional even though it leaves the value null, so a late
+// load must not resurrect the default image.
+PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPreservesExplicitNull) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "img";
+  prop->propertyType = pagx::ViewModelPropertyType::Image;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  // Unresolved external path: the default decodes to null at build time.
+  auto imgNode = doc->makeNode<pagx::Image>("imgRes");
+  imgNode->filePath = "assets/avatar.png";
+  prop->defaultImage = imgNode;
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto imgProp = scene->viewModel()->propertyImage("img");
+  ASSERT_NE(imgProp, nullptr);
+  EXPECT_EQ(imgProp->value(), nullptr);
+  // Business explicitly clears the value (already null, but an intentional assignment).
+  imgProp->value(nullptr);
+  // The resource loads afterwards; the explicit clear must survive (no resurrection of the default).
+  auto data = pagx::DecodeBase64DataURI(redPNG);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/avatar.png", data));
+  EXPECT_EQ(imgProp->value(), nullptr);
+}
+
 // End-to-end: a DataBind bound to a ViewModel image must push the refreshed image to its target
 // after the referenced <Image> resource loads. Proves resource-load -> VM refresh -> DataBind push.
 PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPropagatesThroughDataBind) {
@@ -1745,6 +1781,52 @@ PAGX_TEST(PAGXViewModelTest, RectangleRoundnessSyncBack) {
   runtimeRect->setRoundness(12.0f);
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FLOAT_EQ(rProp->value(), 12.0f);
+}
+
+// An unset optional channel (TextModifier strokeColor never authored) must NOT sync back: its
+// reader returns false so syncBack skips it, leaving a ToSource-bound ViewModel value untouched
+// rather than clobbering it with a fabricated default.
+PAGX_TEST(PAGXViewModelTest, UnsetOptionalChannelDoesNotSyncBack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "stroke";
+  prop->propertyType = pagx::ViewModelPropertyType::Color;
+  prop->defaultColor = pagx::Color{1, 0, 0, 1};  // red source value
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("textLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontSize = 24;
+  layer->contents.push_back(text);
+  auto modifier = doc->makeNode<pagx::TextModifier>("mod");
+  // strokeColor is intentionally left unset (std::nullopt).
+  layer->contents.push_back(modifier);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.stroke";
+  db->target = "@mod";
+  db->channel = "strokeColor";
+  db->flags = pagx::DataBindDirection::ToSource;  // target -> VM only
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto strokeProp = scene->viewModel()->propertyColor("stroke");
+  ASSERT_NE(strokeProp, nullptr);
+  EXPECT_FLOAT_EQ(strokeProp->value().red, 1.0f);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // Draw: the modifier's strokeColor optional is empty, so its reader returns false and syncBack
+  // skips it. The ViewModel source value must remain the red it was given, not be clobbered.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(strokeProp->value().red, 1.0f);
+  EXPECT_FLOAT_EQ(strokeProp->value().green, 0.0f);
+  EXPECT_FLOAT_EQ(strokeProp->value().blue, 0.0f);
+  EXPECT_FLOAT_EQ(strokeProp->value().alpha, 1.0f);
 }
 
 // Once direction: the ViewModel value is applied to the target exactly once on the first frame, and

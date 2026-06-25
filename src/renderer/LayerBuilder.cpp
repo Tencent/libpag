@@ -699,21 +699,25 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setName(*v);
   }
 
-  static KeyValue ReadLayerAlpha(const void* object) {
-    return KeyValue{static_cast<const tgfx::Layer*>(object)->alpha()};
+  static bool ReadLayerAlpha(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->alpha()};
+    return true;
   }
 
-  static KeyValue ReadLayerVisible(const void* object) {
-    return KeyValue{static_cast<const tgfx::Layer*>(object)->visible()};
+  static bool ReadLayerVisible(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->visible()};
+    return true;
   }
 
-  static KeyValue ReadLayerBlendMode(const void* object) {
+  static bool ReadLayerBlendMode(const void* object, KeyValue* out) {
     auto mode = FromTGFX(static_cast<const tgfx::Layer*>(object)->blendMode());
-    return KeyValue{static_cast<int>(mode)};
+    *out = KeyValue{static_cast<int>(mode)};
+    return true;
   }
 
-  static KeyValue ReadLayerName(const void* object) {
-    return KeyValue{static_cast<const tgfx::Layer*>(object)->name()};
+  static bool ReadLayerName(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->name()};
+    return true;
   }
 
   // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
@@ -915,33 +919,39 @@ class LayerBuilderContext {
 
   // Templated readers symmetric to the writers above. syncBack uses these to flow the current
   // target value back into a ViewModel property; each reads the same getter its writer mixes
-  // against, so a channel that can be driven can also be read back.
+  // against, so a channel that can be driven can also be read back. They always have a value, so
+  // they return true.
   template <typename T, auto Getter>
-  static KeyValue ReadScalar(const void* object) {
-    return KeyValue{static_cast<float>((static_cast<const T*>(object)->*Getter)())};
+  static bool ReadScalar(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<float>((static_cast<const T*>(object)->*Getter)())};
+    return true;
   }
 
   template <typename T, auto Getter>
-  static KeyValue ReadBoolean(const void* object) {
-    return KeyValue{static_cast<bool>((static_cast<const T*>(object)->*Getter)())};
+  static bool ReadBoolean(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<bool>((static_cast<const T*>(object)->*Getter)())};
+    return true;
   }
 
   template <typename T, auto Getter>
-  static KeyValue ReadColorChannel(const void* object) {
+  static bool ReadColorChannel(const void* object, KeyValue* out) {
     auto c = (static_cast<const T*>(object)->*Getter)();
-    return KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
   }
 
   template <typename T, auto Getter, bool WidthAxis>
-  static KeyValue ReadSizeAxis(const void* object) {
+  static bool ReadSizeAxis(const void* object, KeyValue* out) {
     auto size = (static_cast<const T*>(object)->*Getter)();
-    return KeyValue{WidthAxis ? size.width : size.height};
+    *out = KeyValue{WidthAxis ? size.width : size.height};
+    return true;
   }
 
   template <typename T, auto Getter, bool XAxis>
-  static KeyValue ReadPointAxis(const void* object) {
+  static bool ReadPointAxis(const void* object, KeyValue* out) {
     auto point = (static_cast<const T*>(object)->*Getter)();
-    return KeyValue{XAxis ? point.x : point.y};
+    *out = KeyValue{XAxis ? point.x : point.y};
+    return true;
   }
 
   // Rectangle roundness: the PAGX node carries a single float but tgfx exposes a 4-corner array, so
@@ -956,8 +966,9 @@ class LayerBuilderContext {
     rect->setRoundness(MixFloat(current, *v, mix));
   }
 
-  static KeyValue ReadRectangleRoundness(const void* object) {
-    return KeyValue{static_cast<const tgfx::Rectangle*>(object)->roundness()[0]};
+  static bool ReadRectangleRoundness(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Rectangle*>(object)->roundness()[0]};
+    return true;
   }
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
@@ -1111,12 +1122,14 @@ class LayerBuilderContext {
     text->setPosition(pos);
   }
 
-  static KeyValue ReadTextX(const void* object) {
-    return KeyValue{static_cast<const tgfx::Text*>(object)->position().x};
+  static bool ReadTextX(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Text*>(object)->position().x};
+    return true;
   }
 
-  static KeyValue ReadTextY(const void* object) {
-    return KeyValue{static_cast<const tgfx::Text*>(object)->position().y};
+  static bool ReadTextY(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Text*>(object)->position().y};
+    return true;
   }
 
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
@@ -1247,15 +1260,17 @@ class LayerBuilderContext {
     pattern->setImage(LayerBuilder::GetTGFXImage(*v));
   }
 
-  static KeyValue ReadImagePatternImage(const void* object) {
+  static bool ReadImagePatternImage(const void* object, KeyValue* out) {
     auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
-    return KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    *out = KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    return true;
   }
 
-  static KeyValue ReadSolidColor(const void* object) {
+  static bool ReadSolidColor(const void* object, KeyValue* out) {
     auto c = static_cast<const tgfx::SolidColor*>(object)->color();
     // tgfx::Color is always sRGB, so the read-back color is reported in sRGB color space.
-    return KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
   }
 
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
@@ -1337,29 +1352,31 @@ class LayerBuilderContext {
     stop->gradient->setPositions(std::move(positions));
   }
 
-  static KeyValue ReadColorStopColor(const void* object) {
+  static bool ReadColorStopColor(const void* object, KeyValue* out) {
     auto* stop = GetColorStopBinding(const_cast<void*>(object));
     if (stop == nullptr || stop->gradient == nullptr) {
-      return KeyValue{Color{}};
+      return false;
     }
     auto colors = stop->gradient->colors();
     if (stop->index >= colors.size()) {
-      return KeyValue{Color{}};
+      return false;
     }
     auto c = colors[stop->index];
-    return KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
   }
 
-  static KeyValue ReadColorStopOffset(const void* object) {
+  static bool ReadColorStopOffset(const void* object, KeyValue* out) {
     auto* stop = GetColorStopBinding(const_cast<void*>(object));
     if (stop == nullptr || stop->gradient == nullptr) {
-      return KeyValue{0.0f};
+      return false;
     }
     auto positions = stop->gradient->positions();
     if (stop->index >= positions.size()) {
-      return KeyValue{0.0f};
+      return false;
     }
-    return KeyValue{positions[stop->index]};
+    *out = KeyValue{positions[stop->index]};
+    return true;
   }
 
   void extractGradientStops(const std::vector<ColorStop*>& colorStops,
@@ -1719,27 +1736,34 @@ class LayerBuilderContext {
     modifier->setStrokeWidth(current.has_value() ? MixFloat(*current, *v, mix) : *v);
   }
 
-  // Optional-valued TextModifier readers: report the resolved value, or the type default when the
-  // optional is empty.
-  static KeyValue ReadTextModifierFillColor(const void* object) {
+  // Optional-valued TextModifier readers: report the resolved value, or return false when the
+  // optional is unset so syncBack skips the channel (an unset paint property has no value to flow
+  // back into the ViewModel, and reporting a fabricated default would clobber the source).
+  static bool ReadTextModifierFillColor(const void* object, KeyValue* out) {
     auto c = static_cast<const tgfx::TextModifier*>(object)->fillColor();
     if (!c.has_value()) {
-      return KeyValue{Color{}};
+      return false;
     }
-    return KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    *out = KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    return true;
   }
 
-  static KeyValue ReadTextModifierStrokeColor(const void* object) {
+  static bool ReadTextModifierStrokeColor(const void* object, KeyValue* out) {
     auto c = static_cast<const tgfx::TextModifier*>(object)->strokeColor();
     if (!c.has_value()) {
-      return KeyValue{Color{}};
+      return false;
     }
-    return KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    *out = KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    return true;
   }
 
-  static KeyValue ReadTextModifierStrokeWidth(const void* object) {
+  static bool ReadTextModifierStrokeWidth(const void* object, KeyValue* out) {
     auto w = static_cast<const tgfx::TextModifier*>(object)->strokeWidth();
-    return KeyValue{w.has_value() ? *w : 0.0f};
+    if (!w.has_value()) {
+      return false;
+    }
+    *out = KeyValue{*w};
+    return true;
   }
 
   std::shared_ptr<tgfx::TextModifier> convertTextModifier(const TextModifier* node) {

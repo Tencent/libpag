@@ -155,12 +155,11 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       }
       case ViewModelPropertyType::Image: {
         auto v = std::make_shared<PAGViewModelValueImage>();
-        // Decode from the referenced <Image> resource. Remember the source node and the decoded
-        // baseline so a later resource change (host loadFileData) can re-decode this value, while a
-        // business-side override (propertyValue != builtImage) is left untouched.
+        // Decode from the referenced <Image> resource. Remember the source node so a later resource
+        // change (host loadFileData) can re-decode this value, unless the business side has assigned
+        // its own value in the meantime (tracked by userAssigned).
         v->sourceImage = prop->defaultImage;
         v->propertyValue = DecodeImageNode(prop->defaultImage);
-        v->builtImage = v->propertyValue;
         v->type = ViewModelValueType::Image;
         value = std::move(v);
         break;
@@ -485,15 +484,14 @@ void PAGScene::refreshViewModelImages(PAGComposition* comp,
           changed.find(imageValue->sourceImage) == changed.end()) {
         continue;
       }
-      // Preserve a business-side override: only re-decode while the value is still the schema-built
-      // baseline. Route through setValueInternal(fromVM=true) so observers fire and dependent
-      // DataBinds are marked dirty (the new image reaches bound targets on the next draw).
-      if (imageValue->propertyValue != imageValue->builtImage) {
+      // Preserve a business-side assignment: only re-decode the schema default while the value has
+      // not been explicitly assigned through the public setter. Route through
+      // setValueInternal(fromVM=true) so observers fire and dependent DataBinds are marked dirty
+      // (the new image reaches bound targets on the next draw).
+      if (imageValue->userAssigned) {
         continue;
       }
-      auto decoded = DecodeImageNode(imageValue->sourceImage);
-      imageValue->builtImage = decoded;
-      imageValue->setValueInternal(std::move(decoded), true);
+      imageValue->setValueInternal(DecodeImageNode(imageValue->sourceImage), true);
     }
   }
   std::vector<PAGComposition*> childComps = {};

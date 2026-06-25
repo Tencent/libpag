@@ -134,7 +134,9 @@ void DataBindRuntime::markAllDirty() {
   // binding keeps onceApplied==true and is therefore skipped in update(): it is fire-and-forget, so
   // a refresh does not restore its value (only ToTarget/TwoWay follow the ViewModel continuously).
   for (auto& entry : entries) {
-    markDirty(entry.dataBind);
+    if (entry.toTarget()) {
+      markDirty(entry.dataBind);
+    }
   }
 }
 

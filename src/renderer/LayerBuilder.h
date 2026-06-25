@@ -53,10 +53,11 @@ struct RuntimeColorStop {
  */
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
-// Reads the current value of a channel back from a runtime object, returning it as a KeyValue.
-// Symmetric to RuntimeWriter; used by DataBind syncBack to flow animation-driven layer values back
-// into ViewModel properties.
-using RuntimeReader = KeyValue (*)(const void* object);
+// Reads the current value of a channel back from a runtime object into *out. Returns false when the
+// channel currently has no value to sync back (e.g. an unset optional property), in which case the
+// channel is skipped by DataBind syncBack. Symmetric to RuntimeWriter; used to flow target changes
+// back into ViewModel properties.
+using RuntimeReader = bool (*)(const void* object, KeyValue* out);
 
 struct RuntimeTarget {
   virtual ~RuntimeTarget() = default;
@@ -107,14 +108,14 @@ struct RuntimeTarget {
 
   // Reads the current value of a channel back from the bound object. Virtual so a subclass
   // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y). Returns
-  // false if no reader is registered for the channel or the object is null.
+  // false if no reader is registered for the channel, the object is null, or the reader reports the
+  // channel currently has no value to sync back.
   virtual bool read(const std::string& channel, KeyValue* out) const {
     auto it = readers.find(channel);
     if (it == readers.end() || object == nullptr || out == nullptr) {
       return false;
     }
-    *out = it->second(object.get());
-    return true;
+    return it->second(object.get(), out);
   }
 
  protected:
