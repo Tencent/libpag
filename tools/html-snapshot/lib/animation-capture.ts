@@ -566,6 +566,68 @@ export function pagxBuildCanonicalAnimation(
   return { name, keyframesCss, animationShorthand };
 }
 
+// Pure: build a 2-stop descriptor for a captured CSS `transition` from its
+// recorded start (`fromBag`) and resting end (`toBag`) property bags. Both bags
+// are raw (un-normalised) property maps in the shape `pagxNormalizeProps`
+// accepts; `box` resolves percent translations. Returns null when the
+// transition produces no playable motion (zero duration, or no tracked channel
+// whose value actually changes between the two states), so the caller can skip
+// it.
+//
+// A CSS transition is not declarative like `@keyframes`: it only describes how
+// to interpolate when a property changes. We reconstruct the equivalent
+// keyframe animation from the two endpoints we observed — the value at the
+// moment the transition started (recorded via the `transitionrun` listener
+// installed by `pagxTransitionInstall`) and the value once the page has settled
+// (read at capture time). A `transform` channel present on only one side is
+// treated as `translate(0px, 0px)` on the missing side (a `none -> translate()`
+// or `translate() -> none` transition still carries motion); other channels
+// require both endpoints, since e.g. an opacity defined on only one side cannot
+// describe a tween.
+export function pagxTransitionDescriptorFromBags(
+  fromBag: Record<string, unknown>,
+  toBag: Record<string, unknown>,
+  box: { width: number; height: number } | null,
+  durationMs: number,
+  delayMs: number,
+  timing: string,
+): PagxAnimDescriptor | null {
+  if (!(durationMs > 0)) return null;
+  const fromNorm = pagxNormalizeProps(fromBag, box);
+  const toNorm = pagxNormalizeProps(toBag, box);
+  const keys: Record<string, true> = {};
+  for (const k of Object.keys(fromNorm)) keys[k] = true;
+  for (const k of Object.keys(toNorm)) keys[k] = true;
+  const startProps: Record<string, string> = {};
+  const endProps: Record<string, string> = {};
+  let changed = false;
+  for (const key of Object.keys(keys)) {
+    let fv: string | null = fromNorm[key] != null ? fromNorm[key] : null;
+    let tv: string | null = toNorm[key] != null ? toNorm[key] : null;
+    if (key === 'transform') {
+      if (fv == null) fv = 'translate(0px, 0px)';
+      if (tv == null) tv = 'translate(0px, 0px)';
+    }
+    if (fv == null || tv == null) continue; // single-sided channel — not a tween
+    if (fv === tv) continue; // static channel — nothing to animate
+    startProps[key] = fv;
+    endProps[key] = tv;
+    changed = true;
+  }
+  if (!changed) return null;
+  return {
+    keyframes: [
+      { offset: 0, props: startProps },
+      { offset: 1, props: endProps },
+    ],
+    durationMs,
+    delayMs: delayMs || 0,
+    iterations: 1,
+    direction: 'normal',
+    timing: timing || 'linear',
+  };
+}
+
 // ===== In-browser DOM collectors (module scope, serialised into the page) =====
 
 export function pagxCandidateElements(maxElements: number): HTMLElement[] {
@@ -959,6 +1021,129 @@ export function pagxCollectAnime(
   }
 }
 
+// Install the early `transitionrun` recorder on `window.__pagxTransitions`.
+//
+// CSS transitions are invisible to the late capture pass: a transition only
+// surfaces in `document.getAnimations()` while it is actively interpolating,
+// and by snapshot time every load-triggered entrance transition (the dominant
+// real-world use: an element starts at `opacity:0`/`translateY(20px)` and a
+// class flip on `rAF`/`load` transitions it to its resting state) has already
+// finished — leaving only the final value, with the start value lost.
+//
+// This runs at document-start (registered as an init script *before* the page's
+// own scripts) and listens for `transitionrun`, which the engine fires the
+// instant a transition is created — before its delay and before any visible
+// progress. At that moment `getComputedStyle` still reports the *start* value,
+// so we record it per (element, property) along with the property's resolved
+// duration / delay / timing-function. `pagxCollectTransitions` later pairs each
+// recorded start with the element's settled end value to synthesise the
+// equivalent `@keyframes`.
+//
+// Only the runtime-playable channels are tracked (opacity / transform / color /
+// background-color); `transitionrun` always reports a concrete longhand in
+// `propertyName` even when the author wrote `transition: all`, so the filter is
+// exact. Last write wins per (element, property): a re-triggered transition
+// (e.g. the same element animated twice) keeps the most recent start, which is
+// the one whose end value we read at capture time.
+export function pagxTransitionInstall(): void {
+  try {
+    const w = window as unknown as { __pagxTransitions?: unknown };
+    if (w.__pagxTransitions) return;
+    const store: { map: Map<Element, Record<string, unknown>> } = { map: new Map() };
+    w.__pagxTransitions = store;
+    const tracked: Record<string, true> = {
+      opacity: true,
+      transform: true,
+      color: true,
+      'background-color': true,
+    };
+    const record = (e: TransitionEvent): void => {
+      try {
+        const el = e.target as Element;
+        if (!el || el.nodeType !== 1) return;
+        const prop = e.propertyName;
+        if (!prop || !tracked[prop]) return;
+        const cs = getComputedStyle(el as HTMLElement);
+        const props = pagxSplitTopLevelCommas(cs.transitionProperty || '');
+        const durs = pagxSplitTopLevelCommas(cs.transitionDuration || '');
+        const dels = pagxSplitTopLevelCommas(cs.transitionDelay || '');
+        const tims = pagxSplitTopLevelCommas(cs.transitionTimingFunction || '');
+        let idx = props.indexOf(prop);
+        if (idx < 0) idx = props.indexOf('all');
+        if (idx < 0) idx = 0;
+        const durationMs = pagxParseTimeMs(durs[idx] || durs[0] || '0s');
+        const delayMs = pagxParseTimeMs(dels[idx] || dels[0] || '0s');
+        const timing = (tims[idx] || tims[0] || 'linear').trim();
+        const from = prop === 'transform'
+          ? cs.transform
+          : cs.getPropertyValue(prop);
+        let perEl = store.map.get(el);
+        if (!perEl) {
+          perEl = {};
+          store.map.set(el, perEl);
+        }
+        perEl[prop] = { from, durationMs, delayMs, timing };
+      } catch (_) {
+        /* ignore one event */
+      }
+    };
+    document.addEventListener('transitionrun', record, true);
+  } catch (_) {
+    /* transitions simply won't be captured */
+  }
+}
+
+// Capture-time collector: turn every transition recorded by
+// `pagxTransitionInstall` into a canonical descriptor. Reads each element's
+// settled (resting) value as the transition's end state, pairs it with the
+// recorded start, and merges all of the element's transitioned channels into a
+// single descriptor — the importer plays one `animation` shorthand per element,
+// so per-property durations are collapsed onto the longest one (its delay /
+// timing-function come along). Runs last in the chain so an element already
+// handled by WAAPI / `@keyframes` / GSAP / anime.js (`seen`) keeps that
+// higher-fidelity capture.
+export function pagxCollectTransitions(captured: unknown[], seen: Set<Element>): void {
+  const store = (window as unknown as {
+    __pagxTransitions?: { map?: Map<Element, Record<string, unknown>> };
+  }).__pagxTransitions;
+  if (!store || !store.map || typeof store.map.forEach !== 'function') return;
+  store.map.forEach((perEl, el) => {
+    try {
+      if (!el || el.nodeType !== 1 || seen.has(el)) return;
+      if ((el as { isConnected?: boolean }).isConnected === false) return;
+      const cs = getComputedStyle(el as HTMLElement);
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      const box = { width: rect.width, height: rect.height };
+      const fromBag: Record<string, unknown> = {};
+      const toBag: Record<string, unknown> = {};
+      let bestDur = 0;
+      let bestDelay = 0;
+      let bestTiming = 'linear';
+      for (const prop of Object.keys(perEl)) {
+        const info = perEl[prop] as {
+          from: string; durationMs: number; delayMs: number; timing: string;
+        };
+        const toVal = prop === 'transform' ? cs.transform : cs.getPropertyValue(prop);
+        fromBag[prop] = info.from;
+        toBag[prop] = toVal;
+        if (info.durationMs > bestDur) {
+          bestDur = info.durationMs;
+          bestDelay = info.delayMs;
+          bestTiming = info.timing;
+        }
+      }
+      const desc = pagxTransitionDescriptorFromBags(
+        fromBag, toBag, box, bestDur, bestDelay, bestTiming,
+      );
+      if (!desc) return;
+      captured.push({ el: el as HTMLElement, ...desc });
+      seen.add(el);
+    } catch (_) {
+      /* skip this element */
+    }
+  });
+}
+
 // ===== In-browser orchestrator =====
 //
 // Runs the collector priority chain, then rewrites every captured animation
@@ -981,6 +1166,10 @@ export function pagxAnimMain(opts: {
   pagxCollectCSS(captured, seen, maxElements);
   pagxCollectGsap(captured, seen, sampleCount, maxElements);
   pagxCollectAnime(captured, seen, sampleCount, maxElements);
+  // Runs last so elements already captured as @keyframes / WAAPI / library
+  // tweens keep that higher-fidelity result; only purely transition-driven
+  // motion (recorded early by pagxTransitionInstall) is added here.
+  pagxCollectTransitions(captured, seen);
   if (captured.length === 0) return { count: 0, names: [] };
 
   let css = '';
@@ -1057,16 +1246,33 @@ const PAGX_ANIM_FNS = [
   pagxSplitTopLevelCommas,
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
+  pagxTransitionDescriptorFromBags,
   pagxCandidateElements,
   pagxBuildKeyframesIndex,
   pagxCollectWAAPI,
   pagxCollectCSS,
+  pagxCollectTransitions,
   pagxSampleTimeline,
   pagxGsapWindow,
   pagxCollectGsap,
   pagxCollectAnime,
   pagxAnimMain,
 ];
+
+// Init-script form: install the early `transitionrun` recorder so CSS
+// transitions that fire (and finish) during load are still observable at
+// capture time. Registered via the page-loader's `initScripts` (before
+// navigation), mirroring SNAPSHOT_INIT_SCRIPT / ICON_FONT_INIT_SCRIPT. Only the
+// three helpers the recorder depends on are bundled — the recorder writes to
+// `window.__pagxTransitions`, which `pagxCollectTransitions` (shipped later in
+// the capture IIFE) reads back.
+export const PAGX_TRANSITION_INIT_SCRIPT =
+  '(function() {\n' +
+  pagxSplitTopLevelCommas.toString() + '\n' +
+  pagxParseTimeMs.toString() + '\n' +
+  pagxTransitionInstall.toString() + '\n' +
+  'pagxTransitionInstall();\n' +
+  '})();';
 
 // Build the self-contained IIFE evaluated in the page. The helper sources are
 // concatenated and the entry call passes `opts` inlined as JSON.

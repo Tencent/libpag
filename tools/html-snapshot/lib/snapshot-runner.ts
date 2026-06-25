@@ -16,7 +16,7 @@ import {
   materializeDecorativePseudoElements,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
-import { capturePagxAnimationsOnPage } from './animation-capture';
+import { capturePagxAnimationsOnPage, PAGX_TRANSITION_INIT_SCRIPT } from './animation-capture';
 import {
   makeFontCaptureListener,
   saveDownloadedFonts,
@@ -372,7 +372,12 @@ export async function runSnapshot(
     // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
     // dispatch wrappers in lib/icon-font.ts), instead of re-encoding the
     // ~80 KB helper source for every snapshot.
-    initScripts: [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
+    // The transition recorder must be installed before the page's own scripts
+    // run so load-triggered entrance transitions are observed at their start;
+    // only register it when animation capture is enabled.
+    initScripts: captureAnimations
+      ? [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT]
+      : [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
   });
 
   try {

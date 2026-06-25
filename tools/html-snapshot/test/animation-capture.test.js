@@ -19,8 +19,10 @@ const {
   pagxNormalizeTiming,
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
+  pagxTransitionDescriptorFromBags,
   buildAnimationCapturePayload,
   capturePagxAnimationsOnPage,
+  PAGX_TRANSITION_INIT_SCRIPT,
 } = require('../dist/lib/animation-capture');
 
 describe('pagxExtractTranslate', () => {
@@ -411,12 +413,81 @@ describe('pagxBuildCanonicalAnimation', () => {
   });
 });
 
+describe('pagxTransitionDescriptorFromBags', () => {
+  test('builds a 2-stop descriptor for an opacity transition', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1' }, null, 600, 0, 'ease',
+    );
+    expect(out).not.toBeNull();
+    expect(out.durationMs).toBe(600);
+    expect(out.timing).toBe('ease');
+    expect(out.iterations).toBe(1);
+    expect(out.keyframes).toEqual([
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ]);
+  });
+
+  test('treats a one-sided transform as translate(0px, 0px) on the missing side', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { transform: 'none' }, { transform: 'translate(40px, 0px)' }, null, 300, 0, 'linear',
+    );
+    expect(out.keyframes[0].props.transform).toBe('translate(0px, 0px)');
+    expect(out.keyframes[1].props.transform).toBe('translate(40px, 0px)');
+  });
+
+  test('merges multiple changing channels into one descriptor', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0', transform: 'translate(0px, 20px)' },
+      { opacity: '1', transform: 'translate(0px, 0px)' },
+      null, 500, 100, 'ease-out',
+    );
+    expect(out.delayMs).toBe(100);
+    expect(out.keyframes[0].props).toEqual({ opacity: '0', transform: 'translate(0px, 20px)' });
+    expect(out.keyframes[1].props).toEqual({ opacity: '1', transform: 'translate(0px, 0px)' });
+  });
+
+  test('returns null when no tracked channel changes', () => {
+    expect(pagxTransitionDescriptorFromBags(
+      { opacity: '1' }, { opacity: '1' }, null, 300, 0, 'linear',
+    )).toBeNull();
+  });
+
+  test('returns null for a non-positive duration', () => {
+    expect(pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1' }, null, 0, 0, 'linear',
+    )).toBeNull();
+  });
+
+  test('drops a channel defined on only one side (non-transform)', () => {
+    // `color` present only in `to` cannot describe a tween (no start value).
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1', color: 'rgb(255, 0, 0)' }, null, 300, 0, 'linear',
+    );
+    expect(out.keyframes[0].props).toEqual({ opacity: '0' });
+    expect(out.keyframes[1].props).toEqual({ opacity: '1' });
+  });
+});
+
+describe('PAGX_TRANSITION_INIT_SCRIPT', () => {
+  test('is a self-contained IIFE that installs the transitionrun recorder', () => {
+    expect(typeof PAGX_TRANSITION_INIT_SCRIPT).toBe('string');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxTransitionInstall');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('pagxTransitionInstall();');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('transitionrun');
+    // bundles its two helper dependencies
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxSplitTopLevelCommas');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxParseTimeMs');
+  });
+});
+
 describe('buildAnimationCapturePayload', () => {
   test('produces a self-contained IIFE that calls pagxAnimMain with inlined opts', () => {
     const payload = buildAnimationCapturePayload({ sampleCount: 6, maxElements: 100 });
     expect(payload.startsWith('(() => {')).toBe(true);
     expect(payload).toContain('function pagxAnimMain');
     expect(payload).toContain('function pagxExtractTranslate');
+    expect(payload).toContain('function pagxCollectTransitions');
     expect(payload).toContain(`"prefix":"${PAGX_ANIM_PREFIX}"`);
     expect(payload).toContain(`"styleId":"${PAGX_ANIM_STYLE_ID}"`);
     expect(payload).toContain('"sampleCount":6');
