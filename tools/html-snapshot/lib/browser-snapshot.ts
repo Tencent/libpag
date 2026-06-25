@@ -2753,7 +2753,7 @@ function render(el, parentRect, opts, precomputed) {
 
 // ===== Main snapshot entry =====
 
-function snapshotMain() {
+function snapshotMain(opts) {
   const body = document.body;
   body.style.margin = '0';
   body.style.padding = '0';
@@ -2828,9 +2828,26 @@ function snapshotMain() {
   // already includes any child content that overflows past the body's
   // declared size, so it correctly captures both fixed-size mocks and fluid
   // pages whose content extends past the viewport.
+  //
+  // Caller may override the auto-measured size by passing `{ canvasWidth,
+  // canvasHeight }`. The runSnapshot pipeline uses this when it has just
+  // resized the viewport to a previously-measured (W, H) so a script-driven
+  // resize handler (e.g. a `fit() { stage.transform = scale(min(w/W, h/H)) }`
+  // that also calls a follow-up `alignWeapons()` that writes into the layout)
+  // does not reflow the page into a *new* size that would make `body.
+  // scrollWidth` here disagree with the value baseline-frames.js / pagx
+  // render are using as the canvas. Without the override the second resize
+  // pass keeps drifting (1400x900 -> 1660x990 -> 1790x1035 -> ...) and the
+  // PNGs land at different sizes.
   const bodyRect = body.getBoundingClientRect();
-  const canvasWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
-  const canvasHeight = Math.max(body.scrollHeight, Math.round(bodyRect.height));
+  const measuredWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  const measuredHeight = Math.max(body.scrollHeight, Math.round(bodyRect.height));
+  const overrideW = opts && typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0
+    ? opts.canvasWidth : 0;
+  const overrideH = opts && typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0
+    ? opts.canvasHeight : 0;
+  const canvasWidth = overrideW || measuredWidth;
+  const canvasHeight = overrideH || measuredHeight;
 
   const parts = [];
   for (const c of body.children) {
@@ -3136,6 +3153,16 @@ window.__pagxSnapshot = {
 // CDP roundtrip per snapshot is bounded by the protocol overhead, not the
 // payload size.
 const TAKE_SNAPSHOT_EXPR = '(() => window.__pagxSnapshot.takeSnapshot())()';
+
+// Same as TAKE_SNAPSHOT_EXPR but forwards a caller-supplied canvas hint
+// `{canvasWidth, canvasHeight}` so script-driven layout reflow during the
+// run (a `fit()` resize handler chained with `alignWeapons()`-style follow-
+// ups) does not move the canvas size out from under the rest of the
+// pipeline.
+function buildTakeSnapshotExprWithHint(canvasWidth, canvasHeight) {
+  return '(() => window.__pagxSnapshot.takeSnapshot({canvasWidth:' +
+    String(canvasWidth) + ',canvasHeight:' + String(canvasHeight) + '}))()';
+}
 
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
@@ -3541,6 +3568,7 @@ export {
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,
+  buildTakeSnapshotExprWithHint,
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
