@@ -85,12 +85,12 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   // When the composition is not yet loaded (composition == nullptr), BuildCompositionSubtree
   // returns an empty root. Build a minimal tgfx slot layer so the PAGComposition has a valid
   // runtimeLayer for syncChildren to attach children into later.
-  if (composition->runtimeLayer == nullptr) {
-    composition->runtimeLayer =
-        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get());
-  }
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
+  if (composition->runtimeLayer == nullptr) {
+    composition->runtimeLayer =
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get(), composition->document);
+  }
   if (externalDoc != nullptr) {
     externalDoc->registerLiveScene(parentScene);
   }
@@ -198,7 +198,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       }
       auto* dirtyLayer = static_cast<Layer*>(dirty);
       if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
-        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
+        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document);
       }
     }
   }
@@ -234,7 +234,7 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     }
     auto slot = binding->get<tgfx::Layer>(layer);
     if (slot == nullptr) {
-      slot = LayerBuilder::BuildLayerInto(layer, binding);
+      slot = LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
     }
     if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
       slot->addChild(childComposition->runtimeLayer);
@@ -243,7 +243,8 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
   }
   auto layerRuntime = binding->get<tgfx::Layer>(layer);
   if (layerRuntime == nullptr) {
-    layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
+    layerRuntime =
+        LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
   }
   if (layerRuntime == nullptr) {
     return nullptr;
