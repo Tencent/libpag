@@ -2762,7 +2762,21 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
           prop->defaultColor = GetColorAttribute(child.get(), "default", doc);
         } else if (typeStr == "Image" || typeStr == "image") {
           prop->propertyType = ViewModelPropertyType::Image;
-          prop->defaultImage = GetAttribute(child.get(), "default");
+          auto imageAttr = GetAttribute(child.get(), "default");
+          if (!imageAttr.empty()) {
+            if (imageAttr[0] == '@') {
+              prop->defaultImage = doc->findNode<Image>(imageAttr.substr(1));
+              if (!prop->defaultImage) {
+                ReportError(doc, child.get(),
+                            "Resource '" + imageAttr + "' not found for 'default' attribute.");
+              }
+            } else {
+              ReportError(doc, child.get(),
+                          "Image 'default' must reference an Image resource by id (e.g. "
+                          "\"@imageId\"), got '" +
+                              imageAttr + "'.");
+            }
+          }
         } else if (typeStr == "ViewModel" || typeStr == "viewModel") {
           prop->propertyType = ViewModelPropertyType::ViewModel;
         } else if (typeStr == "Enum" || typeStr == "enum") {

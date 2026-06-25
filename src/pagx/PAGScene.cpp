@@ -29,6 +29,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -39,6 +40,25 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
+
+// Decodes an <Image> resource node into a PAGImage using the same precedence as the renderer's
+// ImagePattern path: host-injected data first, then an inline data URI, then an external file path.
+// Returns nullptr for a null node or one with no usable source.
+static std::shared_ptr<PAGImage> DecodeImageNode(const Image* imageNode) {
+  if (imageNode == nullptr) {
+    return nullptr;
+  }
+  if (imageNode->data) {
+    return PAGImage::MakeFromData(imageNode->data);
+  }
+  if (imageNode->filePath.find("data:") == 0) {
+    return PAGImage::MakeFromDataURI(imageNode->filePath);
+  }
+  if (!imageNode->filePath.empty()) {
+    return PAGImage::MakeFromPath(imageNode->filePath);
+  }
+  return nullptr;
+}
 
 PAGScene::PAGScene() = default;
 
@@ -135,11 +155,12 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       }
       case ViewModelPropertyType::Image: {
         auto v = std::make_shared<PAGViewModelValueImage>();
-        if (prop->defaultImage.find("data:") == 0) {
-          v->propertyValue = PAGImage::MakeFromDataURI(prop->defaultImage);
-        } else if (!prop->defaultImage.empty()) {
-          v->propertyValue = PAGImage::MakeFromPath(prop->defaultImage);
-        }
+        // Decode from the referenced <Image> resource. Remember the source node and the decoded
+        // baseline so a later resource change (host loadFileData) can re-decode this value, while a
+        // business-side override (propertyValue != builtImage) is left untouched.
+        v->sourceImage = prop->defaultImage;
+        v->propertyValue = DecodeImageNode(prop->defaultImage);
+        v->builtImage = v->propertyValue;
         v->type = ViewModelValueType::Image;
         value = std::move(v);
         break;
@@ -252,15 +273,15 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
     }
     // A nested Composition may carry DataBinds that reference a parent ViewModel property even when
     // it has no ViewModel of its own. Build a DataContext (with null VM when absent) chained to the
-    // parent so resolve() can walk up to the parent VM.
+    // parent so resolve() can walk up to the parent VM. Binding is deferred to buildViewModels'
+    // final pass: a parent dataBind may descend through a ViewModel reference into a nested
+    // instance, and DataBindRuntime::bind() resolves (and caches) source paths once, so every
+    // referenceInstance must be linked before any bind() runs.
     if (compSchema->viewModel != nullptr || !compSchema->dataBinds.empty()) {
       childComp->dataBindRuntime = std::make_unique<DataBindRuntime>();
       auto dataCtx = std::make_shared<DataContext>(childVM);
       if (parentComp->dataContext != nullptr) dataCtx->parent(parentComp->dataContext);
       childComp->dataContext = dataCtx;
-      if (!compSchema->dataBinds.empty())
-        childComp->dataBindRuntime->bind(compSchema->dataBinds, childComp->dataContext.get(),
-                                         childComp->document);
     }
     buildNestedViewModels(childComp);
   }
@@ -273,12 +294,41 @@ void PAGScene::buildViewModels() {
     _rootComposition->compositionViewModel = rootViewModel;
     _rootComposition->dataBindRuntime = std::make_unique<DataBindRuntime>();
     _rootComposition->dataContext = std::make_shared<DataContext>(rootViewModel);
-    if (!document->dataBinds.empty())
-      _rootComposition->dataBindRuntime->bind(document->dataBinds,
-                                              _rootComposition->dataContext.get(), document.get());
   }
-  if (_rootComposition != nullptr) {
-    buildNestedViewModels(_rootComposition.get());
+  if (_rootComposition == nullptr) {
+    return;
+  }
+  // Build the entire nested ViewModel tree (VMs, contexts, referenceInstance links) before binding
+  // any dataBinds. DataBindRuntime::bind() resolves each source path once and caches the result, so
+  // a cross-level source such as "$vm.nestedRef.childProp" only resolves correctly after every
+  // nested referenceInstance is linked. Binding eagerly during tree construction would resolve such
+  // a path to null and permanently drop the bind.
+  buildNestedViewModels(_rootComposition.get());
+  // Deferred binding pass over the whole composition tree. Root binds document->dataBinds against
+  // the document; each nested composition binds its own schema's dataBinds against its document.
+  std::vector<PAGComposition*> pending = {_rootComposition.get()};
+  while (!pending.empty()) {
+    auto* comp = pending.back();
+    pending.pop_back();
+    if (comp->dataBindRuntime != nullptr) {
+      const std::vector<DataBind*>* binds = nullptr;
+      PAGXDocument* bindDoc = nullptr;
+      if (comp == _rootComposition.get()) {
+        binds = &document->dataBinds;
+        bindDoc = document.get();
+      } else if (comp->node != nullptr && comp->node->composition != nullptr) {
+        binds = &comp->node->composition->dataBinds;
+        bindDoc = comp->document;
+      }
+      if (binds != nullptr && !binds->empty()) {
+        comp->dataBindRuntime->bind(*binds, comp->dataContext.get(), bindDoc);
+      }
+    }
+    std::vector<PAGComposition*> childComps = {};
+    PAGComposition::CollectChildCompositions(comp, childComps);
+    for (auto* childComp : childComps) {
+      pending.push_back(childComp);
+    }
   }
 }
 
@@ -418,6 +468,47 @@ void PAGScene::clearCompositionTreeDirty(PAGComposition* comp) {
   for (auto* childComp : childComps) {
     clearCompositionTreeDirty(childComp);
   }
+}
+
+void PAGScene::refreshViewModelImages(PAGComposition* comp,
+                                      const std::unordered_set<const Image*>& changed) {
+  if (comp == nullptr) {
+    return;
+  }
+  if (comp->compositionViewModel != nullptr) {
+    for (const auto& value : comp->compositionViewModel->properties()) {
+      if (value == nullptr || value->valueType() != ViewModelValueType::Image) {
+        continue;
+      }
+      auto* imageValue = static_cast<PAGViewModelValueImage*>(value.get());
+      if (imageValue->sourceImage == nullptr ||
+          changed.find(imageValue->sourceImage) == changed.end()) {
+        continue;
+      }
+      // Preserve a business-side override: only re-decode while the value is still the schema-built
+      // baseline. Route through setValueInternal(fromVM=true) so observers fire and dependent
+      // DataBinds are marked dirty (the new image reaches bound targets on the next draw).
+      if (imageValue->propertyValue != imageValue->builtImage) {
+        continue;
+      }
+      auto decoded = DecodeImageNode(imageValue->sourceImage);
+      imageValue->builtImage = decoded;
+      imageValue->setValueInternal(std::move(decoded), true);
+    }
+  }
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(comp, childComps);
+  for (auto* childComp : childComps) {
+    refreshViewModelImages(childComp, changed);
+  }
+}
+
+void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages) {
+  if (changedImages.empty() || _rootComposition == nullptr) {
+    return;
+  }
+  std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
+  refreshViewModelImages(_rootComposition.get(), changed);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,

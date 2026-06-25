@@ -44,6 +44,11 @@ class DataBindRuntime {
 
   void markDirtyForValue(PAGViewModelValue* value);
 
+  // Re-marks every binding dirty so the next update() re-applies the ViewModel value to the target.
+  // Called after a layer is refreshed in place: the rebuilt runtime targets reset their channels to
+  // the node defaults, so the VM-driven values must be re-applied or they would be lost.
+  void markAllDirty();
+
   void update(RuntimeBinding* binding, float mix = 1.0f);
   void syncBack(RuntimeBinding* binding);
 

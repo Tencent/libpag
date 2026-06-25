@@ -217,6 +217,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
   }
 
   if (binding != nullptr) {
+    bool refreshedLayer = false;
     for (auto* dirty : dirtyNodes) {
       if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
         continue;
@@ -224,7 +225,14 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       auto* dirtyLayer = static_cast<Layer*>(dirty);
       if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
+        refreshedLayer = true;
       }
+    }
+    // A refreshed layer rebuilds its runtime targets, resetting their channels to the node
+    // defaults. Re-mark this composition's bindings dirty so the next updateDataBinds re-applies
+    // the current ViewModel values instead of leaving the rebuilt targets at their defaults.
+    if (refreshedLayer && dataBindRuntime != nullptr) {
+      dataBindRuntime->markAllDirty();
     }
   }
   for (auto& child : children) {

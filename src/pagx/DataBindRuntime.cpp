@@ -129,6 +129,15 @@ void DataBindRuntime::markDirtyForValue(PAGViewModelValue* value) {
   }
 }
 
+void DataBindRuntime::markAllDirty() {
+  // Re-mark every binding so update() re-applies the ViewModel value to the rebuilt target. A Once
+  // binding keeps onceApplied==true and is therefore skipped in update(): it is fire-and-forget, so
+  // a refresh does not restore its value (only ToTarget/TwoWay follow the ViewModel continuously).
+  for (auto& entry : entries) {
+    markDirty(entry.dataBind);
+  }
+}
+
 // ---- update (ViewModel → render node) ----------------------------------------
 
 static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
@@ -301,7 +310,19 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     // pass (or on the first pass, to establish a baseline). This keeps repeated syncBacks
     // idempotent and, when one ViewModel property is bound to several targets, lets only the
     // target that actually changed write back instead of every binding overwriting the source.
-    if (entry.hasLastTarget && entry.lastTargetValue == kv) {
+    //
+    // Image values are special: the reader wraps the target's tgfx::Image in a fresh PAGImage every
+    // call, so wrapper-pointer equality on KeyValue would never match. Compare the underlying
+    // tgfx::Image against the ViewModel's current image instead, so an unchanged image neither
+    // overwrites the source URI nor fires observers, while a genuine image change still syncs back.
+    if (entry.source->valueType() == ViewModelValueType::Image) {
+      auto* imageValue = static_cast<PAGViewModelValueImage*>(entry.source);
+      auto* targetImage = std::get_if<std::shared_ptr<PAGImage>>(&kv);
+      auto targetTGFX = targetImage != nullptr ? LayerBuilder::GetTGFXImage(*targetImage) : nullptr;
+      if (LayerBuilder::GetTGFXImage(imageValue->value()) == targetTGFX) {
+        continue;
+      }
+    } else if (entry.hasLastTarget && entry.lastTargetValue == kv) {
       continue;
     }
     entry.lastTargetValue = kv;

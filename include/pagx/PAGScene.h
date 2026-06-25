@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
@@ -41,6 +42,7 @@ class PAGXDocument;
 class SuppressDelegation;
 class PAGViewModelValue;
 class ViewModel;
+class Image;
 struct Matrix;
 struct RuntimeBinding;
 
@@ -165,6 +167,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // this document's own nodes; rebuilds the whole tree when the edit comes from an embedded external
   // document (its nodes are not owned by this scene's document).
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
+
+  // Dispatch target for PAGXDocument::notifyChange when <Image> resource nodes change (e.g. host
+  // loadFileData). Re-decodes any ViewModel image value built from a changed Image node, unless the
+  // business side has overridden it. Keyed off the Image nodes themselves because a ViewModel
+  // schema is not reachable from the Layer tree that onNodesChanged refreshes.
+  void onImageResourcesChanged(const std::vector<Image*>& changedImages);
+  static void refreshViewModelImages(PAGComposition* comp,
+                                     const std::unordered_set<const Image*>& changed);
 
   // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
   // tree first. Used at creation and when an embedded external document changes (an external

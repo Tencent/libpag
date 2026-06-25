@@ -1305,7 +1305,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
                   "default", ColorToHexString(prop->defaultColor, prop->defaultColor.alpha < 1.0f));
               break;
             case ViewModelPropertyType::Image:
-              xml.addAttribute("default", prop->defaultImage);
+              if (prop->defaultImage) {
+                xml.addAttribute("default", "@" + prop->defaultImage->id);
+              }
               break;
             case ViewModelPropertyType::ViewModel:
               if (prop->viewModelRef)

@@ -146,6 +146,18 @@ struct RuntimeBinding {
     ensureTarget(node)->setReader(channel, std::move(reader));
   }
 
+  // Registers a writer and its symmetric reader for a channel in one call, declaring the channel as
+  // two-way capable (ViewModel -> target via the writer, target -> ViewModel via the reader).
+  void setAccessor(const Node* node, const std::string& channel, RuntimeWriter writer,
+                   RuntimeReader reader) {
+    if (node == nullptr) {
+      return;
+    }
+    auto* target = ensureTarget(node);
+    target->setWriter(channel, std::move(writer));
+    target->setReader(channel, std::move(reader));
+  }
+
   template <typename T>
   std::shared_ptr<T> get(const Node* node) const {
     auto it = targets.find(node);
@@ -367,9 +379,9 @@ class LayerBuilder {
 
   /**
    * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
-   * to write an animation-driven image back into an image-valued ViewModel property. The returned
-   * PAGImage carries only the decoded bitmap (no originating path or data URI), which is sufficient
-   * for re-rendering and for assigning the value to other ViewModel properties.
+   * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
+   * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
+   * for change detection, so the empty source does not cause spurious writebacks.
    */
   static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 

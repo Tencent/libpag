@@ -27,6 +27,7 @@ namespace pagx {
 
 class DataConverter;
 class ViewModel;
+class Image;
 
 /**
  * ViewModelPropertyType enumerates the value types a ViewModel property can hold.
@@ -102,10 +103,11 @@ class ViewModelProperty : public Node {
   Color defaultColor = {};
 
   /**
-   * Default image reference, used when propertyType is Image. The value is an image resource id
-   * (e.g. "assets/hero.png") or a data URI.
+   * Default image, used when propertyType is Image. References an <Image> resource node (the same
+   * node type ImagePattern uses), so the default image shares the resource's decode and host
+   * file-injection path. Null means no default image.
    */
-  std::string defaultImage = {};
+  Image* defaultImage = nullptr;
 
   /**
    * Allowed string values for Enum properties. Each value maps to its index (0-based).

@@ -34,7 +34,10 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "renderer/LayerBuilder.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/Rectangle.h"
 
 namespace pag {
 
@@ -337,6 +340,31 @@ PAGX_TEST(PAGXViewModelTest, DataBindXMLRoundTrip) {
   EXPECT_EQ(comp->dataBinds[0]->channel, "text");
 }
 
+// An Image property's default references an <Image> resource by id and round-trips as "@id".
+PAGX_TEST(PAGXViewModelTest, ImageDefaultResourceRefRoundTrip) {
+  std::string xml = VMXml(
+      "    <ViewModel id=\"MainVM\">\n      <Property name=\"avatar\" type=\"Image\" "
+      "default=\"@avatarRes\"/>\n    </ViewModel>\n    <Image id=\"avatarRes\" "
+      "source=\"assets/avatar.png\"/>\n");
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_NE(doc->viewModel, nullptr);
+  ASSERT_EQ(doc->viewModel->properties.size(), 1u);
+  auto* prop = doc->viewModel->properties[0];
+  ASSERT_NE(prop->defaultImage, nullptr);
+  EXPECT_EQ(prop->defaultImage->id, "avatarRes");
+  EXPECT_EQ(prop->defaultImage->filePath, "assets/avatar.png");
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
+  ASSERT_NE(roundTripped, nullptr);
+  ASSERT_NE(roundTripped->viewModel, nullptr);
+  ASSERT_EQ(roundTripped->viewModel->properties.size(), 1u);
+  auto* prop2 = roundTripped->viewModel->properties[0];
+  ASSERT_NE(prop2->defaultImage, nullptr);
+  EXPECT_EQ(prop2->defaultImage->id, "avatarRes");
+  EXPECT_EQ(prop2->defaultImage->filePath, "assets/avatar.png");
+}
+
 PAGX_TEST(PAGXViewModelTest, HasChangedFlag) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto scene = MakeScene(doc.get(), "TestVM", 2);
@@ -449,6 +477,60 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);
+}
+
+// Repro/guard: after a layer is refreshed in place (e.g. a late loadFileData edit on that layer),
+// a ToTarget DataBind must re-apply the ViewModel's current value to the rebuilt target. Otherwise
+// the refresh resets the channel to the node's authored default and the VM-pushed value is lost.
+PAGX_TEST(PAGXViewModelTest, DataBindReappliesAfterLayerRefresh) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "alpha";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 1.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.alpha";
+  db->target = "@rect";
+  db->channel = "alpha";
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  // Push a non-default alpha through the ToTarget binding.
+  vm->propertyNumber("alpha")->value(0.3f);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
+  // Refresh the layer in place (simulates a late edit / loadFileData touching this layer). The
+  // rebuilt target resets alpha to the node default (1.0); the binding must re-apply 0.3 on the
+  // next draw rather than leaving the VM-pushed value lost.
+  doc->notifyChange({layer}, false);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
 }
 
 // ========== Rendering ==========
@@ -1118,7 +1200,6 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   auto* p = doc->makeNode<pagx::ViewModelProperty>();
   p->name = "img";
   p->propertyType = pagx::ViewModelPropertyType::Image;
-  p->defaultImage = redPNG;
   s->properties.push_back(p);
   doc->viewModel = s;
   auto l = doc->makeNode<pagx::Layer>("r");
@@ -1129,6 +1210,7 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   r->size.height = 200;
   auto imgNode = doc->makeNode<pagx::Image>("imgRes");
   imgNode->filePath = redPNG;
+  p->defaultImage = imgNode;
   auto pattern = doc->makeNode<pagx::ImagePattern>("bgImg");
   pattern->image = imgNode;
   auto f = doc->makeNode<pagx::Fill>();
@@ -1164,6 +1246,558 @@ PAGX_TEST(PAGXViewModelTest, ImageValueTriggersDataBindSync) {
   auto& px = *reinterpret_cast<uint32_t*>(pixels.data() + (100 * 200 + 100) * 4);
   EXPECT_NEAR((px >> 8) & 0xFF, 255, 5);
   EXPECT_NEAR(px & 0xFF, 0, 5);
+}
+
+// Regression: a TwoWay Boolean binding must sync the real layer visibility back into the
+// ViewModel. KeyValueToFloat previously ignored the bool KeyValue alternative, so syncBack always
+// wrote false regardless of the layer's actual visibility.
+PAGX_TEST(PAGXViewModelTest, BooleanSyncBackToViewModel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "vis";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  prop->defaultBoolean = false;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.vis";
+  db->target = "@rect";
+  db->channel = "visible";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto visProp = vm->propertyBoolean("vis");
+  ASSERT_NE(visProp, nullptr);
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel default (false) is pushed to the layer.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(visProp->value(), false);
+  EXPECT_EQ(tgfxLayer->visible(), false);
+  // Drive layer visibility true externally, then draw: syncBack must write true back into the VM
+  // (not the bug's constant false).
+  tgfxLayer->setVisible(true);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(visProp->value(), true);
+}
+
+// Regression: a TwoWay x binding must sync back the animated x channel value (animX), not the
+// composed layer-matrix translate. With a non-zero authored matrix translation the old read()
+// returned animX + matrix.tx, polluting the ViewModel.
+PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "x";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 0.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 100;
+  layer->height = 100;
+  // Authored matrix carries a non-zero translation; the x channel value must round-trip
+  // independently of it.
+  layer->matrix = pagx::Matrix::Translate(30.0f, 0.0f);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "rect";
+  anim->objects.push_back(object);
+  auto* xChan = doc->makeNode<pagx::TypedChannel<float>>();
+  xChan->name = "x";
+  xChan->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  xChan->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(xChan);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.x";
+  db->target = "@rect";
+  db->channel = "x";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto xProp = vm->propertyNumber("x");
+  ASSERT_NE(xProp, nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_NE(timeline, nullptr);
+  timeline->setCurrentTime(500000);
+  timeline->apply();
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // First frame: the ViewModel default (0) takes priority and is pushed to the target.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(xProp->value(), 0.0f);
+  // Second frame: syncBack writes the animated x channel value (~50) back, NOT 50 + 30 authored
+  // translate.
+  timeline->apply();
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_NEAR(xProp->value(), 50.0f, 0.01f);
+}
+
+// Regression: image syncBack must use tgfx::Image comparison, not PAGImage wrapper identity. An
+// unchanged target image must NOT write back (the per-read wrapper would otherwise overwrite the VM
+// image, dropping its source URI, and fire observers every frame). A genuine image change at the
+// target MUST sync back into the ViewModel.
+PAGX_TEST(PAGXViewModelTest, ImageTwoWaySyncBack) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  const std::string greenPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQB7CYF4AAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "img";
+  prop->propertyType = pagx::ViewModelPropertyType::Image;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto imgNode = doc->makeNode<pagx::Image>("imgRes");
+  imgNode->filePath = redPNG;
+  prop->defaultImage = imgNode;
+  auto pattern = doc->makeNode<pagx::ImagePattern>("bgImg");
+  pattern->image = imgNode;
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.img";
+  db->target = "@bgImg";
+  db->channel = "image";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto imgProp = vm->propertyImage("img");
+  ASSERT_NE(imgProp, nullptr);
+  auto original = imgProp->value();
+  ASSERT_NE(original, nullptr);
+  EXPECT_EQ(original->source(), redPNG);
+  int obs = 0;
+  auto h = imgProp->addObserver([&]() { obs++; });
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // Unchanged target image across several frames: syncBack compares the underlying tgfx::Image, so
+  // the VM image identity and source are preserved and the observer is never fired.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(imgProp->value(), original);
+  EXPECT_EQ(imgProp->value()->source(), redPNG);
+  EXPECT_EQ(obs, 0);
+  // Drive the runtime pattern's image to a genuinely different tgfx::Image, then draw: syncBack must
+  // detect the change and write the new image back into the ViewModel.
+  auto greenImage = pagx::PAGImage::MakeFromDataURI(greenPNG);
+  ASSERT_NE(greenImage, nullptr);
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimePattern = binding->get<tgfx::ImagePattern>(pattern);
+  ASSERT_NE(runtimePattern, nullptr);
+  runtimePattern->setImage(pagx::LayerBuilder::GetTGFXImage(greenImage));
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(imgProp->value(), nullptr);
+  EXPECT_EQ(pagx::LayerBuilder::GetTGFXImage(imgProp->value()),
+            pagx::LayerBuilder::GetTGFXImage(greenImage));
+  EXPECT_EQ(obs, 1);
+}
+
+// A late loadFileData on an <Image> that a ViewModel image default references must refresh the VM
+// image value (was null for an unresolved external path) and fire its observer.
+PAGX_TEST(PAGXViewModelTest, ImageResourceLoadRefreshesViewModelDefault) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "img";
+  prop->propertyType = pagx::ViewModelPropertyType::Image;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  // External file path: unresolved at build time (host has not provided the bytes yet).
+  auto imgNode = doc->makeNode<pagx::Image>("imgRes");
+  imgNode->filePath = "assets/avatar.png";
+  prop->defaultImage = imgNode;
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto imgProp = vm->propertyImage("img");
+  ASSERT_NE(imgProp, nullptr);
+  // The external path could not be decoded at build time.
+  EXPECT_EQ(imgProp->value(), nullptr);
+  int obs = 0;
+  auto h = imgProp->addObserver([&]() { obs++; });
+  // Host injects the bytes for the external path.
+  auto data = pagx::DecodeBase64DataURI(redPNG);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/avatar.png", data));
+  // The VM image value is now decoded and the observer fired once.
+  ASSERT_NE(imgProp->value(), nullptr);
+  EXPECT_EQ(obs, 1);
+}
+
+// A business-side image override must NOT be clobbered when the referenced <Image> resource loads.
+PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPreservesOverride) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  const std::string greenPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQB7CYF4AAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "img";
+  prop->propertyType = pagx::ViewModelPropertyType::Image;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto imgNode = doc->makeNode<pagx::Image>("imgRes");
+  imgNode->filePath = "assets/avatar.png";
+  prop->defaultImage = imgNode;
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto imgProp = scene->viewModel()->propertyImage("img");
+  ASSERT_NE(imgProp, nullptr);
+  // Business side assigns its own image before the resource loads.
+  auto custom = pagx::PAGImage::MakeFromDataURI(greenPNG);
+  ASSERT_NE(custom, nullptr);
+  imgProp->value(custom);
+  // The resource loads afterwards; the override must survive.
+  auto data = pagx::DecodeBase64DataURI(redPNG);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/avatar.png", data));
+  EXPECT_EQ(imgProp->value(), custom);
+}
+
+// End-to-end: a DataBind bound to a ViewModel image must push the refreshed image to its target
+// after the referenced <Image> resource loads. Proves resource-load -> VM refresh -> DataBind push.
+PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPropagatesThroughDataBind) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "img";
+  prop->propertyType = pagx::ViewModelPropertyType::Image;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  // The pattern uses a SEPARATE inline image so the binding (not the pattern's own resource) is
+  // what drives the target; the VM default references the external-path resource being loaded.
+  auto patternImg = doc->makeNode<pagx::Image>("patternImg");
+  patternImg->filePath = redPNG;
+  auto pattern = doc->makeNode<pagx::ImagePattern>("bgImg");
+  pattern->image = patternImg;
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto vmImg = doc->makeNode<pagx::Image>("vmImg");
+  vmImg->filePath = "assets/avatar.png";
+  prop->defaultImage = vmImg;
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.img";
+  db->target = "@bgImg";
+  db->channel = "image";
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto imgProp = scene->viewModel()->propertyImage("img");
+  ASSERT_NE(imgProp, nullptr);
+  EXPECT_EQ(imgProp->value(), nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // Host loads the external resource the VM default references.
+  auto data = pagx::DecodeBase64DataURI(redPNG);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/avatar.png", data));
+  ASSERT_NE(imgProp->value(), nullptr);
+  // Draw so the now-dirty DataBind applies the refreshed VM image onto the pattern target.
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimePattern = binding->get<tgfx::ImagePattern>(pattern);
+  ASSERT_NE(runtimePattern, nullptr);
+  EXPECT_EQ(runtimePattern->image(), pagx::LayerBuilder::GetTGFXImage(imgProp->value()));
+}
+
+// A nested composition's own ViewModel image default must also refresh when its referenced <Image>
+// resource loads (refreshViewModelImages walks the whole composition tree, not just the root VM).
+PAGX_TEST(PAGXViewModelTest, ImageResourceLoadRefreshesNestedViewModel) {
+  const std::string redPNG =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQ"
+      "mCC";
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* rootVM = doc->makeNode<pagx::ViewModel>("RootVM");
+  auto* vmSlot = doc->makeNode<pagx::ViewModelProperty>();
+  vmSlot->name = "childSlot";
+  vmSlot->propertyType = pagx::ViewModelPropertyType::ViewModel;
+  rootVM->properties.push_back(vmSlot);
+  doc->viewModel = rootVM;
+  // Child composition with its own VM carrying an external-path image default.
+  auto* childComp = doc->makeNode<pagx::Composition>("ChildComp");
+  childComp->width = 200;
+  childComp->height = 200;
+  auto* childVM = doc->makeNode<pagx::ViewModel>("ChildVM");
+  auto* childImgProp = doc->makeNode<pagx::ViewModelProperty>();
+  childImgProp->name = "img";
+  childImgProp->propertyType = pagx::ViewModelPropertyType::Image;
+  childVM->properties.push_back(childImgProp);
+  childComp->viewModel = childVM;
+  auto childImg = doc->makeNode<pagx::Image>("childImg");
+  childImg->filePath = "assets/child.png";
+  childImgProp->defaultImage = childImg;
+  auto childLayer = doc->makeNode<pagx::Layer>("childText");
+  childLayer->width = 200;
+  childLayer->height = 200;
+  childComp->layers.push_back(childLayer);
+  auto rootLayer = doc->makeNode<pagx::Layer>("rootLayer");
+  rootLayer->width = 200;
+  rootLayer->height = 200;
+  rootLayer->composition = childComp;
+  rootLayer->vmContext = "$vm.childSlot";
+  doc->layers.push_back(rootLayer);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto slot = scene->viewModel()->propertyViewModel("childSlot");
+  ASSERT_NE(slot, nullptr);
+  auto childInstance = slot->referenceViewModel();
+  ASSERT_NE(childInstance, nullptr);
+  auto childImgValue = childInstance->propertyImage("img");
+  ASSERT_NE(childImgValue, nullptr);
+  EXPECT_EQ(childImgValue->value(), nullptr);
+  // Loading the nested VM's referenced resource refreshes the nested image value.
+  auto data = pagx::DecodeBase64DataURI(redPNG);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/child.png", data));
+  EXPECT_NE(childImgValue->value(), nullptr);
+}
+
+// Two-way for a templated SizeAxis channel: a TwoWay binding on Rectangle size.width must sync the
+// runtime rectangle's width back into the ViewModel after it changes (validates ReadSizeAxis).
+PAGX_TEST(PAGXViewModelTest, RectangleSizeWidthSyncBack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "w";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 100.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rectLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>("rectShape");
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.w";
+  db->target = "@rectShape";
+  db->channel = "size.width";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto wProp = scene->viewModel()->propertyNumber("w");
+  ASSERT_NE(wProp, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // First frame: VM default (100) is pushed to the rectangle.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(wProp->value(), 100.0f);
+  // Drive the runtime rectangle width externally, then draw: syncBack reads it back into the VM.
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeRect = binding->get<tgfx::Rectangle>(rect);
+  ASSERT_NE(runtimeRect, nullptr);
+  runtimeRect->setSize({160.0f, 100.0f});
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(wProp->value(), 160.0f);
+}
+
+// Two-way for a bespoke reader channel: Rectangle roundness uses WriteRectangleRoundness /
+// ReadRectangleRoundness (single value <-> 4-corner array). Validates the bespoke reader path.
+PAGX_TEST(PAGXViewModelTest, RectangleRoundnessSyncBack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "r";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 0.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rectLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>("rectShape");
+  rect->size.width = 100;
+  rect->size.height = 100;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.r";
+  db->target = "@rectShape";
+  db->channel = "roundness";
+  db->flags = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto rProp = scene->viewModel()->propertyNumber("r");
+  ASSERT_NE(rProp, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(rProp->value(), 0.0f);
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeRect = binding->get<tgfx::Rectangle>(rect);
+  ASSERT_NE(runtimeRect, nullptr);
+  runtimeRect->setRoundness(12.0f);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(rProp->value(), 12.0f);
+}
+
+// Once direction: the ViewModel value is applied to the target exactly once on the first frame, and
+// later ViewModel changes are ignored. Once is fire-and-forget, so an in-place layer refresh does
+// NOT restore its value — the rebuilt target keeps the node default (only ToTarget/TwoWay follow
+// the ViewModel continuously and are re-applied after a refresh).
+PAGX_TEST(PAGXViewModelTest, OnceDirectionAppliesOnceAndIgnoresLaterChanges) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "alpha";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 0.5f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.alpha";
+  db->target = "@rect";
+  db->channel = "alpha";
+  db->flags = pagx::DataBindDirection::Once;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto layers = scene->getLayersUnderPoint(100, 100);
+  ASSERT_GT(layers.size(), 0u);
+  auto tgfxLayer = layers[0]->runtimeLayer;
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto alphaProp = scene->viewModel()->propertyNumber("alpha");
+  ASSERT_NE(alphaProp, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // First frame: the configured default (0.5) is applied once.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
+  // A later ViewModel change is ignored by a Once binding.
+  alphaProp->value(0.2f);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
 }
 
 // ========== DataConverter runtime ==========

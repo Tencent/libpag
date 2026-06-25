@@ -24,6 +24,8 @@
 
 namespace pagx {
 
+class Image;
+
 /**
  * PAGViewModelValueImage holds an image ViewModel property value. The value is a PAGImage object
  * wrapping a decoded image, so DataBind writers receive a ready-to-render image without per-frame
@@ -53,6 +55,14 @@ class PAGViewModelValueImage : public PAGViewModelValue {
 
  private:
   std::shared_ptr<PAGImage> propertyValue = nullptr;
+
+  // The <Image> resource node this value was decoded from at build time (null if the property had
+  // no default image). Used to re-decode when that resource changes (e.g. host loadFileData).
+  Image* sourceImage = nullptr;
+  // The PAGImage produced by the last schema decode. A resource change only re-decodes while the
+  // current value still equals this baseline; once the business side assigns its own image,
+  // builtImage diverges and the override is preserved.
+  std::shared_ptr<PAGImage> builtImage = nullptr;
 
   friend class PAGViewModel;
   friend class PAGScene;
