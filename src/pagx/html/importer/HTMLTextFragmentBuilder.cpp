@@ -109,7 +109,6 @@ void HTMLTextFragmentBuilder::ResolveWhiteSpaceFlags(const std::string& whiteSpa
   outPreserveNewlines = ws == "pre" || ws == "pre-wrap" || ws == "pre-line";
 }
 
-
 bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const TextFragment& b) {
   // CSS unit conversions (em -> px etc.) introduce sub-pixel rounding that should not
   // prevent two same-styled inline runs from merging. Use a small absolute tolerance for
@@ -128,12 +127,20 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
   const bool familyMatch = inherited.primaryFontFamily.empty()
                                ? a.fontFamily == HTML_DEFAULT_FONT_FAMILY
                                : a.fontFamily == inherited.primaryFontFamily;
+  // The white-space flags must match too: two runs with identical glyph styling but different
+  // collapsing rules (e.g. a `pre` span next to a `normal` one) cannot share a fragment,
+  // because `collapseFragmentWhitespace` folds each fragment as a unit and would apply the
+  // wrong rule to half of a merged run.
+  bool incomingCollapse = true;
+  bool incomingPreserveNewlines = false;
+  ResolveWhiteSpaceFlags(inherited.whiteSpace, incomingCollapse, incomingPreserveNewlines);
   return familyMatch && a.fontStyleName == inherited.fontStyleName &&
          a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
-         a.fillImage == inherited.textFillImage;
+         a.fillImage == inherited.textFillImage && a.collapseWhitespace == incomingCollapse &&
+         a.preserveNewlines == incomingPreserveNewlines;
 }
 
 void HTMLTextFragmentBuilder::appendFragment(std::vector<TextFragment>& out,
@@ -177,21 +184,34 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
-      // Map every collapsible whitespace character in the text node — newline,
-      // carriage return, tab — to a regular space before handing the run to
-      // `appendFragment`. CSS treats these as equivalent to spaces inside a
-      // `white-space: normal | nowrap` inline-formatting-context, so the
-      // downstream `CollapseHTMLWhitespace` pass (whose front-trim only drops
-      // ASCII spaces, intentionally, to preserve `<br>`-originated `\n`) can
-      // collapse and trim them away just like the browser would. Without this
-      // step, indented source HTML such as `<h1>\n        Title</h1>` leaks
-      // its source newline into the first fragment ("\n Title"), shifting the
-      // rendered baseline by one space and / or introducing a phantom line
-      // break. `<br>` keeps its hard `\n` because that path appends the
+      // Normalise the raw text node's whitespace per the run's CSS `white-space`. For
+      // collapsing modes (normal / nowrap / pre-line) every newline / carriage-return / tab
+      // becomes a regular space so the downstream `CollapseHTMLWhitespace` pass can fold and
+      // trim them exactly like the browser; without this, indented source HTML such as
+      // `<h1>\n        Title</h1>` would leak its source newline into the first fragment.
+      // `pre-line` is the exception that still keeps newlines as hard breaks, so its `\n`
+      // (and `\r`, mapped to `\n`) survive while tabs / spaces collapse. Preserving modes
+      // (pre / pre-wrap) keep both spaces and newlines verbatim; only `\r` is mapped to `\n`
+      // so a hard break renders. `<br>` keeps its hard `\n` because that path appends the
       // newline directly (not via a text node), so its semantics are unaffected.
+      bool collapseWs = true;
+      bool preserveNl = false;
+      ResolveWhiteSpaceFlags(inherited.whiteSpace, collapseWs, preserveNl);
       std::string text = child->name;
-      for (char& c : text) {
-        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+      if (collapseWs && !preserveNl) {
+        for (char& c : text) {
+          if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+        }
+      } else if (collapseWs && preserveNl) {
+        for (char& c : text) {
+          if (c == '\r') c = '\n';
+          else if (c == '\t')
+            c = ' ';
+        }
+      } else {
+        for (char& c : text) {
+          if (c == '\r') c = '\n';
+        }
       }
       appendFragment(out, inherited, std::move(text));
     } else if (child->type == DOMNodeType::Element) {
@@ -273,10 +293,23 @@ void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragmen
   // leading whitespace; intermediate fragments keep both ends; cross-fragment boundary
   // whitespace is collapsed by trimming a fragment's leading whitespace when the previous
   // fragment ended with whitespace; trailing whitespace at the very end of the run is removed
-  // in a post-pass on the last surviving fragment.
+  // in a post-pass on the last surviving fragment. A fragment whose `white-space` is `pre` /
+  // `pre-wrap` (collapseWhitespace == false) is exempt from all of this: its source spaces
+  // and newlines are emitted verbatim, so it neither folds nor trims and only updates the
+  // boundary state for its collapsing neighbours.
   size_t writeIndex = 0;
   bool prevEndsWithWhitespace = false;
   for (size_t i = 0; i < fragments.size(); ++i) {
+    if (!fragments[i].collapseWhitespace) {
+      if (fragments[i].text.empty()) continue;
+      char back = fragments[i].text.back();
+      prevEndsWithWhitespace = (back == ' ' || back == '\n' || back == '\t');
+      if (writeIndex != i) {
+        fragments[writeIndex] = std::move(fragments[i]);
+      }
+      ++writeIndex;
+      continue;
+    }
     bool trimLeading = (writeIndex == 0) || prevEndsWithWhitespace;
     fragments[i].text =
         CollapseHTMLWhitespace(fragments[i].text, trimLeading, /*trimTrailing=*/false);
@@ -289,7 +322,10 @@ void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragmen
     ++writeIndex;
   }
   while (writeIndex > 0) {
-    auto& last = fragments[writeIndex - 1].text;
+    auto& lastFrag = fragments[writeIndex - 1];
+    // A trailing `pre` / `pre-wrap` run keeps its whitespace, so stop trimming at it.
+    if (!lastFrag.collapseWhitespace) break;
+    auto& last = lastFrag.text;
     while (!last.empty() && (last.back() == ' ' || last.back() == '\n')) {
       last.pop_back();
     }

@@ -110,6 +110,13 @@ class HTMLTextFragmentBuilder {
  private:
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
 
+  /** Derives the two whitespace-handling flags from a CSS `white-space` value:
+   *  `outCollapseWhitespace` is false for `pre` / `pre-wrap` (source spaces kept verbatim),
+   *  `outPreserveNewlines` is true for `pre` / `pre-wrap` / `pre-line` (source newlines kept
+   *  as hard breaks). Unrecognised values fall back to `white-space: normal`. */
+  static void ResolveWhiteSpaceFlags(const std::string& whiteSpace, bool& outCollapseWhitespace,
+                                     bool& outPreserveNewlines);
+
   /** Returns true when two fragments share every style fingerprint (everything except `text`),
    *  and therefore can be merged into a single run. */
   static bool fragmentsShareStyle(const TextFragment& a, const TextFragment& b);
