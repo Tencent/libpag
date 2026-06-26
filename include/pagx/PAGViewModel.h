@@ -34,7 +34,6 @@
 namespace pagx {
 
 class DataContext;
-class ViewModel;
 
 /**
  * PAGViewModel holds the runtime property values for one ViewModel instance. It provides

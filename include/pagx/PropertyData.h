@@ -69,7 +69,6 @@ class PropertyData {
   std::string propertyName = {};
   std::unordered_map<std::string, std::string> customDataMap = {};
 
-  friend class PAGViewModel;
   friend class PAGScene;
 };
 
