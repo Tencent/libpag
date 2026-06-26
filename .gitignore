@@ -121,3 +121,5 @@ cli/npm/package-lock.json
 # PAGX verify artifacts
 *.layout.xml
 
+# Local-only helper scripts (not part of the project)
+pagx/wechat/script/copy-to-cocraft.js

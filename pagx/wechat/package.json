@@ -1,0 +1,41 @@
+{
+  "name": "@tencent/pagx-viewer-miniprogram",
+  "version": "1.9.6",
+  "description": "PAGX Viewer for WeChat Miniprogram",
+  "type": "module",
+  "main": "lib/pagx-viewer.js",
+  "typings": "types/pagx/wechat/ts/pagx.d.ts",
+  "files": [
+    "lib",
+    "types",
+    "CHANGELOG.md",
+    "GETTING_STARTED.md"
+  ],
+  "scripts": {
+    "clean": "rimraf --glob .pagx-viewer.wasm.md5",
+    "build:js": "rollup -c ./script/rollup.wx.js &&  node script/copy-files.js  &&  tsc -p ./tsconfig.type.json ",
+    "build": "node script/cmake.wx.js -a wasm && brotli -f ./lib/pagx-viewer.wasm && npm run build:js",
+    "build:release": "node script/cmake.wx.js -a wasm -DNO_LOG=ON && brotli -f ./lib/pagx-viewer.wasm && npm run build:js",
+    "copyFile": "node script/copy-files.js"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "~28.0.3",
+    "@rollup/plugin-json": "~6.1.0",
+    "@rollup/plugin-node-resolve": "~16.0.1",
+    "@rollup/plugin-alias": "^5.0.0",
+    "@types/emscripten": "~1.39.6",
+    "esbuild": "~0.15.14",
+    "rimraf": "~5.0.10",
+    "rollup": "~2.79.1",
+    "rollup-plugin-esbuild": "~4.10.3",
+    "rollup-plugin-terser": "~7.0.2",
+    "tslib": "~2.4.1",
+    "typescript": "~5.0.3"
+  },
+  "dependencies": {
+    "express": "^4.21.1"
+  },
+  "license": "BSD-3-Clause",
+  "author": "Tencent",
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

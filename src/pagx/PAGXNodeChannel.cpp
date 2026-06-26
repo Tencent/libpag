@@ -172,6 +172,35 @@ static bool AccessColor(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   return true;
 }
 
+// Color channel access for Fill/Stroke nodes. Reads/writes the color through the underlying
+// SolidColor child node, since Fill and Stroke own a ColorSource pointer (not a Color directly).
+static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  ColorSource* colorSource = nullptr;
+  if (node->nodeType() == NodeType::Fill) {
+    colorSource = static_cast<Fill*>(node)->color;
+  } else if (node->nodeType() == NodeType::Stroke) {
+    colorSource = static_cast<Stroke*>(node)->color;
+  }
+  if (colorSource == nullptr || colorSource->nodeType() != NodeType::SolidColor) {
+    return false;
+  }
+  auto* solid = static_cast<SolidColor*>(colorSource);
+  if (getOut == nullptr && setIn == nullptr) {
+    solid->color = Default<SolidColor>().color;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = solid->color;
+    return true;
+  }
+  const auto* value = std::get_if<Color>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  solid->color = *value;
+  return true;
+}
+
 // Point sub-component access: addresses position.x / position.y etc. XAxis selects x vs y.
 template <typename T, auto Field, bool XAxis>
 static bool AccessPointAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -463,6 +492,7 @@ static std::vector<ChannelDef> BuildTextFields() {
 
 static std::vector<ChannelDef> BuildFillFields() {
   return {
+      {"color", Anim, &AccessFillStrokeColor},
       FIELD_FLOAT(Fill, "alpha", alpha, Anim),
       FIELD_ENUM(Fill, "blendMode", blendMode, NoFlags, BlendMode),
       FIELD_ENUM(Fill, "fillRule", fillRule, NoFlags, FillRule),
@@ -472,6 +502,7 @@ static std::vector<ChannelDef> BuildFillFields() {
 
 static std::vector<ChannelDef> BuildStrokeFields() {
   return {
+      {"color", Anim, &AccessFillStrokeColor},
       FIELD_FLOAT(Stroke, "width", width, Anim),
       FIELD_FLOAT(Stroke, "alpha", alpha, Anim),
       FIELD_ENUM(Stroke, "blendMode", blendMode, NoFlags, BlendMode),

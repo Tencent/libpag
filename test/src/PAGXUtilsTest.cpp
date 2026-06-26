@@ -209,6 +209,15 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_SkewOnly) {
   group->skew = 30.0f;
   auto m = pagx::BuildGroupMatrix(group);
   EXPECT_FALSE(m.isIdentity());
+  // Lock the sign convention. The native renderer (ShapeRenderer::SkewFromAxis) feeds
+  // `DegreesToRadians(-skew)` into the shear matrix; with skewAxis=0 and a positive `skew`,
+  // the resulting m.c is tan(-skew) < 0. SVG/PPT/HTML all share the same convention. A
+  // regression that flips back to `+skew` (the legacy convention) would make m.c positive and
+  // produce shear in the opposite direction — visually obvious in renders but invisible to
+  // !isIdentity() alone, so assert the sign explicitly.
+  EXPECT_LT(m.c, 0.0f);
+  constexpr float kRad = static_cast<float>(M_PI) / 180.0f;
+  EXPECT_NEAR(m.c, std::tan(-group->skew * kRad), 1e-5f);
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_AnchorPositionScaleRotation) {
@@ -2000,6 +2009,269 @@ PAGX_TEST(PAGXUtilsTest, SVGFeatureProbe_VisibleLayerWithFeature) {
   auto flags = pagx::ProbeLayerFeaturesForSVG(layer);
   EXPECT_TRUE(flags.hasConicGradient);
   EXPECT_TRUE(flags.needsRasterization());
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGFeatureProbe_StrokeWithSolidColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  stroke->color = solid;
+  std::vector<pagx::Element*> elements = {stroke};
+  auto flags = pagx::ProbeElementsFeaturesForSVG(elements);
+  EXPECT_FALSE(flags.needsRasterization());
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGFeatureProbe_GroupConicGradient) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto group = doc->makeNode<pagx::Group>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto grad = doc->makeNode<pagx::ConicGradient>();
+  fill->color = grad;
+  group->elements.push_back(fill);
+  std::vector<pagx::Element*> elements = {group};
+  auto flags = pagx::ProbeElementsFeaturesForSVG(elements);
+  EXPECT_TRUE(flags.hasConicGradient);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGFeatureProbe_TextBoxWithDiamondGradient) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto box = doc->makeNode<pagx::TextBox>();
+  auto stroke = doc->makeNode<pagx::Stroke>();
+  auto grad = doc->makeNode<pagx::DiamondGradient>();
+  stroke->color = grad;
+  box->elements.push_back(stroke);
+  std::vector<pagx::Element*> elements = {box};
+  auto flags = pagx::ProbeElementsFeaturesForSVG(elements);
+  EXPECT_TRUE(flags.hasDiamondGradient);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGFeatureProbe_VisibleLayerWithoutFeatures) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents.push_back(fill);
+  auto flags = pagx::ProbeLayerFeaturesForSVG(layer);
+  EXPECT_FALSE(flags.needsRasterization());
+}
+
+// ---------------------------------------------------------------------------
+// SVGPathParser — PathDataFromSVGString
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_EmptyString) {
+  auto path = pagx::PathDataFromSVGString("");
+  EXPECT_TRUE(path.isEmpty());
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_MoveLineClose) {
+  auto path = pagx::PathDataFromSVGString("M10 20 L30 40 Z");
+  ASSERT_EQ(path.verbs().size(), 3u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Close);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 10.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 30.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 40.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_RelativeMoveAndLine) {
+  // Lower-case commands are relative to the current point.
+  auto path = pagx::PathDataFromSVGString("m5 5 l10 10");
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 15.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 15.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_HorizontalAndVerticalLines) {
+  // H and V commands and their relative variants.
+  auto path = pagx::PathDataFromSVGString("M0 0 H50 V20 h-10 v-5");
+  ASSERT_EQ(path.verbs().size(), 5u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 50.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 0.0f);
+  EXPECT_FLOAT_EQ(path.points()[2].x, 50.0f);
+  EXPECT_FLOAT_EQ(path.points()[2].y, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[3].x, 40.0f);
+  EXPECT_FLOAT_EQ(path.points()[3].y, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[4].x, 40.0f);
+  EXPECT_FLOAT_EQ(path.points()[4].y, 15.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_QuadAndCubicCurves) {
+  auto path = pagx::PathDataFromSVGString("M0 0 Q10 20 30 40 C50 60 70 80 90 100");
+  ASSERT_EQ(path.verbs().size(), 3u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Quad);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Cubic);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_SmoothCubic) {
+  // S after C uses the reflected control point. The reflected x/y of the
+  // previous C ends at (40,40) reflected from control (10,30) -> (70,50).
+  auto path = pagx::PathDataFromSVGString("M0 0 C10 10 20 30 40 40 S60 60 80 80");
+  ASSERT_EQ(path.verbs().size(), 3u);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Cubic);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_SmoothQuad) {
+  auto path = pagx::PathDataFromSVGString("M0 0 Q10 20 30 40 T60 80");
+  ASSERT_EQ(path.verbs().size(), 3u);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Quad);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_SmoothCubicWithoutPriorCubic) {
+  // S / T without a prior C / Q reuse the current point as control1.
+  auto path = pagx::PathDataFromSVGString("M0 0 S10 10 20 20");
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Cubic);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_SmoothQuadWithoutPriorQuad) {
+  auto path = pagx::PathDataFromSVGString("M0 0 T10 10");
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Quad);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ImplicitContinuationAfterMove) {
+  // Pairs after M continue as implicit L (uppercase) / l (lowercase).
+  auto path = pagx::PathDataFromSVGString("M0 0 10 10 20 20");
+  ASSERT_EQ(path.verbs().size(), 3u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Line);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 10.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 10.0f);
+  EXPECT_FLOAT_EQ(path.points()[2].x, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[2].y, 20.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ArcQuarterCircle) {
+  // Arc command should generate cubic segments.
+  auto path = pagx::PathDataFromSVGString("M0 0 A10 10 0 0 1 10 10");
+  EXPECT_GT(path.verbs().size(), 1u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  bool sawCubic = false;
+  for (auto v : path.verbs()) {
+    if (v == pagx::PathVerb::Cubic) {
+      sawCubic = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(sawCubic);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ArcZeroRadiusFallsBackToLine) {
+  // rx == 0 falls back to a straight line.
+  auto path = pagx::PathDataFromSVGString("M0 0 A0 0 0 0 0 50 0");
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 50.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ArcLargeArcFullCircle) {
+  // Endpoints coincide → near-full sweep; large-arc forces a full sweep.
+  auto path = pagx::PathDataFromSVGString("M50 0 A50 50 0 1 1 49.99 0");
+  EXPECT_GT(path.verbs().size(), 1u);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_NumberWithExponentAndSign) {
+  auto path = pagx::PathDataFromSVGString("M+1.5e1 -2.5e1");
+  ASSERT_EQ(path.verbs().size(), 1u);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 15.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, -25.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_LeadingDot) {
+  // ".5" should parse as 0.5.
+  auto path = pagx::PathDataFromSVGString("M.5 .25");
+  ASSERT_EQ(path.verbs().size(), 1u);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 0.5f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 0.25f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_CommasAsSeparators) {
+  auto path = pagx::PathDataFromSVGString("M10,20,30,40");
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_InvalidNumberRecovers) {
+  // Garbage between commands triggers the recovery path that skips to the
+  // next letter without erroring.
+  auto path = pagx::PathDataFromSVGString("M0 0 garbage L10 10");
+  // Recovery must keep both commands intact: the Move at (0,0) and the LineTo at (10,10). Without
+  // the count + endpoint assertions, a regression that drops the L command (or that consumes the
+  // garbage as a malformed coordinate and corrupts the next number) would silently still satisfy
+  // the original "verbs >= 2 and first is Move" check.
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  ASSERT_GE(path.points().size(), 2u);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 0.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 0.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 10.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 10.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_UnknownCommandSkipped) {
+  // Unknown letter triggers the default branch and the parser advances past it.
+  auto path = pagx::PathDataFromSVGString("X M5 5 L20 30");
+  // The recovery skips X and then consumes both M and L. Asserting the second endpoint guards
+  // against a regression that re-eats the unknown command's bytes and corrupts the L payload.
+  ASSERT_EQ(path.verbs().size(), 2u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Line);
+  ASSERT_GE(path.points().size(), 2u);
+  EXPECT_FLOAT_EQ(path.points()[0].x, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[0].y, 5.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].x, 20.0f);
+  EXPECT_FLOAT_EQ(path.points()[1].y, 30.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ZAfterLineKeepsCurrent) {
+  // After Z, the current point should reset to the start of the contour.
+  auto path = pagx::PathDataFromSVGString("M10 10 L20 20 Z L30 30");
+  ASSERT_EQ(path.verbs().size(), 4u);
+  EXPECT_EQ(path.verbs()[2], pagx::PathVerb::Close);
+  EXPECT_EQ(path.verbs()[3], pagx::PathVerb::Line);
+}
+
+// ---------------------------------------------------------------------------
+// SVGPathParser — PathDataToSVGString
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ToSVGStringEmpty) {
+  pagx::PathData empty;
+  EXPECT_EQ(pagx::PathDataToSVGString(empty), "");
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ToSVGStringAllVerbs) {
+  // Round-trip through the parser to construct a PathData with every verb,
+  // then ensure each command letter appears in the serialized output.
+  auto path = pagx::PathDataFromSVGString("M0 0 L10 0 Q15 5 20 0 C25 -5 30 -5 35 0 Z");
+  auto out = pagx::PathDataToSVGString(path);
+  EXPECT_NE(out.find("M"), std::string::npos);
+  EXPECT_NE(out.find("L"), std::string::npos);
+  EXPECT_NE(out.find("Q"), std::string::npos);
+  EXPECT_NE(out.find("C"), std::string::npos);
+  EXPECT_NE(out.find("Z"), std::string::npos);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGPathParser_ToSVGStringRoundTripPreservesGeometry) {
+  auto original = pagx::PathDataFromSVGString("M5 10 L20 30 L40 60 Z");
+  auto serialized = pagx::PathDataToSVGString(original);
+  auto restored = pagx::PathDataFromSVGString(serialized);
+  ASSERT_EQ(original.verbs().size(), restored.verbs().size());
+  ASSERT_EQ(original.points().size(), restored.points().size());
+  for (size_t i = 0; i < original.points().size(); ++i) {
+    EXPECT_FLOAT_EQ(original.points()[i].x, restored.points()[i].x);
+    EXPECT_FLOAT_EQ(original.points()[i].y, restored.points()[i].y);
+  }
 }
 
 }  // namespace pag

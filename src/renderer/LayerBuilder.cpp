@@ -85,6 +85,7 @@
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
@@ -118,6 +119,23 @@
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
+
+// Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
+// Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
+// sampling pass over the affected layer; large designs can carry hundreds of such effects
+// whose combined offscreen cost dominates the frame budget. Flip individual switches to 1 in
+// debug builds to measure how much of the rendering load is attributable to each effect type.
+// The visual result with an effect disabled is wrong (missing shadows / blur), but everything
+// downstream still parses, lays out, and renders without crashing.
+//
+// PAG_DISABLE_BACKGROUND_BLUR_STYLE: skips BackgroundBlurStyle (offscreen background snapshot
+//   plus blur pass; usually the heaviest single category in dense designs).
+// PAG_DISABLE_SHADOW_STYLES:         skips DropShadowStyle and InnerShadowStyle.
+// PAG_DISABLE_LAYER_FILTERS:         skips all LayerFilters (BlurFilter, DropShadow/InnerShadow
+//   filters, BlendFilter, ColorMatrixFilter). BlurFilter with very large sigma dominates here.
+#define PAG_DISABLE_BACKGROUND_BLUR_STYLE 0
+#define PAG_DISABLE_SHADOW_STYLES 0
+#define PAG_DISABLE_LAYER_FILTERS 0
 
 // Runtime target for a Layer's tgfx::Layer that keeps the layer transform decomposed into its
 // animatable sources (x, y translation and the 2D matrix). The final tgfx matrix is recomposed as
@@ -215,13 +233,20 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-// Build context that maintains state during layer tree construction
+// Build context that maintains state during layer tree construction. Designed so the same
+// instance can be reused: the session-based flow keeps the context alive after build() so that
+// later rebuildForFilePath() calls can find the already-created tgfx layers and regenerate
+// their contents in place.
 class LayerBuilderContext {
  public:
   LayerBuilderContext() = default;
 
   void setNeedsRuntimeData(bool value) {
     _needsRuntimeData = value;
+  }
+
+  void setDocument(const PAGXDocument* document) {
+    _document = document;
   }
 
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
@@ -239,14 +264,33 @@ class LayerBuilderContext {
       }
       resolvePendingMasks();
     }
-    _result.root = root;
-    return std::move(_result);
+    LayerBuildResult result = std::move(_result);
+    _result = {};
+    result.root = root;
+    return result;
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
-    _result.root = root;
-    return std::move(_result);
+    LayerBuildResult result = {};
+    result.root = root;
+    // Transfer the RuntimeBinding populated during build()/convertLayer so callers (PAGScene,
+    // BuildForRuntime) can drive animation channel writers. The layerMap below is rebuilt
+    // separately and must not be clobbered, so we move only the binding rather than the whole
+    // _result.
+    result.binding = std::move(_result.binding);
+    _result = {};
+    // LayerBuildResult exposes a 1:1 pagx Layer -> tgfx Layer map for historical reasons. When
+    // a Composition is referenced by multiple Layers a single pagx Layer node actually produces
+    // several tgfx Layers; we only surface the first one here to keep the public contract
+    // stable. Session users that need every copy go through getTgfxLayers() instead.
+    result.layerMap.reserve(_tgfxLayersByPagxLayer.size());
+    for (const auto& [pagxLayer, tgfxLayers] : _tgfxLayersByPagxLayer) {
+      if (!tgfxLayers.empty()) {
+        result.layerMap.emplace(pagxLayer, tgfxLayers.front());
+      }
+    }
+    return result;
   }
 
   // Rewrites the current state of a single Layer node onto its existing tgfx::Layer, preserving the
@@ -586,6 +630,7 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
+    _document = &document;
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
@@ -602,8 +647,9 @@ class LayerBuilderContext {
 
   void resolvePendingMasks() {
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
-      auto maskLayer = _result.getLayer(maskPagx);
-      if (maskLayer != nullptr) {
+      auto it = _tgfxLayersByPagxLayer.find(maskPagx);
+      if (it != _tgfxLayersByPagxLayer.end() && !it->second.empty()) {
+        auto maskLayer = it->second.front();
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
         maskLayer->setVisible(true);
@@ -612,6 +658,68 @@ class LayerBuilderContext {
       }
     }
     _pendingMasks.clear();
+  }
+
+  // Returns every tgfx layer produced for the given pagx Layer. Order matches convertLayer()
+  // invocation order; an empty vector means the pagx Layer was never visited.
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayers(const Layer* pagxLayer) const {
+    auto it = _tgfxLayersByPagxLayer.find(pagxLayer);
+    if (it == _tgfxLayersByPagxLayer.end()) {
+      return {};
+    }
+    return it->second;
+  }
+
+  // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
+  // conversion goes through getOrCreateImage() again and re-queries the provider.
+  void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
+    if (filePath.empty()) {
+      return;
+    }
+    for (auto& node : document.nodes) {
+      if (!node || node->nodeType() != NodeType::Image) {
+        continue;
+      }
+      auto* imageNode = static_cast<const Image*>(node.get());
+      if (imageNode->filePath != filePath) {
+        continue;
+      }
+      _imageCache.erase(imageNode);
+    }
+  }
+
+  // Drops the entire image cache. Must be called when the document's node tree undergoes
+  // structural changes (e.g. notifyChange with node additions/removals) because the raw Image*
+  // keys may become dangling after such edits.
+  void invalidateAllImages() {
+    _imageCache.clear();
+  }
+
+  // Builds the tgfx VectorElement list for a pagx Layer's contents, skipping elements that
+  // convert to null. Shared by convertVectorLayer() (initial build) and rebuildVectorContents()
+  // (progressive image refresh) so the two paths cannot drift.
+  std::vector<std::shared_ptr<tgfx::VectorElement>> buildVectorContents(const Layer* node) {
+    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(node->contents.size());
+    for (const auto& element : node->contents) {
+      auto tgfxElement = convertVectorElement(element);
+      if (tgfxElement) {
+        contents.push_back(tgfxElement);
+      }
+    }
+    return contents;
+  }
+
+  // Regenerates the contents of a VectorLayer by walking the original pagx Layer's contents
+  // list through convertVectorElement(). Non-VectorLayer targets are skipped because they do
+  // not own a setContents()-style slot (Composition container layers etc).
+  bool rebuildVectorContents(const Layer* pagxLayer, tgfx::Layer* tgfxLayer) {
+    if (!pagxLayer || !tgfxLayer || tgfxLayer->type() != tgfx::LayerType::Vector) {
+      return false;
+    }
+    auto* vectorLayer = static_cast<tgfx::VectorLayer*>(tgfxLayer);
+    vectorLayer->setContents(buildVectorContents(pagxLayer));
+    return true;
   }
 
  private:
@@ -637,7 +745,10 @@ class LayerBuilderContext {
       auto target = std::unique_ptr<RuntimeTarget>(new LayerRuntimeTarget());
       auto* layerTarget =
           static_cast<LayerRuntimeTarget*>(_result.binding.setTarget(node, std::move(target)));
-      // Register layer for mask lookups and animation writers.
+      // Register layer for mask lookups and later rebuildForFilePath(). A single pagx Layer
+      // may appear here multiple times when its owning Composition is instanced more than
+      // once, so we append rather than overwrite.
+      _tgfxLayersByPagxLayer[node].push_back(layer);
       _result.binding.set(node, layer);
       bindLayerChannels(node);
 
@@ -746,15 +857,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
-    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    contents.reserve(node->contents.size());
-    for (const auto& element : node->contents) {
-      auto tgfxElement = convertVectorElement(element);
-      if (tgfxElement) {
-        contents.push_back(tgfxElement);
-      }
-    }
-    layer->setContents(contents);
+    layer->setContents(buildVectorContents(node));
     return layer;
   }
 
@@ -767,6 +870,108 @@ class LayerBuilderContext {
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
       GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+    }
+  }
+
+  // FNV-1a 64-bit mixing step over a raw byte range. Kept as an explicit helper (no lambda)
+  // so ComputeTextBlobFingerprint stays readable while honoring the no-lambda project rule.
+  static void FnvMix(uint64_t* h, const void* data, size_t bytes) {
+    constexpr uint64_t FNV_PRIME = 0x100000001b3ULL;
+    const uint8_t* p = static_cast<const uint8_t*>(data);
+    for (size_t i = 0; i < bytes; ++i) {
+      *h ^= p[i];
+      *h *= FNV_PRIME;
+    }
+  }
+
+  // Mixes a contiguous container (size prefix + element bytes) into the running FNV hash.
+  template <typename Vec>
+  static void FnvMixVector(uint64_t* h, const Vec& vec) {
+    size_t n = vec.size();
+    FnvMix(h, &n, sizeof(n));
+    if (n > 0) {
+      FnvMix(h, vec.data(), n * sizeof(vec[0]));
+    }
+  }
+
+  // Fingerprint over every input GlyphRunRenderer::BuildTextBlob consumes. When BuildTextBlob is
+  // changed to read a new field, that field MUST be mixed in here — otherwise the cache may serve
+  // stale glyphs.
+  static uint64_t ComputeTextBlobFingerprint(const Text* text, const tgfx::Matrix& inverseMatrix) {
+    // FNV-1a 64-bit. Collision probability for ~5K entries is ~10^-12, and the glyphSum secondary
+    // check guards the rare miss.
+    constexpr uint64_t FNV_OFFSET = 0xcbf29ce484222325ULL;
+    uint64_t h = FNV_OFFSET;
+    // 1. Inverse matrix (6 floats).
+    float matrixValues[6] = {0};
+    inverseMatrix.get6(matrixValues);
+    FnvMix(&h, matrixValues, sizeof(matrixValues));
+    // 2. Faux bold / italic flags
+    bool fauxFlags[2] = {text->fauxBold, text->fauxItalic};
+    FnvMix(&h, fauxFlags, sizeof(fauxFlags));
+    // 3. GlyphRun count
+    size_t runCount = text->glyphRuns.size();
+    FnvMix(&h, &runCount, sizeof(runCount));
+    // 4. Per-run geometry.
+    for (const auto* run : text->glyphRuns) {
+      if (!run) {
+        uint8_t nullMarker = 0;
+        FnvMix(&h, &nullMarker, sizeof(nullMarker));
+        continue;
+      }
+      const Font* fontPtr = run->font;
+      FnvMix(&h, &fontPtr, sizeof(fontPtr));
+      FnvMix(&h, &run->fontSize, sizeof(run->fontSize));
+      FnvMix(&h, &run->x, sizeof(run->x));
+      FnvMix(&h, &run->y, sizeof(run->y));
+      FnvMixVector(&h, run->glyphs);
+      FnvMixVector(&h, run->positions);
+      FnvMixVector(&h, run->xOffsets);
+      FnvMixVector(&h, run->scales);
+      FnvMixVector(&h, run->rotations);
+      FnvMixVector(&h, run->skews);
+      FnvMixVector(&h, run->anchors);
+    }
+    return h;
+  }
+
+  // Total glyph count across all GlyphRuns. Used as a cheap secondary key check so a 64-bit
+  // hash collision (already < 1 in 10^12) cannot promote to a wrong-render bug — a mismatched
+  // glyphSum forces a rebuild rather than reuse.
+  static size_t SumGlyphCount(const Text* text) {
+    size_t sum = 0;
+    for (const auto* run : text->glyphRuns) {
+      if (run) sum += run->glyphs.size();
+    }
+    return sum;
+  }
+
+  // Cached wrapper around PrepareTextBlob. Looks up the fingerprint first; on hit reuses the
+  // TextBlob and per-glyph anchors from the cache. On miss builds via PrepareTextBlob and
+  // stashes the result.
+  void prepareTextBlobCached(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text || !text->glyphData) return;
+    // Already prepared in this build session (or a previous instance hit the same cache slot).
+    if (text->glyphData->textBlob) return;
+    // The runtime-shaping path uses layoutRuns rather than glyphRuns; the fingerprint scheme
+    // here covers only the embedded glyphRuns path, which is what cocraft exports. Fall back
+    // to the uncached path for layoutRuns to stay correct.
+    if (!text->glyphData->layoutRuns.empty() || text->glyphRuns.empty()) {
+      PrepareTextBlob(text, inverseMatrix);
+      return;
+    }
+    auto fingerprint = ComputeTextBlobFingerprint(text, inverseMatrix);
+    size_t glyphSum = SumGlyphCount(text);
+    auto it = _textBlobCache.find(fingerprint);
+    if (it != _textBlobCache.end() && it->second.glyphSum == glyphSum) {
+      text->glyphData->textBlob = it->second.textBlob;
+      text->glyphData->anchors = it->second.anchors;
+      return;
+    }
+    PrepareTextBlob(text, inverseMatrix);
+    if (text->glyphData->textBlob) {
+      _textBlobCache[fingerprint] =
+          TextBlobCacheEntry{glyphSum, text->glyphData->textBlob, text->glyphData->anchors};
     }
   }
 
@@ -783,7 +988,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      PrepareTextBlob(childText[i], inverse);
+      prepareTextBlobCached(childText[i], inverse);
     }
   }
 
@@ -1125,11 +1330,8 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
+    prepareTextBlobCached(node, tgfx::Matrix::I());
     auto textBlob = node->glyphData->textBlob;
-    if (textBlob == nullptr) {
-      PrepareTextBlob(node, tgfx::Matrix::I());
-      textBlob = node->glyphData->textBlob;
-    }
     if (textBlob == nullptr) {
       return nullptr;
     }
@@ -1150,6 +1352,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
+      // an opaque SolidColor here would paint a black placeholder over every shape that uses an
+      // ImagePattern before its image is resolved via the provider; leaving the fill empty keeps
+      // those shapes transparent until the image is ready.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
@@ -1169,6 +1378,10 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
+      if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+        _result.binding.setAccessor(node, "color", WritePainterColor<tgfx::FillStyle>,
+                                    ReadPainterColor<tgfx::FillStyle>);
+      }
       _result.binding.setAccessor(
           node, "alpha",
           WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>,
@@ -1183,6 +1396,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
+      // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
+      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // keeps those shapes transparent until the image is ready, matching convertFill.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
@@ -1212,6 +1432,10 @@ class LayerBuilderContext {
     }
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
+    }
+    if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+      _result.binding.setAccessor(node, "color", WritePainterColor<tgfx::StrokeStyle>,
+                                  ReadPainterColor<tgfx::StrokeStyle>);
     }
     _result.binding.setAccessor(node, "width",
                                 WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
@@ -1263,6 +1487,28 @@ class LayerBuilderContext {
     // tgfx::Color is always sRGB, so the read-back color is reported in sRGB color space.
     *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
     return true;
+  }
+
+  template <typename PainterType>
+  static void WritePainterColor(void* object, const KeyValue& value, float mix) {
+    auto* painter = static_cast<PainterType*>(object);
+    auto colorSource = painter->colorSource();
+    auto* solid = static_cast<tgfx::SolidColor*>(colorSource.get());
+    if (solid == nullptr) {
+      return;
+    }
+    WriteSolidColor(solid, value, mix);
+  }
+
+  template <typename PainterType>
+  static bool ReadPainterColor(const void* object, KeyValue* out) {
+    auto* painter = static_cast<const PainterType*>(object);
+    auto colorSource = painter->colorSource();
+    auto* solid = static_cast<const tgfx::SolidColor*>(colorSource.get());
+    if (solid == nullptr) {
+      return false;
+    }
+    return ReadSolidColor(solid, out);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
@@ -1405,6 +1651,7 @@ class LayerBuilderContext {
         gradient->setMatrix(ToTGFX(node->matrix));
       }
     }
+
     return gradient;
   }
 
@@ -1534,23 +1781,13 @@ class LayerBuilderContext {
     }
 
     auto imageNode = node->image;
-    std::shared_ptr<tgfx::Image> image = nullptr;
-    if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
-    } else if (imageNode->filePath.find("data:") == 0) {
-      image = ImageFromDataURI(imageNode->filePath);
-    } else if (!imageNode->filePath.empty()) {
-      // External file path (already resolved to absolute during import)
-      image = tgfx::Image::MakeFromFile(imageNode->filePath);
-    }
-
-    if (image) {
-      _result.binding.set(imageNode, image);
-    }
-
+    auto image = getOrCreateImage(imageNode);
     if (!image) {
+      // Image data is missing for this node (never loaded or decode failed); paint nothing
+      // rather than falling back to an opaque color that would be visibly wrong.
       return nullptr;
     }
+    _result.binding.set(imageNode, image);
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
@@ -1571,6 +1808,50 @@ class LayerBuilderContext {
     }
 
     return pattern;
+  }
+
+  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode) {
+    auto it = _imageCache.find(imageNode);
+    if (it != _imageCache.end()) {
+      return it->second;
+    }
+    // Resolution chain. Two camps of sources exist:
+    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
+    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
+    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
+    //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
+    //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
+    //      not re-decode at every zoom level.
+    std::shared_ptr<tgfx::Image> image = nullptr;
+    bool isBackendTexture = false;
+    // Priority 1: query the provider for a platform-decoded image.
+    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
+    if (provider && !imageNode->filePath.empty()) {
+      image = provider->resolveImage(imageNode->filePath);
+      if (image) {
+        isBackendTexture = true;
+      }
+    }
+    // Priority 2: fallback to standard decoding chain.
+    if (!image) {
+      if (imageNode->data) {
+        image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        image = ImageFromDataURI(imageNode->filePath);
+      } else if (!imageNode->filePath.empty()) {
+        image = tgfx::Image::MakeFromFile(imageNode->filePath);
+      }
+    }
+    if (image && !isBackendTexture) {
+      image = image->makeMipmapped(true);
+    }
+    // Only memoize successful results. A null entry would cache the absence of a provider-
+    // resolved image forever, so a later provider update would never take effect after
+    // invalidation.
+    if (image) {
+      _imageCache[imageNode] = image;
+    }
+    return image;
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
@@ -2042,6 +2323,7 @@ class LayerBuilderContext {
     }
 
     // Layer filters
+#if !PAG_DISABLE_LAYER_FILTERS
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
     filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
@@ -2053,6 +2335,7 @@ class LayerBuilderContext {
     if (!filters.empty()) {
       layer->setFilters(filters);
     }
+#endif  // !PAG_DISABLE_LAYER_FILTERS
   }
 
   std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
@@ -2062,6 +2345,9 @@ class LayerBuilderContext {
 
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const DropShadowStyle*>(node);
         auto tgfxStyle =
             tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
@@ -2072,8 +2358,12 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindDropShadowStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::InnerShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const InnerShadowStyle*>(node);
         auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
                                                       style->blurY, ToTGFX(style->color));
@@ -2083,8 +2373,12 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindInnerShadowStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::BackgroundBlurStyle: {
+#if PAG_DISABLE_BACKGROUND_BLUR_STYLE
+        return nullptr;
+#else
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
         auto tgfxStyle =
             tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY, ToTGFX(style->tileMode));
@@ -2094,6 +2388,7 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindBackgroundBlurStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::NoiseStyle: {
         auto style = static_cast<const pagx::NoiseStyle*>(node);
@@ -2746,6 +3041,8 @@ class LayerBuilderContext {
     }
   }
 
+  std::unordered_map<const Layer*, std::vector<std::shared_ptr<tgfx::Layer>>>
+      _tgfxLayersByPagxLayer = {};
   struct PathCacheKey {
     const PathData* data;
     float scale;
@@ -2764,6 +3061,22 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  // Maps pagx Image node pointers to their tgfx::Image wrappers. The raw pointer keys are stable
+  // as long as the document's node vector is not structurally modified. If the document undergoes
+  // structural changes (node additions/removals via notifyChange), callers must call
+  // invalidateAllImages() to prevent dangling-pointer lookups.
+  const PAGXDocument* _document = nullptr;
+  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
+  // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
+  // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
+  // Sharing the same TextBlob shared_ptr across many Text nodes is what reclaims the bulk of
+  // the per-Text glyph-path memory cost we observed at 0% reuse before the cache was added.
+  struct TextBlobCacheEntry {
+    size_t glyphSum = 0;
+    std::shared_ptr<tgfx::TextBlob> textBlob;
+    std::vector<tgfx::Point> anchors;
+  };
+  std::unordered_map<uint64_t, TextBlobCacheEntry> _textBlobCache = {};
   bool _needsRuntimeData = false;
 };
 
@@ -2799,6 +3112,85 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   return context.buildWithMap(*document);
 }
 
+// LayerBuilderSession PImpl: owns the LayerBuilderContext and a non-owning pointer back to the
+// PAGXDocument so rebuildForFilePath() can re-enumerate Image nodes and affected layers.
+// Lifetime guarantee: PAGXView always destroys builderSession before document (both in
+// parsePAGX() and in the destructor's member destruction order), so this pointer never dangles.
+struct LayerBuilderSession::Impl {
+  LayerBuilderContext context;
+  PAGXDocument* document = nullptr;
+};
+
+LayerBuilderSession::LayerBuilderSession() : impl(std::make_unique<Impl>()) {
+}
+
+LayerBuilderSession::~LayerBuilderSession() = default;
+
+LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
+  if (document == nullptr) {
+    return {};
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilderSession::build() called before applyLayout(). Call "
+        "document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+  impl->document = document;
+  return impl->context.buildWithMap(*document);
+}
+
+void LayerBuilderSession::invalidateAllImages() {
+  impl->context.invalidateAllImages();
+}
+
+size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
+  if (!impl->document || filePath.empty()) {
+    return 0;
+  }
+  // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
+  // into convertImagePattern() re-queries the provider for the updated image.
+  impl->context.invalidateImagesByFilePath(*impl->document, filePath);
+
+  const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  if (affectedLayers.empty()) {
+    return 0;
+  }
+  size_t rebuiltCount = 0;
+  for (const auto* pagxLayer : affectedLayers) {
+    auto tgfxLayers = impl->context.getTgfxLayers(pagxLayer);
+    for (const auto& tgfxLayer : tgfxLayers) {
+      if (impl->context.rebuildVectorContents(pagxLayer, tgfxLayer.get())) {
+        ++rebuiltCount;
+      }
+    }
+  }
+  return rebuiltCount;
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayersByImageFilePath(
+    const std::string& filePath) const {
+  if (!impl->document || filePath.empty()) {
+    return {};
+  }
+  const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  if (affectedLayers.empty()) {
+    return {};
+  }
+  std::vector<std::shared_ptr<tgfx::Layer>> result;
+  for (const auto* pagxLayer : affectedLayers) {
+    auto tgfxLayers = impl->context.getTgfxLayers(pagxLayer);
+    result.insert(result.end(), tgfxLayers.begin(), tgfxLayers.end());
+  }
+  return result;
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayers(
+    const Layer* pagxLayer) const {
+  return impl->context.getTgfxLayers(pagxLayer);
+}
+
 LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
@@ -2825,22 +3217,26 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   return context.buildSubtree(composition);
 }
 
-bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                       const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return false;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.refreshLayerInPlace(node, binding);
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
-                                                          RuntimeBinding* binding) {
+                                                          RuntimeBinding* binding,
+                                                          const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.buildLayerInto(node, binding);
 }
 

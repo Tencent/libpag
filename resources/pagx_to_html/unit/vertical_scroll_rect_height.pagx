@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: vertical flex scrollRect container keeps resolved height. -->
+<pagx width="260" height="160">
+  <Layer id="stack" width="220" layout="vertical" alignment="start">
+    <Layer id="header" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#EEEEEE"/>
+    </Layer>
+    <Layer id="scroller" width="220" layout="horizontal" alignment="center" scrollRect="0,0,220,40">
+      <Layer id="item" width="40" height="40" includeInLayout="false">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Layer>
+    <Layer id="footer" width="220" height="20">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#DDDDDD"/>
+    </Layer>
+  </Layer>
+</pagx>

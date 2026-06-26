@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "pages/viewer/viewer"
+  ],
+  "window": {
+    "navigationBarTitleText": "PAGX Viewer",
+    "navigationBarBackgroundColor": "#1a1a1a",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#2a2a2a"
+  },
+  "sitemapLocation": "sitemap.json"
+}

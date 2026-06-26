@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -36,6 +37,42 @@ struct FillStrokeInfo {
 };
 
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);
+
+/**
+ * Walks `contents` (and recurses through Group / TextBox containers) and returns true as soon as
+ * a Fill or Stroke painter with placement == Foreground is found. The exporters use this to
+ * decide whether a second painter pass is needed: skipping the foreground pass entirely when no
+ * foreground painter exists keeps simple layers terse, but a foreground painter buried inside a
+ * Group must still be detected, otherwise its background-pass output is suppressed by the
+ * placement filter and its foreground-pass output is suppressed by the missing dispatch.
+ */
+bool HasForegroundPainter(const std::vector<Element*>& contents);
+
+/**
+ * Escapes a font-family value for safe emission inside a CSS declaration wrapped in single
+ * quotes (e.g. `font-family:'<escaped>'`) or inside an SVG attribute that already wraps the
+ * family name in quotes. Drops control characters and CSS-significant characters that would
+ * otherwise let the value escape its quoted context, and backslash-escapes any embedded
+ * single-quote / backslash. Empty input yields an empty output.
+ *
+ * Both HTML and SVG exporters call this so the two pipelines emit identical strings for
+ * identical input — the @font-face declaration in particular must match the family-name
+ * spelling on every <text>/<span> reference, otherwise the browser cannot resolve the font.
+ */
+std::string EscapeCssFontFamily(const std::string& family);
+
+/**
+ * Escapes a font-family value for safe emission inside a CSS declaration wrapped in single
+ * quotes (e.g. `font-family:'<escaped>'`) or inside an SVG attribute that already wraps the
+ * family name in quotes. Drops control characters and CSS-significant characters that would
+ * otherwise let the value escape its quoted context, and backslash-escapes any embedded
+ * single-quote / backslash. Empty input yields an empty output.
+ *
+ * Both HTML and SVG exporters call this so the two pipelines emit identical strings for
+ * identical input — the @font-face declaration in particular must match the family-name
+ * spelling on every <text>/<span> reference, otherwise the browser cannot resolve the font.
+ */
+std::string EscapeCssFontFamily(const std::string& family);
 
 Matrix BuildLayerMatrix(const Layer* layer);
 

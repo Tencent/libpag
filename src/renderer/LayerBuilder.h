@@ -336,6 +336,9 @@ struct RuntimeBinding {
 struct LayerBuildResult {
   std::shared_ptr<tgfx::Layer> root = nullptr;
   RuntimeBinding binding = {};
+  // 1:1 pagx Layer -> tgfx Layer map, exposing only the first copy when a Composition is
+  // referenced by multiple Layers. Session users that need every copy use getTgfxLayers().
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
 
   /**
    * Returns the tgfx layer corresponding to the specified PAGX Layer node, or nullptr if the node
@@ -417,9 +420,11 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
+   * @param document The owning document, used to resolve image resources via the provider.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
-  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding);
+  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                  const PAGXDocument* document);
 
   /**
    * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
@@ -429,9 +434,87 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
+   * @param document The owning document, used to resolve image resources via the provider.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
-  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding);
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
+                                                     const PAGXDocument* document);
+};
+
+/**
+ * LayerBuilderSession wraps LayerBuilder with stateful behavior: it retains the build context
+ * after build() returns so callers can later re-generate a layer's contents when an underlying
+ * Image resource changes (e.g. progressive upgrade from a low-resolution thumbnail to a full
+ * version). The class is intended for the progressive image loading flow on WeChat; other
+ * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
+ *
+ * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
+ * cycle), and then call rebuildForFilePath() whenever the ImageResourceProvider's state changes
+ * for a given filePath (new image attached or evicted). Destroying the session releases all
+ * cached layer/image state.
+ *
+ * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
+ * for the entire lifetime of this session. The session stores a non-owning pointer to the
+ * document and dereferences it on every rebuildForFilePath() call. Destroy the session before
+ * (or together with) the document.
+ */
+class LayerBuilderSession {
+ public:
+  LayerBuilderSession();
+  ~LayerBuilderSession();
+
+  LayerBuilderSession(const LayerBuilderSession&) = delete;
+  LayerBuilderSession& operator=(const LayerBuilderSession&) = delete;
+
+  /**
+   * Builds the layer tree for the given document. Behaves identically to
+   * LayerBuilder::BuildWithMap() but keeps the internal context alive for later rebuilds.
+   * @return The LayerBuildResult (root layer + pagx Layer to tgfx Layer mapping). The mapping
+   *         reflects the first tgfx layer produced for each pagx Layer; callers that need all
+   *         copies (for example to refresh every Composition instance that shares a Layer)
+   *         should use getTgfxLayers() instead.
+   */
+  LayerBuildResult build(PAGXDocument* document);
+
+  /**
+   * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
+   * ImagePattern backed by an Image node whose filePath matches the given value. Call this
+   * after the ImageResourceProvider's state changes for the path so the renderer re-queries
+   * the provider and picks up the new tgfx::Image. A single filePath may match multiple Image
+   * nodes and each Image node may be referenced by multiple Layers, which in turn may have
+   * been duplicated by Composition instancing; all such copies are refreshed in one call.
+   * @return The number of tgfx layers whose contents were regenerated. Zero means no layer
+   *         currently references the given filePath (or the document has not been built yet).
+   */
+  size_t rebuildForFilePath(const std::string& filePath);
+
+  /**
+   * Drops the entire internal image cache. Call this after the document undergoes structural
+   * node changes (e.g. after notifyChange with node additions or removals) because the
+   * cache keys are raw Image* pointers that become dangling when nodes are replaced.
+   */
+  void invalidateAllImages();
+
+  /**
+   * Returns every tgfx::Layer that was produced for layers referencing the given image file
+   * path. Combines findLayersByImageFilePath() and getTgfxLayers() into a single call so
+   * callers do not need to handle internal pagx::Layer pointers.
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayersByImageFilePath(
+      const std::string& filePath) const;
+
+  /**
+   * Returns every tgfx::Layer that was produced for the given pagx Layer during build(). A
+   * pagx Layer may map to several tgfx layers when its owning Composition is instanced more
+   * than once; the returned vector preserves build order.
+   * @return An empty vector when the pagx Layer was not seen during build() (e.g. nullptr,
+   *         a mask-only layer that got skipped, or no build() call has been made yet).
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayers(const Layer* pagxLayer) const;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl;
 };
 
 }  // namespace pagx
