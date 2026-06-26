@@ -3336,7 +3336,12 @@ async function materializeDecorativePseudoElements() {
       if (!raw) continue;
       const def = DEFAULTS.get(prop);
       if (def !== undefined && raw === def) continue;
-      parts.push(`${prop}: ${raw}`);
+      // Rewrite embedded double quotes (e.g. `filter: url("#blur")`,
+      // `font-family: "Inter"`) as single quotes — CSS treats them equivalently
+      // — so the value embeds safely inside the surrounding style="…" attribute
+      // and doesn't break the importer's XML parse. Mirrors appendStyleProp on
+      // the main snapshot path.
+      parts.push(`${prop}: ${raw.replace(/"/g, "'")}`);
     }
     return parts.join('; ');
   }
