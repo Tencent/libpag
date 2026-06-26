@@ -125,7 +125,7 @@ void DataBindRuntime::markDirtyForValue(PAGViewModelValue* value) {
     return;
   }
   for (auto& entry : entries) {
-    if (entry.source == value) {
+    if (entry.source == value && entry.toTarget()) {
       markDirty(entry.dataBind);
     }
   }
