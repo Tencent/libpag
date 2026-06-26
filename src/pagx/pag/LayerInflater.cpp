@@ -111,13 +111,15 @@ std::shared_ptr<tgfx::Layer> makeLayerByType(LayerType type) {
       // integration can upgrade the call site with zero surrounding changes.
       return tgfx::Layer::Make();
     case LayerType::Layer:
+      // A plain, children-only Layer mirrors LayerBuilder::convertLayer, which emits a
+      // VectorLayer for the no-composition / no-contents case so Fill/Stroke color channels
+      // share a uniform host. Both render paths must produce the same tgfx type for parity.
+      return tgfx::VectorLayer::Make();
     case LayerType::Text:
     case LayerType::CompositionRef:
-      // Layer/Text/CompositionRef are handled by inflateLayer's explicit
-      // branches before the type-dispatched payload path; returning a bare
-      // Layer here keeps makeLayerByType total without inventing payload
-      // semantics (Layer carries only children, CompositionRef is routed
-      // via inflateComposition, Text is deferred to Phase 10).
+      // Text is deferred to Phase 10 and CompositionRef is routed via inflateComposition before
+      // reaching here; a bare Layer keeps makeLayerByType total without inventing payload
+      // semantics for these two.
       return tgfx::Layer::Make();
   }
   return tgfx::Layer::Make();

@@ -10,6 +10,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/pag/FontProvider.h"
 #include "tgfx/core/Typeface.h"
+#include "utils/ProjectPath.h"
 
 namespace pagx::pag {
 namespace {
@@ -166,19 +167,16 @@ TEST(FontProvider, MakeFontProviderFromConfigEmptyConfig) {
 }
 
 TEST(FontProvider, MakeFontProviderFromConfigFallbackQueryable) {
-  // Register one in-memory typeface as a fallback. The adapter should round-
-  // trip it through FontConfig::fallbackTypefaces().
+  // Register one fallback font by path. The adapter should round-trip it
+  // through LayoutContext::fallbackTypefaces() and resolve to a real typeface.
   auto config = std::make_shared<pagx::FontConfig>();
-  auto fallback = tgfx::Typeface::MakeEmpty();
-  ASSERT_NE(fallback, nullptr);
-  std::vector<std::shared_ptr<tgfx::Typeface>> list = {fallback};
-  config->addFallbackTypefaces(list);
+  config->addFallbackFont(::pag::ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
 
   auto provider = MakeFontProviderFromConfig(config);
   ASSERT_NE(provider, nullptr);
   auto chain = provider->getFallbackTypefaces();
   ASSERT_EQ(chain.size(), 1u);
-  EXPECT_EQ(chain[0], fallback);
+  EXPECT_NE(chain[0], nullptr);
 }
 
 TEST(FontProvider, MakeFontProviderFromConfigExposesFontConfig) {

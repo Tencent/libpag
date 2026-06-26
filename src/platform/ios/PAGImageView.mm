@@ -67,6 +67,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @end
 
+@interface PAGImageView () <PAGAnimatorUpdater, PAGAnimatorListener>
+@end
+
 @implementation PAGImageView {
   NSString* filePath;
   PAGAnimator* animator;
@@ -82,6 +85,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   std::mutex imageViewLock;
   CVPixelBufferPoolRef diskBufferPool;
+  NSHashTable* listeners;
+  std::mutex listenerLock;
 }
 
 @synthesize memoryCacheEnabled = _memoryCacheEnabled;
@@ -109,6 +114,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   numFrames = 0;
   self.backgroundColor = [UIColor clearColor];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
+  listeners = [[NSHashTable weakObjectsHashTable] retain];
+  [animator addListener:self];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
@@ -127,6 +134,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (filePath != nil) {
     [filePath release];
   }
+  [listeners release];
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
 }
@@ -494,11 +502,72 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)addListener:(id<PAGImageViewListener>)listener {
-  [animator addListener:(id<PAGAnimatorListener>)listener];
+  if (listener == nil) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(listenerLock);
+  [listeners addObject:listener];
 }
 
 - (void)removeListener:(id<PAGImageViewListener>)listener {
-  [animator removeListener:(id<PAGAnimatorListener>)listener];
+  if (listener == nil) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(listenerLock);
+  [listeners removeObject:listener];
+}
+
+#pragma mark - PAGAnimatorListener
+
+- (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationStart:)];
+}
+
+- (void)onAnimationEnd:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationEnd:)];
+}
+
+- (void)onAnimationCancel:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationCancel:)];
+}
+
+- (void)onAnimationRepeat:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationRepeat:)];
+}
+
+- (void)onAnimationUpdate:(id<PAGAnimatorUpdater>)updater {
+  [self dispatchListenerEvent:@selector(onAnimationUpdate:)];
+}
+
+- (void)dispatchListenerEvent:(SEL)selector {
+  if ([NSThread isMainThread]) {
+    [self performListenerEventOnMainThread:selector];
+    return;
+  }
+  // Retain self before crossing threads to keep the receiver alive until the
+  // dispatched block finishes notifying listeners on the main thread.
+  [self retain];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self performListenerEventOnMainThread:selector];
+    [self release];
+  });
+}
+
+- (void)performListenerEventOnMainThread:(SEL)selector {
+  NSArray* copiedListeners = nil;
+  {
+    std::lock_guard<std::mutex> autoLock(listenerLock);
+    copiedListeners = [[listeners allObjects] retain];
+  }
+  for (id<PAGImageViewListener> listener in copiedListeners) {
+    if ([listener respondsToSelector:selector]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+      [listener performSelector:selector withObject:self];
+#pragma clang diagnostic pop
+    }
+  }
+  [copiedListeners release];
 }
 
 - (int)repeatCount {

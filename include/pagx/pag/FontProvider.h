@@ -104,13 +104,13 @@ std::shared_ptr<FontProvider> MakeDefaultFontProvider();
  * Path B (PAGLoader / Inflater) can share a single FontConfig, guaranteeing
  * the two paths resolve every fontFamily/fontStyle to the same typeface.
  *
- * getTypeface / getFallbackTypefaces delegate to FontConfig::findTypeface /
- * FontConfig::fallbackTypefaces. Those are non-const on FontConfig because
- * they may lazy-load deferred fallback fonts; the adapter keeps its
- * shared_ptr<FontConfig> non-const and performs the lazy load inside the
- * FontProvider's const virtual methods. That's safe — FontProvider's const
- * contract is about not exposing mutable state to callers, and lazy-load is
- * an invisible optimization.
+ * getTypeface / getFallbackTypefaces delegate to LayoutContext::findTypeface /
+ * LayoutContext::fallbackTypefaces (constructed over the shared FontConfig).
+ * Those are non-const because they may lazy-load deferred fallback fonts; the
+ * adapter keeps its shared_ptr<FontConfig> non-const and performs the lazy load
+ * inside the FontProvider's const virtual methods. That's safe — FontProvider's
+ * const contract is about not exposing mutable state to callers, and lazy-load
+ * is an invisible optimization.
  *
  * Returns nullptr if `fontConfig` is nullptr.
  */

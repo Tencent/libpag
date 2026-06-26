@@ -70,7 +70,7 @@ class FontConfigFontProvider : public FontProvider {
     if (fontConfig == nullptr) {
       return {};
     }
-    return fontConfig->fallbackTypefaces();
+    return layoutContext.fallbackTypefaces();
   }
 
   pagx::FontConfig* getFontConfig() const override {

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: rich text newline group emits a single line break. -->
+<pagx width="240" height="80">
+  <Layer width="240" height="80">
+    <Group>
+      <Text text="Title" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <Group>
+      <Text text="&#10;" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <Group>
+      <Text text="Option" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill color="#111111"/>
+    </Group>
+    <TextBox width="200" lineHeight="24"/>
+  </Layer>
+</pagx>

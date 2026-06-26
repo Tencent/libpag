@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: real text with GlyphRun uses embedded WOFF2 font output. -->
+<pagx width="160" height="48">
+  <Resources>
+    <Font id="shapes" unitsPerEm="1000">
+      <Glyph advance="700" path="M 0,0 L 700,0 L 700,-700 L 0,-700 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="160" height="48">
+    <Text text="搜索" fontFamily="PingFang SC" fontSize="16">
+      <GlyphRun font="@shapes" fontSize="16" glyphs="1,1" x="10" y="24"
+                xOffsets="0,18" bounds="0,0,32,22"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>

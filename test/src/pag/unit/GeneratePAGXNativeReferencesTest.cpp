@@ -30,24 +30,15 @@ namespace pag {
 
 namespace {
 
-std::vector<std::shared_ptr<tgfx::Typeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<tgfx::Typeface>> result = {};
-  auto regularTypeface =
-      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  if (regularTypeface) {
-    result.push_back(regularTypeface);
+void AddFallbackFonts(pagx::FontConfig& fontConfig) {
+  const char* paths[] = {
+      "resources/font/NotoSansSC-Regular.otf",
+      "resources/font/NotoColorEmoji.ttf",
+      "resources/font/NotoSansHebrew-Regular.ttf",
+  };
+  for (const char* relPath : paths) {
+    fontConfig.addFallbackFont(ProjectPath::Absolute(relPath), 0);
   }
-  auto emojiTypeface =
-      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-  if (emojiTypeface) {
-    result.push_back(emojiTypeface);
-  }
-  auto hebrewTypeface = tgfx::Typeface::MakeFromPath(
-      ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
-  if (hebrewTypeface) {
-    result.push_back(hebrewTypeface);
-  }
-  return result;
 }
 
 void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
@@ -59,10 +50,7 @@ void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
       "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
   };
   for (const char* path : arialPaths) {
-    auto typeface = tgfx::Typeface::MakeFromPath(path);
-    if (typeface) {
-      fontConfig.registerTypeface(std::move(typeface));
-    }
+    fontConfig.registerFont(path, 0);
   }
 #else
   (void)fontConfig;
@@ -87,7 +75,7 @@ TEST_F(PAGXNativeReferenceTest, RenderSpecSamplesToPAGXNativeDir) {
   ASSERT_FALSE(files.empty()) << "no .pagx fixtures under " << samplesDir;
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(CreateFallbackTypefaces());
+  AddFallbackFonts(fontConfig);
   RegisterSystemFonts(fontConfig);
 
   size_t written = 0;

@@ -1,0 +1,7 @@
+CMakeLists.txt
+src/
+../../src/pagx/
+../../src/renderer/
+../../include/pagx/
+../../third_party/tgfx/src/
+../../third_party/tgfx/include/

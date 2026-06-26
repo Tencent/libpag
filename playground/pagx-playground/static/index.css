@@ -29,6 +29,8 @@ html, body {
     right: 0;
     z-index: 1;
     touch-action: none;
+    background:
+        repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%) 0 0 / 32px 32px;
 }
 
 .canvas.hidden {
@@ -525,7 +527,7 @@ html, body {
     width: 100%;
     aspect-ratio: 1 / 1;
     background:
-        repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+            repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
     border-radius: 6px;
     object-fit: contain;
 }

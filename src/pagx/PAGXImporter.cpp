@@ -52,6 +52,8 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -183,6 +185,8 @@ static DropShadowFilter* ParseDropShadowFilter(const DOMNode* node, PAGXDocument
 static InnerShadowFilter* ParseInnerShadowFilter(const DOMNode* node, PAGXDocument* doc);
 static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc);
 static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
+static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc);
+static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc);
 
 //==============================================================================
 // Custom data parsing
@@ -339,6 +343,7 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+
   // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
   child = node->firstChild;
   while (child) {
@@ -577,9 +582,9 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
                     " Expected: Layer, Group, Rectangle, Ellipse, Polystar,"
                     " Path, Text, Fill, Stroke, TrimPath, RoundCorner,"
                     " MergePath, TextModifier, TextPath, TextBox, Repeater,"
-                    " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle,"
+                    " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle,"
                     " BlurFilter, DropShadowFilter, InnerShadowFilter,"
-                    " BlendFilter, ColorMatrixFilter.");
+                    " BlendFilter, ColorMatrixFilter, NoiseFilter.");
   }
 
   return layer;
@@ -623,7 +628,7 @@ static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'styles'."
                       " Expected: DropShadowStyle, InnerShadowStyle,"
-                      " BackgroundBlurStyle.");
+                      " BackgroundBlurStyle, NoiseStyle.");
     }
   }
 }
@@ -644,7 +649,7 @@ static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'filters'."
                       " Expected: BlurFilter, DropShadowFilter,"
-                      " InnerShadowFilter, BlendFilter, ColorMatrixFilter.");
+                      " InnerShadowFilter, BlendFilter, ColorMatrixFilter, NoiseFilter.");
     }
   }
 }
@@ -758,6 +763,9 @@ static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "BackgroundBlurStyle") {
     return ParseBackgroundBlurStyle(node, doc);
   }
+  if (node->name == "NoiseStyle") {
+    return ParseNoiseStyle(node, doc);
+  }
   return nullptr;
 }
 
@@ -776,6 +784,9 @@ static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "ColorMatrixFilter") {
     return ParseColorMatrixFilter(node, doc);
+  }
+  if (node->name == "NoiseFilter") {
+    return ParseNoiseFilter(node, doc);
   }
   return nullptr;
 }
@@ -990,15 +1001,19 @@ static Fill* ParseFill(const DOMNode* node, PAGXDocument* doc) {
   if (!fill) {
     return nullptr;
   }
-  fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    fill->color = childColor;
+  } else {
+    fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   fill->alpha = GetFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
   fill->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   fill->fillRule = GET_ENUM(node, "fillRule", "winding", doc, FillRule);
   fill->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    fill->color = childColor;
-  }
   return fill;
 }
 
@@ -1007,7 +1022,15 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
   if (!stroke) {
     return nullptr;
   }
-  stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    stroke->color = childColor;
+  } else {
+    stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   stroke->width = GetFloatAttribute(node, "width", Default<Stroke>().width, doc);
   stroke->alpha = GetFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
   stroke->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
@@ -1023,10 +1046,6 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
       GetBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
   stroke->align = GET_ENUM(node, "align", "center", doc, StrokeAlign);
   stroke->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    stroke->color = childColor;
-  }
   return stroke;
 }
 
@@ -1610,6 +1629,13 @@ Color ParseTypedValue<Color>(const std::string& value, PAGXDocument* doc, const 
   return color;
 }
 
+template <>
+Matrix ParseTypedValue<Matrix>(const std::string& value, PAGXDocument*, const DOMNode*) {
+  // MatrixFromString accepts the same "a,b,c,d,tx,ty" form used for the matrix attribute; an
+  // unparseable value yields the identity matrix.
+  return MatrixFromString(value);
+}
+
 template <typename T>
 static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
                            PAGXDocument* doc) {
@@ -1708,6 +1734,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "color") {
     auto ch = makeNodeFromXML<TypedChannel<Color>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "matrix") {
+    auto ch = makeNodeFromXML<TypedChannel<Matrix>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {
@@ -2031,6 +2061,34 @@ static void ParseShadowAttributes(const DOMNode* node, PAGXDocument* doc, float&
   }
 }
 
+static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<NoiseStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  style->excludeChildEffects =
+      GetBoolAttribute(node, "excludeChildEffects", Default<NoiseStyle>().excludeChildEffects, doc);
+  style->mode = GET_ENUM(node, "mode", "mono", doc, NoiseMode);
+  style->size = GetFloatAttribute(node, "size", Default<NoiseStyle>().size, doc);
+  style->density = GetFloatAttribute(node, "density", Default<NoiseStyle>().density, doc);
+  style->seed = GetFloatAttribute(node, "seed", Default<NoiseStyle>().seed, doc);
+  auto colorStr = GetAttribute(node, "color");
+  if (!colorStr.empty()) {
+    style->color = GetColorAttribute(node, "color", doc);
+  }
+  auto firstColorStr = GetAttribute(node, "firstColor");
+  if (!firstColorStr.empty()) {
+    style->firstColor = GetColorAttribute(node, "firstColor", doc);
+  }
+  auto secondColorStr = GetAttribute(node, "secondColor");
+  if (!secondColorStr.empty()) {
+    style->secondColor = GetColorAttribute(node, "secondColor", doc);
+  }
+  style->opacity = GetFloatAttribute(node, "opacity", Default<NoiseStyle>().opacity, doc);
+  return style;
+}
+
 static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc) {
   auto style = makeNodeFromXML<DropShadowStyle>(node, doc);
   if (!style) {
@@ -2076,6 +2134,32 @@ static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDo
 //==============================================================================
 // Layer filter parsing
 //==============================================================================
+
+static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<NoiseFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->mode = GET_ENUM(node, "mode", "mono", doc, NoiseMode);
+  filter->size = GetFloatAttribute(node, "size", Default<NoiseFilter>().size, doc);
+  filter->density = GetFloatAttribute(node, "density", Default<NoiseFilter>().density, doc);
+  filter->seed = GetFloatAttribute(node, "seed", Default<NoiseFilter>().seed, doc);
+  filter->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  auto colorStr = GetAttribute(node, "color");
+  if (!colorStr.empty()) {
+    filter->color = GetColorAttribute(node, "color", doc);
+  }
+  auto firstColorStr = GetAttribute(node, "firstColor");
+  if (!firstColorStr.empty()) {
+    filter->firstColor = GetColorAttribute(node, "firstColor", doc);
+  }
+  auto secondColorStr = GetAttribute(node, "secondColor");
+  if (!secondColorStr.empty()) {
+    filter->secondColor = GetColorAttribute(node, "secondColor", doc);
+  }
+  filter->opacity = GetFloatAttribute(node, "opacity", Default<NoiseFilter>().opacity, doc);
+  return filter;
+}
 
 static BlurFilter* ParseBlurFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<BlurFilter>(node, doc);

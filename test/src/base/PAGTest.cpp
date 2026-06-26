@@ -39,24 +39,19 @@ void PAGTest::TearDown() {
 
 namespace {
 
-// Standard fallback typefaces used by PAGXTest fixtures: Noto Sans SC covers
+// Standard fallback fonts used by PAGXTest fixtures: Noto Sans SC covers
 // CJK, Noto Color Emoji covers emoji, Noto Sans Hebrew covers Hebrew. Order
-// matters — the LayoutContext walks this vector in sequence when shaping
+// matters — the LayoutContext walks this list in sequence when shaping
 // codepoints that the primary font can't render.
-std::vector<std::shared_ptr<tgfx::Typeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<tgfx::Typeface>> out;
+void AddFallbackFonts(pagx::FontConfig& fontConfig) {
   const char* paths[] = {
       "resources/font/NotoSansSC-Regular.otf",
       "resources/font/NotoColorEmoji.ttf",
       "resources/font/NotoSansHebrew-Regular.ttf",
   };
   for (const char* relPath : paths) {
-    auto typeface = tgfx::Typeface::MakeFromPath(ProjectPath::Absolute(relPath));
-    if (typeface != nullptr) {
-      out.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(ProjectPath::Absolute(relPath), 0);
   }
-  return out;
 }
 
 // macOS-only: register the four most common Arial faces so PAGX samples that
@@ -73,10 +68,7 @@ void RegisterSystemFonts(pagx::FontConfig& fontConfig) {
       "/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf",
   };
   for (const char* path : arialPaths) {
-    auto typeface = tgfx::Typeface::MakeFromPath(path);
-    if (typeface != nullptr) {
-      fontConfig.registerTypeface(std::move(typeface));
-    }
+    fontConfig.registerFont(path, 0);
   }
 #else
   (void)fontConfig;
@@ -93,7 +85,7 @@ void PAGXTest::SetUp() {
   ASSERT_TRUE(context != nullptr);
 
   sharedFontConfig = std::make_shared<pagx::FontConfig>();
-  sharedFontConfig->addFallbackTypefaces(CreateFallbackTypefaces());
+  AddFallbackFonts(*sharedFontConfig);
   RegisterSystemFonts(*sharedFontConfig);
   sharedFontProvider = pagx::pag::MakeFontProviderFromConfig(sharedFontConfig);
 }

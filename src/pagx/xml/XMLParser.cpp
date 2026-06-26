@@ -212,6 +212,7 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
                           static_cast<int>(length), true);
 
   _expatParser = nullptr;
+
   return XML_STATUS_ERROR != status;
 }
 

@@ -48,6 +48,10 @@ static const char* TileModeToRepeatCss(TileMode m) {
   return m == TileMode::Repeat ? "repeat" : "no-repeat";
 }
 
+static float ClampedRectangleRoundness(const Rectangle* rect, const Size& size) {
+  return std::min(rect->roundness, std::min(size.width / 2, size.height / 2));
+}
+
 bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                         bool useModifiedPathData, float& outX, float& outY,
                                         float& outW, float& outH) {
@@ -279,6 +283,10 @@ std::string BuildPolystarPath(const Polystar* ps) {
 // Compute signed area of a path to determine winding direction.
 // Positive = clockwise, negative = counter-clockwise.
 namespace {
+// The shoelace sum stores twice the signed area in squared SVG coordinate units. Keep this
+// threshold tiny so only degenerate contour noise is ignored, not real thin geometry.
+static constexpr float CONTOUR_AREA_EPSILON = 1.0f / (1 << 12);
+
 struct SignedAreaVisitor {
   float area = 0.0f;
   Point startPoint = {};
@@ -318,6 +326,151 @@ float ComputePathSignedArea(const PathData& pathData) {
 
 bool IsPathClockwise(const PathData& pathData) {
   return ComputePathSignedArea(pathData) > 0;
+}
+
+// Ensures every contour in the path has the specified winding direction. For multi-contour paths
+// (e.g. stroke outlines with outer CW ring + inner CCW ring), reversing the entire path as a unit
+// destroys the relative winding relationship. This function reverses only those individual contours
+// whose direction does not match `clockwise`, preserving the intended fill semantics.
+static std::string EnsureContoursDirection(const PathData& pathData, bool clockwise) {
+  struct Segment {
+    PathVerb verb = PathVerb::Move;
+    std::vector<Point> points = {};
+  };
+  struct Contour {
+    Point startPoint = {};
+    std::vector<Segment> segments = {};
+    bool closed = false;
+  };
+  std::vector<Contour> contours = {};
+  Contour currentContour = {};
+  bool hasContour = false;
+
+  struct ContourVisitor {
+    std::vector<Contour>& contours;
+    Contour& currentContour;
+    bool& hasContour;
+    void operator()(PathVerb verb, const Point* pts) {
+      switch (verb) {
+        case PathVerb::Move:
+          if (hasContour) {
+            contours.push_back(std::move(currentContour));
+            currentContour = {};
+          }
+          currentContour.startPoint = pts[0];
+          hasContour = true;
+          break;
+        case PathVerb::Line: {
+          Segment seg = {PathVerb::Line, {pts[0]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Quad: {
+          Segment seg = {PathVerb::Quad, {pts[0], pts[1]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Cubic: {
+          Segment seg = {PathVerb::Cubic, {pts[0], pts[1], pts[2]}};
+          currentContour.segments.push_back(std::move(seg));
+          break;
+        }
+        case PathVerb::Close:
+          currentContour.closed = true;
+          break;
+      }
+    }
+  };
+  ContourVisitor visitor{contours, currentContour, hasContour};
+  pathData.forEach(std::ref(visitor));
+  if (hasContour) {
+    contours.push_back(std::move(currentContour));
+  }
+
+  std::string result;
+  for (auto& contour : contours) {
+    // Compute signed area for this contour.
+    float area = 0;
+    Point cur = contour.startPoint;
+    for (auto& seg : contour.segments) {
+      Point end = seg.points.back();
+      area += (cur.x * end.y - end.x * cur.y);
+      cur = end;
+    }
+    if (contour.closed) {
+      area += (cur.x * contour.startPoint.y - contour.startPoint.x * cur.y);
+    }
+    bool keepOriginalDirection = std::abs(area) <= CONTOUR_AREA_EPSILON || (area > 0) == clockwise;
+
+    if (keepOriginalDirection) {
+      // Emit contour as-is.
+      result += "M" + CssFloatToString(contour.startPoint.x) + " " +
+                CssFloatToString(contour.startPoint.y);
+      for (auto& seg : contour.segments) {
+        switch (seg.verb) {
+          case PathVerb::Line:
+            result +=
+                "L" + CssFloatToString(seg.points[0].x) + " " + CssFloatToString(seg.points[0].y);
+            break;
+          case PathVerb::Quad:
+            result += "Q" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(seg.points[1].x) +
+                      " " + CssFloatToString(seg.points[1].y);
+            break;
+          case PathVerb::Cubic:
+            result += "C" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(seg.points[1].x) +
+                      " " + CssFloatToString(seg.points[1].y) + " " +
+                      CssFloatToString(seg.points[2].x) + " " + CssFloatToString(seg.points[2].y);
+            break;
+          default:
+            break;
+        }
+      }
+      if (contour.closed) {
+        result += "Z";
+      }
+    } else {
+      // Emit contour reversed.
+      if (contour.segments.empty()) {
+        result += "M" + CssFloatToString(contour.startPoint.x) + " " +
+                  CssFloatToString(contour.startPoint.y);
+        if (contour.closed) {
+          result += "Z";
+        }
+        continue;
+      }
+      Point newStart = contour.segments.back().points.back();
+      result += "M" + CssFloatToString(newStart.x) + " " + CssFloatToString(newStart.y);
+      for (int i = static_cast<int>(contour.segments.size()) - 1; i >= 0; i--) {
+        auto& seg = contour.segments[static_cast<size_t>(i)];
+        Point segStart = (i == 0) ? contour.startPoint
+                                  : contour.segments[static_cast<size_t>(i - 1)].points.back();
+        switch (seg.verb) {
+          case PathVerb::Line:
+            result += "L" + CssFloatToString(segStart.x) + " " + CssFloatToString(segStart.y);
+            break;
+          case PathVerb::Quad:
+            result += "Q" + CssFloatToString(seg.points[0].x) + " " +
+                      CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) + " " +
+                      CssFloatToString(segStart.y);
+            break;
+          case PathVerb::Cubic:
+            result += "C" + CssFloatToString(seg.points[1].x) + " " +
+                      CssFloatToString(seg.points[1].y) + " " + CssFloatToString(seg.points[0].x) +
+                      " " + CssFloatToString(seg.points[0].y) + " " + CssFloatToString(segStart.x) +
+                      " " + CssFloatToString(segStart.y);
+            break;
+          default:
+            break;
+        }
+      }
+      if (contour.closed) {
+        result += "Z";
+      }
+    }
+  }
+  return result;
 }
 
 float ComputeCubicBezierLength(Point p0, Point p1, Point p2, Point p3, int depth) {
@@ -1137,7 +1290,7 @@ std::string HTMLWriter::getOrCreatePathDef(const std::string& d) {
 }
 
 void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, float bboxY,
-                              float bboxW, float bboxH) {
+                              float bboxW, float bboxH, bool emitFillRule) {
   if (!fill) {
     out.addAttr("fill", "none");
     return;
@@ -1150,7 +1303,7 @@ void HTMLWriter::applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX, f
   if (ea < 1.0f) {
     out.addAttr("fill-opacity", CssFloatToString(ea));
   }
-  if (fill->fillRule == FillRule::EvenOdd) {
+  if (emitFillRule && fill->fillRule == FillRule::EvenOdd) {
     out.addAttr("fill-rule", "evenodd");
   }
 }
@@ -1321,7 +1474,7 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
     top = pos.y - size.height / 2;
     w = size.width;
     h = size.height;
-    roundness = std::min(rect->roundness, std::min(w / 2, h / 2));
+    roundness = ClampedRectangleRoundness(rect, size);
   } else {
     auto el = static_cast<const Ellipse*>(geo.element);
     auto pos = el->renderPosition();
@@ -1593,8 +1746,9 @@ void HTMLWriter::renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInf
         out.addAttr("y", CssFloatToString(ry));
         out.addAttr("width", CssFloatToString(size.width));
         out.addAttr("height", CssFloatToString(size.height));
-        if (r->roundness > 0) {
-          out.addAttr("rx", CssFloatToString(r->roundness));
+        auto roundness = ClampedRectangleRoundness(r, size);
+        if (roundness > 0) {
+          out.addAttr("rx", CssFloatToString(roundness));
         }
         out.addAttr("fill", "none");
         out.addAttr("stroke", "white");
@@ -1706,8 +1860,9 @@ void HTMLWriter::emitStrokeClipDefs(HTMLBuilder& out, const std::vector<GeoInfo>
           }
           out.addAttr("width", CssFloatToString(size.width));
           out.addAttr("height", CssFloatToString(size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", CssFloatToString(r->roundness));
+          auto roundness = ClampedRectangleRoundness(r, size);
+          if (roundness > 0) {
+            out.addAttr("rx", CssFloatToString(roundness));
           }
           out.closeTagSelfClosing();
           break;
@@ -1874,9 +2029,10 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           }
           out.addAttr("width", CssFloatToString(size.width));
           out.addAttr("height", CssFloatToString(size.height));
-          if (r->roundness > 0) {
-            out.addAttr("rx", CssFloatToString(r->roundness));
-            out.addAttr("ry", CssFloatToString(r->roundness));
+          auto roundness = ClampedRectangleRoundness(r, size);
+          if (roundness > 0) {
+            out.addAttr("rx", CssFloatToString(roundness));
+            out.addAttr("ry", CssFloatToString(roundness));
           }
         }
         applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
@@ -2074,39 +2230,28 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       } else {
         GeoToPathData(g.element, g.type, pathData);
       }
-      bool needReverse = false;
       switch (mergeMode) {
         case MergePathMode::Union:
-          if (!IsPathClockwise(pathData)) {
-            needReverse = true;
-          }
+          // For Union with nonzero fill-rule, all contours must be clockwise so overlapping
+          // regions are filled. Use per-contour direction enforcement to correctly handle
+          // multi-contour paths (e.g. stroke outlines with outer CW + inner CCW rings).
+          mergedPath += EnsureContoursDirection(pathData, true);
           fillRule = "nonzero";
           break;
         case MergePathMode::Xor:
+          mergedPath += PathDataToSVGString(pathData);
           fillRule = "evenodd";
           break;
         case MergePathMode::Difference:
-          if (i == 0) {
-            if (!IsPathClockwise(pathData)) {
-              needReverse = true;
-            }
-          } else {
-            if (IsPathClockwise(pathData)) {
-              needReverse = true;
-            }
-          }
+          // For Difference: first shape clockwise (additive), subsequent shapes
+          // counter-clockwise (subtractive). Per-contour enforcement handles multi-contour.
+          mergedPath += EnsureContoursDirection(pathData, i == 0);
           fillRule = "nonzero";
           break;
         case MergePathMode::Append:
         default:
+          mergedPath += PathDataToSVGString(pathData);
           break;
-      }
-      if (needReverse) {
-        PathData reversed = PathDataFromSVGString("");
-        ReversePathData(pathData, reversed);
-        mergedPath += PathDataToSVGString(reversed);
-      } else {
-        mergedPath += PathDataToSVGString(pathData);
       }
     }
     if (mergedPath.empty()) {
@@ -2146,10 +2291,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.closeTagStart();
     out.openTag("path");
     out.addAttr("d", mergedPath);
-    if (fillRule != "nonzero") {
+    bool hasMergeFillRule = fillRule != "nonzero";
+    if (hasMergeFillRule) {
       out.addAttr("fill-rule", fillRule);
     }
-    applySVGFill(out, fill, x0, y0, sw, sh);
+    applySVGFill(out, fill, x0, y0, sw, sh,
+                 !hasMergeFillRule && mergeMode == MergePathMode::Append);
     applySVGStroke(out, stroke);
     out.closeTagSelfClosing();
     out.closeTag();

@@ -16,26 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import './babel';
+import * as types from './types';
+import createPAG from '../wasm/pagx-viewer';
+import { PAGX } from './types';
+import { binding } from './binding';
 
-#include <cstdint>
-#include <string>
-#include <vector>
-
-namespace pagx {
-
-class Font;
-
-struct Woff2FontResult {
-  std::vector<uint8_t> woff2Data;
-  std::string familyName;
-  std::string relativeUrl;
-};
+export interface moduleOption {
+  /**
+   * Link to wasm file.
+   */
+  locateFile?: (file: string) => string;
+}
 
 /**
- * Builds a WOFF2 font file from a PAGX Font node containing vector glyph outlines. Returns an
- * empty result if the font contains any bitmap glyphs or has no glyphs.
+ * Initialize PAGX webassembly module.
  */
-Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId);
+const PAGXInit = (moduleOption: moduleOption = {}): Promise<types.PAGX> =>
+  createPAG(moduleOption)
+    .then((module: types.PAGX) => {
+      binding(module);
+      return module;
+    })
+    .catch((error: any) => {
+      console.error(error);
+      throw new Error('PAGXInit fail! Please check .wasm file path valid.');
+    });
 
-}  // namespace pagx
+export { PAGXInit, types };
+export { ImageQuality } from './pagx-view';
+export type { TextureEventHandler } from './pagx-view';

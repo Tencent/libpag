@@ -128,3 +128,6 @@ cli/npm/package-lock.json
 # developer machines would distort the committed reference; keep them local
 # so every developer sees their own numbers without polluting the repo.
 test/perf/baseline.json
+
+# Local-only helper scripts (not part of the project)
+pagx/wechat/script/copy-to-cocraft.js

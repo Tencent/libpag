@@ -255,6 +255,32 @@ if (APPLE)
             VERBATIM
     )
 
+    # Find macdeployqt next to the Qt bin directory
+    find_program(DEPLOYQT_EXECUTABLE macdeployqt
+            PATHS ${CMAKE_PREFIX_PATH}/../../bin
+            REQUIRED)
+
+    # Deploy Qt and ffmovie into the plugin bundle
+    set(PLUGIN_BUNDLE_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>")
+    set(PLUGIN_FRAMEWORKS_DIR "${PLUGIN_BUNDLE_DIR}/Contents/Frameworks")
+    set(PLUGIN_FFMOVIE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../viewer/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib")
+
+    add_custom_command(
+            TARGET PAGExporter POST_BUILD
+            # Extract dSYM before macdeployqt (which may strip the binary)
+            COMMAND /bin/sh -c "dsymutil '${PLUGIN_BUNDLE_DIR}/Contents/MacOS/PAGExporter' -o '${CMAKE_BINARY_DIR}/PAGExporter.dSYM' 2>/dev/null || true"
+            # Copy libffmovie.dylib
+            COMMAND /bin/sh -c "mkdir -p '${PLUGIN_FRAMEWORKS_DIR}' && [ -f '${PLUGIN_FRAMEWORKS_DIR}/libffmovie.dylib' ] || cp '${PLUGIN_FFMOVIE_SRC}' '${PLUGIN_FRAMEWORKS_DIR}/'"
+            # Deploy Qt (skip if already deployed). macdeployqt only supports .app bundles
+            # (CFBundlePackageType=APPL), so it may exit non-zero for .plugin bundles.
+            # The non-zero exit is safe to ignore as Qt frameworks are still copied successfully.
+            COMMAND /bin/sh -c "[ -d '${PLUGIN_FRAMEWORKS_DIR}/QtCore.framework' ] || '${DEPLOYQT_EXECUTABLE}' -no-strip '${PLUGIN_BUNDLE_DIR}' -qmldir='${CMAKE_CURRENT_SOURCE_DIR}/assets/qml' || true"
+            # Set rpath
+            COMMAND /bin/sh -c "install_name_tool -add_rpath '@loader_path/../Frameworks' '${PLUGIN_BUNDLE_DIR}/Contents/MacOS/PAGExporter' 2>/dev/null || true"
+            COMMENT "Deploying runtime dependencies into PAGExporter.plugin"
+            VERBATIM
+    )
+
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_custom_command(
                 TARGET PAGExporter POST_BUILD

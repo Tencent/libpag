@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -47,6 +47,11 @@ class LayoutContext {
   // fonts first, then system fallback fonts. Typefaces are created on demand.
   std::shared_ptr<tgfx::Typeface> fallbackTypeface(int32_t codepoint,
                                                    const tgfx::Typeface* primaryTypeface);
+
+  // Returns all user fallback typefaces in registration order. Lazy-loads deferred entries; any
+  // holder that fails to resolve is skipped. Used by the PAG v2 FontProvider adapter to serve the
+  // same fallback chain the layout engine uses.
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces();
 
   FontConfig* getFontConfig() const {
     return fontConfig;

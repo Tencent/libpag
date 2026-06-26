@@ -630,17 +630,17 @@
 <context>
     <name>pag::PluginInstaller</name>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="127"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="126"/>
         <source>Install Adobe After Effects Plug-in</source>
         <translation>安装 Adobe After Effects 插件</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="131"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="130"/>
         <source>Do you want to install the Adobe After Effects plugins?</source>
         <translation>是否要安装 Adobe After Effects 插件？</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="135"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="134"/>
         <source>Update Adobe After Effects Plug-in</source>
         <translation>更新 Adobe After Effects 插件</translation>
     </message>
@@ -649,105 +649,105 @@
         <translation type="vanished">有新版本的插件可用。是否要安装？</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="73"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="72"/>
         <source>Reinstall Adobe After Effects Plug-in</source>
         <translation>重新安装 Adobe After Effects 插件</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="74"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="73"/>
         <source>The plugins are already installed with the latest version. Do you want to reinstall them?</source>
         <translation>插件已是最新版本。是否要重新安装？</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="146"/>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="189"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="145"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="188"/>
         <source>Please close Adobe After Effects</source>
         <translation>请关闭 Adobe After Effects</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="147"/>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="190"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="146"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="189"/>
         <source>Adobe After Effects is currently running. Please close it and click OK to continue, or Cancel to abort.</source>
         <translation>Adobe After Effects 正在运行。请关闭它并点击确定继续，或点击取消中止。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="157"/>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="172"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="156"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="171"/>
         <source>Installation Failed</source>
         <translation>安装失败</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="157"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="156"/>
         <source>Plugin source not found: %1</source>
         <translation>未找到插件源：%1</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="166"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="165"/>
         <source>Installation Complete</source>
         <translation>安装完成</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="167"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="166"/>
         <source>Adobe After Effects plugins have been successfully installed!</source>
         <translation>Adobe After Effects 插件已成功安装！</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="169"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="168"/>
         <source>Adobe After Effects plug-in installed successfully.</source>
         <translation>Adobe After Effects 插件安装成功。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="173"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="172"/>
         <source>Failed to install Adobe After Effects plugins. Please check permissions.</source>
         <translation>安装 Adobe After Effects 插件失败。请检查权限。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="177"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="176"/>
         <source>Failed to install Adobe After Effects plug-in due to permission issues.</source>
         <translation>由于权限问题，安装 Adobe After Effects 插件失败。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="183"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="182"/>
         <source>Uninstall Plugins</source>
         <translation>卸载插件</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="184"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="183"/>
         <source>Are you sure you want to uninstall the selected plugins?</source>
         <translation>确定要卸载选中的插件吗？</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="200"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="199"/>
         <source>Uninstallation Complete</source>
         <translation>卸载完成</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="200"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="199"/>
         <source>Plugins have been successfully removed!</source>
         <translation>插件已成功移除！</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="201"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="200"/>
         <source>Uninstalled AE Plug-in Successfully</source>
         <translation>AE 插件卸载成功</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="204"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="203"/>
         <source>Uninstallation Failed</source>
         <translation>卸载失败</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="205"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="204"/>
         <source>Failed to uninstall plugins. Please check permissions.</source>
         <translation>卸载插件失败。请检查权限。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="207"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="206"/>
         <source>Failed to uninstall AE Plug-in due to permission issues.</source>
         <translation>由于权限问题，卸载 AE 插件失败。</translation>
     </message>
     <message>
-        <location filename="../../src/platform/PluginInstaller.cpp" line="139"/>
+        <location filename="../../src/platform/PluginInstaller.cpp" line="138"/>
         <source>A new version of the Adobe After Effects plugin is available. Would you like to update it now?</source>
         <translation>Adobe After Effects 插件有新版本可用，是否立即更新？</translation>
     </message>

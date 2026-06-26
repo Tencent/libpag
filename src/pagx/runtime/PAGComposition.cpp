@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGComposition.h"
+#include <unordered_map>
 #include <unordered_set>
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
@@ -26,6 +27,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 
@@ -42,57 +44,107 @@ LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
 }
 
+void PAGComposition::advance(int64_t deltaMicroseconds) {
+  for (auto& timeline : timelines) {
+    timeline->advance(deltaMicroseconds);
+  }
+  PAGLayer::advance(deltaMicroseconds);
+}
+
+void PAGComposition::apply(float mix) {
+  for (auto& timeline : timelines) {
+    timeline->apply(mix);
+  }
+  PAGLayer::apply(mix);
+}
+
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
     const Layer* ownerLayer, const std::shared_ptr<PAGScene>& parentScene,
     std::unordered_set<const Composition*>& visited) {
-  if (ownerLayer == nullptr || parentScene == nullptr || ownerLayer->composition == nullptr) {
+  if (ownerLayer == nullptr || parentScene == nullptr) {
     return nullptr;
   }
-  // Cycle guard: visited holds the compositions on the current ancestor path. A composition that
-  // references itself (directly or via an A->B->A chain) would otherwise recurse without end and
-  // overflow the stack. Report the cycle on the owning document and drop this subtree. The set is
-  // treated as a path stack (inserted on the way down, erased on return) so a composition reused
-  // by sibling layers is not mistaken for a cycle. The external-file chain guard in
-  // PAGXDocument::LoadExternalComposition does not cover same-document @id references.
+  // Cycle guard: visited acts as a path stack — a composition on the current ancestor chain
+  // is rejected, but the same composition reused by a sibling is not (visited is scoped per path).
+  // The external-file chain guard (loadFileData) does not cover same-document @id references.
   auto* sourceComposition = ownerLayer->composition;
-  if (visited.find(sourceComposition) != visited.end()) {
-    auto* document = parentScene->document.get();
-    if (document != nullptr) {
-      document->errors.push_back("Cyclic composition reference detected: '@" +
-                                 sourceComposition->id + "'.");
+  if (sourceComposition != nullptr) {
+    if (visited.find(sourceComposition) != visited.end()) {
+      auto* document = parentScene->document.get();
+      if (document != nullptr) {
+        document->errors.push_back("Cyclic composition reference detected: '@" +
+                                   sourceComposition->id + "'.");
+      }
+      return nullptr;
     }
-    return nullptr;
   }
   auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
   auto composition = std::shared_ptr<PAGComposition>(
       new PAGComposition(ownerLayer, std::move(buildResult.root), parentScene));
   *composition->binding = std::move(buildResult.binding);
+  // When the composition is not yet loaded (composition == nullptr), BuildCompositionSubtree
+  // returns an empty root. Build a minimal tgfx slot layer so the PAGComposition has a valid
+  // runtimeLayer for syncChildren to attach children into later.
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
-  // Spawn the timelines declared on the owner layer, targeting this composition's own binding and
-  // document, then build the persistent per-layer runtime node tree for the composition content.
-  for (const auto& driver : ownerLayer->timelines) {
+  if (composition->runtimeLayer == nullptr) {
+    composition->runtimeLayer =
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get(), composition->document);
+  }
+  if (externalDoc != nullptr) {
+    externalDoc->registerLiveScene(parentScene);
+  }
+  composition->spawnTimelines(parentScene);
+  if (sourceComposition != nullptr) {
+    visited.insert(sourceComposition);
+    composition->buildChildren(ownerLayer->composition->layers, visited);
+    visited.erase(sourceComposition);
+  }
+  return composition;
+}
+
+void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
+  timelines.clear();
+  if (node == nullptr) {
+    return;
+  }
+  for (const auto& driver : node->timelines) {
     if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
       continue;
     }
     auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation = composition->document != nullptr
-                          ? composition->document->findNode<Animation>(animationDriver->animationId)
-                          : nullptr;
+    auto* animation =
+        document != nullptr ? document->findNode<Animation>(animationDriver->animationId) : nullptr;
     if (animation == nullptr) {
       continue;
     }
-    auto timeline = std::shared_ptr<PAGTimeline>(
-        new PAGTimeline(animation, composition->binding.get(), composition->document, parentScene));
-    if (animationDriver->playing) {
-      timeline->play();
+    auto timeline =
+        std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding.get(), document, scene));
+    if (!animationDriver->playing) {
+      timeline->pause();
     }
-    composition->timelines.push_back(std::move(timeline));
+    timelines.push_back(std::move(timeline));
   }
-  visited.insert(sourceComposition);
-  composition->buildChildren(ownerLayer->composition->layers, visited);
-  visited.erase(sourceComposition);
-  return composition;
+}
+
+void PAGComposition::spawnTimelinesFromScene() {
+  auto scene = rootScene.lock();
+  if (scene != nullptr) {
+    spawnTimelines(scene);
+  }
+}
+
+void PAGComposition::resetTimelines() {
+  forEachComposition(ResetCompositionTimelines);
+}
+
+void PAGComposition::forEachComposition(void (*visitor)(PAGComposition*)) {
+  PAGLayer::forEachComposition(visitor);
+  visitor(this);
+}
+
+void PAGComposition::ResetCompositionTimelines(PAGComposition* comp) {
+  comp->spawnTimelinesFromScene();
 }
 
 void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
@@ -101,89 +153,245 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
   if (!scene) {
     return;
   }
+  BuildChildren(binding.get(), layers, children, scene, visited);
+}
+
+void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
+                                   std::vector<std::shared_ptr<PAGLayer>>& outChildren,
+                                   const std::shared_ptr<PAGScene>& scene,
+                                   std::unordered_set<const Composition*>& visited) {
+  if (binding == nullptr || scene == nullptr) {
+    return;
+  }
   for (auto* layer : layers) {
     if (layer == nullptr) {
       continue;
     }
-    auto layerRuntime = binding->get<tgfx::Layer>(layer);
-    if (layer->composition != nullptr) {
-      auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
-      if (childComposition == nullptr) {
+    auto child = BuildChildLayer(layer, binding, scene, visited);
+    if (child != nullptr) {
+      outChildren.push_back(std::move(child));
+    }
+  }
+}
+
+void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
+                                  const std::unordered_set<const Node*>& dirtySet,
+                                  std::unordered_set<const Composition*>& visited) {
+  const std::vector<Layer*>* sourceLayers = nullptr;
+  if (node == nullptr) {
+    auto scene = rootScene.lock();
+    if (scene != nullptr && scene->document != nullptr) {
+      sourceLayers = &scene->document->layers;
+    }
+  } else if (node->composition != nullptr) {
+    sourceLayers = &node->composition->layers;
+  }
+  bool containerDirty = node == nullptr || dirtySet.find(node) != dirtySet.end();
+  if (sourceLayers != nullptr && containerDirty) {
+    syncChildren(*sourceLayers, visited);
+  }
+
+  if (binding != nullptr) {
+    for (auto* dirty : dirtyNodes) {
+      if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
         continue;
       }
-      if (childComposition->runtimeLayer != nullptr && layerRuntime != nullptr) {
-        layerRuntime->addChild(childComposition->runtimeLayer);
+      auto* dirtyLayer = static_cast<Layer*>(dirty);
+      if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
+        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document);
       }
-      children.push_back(std::move(childComposition));
-    } else {
-      children.push_back(std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene)));
     }
   }
-}
-
-void PAGComposition::advance(int64_t deltaMicroseconds) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->advance(deltaMicroseconds);
-    }
-  }
-  for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->advance(deltaMicroseconds);
-    }
-  }
-}
-
-void PAGComposition::apply(float mix) {
-  for (auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->apply(mix);
-    }
-  }
-  for (auto& child : children) {
-    if (child != nullptr && child->layerType() != LayerType::Layer) {
-      static_cast<PAGComposition*>(child.get())->apply(mix);
-    }
-  }
-}
-
-std::shared_ptr<PAGLayer> PAGComposition::findChildForLayer(const tgfx::Layer* hitLayer) {
   for (auto& child : children) {
     if (child == nullptr) {
       continue;
     }
-    if (child->runtimeLayer.get() == hitLayer) {
-      return child;
-    }
     if (child->layerType() != LayerType::Layer) {
-      auto found = static_cast<PAGComposition*>(child.get())->findChildForLayer(hitLayer);
-      if (found != nullptr) {
-        return found;
+      auto* childComposition = static_cast<PAGComposition*>(child.get());
+      const Composition* childSource =
+          childComposition->node != nullptr ? childComposition->node->composition : nullptr;
+      bool inserted = false;
+      if (childSource != nullptr) {
+        inserted = visited.insert(childSource).second;
+      }
+      childComposition->refreshNodes(dirtyNodes, dirtySet, visited);
+      if (inserted) {
+        visited.erase(childSource);
+      }
+    } else if (!child->children.empty()) {
+      refreshPlainContainerChildren(child.get(), dirtyNodes, visited, dirtySet);
+    }
+  }
+}
+
+std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
+    const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
+    std::unordered_set<const Composition*>& visited) {
+  if (layer->composition != nullptr || !layer->compositionFilePath.empty()) {
+    auto childComposition = PAGComposition::MakeChild(layer, scene, visited);
+    if (childComposition == nullptr) {
+      return nullptr;
+    }
+    auto slot = binding->get<tgfx::Layer>(layer);
+    if (slot == nullptr) {
+      slot = LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
+    }
+    if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
+      slot->addChild(childComposition->runtimeLayer);
+    }
+    return childComposition;
+  }
+  auto layerRuntime = binding->get<tgfx::Layer>(layer);
+  if (layerRuntime == nullptr) {
+    layerRuntime =
+        LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
+  }
+  if (layerRuntime == nullptr) {
+    return nullptr;
+  }
+  auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
+  if (!layer->children.empty()) {
+    BuildChildren(binding, layer->children, child->children, scene, visited);
+    for (auto& nestedChild : child->children) {
+      auto nestedSlot = binding->get<tgfx::Layer>(nestedChild->node);
+      if (nestedSlot != nullptr && child->runtimeLayer != nullptr) {
+        child->runtimeLayer->addChild(nestedSlot);
       }
     }
   }
-  return nullptr;
+  return child;
 }
 
-std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float x, float y) {
-  std::vector<std::shared_ptr<PAGLayer>> result = {};
-  if (runtimeLayer == nullptr) {
-    return result;
+void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
+                                  std::unordered_set<const Composition*>& visited) {
+  auto scene = rootScene.lock();
+  if (!scene || binding == nullptr || runtimeLayer == nullptr) {
+    return;
   }
-  // tgfx getLayersUnderPoint returns the hit tgfx layers top-most first, in this composition's root
-  // coordinate space, covering the whole subtree (child composition roots are attached into the
-  // same tree). A hit tgfx layer may be an internal sub-layer (mask, vector content) not bound to a
-  // persistent node; keep only those that match a persistent PAGLayer node's runtimeLayer.
-  // Resolution searches this composition's children and recurses into descendant compositions. The
-  // first array entry stays the top-most layer.
-  auto hitLayers = runtimeLayer->getLayersUnderPoint(x, y);
-  for (const auto& hitLayer : hitLayers) {
-    auto matched = findChildForLayer(hitLayer.get());
-    if (matched != nullptr && matched->layerType() == LayerType::Layer) {
-      result.push_back(std::move(matched));
+  std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};
+  for (auto& child : children) {
+    if (child != nullptr && child->node != nullptr) {
+      existing.emplace(child->node, child);
     }
   }
-  return result;
+  std::unordered_set<const Layer*> kept = {};
+  std::vector<std::shared_ptr<PAGLayer>> newChildren = {};
+  newChildren.reserve(sourceLayers.size());
+  for (auto* layer : sourceLayers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    auto it = existing.find(layer);
+    if (it != existing.end()) {
+      newChildren.push_back(it->second);
+      kept.insert(layer);
+      continue;
+    }
+    auto child = BuildChildLayer(layer, binding.get(), scene, visited);
+    if (child != nullptr) {
+      newChildren.push_back(std::move(child));
+    }
+  }
+  for (auto& child : children) {
+    // Detach the slot (binding entry) rather than child->runtimeLayer: for a composition child
+    // the latter is the subtree root nested under the slot, so detaching the slot removes the
+    // entire subtree together. The slot must be looked up before binding->remove() erases the
+    // mapping.
+    if (child == nullptr || child->node == nullptr || kept.find(child->node) != kept.end()) {
+      continue;
+    }
+    auto slot = binding->get<tgfx::Layer>(child->node);
+    if (slot != nullptr) {
+      slot->removeFromParent();
+    }
+    binding->remove(child->node);
+  }
+  children = std::move(newChildren);
+  // Reorder this parent's direct tgfx children to match the document order. addChild on a layer
+  // already parented here moves it to the top, so appending in source order yields document order.
+  for (auto& child : children) {
+    if (child == nullptr || child->node == nullptr) {
+      continue;
+    }
+    auto slot = binding->get<tgfx::Layer>(child->node);
+    if (slot != nullptr) {
+      runtimeLayer->addChild(slot);
+    }
+  }
+}
+
+void PAGComposition::refreshPlainContainerChildren(
+    PAGLayer* container, const std::vector<Node*>& dirtyNodes,
+    std::unordered_set<const Composition*>& visited,
+    const std::unordered_set<const Node*>& dirtySet) {
+  if (container == nullptr || container->node == nullptr) {
+    return;
+  }
+  bool dirty = dirtySet.find(container->node) != dirtySet.end();
+  if (dirty) {
+    auto scene = rootScene.lock();
+    if (scene != nullptr && binding != nullptr) {
+      // Incrementally sync the container's runtime children with its source layer list, reusing
+      // existing PAGLayer / PAGComposition handles so external holders are not invalidated.
+      std::unordered_map<const Layer*, std::shared_ptr<PAGLayer>> existing = {};
+      for (auto& child : container->children) {
+        if (child != nullptr && child->node != nullptr) {
+          existing.emplace(child->node, child);
+        }
+      }
+      std::unordered_set<const Layer*> kept = {};
+      std::vector<std::shared_ptr<PAGLayer>> newChildren = {};
+      newChildren.reserve(container->node->children.size());
+      for (auto* sourceChild : container->node->children) {
+        if (sourceChild == nullptr) {
+          continue;
+        }
+        auto it = existing.find(sourceChild);
+        if (it != existing.end()) {
+          newChildren.push_back(it->second);
+          kept.insert(sourceChild);
+          continue;
+        }
+        auto child = BuildChildLayer(sourceChild, binding.get(), scene, visited);
+        if (child != nullptr) {
+          newChildren.push_back(std::move(child));
+        }
+      }
+      for (auto& oldChild : container->children) {
+        if (oldChild == nullptr || oldChild->node == nullptr ||
+            kept.find(oldChild->node) != kept.end()) {
+          continue;
+        }
+        auto slot = binding->get<tgfx::Layer>(oldChild->node);
+        if (slot != nullptr) {
+          slot->removeFromParent();
+        }
+        binding->remove(oldChild->node);
+      }
+      container->children = std::move(newChildren);
+      if (container->runtimeLayer != nullptr) {
+        for (auto& child : container->children) {
+          if (child == nullptr || child->node == nullptr) {
+            continue;
+          }
+          auto slot = binding->get<tgfx::Layer>(child->node);
+          if (slot != nullptr) {
+            container->runtimeLayer->addChild(slot);
+          }
+        }
+      }
+    }
+  }
+  for (auto& child : container->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() != LayerType::Layer) {
+      static_cast<PAGComposition*>(child.get())->refreshNodes(dirtyNodes, dirtySet, visited);
+    } else if (!child->children.empty()) {
+      refreshPlainContainerChildren(child.get(), dirtyNodes, visited, dirtySet);
+    }
+  }
 }
 
 }  // namespace pagx
