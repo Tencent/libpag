@@ -624,6 +624,19 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmptyDocument) {
 }
 
 /**
+ * Test SVG import: a zero-size SVG that only hosts <defs> (a common hidden
+ * container in snapshotted HTML) is legal and must import to a valid empty
+ * document rather than failing the parse.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ZeroSizeDefsOnly) {
+  std::string svg = "<svg width=\"0\" height=\"0\"><defs><path id=\"p0\" d=\"M0 0L10 0L5 8Z\"/>"
+                    "</defs></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->layers.empty());
+}
+
+/**
  * Test SVG export with inner shadow filter.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_InnerShadow) {

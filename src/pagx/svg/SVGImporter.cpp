@@ -129,8 +129,12 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     _viewBoxHeight = sourceH;
   }
 
+  // A zero-size SVG (e.g. a hidden `<svg width="0" height="0">` that only hosts
+  // <defs>, a common pattern in snapshotted HTML) is legal but paints nothing.
+  // Return an empty document rather than failing the whole import: the caller
+  // gets a valid result with no layers, and any visible siblings still resolve.
   if (sourceW <= 0 || sourceH <= 0) {
-    return nullptr;
+    return PAGXDocument::Make(0, 0);
   }
 
   // Determine target dimensions: external target > SVG explicit size > viewBox size.
@@ -151,7 +155,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   if (targetW <= 0 || targetH <= 0) {
-    return nullptr;
+    return PAGXDocument::Make(0, 0);
   }
 
   _document = PAGXDocument::Make(targetW, targetH);

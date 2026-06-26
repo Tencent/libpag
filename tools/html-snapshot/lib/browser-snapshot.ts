@@ -534,7 +534,12 @@ function appendStyleProp(parts, computed, entry, ctx) {
   if (entry.defaults && entry.defaults.includes(v)) return;
   if (entry.skipIfEqualsTextColor && ctx && v === ctx.textColor) return;
   const outProp = entry.outProp || entry.prop;
-  parts.push(`${outProp}: ${v}`);
+  // Rewrite embedded double quotes as single quotes so the value embeds safely
+  // inside the surrounding style="…" attribute. CSS treats single- and double-
+  // quoted strings (and url("…") / url('…')) equivalently, so a value like
+  // `filter: url("#blur")` round-trips while no longer prematurely closing the
+  // attribute and breaking the XML parse on import.
+  parts.push(`${outProp}: ${v.replace(/"/g, "'")}`);
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -1205,7 +1210,11 @@ function freezeSvg(svgEl, rect) {
     for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs);
   };
   walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS);
-  return clone.outerHTML;
+  // outerHTML serialises U+00A0 as the named entity &nbsp;, which the importer's
+  // XML parser rejects (XML predefines only &amp; &lt; &gt; &quot; &apos;).
+  // Rewrite it to the numeric character reference so the frozen SVG stays valid
+  // XML; every other entity the HTML serialiser emits is already XML-legal.
+  return clone.outerHTML.replace(/&nbsp;/g, '&#160;');
 }
 
 // ===== Multi-line text emission =====
