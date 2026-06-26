@@ -7569,7 +7569,8 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
 
 /**
  * Test case: hit test resolves a leaf layer nested under a container layer that has no composition
- * reference. The container itself is not returned; only the leaf is.
+ * reference. The leaf is the top-most hit, with its ancestor container and the root composition
+ * following in the result.
  */
 PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10137,10 +10138,11 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   EXPECT_EQ(hits[1]->name(), "Middle");
   EXPECT_EQ(hits[2]->name(), "Root");
+  EXPECT_EQ(hits[3], scene->rootComposition());
 
   // Add a grandchild under middle and notify.
   auto grandchild = doc->makeNode<pagx::Layer>("Grandchild");
@@ -10158,10 +10160,10 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   hits = scene->getLayersUnderPoint(120, 120);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Grandchild");
 
   // Remove the grandchild and notify; it is no longer hit.
@@ -10169,7 +10171,7 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   // No content covers (120,120) after removing grandchild: Middle has no direct content.
   hits = scene->getLayersUnderPoint(120, 120);
@@ -10183,6 +10185,37 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   ASSERT_EQ(hits.size(), 0u);
   hits = scene->getLayersUnderPoint(120, 120);
   ASSERT_EQ(hits.size(), 0u);
+}
+
+/**
+ * Test case: hit testing returns authored PAGComposition nodes, not only plain layers. A Layer slot
+ * referencing a composition is hit, and the composition instance itself appears in the result chain
+ * because a composition is a PAGLayer.
+ */
+PAGX_TEST(PAGXTest, HitTestReturnsCompositionNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto slot = doc->makeNode<pagx::Layer>("Slot");
+  slot->name = "Slot";
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  scene->advanceAndApply(500'000);
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  bool hasComposition = false;
+  for (const auto& hit : hits) {
+    if (hit->layerType() == pagx::LayerType::Composition) {
+      hasComposition = true;
+    }
+  }
+  EXPECT_TRUE(hasComposition);
 }
 
 /**

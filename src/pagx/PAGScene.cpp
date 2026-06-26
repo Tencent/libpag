@@ -523,7 +523,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
   for (const auto& hitLayer : hitLayers) {
     auto it = layerRegistry.find(hitLayer.get());
-    if (it != layerRegistry.end() && it->second->layerType() == LayerType::Layer) {
+    if (it != layerRegistry.end()) {
       result.push_back(it->second->shared_from_this());
     }
   }
