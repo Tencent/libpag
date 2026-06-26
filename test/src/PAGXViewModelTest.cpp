@@ -1947,7 +1947,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterSecondsToFrames) {
   // Verify the converter output reached the layer through the DataBind pipeline.
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 120.0f);
 
-  // Independently verify the converter output via the registry.
+  // Verify the converter output via the registry (same path the pipeline uses).
   auto& registry = pagx::DataConverterRegistry::instance();
   pagx::KeyValue input{2.0f};
   auto output = registry.apply(conv, input);
