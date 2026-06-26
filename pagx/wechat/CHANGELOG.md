@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.9.7
+
+### 新增
+
+- `CheckPagx` 增强：返回结果新增 `brand`、`model`、`gpuRenderer` 字段，支持
+  Mali GPU 驱动缺陷检测（Mali-G925 / Mali-G1-Ultra），存在缺陷时直接返回 -1
+  表示不支持渲染
+
+### 变更
+
+- `PAGXView.registerFonts()` 重构：改为直接通过 `fontConfig` 注册字体，移除
+  中间 Typeface 对象的创建步骤
+- 系统信息采集新增 `brand`、`model` 字段
+- 构建脚本 `copy-files.js` 扩展复制目标目录
+
+---
+
 ## v1.9.6
 
 ### 变更
