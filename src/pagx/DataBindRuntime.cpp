@@ -34,7 +34,9 @@
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/types/Color.h"
+#include "pagx/utils/ColorSpaceUtils.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/ToTGFX.h"
 
 namespace pagx {
 
@@ -323,6 +325,25 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
       auto targetTGFX = targetImage != nullptr ? LayerBuilder::GetTGFXImage(*targetImage) : nullptr;
       if (LayerBuilder::GetTGFXImage(imageValue->value()) == targetTGFX) {
         continue;
+      }
+    } else if (entry.source->valueType() == ViewModelPropertyType::Color) {
+      // Color change detection must happen in the target's sRGB domain. The reader reports the
+      // target color in sRGB (tgfx::Color is always sRGB), and writers project the ViewModel color
+      // into that same sRGB domain through ToTGFX. Comparing the read-back against ToTGFX of the
+      // current ViewModel value therefore asks the precise question "did the target color change?"
+      // without a lossy sRGB->source-space round-trip, which would never compare equal for a wide
+      // gamut (Display P3) source and force a spurious first-pass writeback that overwrites the
+      // ViewModel color and fires its observers even when nothing changed.
+      auto* colorReadback = std::get_if<Color>(&kv);
+      if (colorReadback != nullptr) {
+        auto* colorValue = static_cast<PAGViewModelValueColor*>(entry.source);
+        if (ToTGFX(*colorReadback) == ToTGFX(colorValue->value())) {
+          continue;
+        }
+        // The target color genuinely changed. Re-express the sRGB read-back in the ViewModel's
+        // current color space before writing it back, so a Display P3 property keeps its color
+        // space instead of silently degrading to sRGB.
+        kv = KeyValue{ConvertColorSpace(*colorReadback, colorValue->value().colorSpace)};
       }
     } else if (entry.hasLastTarget && entry.lastTargetValue == kv) {
       continue;

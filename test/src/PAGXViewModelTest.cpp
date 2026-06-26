@@ -2460,4 +2460,61 @@ PAGX_TEST(PAGXViewModelTest, VMContextConnection) {
   EXPECT_EQ(label->value(), "hello");
 }
 
+PAGX_TEST(PAGXViewModelTest, TwoWaySyncPreservesColorSpaceOnReadback) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("T");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "bg";
+  prop->propertyType = pagx::ViewModelPropertyType::Color;
+  prop->defaultColor = pagx::Color{1, 0, 0, 1, pagx::ColorSpace::DisplayP3};
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("r");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>("fillColor");
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.bg";
+  db->target = "@fillColor";
+  db->channel = "color";
+  db->direction = pagx::DataBindDirection::TwoWay;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto bg = vm->propertyColor("bg");
+  ASSERT_NE(bg, nullptr);
+  EXPECT_EQ(bg->value().colorSpace, pagx::ColorSpace::DisplayP3);
+  int obs = 0;
+  auto h = bg->addObserver([&]() { obs++; });
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  // The color is never changed on the target side, so the first-frame syncBack must not clobber the
+  // ViewModel's Display P3 value with the sRGB-labeled read-back, nor fire the observer. Without
+  // color-space normalization the sRGB-labeled read-back would never equal the P3 source, forcing a
+  // spurious first-pass writeback.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(obs, 0);
+  EXPECT_EQ(bg->value().colorSpace, pagx::ColorSpace::DisplayP3);
+  EXPECT_FLOAT_EQ(bg->value().red, 1.0f);
+  EXPECT_FLOAT_EQ(bg->value().green, 0.0f);
+  EXPECT_FLOAT_EQ(bg->value().blue, 0.0f);
+  // A second draw keeps the value stable and still does not notify.
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_EQ(obs, 0);
+  EXPECT_EQ(bg->value().colorSpace, pagx::ColorSpace::DisplayP3);
+}
+
 }  // namespace pag
