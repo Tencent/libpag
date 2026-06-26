@@ -210,7 +210,11 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
 
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   bool hasMultipleFragments = fragments.size() > 1;
-  bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
+  // CSS `white-space` suppresses automatic line breaking for both `nowrap` and `pre`
+  // (`pre` preserves runs of whitespace / newlines and never soft-wraps). `pre-wrap` and
+  // `pre-line` still wrap, so they keep the default word-wrap behaviour.
+  std::string ws = ToLower(Trim(inherited.whiteSpace));
+  bool hasNoWrap = ws == "nowrap" || ws == "pre";
   std::string wm = ToLower(Trim(inherited.writingMode));
   bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
   // A child inline run that carries an explicit `line-height` (e.g. the digit-badge idiom
