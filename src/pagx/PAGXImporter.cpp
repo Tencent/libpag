@@ -2796,14 +2796,16 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
           prop->enumOptions = SplitEnumOptions(optionsStr);
         }
         // An out-of-range Enum default would otherwise be silently accepted and dereference past
-        // the option list at runtime.
+        // the option list at runtime. With no options the default is unconstrained, so skip the
+        // check: the exporter omits both the option list and a zero default, and re-importing that
+        // output must not raise a spurious error.
         if (prop->propertyType == ViewModelPropertyType::Enum) {
           auto optionCount = static_cast<int>(prop->enumOptions.size());
-          if (prop->defaultEnum < 0 || prop->defaultEnum >= optionCount) {
+          if (optionCount > 0 && (prop->defaultEnum < 0 || prop->defaultEnum >= optionCount)) {
             ReportError(doc, child.get(),
                         "Enum 'default' index " + std::to_string(prop->defaultEnum) +
                             " is out of range for " + std::to_string(optionCount) + " option(s).");
-            prop->defaultEnum = optionCount > 0 ? (prop->defaultEnum < 0 ? 0 : optionCount - 1) : 0;
+            prop->defaultEnum = prop->defaultEnum < 0 ? 0 : optionCount - 1;
           }
         }
         auto converterId = GetAttribute(child.get(), "dataConverter");

@@ -2324,6 +2324,30 @@ PAGX_TEST(PAGXViewModelTest, EnumOptionCommaRoundTrip) {
   EXPECT_EQ(prop->enumOptions[2], "a\\b");
 }
 
+// An Enum property with no options and a zero default exports neither an options list nor a default
+// attribute. Re-importing that output must round-trip cleanly instead of reporting the default as
+// out of range for zero options.
+PAGX_TEST(PAGXViewModelTest, EnumEmptyOptionsRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MainVM");
+  auto* enumProp = doc->makeNode<pagx::ViewModelProperty>();
+  enumProp->name = "layout";
+  enumProp->propertyType = pagx::ViewModelPropertyType::Enum;
+  enumProp->defaultEnum = 0;
+  schema->properties.push_back(enumProp);
+  doc->viewModel = schema;
+
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
+  ASSERT_NE(roundTripped, nullptr);
+  ASSERT_NE(roundTripped->viewModel, nullptr);
+  ASSERT_EQ(roundTripped->viewModel->properties.size(), 1u);
+  auto* prop = roundTripped->viewModel->properties[0];
+  EXPECT_EQ(prop->propertyType, pagx::ViewModelPropertyType::Enum);
+  EXPECT_TRUE(prop->enumOptions.empty());
+  EXPECT_EQ(prop->defaultEnum, 0);
+}
+
 // ========== Nested composition DataBind ==========
 
 PAGX_TEST(PAGXViewModelTest, NestedCompositionDataBind) {
