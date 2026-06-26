@@ -31,6 +31,7 @@ class PAGScene;
 class PAGViewModel;
 class PropertyData;
 class DataBindRuntime;
+class DataConverter;
 
 /**
  * PAGViewModelValue is the base class for typed ViewModel property values. Each value holds the
@@ -117,7 +118,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   ViewModelPropertyType type = ViewModelPropertyType::Number;
   std::weak_ptr<PAGScene> scene = {};
   bool notifying = false;
-  class DataConverter* converter = nullptr;
+  DataConverter* converter = nullptr;
   std::shared_ptr<PropertyData> pd;
 
   /**
