@@ -93,8 +93,22 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
   frag.lineHeight = _valueParser.resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+  ResolveWhiteSpaceFlags(inherited.whiteSpace, frag.collapseWhitespace, frag.preserveNewlines);
   return frag;
 }
+
+void HTMLTextFragmentBuilder::ResolveWhiteSpaceFlags(const std::string& whiteSpace,
+                                                     bool& outCollapseWhitespace,
+                                                     bool& outPreserveNewlines) {
+  // CSS `white-space` controls two independent behaviours used here. `pre` and `pre-wrap`
+  // keep every source space (no folding); `pre`, `pre-wrap` and `pre-line` all turn a
+  // source newline into a hard line break. `normal` and `nowrap` fold whitespace and drop
+  // newlines. Anything unrecognised falls back to `normal`.
+  std::string ws = ToLower(Trim(whiteSpace));
+  outCollapseWhitespace = !(ws == "pre" || ws == "pre-wrap");
+  outPreserveNewlines = ws == "pre" || ws == "pre-wrap" || ws == "pre-line";
+}
+
 
 bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const TextFragment& b) {
   // CSS unit conversions (em -> px etc.) introduce sub-pixel rounding that should not

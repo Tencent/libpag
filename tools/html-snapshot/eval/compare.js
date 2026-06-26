@@ -31,9 +31,28 @@ const { openAndSettlePage } = require('../dist/lib/page-loader');
 const pixelmatchMod = require('pixelmatch');
 const pixelmatch = typeof pixelmatchMod === 'function' ? pixelmatchMod : pixelmatchMod.default;
 
+// Composite the image over an opaque white background, in place. The baseline
+// PNG (Chromium) is rendered on an opaque white body, while the subset PNG
+// (`pagx render`) keeps a transparent background. Comparing the raw RGBA would
+// flag every transparent background pixel as different from opaque white, so
+// the whole empty canvas turns into a diff. Flattening both onto white (the
+// same fill `padToCommon` uses) removes that false signal and leaves only the
+// real content delta. Already-opaque white pixels are unchanged.
+function flattenToWhite(img) {
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] / 255;
+    data[i] = Math.round(data[i] * alpha + 255 * (1 - alpha));
+    data[i + 1] = Math.round(data[i + 1] * alpha + 255 * (1 - alpha));
+    data[i + 2] = Math.round(data[i + 2] * alpha + 255 * (1 - alpha));
+    data[i + 3] = 255;
+  }
+  return img;
+}
+
 function loadPng(filePath) {
   const data = fs.readFileSync(filePath);
-  return PNG.sync.read(data);
+  return flattenToWhite(PNG.sync.read(data));
 }
 
 // Pad to common size with white pixels. We never resample because that would

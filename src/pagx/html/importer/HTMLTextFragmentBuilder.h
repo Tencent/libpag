@@ -78,6 +78,14 @@ class HTMLTextFragmentBuilder {
     // no explicit line-height — `convertTextLeaf` then leaves `TextBox.lineHeight` at its
     // auto default.
     float lineHeight = NAN;
+    // Derived from the run's CSS `white-space`. `collapseWhitespace` folds runs of
+    // spaces / tabs into a single space (normal / nowrap / pre-line); when false
+    // (pre / pre-wrap) the source spaces are emitted verbatim. `preserveNewlines` keeps a
+    // source `\n` as a hard line break (pre / pre-wrap / pre-line); when false
+    // (normal / nowrap) newlines collapse to spaces like any other whitespace. Defaults
+    // match `white-space: normal`.
+    bool collapseWhitespace = true;
+    bool preserveNewlines = false;
   };
 
   HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
