@@ -37,7 +37,7 @@ class DataConverterRegistry {
   using ConverterFn = std::function<KeyValue(const KeyValue& input,
                                              const std::map<std::string, std::string>& params)>;
 
-  static DataConverterRegistry& instance();
+  static DataConverterRegistry& GetInstance();
 
   /**
    * Applies the forward converter. Returns input unchanged if no converter matches.

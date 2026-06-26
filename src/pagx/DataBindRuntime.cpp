@@ -202,7 +202,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
     }
     auto keyValue = ValueToKeyValue(entry->source);
     if (entry->source->converter != nullptr) {
-      keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
+      keyValue = DataConverterRegistry::GetInstance().apply(entry->source->converter, keyValue);
     }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
     if (entry->dataBind->direction == DataBindDirection::Once) {
@@ -351,7 +351,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     entry.lastTargetValue = kv;
     entry.hasLastTarget = true;
     // Apply inverse converter for syncBack direction (layer value → VM domain).
-    auto vmValue = DataConverterRegistry::instance().applyInverse(entry.source->converter, kv);
+    auto vmValue = DataConverterRegistry::GetInstance().applyInverse(entry.source->converter, kv);
     WriteVmValue(entry.source, vmValue);
   }
 }

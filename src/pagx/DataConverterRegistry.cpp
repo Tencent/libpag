@@ -45,7 +45,7 @@ DataConverterRegistry::DataConverterRegistry() {
   registerInverseConverter("degsToRads", ConvertInverseDegsToRads);
 }
 
-DataConverterRegistry& DataConverterRegistry::instance() {
+DataConverterRegistry& DataConverterRegistry::GetInstance() {
   static DataConverterRegistry registry;
   return registry;
 }

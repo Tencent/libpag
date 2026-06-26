@@ -1881,7 +1881,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterSecondsToFrames) {
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 120.0f);
 
   // Verify the converter output via the registry (same path the pipeline uses).
-  auto& registry = pagx::DataConverterRegistry::instance();
+  auto& registry = pagx::DataConverterRegistry::GetInstance();
   pagx::KeyValue input{2.0f};
   auto output = registry.apply(conv, input);
   ASSERT_TRUE(std::holds_alternative<float>(output));
@@ -1939,7 +1939,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
   ASSERT_NE(surface, nullptr);
   EXPECT_TRUE(scene->draw(surface));
   // Converter output is "$5999.00" (string), applied to the "name" channel.
-  auto& registry = pagx::DataConverterRegistry::instance();
+  auto& registry = pagx::DataConverterRegistry::GetInstance();
   pagx::KeyValue priceInput{5999.0f};
   auto priceOutput = registry.apply(conv, priceInput);
   ASSERT_TRUE(std::holds_alternative<std::string>(priceOutput));
@@ -1952,7 +1952,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterPriceFormat) {
 PAGX_TEST(PAGXViewModelTest, DataConverterNotFoundPassthrough) {
   // Non-existent converter → value passes through unchanged.
   pagx::KeyValue input{42.0f};
-  auto output = pagx::DataConverterRegistry::instance().apply(nullptr, input);
+  auto output = pagx::DataConverterRegistry::GetInstance().apply(nullptr, input);
   ASSERT_TRUE(std::holds_alternative<float>(output));
   EXPECT_FLOAT_EQ(std::get<float>(output), 42.0f);
 }
@@ -1963,7 +1963,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterInverseSecondsToFrames) {
   conv->params["frameRate"] = "60";
 
   pagx::KeyValue input{120.0f};
-  auto output = pagx::DataConverterRegistry::instance().applyInverse(conv.get(), input);
+  auto output = pagx::DataConverterRegistry::GetInstance().applyInverse(conv.get(), input);
   ASSERT_TRUE(std::holds_alternative<float>(output));
   EXPECT_FLOAT_EQ(std::get<float>(output), 2.0f);
 }
@@ -1971,7 +1971,7 @@ PAGX_TEST(PAGXViewModelTest, DataConverterInverseSecondsToFrames) {
 PAGX_TEST(PAGXViewModelTest, DataConverterInversePassthrough) {
   // No registered inverse → value unchanged.
   pagx::KeyValue input{99.0f};
-  auto output = pagx::DataConverterRegistry::instance().applyInverse(nullptr, input);
+  auto output = pagx::DataConverterRegistry::GetInstance().applyInverse(nullptr, input);
   ASSERT_TRUE(std::holds_alternative<float>(output));
   EXPECT_FLOAT_EQ(std::get<float>(output), 99.0f);
 }
