@@ -67,12 +67,12 @@ class DataBindRuntime {
 
     // ToSource/TwoWay flow target changes back to the ViewModel.
     bool toSource() const {
-      return dataBind->flags == DataBindDirection::ToSource ||
-             dataBind->flags == DataBindDirection::TwoWay;
+      return dataBind->direction == DataBindDirection::ToSource ||
+             dataBind->direction == DataBindDirection::TwoWay;
     }
     // Everything except pure ToSource drives the target from the ViewModel.
     bool toTarget() const {
-      return dataBind->flags != DataBindDirection::ToSource;
+      return dataBind->direction != DataBindDirection::ToSource;
     }
   };
 

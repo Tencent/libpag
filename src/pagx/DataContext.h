@@ -32,7 +32,7 @@ class PAGViewModelValue;
  * that enables DataBind source path resolution to traverse up through nested compositions.
  *
  * Resolution: "resolve(path)" walks the path segments through the local ViewModel first,
- * descending into ViewModelInstanceViewModel references for nested paths. If a segment is not
+ * descending into PAGViewModelValueViewModel references for nested paths. If a segment is not
  * found, the chain falls back to parentContext and retries.
  */
 class DataContext {

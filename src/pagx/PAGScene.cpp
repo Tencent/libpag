@@ -128,28 +128,28 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       case ViewModelPropertyType::Number: {
         auto v = std::make_shared<PAGViewModelValueNumber>();
         v->propertyValue = prop->defaultNumber;
-        v->type = ViewModelValueType::Number;
+        v->type = ViewModelPropertyType::Number;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::String: {
         auto v = std::make_shared<PAGViewModelValueString>();
         v->propertyValue = prop->defaultString;
-        v->type = ViewModelValueType::String;
+        v->type = ViewModelPropertyType::String;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::Boolean: {
         auto v = std::make_shared<PAGViewModelValueBoolean>();
         v->propertyValue = prop->defaultBoolean;
-        v->type = ViewModelValueType::Boolean;
+        v->type = ViewModelPropertyType::Boolean;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::Color: {
         auto v = std::make_shared<PAGViewModelValueColor>();
         v->propertyValue = prop->defaultColor;
-        v->type = ViewModelValueType::Color;
+        v->type = ViewModelPropertyType::Color;
         value = std::move(v);
         break;
       }
@@ -160,27 +160,27 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         // its own value in the meantime (tracked by userAssigned).
         v->sourceImage = prop->defaultImage;
         v->propertyValue = DecodeImageNode(prop->defaultImage);
-        v->type = ViewModelValueType::Image;
+        v->type = ViewModelPropertyType::Image;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::ViewModel: {
         auto v = std::make_shared<PAGViewModelValueViewModel>();
-        v->type = ViewModelValueType::ViewModel;
+        v->type = ViewModelPropertyType::ViewModel;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::Enum: {
         auto v = std::make_shared<PAGViewModelValueEnum>();
         v->propertyValue = prop->defaultEnum;
-        v->type = ViewModelValueType::Enum;
+        v->type = ViewModelPropertyType::Enum;
         value = std::move(v);
         break;
       }
       case ViewModelPropertyType::Trigger: {
         auto v = std::make_shared<PAGViewModelValueBoolean>();
         v->propertyValue = false;
-        v->type = ViewModelValueType::Trigger;
+        v->type = ViewModelPropertyType::Trigger;
         value = std::move(v);
         break;
       }
@@ -451,11 +451,11 @@ void PAGScene::flushDataBinds() {
 
 void PAGScene::clearAllViewModelsDirty() {
   if (_rootComposition != nullptr) {
-    clearCompositionTreeDirty(_rootComposition.get());
+    ClearCompositionTreeDirty(_rootComposition.get());
   }
 }
 
-void PAGScene::clearCompositionTreeDirty(PAGComposition* comp) {
+void PAGScene::ClearCompositionTreeDirty(PAGComposition* comp) {
   if (comp == nullptr) {
     return;
   }
@@ -465,18 +465,18 @@ void PAGScene::clearCompositionTreeDirty(PAGComposition* comp) {
   std::vector<PAGComposition*> childComps = {};
   PAGComposition::CollectChildCompositions(comp, childComps);
   for (auto* childComp : childComps) {
-    clearCompositionTreeDirty(childComp);
+    ClearCompositionTreeDirty(childComp);
   }
 }
 
-void PAGScene::refreshViewModelImages(PAGComposition* comp,
+void PAGScene::RefreshViewModelImages(PAGComposition* comp,
                                       const std::unordered_set<const Image*>& changed) {
   if (comp == nullptr) {
     return;
   }
   if (comp->compositionViewModel != nullptr) {
     for (const auto& value : comp->compositionViewModel->properties()) {
-      if (value == nullptr || value->valueType() != ViewModelValueType::Image) {
+      if (value == nullptr || value->valueType() != ViewModelPropertyType::Image) {
         continue;
       }
       auto* imageValue = static_cast<PAGViewModelValueImage*>(value.get());
@@ -497,7 +497,7 @@ void PAGScene::refreshViewModelImages(PAGComposition* comp,
   std::vector<PAGComposition*> childComps = {};
   PAGComposition::CollectChildCompositions(comp, childComps);
   for (auto* childComp : childComps) {
-    refreshViewModelImages(childComp, changed);
+    RefreshViewModelImages(childComp, changed);
   }
 }
 
@@ -506,7 +506,7 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
     return;
   }
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
-  refreshViewModelImages(_rootComposition.get(), changed);
+  RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,

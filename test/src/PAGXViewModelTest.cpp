@@ -30,13 +30,13 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextModifier.h"
-#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
-#include "renderer/LayerBuilder.h"
 #include "pagx/utils/Base64.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
 #include "tgfx/layers/vectors/Rectangle.h"
@@ -288,8 +288,8 @@ PAGX_TEST(PAGXViewModelTest, ValueTypeEnum) {
   auto scene = MakeScene(doc.get(), "TestVM", 5);
   auto vm = scene->viewModel();
   auto props = vm->properties();
-  EXPECT_EQ(props[0]->valueType(), pagx::ViewModelValueType::String);
-  EXPECT_EQ(props[1]->valueType(), pagx::ViewModelValueType::Number);
+  EXPECT_EQ(props[0]->valueType(), pagx::ViewModelPropertyType::String);
+  EXPECT_EQ(props[1]->valueType(), pagx::ViewModelPropertyType::Number);
 }
 
 // ========== XML ==========
@@ -384,7 +384,7 @@ PAGX_TEST(PAGXViewModelTest, ManualVMConstruction) {
   auto val = std::make_shared<pagx::PAGViewModelValueNumber>();
   val->propertyName = "x";
   val->propertyValue = 5.0f;
-  val->type = pagx::ViewModelValueType::Number;
+  val->type = pagx::ViewModelPropertyType::Number;
   vm->propertyMap["x"] = val;
   EXPECT_EQ(vm->propertyNumber("x")->value(), 5.0f);
 }
@@ -657,7 +657,7 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -735,7 +735,7 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -817,7 +817,7 @@ PAGX_TEST(PAGXViewModelTest, SyncsAnimationToVM) {
   db->source = "$vm.alpha";
   db->target = "@r";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -873,7 +873,7 @@ PAGX_TEST(PAGXViewModelTest, StringSyncBackToViewModel) {
   db->source = "$vm.label";
   db->target = "@rect";
   db->channel = "name";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -904,20 +904,20 @@ PAGX_TEST(PAGXViewModelTest, DataBindFlagsRoundTrip) {
       "    <ViewModel id=\"MainVM\">\n      <Property name=\"title\" type=\"String\"/>\n    "
       "</ViewModel>\n    <Composition id=\"Main\" width=\"400\" height=\"300\">\n      <Layer "
       "id=\"textLayer\" name=\"Text\"/>\n      <DataBind source=\"$vm.title\" "
-      "target=\"@textLayer\" channel=\"name\" flags=\"TwoWay\"/>\n    </Composition>\n");
+      "target=\"@textLayer\" channel=\"name\" direction=\"TwoWay\"/>\n    </Composition>\n");
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_NE(doc, nullptr);
   auto* comp = doc->findNode<pagx::Composition>("Main");
   ASSERT_NE(comp, nullptr);
   ASSERT_EQ(comp->dataBinds.size(), 1u);
-  EXPECT_EQ(comp->dataBinds[0]->flags, pagx::DataBindDirection::TwoWay);
+  EXPECT_EQ(comp->dataBinds[0]->direction, pagx::DataBindDirection::TwoWay);
   auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
   auto roundTripped = pagx::PAGXImporter::FromXML(exportedXml);
   ASSERT_NE(roundTripped, nullptr);
   auto* comp2 = roundTripped->findNode<pagx::Composition>("Main");
   ASSERT_NE(comp2, nullptr);
   ASSERT_EQ(comp2->dataBinds.size(), 1u);
-  EXPECT_EQ(comp2->dataBinds[0]->flags, pagx::DataBindDirection::TwoWay);
+  EXPECT_EQ(comp2->dataBinds[0]->direction, pagx::DataBindDirection::TwoWay);
 }
 
 // Verify one ViewModel property bound to multiple targets (default ToTarget) drives every target,
@@ -1280,7 +1280,7 @@ PAGX_TEST(PAGXViewModelTest, BooleanSyncBackToViewModel) {
   db->source = "$vm.vis";
   db->target = "@rect";
   db->channel = "visible";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1351,7 +1351,7 @@ PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
   db->source = "$vm.x";
   db->target = "@rect";
   db->channel = "x";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1418,7 +1418,7 @@ PAGX_TEST(PAGXViewModelTest, ImageTwoWaySyncBack) {
   db->source = "$vm.img";
   db->target = "@bgImg";
   db->channel = "image";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1630,7 +1630,7 @@ PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPropagatesThroughDataBind) {
 }
 
 // A nested composition's own ViewModel image default must also refresh when its referenced <Image>
-// resource loads (refreshViewModelImages walks the whole composition tree, not just the root VM).
+// resource loads (RefreshViewModelImages walks the whole composition tree, not just the root VM).
 PAGX_TEST(PAGXViewModelTest, ImageResourceLoadRefreshesNestedViewModel) {
   const std::string redPNG =
       "data:image/png;base64,"
@@ -1712,7 +1712,7 @@ PAGX_TEST(PAGXViewModelTest, RectangleSizeWidthSyncBack) {
   db->source = "$vm.w";
   db->target = "@rectShape";
   db->channel = "size.width";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1763,7 +1763,7 @@ PAGX_TEST(PAGXViewModelTest, RectangleRoundnessSyncBack) {
   db->source = "$vm.r";
   db->target = "@rectShape";
   db->channel = "roundness";
-  db->flags = pagx::DataBindDirection::TwoWay;
+  db->direction = pagx::DataBindDirection::TwoWay;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1810,7 +1810,7 @@ PAGX_TEST(PAGXViewModelTest, UnsetOptionalChannelDoesNotSyncBack) {
   db->source = "$vm.stroke";
   db->target = "@mod";
   db->channel = "strokeColor";
-  db->flags = pagx::DataBindDirection::ToSource;  // target -> VM only
+  db->direction = pagx::DataBindDirection::ToSource;  // target -> VM only
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -1860,7 +1860,7 @@ PAGX_TEST(PAGXViewModelTest, OnceDirectionAppliesOnceAndIgnoresLaterChanges) {
   db->source = "$vm.alpha";
   db->target = "@rect";
   db->channel = "alpha";
-  db->flags = pagx::DataBindDirection::Once;
+  db->direction = pagx::DataBindDirection::Once;
   doc->dataBinds.push_back(db);
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -2095,7 +2095,7 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeDestructorWithDeadSource) {
   {
     auto sourceValue = std::make_shared<pagx::PAGViewModelValueNumber>();
     sourceValue->propertyValue = 42.0f;
-    sourceValue->type = pagx::ViewModelValueType::Number;
+    sourceValue->type = pagx::ViewModelPropertyType::Number;
 
     pagx::DataBindRuntime::BindingEntry entry;
     entry.source = sourceValue.get();
@@ -2134,12 +2134,12 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto themeVal = std::make_shared<pagx::PAGViewModelValueString>();
   themeVal->propertyName = "theme";
   themeVal->propertyValue = "dark";
-  themeVal->type = pagx::ViewModelValueType::String;
+  themeVal->type = pagx::ViewModelPropertyType::String;
   nestedVM->propertyMap["theme"] = themeVal;
 
   auto containerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   containerVal->propertyName = "container";
-  containerVal->type = pagx::ViewModelValueType::ViewModel;
+  containerVal->type = pagx::ViewModelPropertyType::ViewModel;
   containerVal->referenceInstance = nestedVM;
   parentScene->viewModel()->propertyMap["container"] = containerVal;
 
@@ -2147,7 +2147,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   auto childVM = std::shared_ptr<pagx::PAGViewModel>(new pagx::PAGViewModel());
   auto childContainerVal = std::make_shared<pagx::PAGViewModelValueViewModel>();
   childContainerVal->propertyName = "container";
-  childContainerVal->type = pagx::ViewModelValueType::ViewModel;
+  childContainerVal->type = pagx::ViewModelPropertyType::ViewModel;
   // referenceInstance is intentionally left null.
   childVM->propertyMap["container"] = childContainerVal;
 
@@ -2159,7 +2159,7 @@ PAGX_TEST(PAGXViewModelTest, DataContextParentFallbackNullVmRef) {
   // then falls back to parent where container exists and holds "theme"="dark".
   auto* resolved = childCtx->resolve({"$vm", "container", "theme"});
   ASSERT_NE(resolved, nullptr);
-  EXPECT_EQ(resolved->valueType(), pagx::ViewModelValueType::String);
+  EXPECT_EQ(resolved->valueType(), pagx::ViewModelPropertyType::String);
   EXPECT_EQ(static_cast<const pagx::PAGViewModelValueString*>(resolved)->value(), "dark");
 }
 
@@ -2288,7 +2288,7 @@ PAGX_TEST(PAGXViewModelTest, EnumValueIntStorage) {
 
   auto theme = vm->propertyEnum("theme");
   ASSERT_NE(theme, nullptr);
-  EXPECT_EQ(theme->valueType(), pagx::ViewModelValueType::Enum);
+  EXPECT_EQ(theme->valueType(), pagx::ViewModelPropertyType::Enum);
   EXPECT_EQ(theme->value(), 2);
   EXPECT_FALSE(theme->hasChanged());
 

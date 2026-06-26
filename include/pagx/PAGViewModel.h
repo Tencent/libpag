@@ -56,44 +56,44 @@ class PAGViewModel {
    * Returns the number-typed property with the given name. Returns nullptr if no such property
    * exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueNumber> propertyNumber(const std::string& name);
+  std::shared_ptr<PAGViewModelValueNumber> propertyNumber(const std::string& name) const;
 
   /**
    * Returns the enum-typed property with the given name. The value is a zero-based option index.
    * Returns nullptr if no such property exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueEnum> propertyEnum(const std::string& name);
+  std::shared_ptr<PAGViewModelValueEnum> propertyEnum(const std::string& name) const;
 
   /**
    * Returns the string-typed property with the given name. Returns nullptr if no such property
    * exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueString> propertyString(const std::string& name);
+  std::shared_ptr<PAGViewModelValueString> propertyString(const std::string& name) const;
 
   /**
    * Returns the boolean-typed property with the given name. Trigger-typed properties are also
    * returned via this accessor, since a Trigger is backed by a boolean value. Returns nullptr if
    * no such property exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueBoolean> propertyBoolean(const std::string& name);
+  std::shared_ptr<PAGViewModelValueBoolean> propertyBoolean(const std::string& name) const;
 
   /**
    * Returns the color-typed property with the given name. Returns nullptr if no such property
    * exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueColor> propertyColor(const std::string& name);
+  std::shared_ptr<PAGViewModelValueColor> propertyColor(const std::string& name) const;
 
   /**
    * Returns the image-typed property with the given name. Returns nullptr if no such property
    * exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueImage> propertyImage(const std::string& name);
+  std::shared_ptr<PAGViewModelValueImage> propertyImage(const std::string& name) const;
 
   /**
    * Returns the nested-ViewModel-typed property with the given name. Returns nullptr if no such
    * property exists or its type does not match.
    */
-  std::shared_ptr<PAGViewModelValueViewModel> propertyViewModel(const std::string& name);
+  std::shared_ptr<PAGViewModelValueViewModel> propertyViewModel(const std::string& name) const;
 
   /**
    * Returns all properties in declaration order. Used for reflection-driven UI generation or

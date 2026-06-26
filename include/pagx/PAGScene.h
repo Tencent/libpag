@@ -173,7 +173,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // business side has overridden it. Keyed off the Image nodes themselves because a ViewModel
   // schema is not reachable from the Layer tree that onNodesChanged refreshes.
   void onImageResourcesChanged(const std::vector<Image*>& changedImages);
-  static void refreshViewModelImages(PAGComposition* comp,
+  static void RefreshViewModelImages(PAGComposition* comp,
                                      const std::unordered_set<const Image*>& changed);
 
   // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
@@ -182,10 +182,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void buildRuntimeTree();
   void buildViewModels();
   void buildNestedViewModels(PAGComposition* parentComp);
-  static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
+  static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(
+      ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
   void flushDataBinds();
   void clearAllViewModelsDirty();
-  static void clearCompositionTreeDirty(PAGComposition* comp);
+  static void ClearCompositionTreeDirty(PAGComposition* comp);
 
   RuntimeBinding* mutableBinding();
 

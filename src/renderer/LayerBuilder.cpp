@@ -699,16 +699,6 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setName(*v);
   }
 
-  static bool ReadLayerAlpha(const void* object, KeyValue* out) {
-    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->alpha()};
-    return true;
-  }
-
-  static bool ReadLayerVisible(const void* object, KeyValue* out) {
-    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->visible()};
-    return true;
-  }
-
   static bool ReadLayerBlendMode(const void* object, KeyValue* out) {
     auto mode = FromTGFX(static_cast<const tgfx::Layer*>(object)->blendMode());
     *out = KeyValue{static_cast<int>(mode)};
@@ -723,8 +713,10 @@ class LayerBuilderContext {
   // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
   // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
-    _result.binding.setAccessor(node, "alpha", WriteLayerAlpha, ReadLayerAlpha);
-    _result.binding.setAccessor(node, "visible", WriteLayerVisible, ReadLayerVisible);
+    _result.binding.setAccessor(node, "alpha", WriteLayerAlpha,
+                                ReadScalar<tgfx::Layer, &tgfx::Layer::alpha>);
+    _result.binding.setAccessor(node, "visible", WriteLayerVisible,
+                                ReadBoolean<tgfx::Layer, &tgfx::Layer::visible>);
     _result.binding.setAccessor(node, "blendMode", WriteLayerBlendMode, ReadLayerBlendMode);
     _result.binding.setAccessor(node, "name", WriteLayerName, ReadLayerName);
   }

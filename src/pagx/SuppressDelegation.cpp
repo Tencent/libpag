@@ -39,7 +39,11 @@ SuppressDelegation::~SuppressDelegation() {
     return;
   }
   s->suppressNotify = false;
-  auto& pending = s->pendingNotifications;
+  // Drain a local snapshot: a nested SuppressDelegation created by an observer callback would
+  // push onto s->pendingNotifications again, so iterating the member directly would invalidate
+  // the range-for. Move it out and clear the member before notifying.
+  auto pending = std::move(s->pendingNotifications);
+  s->pendingNotifications.clear();
   // Deduplicate with a set while preserving the original pending order for notify.
   std::unordered_set<PAGViewModelValue*> seen = {};
   seen.reserve(pending.size());
@@ -51,7 +55,6 @@ SuppressDelegation::~SuppressDelegation() {
       value->notifyObservers();
     }
   }
-  pending.clear();
 }
 
 bool SuppressDelegation::IsSuppressed(const std::shared_ptr<PAGScene>& scene) {

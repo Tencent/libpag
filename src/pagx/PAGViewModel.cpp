@@ -22,80 +22,83 @@ namespace pagx {
 
 // ---- Typed property accessors ------------------------------------------------
 
-std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(const std::string& name) {
+std::shared_ptr<PAGViewModelValueNumber> PAGViewModel::propertyNumber(
+    const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::Number) {
+  if (it->second->valueType() != ViewModelPropertyType::Number) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueNumber>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueEnum> PAGViewModel::propertyEnum(const std::string& name) {
+std::shared_ptr<PAGViewModelValueEnum> PAGViewModel::propertyEnum(const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::Enum) {
+  if (it->second->valueType() != ViewModelPropertyType::Enum) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueEnum>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(const std::string& name) {
+std::shared_ptr<PAGViewModelValueString> PAGViewModel::propertyString(
+    const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::String) {
+  if (it->second->valueType() != ViewModelPropertyType::String) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueString>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(const std::string& name) {
+std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(
+    const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
   const auto type = it->second->valueType();
-  if (type != ViewModelValueType::Boolean && type != ViewModelValueType::Trigger) {
+  if (type != ViewModelPropertyType::Boolean && type != ViewModelPropertyType::Trigger) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueBoolean>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::string& name) {
+std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::Color) {
+  if (it->second->valueType() != ViewModelPropertyType::Color) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueColor>(it->second);
 }
 
-std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(const std::string& name) {
+std::shared_ptr<PAGViewModelValueImage> PAGViewModel::propertyImage(const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::Image) {
+  if (it->second->valueType() != ViewModelPropertyType::Image) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueImage>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueViewModel> PAGViewModel::propertyViewModel(
-    const std::string& name) {
+    const std::string& name) const {
   auto it = propertyMap.find(name);
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  if (it->second->valueType() != ViewModelValueType::ViewModel) {
+  if (it->second->valueType() != ViewModelPropertyType::ViewModel) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueViewModel>(it->second);

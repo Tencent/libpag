@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/nodes/ViewModelProperty.h"
 
 namespace pagx {
 
@@ -30,11 +31,6 @@ class PAGScene;
 class PAGViewModel;
 class PropertyData;
 class DataBindRuntime;
-
-/**
- * ViewModelValueType enumerates the runtime value types of a PAGViewModelValue.
- */
-enum class ViewModelValueType { Number, String, Boolean, Color, Image, ViewModel, Enum, Trigger };
 
 /**
  * PAGViewModelValue is the base class for typed ViewModel property values. Each value holds the
@@ -76,7 +72,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   /**
    * Returns the runtime value type of this property.
    */
-  ViewModelValueType valueType() const {
+  ViewModelPropertyType valueType() const {
     return type;
   }
 
@@ -118,7 +114,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
 
   std::string propertyName = {};
   bool dirty = false;
-  ViewModelValueType type = ViewModelValueType::Number;
+  ViewModelPropertyType type = ViewModelPropertyType::Number;
   std::weak_ptr<PAGScene> scene = {};
   bool notifying = false;
   class DataConverter* converter = nullptr;

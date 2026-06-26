@@ -80,7 +80,7 @@ class DataBind : public Node {
   /**
    * The binding direction. Default is ToTarget (ViewModel → render node, read-only).
    */
-  DataBindDirection flags = DataBindDirection::ToTarget;
+  DataBindDirection direction = DataBindDirection::ToTarget;
 
   NodeType nodeType() const override {
     return NodeType::DataBind;

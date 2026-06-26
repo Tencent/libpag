@@ -2787,8 +2787,10 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
         } else {
           ReportError(doc, child.get(), "Invalid value '" + typeStr + "' for 'type' attribute.");
         }
-        prop->minValue = GetOptionalFloatAttribute(child.get(), "min", doc);
-        prop->maxValue = GetOptionalFloatAttribute(child.get(), "max", doc);
+        if (prop->propertyType == ViewModelPropertyType::Number) {
+          prop->minValue = GetOptionalFloatAttribute(child.get(), "min", doc);
+          prop->maxValue = GetOptionalFloatAttribute(child.get(), "max", doc);
+        }
         auto optionsStr = GetAttribute(child.get(), "options");
         if (!optionsStr.empty()) {
           prop->enumOptions = SplitEnumOptions(optionsStr);
@@ -2811,12 +2813,14 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
             ReportError(doc, child.get(),
                         "Resource '" + converterId + "' not found for 'dataConverter' attribute.");
         }
-        auto vmRef = GetAttribute(child.get(), "viewModelRef");
-        if (!vmRef.empty() && vmRef[0] == '@') {
-          prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
-          if (!prop->viewModelRef)
-            ReportError(doc, child.get(),
-                        "Resource '" + vmRef + "' not found for 'viewModelRef' attribute.");
+        if (prop->propertyType == ViewModelPropertyType::ViewModel) {
+          auto vmRef = GetAttribute(child.get(), "viewModelRef");
+          if (!vmRef.empty() && vmRef[0] == '@') {
+            prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
+            if (!prop->viewModelRef)
+              ReportError(doc, child.get(),
+                          "Resource '" + vmRef + "' not found for 'viewModelRef' attribute.");
+          }
         }
         vm->properties.push_back(prop);
       }
@@ -2836,18 +2840,27 @@ static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
   bind->source = GetAttribute(node, "source");
   bind->target = GetAttribute(node, "target");
   bind->channel = GetAttribute(node, "channel");
-  auto flagsStr = GetAttribute(node, "flags");
-  if (!flagsStr.empty()) {
-    if (flagsStr == "ToTarget") {
-      bind->flags = DataBindDirection::ToTarget;
-    } else if (flagsStr == "ToSource") {
-      bind->flags = DataBindDirection::ToSource;
-    } else if (flagsStr == "TwoWay") {
-      bind->flags = DataBindDirection::TwoWay;
-    } else if (flagsStr == "Once") {
-      bind->flags = DataBindDirection::Once;
+  if (bind->source.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'source' attribute.");
+  }
+  if (bind->target.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'target' attribute.");
+  }
+  if (bind->channel.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'channel' attribute.");
+  }
+  auto directionStr = GetAttribute(node, "direction");
+  if (!directionStr.empty()) {
+    if (directionStr == "ToTarget") {
+      bind->direction = DataBindDirection::ToTarget;
+    } else if (directionStr == "ToSource") {
+      bind->direction = DataBindDirection::ToSource;
+    } else if (directionStr == "TwoWay") {
+      bind->direction = DataBindDirection::TwoWay;
+    } else if (directionStr == "Once") {
+      bind->direction = DataBindDirection::Once;
     } else {
-      ReportError(doc, node, "Invalid value '" + flagsStr + "' for 'flags' attribute.");
+      ReportError(doc, node, "Invalid value '" + directionStr + "' for 'direction' attribute.");
     }
   }
   return bind;
@@ -2862,7 +2875,15 @@ static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc)
     if (child->type == DOMNodeType::Element && child->name == "Param") {
       auto name = GetAttribute(child.get(), "name");
       auto value = GetAttribute(child.get(), "value");
-      if (!name.empty()) converter->params[name] = value;
+      if (!name.empty()) {
+        converter->params[name] = value;
+      } else {
+        ReportError(doc, child.get(), "Param requires a non-empty 'name' attribute.");
+      }
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(
+          doc, child.get(),
+          "Element '" + child->name + "' is not allowed in 'DataConverter'. Expected: Param.");
     }
     child = child->nextSibling;
   }

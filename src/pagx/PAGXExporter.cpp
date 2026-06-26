@@ -1345,8 +1345,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("source", bind->source);
       xml.addAttribute("target", bind->target);
       xml.addAttribute("channel", bind->channel);
-      if (bind->flags != DataBindDirection::ToTarget) {
-        xml.addAttribute("flags", DataBindDirectionToString(bind->flags));
+      if (bind->direction != DataBindDirection::ToTarget) {
+        xml.addAttribute("direction", DataBindDirectionToString(bind->direction));
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();

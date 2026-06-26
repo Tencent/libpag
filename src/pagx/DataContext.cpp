@@ -73,7 +73,7 @@ PAGViewModelValue* DataContext::resolve(const std::vector<std::string>& path) co
       return nullptr;
     }
     // Check if value is a nested ViewModel reference. If so, descend into it.
-    if (value->valueType() == ViewModelValueType::ViewModel) {
+    if (value->valueType() == ViewModelPropertyType::ViewModel) {
       auto* vmValue = static_cast<PAGViewModelValueViewModel*>(value);
       currentVM = vmValue->referenceViewModel();
     } else if (i == path.size() - 1) {

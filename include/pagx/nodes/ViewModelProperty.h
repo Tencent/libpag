@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 

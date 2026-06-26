@@ -147,21 +147,21 @@ static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
     return KeyValue{0.0f};
   }
   switch (value->valueType()) {
-    case ViewModelValueType::Number:
+    case ViewModelPropertyType::Number:
       return KeyValue{static_cast<PAGViewModelValueNumber*>(value)->value()};
-    case ViewModelValueType::String:
+    case ViewModelPropertyType::String:
       return KeyValue{static_cast<PAGViewModelValueString*>(value)->value()};
-    case ViewModelValueType::Boolean:
+    case ViewModelPropertyType::Boolean:
       return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
-    case ViewModelValueType::Color: {
+    case ViewModelPropertyType::Color: {
       auto c = static_cast<PAGViewModelValueColor*>(value)->value();
       return KeyValue{c};
     }
-    case ViewModelValueType::Image:
+    case ViewModelPropertyType::Image:
       return KeyValue{static_cast<PAGViewModelValueImage*>(value)->value()};
-    case ViewModelValueType::Enum:
+    case ViewModelPropertyType::Enum:
       return KeyValue{static_cast<PAGViewModelValueEnum*>(value)->value()};
-    case ViewModelValueType::Trigger:
+    case ViewModelPropertyType::Trigger:
       return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
     default:
       return KeyValue{0.0f};
@@ -195,7 +195,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
       continue;
     }
     // Once: apply the ViewModel value to the target a single time, then skip.
-    if (entry->dataBind->flags == DataBindDirection::Once && entry->onceApplied) {
+    if (entry->dataBind->direction == DataBindDirection::Once && entry->onceApplied) {
       continue;
     }
     auto keyValue = ValueToKeyValue(entry->source);
@@ -203,7 +203,7 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
       keyValue = DataConverterRegistry::instance().apply(entry->source->converter, keyValue);
     }
     binding->apply(entry->targetNode, entry->channel, keyValue, mix);
-    if (entry->dataBind->flags == DataBindDirection::Once) {
+    if (entry->dataBind->direction == DataBindDirection::Once) {
       entry->onceApplied = true;
     }
   }
@@ -247,28 +247,28 @@ void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv)
     return;
   }
   switch (value->valueType()) {
-    case ViewModelValueType::Number:
+    case ViewModelPropertyType::Number:
       static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(KeyValueToFloat(kv), false);
       break;
-    case ViewModelValueType::Boolean:
-    case ViewModelValueType::Trigger:
+    case ViewModelPropertyType::Boolean:
+    case ViewModelPropertyType::Trigger:
       static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(KeyValueToFloat(kv) != 0.0f,
                                                                       false);
       break;
-    case ViewModelValueType::Enum:
+    case ViewModelPropertyType::Enum:
       static_cast<PAGViewModelValueEnum*>(value)->setValueInternal(KeyValueToInt(kv), false);
       break;
-    case ViewModelValueType::String:
+    case ViewModelPropertyType::String:
       if (auto* s = std::get_if<std::string>(&kv)) {
         static_cast<PAGViewModelValueString*>(value)->setValueInternal(*s, false);
       }
       break;
-    case ViewModelValueType::Color:
+    case ViewModelPropertyType::Color:
       if (auto* c = std::get_if<Color>(&kv)) {
         static_cast<PAGViewModelValueColor*>(value)->setValueInternal(*c, false);
       }
       break;
-    case ViewModelValueType::Image:
+    case ViewModelPropertyType::Image:
       if (auto* img = std::get_if<std::shared_ptr<PAGImage>>(&kv)) {
         static_cast<PAGViewModelValueImage*>(value)->setValueInternal(*img, false);
       }
@@ -317,7 +317,7 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     // call, so wrapper-pointer equality on KeyValue would never match. Compare the underlying
     // tgfx::Image against the ViewModel's current image instead, so an unchanged image neither
     // overwrites the source URI nor fires observers, while a genuine image change still syncs back.
-    if (entry.source->valueType() == ViewModelValueType::Image) {
+    if (entry.source->valueType() == ViewModelPropertyType::Image) {
       auto* imageValue = static_cast<PAGViewModelValueImage*>(entry.source);
       auto* targetImage = std::get_if<std::shared_ptr<PAGImage>>(&kv);
       auto targetTGFX = targetImage != nullptr ? LayerBuilder::GetTGFXImage(*targetImage) : nullptr;

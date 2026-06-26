@@ -133,20 +133,6 @@ struct RuntimeBinding {
     ensureTarget(node)->setObject(std::move(object));
   }
 
-  void setWriter(const Node* node, const std::string& channel, RuntimeWriter writer) {
-    if (node == nullptr) {
-      return;
-    }
-    ensureTarget(node)->setWriter(channel, std::move(writer));
-  }
-
-  void setReader(const Node* node, const std::string& channel, RuntimeReader reader) {
-    if (node == nullptr) {
-      return;
-    }
-    ensureTarget(node)->setReader(channel, std::move(reader));
-  }
-
   // Registers a writer and its symmetric reader for a channel in one call, declaring the channel as
   // two-way capable (ViewModel -> target via the writer, target -> ViewModel via the reader).
   void setAccessor(const Node* node, const std::string& channel, RuntimeWriter writer,
