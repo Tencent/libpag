@@ -40,8 +40,15 @@ class DataBindRuntime {
   DataBindRuntime() = default;
   ~DataBindRuntime();
 
+  // Resolves each DataBind's source path against the DataContext and its target node against the
+  // document, then registers this runtime as a dependent of every resolved ViewModel value. A
+  // binding that drives the target is marked dirty so the first update() applies the configured
+  // default. Bindings whose source or target cannot be resolved are skipped.
   void bind(const std::vector<DataBind*>& binds, DataContext* context, PAGXDocument* doc);
 
+  // Marks every binding whose source is the given ViewModel value dirty so the next update()
+  // re-applies it to the target. Only bindings that drive the target are marked, mirroring
+  // markAllDirty(); pure ToSource bindings are left untouched.
   void markDirtyForValue(PAGViewModelValue* value);
 
   // Re-marks every binding dirty so the next update() re-applies the ViewModel value to the target.
@@ -49,7 +56,14 @@ class DataBindRuntime {
   // the node defaults, so the VM-driven values must be re-applied or they would be lost.
   void markAllDirty();
 
+  // Applies pending dirty bindings to their target nodes through the RuntimeBinding (ViewModel →
+  // render node). Each dirty source value is run through its converter and written to the target
+  // channel with the given mix weight. Once bindings apply a single time and are then skipped.
   void update(RuntimeBinding* binding, float mix = 1.0f);
+
+  // Reads bound target channels back into their ViewModel sources through the RuntimeBinding
+  // (render node → ViewModel). Only ToSource/TwoWay bindings flow back, dirty bindings are skipped,
+  // and a write occurs only when the target value actually changed since the previous pass.
   void syncBack(RuntimeBinding* binding);
 
  private:
