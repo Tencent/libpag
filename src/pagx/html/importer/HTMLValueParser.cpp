@@ -418,19 +418,44 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative.
   if (!sizeTokens.empty() && boxWidth > 0) {
     float radius = resolveRadialLength(sizeTokens[0], boxWidth);
-    if (!std::isnan(radius)) grad->radius = radius;
+    if (!std::isnan(radius)) {
+      grad->radius = radius;
+    } else {
+      // Extent keywords (closest-side / farthest-corner / ...) have no scalar PAGX radius; keep
+      // the box-filling default and surface a diagnostic instead of silently mis-sizing.
+      _diagnostics.warn("html: radial-gradient size '" + sizeTokens[0] +
+                        "' not supported; using box-filling radius");
+    }
   }
 
-  // Position: `at <x> <y>`. Each axis is a length (px, normalised against its box axis), a percent,
-  // or a keyword (left/center/right, top/center/bottom).
-  if (!positionTokens.empty() && boxWidth > 0) {
-    float cx = resolveRadialPosition(positionTokens[0], boxWidth, /*isVertical=*/false);
-    if (!std::isnan(cx)) grad->center.x = cx;
+  // Position: `at <x> <y>`. Axis-locked keywords (left/right -> x, top/bottom -> y) are assigned
+  // first so author order is irrelevant (`at top left` == `at left top`); the remaining `center`
+  // and length tokens then fill the still-unset axes in x-then-y order, matching CSS.
+  float cx = NAN;
+  float cy = NAN;
+  std::vector<std::string> freeTokens;
+  for (auto& token : positionTokens) {
+    if (token == "left") {
+      cx = 0.0f;
+    } else if (token == "right") {
+      cx = 1.0f;
+    } else if (token == "top") {
+      cy = 0.0f;
+    } else if (token == "bottom") {
+      cy = 1.0f;
+    } else {
+      freeTokens.push_back(token);
+    }
   }
-  if (positionTokens.size() >= 2 && boxHeight > 0) {
-    float cy = resolveRadialPosition(positionTokens[1], boxHeight, /*isVertical=*/true);
-    if (!std::isnan(cy)) grad->center.y = cy;
+  for (auto& token : freeTokens) {
+    if (std::isnan(cx) && boxWidth > 0) {
+      cx = (token == "center") ? 0.5f : resolveRadialLength(token, boxWidth);
+    } else if (std::isnan(cy) && boxHeight > 0) {
+      cy = (token == "center") ? 0.5f : resolveRadialLength(token, boxHeight);
+    }
   }
+  if (!std::isnan(cx)) grad->center.x = cx;
+  if (!std::isnan(cy)) grad->center.y = cy;
 }
 
 float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAxis) {
@@ -447,19 +472,6 @@ float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAx
   float px = parseAbsoluteLengthPx(token);
   if (std::isnan(px)) return NAN;
   return px / boxAxis;
-}
-
-float HTMLValueParser::resolveRadialPosition(const std::string& token, float boxAxis,
-                                             bool isVertical) {
-  if (token == "center") return 0.5f;
-  if (!isVertical) {
-    if (token == "left") return 0.0f;
-    if (token == "right") return 1.0f;
-  } else {
-    if (token == "top") return 0.0f;
-    if (token == "bottom") return 1.0f;
-  }
-  return resolveRadialLength(token, boxAxis);
 }
 
 ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {

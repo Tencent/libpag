@@ -677,6 +677,59 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientPercentDescriptor) {
   EXPECT_TRUE(NearlyEqual(rg->radius, 0.5f, 0.01f));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientSingleKeywordPositionUsesVerticalAxis) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(circle at top, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // CSS single-value `top` means y-axis = top, x-axis = center.
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientReversedKeywordPositionOrder) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(circle at bottom right, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // Axis-locked keywords are order-independent: `bottom right` == `right bottom`.
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 1.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 1.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientExtentKeywordKeepsDefaultRadius) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(closest-side at 25px 25px, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // The unsupported extent keyword degrades to the box-filling default radius, but the explicit
+  // pixel position is still recovered.
+  EXPECT_TRUE(NearlyEqual(rg->radius, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.25f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.25f, 0.01f));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">

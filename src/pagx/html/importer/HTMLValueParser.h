@@ -116,9 +116,6 @@ class HTMLValueParser {
   // Resolves a single radial size/position length token to a value normalised against `boxAxis`.
   // Handles px lengths and `<pct>%`; returns NaN when the token is not a length.
   float resolveRadialLength(const std::string& token, float boxAxis);
-  // Resolves a position-axis token, mapping left/center/right and top/center/bottom keywords to
-  // 0 / 0.5 / 1 before falling back to a length.
-  float resolveRadialPosition(const std::string& token, float boxAxis, bool isVertical);
 
   HTMLDiagnosticSink& _diagnostics;
   PAGXDocument* _document = nullptr;
