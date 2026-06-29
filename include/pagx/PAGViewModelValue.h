@@ -54,10 +54,8 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
    * scope exit. Returns an ObserverHandle; the observer is automatically removed when the handle
    * is destroyed or detached.
    *
-   * The callback must not capture a shared_ptr to this value or to its owning PAGViewModel: the
-   * value keeps its observers alive, so a strong capture forms a reference cycle that leaks the
-   * value (and its ViewModel) even after the handle is gone. Capture a weak_ptr and lock it inside
-   * the callback instead.
+   * The callback must not strongly capture this value or its owning PAGViewModel, which would leak
+   * them; capture a weak_ptr and lock it inside the callback instead.
    */
   ObserverHandle addObserver(Observer observer);
 
