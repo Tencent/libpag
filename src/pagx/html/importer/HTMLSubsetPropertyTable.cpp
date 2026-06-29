@@ -184,8 +184,11 @@ std::string TransformBackgroundImage(const std::string& value, const PropertyCon
     return Trim(value);
   }
   if (lc.find("url(") != std::string::npos) {
-    return DropProperty("background-image", value, "url() backgrounds require <img/> instead",
-                        diags);
+    // A `url(...)` background round-trips into an `ImagePattern` fill (the inverse of the
+    // exporter's emission). The accompanying `background-size` / `background-repeat` /
+    // `background-position` are kept too (see the property table) so the importer can recover
+    // the pattern's scaleMode / tile modes / matrix.
+    return Trim(value);
   }
   if (Trim(lc) == "none") return std::string();
   return DropProperty("background-image", value, "is not a supported value", diags);
@@ -357,6 +360,12 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-color", PropAction::Keep, nullptr, nullptr},
     {"background-image", PropAction::Transform, &TransformBackgroundImage, nullptr},
     {"background-clip", PropAction::Transform, &TransformBackgroundClip, nullptr},
+    // `background-size` / `background-repeat` / `background-position` are kept verbatim and
+    // consumed only when paired with a `url(...)` background, where they drive the recovered
+    // ImagePattern's scaleMode / tile modes / matrix.
+    {"background-size", PropAction::Keep, nullptr, nullptr},
+    {"background-repeat", PropAction::Keep, nullptr, nullptr},
+    {"background-position", PropAction::Keep, nullptr, nullptr},
     {"border", PropAction::Transform, &TransformBorder, nullptr},
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
     {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
@@ -416,9 +425,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"min-height", PropAction::Drop, nullptr, "is not in the subset"},
     {"max-height", PropAction::Drop, nullptr, "is not in the subset"},
     {"aspect-ratio", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-size", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-repeat", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-position", PropAction::Drop, nullptr, "is not in the subset"},
     {"text-transform", PropAction::Drop, nullptr, "is not in the subset"},
     {"text-indent", PropAction::Drop, nullptr, "is not in the subset"},
     {"word-spacing", PropAction::Drop, nullptr, "is not in the subset"},

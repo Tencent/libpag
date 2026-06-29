@@ -1243,19 +1243,19 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;clip-path:circle(20px);
-                  background-size:cover;width:50px;height:50px"></div>
+                  perspective:200px;width:50px;height:50px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  bool outlineWarn = false, clipWarn = false, bgSizeWarn = false;
+  bool outlineWarn = false, clipWarn = false, perspectiveWarn = false;
   for (const auto& msg : doc->errors) {
     if (msg.find("outline") != std::string::npos) outlineWarn = true;
     if (msg.find("clip-path") != std::string::npos) clipWarn = true;
-    if (msg.find("background-size") != std::string::npos) bgSizeWarn = true;
+    if (msg.find("perspective") != std::string::npos) perspectiveWarn = true;
   }
   EXPECT_TRUE(outlineWarn);
   EXPECT_TRUE(clipWarn);
-  EXPECT_TRUE(bgSizeWarn);
+  EXPECT_TRUE(perspectiveWarn);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginWarnsWithTransform) {
@@ -2483,6 +2483,81 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
 
+// CSS `background-image: url(...)` round-trips into an ImagePattern fill (the inverse of the
+// HTML exporter). `background-size` selects the scaleMode: contain → LetterBox.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeContainMapsToLetterBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-size:contain;background-repeat:no-repeat;
+                  background-position:50% 50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
+}
+
+// `background-size: cover` → Zoom.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeCoverMapsToZoom) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-size:cover;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
+}
+
+// `background-size: 100% 100%` → Stretch.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeFullMapsToStretch) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-size:100% 100%;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// A tiling `background-repeat: repeat` (no fitted size keyword) → ScaleMode::None with both tile
+// modes set to Repeat and the matrix translation carrying the `background-position` offset.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatMapsToNoneTiled) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-repeat:repeat;background-position:-20px -30px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Repeat);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
+  EXPECT_FLOAT_EQ(pattern->matrix.tx, -20.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.ty, -30.0f);
+}
+
 // Folding rule also handles asymmetric `border-radius`: the image-pattern fill rides on top
 // of whatever geometry `applyBackgroundVisuals` emitted, so a card-style wrapper that uses
 // "rounded top, square bottom" (very common for media tiles) ends up with a Path geometry +
@@ -2503,7 +2578,6 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsIntoPathForAsymmetricRadi
   auto* path = FindElementOfType<pagx::Path>(wrapper);
   ASSERT_NE(path, nullptr);
   ASSERT_NE(path->data, nullptr);
-  // Path emitter starts at (W, TR) = (64, 16). The bottom corners stay sharp because BR/BL
   // are 0, so the path has exactly two cubic segments (TL + TR).
   size_t cubicCount = 0;
   for (auto v : path->data->verbs()) {
@@ -3267,22 +3341,23 @@ PAG_TEST(PAGXHTMLImporterTest, RawOverflowAutoWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawBackgroundUrlWarns) {
-  // Without the subset transformer, the layer builder receives the raw `url(...)` and warns.
-  pagx::HTMLImporter::Options opts;
-  opts.autoNormalize = false;
-  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+PAG_TEST(PAGXHTMLImporterTest, BackgroundUrlRecoversImagePattern) {
+  // A CSS `url(...)` background round-trips into an ImagePattern fill (the inverse of the HTML
+  // exporter), rather than being dropped with a warning.
+  auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="width:50px;height:50px;background-image:url(theme.png)"></div>
     </body></html>
-  )HTML",
-                                             opts);
+  )HTML");
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find("url") != std::string::npos) warned = true;
-  }
-  EXPECT_TRUE(warned);
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_NE(layer, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_NE(pattern->image->filePath.find("theme.png"), std::string::npos);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {

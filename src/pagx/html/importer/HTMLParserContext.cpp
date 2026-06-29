@@ -292,6 +292,10 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
+    if (!box.backgroundImage.empty() &&
+        ToLower(box.backgroundImage).find("url(") != std::string::npos) {
+      applyBackgroundImageFill(box, layer);
+    }
   }
   _layerBuilder->applyLayerAttributes(layer, body, box);
 
@@ -410,6 +414,13 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
+    // A `url(...)` background is recovered as an ImagePattern fill here (it needs the image
+    // registry + native-size decoding the layer builder has no access to). Runs right after the
+    // background geometry is emitted so the fill stacks on top of it.
+    if (!box.backgroundImage.empty() &&
+        ToLower(box.backgroundImage).find("url(") != std::string::npos) {
+      applyBackgroundImageFill(box, layer);
+    }
   }
 
   _layerBuilder->applyBoxTransform(layer, box, element);

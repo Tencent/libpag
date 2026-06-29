@@ -311,6 +311,11 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   }
   if (box.backgroundImage.empty()) return;
 
+  // A `url(...)` background is recovered as an `ImagePattern` fill by `HTMLParserContext`
+  // (it owns the image-resource registry and native-size decoding). The geometry is already
+  // on the layer; leave the fill to the caller and emit nothing here.
+  if (ToLower(box.backgroundImage).find("url(") != std::string::npos) return;
+
   // CSS allows stacking multiple gradients in `background-image` separated by top-level
   // commas, with the first listed gradient painted on top. PAGX paints Fills in the order
   // they appear in `contents` (later Fills cover earlier ones), so we emit gradients in

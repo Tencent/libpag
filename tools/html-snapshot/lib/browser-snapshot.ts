@@ -81,18 +81,39 @@ function normalizeBorderRadius(value) {
   return value;
 }
 
-// PAGX supports `background-image` only when the value is one of the gradient
-// functions (linear/radial/conic). `url(...)` backgrounds — which would
-// otherwise originate from CSS-in-JS or stylesheets — must be authored as
-// <img> elements; drop them silently here so the importer doesn't have to
-// warn for every blob the page paints over its decoration layer.
+// PAGX supports `background-image` when the value is one of the gradient
+// functions (linear/radial/conic) or a single `url(...)` reference. A url
+// background round-trips into an `ImagePattern` fill on import (the inverse of
+// the HTML exporter's emission). Chromium reports the url already resolved to
+// an absolute form; rewrite a local `file://` url to a plain absolute path
+// (the form the PAGX importer + tgfx load directly, matching the `<img>`
+// `data-snapshot-src` path), and keep `data:` / `http(s)` urls verbatim (the
+// `inlineExternalImages` pre-pass converts remote bytes to a data URI).
+// Compound url + gradient stacks and the `none` keyword are dropped.
 function normalizeBackgroundImage(value) {
   if (!value) return '';
   if (value === 'none') return '';
-  if (/url\(/i.test(value)) return '';
   if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value)) {
     return value;
   }
+  const trimmed = value.trim();
+  if (/^url\(/i.test(trimmed)) {
+    const m = /^url\(\s*(['"]?)([^'")]+)\1\s*\)$/i.exec(trimmed);
+    if (!m) return '';
+    let url = m[2];
+    if (/^file:/i.test(url)) {
+      try {
+        const u = new URL(url);
+        let p = decodeURIComponent(u.pathname);
+        if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+        url = p;
+      } catch (_) {
+        return '';
+      }
+    }
+    return `url("${url.replace(/"/g, "'")}")`;
+  }
+  if (/url\(/i.test(value)) return '';
   return '';
 }
 
@@ -559,6 +580,25 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Forward `background-size` / `background-repeat` / `background-position` when the element
+// carries a `url(...)` background image. The importer recovers them into the ImagePattern's
+// scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
+// properties, so emitting them there would be noise; only forward for url backgrounds. Each
+// value is suppressed when it equals the CSS default so the common fitted card stays compact.
+function appendBackgroundImageFitting(parts, computed) {
+  const bgImage = computed.getPropertyValue('background-image').trim();
+  if (!/^url\(/i.test(bgImage)) return;
+  const size = computed.getPropertyValue('background-size').trim();
+  if (size && size !== 'auto') parts.push(`background-size: ${size}`);
+  // `background-repeat` is always forwarded for url backgrounds (never suppressed against the
+  // CSS default `repeat`): the importer maps `repeat` to the tiling ScaleMode::None pattern, so
+  // dropping it would silently turn a tiled card into a single off-screen image.
+  const repeat = computed.getPropertyValue('background-repeat').trim();
+  if (repeat) parts.push(`background-repeat: ${repeat}`);
+  const position = computed.getPropertyValue('background-position').trim();
+  if (position && position !== '0% 0%') parts.push(`background-position: ${position}`);
+}
+
 // Build the style string for a kept element. `opts.box` includes background/
 // border/shadow/etc.; `opts.text` includes color/font-*; `opts.positioned`
 // toggles the absolute-positioning header (off for inline text children that
@@ -676,6 +716,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     // rationale.
     appendBorder(parts, computed);
     appendBoxShadow(parts, computed);
+    appendBackgroundImageFitting(parts, computed);
   }
 
   if (opts.text) {
@@ -2964,6 +3005,7 @@ const HELPER_FNS = [
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
+  appendBackgroundImageFitting,
   buildStyle,
   readCornerRadii,
   roundedUniformBorderSvg,
@@ -3167,6 +3209,53 @@ async function inlineExternalImages(cachedMap) {
   for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
     const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOne));
+  }
+
+  // Pass 2: remote CSS `background-image: url(...)`. Chromium reports the url already resolved
+  // to an absolute form. Local `file://` urls are handled at emit time by
+  // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
+  // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
+  // `background-image` with a `data:` URI so the walker emits a self-contained reference. Only
+  // the first layer of a comma-separated stack is handled: that is the single-image case the
+  // exporter produces and the only one the importer recovers.
+  function firstCssUrl(value) {
+    const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
+    return m ? m[2] : '';
+  }
+
+  const bgPending = [];
+  const allEls = Array.from(document.querySelectorAll('*'));
+  for (const el of allEls) {
+    const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
+    if (!bg || !/^url\(/i.test(bg)) continue;
+    const url = firstCssUrl(bg);
+    if (!url || url.startsWith('data:') || /^file:/i.test(url)) continue;
+    if (!/^https?:/i.test(url)) continue;
+    const cached = cache[url];
+    if (cached) {
+      el.style.backgroundImage = `url("${cached.replace(/"/g, '\\"')}")`;
+      continue;
+    }
+    bgPending.push({ el, url });
+  }
+
+  async function processOneBg(entry) {
+    try {
+      const res = await fetch(entry.url, { credentials: 'omit' });
+      if (!res.ok) {
+        console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
+        return;
+      }
+      const dataUri = await blobToDataUri(await res.blob());
+      entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
+    } catch (err) {
+      console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
+    }
+  }
+
+  for (let i = 0; i < bgPending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(processOneBg));
   }
 }
 

@@ -29,6 +29,9 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/utils/Base64.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pagx {
 
@@ -126,6 +129,50 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   // emitting the subset HTML; reaching this branch means a hand-written subset
   // file slipped through. Fall back to the CSS default.
   return ScaleMode::Stretch;
+}
+
+// Extracts the source string from a CSS `url(...)` token, stripping the wrapper, surrounding
+// whitespace, and matching quotes. Returns empty when `value` is not a `url(...)` form.
+std::string ExtractCssUrl(const std::string& value) {
+  std::string trimmed = Trim(value);
+  std::string lower = ToLower(trimmed);
+  auto open = lower.find("url(");
+  if (open == std::string::npos) return {};
+  auto close = trimmed.rfind(')');
+  if (close == std::string::npos || close <= open + 4) return {};
+  std::string inner = Trim(trimmed.substr(open + 4, close - (open + 4)));
+  if (inner.size() >= 2 && (inner.front() == '"' || inner.front() == '\'') &&
+      inner.back() == inner.front()) {
+    inner = inner.substr(1, inner.size() - 2);
+  }
+  return Trim(inner);
+}
+
+// Maps a `background-repeat` keyword onto a per-axis tile mode. CSS `repeat` / `repeat-x` /
+// `repeat-y` tile; `no-repeat` / `space` / `round` clamp to Decal so the single image is painted
+// once. An empty value falls back to the CSS default `repeat` (both axes tile). The exporter only
+// ever emits `repeat` / `no-repeat` (optionally per-axis), which this covers exactly.
+void ResolveBackgroundRepeat(const std::string& repeat, TileMode& outX, TileMode& outY) {
+  if (repeat.empty()) {
+    outX = TileMode::Repeat;
+    outY = TileMode::Repeat;
+    return;
+  }
+  outX = TileMode::Decal;
+  outY = TileMode::Decal;
+  auto tokens = SplitTopLevelWhitespace(repeat);
+  std::string x = tokens.empty() ? std::string() : tokens[0];
+  std::string y = tokens.size() > 1 ? tokens[1] : x;
+  if (x == "repeat") outX = TileMode::Repeat;
+  if (y == "repeat") outY = TileMode::Repeat;
+  // `repeat-x` / `repeat-y` are single-axis shorthands: a leading `repeat-x` tiles X only.
+  if (x == "repeat-x") {
+    outX = TileMode::Repeat;
+    outY = TileMode::Decal;
+  } else if (x == "repeat-y") {
+    outX = TileMode::Decal;
+    outY = TileMode::Repeat;
+  }
 }
 
 }  // namespace
@@ -254,6 +301,93 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
 
 std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
   return _svgEmitter->serialize(svgNode);
+}
+
+bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer) {
+  std::string src = ExtractCssUrl(box.backgroundImage);
+  if (src.empty()) return false;
+  auto* imageNode = registerImageResource(resolveImageSource(src));
+  if (!imageNode) return false;
+
+  auto pattern = _document->makeNode<ImagePattern>();
+  pattern->image = imageNode;
+
+  // `background-size` keywords map onto a fitted scaleMode that centres the image and ignores
+  // repeat/position — the inverse of the exporter's letterbox/zoom/stretch emission. Anything
+  // else (an explicit pixel size, or a tiling repeat) becomes ScaleMode::None with the matrix
+  // carrying the per-axis scale and the position offset.
+  const std::string& size = box.backgroundSize;
+  bool fitted = false;
+  if (size == "contain") {
+    pattern->scaleMode = ScaleMode::LetterBox;
+    fitted = true;
+  } else if (size == "cover") {
+    pattern->scaleMode = ScaleMode::Zoom;
+    fitted = true;
+  } else if (size == "100% 100%") {
+    pattern->scaleMode = ScaleMode::Stretch;
+    fitted = true;
+  }
+
+  if (!fitted) {
+    pattern->scaleMode = ScaleMode::None;
+    ResolveBackgroundRepeat(box.backgroundRepeat, pattern->tileModeX, pattern->tileModeY);
+
+    // Per-axis scale: the on-screen tile size (`background-size: <w>px <h>px`) divided by the
+    // image's native pixel size mirrors the exporter's `tileW = sx * imgW` emission. Without an
+    // explicit size the tile is the image's native size, i.e. scale 1.
+    auto sizeTokens = SplitTopLevelWhitespace(size);
+    float tileW = sizeTokens.size() > 0 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[0]) : NAN;
+    float tileH =
+        sizeTokens.size() > 1 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[1]) : tileW;
+    auto nativeSize = decodeImageNativeSize(imageNode);
+    if (!std::isnan(tileW) && tileW > 0 && nativeSize.first > 0) {
+      pattern->matrix.a = tileW / static_cast<float>(nativeSize.first);
+    }
+    if (!std::isnan(tileH) && tileH > 0 && nativeSize.second > 0) {
+      pattern->matrix.d = tileH / static_cast<float>(nativeSize.second);
+    }
+
+    // `background-position: <x>px <y>px` is the tile origin relative to this element's own box.
+    // Each re-imported card is a standalone Layer whose contents share the box origin, so the
+    // position maps straight onto the pattern matrix translation (the exporter writes the same
+    // value back, offset by the layer's own left/top which is zero in the standalone case).
+    auto posTokens = SplitTopLevelWhitespace(box.backgroundPosition);
+    if (posTokens.size() > 0) {
+      float posX = _valueParser->parseAbsoluteLengthPx(posTokens[0]);
+      if (!std::isnan(posX)) pattern->matrix.tx = posX;
+    }
+    if (posTokens.size() > 1) {
+      float posY = _valueParser->parseAbsoluteLengthPx(posTokens[1]);
+      if (!std::isnan(posY)) pattern->matrix.ty = posY;
+    }
+  }
+
+  auto fill = _document->makeNode<Fill>();
+  fill->color = pattern;
+  layer->contents.push_back(fill);
+  return true;
+}
+
+std::pair<int, int> HTMLParserContext::decodeImageNativeSize(const Image* image) {
+  if (!image) return {0, 0};
+  std::shared_ptr<tgfx::ImageCodec> codec;
+  if (image->data && image->data->size() > 0) {
+    auto data = tgfx::Data::MakeWithCopy(image->data->bytes(), image->data->size());
+    codec = tgfx::ImageCodec::MakeFrom(std::move(data));
+  } else if (!image->filePath.empty()) {
+    if (image->filePath.compare(0, 5, "data:") == 0) {
+      auto decoded = DecodeBase64DataURI(image->filePath);
+      if (decoded && decoded->size() > 0) {
+        auto data = tgfx::Data::MakeWithCopy(decoded->bytes(), decoded->size());
+        codec = tgfx::ImageCodec::MakeFrom(std::move(data));
+      }
+    } else {
+      codec = tgfx::ImageCodec::MakeFrom(image->filePath);
+    }
+  }
+  if (!codec) return {0, 0};
+  return {codec->width(), codec->height()};
 }
 
 Image* HTMLParserContext::registerImageResource(const std::string& imageSource) {

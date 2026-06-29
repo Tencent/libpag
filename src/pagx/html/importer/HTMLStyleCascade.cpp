@@ -706,6 +706,14 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
+  // A `url(...)` background round-trips through `ImagePattern`, which needs the CSS fitting
+  // hints the exporter emitted alongside it. Capture them only for url backgrounds; gradients
+  // ignore size/repeat/position entirely.
+  if (!bgImage.empty() && ToLower(bgImage).find("url(") != std::string::npos) {
+    box.backgroundSize = LookupLowerTrimmed(props, "background-size");
+    box.backgroundRepeat = LookupLowerTrimmed(props, "background-repeat");
+    box.backgroundPosition = LookupLowerTrimmed(props, "background-position");
+  }
   // `background-clip: text` is the only clip value the importer models. The subset transformer
   // already normalises every other keyword to empty, so a non-empty value here equals `text`.
   std::string bgClip = LookupLowerTrimmed(props, "background-clip");
@@ -747,9 +755,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* VisualsDisallowed[] = {"background-size",     "background-repeat",
-                                            "background-position", "outline",
-                                            "perspective",         "clip-path"};
+  static const char* VisualsDisallowed[] = {"outline", "perspective", "clip-path"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");

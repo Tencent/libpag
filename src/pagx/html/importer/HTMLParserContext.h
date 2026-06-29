@@ -24,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
@@ -95,6 +96,14 @@ class HTMLParserContext {
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 
+  // Recovers a CSS `url(...)` background into an `ImagePattern` Fill appended to `layer`
+  // (the inverse of `HTMLWriter`'s ImagePattern emission). `background-size` selects the
+  // scaleMode (contain/cover/100% 100% → LetterBox/Zoom/Stretch); any explicit pixel size or a
+  // tiling `background-repeat` falls back to ScaleMode::None with the pattern matrix carrying the
+  // per-axis scale and the position offset. Returns true when a fill was emitted. The layer's
+  // background geometry must already be present (added by `applyBackgroundVisuals`).
+  bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
+
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
   // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
@@ -111,6 +120,11 @@ class HTMLParserContext {
 
   // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
+  // path). Returns {0, 0} when the bytes cannot be decoded. Used to recover the per-axis scale
+  // of a tiled `background-image` (CSS tile px / native px).
+  std::pair<int, int> decodeImageNativeSize(const Image* image);
 
   // Resolves a raw `<img src>` URL via `_imageResources->resolveSource`.
   std::string resolveImageSource(const std::string& src) const;

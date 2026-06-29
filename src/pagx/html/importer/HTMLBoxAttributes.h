@@ -210,6 +210,19 @@ struct HTMLBoxAttributes {
   // painting a rectangle on this element.
   bool backgroundClipText = false;
 
+  // CSS `background-size` / `background-repeat` / `background-position`, kept lower-cased and
+  // trimmed. Only meaningful when `backgroundImage` is a `url(...)` reference; the importer maps
+  // them back onto an `ImagePattern` fill — the inverse of `HTMLWriter`'s exporter emission:
+  //   - size `contain` / `cover` / `100% 100%` → ScaleMode LetterBox / Zoom / Stretch (a fitted
+  //     mode that centres the image and ignores repeat/position).
+  //   - any other case (explicit `<w>px <h>px` size, or `repeat`) → ScaleMode None with the
+  //     pattern matrix carrying the per-axis scale (tile px / native px) and the position offset,
+  //     and tile modes taken from `background-repeat`.
+  // Empty means "not authored" and the property falls back to its CSS default.
+  std::string backgroundSize = {};
+  std::string backgroundRepeat = {};
+  std::string backgroundPosition = {};
+
   // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
   // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
   // exceed the box's edge length). When the input was uniform — or all four resolved values are
