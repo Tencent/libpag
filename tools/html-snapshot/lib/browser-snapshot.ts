@@ -1333,10 +1333,30 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   const text = textNode.nodeValue || '';
   if (!text.trim()) return [];
   const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
-  const cleanLine = (s) => (preserve ? s : s.replace(/\s+/g, ' ').trim());
+  // A preserve-mode slice can be bounded by the forced break characters that
+  // visually terminate the line above/below it: a trailing run on the line it
+  // ends, and (only for the whole text's leading blank lines, which collapse to
+  // a single rect) a leading run. Strip both runs of `\r` / `\n` so the emitted
+  // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
+  // indentation — stay intact. The line's vertical offset is already encoded in
+  // its rect, so dropping the break characters never loses positioning.
+  // Collapsing modes fold + trim all whitespace as before.
+  const cleanLine = (s) => {
+    const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
+    return preserve ? stripped : stripped.replace(/\s+/g, ' ').trim();
+  };
   const range = document.createRange();
   range.selectNodeContents(textNode);
-  const lineRects = Array.from(range.getClientRects());
+  // Chromium emits a spurious zero-width client rect at a forced `\n` break that
+  // shares the SAME visual line (and `top`) as the preceding text. The
+  // Y-coordinate bisection below treats every rect as a distinct line, so that
+  // zero-width rect would split one line's text at an arbitrary character offset
+  // (e.g. `Hello\nWorld` → `H` + `ello`). Drop zero-area rects up front: they
+  // paint nothing, and a genuinely empty line is discarded later anyway because
+  // its sliced text is whitespace-only.
+  const lineRects = Array.from(range.getClientRects()).filter(
+    (r) => r.width > 0 && r.height > 0,
+  );
   if (lineRects.length === 0) {
     range.detach && range.detach();
     return [];
