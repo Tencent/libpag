@@ -320,7 +320,7 @@ void PAGScene::buildViewModels() {
         bindDoc = comp->document;
       }
       if (binds != nullptr && !binds->empty()) {
-        comp->dataBindRuntime->bind(*binds, comp->dataContext.get(), bindDoc);
+        comp->dataBindRuntime->bind(*binds, comp->dataContext.get(), bindDoc, comp->binding.get());
       }
     }
     std::vector<PAGComposition*> childComps = {};

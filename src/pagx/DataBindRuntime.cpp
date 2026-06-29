@@ -67,7 +67,8 @@ static std::vector<std::string> ParseSourcePath(const std::string& source) {
 // ---- bind --------------------------------------------------------------------
 
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
-                           PAGXDocument* doc) {
+                           PAGXDocument* doc, RuntimeBinding* binding) {
+  boundBinding = binding;
   for (auto* db : binds) {
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
@@ -124,10 +125,17 @@ void DataBindRuntime::markDirtyForValue(PAGViewModelValue* value) {
   if (value == nullptr) {
     return;
   }
+  // boundBinding is always set: this runtime only becomes a dependent of value inside bind(), which
+  // sets boundBinding first, so a callback here implies bind() already ran.
+  DEBUG_ASSERT(boundBinding != nullptr);
   for (auto& entry : entries) {
-    if (entry.source == value && entry.toTarget()) {
-      markDirty(entry.dataBind);
+    if (entry.source != value || !entry.toTarget()) {
+      continue;
     }
+    // Apply immediately so geometry queries (bounds, hit testing) observe the change before the
+    // next draw. mix is 1 because a direct ViewModel assignment takes full effect at once; animated
+    // mixing only happens in update() during draw.
+    applyEntry(entry, boundBinding, 1.0f);
   }
 }
 
@@ -170,6 +178,29 @@ static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
   }
 }
 
+void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, float mix) {
+  if (binding == nullptr || entry.source == nullptr || entry.sourceGuard.lock() == nullptr ||
+      entry.targetNode == nullptr || entry.dataBind == nullptr) {
+    return;
+  }
+  // Pure ToSource bindings never drive the target.
+  if (!entry.toTarget()) {
+    return;
+  }
+  // Once: apply the ViewModel value to the target a single time, then skip.
+  if (entry.dataBind->direction == DataBindDirection::Once && entry.onceApplied) {
+    return;
+  }
+  auto keyValue = ValueToKeyValue(entry.source);
+  if (entry.source->converter != nullptr) {
+    keyValue = DataConverterRegistry::GetInstance().apply(entry.source->converter, keyValue);
+  }
+  binding->apply(entry.targetNode, entry.channel, keyValue, mix);
+  if (entry.dataBind->direction == DataBindDirection::Once) {
+    entry.onceApplied = true;
+  }
+}
+
 void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
   if (dirtyBinds.empty() || binding == nullptr) {
     return;
@@ -188,26 +219,10 @@ void DataBindRuntime::update(RuntimeBinding* binding, float mix) {
         break;
       }
     }
-    if (entry == nullptr || entry->source == nullptr || entry->sourceGuard.lock() == nullptr ||
-        entry->targetNode == nullptr || entry->dataBind == nullptr) {
+    if (entry == nullptr) {
       continue;
     }
-    // Pure ToSource bindings never drive the target.
-    if (!entry->toTarget()) {
-      continue;
-    }
-    // Once: apply the ViewModel value to the target a single time, then skip.
-    if (entry->dataBind->direction == DataBindDirection::Once && entry->onceApplied) {
-      continue;
-    }
-    auto keyValue = ValueToKeyValue(entry->source);
-    if (entry->source->converter != nullptr) {
-      keyValue = DataConverterRegistry::GetInstance().apply(entry->source->converter, keyValue);
-    }
-    binding->apply(entry->targetNode, entry->channel, keyValue, mix);
-    if (entry->dataBind->direction == DataBindDirection::Once) {
-      entry->onceApplied = true;
-    }
+    applyEntry(*entry, binding, mix);
   }
 }
 

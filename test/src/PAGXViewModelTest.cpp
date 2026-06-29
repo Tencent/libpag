@@ -1865,10 +1865,12 @@ PAGX_TEST(PAGXViewModelTest, DataConverterSecondsToFrames) {
   ASSERT_NE(propV, nullptr);
   EXPECT_FLOAT_EQ(propV->value(), 1.0f);
 
-  // Set duration to 2.0 seconds; converter outputs 120.0 frames (2.0 * 60).
+  // Set duration to 2.0 seconds; converter outputs 120.0 frames (2.0 * 60). The DataBind applies
+  // immediately, so the rect's x shifts to 120 before any draw: the hit point must target the
+  // rect's new position to retrieve the layer.
   propV->value(2.0f);
 
-  auto layers = scene->getLayersUnderPoint(100, 100);
+  auto layers = scene->getLayersUnderPoint(150, 100);
   ASSERT_GT(layers.size(), 0u);
   auto tgfxLayer = layers[0]->runtimeLayer;
   ASSERT_NE(tgfxLayer, nullptr);
@@ -2006,7 +2008,7 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeNullDataBindSafety) {
                                            : nullptr;
   std::vector<pagx::DataBind*> binds = {db};
   auto binding = std::make_unique<pagx::RuntimeBinding>();
-  runtime->bind(binds, ctx.get(), doc.get());
+  runtime->bind(binds, ctx.get(), doc.get(), binding.get());
   EXPECT_FALSE(runtime->entries.empty());
 
   // After binding, nullify dataBind on one entry to simulate document lifetime ending.

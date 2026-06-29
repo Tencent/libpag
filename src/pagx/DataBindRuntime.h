@@ -43,12 +43,16 @@ class DataBindRuntime {
   // Resolves each DataBind's source path against the DataContext and its target node against the
   // document, then registers this runtime as a dependent of every resolved ViewModel value. A
   // binding that drives the target is marked dirty so the first update() applies the configured
-  // default. Bindings whose source or target cannot be resolved are skipped.
-  void bind(const std::vector<DataBind*>& binds, DataContext* context, PAGXDocument* doc);
+  // default. Bindings whose source or target cannot be resolved are skipped. binding is the owning
+  // composition's RuntimeBinding, borrowed so that a later ViewModel change can apply to the target
+  // immediately; the composition owns it and outlives this runtime, so the pointer stays valid.
+  void bind(const std::vector<DataBind*>& binds, DataContext* context, PAGXDocument* doc,
+            RuntimeBinding* binding);
 
-  // Marks every binding whose source is the given ViewModel value dirty so the next update()
-  // re-applies it to the target. Only bindings that drive the target are marked, mirroring
-  // markAllDirty(); pure ToSource bindings are left untouched.
+  // Applies the change of a ViewModel value to its bound targets immediately through the borrowed
+  // RuntimeBinding so queries that read render geometry (bounds, hit testing) observe the new value
+  // without waiting for the next draw. Only bindings that drive the target are applied; pure
+  // ToSource bindings are left untouched.
   void markDirtyForValue(PAGViewModelValue* value);
 
   // Re-marks every binding dirty so the next update() re-applies the ViewModel value to the target.
@@ -92,6 +96,14 @@ class DataBindRuntime {
 
   std::vector<DataBind*> dirtyBinds = {};
   std::vector<BindingEntry> entries = {};
+  // Borrowed from the owning composition (not owned). The composition holds both the RuntimeBinding
+  // and this runtime and destroys them together, so the pointer is valid for this runtime's life.
+  RuntimeBinding* boundBinding = nullptr;
+
+  // Applies a single binding entry's ViewModel value to its target channel through binding, running
+  // the source through its converter. Handles the Once direction's single-application guard. Shared
+  // by update() and the immediate-apply path in markDirtyForValue().
+  void applyEntry(BindingEntry& entry, RuntimeBinding* binding, float mix);
 
   static void WriteVmValue(PAGViewModelValue* value, const KeyValue& kv);
 };
