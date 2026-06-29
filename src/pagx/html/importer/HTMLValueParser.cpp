@@ -400,12 +400,21 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   std::vector<std::string> sizeTokens;
   std::vector<std::string> positionTokens;
   bool afterAt = false;
+  bool explicitCircle = false;
+  bool explicitEllipse = false;
   for (auto& token : tokens) {
     if (token == "at") {
       afterAt = true;
       continue;
     }
-    if (token == "circle" || token == "ellipse") continue;
+    if (token == "circle") {
+      explicitCircle = true;
+      continue;
+    }
+    if (token == "ellipse") {
+      explicitEllipse = true;
+      continue;
+    }
     if (afterAt) {
       positionTokens.push_back(token);
     } else {
@@ -415,11 +424,15 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
 
   // Radius: the exporter writes `rx = radius * boxWidth` (and an ellipse's `ry` is implied by the
   // box height under PAGX's single-radius + fitsToGeometry model), so a length token divided by
-  // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative.
+  // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative. Track whether
+  // the radius came from an explicit px length so a circle on a non-square box can later switch to
+  // the fitsToGeometry=false pixel model (see below).
+  bool radiusFromPxLength = false;
   if (!sizeTokens.empty() && boxWidth > 0) {
     float radius = resolveRadialLength(sizeTokens[0], boxWidth);
     if (!std::isnan(radius)) {
       grad->radius = radius;
+      radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
     } else {
       // Extent keywords (closest-side / farthest-corner / ...) have no scalar PAGX radius; keep
       // the box-filling default and surface a diagnostic instead of silently mis-sizing.
@@ -456,6 +469,20 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   }
   if (!std::isnan(cx)) grad->center.x = cx;
   if (!std::isnan(cy)) grad->center.y = cy;
+
+  // A CSS `circle <r>px` keeps a single uniform radius regardless of box aspect ratio. PAGX's
+  // default fitsToGeometry=true model stretches the normalised radius by box width and height
+  // independently, so on a non-square box it would render the circle as an ellipse. Switch such a
+  // circle to the fitsToGeometry=false pixel model (center/radius in the geometry's local px
+  // space, where the box spans (0,0)-(boxWidth,boxHeight)) so the radius stays isotropic. Square
+  // boxes, ellipses, and percentage/extent sizes keep the compact normalised representation.
+  bool isCircle = explicitCircle || (!explicitEllipse && sizeTokens.size() == 1);
+  if (isCircle && radiusFromPxLength && boxWidth > 0 && boxHeight > 0 &&
+      std::abs(boxWidth - boxHeight) > 0.01f) {
+    grad->center = {grad->center.x * boxWidth, grad->center.y * boxHeight};
+    grad->radius = grad->radius * boxWidth;
+    grad->fitsToGeometry = false;
+  }
 }
 
 float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAxis) {

@@ -733,6 +733,62 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientExtentKeywordKeepsDefaultRadius) {
   EXPECT_TRUE(NearlyEqual(rg->center.y, 0.25f, 0.01f));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleOnNonSquareBoxUsesPixelSpace) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:320px;height:140px;background-image:radial-gradient(170px at 120px 40px, #FFFFFF 0%, #06B6D4 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // A circle on a non-square box must switch to the fitsToGeometry=false pixel model so the radius
+  // stays isotropic; the default normalised model would stretch it into a 170x74 ellipse.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 120.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 40.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 170.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleOnSquareBoxKeepsNormalised) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(50px at 25px 75px, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // A square box renders an isotropic circle even under the normalised model, so keep the compact
+  // fitsToGeometry=true representation (px tokens normalised against the 100px box).
+  EXPECT_TRUE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.25f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.75f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 0.5f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientEllipseOnNonSquareBoxKeepsNormalised) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:320px;height:140px;background-image:radial-gradient(ellipse 170px 70px at 120px 40px, #FFFFFF 0%, #06B6D4 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // An explicit ellipse intends anisotropic stretching, so it stays on the normalised model.
+  EXPECT_TRUE(rg->fitsToGeometry);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
