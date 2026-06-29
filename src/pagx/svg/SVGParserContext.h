@@ -41,6 +41,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -119,6 +120,8 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
+                            const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
   Element* convertImage(const std::shared_ptr<DOMNode>& element);
   Group* buildImageGroup(const std::string& imageHref, float x, float y, float width, float height);

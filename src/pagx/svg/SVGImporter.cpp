@@ -1043,6 +1043,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
   // Get text content from child text nodes and tspan elements.
   std::string textContent;
+  std::shared_ptr<DOMNode> textPathElement = nullptr;
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
@@ -1058,6 +1059,26 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
           textContent += tspanChild->name;
         }
         tspanChild = tspanChild->getNextSibling();
+      }
+    } else if (child->name == "textPath") {
+      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
+      // text into the same content buffer the Text node consumes; the path geometry and offset
+      // descriptors are converted separately into a TextPath modifier sibling below.
+      textPathElement = child;
+      auto pathChild = child->getFirstChild();
+      while (pathChild) {
+        if (pathChild->type == DOMNodeType::Text) {
+          textContent += pathChild->name;
+        } else if (pathChild->name == "tspan") {
+          auto tspanChild = pathChild->getFirstChild();
+          while (tspanChild) {
+            if (tspanChild->type == DOMNodeType::Text) {
+              textContent += tspanChild->name;
+            }
+            tspanChild = tspanChild->getNextSibling();
+          }
+        }
+        pathChild = pathChild->getNextSibling();
       }
     }
     child = child->getNextSibling();
@@ -1143,10 +1164,70 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     } else if (anchor == "end") {
       text->textAnchor = TextAnchor::End;
     }
+
+    // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
+    // right after the Text so the resulting [Text, TextPath, Fill] ordering matches what the
+    // PAGX renderer and HTML exporter expect for path text.
+    if (textPathElement) {
+      auto textPath = convertTextPath(textPathElement, element);
+      if (textPath) {
+        group->elements.push_back(textPath);
+      }
+    }
   }
 
   addFillStroke(element, group->elements, inheritedStyle);
   return group;
+}
+TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
+                                            const std::shared_ptr<DOMNode>& textElement) {
+  std::string refId = resolveUrl(getHrefAttribute(textPathElement));
+  if (refId.empty()) {
+    return nullptr;
+  }
+  auto it = _defs.find(refId);
+  if (it == _defs.end() || it->second->name != "path") {
+    return nullptr;
+  }
+  std::string d = getAttribute(it->second, "d");
+  if (d.empty()) {
+    return nullptr;
+  }
+  auto pathData = _document->makeNode<PathData>();
+  *pathData = PathDataFromSVGString(d);
+  if (pathData->isEmpty()) {
+    return nullptr;
+  }
+  registerPathDataResource(pathData);
+
+  auto textPath = _document->makeNode<TextPath>();
+  textPath->path = pathData;
+
+  // startOffset shifts the text start along the path. SVG allows a length or a percentage of
+  // the total path length; parseLength resolves the percentage against the measured length.
+  std::string startOffset = getAttribute(textPathElement, "startOffset");
+  float pathLength = computePathTotalLength(it->second);
+  if (!startOffset.empty()) {
+    textPath->firstMargin = parseLength(startOffset, pathLength);
+  }
+
+  // textLength + lengthAdjust="spacing" stretches the run to fill a fixed span: PAGX models this
+  // as forceAlignment, which redistributes glyph spacing across the path region between the
+  // first and last margins. Recover lastMargin so the stretched span ends where SVG places it.
+  std::string textLength = getAttribute(textElement, "textLength");
+  std::string lengthAdjust = getAttribute(textElement, "lengthAdjust");
+  if (!textLength.empty() && (lengthAdjust.empty() || lengthAdjust == "spacing")) {
+    textPath->forceAlignment = true;
+    float span = parseLength(textLength, pathLength);
+    if (span > 0 && pathLength > 0) {
+      float lastMargin = pathLength - textPath->firstMargin - span;
+      if (lastMargin > 0) {
+        textPath->lastMargin = lastMargin;
+      }
+    }
+  }
+
+  return textPath;
 }
 Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));

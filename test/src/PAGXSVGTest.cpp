@@ -56,6 +56,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "renderer/FontEmbedder.h"
@@ -635,6 +636,104 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ZeroSizeDefsOnly) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->layers.empty());
+}
+
+// Recursively collect every element of the given node type from a layer tree, descending into
+// Layer contents, child Layers, and Group elements. Used by the textPath import tests below.
+static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
+                                  std::vector<pagx::Element*>& out);
+static void CollectElementsFromElement(pagx::Element* element, pagx::NodeType type,
+                                       std::vector<pagx::Element*>& out) {
+  if (element == nullptr) {
+    return;
+  }
+  if (element->nodeType() == type) {
+    out.push_back(element);
+  }
+  if (element->nodeType() == pagx::NodeType::Group) {
+    auto group = static_cast<pagx::Group*>(element);
+    for (auto child : group->elements) {
+      CollectElementsFromElement(child, type, out);
+    }
+  }
+}
+static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
+                                  std::vector<pagx::Element*>& out) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto element : layer->contents) {
+    CollectElementsFromElement(element, type, out);
+  }
+  for (auto child : layer->children) {
+    CollectElementsByType(child, type, out);
+  }
+}
+
+/**
+ * Test SVG import: a <text> element with a <textPath href="#..."> child resolves the referenced
+ * path into a TextPath modifier alongside a Text node, so path-following text imports instead of
+ * collapsing into an empty fill. startOffset maps to firstMargin, and textLength +
+ * lengthAdjust="spacing" maps to forceAlignment with a recovered lastMargin.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<defs><path id=\"line\" d=\"M10 50L270 50\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\" textLength=\"220\""
+      " lengthAdjust=\"spacing\">"
+      "<textPath href=\"#line\" startOffset=\"20\">Along The Line</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  ASSERT_EQ(textPaths.size(), 1u);
+
+  auto text = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(text->text, "Along The Line");
+
+  auto textPath = static_cast<pagx::TextPath*>(textPaths[0]);
+  ASSERT_NE(textPath->path, nullptr);
+  EXPECT_FALSE(textPath->path->isEmpty());
+  EXPECT_FLOAT_EQ(textPath->firstMargin, 20.0f);
+  EXPECT_TRUE(textPath->forceAlignment);
+  // Path length is 260 (straight line from x=10 to x=270). lastMargin = 260 - 20 - 220 = 20.
+  EXPECT_FLOAT_EQ(textPath->lastMargin, 20.0f);
+}
+
+/**
+ * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
+ * modifier but still keeps the text content as a plain Text node, so the run is not lost.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<text font-family=\"Arial\" font-size=\"12\">"
+      "<textPath href=\"#missing\">Orphan Text</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "Orphan Text");
+  EXPECT_TRUE(textPaths.empty());
 }
 
 /**
