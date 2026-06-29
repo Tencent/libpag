@@ -593,10 +593,11 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
- * Test case: re-running layout after a font/text edit clears the cached TextBlob so the next build
- * re-shapes from the updated layout runs instead of returning the stale blob.
+ * Test case: editing a Text node's font size and calling notifyChange(layoutChanged=true) re-runs
+ * layout and refreshes the runtime tree so the cached TextBlob is rebuilt from the new layout runs
+ * (a stale blob would otherwise be returned by the render-time cache and ignore the edit).
  */
-PAGX_TEST(PAGXTest, ReLayoutClearsTextBlobCache) {
+PAGX_TEST(PAGXTest, NotifyChangeRebuildsTextBlobOnFontEdit) {
   auto doc = pagx::PAGXDocument::Make(240, 140);
   auto* textLayer = MakeTextLayer(doc.get(), "Hello", 20, {0, 0, 0, 1});
   doc->layers.push_back(textLayer);
@@ -620,20 +621,22 @@ PAGX_TEST(PAGXTest, ReLayoutClearsTextBlobCache) {
   }
   ASSERT_NE(text, nullptr);
 
-  // The first build shapes the text and populates the cached TextBlob.
-  auto layer = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_TRUE(layer != nullptr);
+  // Building the scene shapes the text and populates the cached TextBlob.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
   ASSERT_NE(text->glyphData->textBlob, nullptr);
+  auto oldBlob = text->glyphData->textBlob;
+  float oldHeight = text->textBounds.height;
 
-  // Editing a layout-affecting property and re-running layout must invalidate the cached blob.
+  // Edit the font size and notify with layoutChanged=true: this re-runs layout (clearing the cached
+  // blob) and refreshes the runtime tree in place, re-shaping from the new layout runs.
   text->fontSize = 40;
-  doc->applyLayout(&fontConfig);
-  EXPECT_EQ(text->glyphData->textBlob, nullptr);
+  doc->notifyChange({text}, true);
 
-  // The next build re-shapes from the new layout runs, repopulating the blob.
-  auto rebuilt = pagx::LayerBuilder::Build(doc.get());
-  ASSERT_TRUE(rebuilt != nullptr);
-  EXPECT_NE(text->glyphData->textBlob, nullptr);
+  // The runtime tree now holds a freshly shaped blob (not the original) reflecting the larger font.
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  EXPECT_NE(text->glyphData->textBlob, oldBlob);
+  EXPECT_GT(text->textBounds.height, oldHeight);
 }
 
 /**
