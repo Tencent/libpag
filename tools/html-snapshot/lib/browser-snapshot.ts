@@ -1166,6 +1166,15 @@ function freezeSvg(svgEl, rect) {
     clone.style.removeProperty('left');
     clone.style.removeProperty('right');
     clone.style.removeProperty('bottom');
+    // `margin` is the same class of offset: getBoundingClientRect already
+    // reports the position margin pushed the SVG to, so a retained margin would
+    // shift it a second time inside the centring wrapper. Strip the shorthand
+    // and each longhand (the SVG may carry either spelling).
+    clone.style.removeProperty('margin');
+    clone.style.removeProperty('margin-top');
+    clone.style.removeProperty('margin-right');
+    clone.style.removeProperty('margin-bottom');
+    clone.style.removeProperty('margin-left');
   }
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
