@@ -119,6 +119,44 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return color;
     }
   }
+  // CSS Color 4 color() function. The exporter round-trips DisplayP3 fills as
+  // `color(display-p3 r g b)` / `color(display-p3 r g b / a)` with channels already in [0, 1],
+  // so without this branch every wide-gamut swatch falls through to the unrecognised-color
+  // path and renders opaque black.
+  if (lowered.compare(0, 6, "color(") == 0) {
+    auto open = value.find('(');
+    auto close = value.rfind(')');
+    if (open != std::string::npos && close != std::string::npos && close > open) {
+      std::string inner = Trim(value.substr(open + 1, close - open - 1));
+      std::string loweredInner = ToLower(inner);
+      if (loweredInner.compare(0, 11, "display-p3 ") == 0 ||
+          loweredInner.compare(0, 11, "display-p3\t") == 0) {
+        std::string channels = inner.substr(10);
+        float alpha = 1.0f;
+        auto slash = channels.find('/');
+        if (slash != std::string::npos) {
+          auto alphaComps = ParseFloatList(channels.substr(slash + 1));
+          if (!alphaComps.empty()) {
+            alpha = alphaComps[0];
+          }
+          channels = channels.substr(0, slash);
+        }
+        auto comps = ParseFloatList(channels);
+        if (comps.size() >= 3) {
+          Color color = {};
+          color.colorSpace = ColorSpace::DisplayP3;
+          color.red = comps[0];
+          color.green = comps[1];
+          color.blue = comps[2];
+          color.alpha = alpha;
+          return color;
+        }
+      }
+    }
+    _diagnostics.warn("html: unsupported color() value '" + value +
+                      "'; falling back to opaque black");
+    return {0, 0, 0, 1, ColorSpace::SRGB};
+  }
   // CSS hsl()/hsla() (CSS Color 3 comma syntax + CSS Color 4 space syntax). Authored CSS
   // such as `background: hsl(120 100% 50%)` reaches us verbatim because the snapshot stage
   // can leave the function call intact (Chrome only normalises `hsl()` to `rgb()` on certain
