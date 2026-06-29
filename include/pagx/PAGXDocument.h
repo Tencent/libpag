@@ -234,6 +234,14 @@ class PAGXDocument : public Node {
    * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
    * refreshes the nodes it is given.
    *
+   * A layout-affecting edit (layoutChanged = true) re-runs layout for the whole document, which may
+   * reposition sibling or ancestor Layers (e.g. a taller text node pushes the following items down
+   * in a Vertical or Flex container). Only the Layers listed in dirtyNodes have their runtime
+   * transforms refreshed, so any other Layer whose position the re-layout moves must also be
+   * included in dirtyNodes — otherwise it keeps its stale on-screen position. When in doubt for a
+   * container edit, pass the container Layer (and its affected siblings) rather than only the
+   * single mutated leaf.
+   *
    * Editing an external composition: call notifyChange on the document that owns the edited nodes.
    * Scenes that embed this document as an external composition are refreshed automatically. A node
    * may only be notified through its owning document; foreign nodes are skipped. Use ownsNode() if
