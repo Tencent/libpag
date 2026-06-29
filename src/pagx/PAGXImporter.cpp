@@ -2833,7 +2833,26 @@ static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
                           "Resource '" + vmRef + "' not found for 'viewModelRef' attribute.");
           }
         }
-        vm->properties.push_back(prop);
+        // A property name is the key used to resolve DataBind sources and typed accessors, so an
+        // empty or duplicate name would make the schema ambiguous. Report and skip such properties
+        // rather than letting a later one silently shadow an earlier one.
+        if (prop->name.empty()) {
+          ReportError(doc, child.get(), "ViewModel 'Property' is missing a non-empty 'name'.");
+        } else {
+          bool duplicate = false;
+          for (auto* existing : vm->properties) {
+            if (existing != nullptr && existing->name == prop->name) {
+              duplicate = true;
+              break;
+            }
+          }
+          if (duplicate) {
+            ReportError(doc, child.get(),
+                        "Duplicate ViewModel property name '" + prop->name + "' is ignored.");
+          } else {
+            vm->properties.push_back(prop);
+          }
+        }
       }
     } else if (child->type == DOMNodeType::Element) {
       ReportError(

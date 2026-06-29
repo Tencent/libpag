@@ -244,6 +244,11 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       pd->propertyName = prop->name;
       pd->customDataMap = prop->customData;
       value->pd = std::move(pd);
+      // The importer rejects empty and duplicate property names, so a schema reaching this point is
+      // expected to have unique non-empty names; keeping propertyMap and propertyList consistent
+      // relies on that invariant.
+      DEBUG_ASSERT(!prop->name.empty() &&
+                   vm->propertyMap.find(prop->name) == vm->propertyMap.end());
       vm->propertyMap[prop->name] = value;
       vm->propertyList.push_back(value);
     }
