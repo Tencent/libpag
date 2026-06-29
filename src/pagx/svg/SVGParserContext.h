@@ -144,6 +144,11 @@ class SVGParserContext {
 
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
 
+  // Returns the total geometric length of the element's outline by building its tgfx::Path and
+  // summing every contour via PathMeasure. Used to honour the SVG `pathLength` attribute when
+  // scaling `stroke-dasharray` / `stroke-dashoffset`. Returns 0 for unsupported or empty shapes.
+  float computePathTotalLength(const std::shared_ptr<DOMNode>& element);
+
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
 

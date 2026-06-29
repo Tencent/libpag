@@ -32,6 +32,8 @@
 #include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
 
@@ -1896,6 +1898,26 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
 
+    // SVG `pathLength` lets the author normalise the path to a chosen total length, so
+    // `stroke-dasharray` / `stroke-dashoffset` values are expressed in that normalised space
+    // (e.g. HTMLExporter emits `pathLength="1"` with fractional dashes to encode a trim path).
+    // Scale the dash values back into user units by the real-to-author length ratio; without
+    // this the fractional dashes are treated as absolute pixels and collapse into a solid line.
+    std::string pathLengthStr = getAttribute(element, "pathLength");
+    if (!strokeNode->dashes.empty() && !pathLengthStr.empty()) {
+      float authorLength = strtof(pathLengthStr.c_str(), nullptr);
+      if (authorLength > 0.0f) {
+        float realLength = computePathTotalLength(element);
+        if (realLength > 0.0f) {
+          float scale = realLength / authorLength;
+          for (auto& dash : strokeNode->dashes) {
+            dash *= scale;
+          }
+          strokeNode->dashOffset *= scale;
+        }
+      }
+    }
+
     // SVG <circle>/<ellipse> path starts at 3 o'clock (cx+r, cy) and proceeds
     // clockwise. PAGX <Ellipse> path starts at 12 o'clock, also clockwise. The
     // 90-degree phase difference would offset every dash by perimeter/4 if left
@@ -1999,6 +2021,67 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   }
 
   return Rect::MakeXYWH(0, 0, 0, 0);
+}
+float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& element) {
+  const auto& tag = element->name;
+  tgfx::Path path = {};
+
+  if (tag == "path") {
+    std::string d = getAttribute(element, "d");
+    if (!d.empty()) {
+      path = ToTGFX(PathDataFromSVGString(d));
+    }
+  } else if (tag == "polyline" || tag == "polygon") {
+    std::string pointsStr = getAttribute(element, "points");
+    if (!pointsStr.empty()) {
+      path = ToTGFX(parsePoints(pointsStr, tag == "polygon"));
+    }
+  } else if (tag == "line") {
+    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
+    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
+    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
+    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
+    path.moveTo(x1, y1);
+    path.lineTo(x2, y2);
+  } else if (tag == "circle") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
+    path.addOval(tgfx::Rect::MakeXYWH(cx - r, cy - r, r * 2, r * 2));
+  } else if (tag == "ellipse") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+    path.addOval(tgfx::Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2));
+  } else if (tag == "rect") {
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+    if (rx == 0) {
+      rx = ry;
+    }
+    if (ry == 0) {
+      ry = rx;
+    }
+    path.addRoundRect(tgfx::Rect::MakeXYWH(x, y, width, height), rx, ry);
+  }
+
+  if (path.isEmpty()) {
+    return 0.0f;
+  }
+  auto measure = tgfx::PathMeasure::MakeFrom(path);
+  if (measure == nullptr) {
+    return 0.0f;
+  }
+  float total = 0.0f;
+  do {
+    total += measure->getLength();
+  } while (measure->nextContour());
+  return total;
 }
 InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                        const InheritedStyle& parentStyle) {
