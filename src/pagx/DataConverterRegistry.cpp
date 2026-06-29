@@ -61,6 +61,11 @@ KeyValue DataConverterRegistry::ConvertSecondsToFrames(
   if (it != params.end()) {
     frameRate = std::strtof(it->second.c_str(), nullptr);
   }
+  // strtof returns 0 on a malformed frameRate; fall back to the default so the forward conversion
+  // does not silently collapse every value to zero (mirrors the inverse converter's guard).
+  if (frameRate == 0.0f) {
+    frameRate = DEFAULT_FRAME_RATE;
+  }
   return KeyValue{seconds * frameRate};
 }
 
@@ -98,7 +103,9 @@ KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
   float frameRate = DEFAULT_FRAME_RATE;
   auto it = params.find("frameRate");
   if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
-  if (frameRate == 0.0f) return input;
+  // A malformed frameRate (strtof returns 0) falls back to the default, matching the forward
+  // converter so a bad parameter does not silently drop the conversion.
+  if (frameRate == 0.0f) frameRate = DEFAULT_FRAME_RATE;
   return KeyValue{frames / frameRate};
 }
 
