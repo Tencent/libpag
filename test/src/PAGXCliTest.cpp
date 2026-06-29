@@ -21,6 +21,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "base/PAGTest.h"
 #include "cli/CommandBounds.h"
@@ -35,6 +36,8 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -2511,6 +2514,44 @@ CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
 
   // Screenshot test: render the resolved file and compare against baseline.
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
+}
+
+CLI_TEST(PAGXCliTest, Resolve_DeduplicatesInlineSvgImageIds) {
+  // Each inline <svg> is imported by its own SVGImporter, which restarts auto-generated id
+  // numbering from scratch, so two unrelated <image> elements both become Image id="image1".
+  // Resolving must rename the collision so the two ImagePatterns keep pointing at distinct images.
+  auto pagxPath = CopyToTemp("import_resolve_dup_image_id.pagx", "resolve_dup_image_id.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& error : doc->errors) {
+    EXPECT_EQ(error.find("Duplicate node id"), std::string::npos) << error;
+  }
+
+  std::unordered_set<std::string> imageIds;
+  std::vector<const pagx::Image*> images;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<const pagx::Image*>(node.get());
+      EXPECT_TRUE(imageIds.insert(image->id).second) << "duplicate Image id " << image->id;
+      images.push_back(image);
+    }
+  }
+  ASSERT_EQ(images.size(), 2u);
+  EXPECT_NE(images[0], images[1]);
+
+  std::vector<const pagx::Image*> patternTargets;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::ImagePattern) {
+      auto* pattern = static_cast<const pagx::ImagePattern*>(node.get());
+      ASSERT_NE(pattern->image, nullptr);
+      patternTargets.push_back(pattern->image);
+    }
+  }
+  ASSERT_EQ(patternTargets.size(), 2u);
+  EXPECT_NE(patternTargets[0], patternTargets[1]);
 }
 
 CLI_TEST(PAGXCliTest, Resolve_AddsResolvedFromComment) {
