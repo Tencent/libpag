@@ -263,16 +263,26 @@ void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv)
     case ViewModelPropertyType::String:
       if (auto* s = std::get_if<std::string>(&kv)) {
         static_cast<PAGViewModelValueString*>(value)->setValueInternal(*s, false);
+      } else {
+        LOGE(
+            "DataBind syncBack skipped: converter output type does not match String property '%s'.",
+            value->name().c_str());
       }
       break;
     case ViewModelPropertyType::Color:
       if (auto* c = std::get_if<Color>(&kv)) {
         static_cast<PAGViewModelValueColor*>(value)->setValueInternal(*c, false);
+      } else {
+        LOGE("DataBind syncBack skipped: converter output type does not match Color property '%s'.",
+             value->name().c_str());
       }
       break;
     case ViewModelPropertyType::Image:
       if (auto* img = std::get_if<std::shared_ptr<PAGImage>>(&kv)) {
         static_cast<PAGViewModelValueImage*>(value)->setValueInternal(*img, false);
+      } else {
+        LOGE("DataBind syncBack skipped: converter output type does not match Image property '%s'.",
+             value->name().c_str());
       }
       break;
     default:
