@@ -82,6 +82,13 @@ class HTMLInlineSvgEmitter {
   std::string serialize(const std::shared_ptr<DOMNode>& svgNode);
 
   /**
+   * Returns the shared `<defs>` child previously indexed by `collectSharedDefs` under `id`, or
+   * nullptr when no such id was seen. Used to resolve a `clip-path: url(#id)` reference back to
+   * its `<clipPath>` definition so the importer can rebuild a contour mask layer from it.
+   */
+  std::shared_ptr<DOMNode> lookupSharedDef(const std::string& id) const;
+
+  /**
    * Formats a `Color` as the colour token spelling accepted by PAGX's SVG importer for
    * `fill` / `stroke` attributes (`#RRGGBB`, `#RRGGBBAA` when alpha < 1). Exposed so the
    * caller can pre-resolve the SVG root's colour before invoking `resolveCurrentColor`.

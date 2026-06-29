@@ -735,6 +735,15 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   box.filter = LookupProperty(props, "filter");
   box.backdropFilter = LookupProperty(props, "backdrop-filter");
 
+  // Alpha / luminance mask descriptors. `mask-image` is kept raw (the `url(data:...)` wrapper is
+  // stripped at apply time); the rest are lower-cased so keyword comparisons are case-insensitive.
+  box.maskImage = LookupProperty(props, "mask-image");
+  box.maskMode = LookupLowerTrimmed(props, "mask-mode");
+  box.maskSize = LookupLowerTrimmed(props, "mask-size");
+  box.maskPosition = LookupLowerTrimmed(props, "mask-position");
+  // `clip-path: url(#id)` reference, kept raw so the apply-side can extract the id.
+  box.clipPathRef = LookupProperty(props, "clip-path");
+
   const std::string& op = LookupProperty(props, "opacity");
   if (!op.empty()) {
     char* end = nullptr;
@@ -755,7 +764,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* VisualsDisallowed[] = {"outline", "perspective", "clip-path"};
+  static const char* VisualsDisallowed[] = {"outline", "perspective"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");

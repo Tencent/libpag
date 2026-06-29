@@ -207,6 +207,18 @@ std::string TransformBackgroundClip(const std::string& value, const PropertyCont
   return DropProperty("background-clip", value, "is not a supported value", diags);
 }
 
+// `clip-path` is modelled only as a reference to a `<clipPath>` def (`url(#id)`), which the
+// importer rebuilds into a contour mask layer. Geometric forms (`inset()` / `circle()` /
+// `ellipse()` / `polygon()` / `path()`) have no PAGX geometry primitive and are dropped with a
+// diagnostic (the strict-mode trigger), matching the snapshot's own `normalizeClipPath` filter.
+std::string TransformClipPath(const std::string& value, const PropertyContext&,
+                              HTMLTransformContext& diags) {
+  std::string lc = ToLower(Trim(value));
+  if (lc.empty() || lc == "none") return std::string();
+  if (lc.compare(0, 4, "url(") == 0) return Trim(value);
+  return DropProperty("clip-path", value, "only url(#id) references are supported", diags);
+}
+
 std::string TransformBorder(const std::string& value, const PropertyContext&,
                             HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -366,6 +378,19 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-size", PropAction::Keep, nullptr, nullptr},
     {"background-repeat", PropAction::Keep, nullptr, nullptr},
     {"background-position", PropAction::Keep, nullptr, nullptr},
+    // Alpha / luminance masks. `mask-image` carries a `url(data:image/svg+xml,...)` whose SVG the
+    // importer turns back into a PAGX mask layer; `mask-mode` selects Alpha vs Luminance and
+    // `mask-size` / `mask-position` drive the mask layer's scale / offset. Kept verbatim and
+    // consumed in HTMLStyleCascade::parseBoxVisuals (the inverse of HTMLWriter::writeMaskCSS).
+    {"mask-image", PropAction::Keep, nullptr, nullptr},
+    {"mask-mode", PropAction::Keep, nullptr, nullptr},
+    {"mask-size", PropAction::Keep, nullptr, nullptr},
+    {"mask-position", PropAction::Keep, nullptr, nullptr},
+    {"mask-repeat", PropAction::Keep, nullptr, nullptr},
+    // `clip-path: url(#id)` references a hidden <clipPath> def; the importer resolves it into a
+    // contour mask layer (the inverse of HTMLWriter::writeClipDef). Geometric clip-path forms
+    // (inset/circle/ellipse/polygon/path) have no PAGX primitive and are dropped with a diagnostic.
+    {"clip-path", PropAction::Transform, &TransformClipPath, nullptr},
     {"border", PropAction::Transform, &TransformBorder, nullptr},
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
     {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
@@ -409,7 +434,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
-    {"clip-path", PropAction::Drop, nullptr, "is not in the subset"},
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},

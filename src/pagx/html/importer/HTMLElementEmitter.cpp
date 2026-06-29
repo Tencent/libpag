@@ -22,14 +22,18 @@
 // handled by `HTMLTextFragmentBuilder` and reached through `_textFragmentBuilder`.
 
 #include <cmath>
+#include <cstring>
 #include "base/utils/MathUtil.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 
@@ -146,6 +150,44 @@ std::string ExtractCssUrl(const std::string& value) {
     inner = inner.substr(1, inner.size() - 2);
   }
   return Trim(inner);
+}
+
+// Decodes a single hex digit to its 0-15 value, or -1 when not a hex digit.
+int HexDigitValue(char h) {
+  if (h >= '0' && h <= '9') return h - '0';
+  if (h >= 'a' && h <= 'f') return h - 'a' + 10;
+  if (h >= 'A' && h <= 'F') return h - 'A' + 10;
+  return -1;
+}
+
+// Decodes a percent-encoded `data:image/svg+xml,...` URI payload into raw SVG text. The HTML
+// exporter emits the mask SVG as `url('data:image/svg+xml,<percent-encoded>')` (NOT base64), so
+// only the `%XX` escapes the exporter produced (`<`, `>`, `#`, `"`, `'`) plus any stray ones need
+// undoing. Returns empty when `dataUri` is not an `image/svg+xml` data URI. A `base64,` payload is
+// rejected (the exporter never emits one) rather than mis-decoded.
+std::string DecodeSvgDataUri(const std::string& dataUri) {
+  static const char* Prefix = "data:image/svg+xml";
+  if (dataUri.compare(0, std::strlen(Prefix), Prefix) != 0) return {};
+  auto comma = dataUri.find(',');
+  if (comma == std::string::npos) return {};
+  std::string meta = dataUri.substr(std::strlen(Prefix), comma - std::strlen(Prefix));
+  if (ToLower(meta).find("base64") != std::string::npos) return {};
+  std::string out;
+  out.reserve(dataUri.size() - comma);
+  for (size_t i = comma + 1; i < dataUri.size(); ++i) {
+    char c = dataUri[i];
+    if (c == '%' && i + 2 < dataUri.size()) {
+      int hi = HexDigitValue(dataUri[i + 1]);
+      int lo = HexDigitValue(dataUri[i + 2]);
+      if (hi >= 0 && lo >= 0) {
+        out.push_back(static_cast<char>((hi << 4) | lo));
+        i += 2;
+        continue;
+      }
+    }
+    out.push_back(c);
+  }
+  return out;
 }
 
 // Maps a `background-repeat` keyword onto a per-axis tile mode. CSS `repeat` / `repeat-x` /
@@ -301,6 +343,98 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
 
 std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
   return _svgEmitter->serialize(svgNode);
+}
+
+void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box) {
+  if (layer == nullptr) return;
+  bool hasMaskImage = !box.maskImage.empty() && ToLower(box.maskImage).find("none") != 0;
+  bool hasClipPath = !box.clipPathRef.empty();
+  if (!hasMaskImage && !hasClipPath) return;
+  // A mask and a clip-path on the same element is not something the exporter emits and tgfx
+  // models only a single mask per layer; honour the mask-image (alpha/luminance) and warn that
+  // the clip-path is dropped, matching the "one mask wins" rule.
+  if (hasMaskImage && hasClipPath) {
+    warn("html: element carries both mask-image and clip-path; clip-path ignored");
+    hasClipPath = false;
+  }
+
+  std::string svgContent;
+  MaskType maskType = MaskType::Alpha;
+  if (hasMaskImage) {
+    std::string url = ExtractCssUrl(box.maskImage);
+    svgContent = DecodeSvgDataUri(url);
+    if (svgContent.empty()) {
+      warn("html: mask-image is not a decodable data:image/svg+xml URI; ignored");
+      return;
+    }
+    maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  } else {
+    std::string id = ExtractCssUrl(box.clipPathRef);
+    if (!id.empty() && id.front() == '#') {
+      id = id.substr(1);
+    }
+    auto clipNode = id.empty() ? nullptr : _svgEmitter->lookupSharedDef(id);
+    if (clipNode == nullptr) {
+      warn("html: clip-path references an unknown <clipPath> id; ignored");
+      return;
+    }
+    // Frame the <clipPath> children inside an <svg> sized to the masked box so the contour lands
+    // in the masked layer's local coordinate space. The clip shapes are painted opaque white;
+    // contour masking only reads their coverage, not their colour.
+    float w = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+    float h = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+    std::string inner;
+    for (auto child = clipNode->getFirstChild(); child; child = child->getNextSibling()) {
+      inner += _svgEmitter->serialize(child);
+    }
+    if (inner.empty()) {
+      warn("html: clip-path <clipPath> has no geometry; ignored");
+      return;
+    }
+    svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + CssFloatToString(w) +
+                 "\" height=\"" + CssFloatToString(h) + "\" viewBox=\"0 0 " + CssFloatToString(w) +
+                 " " + CssFloatToString(h) + "\" fill=\"white\">" + inner + "</svg>";
+    maskType = MaskType::Contour;
+  }
+
+  auto svgDoc = SVGImporter::ParseString(svgContent);
+  if (svgDoc == nullptr || svgDoc->layers.empty()) {
+    warn("html: failed to rebuild mask geometry from SVG; ignored");
+    return;
+  }
+
+  // The mask SVG produces one or more content layers (a single drawn shape in the common case).
+  // Wrap them under one invisible, layout-excluded mask layer so a multi-shape clip-path also
+  // works, then transplant every node from the temporary SVG document into ours.
+  Layer* maskLayer = nullptr;
+  if (svgDoc->layers.size() == 1) {
+    maskLayer = svgDoc->layers[0];
+  } else {
+    maskLayer = _document->makeNode<Layer>();
+    for (auto* l : svgDoc->layers) {
+      maskLayer->children.push_back(l);
+    }
+  }
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  // The mask layer needs a stable id so the exporter can serialise the `mask="@id"` reference;
+  // without one the masked layer would lose its mask on a PAGX round-trip (export then re-import).
+  if (maskLayer->id.empty()) {
+    maskLayer->id = _idAllocator->generateUnique("mask");
+  }
+  for (auto& node : svgDoc->nodes) {
+    _document->nodes.push_back(std::move(node));
+  }
+  svgDoc->nodes.clear();
+  svgDoc->layers.clear();
+
+  layer->mask = maskLayer;
+  layer->maskType = maskType;
+  // The mask layer must be reachable in the display list for the renderer's mask lookup, and must
+  // share the masked layer's local coordinate origin. Adding it as an invisible, layout-excluded
+  // child satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set) nor
+  // laid out (includeInLayout is false).
+  layer->children.push_back(maskLayer);
 }
 
 bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer) {

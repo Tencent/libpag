@@ -188,6 +188,18 @@ static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocume
 static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc);
 static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc);
 
+// A `mask="@id"` reference whose target Layer was not yet registered when the owning Layer was
+// parsed. A mask layer is commonly authored as a (later-parsed) descendant of the masked layer —
+// e.g. the HTML importer attaches the rebuilt mask as an invisible child — so its id is unknown at
+// the moment the parent's `mask` attribute is read. These are collected during the layer walk and
+// resolved once the whole tree (and therefore `nodeMap`) is complete. See ResolvePendingMasks.
+struct PendingMaskRef {
+  Layer* owner = nullptr;
+  std::string maskId = {};
+  const DOMNode* node = nullptr;  // owning Layer's DOM node, for error reporting
+};
+static std::vector<PendingMaskRef> gPendingMaskRefs = {};
+
 //==============================================================================
 // Custom data parsing
 //==============================================================================
@@ -492,7 +504,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   if (!maskAttr.empty() && maskAttr[0] == '@') {
     layer->mask = doc->findNode<Layer>(maskAttr.substr(1));
     if (!layer->mask) {
-      ReportError(doc, node, "Resource '" + maskAttr + "' not found for 'mask' attribute.");
+      // The mask layer is often a later-parsed descendant of this layer (the HTML importer
+      // attaches the rebuilt mask as an invisible child), so its id is not yet in nodeMap. Defer
+      // resolution to ResolvePendingMasks after the full tree is parsed instead of erroring now.
+      gPendingMaskRefs.push_back({layer, maskAttr.substr(1), node});
     }
   }
   layer->maskType = GET_ENUM(node, "maskType", "alpha", doc, MaskType);
@@ -2642,6 +2657,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
+  gPendingMaskRefs.clear();
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
@@ -2668,6 +2684,18 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+
+  // Third pass: resolve any forward `mask="@id"` references now that every Layer id is in nodeMap.
+  for (const auto& pending : gPendingMaskRefs) {
+    auto* maskLayer = doc->findNode<Layer>(pending.maskId);
+    if (maskLayer) {
+      pending.owner->mask = maskLayer;
+    } else {
+      ReportError(doc, pending.node,
+                  "Resource '@" + pending.maskId + "' not found for 'mask' attribute.");
+    }
+  }
+  gPendingMaskRefs.clear();
 }
 
 }  // namespace pagx

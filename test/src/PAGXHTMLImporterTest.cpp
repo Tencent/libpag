@@ -28,6 +28,7 @@
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -35,6 +36,7 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -88,6 +90,7 @@ struct PagxNodeTypeOf;
 
 DECLARE_PAGX_NODE_TYPE(Rectangle);
 DECLARE_PAGX_NODE_TYPE(Path);
+DECLARE_PAGX_NODE_TYPE(Ellipse);
 DECLARE_PAGX_NODE_TYPE(Fill);
 DECLARE_PAGX_NODE_TYPE(Stroke);
 DECLARE_PAGX_NODE_TYPE(Text);
@@ -6207,6 +6210,100 @@ PAG_TEST(PAGXHTMLImporterTest, RawUnmatchedFilterParenthesisWarns) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(HasDiagnosticContaining(doc, "unmatched '(' in filter"));
+}
+
+// CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask
+// layer (the inverse of HTMLWriter::writeMaskCSS). The ellipse geometry round-trips and the mask
+// layer is attached invisibly and excluded from layout.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22110%22 height=%22110%22 viewBox=%220 0 110 110%22%3E%3Cellipse cx=%2255%22 cy=%2255%22 rx=%2255%22 ry=%2255%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:110px 110px;mask-repeat:no-repeat">
+        <div style="width:110px;height:110px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+  EXPECT_FALSE(masked->mask->visible);
+  EXPECT_FALSE(masked->mask->includeInLayout);
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
+  ASSERT_NE(ellipse, nullptr);
+  EXPECT_TRUE(NearlyEqual(ellipse->size.width, 110.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
+}
+
+// `mask-mode: luminance` selects the luminance mask type and the radial-gradient fill inside the
+// mask SVG round-trips into a RadialGradient color source.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageLuminanceUsesLuminanceType) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22110%22 height=%22110%22 viewBox=%220 0 110 110%22%3E%3Cdefs%3E%3CradialGradient id=%22g%22 cx=%220.5%22 cy=%220.5%22 r=%220.5%22 gradientUnits=%22objectBoundingBox%22%3E%3Cstop offset=%220%22 stop-color=%22%23FFFFFF%22/%3E%3Cstop offset=%221%22 stop-color=%22%23000000%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx=%2255%22 cy=%2255%22 rx=%2255%22 ry=%2255%22 fill=%22url(%23g)%22/%3E%3C/svg%3E');mask-mode:luminance;mask-size:110px 110px;mask-repeat:no-repeat">
+        <div style="width:110px;height:110px;background-color:#EF4444"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Luminance);
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  EXPECT_NE(As<pagx::RadialGradient>(fill->color), nullptr);
+}
+
+// `clip-path: url(#id)` resolves the hidden <clipPath> def into a contour mask whose path
+// geometry round-trips (the inverse of HTMLWriter::writeClipDef).
+PAG_TEST(PAGXHTMLImporterTest, ClipPathRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <clipPath id="clip0">
+            <path d="M0,0L110,0L110,110L0,110Z"/>
+          </clipPath>
+        </defs>
+      </svg>
+      <div style="width:110px;height:110px;clip-path:url(#clip0)">
+        <div style="width:110px;height:110px;background-color:#F59E0B"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  // The body has two children: the hidden <svg> holding the clipPath def, then the masked div.
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
+  // SVGImporter folds the axis-aligned rectangular clip path into a Rectangle; either a Path or a
+  // Rectangle is an acceptable contour geometry.
+  bool hasGeometry = FindElementOfType<pagx::Path>(masked->mask) != nullptr ||
+                     FindElementOfType<pagx::Rectangle>(masked->mask) != nullptr;
+  EXPECT_TRUE(hasGeometry);
+}
+
+// The rebuilt mask layer carries a generated id so the `mask="@id"` reference survives a PAGX
+// export / re-import round-trip — including the forward reference (the mask is a descendant of
+// the masked layer, parsed after the owning layer's `mask` attribute is read).
+PAG_TEST(PAGXHTMLImporterTest, MaskReferenceSurvivesRoundTrip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22110%22 height=%22110%22 viewBox=%220 0 110 110%22%3E%3Cellipse cx=%2255%22 cy=%2255%22 rx=%2255%22 ry=%2255%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha">
+        <div style="width:110px;height:110px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("mask=\"@"), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  auto* masked = reloaded->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
 }
 
 }  // namespace pag

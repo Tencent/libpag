@@ -244,6 +244,22 @@ struct HTMLBoxAttributes {
   std::string filter = {};
   std::string backdropFilter = {};
 
+  // CSS `mask-image` / `mask-mode` / `mask-size` / `mask-position` for alpha and luminance masks.
+  // `maskImage` is the raw `url(data:image/svg+xml,...)` the HTML exporter emitted; the importer
+  // decodes the embedded SVG and rebuilds a PAGX mask layer from it (the inverse of
+  // `HTMLWriter::writeMaskCSS`). `maskMode` is the lower-cased keyword (`alpha` / `luminance`);
+  // `maskSize` / `maskPosition` are lower-cased and trimmed and drive the mask layer's scale /
+  // offset. All empty means "no mask authored".
+  std::string maskImage = {};
+  std::string maskMode = {};
+  std::string maskSize = {};
+  std::string maskPosition = {};
+
+  // CSS `clip-path: url(#id)` reference (raw, including the `url(...)` wrapper and any quotes).
+  // The importer resolves the referenced hidden `<clipPath>` def into a contour mask layer (the
+  // inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path authored".
+  std::string clipPathRef = {};
+
   float opacity = 1.0f;
   bool opacitySet = false;
 

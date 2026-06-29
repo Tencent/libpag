@@ -118,6 +118,16 @@ class HTMLParserContext {
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
 
+  // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
+  // `clip-path: url(#id)` (contour) and attaches it to `layer` as `layer->mask` / `maskType`
+  // (the inverse of `HTMLWriter::writeMaskCSS` / `writeClipDef`). The mask geometry SVG is parsed
+  // through `SVGImporter`, and its nodes are transplanted into `_document`. The mask layer is added
+  // as an invisible, layout-excluded child of `layer` so it shares the masked layer's local
+  // coordinate space and is reachable by the renderer's mask lookup. No-op when the box carries
+  // neither a mask nor a clip-path reference. `box` supplies the masked layer's resolved size used
+  // to frame a contour clip-path SVG.
+  void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
+
   // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
 

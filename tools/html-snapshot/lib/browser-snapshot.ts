@@ -129,6 +129,16 @@ function normalizeBackgroundClip(value) {
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
 }
 
+// PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
+// which the importer turns into a contour mask layer. Chromium reports the
+// reference verbatim as `url("#id")`. Geometric forms (`inset()`, `circle()`,
+// `ellipse()`, `polygon()`, `path()`) and `none` are out of subset and collapse
+// to '' so STYLE_SCHEMA's `defaults` filter drops the property entirely.
+function normalizeClipPath(value) {
+  if (!value) return '';
+  return /^url\(/i.test(value.trim()) ? value.trim() : '';
+}
+
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
 // CSS `vertical-rl` / `vertical-lr` map to Vertical (kept verbatim so the
 // importer can tell them apart); `sideways-rl/lr` (which would also rotate
@@ -599,6 +609,29 @@ function appendBackgroundImageFitting(parts, computed) {
   if (position && position !== '0% 0%') parts.push(`background-position: ${position}`);
 }
 
+// Forward the `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`
+// descriptors when the element carries a `mask-image`. The importer needs them
+// to rebuild the PAGX mask layer at the right type, scale and offset (the inverse
+// of HTMLWriter::writeMaskCSS, which always pins size/repeat and shifts position
+// by the masked layer's render origin). On an unmasked box these descriptors are
+// pure noise, so gate the whole group on a non-`none` `mask-image`. Each value is
+// forwarded verbatim (no default suppression) because the exporter only emits them
+// when they matter, and the importer treats a missing descriptor as the CSS default.
+function appendMaskFitting(parts, computed) {
+  const maskImage = computed.getPropertyValue('mask-image').trim();
+  if (!maskImage || maskImage === 'none') return;
+  const mode = computed.getPropertyValue('mask-mode').trim();
+  if (mode && mode !== 'match-source') parts.push(`mask-mode: ${mode}`);
+  const size = computed.getPropertyValue('mask-size').trim();
+  if (size && size !== 'auto') parts.push(`mask-size: ${size}`);
+  const position = computed.getPropertyValue('mask-position').trim();
+  if (position && position !== '0% 0%' && position !== '0px 0px') {
+    parts.push(`mask-position: ${position}`);
+  }
+  const repeat = computed.getPropertyValue('mask-repeat').trim();
+  if (repeat && repeat !== 'repeat') parts.push(`mask-repeat: ${repeat}`);
+}
+
 // Build the style string for a kept element. `opts.box` includes background/
 // border/shadow/etc.; `opts.text` includes color/font-*; `opts.positioned`
 // toggles the absolute-positioning header (off for inline text children that
@@ -717,6 +750,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     appendBorder(parts, computed);
     appendBoxShadow(parts, computed);
     appendBackgroundImageFitting(parts, computed);
+    appendMaskFitting(parts, computed);
   }
 
   if (opts.text) {
@@ -2937,6 +2971,19 @@ const STYLE_SCHEMA = [
   { prop: 'filter',           scope: 'box',  defaults: ['none'] },
   { prop: 'backdrop-filter',  scope: 'box',  defaults: ['none'] },
   { prop: 'mix-blend-mode',   scope: 'box',  defaults: ['normal'] },
+  // Alpha / luminance masks (mask-image: url(data:image/svg+xml,...)) and the
+  // mask-mode / mask-size / mask-position / mask-repeat descriptors the HTML
+  // exporter emits alongside them. The importer rebuilds a PAGX mask layer from
+  // the data-URI SVG (the inverse of HTMLWriter::writeMaskCSS), so the whole
+  // group must survive the snapshot. mask-image defaults to none and is dropped;
+  // the descriptors are forwarded only when the element actually carries a mask,
+  // gated by appendMaskFitting below (they are noise on unmasked boxes).
+  { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
+  // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
+  // inline svg; the importer resolves the def into a contour mask layer (the
+  // inverse of HTMLWriter::writeClipDef). Geometric clip-path forms (inset/ellipse)
+  // are out of subset and collapse to '' so the defaults filter drops them.
+  { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
@@ -2971,6 +3018,7 @@ const HELPER_FNS = [
   normalizeBorderRadius,
   normalizeBackgroundImage,
   normalizeBackgroundClip,
+  normalizeClipPath,
   normalizeWritingMode,
   roundPx,
   px,
@@ -3006,6 +3054,7 @@ const HELPER_FNS = [
   appendBorder,
   appendBoxShadow,
   appendBackgroundImageFitting,
+  appendMaskFitting,
   buildStyle,
   readCornerRadii,
   roundedUniformBorderSvg,

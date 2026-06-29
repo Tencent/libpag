@@ -326,6 +326,11 @@ std::string HTMLInlineSvgEmitter::serialize(const std::shared_ptr<DOMNode>& svgN
   return out;
 }
 
+std::shared_ptr<DOMNode> HTMLInlineSvgEmitter::lookupSharedDef(const std::string& id) const {
+  auto it = _sharedDefs.find(id);
+  return it != _sharedDefs.end() ? it->second : nullptr;
+}
+
 // SVG `fill` / `stroke` attributes accept CSS colour tokens. PAGX's SVG importer
 // understands `#RRGGBB`, `#RRGGBBAA`, and `rgb()/rgba()`, but not the CSS `color()`
 // function used for DisplayP3 — `ColorToSVGHex` collapses those to sRGB hex for us.

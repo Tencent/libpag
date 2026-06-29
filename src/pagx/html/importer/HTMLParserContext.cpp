@@ -486,6 +486,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     }
     child = child->getNextSibling();
   }
+  // Rebuild any CSS mask / clip-path into a PAGX mask layer on the masked content layer. Runs
+  // after children are attached so the mask layer is appended last; it shares `layer`'s local
+  // coordinate origin (the mask SVG geometry is in the masked element's own 0..W/0..H space).
+  applyMaskOrClip(layer, box);
   _idAllocator->assign(wrapper, element);
   return wrapper;
 }
