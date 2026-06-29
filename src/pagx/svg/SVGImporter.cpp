@@ -1837,6 +1837,19 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     fill = inheritedStyle.fill;
   }
 
+  // Determine the effective fill-rule once so it applies to every fill branch below. Inside a
+  // <clipPath> the winding rule is carried by `clip-rule` rather than `fill-rule`, and a clip
+  // child usually has no `fill` attribute (taking the default-black branch), so honour either
+  // spelling here to keep an even-odd clip's interior hole intact.
+  std::string fillRule = getAttribute(element, "fill-rule");
+  if (fillRule.empty()) {
+    fillRule = getAttribute(element, "clip-rule");
+  }
+  if (fillRule.empty()) {
+    fillRule = inheritedStyle.fillRule;
+  }
+  FillRule effectiveFillRule = (fillRule == "evenodd") ? FillRule::EvenOdd : FillRule::Winding;
+
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
@@ -1847,6 +1860,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
+      fillNode->fillRule = effectiveFillRule;
       contents.push_back(fillNode);
     } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
@@ -1865,6 +1879,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       if (!fillOpacity.empty()) {
         fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
+      fillNode->fillRule = effectiveFillRule;
       contents.push_back(fillNode);
     } else {
       auto fillNode = _document->makeNode<Fill>();
@@ -1884,15 +1899,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = parsedColor;
       fillNode->color = solidColor;
-
-      // Determine effective fill-rule.
-      std::string fillRule = getAttribute(element, "fill-rule");
-      if (fillRule.empty()) {
-        fillRule = inheritedStyle.fillRule;
-      }
-      if (fillRule == "evenodd") {
-        fillNode->fillRule = FillRule::EvenOdd;
-      }
+      fillNode->fillRule = effectiveFillRule;
 
       contents.push_back(fillNode);
     }
