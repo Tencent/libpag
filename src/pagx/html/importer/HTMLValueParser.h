@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
@@ -87,7 +88,11 @@ class HTMLValueParser {
   std::vector<FilterStep> parseFilterChain(const std::string& value);
 
   LinearGradient* parseLinearGradient(const std::string& value);
-  RadialGradient* parseRadialGradient(const std::string& value);
+  /** Parses a CSS `radial-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px
+   *  used to normalise the `<size> at <position>` descriptor back into the gradient's (0,0)-(1,1)
+   *  geometry space; pass NaN when unknown to keep the centered, box-filling default. */
+  RadialGradient* parseRadialGradient(const std::string& value, float boxWidth = NAN,
+                                      float boxHeight = NAN);
   ConicGradient* parseConicGradient(const std::string& value);
 
   /** Parses the comma-separated tail of a gradient call into (offset, color) pairs. Offsets that
@@ -104,6 +109,17 @@ class HTMLValueParser {
   void emitColorStops(T& targetStops, const GradientStops& stops);
 
  private:
+  // Parses a radial-gradient leading descriptor ("circle 50px at 50px 50px") and writes the
+  // recovered center / radius onto `grad`, normalised against the box size.
+  void parseRadialDescriptor(const std::string& descriptor, float boxWidth, float boxHeight,
+                             RadialGradient* grad);
+  // Resolves a single radial size/position length token to a value normalised against `boxAxis`.
+  // Handles px lengths and `<pct>%`; returns NaN when the token is not a length.
+  float resolveRadialLength(const std::string& token, float boxAxis);
+  // Resolves a position-axis token, mapping left/center/right and top/center/bottom keywords to
+  // 0 / 0.5 / 1 before falling back to a length.
+  float resolveRadialPosition(const std::string& token, float boxAxis, bool isVertical);
+
   HTMLDiagnosticSink& _diagnostics;
   PAGXDocument* _document = nullptr;
   const float& _canvasWidth;

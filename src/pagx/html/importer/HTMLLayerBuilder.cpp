@@ -153,7 +153,8 @@ Fill* HTMLLayerBuilder::buildSolidFill(const Color& color) {
   return fill;
 }
 
-ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value) {
+ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, float boxWidth,
+                                                    float boxHeight) {
   std::string trimmed = Trim(value);
   if (trimmed.empty()) return nullptr;
   std::string lower = ToLower(trimmed);
@@ -161,7 +162,7 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value) {
     return _valueParser.parseLinearGradient(trimmed);
   }
   if (lower.compare(0, 16, "radial-gradient(") == 0) {
-    return _valueParser.parseRadialGradient(trimmed);
+    return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight);
   }
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
     return _valueParser.parseConicGradient(trimmed);
@@ -326,7 +327,7 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   colors.reserve(layers.size());
   bool anyUnsupported = false;
   for (const auto& part : layers) {
-    if (auto* color = parseGradientByValue(part)) {
+    if (auto* color = parseGradientByValue(part, box.widthPx, box.heightPx)) {
       colors.push_back(color);
     } else {
       anyUnsupported = true;

@@ -80,8 +80,11 @@ class HTMLLayerBuilder {
   /** Builds a `Fill` chain whose colour is a single solid `color`. */
   Fill* buildSolidFill(const Color& color);
 
-  /** Resolves a CSS gradient string into a registered gradient node. */
-  ColorSource* parseGradientByValue(const std::string& value);
+  /** Resolves a CSS gradient string into a registered gradient node. `boxWidth` / `boxHeight`
+   *  are the painted box size in px, used to normalise radial-gradient size/position descriptors;
+   *  pass NaN when unknown. */
+  ColorSource* parseGradientByValue(const std::string& value, float boxWidth = NAN,
+                                    float boxHeight = NAN);
 
   // Inner host / wrappers --------------------------------------------------------------
   /** Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke

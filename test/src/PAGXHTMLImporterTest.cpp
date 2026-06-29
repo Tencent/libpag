@@ -642,6 +642,41 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientSizeAndPositionDescriptor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(100px at 110px 110px, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // px center/radius are normalised against the 100px box, so 110px/100px -> 1.1 and 100px -> 1.0.
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 1.1f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 1.1f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 1.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientPercentDescriptor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:80px;height:40px;background-image:radial-gradient(50% at 25% 75%, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.25f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.75f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 0.5f, 0.01f));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">

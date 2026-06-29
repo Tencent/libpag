@@ -368,14 +368,17 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
   return grad;
 }
 
-RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
+RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, float boxWidth,
+                                                     float boxHeight) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
   std::string first = ToLower(Trim(parts[0]));
-  if (first.find("circle") != std::string::npos || first.find("ellipse") != std::string::npos ||
-      first.find("at") != std::string::npos) {
+  bool hasDescriptor = first.find("circle") != std::string::npos ||
+                       first.find("ellipse") != std::string::npos ||
+                       first.find("at") != std::string::npos;
+  if (hasDescriptor) {
     stopStart = 1;
   }
   GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
@@ -384,8 +387,79 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
   auto grad = _document->makeNode<RadialGradient>();
   grad->center = {0.5f, 0.5f};
   grad->radius = 0.5f;
+  if (hasDescriptor) {
+    parseRadialDescriptor(first, boxWidth, boxHeight, grad);
+  }
   emitColorStops(grad->colorStops, stops);
   return grad;
+}
+
+void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float boxWidth,
+                                            float boxHeight, RadialGradient* grad) {
+  auto tokens = SplitTopLevelWhitespace(descriptor);
+  std::vector<std::string> sizeTokens;
+  std::vector<std::string> positionTokens;
+  bool afterAt = false;
+  for (auto& token : tokens) {
+    if (token == "at") {
+      afterAt = true;
+      continue;
+    }
+    if (token == "circle" || token == "ellipse") continue;
+    if (afterAt) {
+      positionTokens.push_back(token);
+    } else {
+      sizeTokens.push_back(token);
+    }
+  }
+
+  // Radius: the exporter writes `rx = radius * boxWidth` (and an ellipse's `ry` is implied by the
+  // box height under PAGX's single-radius + fitsToGeometry model), so a length token divided by
+  // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative.
+  if (!sizeTokens.empty() && boxWidth > 0) {
+    float radius = resolveRadialLength(sizeTokens[0], boxWidth);
+    if (!std::isnan(radius)) grad->radius = radius;
+  }
+
+  // Position: `at <x> <y>`. Each axis is a length (px, normalised against its box axis), a percent,
+  // or a keyword (left/center/right, top/center/bottom).
+  if (!positionTokens.empty() && boxWidth > 0) {
+    float cx = resolveRadialPosition(positionTokens[0], boxWidth, /*isVertical=*/false);
+    if (!std::isnan(cx)) grad->center.x = cx;
+  }
+  if (positionTokens.size() >= 2 && boxHeight > 0) {
+    float cy = resolveRadialPosition(positionTokens[1], boxHeight, /*isVertical=*/true);
+    if (!std::isnan(cy)) grad->center.y = cy;
+  }
+}
+
+float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAxis) {
+  if (token.empty()) return NAN;
+  if (token.back() == '%') {
+    char* endPtr = nullptr;
+    float pct = std::strtof(token.c_str(), &endPtr);
+    if (endPtr != nullptr && endPtr != token.c_str() &&
+        static_cast<size_t>(endPtr - token.c_str()) == token.size() - 1) {
+      return pct / 100.0f;
+    }
+    return NAN;
+  }
+  float px = parseAbsoluteLengthPx(token);
+  if (std::isnan(px)) return NAN;
+  return px / boxAxis;
+}
+
+float HTMLValueParser::resolveRadialPosition(const std::string& token, float boxAxis,
+                                             bool isVertical) {
+  if (token == "center") return 0.5f;
+  if (!isVertical) {
+    if (token == "left") return 0.0f;
+    if (token == "right") return 1.0f;
+  } else {
+    if (token == "top") return 0.0f;
+    if (token == "bottom") return 1.0f;
+  }
+  return resolveRadialLength(token, boxAxis);
 }
 
 ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
