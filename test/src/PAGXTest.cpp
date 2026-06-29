@@ -593,6 +593,50 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
+ * Test case: re-running layout after a font/text edit clears the cached TextBlob so the next build
+ * re-shapes from the updated layout runs instead of returning the stale blob.
+ */
+PAGX_TEST(PAGXTest, ReLayoutClearsTextBlobCache) {
+  auto doc = pagx::PAGXDocument::Make(240, 140);
+  auto* textLayer = MakeTextLayer(doc.get(), "Hello", 20, {0, 0, 0, 1});
+  doc->layers.push_back(textLayer);
+
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
+  // Locate the Text node inside the layer's Group content.
+  pagx::Text* text = nullptr;
+  for (auto* element : textLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Group) {
+      for (auto* child : static_cast<pagx::Group*>(element)->elements) {
+        if (child->nodeType() == pagx::NodeType::Text) {
+          text = static_cast<pagx::Text*>(child);
+        }
+      }
+    }
+  }
+  ASSERT_NE(text, nullptr);
+
+  // The first build shapes the text and populates the cached TextBlob.
+  auto layer = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(layer != nullptr);
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+
+  // Editing a layout-affecting property and re-running layout must invalidate the cached blob.
+  text->fontSize = 40;
+  doc->applyLayout(&fontConfig);
+  EXPECT_EQ(text->glyphData->textBlob, nullptr);
+
+  // The next build re-shapes from the new layout runs, repopulating the blob.
+  auto rebuilt = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(rebuilt != nullptr);
+  EXPECT_NE(text->glyphData->textBlob, nullptr);
+}
+
+/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
