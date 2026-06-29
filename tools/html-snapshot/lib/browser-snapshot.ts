@@ -1153,6 +1153,20 @@ function freezeSvg(svgEl, rect) {
     return out;
   };
   const clone = svgEl.cloneNode(true);
+  // Drop the SVG's own positioning: `renderSvg` wraps the frozen markup in a
+  // flex-centring `<div>` that already carries the SVG's measured `(left, top)`
+  // against its parent. An author-emitted `style="position:absolute;top:..;left:.."`
+  // on the `<svg>` (as the PAGX HTMLExporter writes for absolutely-placed icons)
+  // would then offset the shape a second time relative to that wrapper, landing it
+  // at roughly double its intended position. Stripping these here mirrors how the
+  // inner `<img>` anchors to its wrapper's origin (see `imageInnerStyle`).
+  if (clone.nodeType === 1 && clone.style) {
+    clone.style.removeProperty('position');
+    clone.style.removeProperty('top');
+    clone.style.removeProperty('left');
+    clone.style.removeProperty('right');
+    clone.style.removeProperty('bottom');
+  }
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
   // without `width`/`height` attributes. PAGX's import pipeline does not
