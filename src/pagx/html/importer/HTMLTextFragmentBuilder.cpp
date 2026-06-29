@@ -381,9 +381,16 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
   }
 
   auto textBox = _document->makeNode<TextBox>();
-  // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
-  // this the TextBox would adopt its single-line natural width and overflow the parent box.
-  textBox->percentWidth = 100.0f;
+  // Anchor the TextBox to the host layer's content size along the wrap axis so that wordWrap can
+  // engage. Without this the TextBox would adopt its single-line natural extent and overflow the
+  // parent box. The wrap axis is the block-progression axis: width for horizontal writing modes
+  // (lines stack vertically, wrap on width), height for vertical writing modes (columns stack
+  // horizontally, wrap on height).
+  if (isVertical) {
+    textBox->percentHeight = 100.0f;
+  } else {
+    textBox->percentWidth = 100.0f;
+  }
   std::string ta = ToLower(Trim(inherited.textAlign));
   if (!ta.empty()) {
     if (ta == "left" || ta == "start") textBox->textAlign = TextAlign::Start;
