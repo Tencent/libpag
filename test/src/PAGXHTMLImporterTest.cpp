@@ -1032,6 +1032,41 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesCamelCaseAttributes) {
   EXPECT_EQ(content.find("<lineargradient"), std::string::npos);
 }
 
+// Regression: HTMLExporter hoists shared paint servers into a single hidden top-level
+// `<svg><defs>` and references them by id from sibling `<svg>`s via `fill="url(#id)"`. A
+// browser resolves those references through a global id lookup, but each inline `<svg>` here
+// becomes an independent import directive — so the referencing `<svg>` must carry a local copy
+// of the gradient or the SVG importer's `url(#…)` lookup fails and the fill falls back to the
+// default (rendered red after error recovery). The importer injects the referenced def into the
+// consuming `<svg>`. Without this, gradient-filled buttons render solid red instead of gradient.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgInjectsSharedDefsReferencedByUrl) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <svg style="position:absolute;width:0;height:0;overflow:hidden">
+        <defs>
+          <linearGradient id="grad0" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#6366F1"/>
+            <stop offset="1" stop-color="#8B5CF6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <svg width="200" height="60" viewBox="0 0 200 60">
+        <rect width="200" height="60" rx="30" fill="url(#grad0)"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  // The two top-level <svg>s become two sibling Layers; the second one carries the <rect>.
+  auto* rectSvg = doc->layers.front()->children.back();
+  const auto& content = rectSvg->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_NE(content.find("fill=\"url(#grad0)\""), std::string::npos);
+  // The shared gradient must now be defined locally inside this same <svg> directive.
+  EXPECT_NE(content.find("<defs>"), std::string::npos);
+  EXPECT_NE(content.find("id=\"grad0\""), std::string::npos);
+  EXPECT_NE(content.find("stop-color=\"#6366F1\""), std::string::npos);
+}
+
 // Regression: inline <svg> with `fill="currentColor"` must be resolved against
 // the inherited CSS `color` from its host. The icon-font snapshot pre-pass
 // (tools/html-snapshot/lib/icon-font.js) emits glyph paths as `fill="currentColor"`

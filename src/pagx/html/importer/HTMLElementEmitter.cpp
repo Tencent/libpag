@@ -242,6 +242,10 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 
+  // Pull in any shared `<defs>` (gradients/patterns/clip paths) this SVG references by id but
+  // does not itself define, so the standalone import directive resolves `url(#…)` locally.
+  _svgEmitter->injectReferencedDefs(element);
+
   layer->importDirective.content = _svgEmitter->serialize(element);
   layer->importDirective.format = "svg";
   _idAllocator->assign(layer, element);

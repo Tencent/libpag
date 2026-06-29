@@ -21,6 +21,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <unordered_set>
+#include <vector>
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -175,11 +177,147 @@ void ResolveCurrentColorRecursive(const std::shared_ptr<DOMNode>& node,
   }
 }
 
+// Pulls the fragment id out of a `url(#id)` functional value (with optional quotes and
+// surrounding whitespace), returning empty when `value` is not such a reference. SVG paint
+// servers, clip-path, mask, filter, and marker properties all use this `url(#…)` spelling.
+std::string ExtractUrlFragmentId(const std::string& value) {
+  std::string trimmed = Trim(value);
+  if (trimmed.size() < 6) return {};
+  if (trimmed.compare(0, 4, "url(") != 0 || trimmed.back() != ')') return {};
+  std::string inner = Trim(trimmed.substr(4, trimmed.size() - 5));
+  if (inner.size() >= 2 && (inner.front() == '"' || inner.front() == '\'') &&
+      inner.back() == inner.front()) {
+    inner = Trim(inner.substr(1, inner.size() - 2));
+  }
+  if (inner.empty() || inner.front() != '#') return {};
+  return inner.substr(1);
+}
+
+// Pulls the fragment id out of a bare `#id` local reference (used by `href` / `xlink:href`,
+// e.g. a `<use href="#shape">` or a gradient inheriting stops via `href="#base">`). Returns
+// empty for non-local references (external URLs) or malformed values.
+std::string ExtractHashFragmentId(const std::string& value) {
+  std::string trimmed = Trim(value);
+  if (trimmed.size() < 2 || trimmed.front() != '#') return {};
+  return trimmed.substr(1);
+}
+
+// Records every id this single node references through a `url(#…)` paint/effect property, a
+// `href` / `xlink:href` local link, or an inline `style="…: url(#…)"` declaration.
+void CollectNodeReferences(const std::shared_ptr<DOMNode>& node,
+                           std::unordered_set<std::string>& out) {
+  if (!node || node->type != DOMNodeType::Element) return;
+  for (const auto& attr : node->attributes) {
+    if (EqualsIgnoreCase(attr.name, "href") || EqualsIgnoreCase(attr.name, "xlink:href")) {
+      std::string id = ExtractHashFragmentId(attr.value);
+      if (!id.empty()) out.insert(id);
+      continue;
+    }
+    if (EqualsIgnoreCase(attr.name, "style")) {
+      for (const auto& decl : ParseStyleDeclarations(attr.value)) {
+        std::string id = ExtractUrlFragmentId(decl.second);
+        if (!id.empty()) out.insert(id);
+      }
+      continue;
+    }
+    std::string id = ExtractUrlFragmentId(attr.value);
+    if (!id.empty()) out.insert(id);
+  }
+}
+
+// Walks the subtree rooted at `node`, unioning every referenced id (see `CollectNodeReferences`)
+// and every id this subtree itself defines, so the caller can compute which references point
+// outside the subtree.
+void CollectSubtreeReferencesAndIds(const std::shared_ptr<DOMNode>& node,
+                                    std::unordered_set<std::string>& referenced,
+                                    std::unordered_set<std::string>& defined, int depth) {
+  if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
+  if (node->type != DOMNodeType::Element) return;
+  CollectNodeReferences(node, referenced);
+  if (auto* idAttr = node->findAttribute("id")) {
+    if (!idAttr->empty()) defined.insert(*idAttr);
+  }
+  for (auto child = node->getFirstChild(); child; child = child->getNextSibling()) {
+    CollectSubtreeReferencesAndIds(child, referenced, defined, depth + 1);
+  }
+}
+
+// Indexes every id-bearing element under any `<defs>` in the subtree into `table`. A first writer
+// wins, matching browser id-resolution where the first element with a given id is authoritative.
+void IndexDefsRecursive(const std::shared_ptr<DOMNode>& node,
+                        std::unordered_map<std::string, std::shared_ptr<DOMNode>>& table,
+                        bool insideDefs, int depth) {
+  if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
+  if (node->type != DOMNodeType::Element) return;
+  bool nowInsideDefs = insideDefs || EqualsIgnoreCase(node->name, "defs");
+  if (insideDefs) {
+    if (auto* idAttr = node->findAttribute("id")) {
+      if (!idAttr->empty()) table.emplace(*idAttr, node);
+    }
+  }
+  for (auto child = node->getFirstChild(); child; child = child->getNextSibling()) {
+    IndexDefsRecursive(child, table, nowInsideDefs, depth + 1);
+  }
+}
+
 }  // namespace
 
 void HTMLInlineSvgEmitter::resolveCurrentColor(const std::shared_ptr<DOMNode>& svgRoot,
                                                const std::string& rootColor) {
   ResolveCurrentColorRecursive(svgRoot, rootColor, /*depth=*/0, /*isRoot=*/true);
+}
+
+void HTMLInlineSvgEmitter::collectSharedDefs(const std::shared_ptr<DOMNode>& root) {
+  IndexDefsRecursive(root, _sharedDefs, /*insideDefs=*/false, /*depth=*/0);
+}
+
+void HTMLInlineSvgEmitter::injectReferencedDefs(const std::shared_ptr<DOMNode>& svgRoot) {
+  if (!svgRoot || _sharedDefs.empty()) return;
+
+  std::unordered_set<std::string> referenced;
+  std::unordered_set<std::string> defined;
+  CollectSubtreeReferencesAndIds(svgRoot, referenced, defined, /*depth=*/0);
+
+  // Resolve the transitive closure of external references: a referenced gradient may itself
+  // inherit stops from another shared def via `href="#base"`, so cloning one def can pull in
+  // more. Worklist over ids that resolve to a shared def and are not already defined locally.
+  std::vector<std::shared_ptr<DOMNode>> toInject;
+  std::unordered_set<std::string> queued;
+  std::vector<std::string> worklist(referenced.begin(), referenced.end());
+  while (!worklist.empty()) {
+    std::string id = worklist.back();
+    worklist.pop_back();
+    if (defined.count(id) > 0 || queued.count(id) > 0) continue;
+    auto it = _sharedDefs.find(id);
+    if (it == _sharedDefs.end()) continue;
+    queued.insert(id);
+    auto clone = CloneDOMSubtree(it->second, /*depth=*/0);
+    if (!clone) continue;
+    toInject.push_back(clone);
+    std::unordered_set<std::string> nested;
+    CollectSubtreeReferencesAndIds(it->second, nested, defined, /*depth=*/0);
+    for (const auto& nestedId : nested) {
+      if (defined.count(nestedId) == 0 && queued.count(nestedId) == 0) {
+        worklist.push_back(nestedId);
+      }
+    }
+  }
+  if (toInject.empty()) return;
+
+  auto defs = std::make_shared<DOMNode>();
+  defs->name = "defs";
+  defs->type = DOMNodeType::Element;
+  std::shared_ptr<DOMNode> lastChild = nullptr;
+  for (auto& node : toInject) {
+    if (lastChild) {
+      lastChild->nextSibling = node;
+    } else {
+      defs->firstChild = node;
+    }
+    lastChild = node;
+  }
+  defs->nextSibling = svgRoot->firstChild;
+  svgRoot->firstChild = defs;
 }
 
 std::string HTMLInlineSvgEmitter::serialize(const std::shared_ptr<DOMNode>& svgNode) {

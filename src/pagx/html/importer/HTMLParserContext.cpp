@@ -196,6 +196,12 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
 
   _idAllocator->collectAll(root, *_diagnostics);
 
+  // HTMLExporter hoists shared paint servers (gradients/patterns/clip paths) into a hidden
+  // top-level `<svg><defs>` and references them by id from many sibling `<svg>`s. Each inline
+  // `<svg>` becomes an independent import directive, so index those shared defs now and inject
+  // the ones each `<svg>` references into it during conversion.
+  _svgEmitter->collectSharedDefs(root);
+
   Layer* bodyLayer = convertBody(body, canvasW, canvasH);
   if (_diagnostics->hadHardError()) {
     return nullptr;
