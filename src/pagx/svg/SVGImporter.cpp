@@ -848,10 +848,12 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     return;
   }
 
-  // Check if this is a use element referencing an image.
+  // Check if this is a use element referencing an image, or a direct image element.
   // In that case, we don't add fill/stroke because the image already has its own fill.
   bool skipFillStroke = false;
-  if (tag == "use") {
+  if (tag == "image") {
+    skipFillStroke = true;
+  } else if (tag == "use") {
     std::string refId = resolveUrl(getHrefAttribute(element));
     auto it = _defs.find(refId);
     if (it != _defs.end() && it->second->name == "image") {
@@ -904,6 +906,8 @@ Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& elemen
     result = convertPath(element);
   } else if (tag == "use") {
     result = convertUse(element);
+  } else if (tag == "image") {
+    result = convertImage(element);
   }
   if (result) {
     parseCustomData(element, result);
@@ -1171,34 +1175,7 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
     // image dimensions without applying the transform again.
     float imageWidth = parseLength(getAttribute(it->second, "width"), _viewBoxWidth);
     float imageHeight = parseLength(getAttribute(it->second, "height"), _viewBoxHeight);
-
-    // Register the image resource.
-    auto imageNode = registerImageResource(imageHref);
-
-    // Create a rectangle to display the image at original size.
-    // The transform will be applied by the parent Layer's matrix.
-    auto rect = _document->makeNode<Rectangle>();
-    rect->position.x = x + imageWidth / 2;
-    rect->position.y = y + imageHeight / 2;
-    rect->size.width = imageWidth;
-    rect->size.height = imageHeight;
-
-    // Create an ImagePattern fill for the rectangle.
-    auto pattern = _document->makeNode<ImagePattern>();
-    pattern->image = imageNode;
-    // Position the pattern at the rectangle's origin.
-    pattern->matrix = Matrix::Translate(x, y);
-
-    // Create a fill with the image pattern.
-    auto fill = _document->makeNode<Fill>();
-    fill->color = pattern;
-
-    // Create a group containing the rectangle and fill.
-    auto group = _document->makeNode<Group>();
-    group->elements.push_back(rect);
-    group->elements.push_back(fill);
-
-    return group;
+    return buildImageGroup(imageHref, x, y, imageWidth, imageHeight);
   }
 
   if (_options.expandUseReferences) {
@@ -1221,6 +1198,52 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   auto group = _document->makeNode<Group>();
   // group->name (removed) = "_useRef:" + refId;
   return group;
+}
+// Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
+// direct <image> element and <use> references to an image. The box (x, y, width, height) is in the
+// element's own coordinate space; any transform on the host element is applied by the parent Layer.
+Group* SVGParserContext::buildImageGroup(const std::string& imageHref, float x, float y,
+                                         float width, float height) {
+  if (imageHref.empty() || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+
+  auto imageNode = registerImageResource(imageHref);
+  if (!imageNode) {
+    return nullptr;
+  }
+
+  auto rect = _document->makeNode<Rectangle>();
+  rect->position.x = x + width / 2;
+  rect->position.y = y + height / 2;
+  rect->size.width = width;
+  rect->size.height = height;
+
+  auto pattern = _document->makeNode<ImagePattern>();
+  pattern->image = imageNode;
+  // Position the pattern at the rectangle's origin so the image covers the box.
+  pattern->matrix = Matrix::Translate(x, y);
+
+  auto fill = _document->makeNode<Fill>();
+  fill->color = pattern;
+
+  auto group = _document->makeNode<Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  return group;
+}
+// Converts a direct <image> element into a Rectangle + ImagePattern fill group. The element's
+// transform / clip-path / mask are handled by convertToLayer on the owning Layer.
+Element* SVGParserContext::convertImage(const std::shared_ptr<DOMNode>& element) {
+  std::string imageHref = getHrefAttribute(element);
+  if (imageHref.empty()) {
+    return nullptr;
+  }
+  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+  float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+  float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+  return buildImageGroup(imageHref, x, y, width, height);
 }
 LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DOMNode>& element,
                                                         const Rect& shapeBounds) {

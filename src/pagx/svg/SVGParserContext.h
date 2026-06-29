@@ -120,6 +120,8 @@ class SVGParserContext {
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
+  Element* convertImage(const std::shared_ptr<DOMNode>& element);
+  Group* buildImageGroup(const std::string& imageHref, float x, float y, float width, float height);
 
   LinearGradient* convertLinearGradient(const std::shared_ptr<DOMNode>& element,
                                         const Rect& shapeBounds);
