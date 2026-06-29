@@ -56,6 +56,11 @@ enum class DataBindDirection : uint8_t {
  * DataBind connects a ViewModel property (source) to a render node channel (target). When the
  * source value changes, the target channel is updated accordingly. DataBind nodes are typically
  * declared inside a Composition and reference the composition's own render nodes via @id.
+ *
+ * If a channel is driven by both a DataBind and a timeline animation, the DataBind wins: each frame
+ * the animation is applied first and the DataBind value is written afterward (during draw), so the
+ * bound ViewModel value overrides the animated one. Avoid binding and animating the same channel
+ * unless this override is intended.
  */
 class DataBind : public Node {
  public:
