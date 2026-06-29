@@ -49,10 +49,8 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   virtual ~PAGViewModelValue() = default;
 
   /**
-   * Adds an observer callback that is invoked when the value changes. Notification is immediate
-   * unless a SuppressDelegation scope is active, in which case it is coalesced and delivered at
-   * scope exit. Returns an ObserverHandle; the observer is automatically removed when the handle
-   * is destroyed or detached.
+   * Adds an observer callback that is invoked when the value changes. Returns an ObserverHandle;
+   * the observer is automatically removed when the handle is destroyed or detached.
    *
    * The callback must not strongly capture this value or its owning PAGViewModel, which would leak
    * them; capture a weak_ptr and lock it inside the callback instead.

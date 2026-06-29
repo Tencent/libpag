@@ -41,10 +41,9 @@ class PAGViewModelValueImage : public PAGViewModelValue {
   }
 
   /**
-   * Sets the image value. Triggers observer callbacks (unless suppressed) and marks dependent
-   * DataBinds dirty; setting the same image skips these notifications. Any assignment, even of the
-   * same image, marks this property as user-assigned and permanently suppresses re-decoding of the
-   * schema-default image when the source resource later changes (e.g. host loadFileData).
+   * Sets the image value; subsequent reads return it. Setting the same value notifies no observers.
+   * Any assignment, even of the same image or null, takes ownership of the property so it is no
+   * longer updated when the underlying image resource reloads.
    */
   void value(std::shared_ptr<PAGImage> v);
 
