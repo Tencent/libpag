@@ -38,10 +38,6 @@ using namespace pagx::html;
 
 namespace {
 
-// The alpha-extract feColorMatrix the exporter inserts via EnsurePipelineAlpha to feed a
-// Drop / Inner / Blend filter from the running pipeline's alpha channel.
-const char* kAlphaExtractValues = "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0";
-
 bool NameIs(const std::shared_ptr<DOMNode>& node, const char* name) {
   return node && node->type == DOMNodeType::Element && node->name == name;
 }
@@ -70,17 +66,25 @@ std::vector<std::shared_ptr<DOMNode>> ElementChildren(const std::shared_ptr<DOMN
   return out;
 }
 
-// True when the feColorMatrix carries the alpha-extract values the exporter uses before a
-// Drop / Inner / Blend filter (as opposed to an author-meaningful colour transform).
+// True when the feColorMatrix only re-derives the alpha channel as a scalar multiple of the input
+// alpha (RGB output columns all zero, the alpha row a single positive multiplier on the input
+// alpha). The exporter emits this as the `1`-multiplier alpha-extract before a Drop / Inner /
+// Blend filter; other tools emit an equivalent opaque-alpha form with a `255` multiplier and
+// `in="SourceAlpha"`. Both are alpha pre-passes folded into the following filter rather than an
+// author-meaningful colour transform.
 bool IsAlphaExtractMatrix(const std::shared_ptr<DOMNode>& node) {
   if (!NameIs(node, "feColorMatrix")) return false;
-  auto values = ParseFloatList(Attr(node, "values"));
-  auto expected = ParseFloatList(kAlphaExtractValues);
-  if (values.size() != expected.size()) return false;
-  for (size_t i = 0; i < values.size(); i++) {
-    if (values[i] != expected[i]) return false;
+  std::string type = Trim(Attr(node, "type"));
+  if (!type.empty() && type != "matrix") return false;
+  auto v = ParseFloatList(Attr(node, "values"));
+  if (v.size() != 20) return false;
+  // Every coefficient except the alpha-on-alpha multiplier (index 18) must be zero, and that
+  // multiplier must be non-zero so the result still carries the source alpha.
+  for (size_t i = 0; i < v.size(); i++) {
+    if (i == 18) continue;
+    if (v[i] != 0.0f) return false;
   }
-  return true;
+  return v[18] != 0.0f;
 }
 
 // True when the feColorMatrix has the DropShadow colour-fill shape:

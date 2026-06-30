@@ -6425,6 +6425,46 @@ PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsShadowOnlyDropShadow) {
   EXPECT_NEAR(drop->color.alpha, 0.502f, 0.01f);
 }
 
+// A drop-shadow <filter> whose alpha pre-pass uses an opaque-alpha feColorMatrix (a 255 multiplier
+// with result="opaqueAlpha", as emitted by tools other than HTMLWriter) is still folded into a
+// single DropShadowFilter — the leading matrix must not be mistaken for a standalone
+// ColorMatrixFilter. Regression for constraint_polystar_center.html.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefDropShadowWithOpaqueAlphaPrepass) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f0">
+            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0" result="opaqueAlpha"/>
+            <feGaussianBlur in="opaqueAlpha" stdDeviation="24 24" result="blur"/>
+            <feOffset in="blur" dy="8" result="off"/>
+            <feColorMatrix in="off" type="matrix" values="0 0 0 0 0.9608 0 0 0 0 0.6196 0 0 0 0 0.0431 0 0 0 0.3765 0" result="shadow"/>
+            <feMerge>
+              <feMergeNode in="shadow"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:200px;height:200px;filter:url(#f0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[0]);
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FLOAT_EQ(drop->offsetX, 0.0f);
+  EXPECT_FLOAT_EQ(drop->offsetY, 8.0f);
+  EXPECT_FLOAT_EQ(drop->blurX, 24.0f);
+  EXPECT_FLOAT_EQ(drop->blurY, 24.0f);
+  EXPECT_FALSE(drop->shadowOnly);
+  EXPECT_NEAR(drop->color.red, 0.9608f, 0.01f);
+  EXPECT_NEAR(drop->color.green, 0.6196f, 0.01f);
+  EXPECT_NEAR(drop->color.alpha, 0.3765f, 0.01f);
+}
+
 // An inner-shadow <filter> (inverted alpha -> blur -> offset -> flood -> two composites) ending in
 // a feMerge with SourceGraphic rebuilds a non-shadow-only InnerShadowFilter, recovering the flood
 // colour and opacity.
