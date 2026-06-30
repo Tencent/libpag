@@ -7567,8 +7567,7 @@ PAG_TEST(PAGXHTMLImporterTest, FilterReferenceToUnknownIdWarns) {
 PAG_TEST(PAGXHTMLDetailTest, EscapeXmlHandlesAllSpecialCharacters) {
   // Non-attribute mode keeps double quotes literal; attribute mode escapes them.
   EXPECT_EQ(pagx::html::EscapeXml("a<b>c&d\"e", /*isAttribute=*/false), "a&lt;b&gt;c&amp;d\"e");
-  EXPECT_EQ(pagx::html::EscapeXml("a<b>c&d\"e", /*isAttribute=*/true),
-            "a&lt;b&gt;c&amp;d&quot;e");
+  EXPECT_EQ(pagx::html::EscapeXml("a<b>c&d\"e", /*isAttribute=*/true), "a&lt;b&gt;c&amp;d&quot;e");
 }
 
 PAG_TEST(PAGXHTMLDetailTest, LooksAbsolutePathRecognisesWindowsDriveLetters) {
