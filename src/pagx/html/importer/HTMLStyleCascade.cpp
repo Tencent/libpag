@@ -242,9 +242,46 @@ bool ParseMatrix(const TransformParseCtx& ctx, HTMLTransform& parsed) {
   return true;
 }
 
+// `matrix3d(m11..m44)` carries a column-major 4x4 transform. PAGX layers are 2D, so we project
+// the matrix orthographically onto the screen plane by dropping the Z row/column: the visible
+// affine is the 2x2 in-plane block plus the in-plane translation
+//     a=m11(parts[0]) b=m12(parts[1]) c=m21(parts[4]) d=m22(parts[5]) tx=m41(parts[12]) ty=m42(parts[13]).
+// For matrices without perspective (m14=m24=m34=0, m44=1) this projection is exact — it equals
+// what the browser composites for a flat element. When the matrix DOES carry perspective the
+// orthographic projection is only an approximation (it ignores the perspective divide and any
+// Z-ordering between preserve-3d siblings), so we keep the affine subset but emit a warning.
+bool ParseMatrix3D(const TransformParseCtx& ctx, HTMLTransform& parsed) {
+  if (ctx.parts.size() != 16) {
+    ctx.diagnostics.warn("html: matrix3d expects 16 numeric arguments; got '" + ctx.transform +
+                         "'");
+    return false;
+  }
+  float m[16];
+  for (size_t i = 0; i < 16; i++) {
+    if (!ParseScalarFloat(ctx.parts[i], m[i])) {
+      ctx.diagnostics.warn("html: matrix3d argument '" + ctx.parts[i] +
+                           "' is not a number; ignored");
+      return false;
+    }
+  }
+  if (m[3] != 0.0f || m[7] != 0.0f || m[11] != 0.0f || m[15] != 1.0f) {
+    ctx.diagnostics.warn("html: matrix3d '" + ctx.transform +
+                         "' carries perspective; projecting onto its 2D affine subset (Z-depth "
+                         "and perspective divide are not represented)");
+  }
+  parsed.matrix.a = m[0];
+  parsed.matrix.b = m[1];
+  parsed.matrix.c = m[4];
+  parsed.matrix.d = m[5];
+  parsed.matrix.tx = m[12];
+  parsed.matrix.ty = m[13];
+  parsed.valid = !parsed.matrix.isIdentity();
+  return true;
+}
+
 // `parseBoxTransform` dispatch table. `composeMatrix` is true when the discrete-field
-// composition (`T * R * Skew * S`) should run after the handler — `matrix()` is the lone
-// false case because it has already populated `parsed.matrix` directly.
+// composition (`T * R * Skew * S`) should run after the handler — `matrix()` and `matrix3d()`
+// are the false cases because they have already populated `parsed.matrix` directly.
 struct TransformHandlerEntry {
   const char* name;
   TransformHandler handler;
@@ -257,6 +294,7 @@ const TransformHandlerEntry TRANSFORM_HANDLERS[] = {
     {"scalex", &ParseScaleX, true},         {"scaley", &ParseScaleY, true},
     {"translate", &ParseTranslate, true},   {"translatex", &ParseTranslateX, true},
     {"translatey", &ParseTranslateY, true}, {"matrix", &ParseMatrix, false},
+    {"matrix3d", &ParseMatrix3D, false},
 };
 
 const TransformHandlerEntry* FindTransformHandler(const std::string& fn) {

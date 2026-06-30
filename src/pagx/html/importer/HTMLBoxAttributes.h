@@ -102,10 +102,11 @@ struct HTMLInheritedStyle {
 /**
  * Resolved CSS `transform` for a single HTML element. Populated when the
  * `transform` declaration uses one of the supported single-function forms
- * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]) or the `matrix(a, b, c, d,
- * tx, ty)` shorthand. Compound function chains and 3D variants
- * (`matrix3d`/`rotate3d`/`perspective`/…) are dropped earlier in the subset
- * transformer.
+ * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]), the `matrix(a, b, c, d,
+ * tx, ty)` shorthand, or the `matrix3d(...)` 3D form (projected
+ * orthographically onto its 2D affine subset). Compound function chains and
+ * the remaining 3D variants (`rotate3d`/`perspective`/…) are dropped earlier
+ * in the subset transformer.
  *
  * The single-function variants populate the discrete fields (skew/rotation/
  * scale/translate) so the existing TextBox path can map them straight onto

@@ -292,10 +292,13 @@ std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTr
 // translate[X|Y]) populate the discrete fields and TextBox uses them
 // directly. The `matrix(a, b, c, d, tx, ty)` shorthand is also accepted —
 // the resolver writes the six floats straight into `HTMLTransform.matrix`
-// so non-text Layers can forward the affine onto `Layer.matrix`. Compound
-// chains like `skewX(-5deg) rotate(10deg)` and 3D variants
-// (`matrix3d`/`rotate3d`/`perspective`) still require decomposition that
-// the importer does not implement, so they are dropped with a warning.
+// so non-text Layers can forward the affine onto `Layer.matrix`. The
+// `matrix3d(...)` 3D form is accepted too: the resolver projects it
+// orthographically onto its 2D affine subset (exact for matrices without
+// perspective, approximate otherwise). Compound chains like
+// `skewX(-5deg) rotate(10deg)` and the remaining 3D variants
+// (`rotate3d`/`perspective`) still require decomposition that the importer
+// does not implement, so they are dropped with a warning.
 std::string TransformTransform(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -318,12 +321,12 @@ std::string TransformTransform(const std::string& value, const PropertyContext&,
   }
   if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
       fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey" ||
-      fn == "matrix") {
+      fn == "matrix" || fn == "matrix3d") {
     return trimmed;
   }
   return DropProperty("transform", value,
                       "is not in the supported function set "
-                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix)",
+                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix/matrix3d)",
                       diags);
 }
 
