@@ -1156,6 +1156,47 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPassedAsImportDirective) {
   EXPECT_NE(leaf->importDirective.content.find("circle"), std::string::npos);
 }
 
+// Regression: an inline <svg> carrying its own `opacity` (presentation attribute and/or inline
+// `style`) must hoist that opacity onto the enclosing Layer's alpha exactly once. The serialized
+// import-directive content must NOT keep the root opacity, otherwise the SVG importer run during
+// `pagx resolve` reads it again and multiplies the two (0.7 × 0.7 ≈ 0.49), washing the shape out.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgRootOpacityHoistedOnceNotDoubled) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="opacity:0.7" opacity="0.7" width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="30" fill="#3B82F6"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(leaf->alpha, 0.7f);
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_EQ(content.find("opacity"), std::string::npos);
+  EXPECT_NE(content.find("circle"), std::string::npos);
+  EXPECT_NE(content.find("#3B82F6"), std::string::npos);
+}
+
+// A descendant of an inline <svg> keeps its own `opacity` — only the root's opacity is hoisted to
+// the Layer alpha, since CSS `opacity` does not inherit. The child opacity composites under the
+// hoisted layer alpha exactly as in the browser.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgChildOpacityPreserved) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="opacity:0.7" width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="30" fill="#3B82F6" opacity="0.5"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(leaf->alpha, 0.7f);
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_NE(content.find("opacity=\"0.5\""), std::string::npos);
+}
+
 // Regression: inline <svg> with only viewBox (no width/height) must keep the
 // case-sensitive `viewBox` attribute through the HTML import pipeline. The
 // browser-emitted snapshot (e.g. from tools/html-snapshot) lowercases HTML

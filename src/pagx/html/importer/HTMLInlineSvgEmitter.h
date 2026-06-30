@@ -76,6 +76,15 @@ class HTMLInlineSvgEmitter {
   void injectReferencedDefs(const std::shared_ptr<DOMNode>& svgRoot);
 
   /**
+   * Removes the root `<svg>`'s own `opacity` (both the presentation attribute and the inline
+   * `style="...;opacity:..."` declaration) so it is not applied a second time by the downstream
+   * SVG importer. The caller hoists the SVG element's CSS `opacity` onto the enclosing PAGX
+   * layer's alpha; leaving it on the serialized root would multiply the two. CSS `opacity` does
+   * not inherit, so only the root's own value is stripped — descendants keep their opacity.
+   */
+  void stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot);
+
+  /**
    * Serialises the subtree rooted at `svgNode` into XML suitable for embedding in
    * `Layer::importDirective::content`. Recursion is bounded by `MAX_HTML_RECURSION_DEPTH`.
    */

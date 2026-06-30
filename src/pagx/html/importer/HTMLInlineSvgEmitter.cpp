@@ -260,7 +260,43 @@ void IndexDefsRecursive(const std::shared_ptr<DOMNode>& node,
   }
 }
 
+// Rebuilds an inline `style="..."` value with every `opacity` declaration removed, returning the
+// remaining declarations re-joined. Used to drop the root `<svg>`'s own opacity once it has been
+// hoisted onto the enclosing layer's alpha, so the downstream SVG importer does not apply it again.
+std::string RemoveOpacityFromInlineStyle(const std::string& style) {
+  auto decls = ParseStyleDeclarations(style);
+  std::string out;
+  out.reserve(style.size());
+  bool first = true;
+  for (auto& decl : decls) {
+    if (EqualsIgnoreCase(decl.first, "opacity")) continue;
+    if (!first) out.push_back(';');
+    out += decl.first;
+    out.push_back(':');
+    out.push_back(' ');
+    out += decl.second;
+    first = false;
+  }
+  return out;
+}
+
 }  // namespace
+
+void HTMLInlineSvgEmitter::stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot) {
+  if (!svgRoot || svgRoot->type != DOMNodeType::Element) return;
+  std::vector<DOMAttribute> kept;
+  kept.reserve(svgRoot->attributes.size());
+  for (auto& attr : svgRoot->attributes) {
+    if (EqualsIgnoreCase(attr.name, "opacity")) continue;
+    if (EqualsIgnoreCase(attr.name, "style")) {
+      std::string rewritten = RemoveOpacityFromInlineStyle(attr.value);
+      if (rewritten.empty()) continue;
+      attr.value = rewritten;
+    }
+    kept.push_back(attr);
+  }
+  svgRoot->attributes = std::move(kept);
+}
 
 void HTMLInlineSvgEmitter::resolveCurrentColor(const std::shared_ptr<DOMNode>& svgRoot,
                                                const std::string& rootColor) {

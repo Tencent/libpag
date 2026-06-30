@@ -335,6 +335,13 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   // does not itself define, so the standalone import directive resolves `url(#…)` locally.
   _svgEmitter->injectReferencedDefs(element);
 
+  // `applyLayerAttributes` already hoisted the SVG element's CSS `opacity` onto `layer->alpha`.
+  // Strip the root `<svg>`'s own opacity before serialising so the nested SVG importer does not
+  // apply it a second time (which would multiply the two and wash the shape out).
+  if (box.opacitySet) {
+    _svgEmitter->stripRootOpacity(element);
+  }
+
   layer->importDirective.content = _svgEmitter->serialize(element);
   layer->importDirective.format = "svg";
   _idAllocator->assign(layer, element);

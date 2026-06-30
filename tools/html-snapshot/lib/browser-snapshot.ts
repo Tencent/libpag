@@ -1250,6 +1250,19 @@ function freezeSvg(svgEl, rect) {
     clone.style.removeProperty('margin-right');
     clone.style.removeProperty('margin-bottom');
     clone.style.removeProperty('margin-left');
+    // `opacity` is a wrapper-owned box property too: `renderSvg`'s flex-centring
+    // `<div>` already carries the SVG's computed `opacity` (it is in STYLE_SCHEMA's
+    // `box` scope). Leaving the same opacity on the `<svg>` would composite it twice
+    // — wrapper × svg — washing the shape out (0.7 × 0.7 ≈ 0.49). Strip the root's own
+    // opacity here; the walk below also skips freezing it back as an attribute. Only the
+    // root is affected — CSS `opacity` does not inherit, so descendants keep theirs.
+    clone.style.removeProperty('opacity');
+  }
+  // A directly-authored `opacity` attribute on the root <svg> is the same wrapper-owned
+  // value in attribute form; drop it so the walk's freeze pass treats the root as having
+  // no opacity to carry.
+  if (clone.nodeType === 1 && clone.removeAttribute) {
+    clone.removeAttribute('opacity');
   }
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
@@ -1263,7 +1276,7 @@ function freezeSvg(svgEl, rect) {
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor, inheritedAttrs) => {
+  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot) => {
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
@@ -1294,6 +1307,10 @@ function freezeSvg(svgEl, rect) {
       // `<style>.cls path { stroke: ... }` rules into the snapshot.
       for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
         const name = SVG_PRESENTATION_ATTRS[i];
+        // The root <svg>'s own `opacity` is hoisted onto the wrapper `<div>` (see the
+        // strip above), so never freeze it back onto the root. Descendants still freeze
+        // their opacity normally — it composites under the wrapper exactly once.
+        if (isRoot && name === 'opacity') continue;
         if (dst.hasAttribute(name)) continue;
         const value = resolvedAttrs[name];
         if (!value) continue;
@@ -1305,9 +1322,9 @@ function freezeSvg(svgEl, rect) {
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false);
   };
-  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS);
+  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS, true);
   // outerHTML serialises U+00A0 as the named entity &nbsp;, which the importer's
   // XML parser rejects (XML predefines only &amp; &lt; &gt; &quot; &apos;).
   // Rewrite it to the numeric character reference so the frozen SVG stays valid
