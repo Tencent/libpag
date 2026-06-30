@@ -1643,6 +1643,19 @@ function collectFlexProps(computed, hasMultipleVisibleItems) {
   const parts = [];
   parts.push('display: flex');
   parts.push(`flex-direction: ${dirOut}`);
+  // A vertical writing mode rotates the flex main axis 90° (CSS resolves
+  // `flex-direction` against the inline/block axes, which swap under
+  // `vertical-rl/lr`). `writing-mode` is a `scope: text` property, so the
+  // generic box walker never emits it onto a flex container — but the PAGX
+  // importer needs it on the container to fold that rotation into its
+  // geometric LayoutMode (HTMLStyleCascade::parseBoxLayout). Emit it here when
+  // the container itself is vertical so `justify-content` lands on the axis the
+  // browser used (otherwise a `flex-direction: column` + `vertical-rl` centred
+  // column renders flush against an edge instead of centred).
+  const wm = normalizeWritingMode(computed.getPropertyValue('writing-mode'));
+  if (wm === 'vertical-rl' || wm === 'vertical-lr') {
+    parts.push(`writing-mode: ${wm}`);
+  }
   if (hasMultipleVisibleItems) {
     const gap = flexMainGapPx(computed, dirOut);
     if (gap) parts.push(`gap: ${gap}`);

@@ -686,6 +686,19 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
   } else if (fd == "row-reverse") {
     _diagnostics.warn("html: flex-direction: row-reverse not supported");
   }
+  // CSS resolves `flex-direction` against the writing mode: `row` runs along the inline axis and
+  // `column` along the block axis. Under a vertical writing mode the inline axis is vertical and
+  // the block axis is horizontal, so the flex main axis is rotated 90° from the horizontal-writing
+  // default. PAGX's LayoutMode is purely geometric (Horizontal = left-to-right, Vertical =
+  // top-to-bottom) and has no writing-mode notion, so fold the rotation in here: `box.flexRow`
+  // henceforth means "main axis is geometrically horizontal". Without this a `flex-direction:
+  // column` + `vertical-rl` container (the canonical centred vertical-text idiom) would map to
+  // LayoutMode::Vertical and apply justify-content along the wrong axis, leaving the column flush
+  // against an edge instead of centred across the box.
+  std::string wm = LookupLowerTrimmed(props, "writing-mode");
+  if (wm == "vertical-rl" || wm == "vertical-lr") {
+    box.flexRow = !box.flexRow;
+  }
   const std::string& gap = LookupProperty(props, "gap");
   if (!gap.empty()) {
     box.gapPx = _valueParser.parseAbsoluteLengthPx(gap);

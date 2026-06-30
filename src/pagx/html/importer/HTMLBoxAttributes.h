@@ -184,7 +184,11 @@ struct HTMLBoxAttributes {
 
   // Layout
   bool displayFlex = false;
-  bool flexRow = true;  // default of CSS flex
+  // True when the flex main axis is geometrically horizontal. Starts from CSS `flex-direction`
+  // (row → true) and is then rotated by the element's writing-mode in `parseBoxLayout`: a vertical
+  // writing mode flips the inline/block axes, so `flex-direction: column` under `vertical-rl/lr`
+  // ends up horizontal. Maps directly to LayoutMode (Horizontal when true, Vertical otherwise).
+  bool flexRow = true;
   float gapPx = 0.0f;
   bool gapSet = false;
   Padding padding = {};
