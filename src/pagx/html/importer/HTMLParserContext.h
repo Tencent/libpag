@@ -128,6 +128,22 @@ class HTMLParserContext {
   // to frame a contour clip-path SVG.
   void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
 
+  // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
+  // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
+  // is imported at its intrinsic pixel size; CSS then scales it to `mask-size` and offsets it by
+  // `mask-position`, both anchored at the masked element's top-left origin and resolved against
+  // its box for percentage / keyword values. `intrinsicW` / `intrinsicH` are the mask SVG's own
+  // dimensions; `box` supplies the masked element's size. No-op when size and position are absent
+  // or `auto`, or when the intrinsic size is degenerate.
+  void applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBoxAttributes& box, float intrinsicW,
+                                float intrinsicH);
+
+  // Resolves one axis of CSS `mask-position` into a top-left pixel offset. `token` is a length, a
+  // percentage, or an edge keyword (`left`/`right`/`top`/`bottom`/`center`); percentages and
+  // keywords resolve against `(boxAxis - maskAxis)` per the CSS background/mask positioning model,
+  // while a bare length is the offset from the box's leading edge.
+  float resolveMaskPositionAxis(const std::string& token, float boxAxis, float maskAxis);
+
   // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
 

@@ -6343,6 +6343,47 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
 }
 
+// A `mask-size` larger than the mask SVG's intrinsic size scales the rebuilt mask layer by the
+// per-axis ratio so the mask geometry covers the element CSS rendered it across, rather than
+// staying pinned at the smaller intrinsic size in the top-left corner. The ratios differ per axis
+// (non-uniform), which the SVGImporter's uniform-fit path cannot express on its own.
+PAG_TEST(PAGXHTMLImporterTest, MaskSizeScalesMaskLayerNonUniformly) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:150px 180px;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  // 150 / 100 = 1.5 on x, 180 / 100 = 1.8 on y, no translation for the default top-left position.
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 1.5f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 1.8f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 0.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 0.0f, 0.001f));
+}
+
+// `mask-position` offsets the rebuilt mask layer by the authored pixel offset, anchored at the
+// masked element's top-left origin, so a mask smaller than the element lands where CSS placed it.
+PAG_TEST(PAGXHTMLImporterTest, MaskPositionOffsetsMaskLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:100px 100px;mask-position:30px 40px;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 30.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 40.0f, 0.001f));
+}
+
 // `mask-mode: luminance` selects the luminance mask type and the radial-gradient fill inside the
 // mask SVG round-trips into a RadialGradient color source.
 PAG_TEST(PAGXHTMLImporterTest, MaskImageLuminanceUsesLuminanceType) {

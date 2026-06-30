@@ -27,6 +27,7 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLParserContext.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -49,6 +50,21 @@ bool IsExternalSvgSrc(const std::string& src) {
   if (src.size() <= 4) return false;
   if (src.compare(0, 5, "data:") == 0) return false;
   return ToLower(src.substr(src.size() - 4)) == ".svg";
+}
+
+// Resolves one axis of a per-axis `mask-size` token into an on-element pixel length. A length
+// (`120px`) is taken verbatim; a percentage resolves against the element's box axis; `auto` (and
+// any unparseable token) returns NaN so the caller can tie the axis to the other for aspect-ratio
+// preservation. `intrinsicAxis` is unused for px/% but kept in the signature for symmetry with the
+// CSS model where `auto` would otherwise fall back to the intrinsic size.
+float ResolveMaskSizeAxis(const std::string& token, float boxAxis, float /*intrinsicAxis*/,
+                          HTMLValueParser& parser) {
+  if (token.empty() || token == "auto") return NAN;
+  float fraction = 0;
+  if (ParseCssPercentage(token, fraction)) {
+    return fraction * boxAxis;
+  }
+  return parser.parseAbsoluteLengthPx(token);
 }
 
 // Maximum depth of layout-only `<div>` wrappers `foldRoundedImageWrapper` will skip
@@ -409,6 +425,11 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
     warn("html: failed to rebuild mask geometry from SVG; ignored");
     return;
   }
+  // The SVG was imported at its intrinsic pixel size (viewBox mapped into the SVG's own
+  // width/height). CSS `mask-size` / `mask-position` then scale and offset that intrinsic box onto
+  // the masked element, so capture the intrinsic dimensions before the document is drained below.
+  float intrinsicW = svgDoc->width;
+  float intrinsicH = svgDoc->height;
 
   // The mask SVG produces one or more content layers (a single drawn shape in the common case).
   // Wrap them under one invisible, layout-excluded mask layer so a multi-shape clip-path also
@@ -424,6 +445,12 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   }
   maskLayer->visible = false;
   maskLayer->includeInLayout = false;
+  // CSS `mask-size` / `mask-position` scale and offset the intrinsic mask box onto the masked
+  // element; replay that transform onto the mask layer. Contour clip-paths are framed to the box
+  // directly above and carry no size/position, so this only applies to mask-image masks.
+  if (hasMaskImage) {
+    applyMaskSizeAndPosition(maskLayer, box, intrinsicW, intrinsicH);
+  }
   // The mask layer needs a stable id so the exporter can serialise the `mask="@id"` reference;
   // without one the masked layer would lose its mask on a PAGX round-trip (export then re-import).
   if (maskLayer->id.empty()) {
@@ -442,6 +469,79 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   // child satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set) nor
   // laid out (includeInLayout is false).
   layer->children.push_back(maskLayer);
+}
+
+float HTMLParserContext::resolveMaskPositionAxis(const std::string& token, float boxAxis,
+                                                 float maskAxis) {
+  if (token.empty() || token == "left" || token == "top") {
+    return 0.0f;
+  }
+  if (token == "right" || token == "bottom") {
+    return boxAxis - maskAxis;
+  }
+  if (token == "center") {
+    return (boxAxis - maskAxis) / 2.0f;
+  }
+  float fraction = 0;
+  if (ParseCssPercentage(token, fraction)) {
+    return fraction * (boxAxis - maskAxis);
+  }
+  float px = _valueParser->parseAbsoluteLengthPx(token);
+  return std::isnan(px) ? 0.0f : px;
+}
+
+void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBoxAttributes& box,
+                                                 float intrinsicW, float intrinsicH) {
+  if (maskLayer == nullptr || !(intrinsicW > 0) || !(intrinsicH > 0)) return;
+  float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+  float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+
+  // Resolve `mask-size` into the on-element pixel box, then divide by the intrinsic box to recover
+  // the per-axis scale. The single-value, `auto`, `contain` and `cover` forms follow the CSS
+  // background/mask sizing model; the exporter's own output is the two-length form.
+  float scaleX = 1.0f;
+  float scaleY = 1.0f;
+  auto sizeTokens = SplitTopLevelWhitespace(box.maskSize);
+  std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
+  std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
+  if (sizeW == "contain" || sizeW == "cover") {
+    float fitX = boxW / intrinsicW;
+    float fitY = boxH / intrinsicH;
+    float fit = (sizeW == "contain") ? std::min(fitX, fitY) : std::max(fitX, fitY);
+    scaleX = fit;
+    scaleY = fit;
+  } else if (!sizeW.empty()) {
+    // Per-axis target length: `auto` (NaN here) keeps the axis tied to the other so the aspect
+    // ratio is preserved, matching CSS when only one dimension is given.
+    float targetW = ResolveMaskSizeAxis(sizeW, boxW, intrinsicW, *_valueParser);
+    float targetH = ResolveMaskSizeAxis(sizeH, boxH, intrinsicH, *_valueParser);
+    if (std::isnan(targetW) && std::isnan(targetH)) {
+      // both auto -> intrinsic size, scale 1
+    } else if (std::isnan(targetW)) {
+      scaleY = targetH / intrinsicH;
+      scaleX = scaleY;
+    } else if (std::isnan(targetH)) {
+      scaleX = targetW / intrinsicW;
+      scaleY = scaleX;
+    } else {
+      scaleX = targetW / intrinsicW;
+      scaleY = targetH / intrinsicH;
+    }
+  }
+
+  // The scaled mask box used to resolve percentage / keyword `mask-position` against the element.
+  float scaledW = intrinsicW * scaleX;
+  float scaledH = intrinsicH * scaleY;
+  auto posTokens = SplitTopLevelWhitespace(box.maskPosition);
+  std::string posX = posTokens.size() > 0 ? posTokens[0] : "";
+  std::string posY = posTokens.size() > 1 ? posTokens[1] : "";
+  float tx = resolveMaskPositionAxis(posX, boxW, scaledW);
+  float ty = resolveMaskPositionAxis(posY, boxH, scaledH);
+
+  // Geometry sits in the intrinsic box anchored at the origin; scale about (0,0) then translate so
+  // the mask lands where CSS positions it. Compose ahead of any transform the SVG import produced.
+  Matrix transform = Matrix::Translate(tx, ty) * Matrix::Scale(scaleX, scaleY);
+  maskLayer->matrix = transform * maskLayer->matrix;
 }
 
 bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer) {
