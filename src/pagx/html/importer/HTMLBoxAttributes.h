@@ -234,6 +234,12 @@ struct HTMLBoxAttributes {
   float borderRadiusBLPx = 0.0f;
   bool borderRadiusSet = false;
   bool borderRadiusUniform = true;
+  // True when every corner's horizontal radius equals half the box width and every corner's
+  // vertical radius equals half the box height — the exact condition under which a CSS
+  // rounded rectangle degenerates into an ellipse inscribed in the box (`border-radius: 50%`
+  // being the canonical author syntax). The importer then emits a PAGX `Ellipse` instead of a
+  // `Rectangle`, so a non-square box renders a true ellipse rather than a pill approximation.
+  bool borderRadiusEllipse = false;
 
   float borderWidthPx = 0.0f;
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};

@@ -33,6 +33,7 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowStyle.h"
@@ -232,11 +233,23 @@ void HTMLLayerBuilder::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribut
 }
 
 Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
+  // `border-radius: 50%` (and the equivalent `50% / 50%`) inscribes a true ellipse in the box.
+  // PAGX `Rectangle` only carries a single scalar roundness, so on a non-square box it would
+  // render a pill (semicircular ends + a straight middle) instead of the ellipse CSS intends.
+  // Emit a PAGX `Ellipse` sized to 100% of the layer so it adapts to the laid-out box, exactly
+  // like the Rectangle fast path below.
+  if (box.borderRadiusEllipse) {
+    auto* ellipse = _document->makeNode<Ellipse>();
+    ellipse->percentWidth = 100.0f;
+    ellipse->percentHeight = 100.0f;
+    return ellipse;
+  }
+
   // Fast path: no border-radius authored, or every corner shares the same radius. PAGX
   // `Rectangle` collapses to a single uniform `roundness`, so emit it as a `percentWidth /
   // percentHeight = 100%` shape that adapts to whatever the parent layer ends up being. This
-  // keeps the common case (border-radius: 12px, border-radius: 50%, all-zeros, ...) on the
-  // same compact representation older optimisations and tests rely on.
+  // keeps the common case (border-radius: 12px, all-zeros, ...) on the same compact
+  // representation older optimisations and tests rely on.
   if (!box.borderRadiusSet || box.borderRadiusUniform) {
     auto* rect = _document->makeNode<Rectangle>();
     rect->percentWidth = 100.0f;

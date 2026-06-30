@@ -294,10 +294,9 @@ PAG_TEST(PAGXHTMLImporterTest, BorderRadiusMapsToRoundness) {
 }
 
 // Regression: macOS-style traffic-light dots use `border-radius: 50%` on a square
-// element to draw circles. Percentage values must be resolved against the box's
-// known px dimensions (using min(width, height) since PAGX Rectangle exposes a
-// single uniform corner radius), so a 12x12 element with `border-radius: 50%`
-// becomes a true circle (roundness = 6).
+// element to draw circles. `border-radius: 50%` inscribes an ellipse in the box, which on
+// a square box is a circle, so the importer emits a PAGX `Ellipse` sized to 100% of the
+// layer (a square Ellipse renders as a circle).
 PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:24px;height:24px">
@@ -306,16 +305,17 @@ PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentBecomesCircleOnSquareBox) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
-  auto* rect = FindElementOfType<pagx::Rectangle>(div);
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(div), nullptr);
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(div);
+  ASSERT_NE(ellipse, nullptr);
+  EXPECT_FLOAT_EQ(ellipse->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(ellipse->percentHeight, 100.0f);
 }
 
-// On a non-square box `border-radius: 50%` would mean an ellipse in CSS, but
-// PAGX Rectangle only supports a single uniform radius. We resolve against the
-// shorter side so the result becomes the closest pill shape the primitive can
-// render (here: 40x12 -> roundness 6, i.e. semicircular ends, no over-rounding).
-PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
+// On a non-square box `border-radius: 50%` means an ellipse in CSS: every corner's horizontal
+// radius is half the width and every corner's vertical radius is half the height. The importer
+// emits a PAGX `Ellipse` (not a pill-shaped Rectangle) so a 40x12 box renders as a true ellipse.
+PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentOnRectangleBecomesEllipse) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:60px;height:20px">
       <div style="width:40px;height:12px;background-color:#28C840;border-radius:50%"></div>
@@ -323,9 +323,11 @@ PAG_TEST(PAGXHTMLImporterTest, BorderRadiusPercentOnRectangleUsesShorterSide) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
-  auto* rect = FindElementOfType<pagx::Rectangle>(div);
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(div), nullptr);
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(div);
+  ASSERT_NE(ellipse, nullptr);
+  EXPECT_FLOAT_EQ(ellipse->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(ellipse->percentHeight, 100.0f);
 }
 
 // A percentage radius on an element whose width/height is not given in px
@@ -2568,9 +2570,10 @@ PAG_TEST(PAGXHTMLImporterTest, ImageDefaultObjectFitIsStretch) {
 // Direct `border-radius` on `<img>` (the canonical "circular avatar" idiom: `<img
 // style="border-radius:50%">`) used to be silently dropped — `convertImage` emitted a plain
 // `Rectangle` regardless of the box's border-radius. The geometry helper now flows through it,
-// so a uniform radius rounds the Rectangle and an asymmetric one falls onto the Path emitter,
-// matching the `<div>` + background-image path.
-PAG_TEST(PAGXHTMLImporterTest, ImageWithUniformBorderRadiusRoundsRectangle) {
+// so `border-radius: 50%` on a square avatar emits an `Ellipse` (a square Ellipse is a circle)
+// and an asymmetric radius falls onto the Path emitter, matching the `<div>` + background-image
+// path.
+PAG_TEST(PAGXHTMLImporterTest, ImageWithUniformBorderRadiusEmitsEllipse) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img src="avatar.png" style="width:64px;height:64px;border-radius:50%"/>
@@ -2578,9 +2581,11 @@ PAG_TEST(PAGXHTMLImporterTest, ImageWithUniformBorderRadiusRoundsRectangle) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* leaf = doc->layers.front()->children.front();
-  auto* rect = FindElementOfType<pagx::Rectangle>(leaf);
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->roundness, 32.0f);
+  EXPECT_EQ(FindElementOfType<pagx::Rectangle>(leaf), nullptr);
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(leaf);
+  ASSERT_NE(ellipse, nullptr);
+  EXPECT_FLOAT_EQ(ellipse->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(ellipse->percentHeight, 100.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, ImageWithAsymmetricBorderRadiusEmitsPath) {

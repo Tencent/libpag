@@ -24,6 +24,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "base/utils/MathUtil.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -887,31 +888,114 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   box.transform = parsed;
 }
 
+// Resolves one axis of a `border-radius` value (the horizontal radii before the optional '/',
+// or the vertical radii after it) into four per-corner pixel values in TL/TR/BR/BL order.
+// `axisLengthPx` is the box dimension that percentage tokens resolve against (width for the
+// horizontal axis, height for the vertical axis). Returns false when any token is invalid or a
+// percentage appears without a fixed px size on that axis, recording a diagnostic; on success the
+// four corners are written to `out`.
+static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, float axisLengthPx,
+                                    HTMLValueParser& valueParser, HTMLDiagnosticSink& diagnostics,
+                                    FourSidedValue& out) {
+  std::vector<float> nums;
+  nums.reserve(tokens.size());
+  for (auto& t : tokens) {
+    std::string trimmed = Trim(t);
+    if (trimmed.empty()) {
+      continue;
+    }
+    float v = NAN;
+    if (trimmed.back() == '%') {
+      char* end = nullptr;
+      float pct = std::strtof(trimmed.c_str(), &end);
+      if (end == trimmed.c_str()) {
+        diagnostics.warn("html: invalid border-radius token '" + t + "'");
+        return false;
+      }
+      if (std::isnan(axisLengthPx)) {
+        diagnostics.warn("html: percentage border-radius '" + t +
+                         "' requires fixed px width/height on the same element; ignored");
+        return false;
+      }
+      v = pct * axisLengthPx / 100.0f;
+    } else {
+      v = valueParser.parseAbsoluteLengthPx(trimmed);
+      if (std::isnan(v)) {
+        diagnostics.warn("html: invalid border-radius token '" + t + "'");
+        return false;
+      }
+    }
+    nums.push_back(std::max(v, 0.0f));
+  }
+  if (nums.empty()) {
+    return false;
+  }
+  out = ExpandFourSideShorthand(nums);
+  return true;
+}
+
 void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props) {
   // CSS `border-radius` shorthand accepts up to 4 lengths or percentages (top-left,
   // top-right, bottom-right, bottom-left), with an optional '/' separating horizontal
-  // and vertical radii for elliptical corners. PAGX `Rectangle` exposes a single
-  // uniform `roundness`, so:
-  //   - elliptical form (containing '/'): warn and drop the value (PAGX has no
-  //     per-axis radius primitive);
-  //   - 1-4 length / percentage tokens: expand to per-corner (TL, TR, BR, BL).
-  //     When all four resolved values are equal the layer builder emits a
-  //     `Rectangle` with that uniform `roundness`; when they differ it
-  //     synthesises a `Path` tracing the rounded outline so the "single
-  //     rounded corner" patterns used as corner decorations (e.g. Tailwind
+  // and vertical radii for elliptical corners. PAGX has two shapes that can carry the
+  // result — `Ellipse` (a center+size oval) and `Rectangle` (single uniform `roundness`):
+  //   - ellipse case: when every corner's horizontal radius equals half the box width and
+  //     every corner's vertical radius equals half the box height, the rounded rectangle
+  //     degenerates into an inscribed ellipse. This covers the canonical `border-radius: 50%`
+  //     (on both square and non-square boxes) and the explicit `50% / 50%` form, and is the
+  //     only configuration in which PAGX can represent a true two-axis radius. Marked with
+  //     `borderRadiusEllipse` so the layer builder emits an `Ellipse`.
+  //   - elliptical form (containing '/') that is NOT a full ellipse: PAGX has no per-axis
+  //     corner-radius primitive, so warn and drop the value.
+  //   - 1-4 length / percentage tokens: expand to per-corner (TL, TR, BR, BL). When all four
+  //     resolved values are equal the layer builder emits a `Rectangle` with that uniform
+  //     `roundness`; when they differ it synthesises a `Path` tracing the rounded outline so
+  //     the "single rounded corner" patterns used as corner decorations (e.g. Tailwind
   //     `rounded-bl-full`) round-trip exactly.
-  //   - percentage tokens are resolved per corner against the box's known px
-  //     dimensions, picking `min(widthPx, heightPx)` (matches the existing
-  //     uniform behaviour so `border-radius: 50%` on a square still becomes a
-  //     true circle). Percentages on elements without fixed px sizes are
-  //     dropped with a warning, and the affected corner stays at 0.
+  //   - percentage tokens in the non-ellipse single-axis path resolve per corner against
+  //     `min(widthPx, heightPx)`. Percentages on elements without fixed px sizes are dropped
+  //     with a warning, and the affected corner stays at 0.
   const std::string& br = LookupProperty(props, "border-radius");
-  if (br.find('/') != std::string::npos) {
+
+  // Split the optional '/' into horizontal and vertical token groups; without a '/' the vertical
+  // radii mirror the horizontal ones. Detect the inscribed-ellipse case first, before collapsing
+  // to the single-axis representation that loses the per-axis radii.
+  auto slashPos = br.find('/');
+  std::string hPart = slashPos == std::string::npos ? br : br.substr(0, slashPos);
+  std::string vPart = slashPos == std::string::npos ? br : br.substr(slashPos + 1);
+  auto hTokens = SplitTopLevelWhitespace(hPart);
+  auto vTokens = SplitTopLevelWhitespace(vPart);
+  if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx) && box.widthPx > 0 &&
+      box.heightPx > 0) {
+    FourSidedValue h{};
+    FourSidedValue v{};
+    if (ResolveBorderRadiusAxis(hTokens, box.widthPx, _valueParser, _diagnostics, h) &&
+        ResolveBorderRadiusAxis(vTokens, box.heightPx, _valueParser, _diagnostics, v)) {
+      float halfW = box.widthPx * 0.5f;
+      float halfH = box.heightPx * 0.5f;
+      bool hIsHalf = pag::FloatNearlyEqual(h.top, halfW) && pag::FloatNearlyEqual(h.right, halfW) &&
+                     pag::FloatNearlyEqual(h.bottom, halfW) && pag::FloatNearlyEqual(h.left, halfW);
+      bool vIsHalf = pag::FloatNearlyEqual(v.top, halfH) && pag::FloatNearlyEqual(v.right, halfH) &&
+                     pag::FloatNearlyEqual(v.bottom, halfH) && pag::FloatNearlyEqual(v.left, halfH);
+      if (hIsHalf && vIsHalf) {
+        box.borderRadiusTLPx = halfW;
+        box.borderRadiusTRPx = halfW;
+        box.borderRadiusBRPx = halfW;
+        box.borderRadiusBLPx = halfW;
+        box.borderRadiusUniform = true;
+        box.borderRadiusEllipse = true;
+        box.borderRadiusSet = true;
+        return;
+      }
+    }
+  }
+
+  if (slashPos != std::string::npos) {
     _diagnostics.warn("html: elliptical border-radius '" + br +
                       "' not supported by PAGX Rectangle; ignored");
     return;
   }
-  auto tokens = SplitTopLevelWhitespace(br);
+  auto tokens = hTokens;
   std::vector<float> nums;
   nums.reserve(tokens.size());
   for (auto& t : tokens) {
