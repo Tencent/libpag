@@ -38,11 +38,6 @@ namespace pagx {
 class ColorSource;
 class ImagePattern;
 
-// Maps an Image node's external file path to a host-supplied decoded image that overrides the
-// document's own decoding. Owned by the runtime PAGScene and passed into the builder so a build can
-// resolve those paths to the host's images instead of decoding from embedded data or file paths.
-using ImageOverrideMap = std::unordered_map<std::string, std::shared_ptr<tgfx::Image>>;
-
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
  */
@@ -373,6 +368,13 @@ class LayerBuilder {
   static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
 
   /**
+   * Returns the host-supplied runtime image cached on an Image node (set via
+   * PAGXDocument::loadFileData(path, PAGImage)), or nullptr if none. Internal accessor that reads
+   * the node's private runtime cache during build.
+   */
+  static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
+
+  /**
    * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
    * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
    * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
@@ -406,8 +408,7 @@ class LayerBuilder {
    * keeping per-slot layerMaps isolated.
    * @param document The document to build from. Must have had applyLayout() called.
    */
-  static LayerBuildResult BuildForRuntime(PAGXDocument* document,
-                                          const ImageOverrideMap* imageOverrides = nullptr);
+  static LayerBuildResult BuildForRuntime(PAGXDocument* document);
 
   /**
    * Builds a Composition's child layer subtree into a fresh LayerBuildResult. Used by the runtime
@@ -415,8 +416,7 @@ class LayerBuilder {
    * @param composition The Composition to build. Must reference layers from a document that has
    *                    had applyLayout() called.
    */
-  static LayerBuildResult BuildCompositionSubtree(const Composition* composition,
-                                                  const ImageOverrideMap* imageOverrides = nullptr);
+  static LayerBuildResult BuildCompositionSubtree(const Composition* composition);
 
   /**
    * Re-applies the current state of a single Layer node onto its existing tgfx::Layer in place,
@@ -428,12 +428,10 @@ class LayerBuilder {
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
    * @param document The owning document, used to decode image resources.
-   * @param imageOverrides Optional host-supplied decoded images keyed by Image filePath.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
   static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
-                                  const PAGXDocument* document,
-                                  const ImageOverrideMap* imageOverrides = nullptr);
+                                  const PAGXDocument* document);
 
   /**
    * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
@@ -444,12 +442,11 @@ class LayerBuilder {
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
    * @param document The owning document, used to decode image resources.
-   * @param imageOverrides Optional host-supplied decoded images keyed by Image filePath.
+   * @param document The owning document, used to decode image resources.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
-  static std::shared_ptr<tgfx::Layer> BuildLayerInto(
-      const Layer* node, RuntimeBinding* binding, const PAGXDocument* document,
-      const ImageOverrideMap* imageOverrides = nullptr);
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
+                                                     const PAGXDocument* document);
 };
 
 /**

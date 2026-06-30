@@ -33,6 +33,7 @@
 namespace pagx {
 
 class DataBind;
+class PAGImage;
 class LayoutContext;
 class PAGScene;
 class ViewModel;
@@ -160,6 +161,19 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
+   * Supplies a host-decoded image for the given external file path. Every Image node whose filePath
+   * matches (in this document and its resolved external documents) renders with this image instead
+   * of decoding from its own data or file path; passing nullptr clears a previous one. The image is
+   * runtime-only state and is not serialized. Use this for resources the host loads itself (e.g.
+   * asynchronously, or from a GPU texture via PAGImage::MakeFromTexture). Existing scenes refresh
+   * the affected layers in place.
+   * @param filePath the external file path as declared in the document's Image nodes
+   * @param image the decoded image to use, or nullptr to clear it
+   * @return true if a matching Image node was found
+   */
+  bool loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image);
+
+  /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. Re-running layout on an
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
@@ -245,6 +259,13 @@ class PAGXDocument : public Node {
   PAGXDocument() = default;
 
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
+
+  // Sets runtimeImage on every Image node matching filePath in this document and its resolved
+  // external documents, collecting the touched Image nodes per owning document.
+  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
+                               const std::shared_ptr<PAGImage>& image,
+                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+                               std::unordered_set<const PAGXDocument*>& visited);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)

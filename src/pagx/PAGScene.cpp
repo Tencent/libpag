@@ -104,7 +104,7 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   timelinesByAnimation.clear();
-  auto buildResult = LayerBuilder::BuildForRuntime(document.get(), &imageOverrides);
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
   *rootComp->binding = std::move(buildResult.binding);
@@ -512,35 +512,6 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   }
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
   RefreshViewModelImages(_rootComposition.get(), changed);
-}
-
-void PAGScene::setImage(const std::string& filePath, std::shared_ptr<PAGImage> image) {
-  if (filePath.empty()) {
-    return;
-  }
-  auto tgfxImage = LayerBuilder::GetTGFXImage(image);
-  if (tgfxImage != nullptr) {
-    imageOverrides[filePath] = std::move(tgfxImage);
-  } else {
-    imageOverrides.erase(filePath);
-  }
-  if (_rootComposition == nullptr || document == nullptr) {
-    return;
-  }
-  // Refresh only the layers that reference this file path, in place. A full runtime-tree rebuild
-  // would reset animation timelines and ViewModel runtime state, which a localized image update
-  // must not do; reuse onNodesChanged so the affected layers re-resolve the image through the
-  // updated overrides while playback and bound values are preserved.
-  const auto& layers = document->findLayersByImageFilePath(filePath);
-  if (layers.empty()) {
-    return;
-  }
-  std::vector<Node*> dirtyNodes;
-  dirtyNodes.reserve(layers.size());
-  for (const auto* layer : layers) {
-    dirtyNodes.push_back(const_cast<Layer*>(layer));
-  }
-  onNodesChanged(dirtyNodes);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,

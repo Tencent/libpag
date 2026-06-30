@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include "pag/gpu.h"
 #include "pagx/types/Data.h"
 
 namespace tgfx {
@@ -57,6 +58,16 @@ class PAGImage {
    * @return a PAGImage, or nullptr if the image could not be decoded.
    */
   static std::shared_ptr<PAGImage> MakeFromData(const std::shared_ptr<Data>& data);
+
+  /**
+   * Creates a PAGImage that wraps an existing GPU backend texture, so the host can supply a texture
+   * it already owns without re-decoding. Requires an active GPU context on the calling thread.
+   * @param texture the backend texture to wrap.
+   * @param origin the texture's origin (top-left or bottom-left).
+   * @return a PAGImage, or nullptr if there is no current GPU context or the texture is invalid.
+   */
+  static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
+                                                   pag::ImageOrigin origin);
 
   /**
    * Returns the source string (file path or data URI) this PAGImage was created from, or an empty

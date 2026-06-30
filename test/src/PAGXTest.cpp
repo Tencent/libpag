@@ -4468,10 +4468,10 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
 }
 
 /**
- * Test case: PAGScene::setImage supplies a host-decoded image for an external file path so the
- * ImagePattern referencing that path renders with the host image instead of decoding itself.
+ * Test case: loadFileData(path, PAGImage) supplies a host-decoded image for an external file path
+ * so the ImagePattern referencing that path renders with the host image instead of decoding itself.
  */
-PAGX_TEST(PAGXTest, SetImageOverridesExternalFilePath) {
+PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <pagx width="100" height="100">
   <Layer id="L">
@@ -4497,7 +4497,7 @@ PAGX_TEST(PAGXTest, SetImageOverridesExternalFilePath) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
-  scene->setImage("avatar.png", hostImage);
+  EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage));
 
   // The bound tgfx ImagePattern now renders with the host-supplied image.
   auto& binding = *scene->rootComposition()->binding;
@@ -4512,7 +4512,7 @@ PAGX_TEST(PAGXTest, SetImageOverridesExternalFilePath) {
   ASSERT_TRUE(hostImage2 != nullptr);
   auto expectedTgfx2 = pagx::LayerBuilder::GetTGFXImage(hostImage2);
   ASSERT_TRUE(expectedTgfx2 != nullptr);
-  scene->setImage("avatar.png", hostImage2);
+  EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage2));
   auto tgfxPattern2 = scene->rootComposition()->binding->get<tgfx::ImagePattern>(pattern);
   ASSERT_TRUE(tgfxPattern2 != nullptr);
   EXPECT_EQ(tgfxPattern2->image(), expectedTgfx2);

@@ -318,6 +318,48 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   return found;
 }
 
+// Sets runtimeImage on every Image node matching filePath in this document and its resolved
+// external documents, collecting the touched Image nodes per owning document for notifyChange.
+void PAGXDocument::LoadImageInChain(
+    PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* imageNode = static_cast<Image*>(node.get());
+      if (imageNode->filePath == filePath) {
+        imageNode->runtimeImage = image;  // filePath is kept as the serialization anchor.
+        docDirtyImages[document].push_back(imageNode);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        LoadImageInChain(layer->externalDoc.get(), filePath, image, docDirtyImages, visited);
+      }
+    }
+  }
+}
+
+bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image) {
+  if (filePath.empty()) {
+    return false;
+  }
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyImages = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  LoadImageInChain(this, filePath, image, docDirtyImages, visited);
+  if (docDirtyImages.empty()) {
+    return false;
+  }
+  // A decoded image swap does not change geometry, so layout is not re-run (layoutChanged = false).
+  for (auto& entry : docDirtyImages) {
+    entry.first->notifyChange(entry.second, false);
+  }
+  return true;
+}
+
 bool PAGXDocument::embed() {
   if (!isLayoutApplied()) {
     LOGE("PAGXDocument::embed() called before applyLayout(). Call applyLayout() first.");

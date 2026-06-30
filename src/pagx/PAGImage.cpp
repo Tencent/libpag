@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGImage.h"
+#include "base/utils/TGFXCast.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -53,6 +55,24 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
   }
   auto tgfxData = ToTGFXData(data);
   auto image = tgfx::Image::MakeFromEncoded(tgfxData);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
+}
+
+std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
+                                                    pag::ImageOrigin origin) {
+  auto device = tgfx::GLDevice::Current();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto* context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto image = tgfx::Image::MakeFrom(context, pag::ToTGFX(texture), pag::ToTGFX(origin));
+  device->unlock();
   if (image == nullptr) {
     return nullptr;
   }

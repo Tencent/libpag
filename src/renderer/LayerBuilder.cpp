@@ -249,10 +249,6 @@ class LayerBuilderContext {
     _document = document;
   }
 
-  void setImageOverrides(const ImageOverrideMap* imageOverrides) {
-    _imageOverrides = imageOverrides;
-  }
-
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
   // their own independent layerMap. The returned LayerBuildResult.root is a fresh container layer
   // populated with the composition's child layers. Per-slot mask resolution still runs on the
@@ -1828,13 +1824,11 @@ class LayerBuilderContext {
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
     bool isHostProvided = false;
-    // Priority 1: a host-supplied decoded image registered for this file path (PAGScene::setImage).
-    if (_imageOverrides != nullptr && !imageNode->filePath.empty()) {
-      auto it = _imageOverrides->find(imageNode->filePath);
-      if (it != _imageOverrides->end()) {
-        image = it->second;
-        isHostProvided = image != nullptr;
-      }
+    // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
+    auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
+    if (runtimeImage != nullptr) {
+      image = LayerBuilder::GetTGFXImage(runtimeImage);
+      isHostProvided = image != nullptr;
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -1850,7 +1844,7 @@ class LayerBuilderContext {
       image = image->makeMipmapped(true);
     }
     // Only memoize successful results. A null entry would cache the absence of a host-provided
-    // image forever, so a later setImage() update would never take effect after invalidation.
+    // image forever, so a later loadFileData() update would never take effect after invalidation.
     if (image) {
       _imageCache[imageNode] = image;
     }
@@ -3069,9 +3063,6 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
-  // Host-supplied decoded images keyed by Image filePath, overriding the document's own decoding.
-  // Borrowed from the runtime PAGScene; null for non-runtime builds.
-  const ImageOverrideMap* _imageOverrides = nullptr;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -3197,8 +3188,7 @@ std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayers(
   return impl->context.getTgfxLayers(pagxLayer);
 }
 
-LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document,
-                                               const ImageOverrideMap* imageOverrides) {
+LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
   }
@@ -3211,51 +3201,48 @@ LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document,
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
-  context.setImageOverrides(imageOverrides);
   return context.buildWithMap(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* composition,
-                                                       const ImageOverrideMap* imageOverrides) {
+LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* composition) {
   if (composition == nullptr) {
     return {};
   }
   LayerBuilderContext context;
   // Slot's recursive children build their own subtrees independently.
   context.setNeedsRuntimeData(true);
-  context.setImageOverrides(imageOverrides);
   return context.buildSubtree(composition);
 }
 
 bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
-                                       const PAGXDocument* document,
-                                       const ImageOverrideMap* imageOverrides) {
+                                       const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return false;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
-  context.setImageOverrides(imageOverrides);
   return context.refreshLayerInPlace(node, binding);
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
                                                           RuntimeBinding* binding,
-                                                          const PAGXDocument* document,
-                                                          const ImageOverrideMap* imageOverrides) {
+                                                          const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
-  context.setImageOverrides(imageOverrides);
   return context.buildLayerInto(node, binding);
 }
 
 std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
   return image ? image->_tgfxImage : nullptr;
+}
+
+std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
+  return node != nullptr ? node->runtimeImage : nullptr;
 }
 
 std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
