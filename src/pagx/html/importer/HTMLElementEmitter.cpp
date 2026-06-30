@@ -534,7 +534,9 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   float scaledH = intrinsicH * scaleY;
   auto posTokens = SplitTopLevelWhitespace(box.maskPosition);
   std::string posX = posTokens.size() > 0 ? posTokens[0] : "";
-  std::string posY = posTokens.size() > 1 ? posTokens[1] : "";
+  // CSS resolves a single `mask-position` value as the horizontal axis with the vertical defaulting
+  // to `center`, not to the leading edge. Two empty tokens keep the `0 0` top-left default below.
+  std::string posY = posTokens.size() > 1 ? posTokens[1] : posTokens.size() == 1 ? "center" : "";
   float tx = resolveMaskPositionAxis(posX, boxW, scaledW);
   float ty = resolveMaskPositionAxis(posY, boxH, scaledH);
 

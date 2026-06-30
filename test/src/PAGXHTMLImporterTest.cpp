@@ -6384,6 +6384,23 @@ PAG_TEST(PAGXHTMLImporterTest, MaskPositionOffsetsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 40.0f, 0.001f));
 }
 
+// A single `mask-position` value sets the horizontal axis; the vertical axis defaults to `center`
+// per CSS, not to the top edge. The mask (100px) centred in a 200px box offsets by (200-100)/2.
+PAG_TEST(PAGXHTMLImporterTest, MaskPositionSingleValueDefaultsVerticalToCenter) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:100px 100px;mask-position:20px;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 20.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 50.0f, 0.001f));
+}
+
 // `mask-mode: luminance` selects the luminance mask type and the radial-gradient fill inside the
 // mask SVG round-trips into a RadialGradient color source.
 PAG_TEST(PAGXHTMLImporterTest, MaskImageLuminanceUsesLuminanceType) {
