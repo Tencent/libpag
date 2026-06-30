@@ -4467,6 +4467,51 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   EXPECT_TRUE(pattern5->image->data != nullptr);
 }
 
+/**
+ * Test case: PAGScene::setImage supplies a host-decoded image for an external file path so the
+ * ImagePattern referencing that path renders with the host image instead of decoding itself.
+ */
+PAGX_TEST(PAGXTest, SetImageOverridesExternalFilePath) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer id="L">
+    <Rectangle width="100" height="100"/>
+    <Fill>
+      <ImagePattern id="pat" image="avatar.png"/>
+    </Fill>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+  auto* pattern = doc->findNode<pagx::ImagePattern>("pat");
+  ASSERT_TRUE(pattern != nullptr);
+  ASSERT_TRUE(pattern->image != nullptr);
+
+  // The host decodes the resource itself and supplies it for the declared file path.
+  auto hostImage =
+      pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(hostImage != nullptr);
+  auto expectedTgfx = pagx::LayerBuilder::GetTGFXImage(hostImage);
+  ASSERT_TRUE(expectedTgfx != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  scene->setImage("avatar.png", hostImage);
+
+  // The bound tgfx ImagePattern now renders with the host-supplied image.
+  auto& binding = *scene->rootComposition()->binding;
+  auto tgfxPattern = binding.get<tgfx::ImagePattern>(pattern);
+  ASSERT_TRUE(tgfxPattern != nullptr);
+  EXPECT_EQ(tgfxPattern->image(), expectedTgfx);
+
+  // Clearing the override drops the host image: the pattern can no longer resolve "avatar.png"
+  // (no local file), so no tgfx pattern is bound.
+  scene->setImage("avatar.png", nullptr);
+  auto& binding2 = *scene->rootComposition()->binding;
+  EXPECT_EQ(binding2.get<tgfx::ImagePattern>(pattern), nullptr);
+}
+
 // =====================================================================================
 // ClipToBounds
 // =====================================================================================

@@ -38,6 +38,11 @@ namespace pagx {
 class ColorSource;
 class ImagePattern;
 
+// Maps an Image node's external file path to a host-supplied decoded image that overrides the
+// document's own decoding. Owned by the runtime PAGScene and passed into the builder so a build can
+// resolve those paths to the host's images instead of decoding from embedded data or file paths.
+using ImageOverrideMap = std::unordered_map<std::string, std::shared_ptr<tgfx::Image>>;
+
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
  */
@@ -401,7 +406,8 @@ class LayerBuilder {
    * keeping per-slot layerMaps isolated.
    * @param document The document to build from. Must have had applyLayout() called.
    */
-  static LayerBuildResult BuildForRuntime(PAGXDocument* document);
+  static LayerBuildResult BuildForRuntime(PAGXDocument* document,
+                                          const ImageOverrideMap* imageOverrides = nullptr);
 
   /**
    * Builds a Composition's child layer subtree into a fresh LayerBuildResult. Used by the runtime
@@ -409,7 +415,8 @@ class LayerBuilder {
    * @param composition The Composition to build. Must reference layers from a document that has
    *                    had applyLayout() called.
    */
-  static LayerBuildResult BuildCompositionSubtree(const Composition* composition);
+  static LayerBuildResult BuildCompositionSubtree(const Composition* composition,
+                                                  const ImageOverrideMap* imageOverrides = nullptr);
 
   /**
    * Re-applies the current state of a single Layer node onto its existing tgfx::Layer in place,
@@ -420,11 +427,13 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
+   * @param imageOverrides Optional host-supplied decoded images keyed by Image filePath.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
   static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
-                                  const PAGXDocument* document);
+                                  const PAGXDocument* document,
+                                  const ImageOverrideMap* imageOverrides = nullptr);
 
   /**
    * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
@@ -434,11 +443,13 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
+   * @param imageOverrides Optional host-supplied decoded images keyed by Image filePath.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
-  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
-                                                     const PAGXDocument* document);
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(
+      const Layer* node, RuntimeBinding* binding, const PAGXDocument* document,
+      const ImageOverrideMap* imageOverrides = nullptr);
 };
 
 /**
@@ -448,9 +459,9 @@ class LayerBuilder {
  * version). The class is intended for the progressive image loading flow on WeChat; other
  * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
  *
- * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
- * cycle), and then call rebuildForFilePath() whenever the ImageResourceProvider's state changes
- * for a given filePath (new image attached or evicted). Destroying the session releases all
+   * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
+   * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
+   * changes (new image attached or evicted). Destroying the session releases all
  * cached layer/image state.
  *
  * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
@@ -479,8 +490,8 @@ class LayerBuilderSession {
   /**
    * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
    * ImagePattern backed by an Image node whose filePath matches the given value. Call this
-   * after the ImageResourceProvider's state changes for the path so the renderer re-queries
-   * the provider and picks up the new tgfx::Image. A single filePath may match multiple Image
+   * after the decoded image for the path changes so the renderer re-resolves it and picks up
+   * the new tgfx::Image. A single filePath may match multiple Image
    * nodes and each Image node may be referenced by multiple Layers, which in turn may have
    * been duplicated by Composition instancing; all such copies are refreshed in one call.
    * @return The number of tgfx layers whose contents were regenerated. Zero means no layer

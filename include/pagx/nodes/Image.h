@@ -27,8 +27,8 @@ namespace pagx {
 
 /**
  * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI. Platform-specific decoded images are
- * managed externally via ImageResourceProvider, not stored on this node.
+ * be a file path, a URL, or a base64-encoded data URI. Decoded images supplied by the host at
+ * runtime are managed by the scene (see PAGScene::setImage), not stored on this node.
  */
 class Image : public Node {
  public:

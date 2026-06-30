@@ -249,6 +249,10 @@ class LayerBuilderContext {
     _document = document;
   }
 
+  void setImageOverrides(const ImageOverrideMap* imageOverrides) {
+    _imageOverrides = imageOverrides;
+  }
+
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
   // their own independent layerMap. The returned LayerBuildResult.root is a fresh container layer
   // populated with the composition's child layers. Per-slot mask resolution still runs on the
@@ -1823,13 +1827,13 @@ class LayerBuilderContext {
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    bool isBackendTexture = false;
-    // Priority 1: query the provider for a platform-decoded image.
-    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
-    if (provider && !imageNode->filePath.empty()) {
-      image = provider->resolveImage(imageNode->filePath);
-      if (image) {
-        isBackendTexture = true;
+    bool isHostProvided = false;
+    // Priority 1: a host-supplied decoded image registered for this file path (PAGScene::setImage).
+    if (_imageOverrides != nullptr && !imageNode->filePath.empty()) {
+      auto it = _imageOverrides->find(imageNode->filePath);
+      if (it != _imageOverrides->end()) {
+        image = it->second;
+        isHostProvided = image != nullptr;
       }
     }
     // Priority 2: fallback to standard decoding chain.
@@ -1842,12 +1846,11 @@ class LayerBuilderContext {
         image = tgfx::Image::MakeFromFile(imageNode->filePath);
       }
     }
-    if (image && !isBackendTexture) {
+    if (image && !isHostProvided) {
       image = image->makeMipmapped(true);
     }
-    // Only memoize successful results. A null entry would cache the absence of a provider-
-    // resolved image forever, so a later provider update would never take effect after
-    // invalidation.
+    // Only memoize successful results. A null entry would cache the absence of a host-provided
+    // image forever, so a later setImage() update would never take effect after invalidation.
     if (image) {
       _imageCache[imageNode] = image;
     }
@@ -3066,6 +3069,9 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
+  // Host-supplied decoded images keyed by Image filePath, overriding the document's own decoding.
+  // Borrowed from the runtime PAGScene; null for non-runtime builds.
+  const ImageOverrideMap* _imageOverrides = nullptr;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -3191,7 +3197,8 @@ std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayers(
   return impl->context.getTgfxLayers(pagxLayer);
 }
 
-LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
+LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document,
+                                               const ImageOverrideMap* imageOverrides) {
   if (document == nullptr) {
     return {};
   }
@@ -3204,39 +3211,46 @@ LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setImageOverrides(imageOverrides);
   return context.buildWithMap(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* composition) {
+LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* composition,
+                                                       const ImageOverrideMap* imageOverrides) {
   if (composition == nullptr) {
     return {};
   }
   LayerBuilderContext context;
   // Slot's recursive children build their own subtrees independently.
   context.setNeedsRuntimeData(true);
+  context.setImageOverrides(imageOverrides);
   return context.buildSubtree(composition);
 }
 
 bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
-                                       const PAGXDocument* document) {
+                                       const PAGXDocument* document,
+                                       const ImageOverrideMap* imageOverrides) {
   if (node == nullptr || binding == nullptr) {
     return false;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
+  context.setImageOverrides(imageOverrides);
   return context.refreshLayerInPlace(node, binding);
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
                                                           RuntimeBinding* binding,
-                                                          const PAGXDocument* document) {
+                                                          const PAGXDocument* document,
+                                                          const ImageOverrideMap* imageOverrides) {
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
   context.setDocument(document);
+  context.setImageOverrides(imageOverrides);
   return context.buildLayerInto(node, binding);
 }
 

@@ -104,7 +104,7 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   timelinesByAnimation.clear();
-  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get(), &imageOverrides);
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
   *rootComp->binding = std::move(buildResult.binding);
@@ -512,6 +512,21 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   }
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
   RefreshViewModelImages(_rootComposition.get(), changed);
+}
+
+void PAGScene::setImage(const std::string& filePath, std::shared_ptr<PAGImage> image) {
+  if (filePath.empty()) {
+    return;
+  }
+  auto tgfxImage = LayerBuilder::GetTGFXImage(image);
+  if (tgfxImage != nullptr) {
+    imageOverrides[filePath] = std::move(tgfxImage);
+  } else {
+    imageOverrides.erase(filePath);
+  }
+  // Rebuild the runtime tree so the layer builder re-resolves images through the updated overrides.
+  // setImage is a low-frequency resource-readiness call, so a full rebuild is acceptable.
+  buildRuntimeTree();
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,

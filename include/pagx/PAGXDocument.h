@@ -24,7 +24,6 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
-#include "pagx/ImageResourceProvider.h"
 #include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
@@ -142,9 +141,8 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
-   * for which the current ImageResourceProvider already holds a decoded counterpart are also
-   * excluded so the same resource is not fetched twice.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. The caller is
+   * responsible for skipping paths it has already supplied (e.g. via PAGScene::setImage).
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -160,17 +158,6 @@ class PAGXDocument : public Node {
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
-
-  /**
-   * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
-   * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
-   * decoded counterpart. The renderer queries the provider during layer building via
-   * resolveImage().
-   *
-   * Passing nullptr removes the provider; the renderer will use only embedded data / file paths.
-   * @param provider the platform-specific image resource provider, or nullptr to remove.
-   */
-  void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
@@ -272,7 +259,6 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
-  std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
   FontConfig fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};

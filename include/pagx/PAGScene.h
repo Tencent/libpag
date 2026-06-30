@@ -30,6 +30,7 @@
 namespace tgfx {
 class DisplayList;
 class Layer;
+class Image;
 }  // namespace tgfx
 
 namespace pagx {
@@ -37,6 +38,7 @@ namespace pagx {
 class Animation;
 class Node;
 class PAGSurface;
+class PAGImage;
 class PAGViewModel;
 class PAGXDocument;
 class SuppressDelegation;
@@ -160,6 +162,18 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
+  /**
+   * Supplies a decoded image for an external file path declared by the document's Image nodes,
+   * letting the host resolve resources it loaded itself (e.g. asynchronously) instead of having
+   * the scene decode from embedded data or the file path. Every Image node whose filePath equals
+   * the given path will render with this image. Passing a null image removes a previous override
+   * for that path. The image overrides the document's own decoding but is itself overridden by a
+   * ViewModel image property bound to the same render node.
+   * @param filePath the external file path as declared in the document's Image node.
+   * @param image the decoded image to use, or nullptr to clear the override.
+   */
+  void setImage(const std::string& filePath, std::shared_ptr<PAGImage> image);
+
  private:
   PAGScene();
 
@@ -216,6 +230,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
+
+  // Host-supplied decoded images keyed by Image node filePath (see setImage). Runtime-only state;
+  // never serialized. Read by the layer builder during build/refresh to override decoding.
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> imageOverrides = {};
 
   friend class PAGXDocument;
   friend class PAGTimeline;

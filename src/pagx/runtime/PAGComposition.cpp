@@ -84,7 +84,8 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
       return nullptr;
     }
   }
-  auto buildResult = LayerBuilder::BuildCompositionSubtree(ownerLayer->composition);
+  auto buildResult = LayerBuilder::BuildCompositionSubtree(
+      ownerLayer->composition, parentScene ? &parentScene->imageOverrides : nullptr);
   auto composition = std::shared_ptr<PAGComposition>(
       new PAGComposition(ownerLayer, std::move(buildResult.root), parentScene));
   *composition->binding = std::move(buildResult.binding);
@@ -95,7 +96,8 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
   if (composition->runtimeLayer == nullptr) {
     composition->runtimeLayer =
-        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get(), composition->document);
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get(), composition->document,
+                                     parentScene ? &parentScene->imageOverrides : nullptr);
   }
   if (externalDoc != nullptr) {
     externalDoc->registerLiveScene(parentScene);
@@ -217,6 +219,8 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
   }
 
   if (binding != nullptr) {
+    auto scene = rootScene.lock();
+    const ImageOverrideMap* imageOverrides = scene != nullptr ? &scene->imageOverrides : nullptr;
     bool refreshedLayer = false;
     for (auto* dirty : dirtyNodes) {
       if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
@@ -224,7 +228,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       }
       auto* dirtyLayer = static_cast<Layer*>(dirty);
       if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
-        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document);
+        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document, imageOverrides);
         refreshedLayer = true;
       }
     }
@@ -267,7 +271,8 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     }
     auto slot = binding->get<tgfx::Layer>(layer);
     if (slot == nullptr) {
-      slot = LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
+      slot = LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr,
+                                          scene ? &scene->imageOverrides : nullptr);
     }
     if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
       slot->addChild(childComposition->runtimeLayer);
@@ -277,7 +282,8 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
   auto layerRuntime = binding->get<tgfx::Layer>(layer);
   if (layerRuntime == nullptr) {
     layerRuntime =
-        LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
+        LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr,
+                                     scene ? &scene->imageOverrides : nullptr);
   }
   if (layerRuntime == nullptr) {
     return nullptr;
