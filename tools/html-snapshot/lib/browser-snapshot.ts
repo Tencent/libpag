@@ -1359,6 +1359,69 @@ function freezeSvg(svgEl, rect) {
 
 // ===== Multi-line text emission =====
 
+// Collapse client rects that belong to the SAME visual line/column into one
+// rect spanning their inline-axis union. `blockAxis` names the wrap-progression
+// axis ('y' = horizontal lines stacking down; 'x-rl'/'x-lr' = vertical columns
+// stacking sideways): two rects are on the same line/column when their extents
+// ALONG that axis overlap. Chromium hands back a separate rect per glyph run on
+// a line (a soft-hyphen's visible hyphen, a bidi direction switch, etc.); the
+// caller's line bisection assumes one rect per line, so without this merge a
+// stray same-line rect would split that line's text at an arbitrary offset.
+//
+// Rects arrive in document order, which is also block-axis order, so a single
+// forward pass that extends the current group while the next rect overlaps it
+// on the block axis suffices. The merged rect keeps the group's block-axis
+// position/size (top/height for 'y', left/width for the vertical modes) and
+// unions the inline-axis interval so its leading edge and extent cover every
+// glyph run on the line.
+function mergeRectsOnSameLine(rects, blockAxis) {
+  if (rects.length <= 1) return rects.slice();
+  // blockLo/blockHi read the wrap-axis interval; inlineLo/inlineHi the
+  // cross-axis interval that gets unioned.
+  const blockLo = (r) => (blockAxis === 'y' ? r.top : r.left);
+  const blockHi = (r) => (blockAxis === 'y' ? r.top + r.height : r.left + r.width);
+  const inlineLo = (r) => (blockAxis === 'y' ? r.left : r.top);
+  const inlineHi = (r) => (blockAxis === 'y' ? r.left + r.width : r.top + r.height);
+  const out = [];
+  let curBlockLo = blockLo(rects[0]);
+  let curBlockHi = blockHi(rects[0]);
+  let curInlineLo = inlineLo(rects[0]);
+  let curInlineHi = inlineHi(rects[0]);
+  const flush = () => {
+    if (blockAxis === 'y') {
+      out.push({
+        left: curInlineLo, top: curBlockLo,
+        width: curInlineHi - curInlineLo, height: curBlockHi - curBlockLo,
+      });
+    } else {
+      out.push({
+        left: curBlockLo, top: curInlineLo,
+        width: curBlockHi - curBlockLo, height: curInlineHi - curInlineLo,
+      });
+    }
+  };
+  for (let i = 1; i < rects.length; i++) {
+    const r = rects[i];
+    // Overlap on the block axis (with a sub-pixel tolerance so adjacent-but-not
+    // -overlapping antialiased lines don't merge) means "same line/column".
+    const overlaps = blockLo(r) < curBlockHi - 0.5 && blockHi(r) > curBlockLo + 0.5;
+    if (overlaps) {
+      curBlockLo = Math.min(curBlockLo, blockLo(r));
+      curBlockHi = Math.max(curBlockHi, blockHi(r));
+      curInlineLo = Math.min(curInlineLo, inlineLo(r));
+      curInlineHi = Math.max(curInlineHi, inlineHi(r));
+    } else {
+      flush();
+      curBlockLo = blockLo(r);
+      curBlockHi = blockHi(r);
+      curInlineLo = inlineLo(r);
+      curInlineHi = inlineHi(r);
+    }
+  }
+  flush();
+  return out;
+}
+
 // Split a text node into one entry per visually-rendered line (horizontal
 // writing modes) or column (vertical writing modes). We use
 // Range.getClientRects() to obtain the per-line/column bounding boxes from the
@@ -1433,16 +1496,63 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   // (e.g. `Hello\nWorld` → `H` + `ello`). Drop zero-area rects up front: they
   // paint nothing, and a genuinely empty line is discarded later anyway because
   // its sliced text is whitespace-only.
-  const lineRects = Array.from(range.getClientRects()).filter(
+  const rawRects = Array.from(range.getClientRects()).filter(
     (r) => r.width > 0 && r.height > 0,
   );
+  // Soft hyphens (U+00AD) are zero-width and invisible EXCEPT where Chromium
+  // breaks the line at one, which paints a visible hyphen. A soft hyphen's OWN
+  // bounding rect is the ground truth for that decision: width > 0 exactly at a
+  // rendered break, 0 everywhere else — independent of how the rects below get
+  // grouped into lines. Pre-measure every soft hyphen so each emitted slice can
+  // swap a rendered one for '-' and drop the invisible rest, matching the text
+  // the browser actually painted. Guarded so the common (no soft hyphen) path
+  // pays nothing.
+  let softHyphenVisible = null;
+  if (text.indexOf('­') !== -1) {
+    softHyphenVisible = new Map();
+    for (let idx = text.indexOf('­'); idx !== -1; idx = text.indexOf('­', idx + 1)) {
+      range.setStart(textNode, idx);
+      range.setEnd(textNode, idx + 1);
+      const r = range.getBoundingClientRect();
+      softHyphenVisible.set(idx, r.width > 0 || r.height > 0);
+    }
+  }
+  // Resolve the [start, end) slice's soft hyphens against the measured map,
+  // THEN run the whitespace cleanup. A visible (break) soft hyphen becomes a
+  // literal hyphen; every other soft hyphen is dropped. Returns the final
+  // line/column text.
+  const sliceText = (start, end) => {
+    const raw = text.slice(start, end);
+    if (!softHyphenVisible) return cleanLine(raw);
+    let resolved = '';
+    for (let j = 0; j < raw.length; j++) {
+      if (raw.charCodeAt(j) === 0x00ad) {
+        resolved += softHyphenVisible.get(start + j) ? '-' : '';
+      } else {
+        resolved += raw[j];
+      }
+    }
+    return cleanLine(resolved);
+  };
+  // A single text node can hand back MORE than one client rect for the same
+  // visual line/column. The common trigger is a soft-hyphen (U+00AD) wrap:
+  // Chromium materialises the visible hyphen glyph as its own rect that shares
+  // the line's `top` (and height) but sits to the right of the text rect —
+  // e.g. `Compre­hensive` wrapped at 100px yields [Compre]+[-] both at top=0,
+  // then [hensive], then [overview]. The bisection treats every rect as a
+  // distinct line, so the stray hyphen rect would split the first line into
+  // `C` + `ompre­` at an arbitrary offset. Bidi runs split a line the same way.
+  // Merge rects whose block-axis intervals overlap (same line/column) into one
+  // inline-union rect BEFORE bisecting, so one visual line maps to exactly one
+  // entry regardless of how many glyph runs Chromium reported for it.
+  const lineRects = mergeRectsOnSameLine(rawRects, blockAxis);
   if (lineRects.length === 0) {
     range.detach && range.detach();
     return [];
   }
   if (lineRects.length === 1) {
     const out = [{
-      text: cleanLine(text),
+      text: sliceText(0, text.length),
       rect: lineRects[0],
     }];
     range.detach && range.detach();
@@ -1491,8 +1601,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
 
   const out = [];
   for (let i = 0; i < lineRects.length; i++) {
-    const slice = text.slice(boundaries[i], boundaries[i + 1]);
-    const cleaned = cleanLine(slice);
+    const cleaned = sliceText(boundaries[i], boundaries[i + 1]);
     if (cleaned) out.push({ text: cleaned, rect: lineRects[i] });
   }
   return out;
@@ -3204,6 +3313,7 @@ const HELPER_FNS = [
   renderBorderTriangle,
   imageInnerStyle,
   freezeSvg,
+  mergeRectsOnSameLine,
   splitTextNodeIntoLines,
   emitTextSpans,
   emitVerticalTextSpans,
