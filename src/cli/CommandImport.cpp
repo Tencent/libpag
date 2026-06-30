@@ -371,6 +371,10 @@ struct ImportOptions {
   std::string outputFile = {};
   std::string format = {};
   ImportFormatOptions formatOptions = {};
+  // Conversion warnings (e.g. flex inference fallbacks, unsupported constructs) are noisy and
+  // non-fatal. They are suppressed by default; `--verbose`/`-v` opts back in. Errors are always
+  // printed.
+  bool verbose = false;
 };
 
 static void PrintUsage() {
@@ -383,6 +387,7 @@ static void PrintUsage() {
       << "  --input <file|url>             Input file or URL to import (required)\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
+      << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
       << "  --svg-no-expand-use            Do not expand <use> references\n"
@@ -406,6 +411,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
+    } else if (arg == "--verbose" || arg == "-v") {
+      options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
                arg == "--svg-preserve-unknown") {
       // Handled by ParseFormatOptions below.
@@ -451,12 +458,14 @@ int RunImport(int argc, char* argv[]) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;
   }
-  for (auto& warning : result.warnings) {
-    std::cerr << "pagx import: warning: " << warning << "\n";
+  if (options.verbose) {
+    for (auto& warning : result.warnings) {
+      std::cerr << "pagx import: warning: " << warning << "\n";
+    }
   }
 
   auto optimizeResult = PAGXOptimizer::Optimize(result.document.get());
-  if (!optimizeResult.converged) {
+  if (options.verbose && !optimizeResult.converged) {
     std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
