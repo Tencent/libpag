@@ -202,13 +202,14 @@ function joinStyles(...parts) {
 // white-space. Used in every spot where a single-line text span sits inside a
 // flex item or rides on a wrapper whose width was measured by Chromium —
 // prevents PAGX's text engine from re-wrapping at a sub-pixel divergence.
-// Skipped for vertical writing-mode spans: PAGX breaks vertical TextBoxes
-// by column height, and a forced `white-space: nowrap` would mis-trigger
-// the importer's `hasNoWrap` branch (disabling wordWrap on what should be
-// a multi-column vertical layout).
+// Applies to vertical writing-mode spans too: `emitVerticalTextSpans` now
+// splits a run into one span PER COLUMN exactly as the horizontal path splits
+// per line, so forcing `nowrap` (which routes through the importer's
+// `hasNoWrap` branch to disable wordWrap) is precisely what stops PAGX from
+// re-breaking a Chromium-measured single column into two when its vertical
+// glyph metrics diverge.
 function withNowrap(style) {
   if (!style) return 'white-space: nowrap';
-  if (/writing-mode:\s*vertical-(rl|lr)/.test(style)) return style;
   return /white-space:/.test(style) ? style : `${style}; white-space: nowrap`;
 }
 
@@ -1334,19 +1335,56 @@ function freezeSvg(svgEl, rect) {
 
 // ===== Multi-line text emission =====
 
-// Split a text node into one entry per visually-rendered line. We use
-// Range.getClientRects() to obtain the per-line bounding boxes from the
+// Split a text node into one entry per visually-rendered line (horizontal
+// writing modes) or column (vertical writing modes). We use
+// Range.getClientRects() to obtain the per-line/column bounding boxes from the
 // browser's own layout, then binary-search the character offsets at which one
-// line gives way to the next. This matches Chromium's line-break decisions
-// exactly while keeping the work to O(lines · log n) getBoundingClientRect
-// calls instead of the O(n) per-character scan the original implementation
-// performed.
+// line/column gives way to the next. This matches Chromium's line-break
+// decisions exactly while keeping the work to O(lines · log n)
+// getBoundingClientRect calls instead of the O(n) per-character scan the
+// original implementation performed.
+//
+// `axis` selects the block-progression axis along which the run wraps:
+//   - 'y' (horizontal writing modes): lines stack downward, so the per-line
+//     rects arrive in increasing `top` order and the bisection key is a
+//     character's mid-Y.
+//   - 'x-rl' (vertical-rl): columns stack leftward, so the rects arrive in
+//     DECREASING `left` order (rightmost column first, matching document
+//     order); the bisection key is the NEGATED mid-X so it stays monotonically
+//     increasing like the 'y' case.
+//   - 'x-lr' (vertical-lr): columns stack rightward, rects in increasing
+//     `left`; key is mid-X.
+// Treating all three as "a monotonically increasing key along the block axis"
+// lets one bisection serve every writing mode.
 //
 // The host element's `white-space` controls whether embedded whitespace is
 // collapsed (`normal`, `nowrap`) or preserved (`pre`, `pre-wrap`, `pre-line`).
 // Collapsing in preserve modes would mangle code snippets, indentation, and
 // other pre-formatted content.
-function splitTextNodeIntoLines(textNode, whiteSpace) {
+function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
+  const blockAxis = axis || 'y';
+  // Map a rect to its block-axis LEADING edge (the side a column/line starts
+  // from in progression order) and a character's mid-point to the same
+  // monotonically-increasing key, so "first char whose key >= the next rect's
+  // leading-edge key" lands exactly on that rect's first character.
+  //   - 'y': lines advance downward, leading edge = rect.top, char key = mid-Y.
+  //   - 'x-lr': columns advance rightward, leading edge = rect.left, char key
+  //     = mid-X.
+  //   - 'x-rl': columns advance leftward; once X is negated to make the order
+  //     ascending, the leading edge becomes the column's RIGHT edge
+  //     -(left + width), NOT -left. Using -left would place the threshold at
+  //     the column's trailing edge, half a column past the glyph centres, so
+  //     every column's characters would be misassigned to the column before it.
+  const rectKey = (r) => {
+    if (blockAxis === 'x-rl') return -(r.left + r.width);
+    if (blockAxis === 'x-lr') return r.left;
+    return r.top;
+  };
+  const charKey = (r) => {
+    if (blockAxis === 'x-rl') return -(r.left + r.width / 2);
+    if (blockAxis === 'x-lr') return r.left + r.width / 2;
+    return r.top + r.height / 2;
+  };
   const text = textNode.nodeValue || '';
   if (!text.trim()) return [];
   const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
@@ -1366,7 +1404,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   range.selectNodeContents(textNode);
   // Chromium emits a spurious zero-width client rect at a forced `\n` break that
   // shares the SAME visual line (and `top`) as the preceding text. The
-  // Y-coordinate bisection below treats every rect as a distinct line, so that
+  // bisection below treats every rect as a distinct line, so that
   // zero-width rect would split one line's text at an arbitrary character offset
   // (e.g. `Hello\nWorld` → `H` + `ello`). Drop zero-area rects up front: they
   // paint nothing, and a genuinely empty line is discarded later anyway because
@@ -1387,12 +1425,12 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
     return out.filter((b) => b.text);
   }
 
-  // Binary-search the first character index whose mid-Y is >= `lineTop`
-  // within [lo, hi). When the candidate char has an empty rect (whitespace
-  // collapsed at a wrap point) we treat it as below the boundary and step
-  // right; this keeps the search O(log n) at the cost of binding collapsed
-  // whitespace to whichever side wins the bisection (visually invisible
-  // either way).
+  // Binary-search the first character index whose block-axis mid-key is >=
+  // `lineKey` within [lo, hi). When the candidate char has an empty rect
+  // (whitespace collapsed at a wrap point) we treat it as before the boundary
+  // and step right; this keeps the search O(log n) at the cost of binding
+  // collapsed whitespace to whichever side wins the bisection (visually
+  // invisible either way).
   //
   // `loStart` lets the caller pass the previously-found boundary as the
   // lower bound, since boundaries are strictly increasing across lines.
@@ -1400,7 +1438,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // layout for the leading characters that we already know belong to a
   // higher line — for a 1000-char × 20-line block that's the difference
   // between log2(1000)·20 ≈ 200 layout flushes and roughly half that.
-  function findFirstCharAtOrBelow(lineTop, loStart) {
+  function findFirstCharAtOrBelow(lineKey, loStart) {
     let lo = loStart;
     let hi = text.length;
     while (lo < hi) {
@@ -1409,8 +1447,8 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
       range.setEnd(textNode, mid + 1);
       const r = range.getBoundingClientRect();
       const empty = r.width === 0 && r.height === 0;
-      const midY = empty ? -Infinity : r.top + r.height / 2;
-      if (empty || midY < lineTop) {
+      const key = empty ? -Infinity : charKey(r);
+      if (empty || key < lineKey) {
         lo = mid + 1;
       } else {
         hi = mid;
@@ -1422,7 +1460,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // Boundary i = first char index of line i (boundaries[0] = 0).
   const boundaries = [0];
   for (let k = 1; k < lineRects.length; k++) {
-    boundaries.push(findFirstCharAtOrBelow(lineRects[k].top, boundaries[k - 1] + 1));
+    boundaries.push(findFirstCharAtOrBelow(rectKey(lineRects[k]), boundaries[k - 1] + 1));
   }
   boundaries.push(text.length);
   range.detach && range.detach();
@@ -1473,10 +1511,10 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
 function emitTextSpans(textNode, parentRect, computed) {
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
-    return emitVerticalTextSpan(textNode, parentRect, computed);
+    return emitVerticalTextSpans(textNode, parentRect, computed, wm);
   }
   const ws = computed.getPropertyValue('white-space');
-  const lines = splitTextNodeIntoLines(textNode, ws);
+  const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
   for (const line of lines) {
@@ -1503,37 +1541,50 @@ function emitTextSpans(textNode, parentRect, computed) {
   return out;
 }
 
-// Emit a single absolutely-positioned <span> for a text node whose host
-// element uses `writing-mode: vertical-rl` or `vertical-lr`. The horizontal
-// `splitTextNodeIntoLines` path can't be reused because Chromium's
-// `getClientRects()` reports glyph rects in column order under vertical
-// writing modes, not line order, so its Y-axis bisection would produce
-// nonsense boundaries. Instead we hand the entire text fragment to PAGX as
-// one column-shaped span and let `TextLayout::layoutColumns` perform the
-// vertical glyph layout itself. The span's bounding box (from the union
-// `Range.getBoundingClientRect()`) gives PAGX the column width / total
-// height it needs; `writing-mode` propagates through STYLE_SCHEMA's
-// `text` scope; `white-space: nowrap` is intentionally NOT forced because
-// vertical TextBoxes break columns by height, and a forced nowrap would
-// mis-trigger the importer's `hasNoWrap` path.
-function emitVerticalTextSpan(textNode, parentRect, computed) {
-  const text = textNode.nodeValue || '';
-  if (!text.trim()) return [];
+// Emit one absolutely-positioned, nowrap <span> per COLUMN of a vertical
+// writing-mode (`vertical-rl` / `vertical-lr`) text node — the column-axis
+// mirror of `emitTextSpans`'s line loop. The earlier implementation handed the
+// whole fragment to PAGX as one un-split column-shaped span and let
+// `TextLayout::layoutColumns` re-break it by column height; but PAGX's vertical
+// glyph metrics (rotated Latin advances, `line-height: normal` interpretation)
+// diverge from Chromium's by sub-pixel amounts, so a column Chromium fit in one
+// pass would spill its last glyph into an extra column under PAGX, shifting the
+// whole run sideways. Splitting here — exactly as the horizontal path splits by
+// line — pins every column to Chromium's break decisions and forces `nowrap` so
+// PAGX never re-breaks, isolating the metric divergence entirely.
+//
+// `line-height` in a vertical writing mode sets each column's WIDTH (the inline
+// cross-size). `getClientRects()` reports the column's ink width, which can be
+// narrower; expand each column to the line-height width and re-centre it around
+// the measured mid-X so consecutive columns tile on the line-height stride —
+// the direct analogue of the horizontal line-height re-centring above.
+function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
+  const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
-  const preserve = typeof ws === 'string' && ws.startsWith('pre');
-  const cleaned = preserve ? text : text.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return [];
-  const range = document.createRange();
-  range.selectNodeContents(textNode);
-  const rect = range.getBoundingClientRect();
-  range.detach && range.detach();
-  if (!rect || (rect.width === 0 && rect.height === 0)) return [];
-  const tl = rect.left - parentRect.left;
-  const tt = rect.top - parentRect.top;
-  const style = buildStyle(tl, tt, rect.width, rect.height, computed, {
-    box: false, text: true,
-  });
-  return [`<span style="${style}">${escapeHtml(applyTextTransform(cleaned, computed))}</span>`];
+  const columns = splitTextNodeIntoLines(textNode, ws, axis);
+  const lineHeightPx = readNum(computed, 'line-height');
+  const out = [];
+  for (const col of columns) {
+    let cl = col.rect.left;
+    let cw = col.rect.width;
+    if (lineHeightPx > cw + 0.1) {
+      const delta = (lineHeightPx - cw) / 2;
+      cl -= delta;
+      cw = lineHeightPx;
+    } else if (lineHeightPx > 0 && cw > lineHeightPx + 0.1) {
+      const delta = (cw - lineHeightPx) / 2;
+      cl += delta;
+      cw = lineHeightPx;
+    }
+    const tl = cl - parentRect.left;
+    const tt = col.rect.top - parentRect.top;
+    const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+      box: false, text: true,
+    });
+    const transformed = applyTextTransform(col.text, computed);
+    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+  }
+  return out;
 }
 
 // ===== Flex container detection =====
@@ -3108,7 +3159,7 @@ const HELPER_FNS = [
   freezeSvg,
   splitTextNodeIntoLines,
   emitTextSpans,
-  emitVerticalTextSpan,
+  emitVerticalTextSpans,
   hasBoxVisualsForInline,
   multiplyColorAlpha,
   resolveInlineTextValue,
