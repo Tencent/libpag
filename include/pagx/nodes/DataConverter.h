@@ -18,56 +18,36 @@
 
 #pragma once
 
-#include <vector>
+#include <map>
+#include <string>
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * DataConverter transforms ViewModel property values before they are applied to render node
+ * channels. A converter carries a type name (e.g. "secondsToFrames") and a set of parameters.
+ * The runtime DataBind engine invokes the converter through a registered converter function.
  */
-class Composition : public Node {
+class DataConverter : public Node {
  public:
   /**
-   * The width of the composition in pixels.
+   * The converter type identifier (e.g. "secondsToFrames", "priceFormat"). Runtime converter
+   * functions are registered by this name.
    */
-  float width = 0.0f;
+  std::string converterType = {};
 
   /**
-   * The height of the composition in pixels.
+   * The converter parameters as key-value pairs. Interpretation is converter-specific.
    */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  /**
-   * The ViewModel schema bound to this composition.
-   */
-  ViewModel* viewModel = nullptr;
-  /**
-   * DataBind nodes that bind ViewModel properties to this composition's layers.
-   */
-  std::vector<DataBind*> dataBinds = {};
+  std::map<std::string, std::string> params = {};
 
   NodeType nodeType() const override {
-    return NodeType::Composition;
+    return NodeType::DataConverter;
   }
 
  private:
-  Composition() = default;
+  DataConverter() = default;
 
   friend class PAGXDocument;
 };

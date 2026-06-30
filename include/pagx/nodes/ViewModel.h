@@ -23,51 +23,27 @@
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
+class ViewModelProperty;
 
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * ViewModel represents a ViewModel schema that declares properties for data binding. A ViewModel
+ * is typically attached to a Composition (or the root document) and can be referenced by id from
+ * other components. Its properties are the data contract: runtime PAGViewModel instances are
+ * created from this schema and populated by business logic.
  */
-class Composition : public Node {
+class ViewModel : public Node {
  public:
   /**
-   * The width of the composition in pixels.
+   * The properties declared in this ViewModel schema, in declaration order.
    */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  /**
-   * The ViewModel schema bound to this composition.
-   */
-  ViewModel* viewModel = nullptr;
-  /**
-   * DataBind nodes that bind ViewModel properties to this composition's layers.
-   */
-  std::vector<DataBind*> dataBinds = {};
+  std::vector<ViewModelProperty*> properties = {};
 
   NodeType nodeType() const override {
-    return NodeType::Composition;
+    return NodeType::ViewModel;
   }
 
  private:
-  Composition() = default;
+  ViewModel() = default;
 
   friend class PAGXDocument;
 };

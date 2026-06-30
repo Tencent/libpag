@@ -28,8 +28,11 @@ namespace pagx {
 
 class PAGTimeline;
 class PAGScene;
+class PAGViewModel;
 class PAGXDocument;
 class Composition;
+class DataBindRuntime;
+class DataContext;
 class Node;
 struct RuntimeBinding;
 
@@ -47,6 +50,12 @@ class PAGComposition : public PAGLayer {
 
   void advance(int64_t deltaMicroseconds) override;
   void apply(float mix = 1.0f) override;
+
+  /**
+   * Returns the ViewModel instance for this composition, or nullptr if the composition has no
+   * ViewModel schema.
+   */
+  std::shared_ptr<PAGViewModel> viewModel() const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
@@ -87,6 +96,13 @@ class PAGComposition : public PAGLayer {
                             std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                             const std::shared_ptr<PAGScene>& scene,
                             std::unordered_set<const Composition*>& visited);
+
+  // Collects the direct child compositions of a layer into outChildren, transparently descending
+  // through plain PAGLayer containers (which may nest compositions) but not into the child
+  // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
+  // update, view-model advance) so that compositions nested under plain container layers are not
+  // skipped.
+  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
 
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
@@ -138,6 +154,11 @@ class PAGComposition : public PAGLayer {
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+  std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
+  std::unique_ptr<DataBindRuntime> dataBindRuntime = {};
+  std::shared_ptr<DataContext> dataContext = nullptr;
+
+  void updateDataBinds(float mix = 1.0f);
 
   friend class PAGScene;
 };

@@ -33,8 +33,10 @@
 
 namespace pagx {
 
+class DataBind;
 class LayoutContext;
 class PAGScene;
+class ViewModel;
 class Image;
 class ImagePattern;
 
@@ -71,6 +73,16 @@ class PAGXDocument : public Node {
    * Top-level animations.
    */
   std::vector<Animation*> animations = {};
+
+  /**
+   * The ViewModel schema bound to this document (raw pointer, owned by nodes).
+   */
+  ViewModel* viewModel = nullptr;
+  /**
+   * DataBind nodes that bind ViewModel properties to this document's layers (raw pointers, owned
+   * by nodes).
+   */
+  std::vector<DataBind*> dataBinds = {};
 
   /**
    * Creates a node of the specified type and adds it to the document management.

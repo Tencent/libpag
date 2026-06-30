@@ -41,7 +41,8 @@ constexpr Frame ZeroFrame = 0;
  */
 enum class KeyframeInterpolationType : uint8_t {
   /**
-   * No interpolation; reserved for keyframes that carry no easing information.
+   * No interpolation; the keyframe carries no easing information and holds its value until the
+   * next keyframe time, behaving the same as Hold.
    */
   None = 0,
   /**
