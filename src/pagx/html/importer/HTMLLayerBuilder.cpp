@@ -163,7 +163,7 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
   if (trimmed.empty()) return nullptr;
   std::string lower = ToLower(trimmed);
   if (lower.compare(0, 16, "linear-gradient(") == 0) {
-    return _valueParser.parseLinearGradient(trimmed);
+    return _valueParser.parseLinearGradient(trimmed, boxWidth, boxHeight);
   }
   if (lower.compare(0, 16, "radial-gradient(") == 0) {
     return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight);

@@ -89,7 +89,13 @@ class HTMLValueParser {
   std::vector<ShadowSpec> parseShadowList(const std::string& value);
   std::vector<FilterStep> parseFilterChain(const std::string& value);
 
-  LinearGradient* parseLinearGradient(const std::string& value);
+  /** Parses a CSS `linear-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px;
+   *  when both are known the gradient line is resolved in absolute pixel space (using the CSS
+   *  magic-corner extent) with `fitsToGeometry=false`, so the equal-color lines stay perpendicular
+   *  on any aspect ratio. Pass NaN when the box size is unknown to keep the geometry-normalised
+   *  (0,0)-(1,1) space, which is only exact for axis-aligned gradients. */
+  LinearGradient* parseLinearGradient(const std::string& value, float boxWidth = NAN,
+                                      float boxHeight = NAN);
   /** Parses a CSS `radial-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px
    *  used to normalise the `<size> at <position>` descriptor back into the gradient's (0,0)-(1,1)
    *  geometry space; pass NaN when unknown to keep the centered, box-filling default. */

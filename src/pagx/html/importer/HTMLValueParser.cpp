@@ -352,7 +352,8 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
   return out;
 }
 
-LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
+LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, float boxWidth,
+                                                     float boxHeight) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   float cssAngle = 180.0f;  // CSS default: to bottom
@@ -373,10 +374,32 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
 
   auto grad = _document->makeNode<LinearGradient>();
   float angle = CssToPagxAngle(cssAngle) * HtmlPi / 180.0f;
-  float cx = 0.5f, cy = 0.5f;
-  float half = 0.5f;
-  grad->startPoint = {cx - std::cos(angle) * half, cy - std::sin(angle) * half};
-  grad->endPoint = {cx + std::cos(angle) * half, cy + std::sin(angle) * half};
+  float dirX = std::cos(angle);
+  float dirY = std::sin(angle);
+  if (std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f) {
+    // Box size unknown (e.g. a text fill, or an unsized box): fall back to the geometry-normalised
+    // (0,0)-(1,1) space. The gradient line spans a fixed unit half-length through the center, which
+    // is only exact for axis-aligned gradients but keeps the default fitsToGeometry behaviour.
+    grad->startPoint = {0.5f - dirX * 0.5f, 0.5f - dirY * 0.5f};
+    grad->endPoint = {0.5f + dirX * 0.5f, 0.5f + dirY * 0.5f};
+    emitColorStops(grad->colorStops, stops);
+    return grad;
+  }
+
+  // With a concrete box, resolve the gradient line in absolute pixel space and disable per-geometry
+  // fitting (matching the SVG importer). PAGX's fitsToGeometry=true non-uniformly scales the
+  // normalised (0,0)-(1,1) line by the box size, which tilts the equal-color lines off perpendicular
+  // on a non-square box; pixel-space endpoints keep them perpendicular for any aspect ratio. The CSS
+  // gradient-line length is the "magic corners" extent L = |W*sinφ| + |H*cosφ| (φ is the PAGX angle,
+  // 0deg = +X), centred on the box, so the 0% / 100% stops land exactly on the covering corners.
+  float lineLength = std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY);
+  float halfX = dirX * lineLength * 0.5f;
+  float halfY = dirY * lineLength * 0.5f;
+  float cx = boxWidth * 0.5f;
+  float cy = boxHeight * 0.5f;
+  grad->startPoint = {cx - halfX, cy - halfY};
+  grad->endPoint = {cx + halfX, cy + halfY};
+  grad->fitsToGeometry = false;
   emitColorStops(grad->colorStops, stops);
   return grad;
 }

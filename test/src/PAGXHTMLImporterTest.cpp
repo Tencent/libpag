@@ -628,11 +628,14 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientAngleConversion) {
   ASSERT_NE(fill, nullptr);
   auto* lg = As<pagx::LinearGradient>(fill->color);
   ASSERT_NE(lg, nullptr);
-  // CSS 90deg (to right) maps to PAGX 0° (along +X axis). startPoint(0, 0.5) → endPoint(1, 0.5).
+  // CSS 90deg (to right) maps to PAGX 0° (along +X axis). With a concrete 50x50 box the gradient
+  // line is resolved in absolute pixel space with fitsToGeometry=false: startPoint(0, 25) →
+  // endPoint(50, 25), spanning the box width centred vertically.
+  EXPECT_FALSE(lg->fitsToGeometry);
   EXPECT_TRUE(NearlyEqual(lg->startPoint.x, 0.0f, 0.005f));
-  EXPECT_TRUE(NearlyEqual(lg->startPoint.y, 0.5f, 0.005f));
-  EXPECT_TRUE(NearlyEqual(lg->endPoint.x, 1.0f, 0.005f));
-  EXPECT_TRUE(NearlyEqual(lg->endPoint.y, 0.5f, 0.005f));
+  EXPECT_TRUE(NearlyEqual(lg->startPoint.y, 25.0f, 0.005f));
+  EXPECT_TRUE(NearlyEqual(lg->endPoint.x, 50.0f, 0.005f));
+  EXPECT_TRUE(NearlyEqual(lg->endPoint.y, 25.0f, 0.005f));
   ASSERT_EQ(lg->colorStops.size(), 2u);
   EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
   EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, HexColor(0x0000FF)));
