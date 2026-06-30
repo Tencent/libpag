@@ -92,6 +92,11 @@ class HTMLStyleCascade {
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBorder(HTMLBoxAttributes& box, const std::string& border);
 
+  // Resolves `-webkit-text-stroke` (shorthand or longhands) into `out.textStrokeWidthPx` /
+  // `out.textStrokeColor`. Called at the tail of `resolveInheritedStyle` once the resolved text
+  // colour is known, since the stroke colour defaults to it.
+  void resolveTextStroke(const PropertyMap& props, HTMLInheritedStyle& out);
+
   // `parseBoxLayout` per-side margin longhand handler. Hoisted out of the original lambda so
   // the project's "no lambda" rule is honoured.
   void applyMarginLonghand(const PropertyMap& props, const char* propName, float& outPx);

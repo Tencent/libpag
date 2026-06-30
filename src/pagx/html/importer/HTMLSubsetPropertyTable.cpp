@@ -418,6 +418,15 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"white-space", PropAction::Keep, nullptr, nullptr},
     {"text-overflow", PropAction::Keep, nullptr, nullptr},
     {"writing-mode", PropAction::Keep, nullptr, nullptr},
+    // `-webkit-text-stroke` (and its two longhands) round-trips into a PAGX text `<Stroke>`
+    // (the inverse of HTMLWriter::ResolveTextStrokeCss). The shorthand carries a width token
+    // plus a colour token, so it cannot be length-resolved as a unit; keep it verbatim and let
+    // HTMLStyleCascade split it. The longhands are kept verbatim too so hand-authored subset
+    // HTML that sets them separately still round-trips. The cascade prefers the shorthand and
+    // falls back to the longhands.
+    {"-webkit-text-stroke", PropAction::Keep, nullptr, nullptr},
+    {"-webkit-text-stroke-width", PropAction::Keep, nullptr, nullptr},
+    {"-webkit-text-stroke-color", PropAction::Keep, nullptr, nullptr},
     // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the
     // function back onto the TextBox / Group transform fields. The handler enforces the
     // supported single-function subset; compound chains and matrix(...) forms are dropped.

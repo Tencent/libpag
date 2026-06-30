@@ -53,9 +53,20 @@ bool ApproxEqual(float a, float b, float eps) {
 // importer so that the cascade carries identical semantics through both layers.
 const std::vector<std::string>& InheritableProperties() {
   static const std::vector<std::string> v = {
-      "color",           "font-family",           "font-size",   "font-weight",
-      "font-style",      "letter-spacing",        "line-height", "text-align",
-      "text-decoration", "text-decoration-color", "white-space",
+      "color",
+      "font-family",
+      "font-size",
+      "font-weight",
+      "font-style",
+      "letter-spacing",
+      "line-height",
+      "text-align",
+      "text-decoration",
+      "text-decoration-color",
+      "white-space",
+      "-webkit-text-stroke",
+      "-webkit-text-stroke-width",
+      "-webkit-text-stroke-color",
   };
   return v;
 }

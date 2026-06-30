@@ -29,6 +29,8 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/xml/XMLDOM.h"
@@ -36,6 +38,22 @@
 namespace pagx {
 
 using namespace pagx::html;
+
+namespace {
+
+// Two runs share a stroke when both carry no stroke (NaN / <= 0 width), or both carry the same
+// width (within rounding tolerance) and colour. Keeps stroke in the fragment-merge fingerprint
+// so a stroked run never collapses into an unstroked neighbour (or vice versa).
+bool StrokesMatch(float widthA, const Color& colorA, float widthB, const Color& colorB) {
+  bool hasA = !std::isnan(widthA) && widthA > 0.0f;
+  bool hasB = !std::isnan(widthB) && widthB > 0.0f;
+  if (hasA != hasB) return false;
+  if (!hasA) return true;
+  constexpr float epsilon = 1e-3f;
+  return std::fabs(widthA - widthB) < epsilon && colorA == colorB;
+}
+
+}  // namespace
 
 HTMLTextFragmentBuilder::HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink,
                                                  HTMLValueParser& valueParser,
@@ -76,6 +94,22 @@ Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
   return fill;
 }
 
+Stroke* HTMLTextFragmentBuilder::buildTextStroke(const TextFragment& fragment) {
+  if (std::isnan(fragment.strokeWidth) || fragment.strokeWidth <= 0.0f) {
+    return nullptr;
+  }
+  auto stroke = _document->makeNode<Stroke>();
+  auto solid = _document->makeNode<SolidColor>();
+  solid->color = fragment.strokeColor;
+  stroke->color = solid;
+  stroke->width = fragment.strokeWidth;
+  // CSS `-webkit-text-stroke` is always centred on the glyph edge; mirror that with
+  // StrokeAlign::Center. Emitted after the Fill so it paints on top (the inverse of
+  // HTMLWriter::ResolveTextStrokeCss, which relies on CSS's default `fill stroke` paint-order).
+  stroke->align = StrokeAlign::Center;
+  return stroke;
+}
+
 HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
@@ -88,6 +122,8 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.letterSpacing = inherited.letterSpacingPx;
   frag.color = inherited.resolvedTextColor;
   frag.textDecoration = inherited.textDecoration;
+  frag.strokeWidth = inherited.textStrokeWidthPx;
+  frag.strokeColor = inherited.textStrokeColor;
   frag.fillImage = inherited.textFillImage;
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
@@ -118,7 +154,8 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
          a.fauxBold == b.fauxBold && a.fauxItalic == b.fauxItalic &&
          std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
-         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
+         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
+         StrokesMatch(a.strokeWidth, a.strokeColor, b.strokeWidth, b.strokeColor);
 }
 
 bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
@@ -140,7 +177,9 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
          a.fillImage == inherited.textFillImage && a.collapseWhitespace == incomingCollapse &&
-         a.preserveNewlines == incomingPreserveNewlines;
+         a.preserveNewlines == incomingPreserveNewlines &&
+         StrokesMatch(a.strokeWidth, a.strokeColor, inherited.textStrokeWidthPx,
+                      inherited.textStrokeColor);
 }
 
 void HTMLTextFragmentBuilder::appendFragment(std::vector<TextFragment>& out,
@@ -377,6 +416,9 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
     const auto& f = fragments.front();
     textHost->contents.push_back(buildTextElement(f));
     textHost->contents.push_back(buildTextFill(f));
+    if (auto* stroke = buildTextStroke(f)) {
+      textHost->contents.push_back(stroke);
+    }
     return;
   }
 
@@ -434,10 +476,16 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
     if (i == 0) {
       textBox->elements.push_back(buildTextElement(f));
       textBox->elements.push_back(buildTextFill(f));
+      if (auto* stroke = buildTextStroke(f)) {
+        textBox->elements.push_back(stroke);
+      }
     } else {
       auto group = _document->makeNode<Group>();
       group->elements.push_back(buildTextElement(f));
       group->elements.push_back(buildTextFill(f));
+      if (auto* stroke = buildTextStroke(f)) {
+        group->elements.push_back(stroke);
+      }
       textBox->elements.push_back(group);
     }
   }

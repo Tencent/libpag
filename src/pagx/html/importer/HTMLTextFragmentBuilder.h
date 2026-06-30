@@ -36,6 +36,7 @@ class HTMLStyleCascade;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
+class Stroke;
 class Text;
 
 /**
@@ -67,6 +68,11 @@ class HTMLTextFragmentBuilder {
     float letterSpacing = 0.0f;
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};
+    // CSS `-webkit-text-stroke` resolved into a stroke width (px) and colour. `strokeWidth` is
+    // NaN (or <= 0) when the run carries no stroke; a positive value drives a PAGX text
+    // `<Stroke>` emitted after the Fill so it paints over the fill (CSS default paint-order).
+    float strokeWidth = NAN;
+    Color strokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
     // Gradient string copied from `HTMLInheritedStyle::textFillImage`. When non-empty,
     // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
     // `background-clip: text` semantics from the nearest clip-to-text ancestor).
@@ -106,6 +112,11 @@ class HTMLTextFragmentBuilder {
   /** Builds a Fill from a fragment: emits a gradient Fill when `fragment.fillImage` is set,
    *  otherwise falls back to `_layerBuilder.buildSolidFill(fragment.color)`. */
   Fill* buildTextFill(const TextFragment& fragment);
+
+  /** Builds a solid `Stroke` from a fragment's `-webkit-text-stroke` resolution, or nullptr
+   *  when the run carries no stroke (`strokeWidth` NaN / <= 0). Uses `StrokeAlign::Center` to
+   *  match CSS, which always centres the stroke band on the glyph edge. */
+  Stroke* buildTextStroke(const TextFragment& fragment);
 
  private:
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);

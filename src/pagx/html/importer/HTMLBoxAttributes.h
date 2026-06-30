@@ -76,6 +76,13 @@ struct HTMLInheritedStyle {
   std::string textDecorationColor = {};
   std::string whiteSpace = {};
   std::string writingMode = {};
+  // CSS `-webkit-text-stroke` resolved by HTMLStyleCascade into a stroke width (px) and a
+  // concrete colour. `textStrokeWidthPx` is NaN when no stroke is authored (or the width is
+  // zero, which paints nothing); a positive value drives an extra PAGX text `<Stroke>` emitted
+  // after the Fill (the inverse of HTMLWriter's `-webkit-text-stroke` emission). The colour
+  // defaults to the resolved text colour when the shorthand omits it, matching CSS.
+  float textStrokeWidthPx = NAN;
+  Color textStrokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
   // Gradient string ("linear-gradient(...)" / "radial-gradient(...)" / "conic-gradient(...)")
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.

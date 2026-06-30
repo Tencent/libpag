@@ -567,7 +567,43 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   }
   out.resolvedTextColor =
       _valueParser.parseColor(out.color.empty() ? std::string(HTML_DEFAULT_TEXT_COLOR) : out.color);
+  resolveTextStroke(props, out);
   return out;
+}
+
+void HTMLStyleCascade::resolveTextStroke(const PropertyMap& props, HTMLInheritedStyle& out) {
+  // CSS `-webkit-text-stroke` is `<line-width> || <color>`. Chromium's snapshot emits the
+  // shorthand (`-webkit-text-stroke`); hand-authored subset HTML may use the two longhands
+  // instead. Prefer the shorthand, then fall back to the longhands. A missing / zero / invalid
+  // width leaves `textStrokeWidthPx` at NaN so the text-leaf builder emits no Stroke. The colour
+  // token is optional and defaults to the resolved text colour, matching CSS.
+  out.textStrokeWidthPx = NAN;
+  out.textStrokeColor = out.resolvedTextColor;
+
+  std::string widthToken;
+  std::string colorToken;
+  const std::string& shorthand = LookupProperty(props, "-webkit-text-stroke");
+  if (!shorthand.empty()) {
+    for (const auto& token : SplitTopLevelWhitespace(shorthand)) {
+      float w = _valueParser.parseAbsoluteLengthPx(token);
+      if (!std::isnan(w)) {
+        widthToken = token;
+      } else {
+        colorToken = token;
+      }
+    }
+  } else {
+    widthToken = LookupProperty(props, "-webkit-text-stroke-width");
+    colorToken = LookupProperty(props, "-webkit-text-stroke-color");
+  }
+
+  if (widthToken.empty()) return;
+  float width = _valueParser.parseAbsoluteLengthPx(widthToken);
+  if (std::isnan(width) || width <= 0.0f) return;
+  out.textStrokeWidthPx = width;
+  if (!colorToken.empty()) {
+    out.textStrokeColor = _valueParser.parseColor(colorToken);
+  }
 }
 
 HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {

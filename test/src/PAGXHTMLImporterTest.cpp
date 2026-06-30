@@ -882,6 +882,83 @@ PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   EXPECT_FALSE(hasTextBox);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, WebkitTextStrokeProducesTextStroke) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:20px;color:#3B82F6;-webkit-text-stroke:2px #10B981">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* text = FindElementOfType<pagx::Text>(leaf);
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "Hi");
+  auto* stroke = FindElementOfType<pagx::Stroke>(leaf);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  // CSS `-webkit-text-stroke` is always centred on the glyph edge.
+  EXPECT_EQ(stroke->align, pagx::StrokeAlign::Center);
+  auto* solid = As<pagx::SolidColor>(stroke->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x10B981)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, WebkitTextStrokeOmittedColorFallsBackToTextColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:20px;color:#EC4899;-webkit-text-stroke-width:3px">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* stroke = FindElementOfType<pagx::Stroke>(leaf);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 3.0f);
+  auto* solid = As<pagx::SolidColor>(stroke->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xEC4899)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ZeroWebkitTextStrokeEmitsNoStroke) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-size:20px;color:#000;-webkit-text-stroke:0px #10B981">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::Stroke>(leaf), nullptr);
+}
+
+// A per-run `-webkit-text-stroke` that differs from the leaf default must survive as a Stroke
+// inside that run's Group, while the unstroked default run emits none. This is the rich-text
+// (TextBox + Group) path, exercised by the BOX / MOD idioms in the round-trip corpus.
+PAG_TEST(PAGXHTMLImporterTest, PerRunWebkitTextStrokeScopedToFragment) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <p style="font-size:20px;color:#111">Plain <span style="-webkit-text-stroke:2px #0EA5E9">Edge</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  // The first run (no stroke) sits flat in tb->elements; the second run (stroked) is wrapped in
+  // a Group. Exactly one Stroke should exist, inside that Group.
+  size_t topLevelStrokes = 0;
+  pagx::Group* strokedGroup = nullptr;
+  for (auto* e : tb->elements) {
+    if (As<pagx::Stroke>(e)) topLevelStrokes++;
+    if (auto* g = As<pagx::Group>(e)) {
+      for (auto* ge : g->elements) {
+        if (As<pagx::Stroke>(ge)) strokedGroup = g;
+      }
+    }
+  }
+  EXPECT_EQ(topLevelStrokes, 0u);
+  ASSERT_NE(strokedGroup, nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RichTextSpansEmitTextBoxFragments) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

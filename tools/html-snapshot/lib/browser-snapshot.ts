@@ -591,6 +591,29 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Coalesce the two `-webkit-text-stroke` longhands Chromium's computed style
+// exposes (`-webkit-text-stroke-width` / `-webkit-text-stroke-color`) into the
+// single shorthand the HTML exporter emits and the importer parses. The
+// shorthand round-trips into a PAGX text `<Stroke>` (the inverse of
+// HTMLWriter::ResolveTextStrokeCss). Returns '' for a zero / missing width
+// (the CSS default, which paints nothing) so unstroked text stays compact.
+// `text-stroke-color` defaults to the resolved `color`; it is forwarded
+// verbatim so the importer reproduces the authored stroke tint rather than
+// re-deriving it from the fill.
+function resolveTextStroke(computed) {
+  const widthRaw = computed.getPropertyValue('-webkit-text-stroke-width').trim();
+  const width = parseFloat(widthRaw);
+  if (!(width > 0)) return '';
+  let color = computed.getPropertyValue('-webkit-text-stroke-color').trim();
+  if (!color) color = computed.getPropertyValue('color').trim();
+  return `${widthRaw} ${color}`;
+}
+
+function appendTextStroke(parts, computed) {
+  const value = resolveTextStroke(computed);
+  if (value) parts.push(`-webkit-text-stroke: ${value}`);
+}
+
 // Forward `background-size` / `background-repeat` / `background-position` when the element
 // carries a `url(...)` background image. The importer recovers them into the ImagePattern's
 // scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
@@ -760,6 +783,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     for (const entry of STYLE_SCHEMA_TEXT) {
       appendStyleProp(parts, computed, entry, ctx);
     }
+    appendTextStroke(parts, computed);
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -2365,6 +2389,14 @@ function emitInlineRunMarkup(el, parentComputed) {
       const outProp = entry.outProp || entry.prop;
       deltaParts.push(`${outProp}: ${v}`);
     }
+    // `-webkit-text-stroke` is not in STYLE_SCHEMA_TEXT (it coalesces two
+    // longhands rather than mapping one property), so emit it as an explicit
+    // delta: forward it only when this run's resolved stroke differs from the
+    // wrapper's, matching the minimal-delta strategy used for the schema props.
+    const stroke = resolveTextStroke(cs);
+    if (stroke && stroke !== resolveTextStroke(parentComputed)) {
+      deltaParts.push(`-webkit-text-stroke: ${stroke}`);
+    }
     const inner = emitInlineRunMarkup(c, cs);
     if (deltaParts.length === 0) {
       out += inner;
@@ -3141,6 +3173,8 @@ const HELPER_FNS = [
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
+  resolveTextStroke,
+  appendTextStroke,
   appendBackgroundImageFitting,
   appendMaskFitting,
   buildStyle,
