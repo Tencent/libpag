@@ -730,11 +730,9 @@ bool ResolveChildMainSize(const PropertyMap& props, bool row, float containerMai
   }
   std::string trimmed = Trim(raw);
   if (trimmed.size() >= 2 && trimmed.back() == '%' && std::isfinite(containerMain)) {
-    std::string num = trimmed.substr(0, trimmed.size() - 1);
-    char* end = nullptr;
-    float pct = std::strtof(num.c_str(), &end);
-    if (end != num.c_str() && std::isfinite(pct)) {
-      outMain = containerMain * pct / 100.0f;
+    float fraction = NAN;
+    if (ParseCssPercentage(trimmed, fraction) && std::isfinite(fraction)) {
+      outMain = containerMain * fraction;
       return true;
     }
   }

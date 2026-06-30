@@ -171,6 +171,14 @@ std::shared_ptr<DOMNode> ReplaceChild(const std::shared_ptr<DOMNode>& parent,
 
 // ----- Numeric / unit helpers ---------------------------------------------------------------
 
+// Parses a CSS `<number>%` token end-to-end into its fractional value (so "50%" -> 0.5). The
+// '%' must be the final character and every preceding character must be consumed by the numeric
+// parse: `strtof` silently returns the leading prefix on input like "5x%", which would otherwise
+// be mistaken for a valid 5% and shift the layout. Returns true and writes `outFraction` (the
+// percentage divided by 100) on success; returns false and leaves `outFraction` untouched when
+// the token is not a well-formed percentage. Callers multiply by the relevant axis length.
+bool ParseCssPercentage(const std::string& token, float& outFraction);
+
 // Try to parse a CSS angle in `deg`, `rad`, `turn`, or unitless (deg).
 float ParseAngle(const std::string& raw);
 

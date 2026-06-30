@@ -606,14 +606,18 @@ void HTMLStyleCascade::parseBoxPositioning(HTMLBoxAttributes& box, const Propert
     box.absolute = true;
   }
   if (!box.absolute) return;
-  const std::string& left = LookupProperty(props, "left");
-  if (!left.empty()) box.leftPx = _valueParser.parseAbsoluteLengthPx(left);
-  const std::string& right = LookupProperty(props, "right");
-  if (!right.empty()) box.rightPx = _valueParser.parseAbsoluteLengthPx(right);
-  const std::string& top = LookupProperty(props, "top");
-  if (!top.empty()) box.topPx = _valueParser.parseAbsoluteLengthPx(top);
-  const std::string& bottom = LookupProperty(props, "bottom");
-  if (!bottom.empty()) box.bottomPx = _valueParser.parseAbsoluteLengthPx(bottom);
+  struct OffsetField {
+    const char* propName;
+    float HTMLBoxAttributes::*field;
+  };
+  static const OffsetField OffsetFields[] = {{"left", &HTMLBoxAttributes::leftPx},
+                                             {"right", &HTMLBoxAttributes::rightPx},
+                                             {"top", &HTMLBoxAttributes::topPx},
+                                             {"bottom", &HTMLBoxAttributes::bottomPx}};
+  for (const auto& f : OffsetFields) {
+    const std::string& raw = LookupProperty(props, f.propName);
+    if (!raw.empty()) box.*(f.field) = _valueParser.parseAbsoluteLengthPx(raw);
+  }
 }
 
 void HTMLStyleCascade::applyMarginLonghand(const PropertyMap& props, const char* propName,
@@ -669,11 +673,8 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
   if (!jc.empty()) box.justifyContent = jc;
   const std::string& flex = LookupProperty(props, "flex");
   if (!flex.empty()) {
-    std::string trimmed = Trim(flex);
-    char* end = nullptr;
-    float v = std::strtof(trimmed.c_str(), &end);
-    bool consumedAll = end != trimmed.c_str() && Trim(end).empty();
-    if (consumedAll && v >= 0) {
+    float v = 0.0f;
+    if (ParseScalarFloat(flex, v) && v >= 0) {
       box.flexGrow = v;
       box.flexGrowSet = true;
     } else {
@@ -690,37 +691,42 @@ void HTMLStyleCascade::parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap&
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
     }
   }
-  if (!LookupProperty(props, "margin").empty() || !LookupProperty(props, "margin-top").empty() ||
-      !LookupProperty(props, "margin-right").empty() ||
-      !LookupProperty(props, "margin-bottom").empty() ||
-      !LookupProperty(props, "margin-left").empty()) {
-    // CSS `margin` shorthand: 1-4 length tokens (T / TB,RL / T,RL,B / T,R,B,L). Longhands
-    // override individual sides after the shorthand expansion. The subset transformer has
-    // already normalised every accepted unit to plain px, so any token that fails to parse
-    // here is malformed input and is reported and skipped (the corresponding side stays at
-    // its default 0). Resulting per-side values are routed onto positioning / padding by
-    // `wrapForMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
-    const std::string& margin = LookupProperty(props, "margin");
-    if (!margin.empty()) {
-      FourSidedValue m = {};
-      if (ParsePxShorthandTokens(margin, "margin", _valueParser, _diagnostics, m)) {
-        box.marginTopPx = m.top;
-        box.marginRightPx = m.right;
-        box.marginBottomPx = m.bottom;
-        box.marginLeftPx = m.left;
-      }
-    }
-    applyMarginLonghand(props, "margin-top", box.marginTopPx);
-    applyMarginLonghand(props, "margin-right", box.marginRightPx);
-    applyMarginLonghand(props, "margin-bottom", box.marginBottomPx);
-    applyMarginLonghand(props, "margin-left", box.marginLeftPx);
-  }
+  parseBoxMargin(box, props);
   if (!LookupProperty(props, "grid-template-columns").empty()) {
     _diagnostics.warn("html: grid layout not supported");
   }
   if (!LookupProperty(props, "grid-template-rows").empty()) {
     _diagnostics.warn("html: grid layout not supported");
   }
+}
+
+void HTMLStyleCascade::parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props) {
+  if (LookupProperty(props, "margin").empty() && LookupProperty(props, "margin-top").empty() &&
+      LookupProperty(props, "margin-right").empty() &&
+      LookupProperty(props, "margin-bottom").empty() &&
+      LookupProperty(props, "margin-left").empty()) {
+    return;
+  }
+  // CSS `margin` shorthand: 1-4 length tokens (T / TB,RL / T,RL,B / T,R,B,L). Longhands
+  // override individual sides after the shorthand expansion. The subset transformer has
+  // already normalised every accepted unit to plain px, so any token that fails to parse
+  // here is malformed input and is reported and skipped (the corresponding side stays at
+  // its default 0). Resulting per-side values are routed onto positioning / padding by
+  // `wrapForMargin` at apply time — PAGX has no margin field on Layer / LayoutNode.
+  const std::string& margin = LookupProperty(props, "margin");
+  if (!margin.empty()) {
+    FourSidedValue m = {};
+    if (ParsePxShorthandTokens(margin, "margin", _valueParser, _diagnostics, m)) {
+      box.marginTopPx = m.top;
+      box.marginRightPx = m.right;
+      box.marginBottomPx = m.bottom;
+      box.marginLeftPx = m.left;
+    }
+  }
+  applyMarginLonghand(props, "margin-top", box.marginTopPx);
+  applyMarginLonghand(props, "margin-right", box.marginRightPx);
+  applyMarginLonghand(props, "margin-bottom", box.marginBottomPx);
+  applyMarginLonghand(props, "margin-left", box.marginLeftPx);
 }
 
 void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
@@ -944,9 +950,8 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
     }
     float v = NAN;
     if (trimmed.back() == '%') {
-      char* end = nullptr;
-      float pct = std::strtof(trimmed.c_str(), &end);
-      if (end == trimmed.c_str()) {
+      float fraction = NAN;
+      if (!ParseCssPercentage(trimmed, fraction)) {
         diagnostics.warn("html: invalid border-radius token '" + t + "'");
         return false;
       }
@@ -955,7 +960,7 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
                          "' requires fixed px width/height on the same element; ignored");
         return false;
       }
-      v = pct * axisLengthPx / 100.0f;
+      v = fraction * axisLengthPx;
     } else {
       v = valueParser.parseAbsoluteLengthPx(trimmed);
       if (std::isnan(v)) {
@@ -1040,9 +1045,8 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
     std::string trimmed = Trim(t);
     float v = NAN;
     if (!trimmed.empty() && trimmed.back() == '%') {
-      char* end = nullptr;
-      float pct = std::strtof(trimmed.c_str(), &end);
-      if (end == trimmed.c_str()) {
+      float fraction = NAN;
+      if (!ParseCssPercentage(trimmed, fraction)) {
         _diagnostics.warn("html: invalid border-radius token '" + t + "'");
         continue;
       }
@@ -1051,7 +1055,7 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
                           "' requires fixed px width/height on the same element; ignored");
         continue;
       }
-      v = pct * std::min(box.widthPx, box.heightPx) / 100.0f;
+      v = fraction * std::min(box.widthPx, box.heightPx);
     } else {
       v = _valueParser.parseAbsoluteLengthPx(trimmed);
       if (std::isnan(v)) {

@@ -405,6 +405,19 @@ std::string EscapeXml(const std::string& text, bool isAttribute) {
   return out;
 }
 
+bool ParseCssPercentage(const std::string& token, float& outFraction) {
+  std::string trimmed = Trim(token);
+  if (trimmed.empty() || trimmed.back() != '%') return false;
+  char* end = nullptr;
+  float pct = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str()) return false;
+  // The numeric parse must stop exactly at the trailing '%', so a token like "5x%" is rejected
+  // instead of being silently read as 5%.
+  if (static_cast<size_t>(end - trimmed.c_str()) != trimmed.size() - 1) return false;
+  outFraction = pct / 100.0f;
+  return true;
+}
+
 float ParseAngle(const std::string& raw) {
   std::string s = Trim(raw);
   if (s.empty()) return 0.0f;

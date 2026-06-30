@@ -85,6 +85,7 @@ class HTMLStyleCascade {
   void parseBoxSizing(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
+  void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
 

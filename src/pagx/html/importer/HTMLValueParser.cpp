@@ -501,11 +501,9 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
 float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAxis) {
   if (token.empty()) return NAN;
   if (token.back() == '%') {
-    char* endPtr = nullptr;
-    float pct = std::strtof(token.c_str(), &endPtr);
-    if (endPtr != nullptr && endPtr != token.c_str() &&
-        static_cast<size_t>(endPtr - token.c_str()) == token.size() - 1) {
-      return pct / 100.0f;
+    float fraction = NAN;
+    if (ParseCssPercentage(token, fraction)) {
+      return fraction;
     }
     return NAN;
   }
@@ -549,11 +547,9 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
         // Validate the percent token end-to-end so '50%' parses while 'abc%' is rejected.
         // strtof silently returns 0 on a leading non-digit, which would otherwise be treated
         // as a valid 0% offset and shift the entire gradient stop layout.
-        char* endPtr = nullptr;
-        float pct = std::strtof(off.c_str(), &endPtr);
-        if (endPtr != nullptr && endPtr != off.c_str() &&
-            static_cast<size_t>(endPtr - off.c_str()) == off.size() - 1) {
-          offset = pct / 100.0f;
+        float fraction = NAN;
+        if (ParseCssPercentage(off, fraction)) {
+          offset = fraction;
         } else {
           _diagnostics.warn("html: malformed gradient stop offset '" + off +
                             "'; inferring position");
