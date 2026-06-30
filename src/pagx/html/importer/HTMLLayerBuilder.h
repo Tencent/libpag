@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 
 namespace pagx {
 
@@ -30,6 +31,7 @@ class ColorSource;
 class Element;
 class Fill;
 class HTMLDiagnosticSink;
+class HTMLInlineSvgEmitter;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
@@ -46,7 +48,8 @@ class PAGXDocument;
  */
 class HTMLLayerBuilder {
  public:
-  HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
+  HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
+                   HTMLInlineSvgEmitter& svgEmitter);
 
   void bindDocument(PAGXDocument* document);
 
@@ -122,6 +125,7 @@ class HTMLLayerBuilder {
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
+  HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
 };
 

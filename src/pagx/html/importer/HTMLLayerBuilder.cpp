@@ -26,6 +26,7 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
+#include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -119,12 +120,14 @@ void ResetLayoutAnchors(Layer* inner) {
 
 }  // namespace
 
-HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser)
-    : _diagnostics(sink), _valueParser(valueParser) {
+HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
+                                   HTMLInlineSvgEmitter& svgEmitter)
+    : _diagnostics(sink), _valueParser(valueParser), _filterDecoder(sink, svgEmitter, valueParser) {
 }
 
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+  _filterDecoder.bindDocument(document);
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
@@ -497,6 +500,11 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         drop->blurY = step.shadow.blur;
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
+        auto decoded = _filterDecoder.decode(step.refId);
+        for (auto* f : decoded) {
+          layer->filters.push_back(f);
+        }
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }

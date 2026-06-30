@@ -59,16 +59,18 @@ class HTMLValueParser {
   };
 
   /**
-   * One step of a CSS `filter` / `backdrop-filter` chain. `Unsupported` is emitted for
-   * anything outside the {`blur`, `drop-shadow`} subset; the caller can surface a diagnostic
-   * using `raw`.
+   * One step of a CSS `filter` / `backdrop-filter` chain. `SvgRef` carries a `url(#id)`
+   * reference to an SVG `<filter>` def, whose `refId` the caller resolves through the
+   * shared-defs table. `Unsupported` is emitted for anything outside the
+   * {`blur`, `drop-shadow`, `url(#…)`} subset; the caller can surface a diagnostic using `raw`.
    */
   struct FilterStep {
-    enum class Kind { Blur, DropShadow, Unsupported };
+    enum class Kind { Blur, DropShadow, SvgRef, Unsupported };
     Kind kind = Kind::Unsupported;
     float blurX = 0;
     float blurY = 0;
     ShadowSpec shadow = {};
+    std::string refId = {};
     std::string raw = {};
   };
 

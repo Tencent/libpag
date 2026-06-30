@@ -330,6 +330,19 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       if (!shadows.empty()) {
         step.shadow = shadows.front();
       }
+    } else if (name == "url") {
+      // `filter: url(#id)` references an SVG `<filter>` def. Strip optional quotes and the
+      // leading '#'; the caller resolves the id through the shared-defs table.
+      std::string ref = Trim(args);
+      if (ref.size() >= 2 && (ref.front() == '"' || ref.front() == '\'') &&
+          ref.back() == ref.front()) {
+        ref = Trim(ref.substr(1, ref.size() - 2));
+      }
+      if (!ref.empty() && ref.front() == '#') {
+        ref = ref.substr(1);
+      }
+      step.kind = ref.empty() ? FilterStep::Kind::Unsupported : FilterStep::Kind::SvgRef;
+      step.refId = ref;
     } else {
       step.kind = FilterStep::Kind::Unsupported;
     }

@@ -32,7 +32,9 @@
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -41,6 +43,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -106,6 +109,9 @@ DECLARE_PAGX_NODE_TYPE(InnerShadowStyle);
 DECLARE_PAGX_NODE_TYPE(BackgroundBlurStyle);
 DECLARE_PAGX_NODE_TYPE(BlurFilter);
 DECLARE_PAGX_NODE_TYPE(DropShadowFilter);
+DECLARE_PAGX_NODE_TYPE(InnerShadowFilter);
+DECLARE_PAGX_NODE_TYPE(ColorMatrixFilter);
+DECLARE_PAGX_NODE_TYPE(BlendFilter);
 
 #undef DECLARE_PAGX_NODE_TYPE
 
@@ -6360,6 +6366,220 @@ PAG_TEST(PAGXHTMLImporterTest, MaskReferenceSurvivesRoundTrip) {
   auto* masked = reloaded->layers.front()->children.front();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+}
+
+// `filter: url(#id)` referencing an SVG <filter> def whose only primitive is a feGaussianBlur with
+// an asymmetric stdDeviation rebuilds a BlurFilter with distinct blurX / blurY — the inverse of
+// HTMLWriter::writeFilterDefs emitting `stdDeviation="blurX blurY"`.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsAsymmetricBlur) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f0">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8 2" result="b0"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* blur = As<pagx::BlurFilter>(div->filters[0]);
+  ASSERT_NE(blur, nullptr);
+  EXPECT_FLOAT_EQ(blur->blurX, 8.0f);
+  EXPECT_FLOAT_EQ(blur->blurY, 2.0f);
+}
+
+// A drop-shadow <filter> built from SourceAlpha (blur -> offset -> colour matrix) with no final
+// feMerge rebuilds a shadow-only DropShadowFilter, recovering offset, blur, and colour.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsShadowOnlyDropShadow) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f1">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="sBlur0"/>
+            <feOffset in="sBlur0" dx="4" dy="8" result="sOff0"/>
+            <feColorMatrix in="sOff0" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.502 0" result="sDrop0"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f1)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[0]);
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FLOAT_EQ(drop->offsetX, 4.0f);
+  EXPECT_FLOAT_EQ(drop->offsetY, 8.0f);
+  EXPECT_FLOAT_EQ(drop->blurX, 12.0f);
+  EXPECT_FLOAT_EQ(drop->blurY, 12.0f);
+  EXPECT_TRUE(drop->shadowOnly);
+  EXPECT_NEAR(drop->color.alpha, 0.502f, 0.01f);
+}
+
+// An inner-shadow <filter> (inverted alpha -> blur -> offset -> flood -> two composites) ending in
+// a feMerge with SourceGraphic rebuilds a non-shadow-only InnerShadowFilter, recovering the flood
+// colour and opacity.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsInnerShadow) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f2">
+            <feComponentTransfer in="SourceAlpha" result="iInv0">
+              <feFuncA type="table" tableValues="1 0"/>
+            </feComponentTransfer>
+            <feGaussianBlur in="iInv0" stdDeviation="6" result="iBlur0"/>
+            <feOffset in="iBlur0" dx="2" dy="2" result="iOff0"/>
+            <feFlood flood-color="#000000" flood-opacity="0.502" result="iFlood0"/>
+            <feComposite in="iFlood0" in2="iOff0" operator="in" result="iShadow0"/>
+            <feComposite in="iShadow0" in2="SourceAlpha" operator="in" result="iClip0"/>
+            <feMerge result="iMerged0">
+              <feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="iClip0"/>
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f2)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* inner = As<pagx::InnerShadowFilter>(div->filters[0]);
+  ASSERT_NE(inner, nullptr);
+  EXPECT_FLOAT_EQ(inner->offsetX, 2.0f);
+  EXPECT_FLOAT_EQ(inner->offsetY, 2.0f);
+  EXPECT_FLOAT_EQ(inner->blurX, 6.0f);
+  EXPECT_FALSE(inner->shadowOnly);
+  EXPECT_NEAR(inner->color.alpha, 0.502f, 0.01f);
+}
+
+// A blend <filter> (feFlood -> feBlend(mode) -> feComposite(in)) rebuilds a BlendFilter recovering
+// the flood colour and the blend mode keyword.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsBlend) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f3">
+            <feFlood flood-color="#0000FF" flood-opacity="0.502" result="bFlood0"/>
+            <feBlend in="bFlood0" in2="SourceGraphic" mode="overlay" result="bBlend0"/>
+            <feComposite in="bBlend0" in2="SourceAlpha" operator="in" result="bClip0"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f3)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* blend = As<pagx::BlendFilter>(div->filters[0]);
+  ASSERT_NE(blend, nullptr);
+  EXPECT_EQ(blend->blendMode, pagx::BlendMode::Overlay);
+  EXPECT_NEAR(blend->color.blue, 1.0f, 0.01f);
+  EXPECT_NEAR(blend->color.alpha, 0.502f, 0.01f);
+}
+
+// A standalone feColorMatrix colour transform rebuilds a ColorMatrixFilter carrying all 20 values.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsColorMatrix) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f4">
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 1 0" result="cm0"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f4)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* cm = As<pagx::ColorMatrixFilter>(div->filters[0]);
+  ASSERT_NE(cm, nullptr);
+  EXPECT_NEAR(cm->matrix[0], 0.33f, 0.01f);
+  EXPECT_NEAR(cm->matrix[18], 1.0f, 0.01f);
+}
+
+// A <filter> whose primitives do not match any exporter template is dropped with a diagnostic, and
+// the element carries no filters rather than a partial chain.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefUnsupportedPrimitivesWarns) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f5">
+            <feTurbulence type="fractalNoise" baseFrequency="0.05" result="noise"/>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="10"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f5)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  EXPECT_TRUE(div->filters.empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "outside the supported set"));
+}
+
+// The decoded filter chain survives a PAGX serialisation round-trip: a DropShadowFilter recovered
+// from an SVG <filter> ref exports to PAGX XML and re-imports with its parameters intact, proving
+// the decoder yields a fully-formed, serialisable node.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterChainRoundTrip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="chain0">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="sBlur0"/>
+            <feOffset in="sBlur0" dx="3" dy="4" result="sOff0"/>
+            <feColorMatrix in="sOff0" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0" result="sDrop0"/>
+            <feMerge result="sMerged0">
+              <feMergeNode in="sDrop0"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#chain0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[0]);
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FALSE(drop->shadowOnly);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  auto* reDiv = reloaded->layers.front()->children.back();
+  ASSERT_EQ(reDiv->filters.size(), 1u);
+  auto* reDrop = As<pagx::DropShadowFilter>(reDiv->filters[0]);
+  ASSERT_NE(reDrop, nullptr);
+  EXPECT_FLOAT_EQ(reDrop->offsetX, 3.0f);
+  EXPECT_FLOAT_EQ(reDrop->offsetY, 4.0f);
+  EXPECT_FLOAT_EQ(reDrop->blurX, 5.0f);
+  EXPECT_FALSE(reDrop->shadowOnly);
 }
 
 }  // namespace pag

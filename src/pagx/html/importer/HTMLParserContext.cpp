@@ -65,7 +65,7 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser);
+  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.

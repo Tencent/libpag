@@ -249,6 +249,8 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLSubsetPropertyTable.h
             src/pagx/html/importer/HTMLSubsetTransformer.cpp
             src/pagx/html/importer/HTMLSubsetTransformer.h
+            src/pagx/html/importer/HTMLSvgFilterDecoder.cpp
+            src/pagx/html/importer/HTMLSvgFilterDecoder.h
             src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
             src/pagx/html/importer/HTMLTextFragmentBuilder.h
             src/pagx/html/importer/HTMLTransformContext.h
