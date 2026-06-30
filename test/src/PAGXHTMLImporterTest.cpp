@@ -5821,15 +5821,17 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, PositionInvalidDropped) {
   EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "position:"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageUrlDropped) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageUrlKept) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="background-image: url(image.png)"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
-  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+  // A `url(...)` background round-trips into an ImagePattern fill, so the transformer keeps the
+  // property instead of dropping it, and emits no unsupported-property diagnostic.
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "background-image"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageNoneDroppedSilently) {
