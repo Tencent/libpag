@@ -4505,11 +4505,17 @@ PAGX_TEST(PAGXTest, SetImageOverridesExternalFilePath) {
   ASSERT_TRUE(tgfxPattern != nullptr);
   EXPECT_EQ(tgfxPattern->image(), expectedTgfx);
 
-  // Clearing the override drops the host image: the pattern can no longer resolve "avatar.png"
-  // (no local file), so no tgfx pattern is bound.
-  scene->setImage("avatar.png", nullptr);
-  auto& binding2 = *scene->rootComposition()->binding;
-  EXPECT_EQ(binding2.get<tgfx::ImagePattern>(pattern), nullptr);
+  // Supplying a different image for the same path switches the pattern to it, and only the
+  // referencing layers are refreshed in place (the tree is not rebuilt).
+  auto hostImage2 =
+      pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
+  ASSERT_TRUE(hostImage2 != nullptr);
+  auto expectedTgfx2 = pagx::LayerBuilder::GetTGFXImage(hostImage2);
+  ASSERT_TRUE(expectedTgfx2 != nullptr);
+  scene->setImage("avatar.png", hostImage2);
+  auto tgfxPattern2 = scene->rootComposition()->binding->get<tgfx::ImagePattern>(pattern);
+  ASSERT_TRUE(tgfxPattern2 != nullptr);
+  EXPECT_EQ(tgfxPattern2->image(), expectedTgfx2);
 }
 
 // =====================================================================================
