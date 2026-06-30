@@ -37,12 +37,19 @@ class PAGXDocument;
  * which serialises each of the five layer filters — Blur, DropShadow, InnerShadow, Blend,
  * ColorMatrix — into a fixed sequence of `fe*` primitives chained through `result` / `in`.
  *
- * The decoder walks the `<filter>`'s primitive children in document order and greedily matches
- * each filter's signature primitive run, allocating the corresponding node through the bound
- * document. It deliberately recognises only the exporter's templates: an arbitrary hand-authored
- * filter whose primitives do not line up with one of those templates is reported via the
- * diagnostic sink and decoding stops, so the caller drops the filter rather than emitting a
- * partial chain that would not match the author's intent.
+ * Rather than assuming the primitives sit in a fixed physical order, the decoder models the
+ * `<filter>` as the data-flow graph it actually is: every primitive names its output via
+ * `result` and references upstream outputs (or the `SourceGraphic` / `SourceAlpha` built-ins) via
+ * `in` / `in2`. Decoding starts from `SourceGraphic` and repeatedly matches one of the five filter
+ * sub-graphs against the current pipeline input, consuming its primitives and advancing the input
+ * to that sub-graph's output, until every primitive has been consumed. Connecting by name rather
+ * than by adjacency tolerates reordered attributes, alternate `result` spellings, an omitted
+ * `result` on the final primitive, and alpha pre-passes that differ only by a scalar multiplier.
+ *
+ * It deliberately recognises only the five exporter templates: a `<filter>` whose primitives do
+ * not all fold into those sub-graphs (e.g. `feImage`, `feTurbulence`) is reported via the
+ * diagnostic sink and dropped whole, so the caller never emits a partial chain that would not
+ * match the author's intent.
  */
 class HTMLSvgFilterDecoder {
  public:
@@ -56,16 +63,11 @@ class HTMLSvgFilterDecoder {
   /**
    * Resolves the `<filter>` def carrying `filterId` through the shared-defs table and decodes its
    * primitive children into a PAGX filter chain. Returns an empty vector (and emits a diagnostic)
-   * when the id is unknown or the primitive sequence does not match an exporter template.
+   * when the id is unknown or the primitive graph does not fold entirely into exporter templates.
    */
   std::vector<LayerFilter*> decode(const std::string& filterId);
 
  private:
-  // Decodes the primitive run starting at `prims[index]` into a single filter node, advancing
-  // `index` past every primitive it consumed. Returns nullptr (and warns) when no exporter
-  // template matches at that position.
-  LayerFilter* decodeStep(const std::vector<std::shared_ptr<DOMNode>>& prims, size_t& index);
-
   HTMLDiagnosticSink& _diagnostics;
   HTMLInlineSvgEmitter& _svgEmitter;
   HTMLValueParser& _valueParser;

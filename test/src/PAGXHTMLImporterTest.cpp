@@ -6562,6 +6562,112 @@ PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefRebuildsColorMatrix) {
   EXPECT_NEAR(cm->matrix[18], 1.0f, 0.01f);
 }
 
+// Connection is by `in` / `result` name, not physical order: a drop-shadow whose primitives are
+// emitted out of document order, with the terminal feColorMatrix omitting `result`, still decodes
+// to one DropShadowFilter. Guards the data-flow model against regressing to positional matching.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefDropShadowReorderedByName) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f6">
+            <feColorMatrix in="off" type="matrix" values="0 0 0 0 0.1 0 0 0 0 0.2 0 0 0 0 0.3 0 0 0 0.5 0"/>
+            <feOffset in="sBlur0" dx="5" dy="6" result="off"/>
+            <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="sBlur0"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f6)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[0]);
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FLOAT_EQ(drop->offsetX, 5.0f);
+  EXPECT_FLOAT_EQ(drop->offsetY, 6.0f);
+  EXPECT_FLOAT_EQ(drop->blurX, 7.0f);
+  EXPECT_TRUE(drop->shadowOnly);
+}
+
+// A drop-shadow whose colour stage is a feFlood masked by feComposite(in) — the variant other
+// tools emit instead of a tint feColorMatrix — also decodes to a DropShadowFilter, recovering the
+// flood colour. The data-flow matcher recognises either colour-fill shape.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefDropShadowFloodColour) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f7">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="b"/>
+            <feOffset in="b" dx="2" dy="2" result="o"/>
+            <feFlood flood-color="#FF0000" flood-opacity="0.5" result="fl"/>
+            <feComposite in="fl" in2="o" operator="in" result="sh"/>
+            <feMerge>
+              <feMergeNode in="sh"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f7)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* drop = As<pagx::DropShadowFilter>(div->filters[0]);
+  ASSERT_NE(drop, nullptr);
+  EXPECT_FLOAT_EQ(drop->offsetX, 2.0f);
+  EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
+  EXPECT_FALSE(drop->shadowOnly);
+  EXPECT_NEAR(drop->color.red, 1.0f, 0.01f);
+  EXPECT_NEAR(drop->color.alpha, 0.5f, 0.01f);
+}
+
+// A chained <filter> (blur -> inner-shadow -> blend) decodes into three filters in pipeline order,
+// each sub-graph consuming the previous one's output by name. Proves multi-stage decomposition.
+PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefChainedThreeFilters) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="f8">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur0"/>
+            <feColorMatrix in="blur0" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="a2"/>
+            <feComponentTransfer in="a2" result="iInv1">
+              <feFuncA type="table" tableValues="1 0"/>
+            </feComponentTransfer>
+            <feGaussianBlur in="iInv1" stdDeviation="6" result="iBlur1"/>
+            <feOffset in="iBlur1" dx="2" dy="2" result="iOff1"/>
+            <feFlood flood-color="#0E7490" result="iFlood1"/>
+            <feComposite in="iFlood1" in2="iOff1" operator="in" result="iShadow1"/>
+            <feComposite in="iShadow1" in2="a2" operator="in" result="iClip1"/>
+            <feMerge result="iMerged1">
+              <feMergeNode in="blur0"/>
+              <feMergeNode in="iClip1"/>
+            </feMerge>
+            <feFlood flood-color="#F0ABFC" flood-opacity="0.251" result="bFlood3"/>
+            <feBlend in="bFlood3" in2="iMerged1" mode="screen" result="bBlend3"/>
+            <feComposite in="bBlend3" in2="iMerged1" operator="in" result="bClip3"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:68px;height:68px;filter:url(#f8)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not supported"));
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 3u);
+  EXPECT_NE(As<pagx::BlurFilter>(div->filters[0]), nullptr);
+  EXPECT_NE(As<pagx::InnerShadowFilter>(div->filters[1]), nullptr);
+  EXPECT_NE(As<pagx::BlendFilter>(div->filters[2]), nullptr);
+}
+
 // A <filter> whose primitives do not match any exporter template is dropped with a diagnostic, and
 // the element carries no filters rather than a partial chain.
 PAG_TEST(PAGXHTMLImporterTest, SvgFilterRefUnsupportedPrimitivesWarns) {
