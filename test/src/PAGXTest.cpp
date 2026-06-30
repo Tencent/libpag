@@ -593,6 +593,53 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
+ * Test case: editing a Text node's font size and calling notifyChange(layoutChanged=true) re-runs
+ * layout and refreshes the runtime tree so the cached TextBlob is rebuilt from the new layout runs
+ * (a stale blob would otherwise be returned by the render-time cache and ignore the edit).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRebuildsTextBlobOnFontEdit) {
+  auto doc = pagx::PAGXDocument::Make(240, 140);
+  auto* textLayer = MakeTextLayer(doc.get(), "Hello", 20, {0, 0, 0, 1});
+  doc->layers.push_back(textLayer);
+
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
+  // Locate the Text node inside the layer's Group content.
+  pagx::Text* text = nullptr;
+  for (auto* element : textLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Group) {
+      for (auto* child : static_cast<pagx::Group*>(element)->elements) {
+        if (child->nodeType() == pagx::NodeType::Text) {
+          text = static_cast<pagx::Text*>(child);
+        }
+      }
+    }
+  }
+  ASSERT_NE(text, nullptr);
+
+  // Building the scene shapes the text and populates the cached TextBlob.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  auto oldBlob = text->glyphData->textBlob;
+  float oldHeight = text->textBounds.height;
+
+  // Edit the font size and notify with layoutChanged=true: this re-runs layout (clearing the cached
+  // blob) and refreshes the runtime tree in place, re-shaping from the new layout runs.
+  text->fontSize = 40;
+  doc->notifyChange({text}, true);
+
+  // The runtime tree now holds a freshly shaped blob (not the original) reflecting the larger font.
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  EXPECT_NE(text->glyphData->textBlob, oldBlob);
+  EXPECT_GT(text->textBounds.height, oldHeight);
+}
+
+/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
