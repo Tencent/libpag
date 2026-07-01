@@ -279,8 +279,7 @@ void EmitContourGeomFromGroups(XMLBuilder& out, const std::vector<PathContour>& 
                                int64_t pathHeight, float scaleX, float scaleY, float scaledOfsX,
                                float scaledOfsY) {
   const CoordScale ts{scaleX, scaleY, scaledOfsX, scaledOfsY};
-  EmitCustGeomCore(out, contours, groups, pathWidth, pathHeight, ts, std::nullopt,
-                   /*bridgeContours=*/true);
+  EmitCustGeomCore(out, contours, groups, pathWidth, pathHeight, ts, std::nullopt, true);
 }
 
 void EmitFlatContourGeom(XMLBuilder& out, const std::vector<PathContour>& contours,

@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
@@ -28,6 +29,7 @@
 
 namespace tgfx {
 class DisplayList;
+class Layer;
 }  // namespace tgfx
 
 namespace pagx {
@@ -35,7 +37,12 @@ namespace pagx {
 class Animation;
 class Node;
 class PAGSurface;
+class PAGViewModel;
 class PAGXDocument;
+class SuppressDelegation;
+class PAGViewModelValue;
+class ViewModel;
+class Image;
 struct Matrix;
 struct RuntimeBinding;
 
@@ -93,6 +100,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Returns the root PAGComposition of this scene.
    */
   std::shared_ptr<PAGComposition> rootComposition() const;
+
+  /**
+   * Returns the root ViewModel for this scene, or nullptr if the document has no ViewModel schema.
+   */
+  std::shared_ptr<PAGViewModel> viewModel() const;
 
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
@@ -156,10 +168,25 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // document (its nodes are not owned by this scene's document).
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
 
+  // Dispatch target for PAGXDocument::notifyChange when <Image> resource nodes change (e.g. host
+  // loadFileData). Re-decodes any ViewModel image value built from a changed Image node, unless the
+  // business side has overridden it. Keyed off the Image nodes themselves because a ViewModel
+  // schema is not reachable from the Layer tree that onNodesChanged refreshes.
+  void onImageResourcesChanged(const std::vector<Image*>& changedImages);
+  static void RefreshViewModelImages(PAGComposition* comp,
+                                     const std::unordered_set<const Image*>& changed);
+
   // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
   // tree first. Used at creation and when an embedded external document changes (an external
   // composition is built into the tree once and cannot be patched in place).
   void buildRuntimeTree();
+  void buildViewModels();
+  void buildNestedViewModels(PAGComposition* parentComp);
+  static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(
+      ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
+  void flushDataBinds();
+  void clearAllViewModelsDirty();
+  static void ClearCompositionTreeDirty(PAGComposition* comp);
 
   RuntimeBinding* mutableBinding();
 
@@ -177,17 +204,26 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
+  std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 
+  bool suppressNotify = false;
+  std::vector<PAGViewModelValue*> pendingNotifications = {};
+
+  // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
+  std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
+
   friend class PAGXDocument;
   friend class PAGTimeline;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;
+  friend class PAGViewModelValue;
+  friend class SuppressDelegation;
 };
 
 }  // namespace pagx

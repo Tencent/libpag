@@ -85,6 +85,7 @@
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
@@ -118,6 +119,23 @@
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
+
+// Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
+// Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
+// sampling pass over the affected layer; large designs can carry hundreds of such effects
+// whose combined offscreen cost dominates the frame budget. Flip individual switches to 1 in
+// debug builds to measure how much of the rendering load is attributable to each effect type.
+// The visual result with an effect disabled is wrong (missing shadows / blur), but everything
+// downstream still parses, lays out, and renders without crashing.
+//
+// PAG_DISABLE_BACKGROUND_BLUR_STYLE: skips BackgroundBlurStyle (offscreen background snapshot
+//   plus blur pass; usually the heaviest single category in dense designs).
+// PAG_DISABLE_SHADOW_STYLES:         skips DropShadowStyle and InnerShadowStyle.
+// PAG_DISABLE_LAYER_FILTERS:         skips all LayerFilters (BlurFilter, DropShadow/InnerShadow
+//   filters, BlendFilter, ColorMatrixFilter). BlurFilter with very large sigma dominates here.
+#define PAG_DISABLE_BACKGROUND_BLUR_STYLE 0
+#define PAG_DISABLE_SHADOW_STYLES 0
+#define PAG_DISABLE_LAYER_FILTERS 0
 
 // Runtime target for a Layer's tgfx::Layer that keeps the layer transform decomposed into its
 // animatable sources (x, y translation and the 2D matrix). The final tgfx matrix is recomposed as
@@ -168,6 +186,22 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return RuntimeTarget::hasWriter(channel);
   }
 
+  // Reads x / y back from the decomposed animated translation (animX / animY), not the final
+  // composed layer matrix. The forward transform composes Translate(animX, animY) * animMatrix, so
+  // the composed matrix translate also folds in animMatrix's own translation; returning animX /
+  // animY gives the true x / y channel value the two-way binding should observe. Other channels
+  // fall through to the base reader table.
+  bool read(const std::string& channel, KeyValue* out) const override {
+    if (channel == "x" || channel == "y") {
+      if (out == nullptr) {
+        return false;
+      }
+      *out = KeyValue{channel == "x" ? animX : animY};
+      return true;
+    }
+    return RuntimeTarget::read(channel, out);
+  }
+
   // Seeds the decomposed transform from the node's authored values so the first animated frame
   // mixes against the static baseline rather than an identity.
   void initTransform(float x, float y, const tgfx::Matrix& matrix) {
@@ -199,13 +233,20 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
   return tgfx::Image::MakeFromEncoded(ToTGFXData(data));
 }
 
-// Build context that maintains state during layer tree construction
+// Build context that maintains state during layer tree construction. Designed so the same
+// instance can be reused: the session-based flow keeps the context alive after build() so that
+// later rebuildForFilePath() calls can find the already-created tgfx layers and regenerate
+// their contents in place.
 class LayerBuilderContext {
  public:
   LayerBuilderContext() = default;
 
   void setNeedsRuntimeData(bool value) {
     _needsRuntimeData = value;
+  }
+
+  void setDocument(const PAGXDocument* document) {
+    _document = document;
   }
 
   // Builds a single Composition's subtree, exposed for PAGComposition runtime slots that need
@@ -223,14 +264,33 @@ class LayerBuilderContext {
       }
       resolvePendingMasks();
     }
-    _result.root = root;
-    return std::move(_result);
+    LayerBuildResult result = std::move(_result);
+    _result = {};
+    result.root = root;
+    return result;
   }
 
   LayerBuildResult buildWithMap(const PAGXDocument& document) {
     auto root = build(document);
-    _result.root = root;
-    return std::move(_result);
+    LayerBuildResult result = {};
+    result.root = root;
+    // Transfer the RuntimeBinding populated during build()/convertLayer so callers (PAGScene,
+    // BuildForRuntime) can drive animation channel writers. The layerMap below is rebuilt
+    // separately and must not be clobbered, so we move only the binding rather than the whole
+    // _result.
+    result.binding = std::move(_result.binding);
+    _result = {};
+    // LayerBuildResult exposes a 1:1 pagx Layer -> tgfx Layer map for historical reasons. When
+    // a Composition is referenced by multiple Layers a single pagx Layer node actually produces
+    // several tgfx Layers; we only surface the first one here to keep the public contract
+    // stable. Session users that need every copy go through getTgfxLayers() instead.
+    result.layerMap.reserve(_tgfxLayersByPagxLayer.size());
+    for (const auto& [pagxLayer, tgfxLayers] : _tgfxLayersByPagxLayer) {
+      if (!tgfxLayers.empty()) {
+        result.layerMap.emplace(pagxLayer, tgfxLayers.front());
+      }
+    }
+    return result;
   }
 
   // Rewrites the current state of a single Layer node onto its existing tgfx::Layer, preserving the
@@ -247,14 +307,6 @@ class LayerBuilderContext {
       return false;
     }
     _result.binding = std::move(*binding);
-    // A plain (non-composition) node that gained contents since it was built as a plain tgfx::Layer
-    // must be promoted to a VectorLayer, the only layer kind that can hold contents. Swap in a new
-    // VectorLayer in the same parent slot, move the existing child layers over, and rebind the node;
-    // child layers and their own bindings are preserved (only this node's tgfx instance changes).
-    if (node->composition == nullptr && !node->contents.empty() &&
-        layer->type() != tgfx::LayerType::Vector) {
-      layer = promoteToVectorLayer(node, layer);
-    }
     // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
     // and the mask is only re-applied when node->mask is set, so reset them first; otherwise an
     // edit that cleared a matrix / blendMode / scrollRect / style / filter / mask would keep the
@@ -370,23 +422,6 @@ class LayerBuilderContext {
     }
     *binding = std::move(_result.binding);
     return true;
-  }
-
-  // Replaces a plain tgfx::Layer that has gained contents with a new VectorLayer in the same parent
-  // slot, and rebinds the node to the new instance. The node's child layers are not moved here: the
-  // subsequent reconcileChildLayers re-attaches each still-bound child onto the new layer. set()
-  // keeps the node's existing LayerRuntimeTarget and channel writers, only swapping its object
-  // pointer. Returns the new layer (or the original if it has no parent to swap within).
-  std::shared_ptr<tgfx::Layer> promoteToVectorLayer(const Layer* node,
-                                                    const std::shared_ptr<tgfx::Layer>& oldLayer) {
-    auto* parent = oldLayer->parent();
-    if (parent == nullptr) {
-      return oldLayer;
-    }
-    auto vectorLayer = tgfx::VectorLayer::Make();
-    parent->replaceChild(oldLayer, vectorLayer);
-    _result.binding.set(node, vectorLayer);
-    return vectorLayer;
   }
 
   // Reconciles the direct child tgfx layers of a plain (non-composition) Layer node against its
@@ -595,6 +630,7 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
+    _document = &document;
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
@@ -611,8 +647,9 @@ class LayerBuilderContext {
 
   void resolvePendingMasks() {
     for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
-      auto maskLayer = _result.getLayer(maskPagx);
-      if (maskLayer != nullptr) {
+      auto it = _tgfxLayersByPagxLayer.find(maskPagx);
+      if (it != _tgfxLayersByPagxLayer.end() && !it->second.empty()) {
+        auto maskLayer = it->second.front();
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
         maskLayer->setVisible(true);
@@ -621,6 +658,68 @@ class LayerBuilderContext {
       }
     }
     _pendingMasks.clear();
+  }
+
+  // Returns every tgfx layer produced for the given pagx Layer. Order matches convertLayer()
+  // invocation order; an empty vector means the pagx Layer was never visited.
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayers(const Layer* pagxLayer) const {
+    auto it = _tgfxLayersByPagxLayer.find(pagxLayer);
+    if (it == _tgfxLayersByPagxLayer.end()) {
+      return {};
+    }
+    return it->second;
+  }
+
+  // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
+  // conversion goes through getOrCreateImage() again and re-queries the provider.
+  void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
+    if (filePath.empty()) {
+      return;
+    }
+    for (auto& node : document.nodes) {
+      if (!node || node->nodeType() != NodeType::Image) {
+        continue;
+      }
+      auto* imageNode = static_cast<const Image*>(node.get());
+      if (imageNode->filePath != filePath) {
+        continue;
+      }
+      _imageCache.erase(imageNode);
+    }
+  }
+
+  // Drops the entire image cache. Must be called when the document's node tree undergoes
+  // structural changes (e.g. notifyChange with node additions/removals) because the raw Image*
+  // keys may become dangling after such edits.
+  void invalidateAllImages() {
+    _imageCache.clear();
+  }
+
+  // Builds the tgfx VectorElement list for a pagx Layer's contents, skipping elements that
+  // convert to null. Shared by convertVectorLayer() (initial build) and rebuildVectorContents()
+  // (progressive image refresh) so the two paths cannot drift.
+  std::vector<std::shared_ptr<tgfx::VectorElement>> buildVectorContents(const Layer* node) {
+    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
+    contents.reserve(node->contents.size());
+    for (const auto& element : node->contents) {
+      auto tgfxElement = convertVectorElement(element);
+      if (tgfxElement) {
+        contents.push_back(tgfxElement);
+      }
+    }
+    return contents;
+  }
+
+  // Regenerates the contents of a VectorLayer by walking the original pagx Layer's contents
+  // list through convertVectorElement(). Non-VectorLayer targets are skipped because they do
+  // not own a setContents()-style slot (Composition container layers etc).
+  bool rebuildVectorContents(const Layer* pagxLayer, tgfx::Layer* tgfxLayer) {
+    if (!pagxLayer || !tgfxLayer || tgfxLayer->type() != tgfx::LayerType::Vector) {
+      return false;
+    }
+    auto* vectorLayer = static_cast<tgfx::VectorLayer*>(tgfxLayer);
+    vectorLayer->setContents(buildVectorContents(pagxLayer));
+    return true;
   }
 
  private:
@@ -637,7 +736,7 @@ class LayerBuilderContext {
     } else if (!node->contents.empty()) {
       layer = convertVectorLayer(node);
     } else {
-      layer = tgfx::Layer::Make();
+      layer = tgfx::VectorLayer::Make();
     }
 
     if (layer) {
@@ -646,7 +745,10 @@ class LayerBuilderContext {
       auto target = std::unique_ptr<RuntimeTarget>(new LayerRuntimeTarget());
       auto* layerTarget =
           static_cast<LayerRuntimeTarget*>(_result.binding.setTarget(node, std::move(target)));
-      // Register layer for mask lookups and animation writers.
+      // Register layer for mask lookups and later rebuildForFilePath(). A single pagx Layer
+      // may appear here multiple times when its owning Composition is instanced more than
+      // once, so we append rather than overwrite.
+      _tgfxLayersByPagxLayer[node].push_back(layer);
       _result.binding.set(node, layer);
       bindLayerChannels(node);
 
@@ -700,12 +802,34 @@ class LayerBuilderContext {
     static_cast<tgfx::Layer*>(object)->setBlendMode(ToTGFX(mode));
   }
 
+  static void WriteLayerName(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<std::string>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<tgfx::Layer*>(object)->setName(*v);
+  }
+
+  static bool ReadLayerBlendMode(const void* object, KeyValue* out) {
+    auto mode = FromTGFX(static_cast<const tgfx::Layer*>(object)->blendMode());
+    *out = KeyValue{static_cast<int>(mode)};
+    return true;
+  }
+
+  static bool ReadLayerName(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Layer*>(object)->name()};
+    return true;
+  }
+
   // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
   // they are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
-    _result.binding.setWriter(node, "alpha", WriteLayerAlpha);
-    _result.binding.setWriter(node, "visible", WriteLayerVisible);
-    _result.binding.setWriter(node, "blendMode", WriteLayerBlendMode);
+    _result.binding.setAccessor(node, "alpha", WriteLayerAlpha,
+                                ReadScalar<tgfx::Layer, &tgfx::Layer::alpha>);
+    _result.binding.setAccessor(node, "visible", WriteLayerVisible,
+                                ReadBoolean<tgfx::Layer, &tgfx::Layer::visible>);
+    _result.binding.setAccessor(node, "blendMode", WriteLayerBlendMode, ReadLayerBlendMode);
+    _result.binding.setAccessor(node, "name", WriteLayerName, ReadLayerName);
   }
 
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
@@ -733,15 +857,7 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
-    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
-    contents.reserve(node->contents.size());
-    for (const auto& element : node->contents) {
-      auto tgfxElement = convertVectorElement(element);
-      if (tgfxElement) {
-        contents.push_back(tgfxElement);
-      }
-    }
-    layer->setContents(contents);
+    layer->setContents(buildVectorContents(node));
     return layer;
   }
 
@@ -754,6 +870,108 @@ class LayerBuilderContext {
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
       GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+    }
+  }
+
+  // FNV-1a 64-bit mixing step over a raw byte range. Kept as an explicit helper (no lambda)
+  // so ComputeTextBlobFingerprint stays readable while honoring the no-lambda project rule.
+  static void FnvMix(uint64_t* h, const void* data, size_t bytes) {
+    constexpr uint64_t FNV_PRIME = 0x100000001b3ULL;
+    const uint8_t* p = static_cast<const uint8_t*>(data);
+    for (size_t i = 0; i < bytes; ++i) {
+      *h ^= p[i];
+      *h *= FNV_PRIME;
+    }
+  }
+
+  // Mixes a contiguous container (size prefix + element bytes) into the running FNV hash.
+  template <typename Vec>
+  static void FnvMixVector(uint64_t* h, const Vec& vec) {
+    size_t n = vec.size();
+    FnvMix(h, &n, sizeof(n));
+    if (n > 0) {
+      FnvMix(h, vec.data(), n * sizeof(vec[0]));
+    }
+  }
+
+  // Fingerprint over every input GlyphRunRenderer::BuildTextBlob consumes. When BuildTextBlob is
+  // changed to read a new field, that field MUST be mixed in here — otherwise the cache may serve
+  // stale glyphs.
+  static uint64_t ComputeTextBlobFingerprint(const Text* text, const tgfx::Matrix& inverseMatrix) {
+    // FNV-1a 64-bit. Collision probability for ~5K entries is ~10^-12, and the glyphSum secondary
+    // check guards the rare miss.
+    constexpr uint64_t FNV_OFFSET = 0xcbf29ce484222325ULL;
+    uint64_t h = FNV_OFFSET;
+    // 1. Inverse matrix (6 floats).
+    float matrixValues[6] = {0};
+    inverseMatrix.get6(matrixValues);
+    FnvMix(&h, matrixValues, sizeof(matrixValues));
+    // 2. Faux bold / italic flags
+    bool fauxFlags[2] = {text->fauxBold, text->fauxItalic};
+    FnvMix(&h, fauxFlags, sizeof(fauxFlags));
+    // 3. GlyphRun count
+    size_t runCount = text->glyphRuns.size();
+    FnvMix(&h, &runCount, sizeof(runCount));
+    // 4. Per-run geometry.
+    for (const auto* run : text->glyphRuns) {
+      if (!run) {
+        uint8_t nullMarker = 0;
+        FnvMix(&h, &nullMarker, sizeof(nullMarker));
+        continue;
+      }
+      const Font* fontPtr = run->font;
+      FnvMix(&h, &fontPtr, sizeof(fontPtr));
+      FnvMix(&h, &run->fontSize, sizeof(run->fontSize));
+      FnvMix(&h, &run->x, sizeof(run->x));
+      FnvMix(&h, &run->y, sizeof(run->y));
+      FnvMixVector(&h, run->glyphs);
+      FnvMixVector(&h, run->positions);
+      FnvMixVector(&h, run->xOffsets);
+      FnvMixVector(&h, run->scales);
+      FnvMixVector(&h, run->rotations);
+      FnvMixVector(&h, run->skews);
+      FnvMixVector(&h, run->anchors);
+    }
+    return h;
+  }
+
+  // Total glyph count across all GlyphRuns. Used as a cheap secondary key check so a 64-bit
+  // hash collision (already < 1 in 10^12) cannot promote to a wrong-render bug — a mismatched
+  // glyphSum forces a rebuild rather than reuse.
+  static size_t SumGlyphCount(const Text* text) {
+    size_t sum = 0;
+    for (const auto* run : text->glyphRuns) {
+      if (run) sum += run->glyphs.size();
+    }
+    return sum;
+  }
+
+  // Cached wrapper around PrepareTextBlob. Looks up the fingerprint first; on hit reuses the
+  // TextBlob and per-glyph anchors from the cache. On miss builds via PrepareTextBlob and
+  // stashes the result.
+  void prepareTextBlobCached(Text* text, const tgfx::Matrix& inverseMatrix) {
+    if (!text || !text->glyphData) return;
+    // Already prepared in this build session (or a previous instance hit the same cache slot).
+    if (text->glyphData->textBlob) return;
+    // The runtime-shaping path uses layoutRuns rather than glyphRuns; the fingerprint scheme
+    // here covers only the embedded glyphRuns path, which is what cocraft exports. Fall back
+    // to the uncached path for layoutRuns to stay correct.
+    if (!text->glyphData->layoutRuns.empty() || text->glyphRuns.empty()) {
+      PrepareTextBlob(text, inverseMatrix);
+      return;
+    }
+    auto fingerprint = ComputeTextBlobFingerprint(text, inverseMatrix);
+    size_t glyphSum = SumGlyphCount(text);
+    auto it = _textBlobCache.find(fingerprint);
+    if (it != _textBlobCache.end() && it->second.glyphSum == glyphSum) {
+      text->glyphData->textBlob = it->second.textBlob;
+      text->glyphData->anchors = it->second.anchors;
+      return;
+    }
+    PrepareTextBlob(text, inverseMatrix);
+    if (text->glyphData->textBlob) {
+      _textBlobCache[fingerprint] =
+          TextBlobCacheEntry{glyphSum, text->glyphData->textBlob, text->glyphData->anchors};
     }
   }
 
@@ -770,7 +988,7 @@ class LayerBuilderContext {
       if (!matrices[i].invert(&inverse)) {
         continue;
       }
-      PrepareTextBlob(childText[i], inverse);
+      prepareTextBlobCached(childText[i], inverse);
     }
   }
 
@@ -896,6 +1114,43 @@ class LayerBuilderContext {
     (obj->*Setter)(point);
   }
 
+  // Templated readers symmetric to the writers above. syncBack uses these to flow the current
+  // target value back into a ViewModel property; each reads the same getter its writer mixes
+  // against, so a channel that can be driven can also be read back. They always have a value, so
+  // they return true.
+  template <typename T, auto Getter>
+  static bool ReadScalar(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<float>((static_cast<const T*>(object)->*Getter)())};
+    return true;
+  }
+
+  template <typename T, auto Getter>
+  static bool ReadBoolean(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<bool>((static_cast<const T*>(object)->*Getter)())};
+    return true;
+  }
+
+  template <typename T, auto Getter>
+  static bool ReadColorChannel(const void* object, KeyValue* out) {
+    auto c = (static_cast<const T*>(object)->*Getter)();
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
+  }
+
+  template <typename T, auto Getter, bool WidthAxis>
+  static bool ReadSizeAxis(const void* object, KeyValue* out) {
+    auto size = (static_cast<const T*>(object)->*Getter)();
+    *out = KeyValue{WidthAxis ? size.width : size.height};
+    return true;
+  }
+
+  template <typename T, auto Getter, bool XAxis>
+  static bool ReadPointAxis(const void* object, KeyValue* out) {
+    auto point = (static_cast<const T*>(object)->*Getter)();
+    *out = KeyValue{XAxis ? point.x : point.y};
+    return true;
+  }
+
   // Rectangle roundness: the PAGX node carries a single float but tgfx exposes a 4-corner array, so
   // this cannot use WriteMixedFloat. Mix against the first corner and apply uniformly.
   static void WriteRectangleRoundness(void* object, const KeyValue& value, float mix) {
@@ -908,6 +1163,11 @@ class LayerBuilderContext {
     rect->setRoundness(MixFloat(current, *v, mix));
   }
 
+  static bool ReadRectangleRoundness(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Rectangle*>(object)->roundness()[0]};
+    return true;
+  }
+
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = tgfx::Rectangle::Make();
     rect->setPosition(ToTGFX(node->renderPosition()));
@@ -916,19 +1176,23 @@ class LayerBuilderContext {
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
     _result.binding.set(node, rect);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(
         node, "size.width",
-        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, true>);
-    _result.binding.setWriter(
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, true>,
+        ReadSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, true>);
+    _result.binding.setAccessor(
         node, "size.height",
-        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, false>);
-    _result.binding.setWriter(node, "position.x",
-                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
-                                             &tgfx::Rectangle::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
-                                             &tgfx::Rectangle::setPosition, false>);
-    _result.binding.setWriter(node, "roundness", WriteRectangleRoundness);
+        WriteSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, &tgfx::Rectangle::setSize, false>,
+        ReadSizeAxis<tgfx::Rectangle, &tgfx::Rectangle::size, false>);
+    _result.binding.setAccessor(node, "position.x",
+                                WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                               &tgfx::Rectangle::setPosition, true>,
+                                ReadPointAxis<tgfx::Rectangle, &tgfx::Rectangle::position, true>);
+    _result.binding.setAccessor(node, "position.y",
+                                WritePointAxis<tgfx::Rectangle, &tgfx::Rectangle::position,
+                                               &tgfx::Rectangle::setPosition, false>,
+                                ReadPointAxis<tgfx::Rectangle, &tgfx::Rectangle::position, false>);
+    _result.binding.setAccessor(node, "roundness", WriteRectangleRoundness, ReadRectangleRoundness);
     return rect;
   }
 
@@ -939,18 +1203,22 @@ class LayerBuilderContext {
     ellipse->setSize({size.width, size.height});
     ellipse->setReversed(node->reversed);
     _result.binding.set(node, ellipse);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(
         node, "size.width",
-        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, true>);
-    _result.binding.setWriter(
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, true>,
+        ReadSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, true>);
+    _result.binding.setAccessor(
         node, "size.height",
-        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, false>);
-    _result.binding.setWriter(
+        WriteSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, &tgfx::Ellipse::setSize, false>,
+        ReadSizeAxis<tgfx::Ellipse, &tgfx::Ellipse::size, false>);
+    _result.binding.setAccessor(
         node, "position.x",
-        WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, &tgfx::Ellipse::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position,
-                                             &tgfx::Ellipse::setPosition, false>);
+        WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, &tgfx::Ellipse::setPosition, true>,
+        ReadPointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, true>);
+    _result.binding.setAccessor(
+        node, "position.y",
+        WritePointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, &tgfx::Ellipse::setPosition, false>,
+        ReadPointAxis<tgfx::Ellipse, &tgfx::Ellipse::position, false>);
     return ellipse;
   }
 
@@ -970,30 +1238,38 @@ class LayerBuilderContext {
       polystar->setPolystarType(tgfx::PolystarType::Star);
     }
     _result.binding.set(node, polystar);
-    _result.binding.setWriter(node, "pointCount",
-                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::pointCount,
-                                              &tgfx::Polystar::setPointCount>);
-    _result.binding.setWriter(node, "outerRadius",
-                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRadius,
-                                              &tgfx::Polystar::setOuterRadius>);
-    _result.binding.setWriter(node, "innerRadius",
-                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRadius,
-                                              &tgfx::Polystar::setInnerRadius>);
-    _result.binding.setWriter(node, "outerRoundness",
-                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRoundness,
-                                              &tgfx::Polystar::setOuterRoundness>);
-    _result.binding.setWriter(node, "innerRoundness",
-                              WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRoundness,
-                                              &tgfx::Polystar::setInnerRoundness>);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(node, "pointCount",
+                                WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::pointCount,
+                                                &tgfx::Polystar::setPointCount>,
+                                ReadScalar<tgfx::Polystar, &tgfx::Polystar::pointCount>);
+    _result.binding.setAccessor(node, "outerRadius",
+                                WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRadius,
+                                                &tgfx::Polystar::setOuterRadius>,
+                                ReadScalar<tgfx::Polystar, &tgfx::Polystar::outerRadius>);
+    _result.binding.setAccessor(node, "innerRadius",
+                                WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRadius,
+                                                &tgfx::Polystar::setInnerRadius>,
+                                ReadScalar<tgfx::Polystar, &tgfx::Polystar::innerRadius>);
+    _result.binding.setAccessor(node, "outerRoundness",
+                                WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::outerRoundness,
+                                                &tgfx::Polystar::setOuterRoundness>,
+                                ReadScalar<tgfx::Polystar, &tgfx::Polystar::outerRoundness>);
+    _result.binding.setAccessor(node, "innerRoundness",
+                                WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::innerRoundness,
+                                                &tgfx::Polystar::setInnerRoundness>,
+                                ReadScalar<tgfx::Polystar, &tgfx::Polystar::innerRoundness>);
+    _result.binding.setAccessor(
         node, "rotation",
-        WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::rotation, &tgfx::Polystar::setRotation>);
-    _result.binding.setWriter(node, "position.x",
-                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
-                                             &tgfx::Polystar::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
-                                             &tgfx::Polystar::setPosition, false>);
+        WriteMixedFloat<tgfx::Polystar, &tgfx::Polystar::rotation, &tgfx::Polystar::setRotation>,
+        ReadScalar<tgfx::Polystar, &tgfx::Polystar::rotation>);
+    _result.binding.setAccessor(node, "position.x",
+                                WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                               &tgfx::Polystar::setPosition, true>,
+                                ReadPointAxis<tgfx::Polystar, &tgfx::Polystar::position, true>);
+    _result.binding.setAccessor(node, "position.y",
+                                WritePointAxis<tgfx::Polystar, &tgfx::Polystar::position,
+                                               &tgfx::Polystar::setPosition, false>,
+                                ReadPointAxis<tgfx::Polystar, &tgfx::Polystar::position, false>);
     return polystar;
   }
 
@@ -1043,12 +1319,19 @@ class LayerBuilderContext {
     text->setPosition(pos);
   }
 
+  static bool ReadTextX(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Text*>(object)->position().x};
+    return true;
+  }
+
+  static bool ReadTextY(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<const tgfx::Text*>(object)->position().y};
+    return true;
+  }
+
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
+    prepareTextBlobCached(node, tgfx::Matrix::I());
     auto textBlob = node->glyphData->textBlob;
-    if (textBlob == nullptr) {
-      PrepareTextBlob(node, tgfx::Matrix::I());
-      textBlob = node->glyphData->textBlob;
-    }
     if (textBlob == nullptr) {
       return nullptr;
     }
@@ -1057,8 +1340,8 @@ class LayerBuilderContext {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
       _result.binding.set(node, tgfxText);
-      _result.binding.setWriter(node, "x", WriteTextX);
-      _result.binding.setWriter(node, "y", WriteTextY);
+      _result.binding.setAccessor(node, "x", WriteTextX, ReadTextX);
+      _result.binding.setAccessor(node, "y", WriteTextY, ReadTextY);
     }
     return tgfxText;
   }
@@ -1069,6 +1352,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
+      // an opaque SolidColor here would paint a black placeholder over every shape that uses an
+      // ImagePattern before its image is resolved via the provider; leaving the fill empty keeps
+      // those shapes transparent until the image is ready.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
@@ -1088,9 +1378,14 @@ class LayerBuilderContext {
       if (node->placement != LayerPlacement::Background) {
         fill->setPlacement(ToTGFX(node->placement));
       }
-      _result.binding.setWriter(
+      if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+        _result.binding.setAccessor(node, "color", WritePainterColor<tgfx::FillStyle>,
+                                    ReadPainterColor<tgfx::FillStyle>);
+      }
+      _result.binding.setAccessor(
           node, "alpha",
-          WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>);
+          WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>,
+          ReadScalar<tgfx::FillStyle, &tgfx::FillStyle::alpha>);
     }
     return fill;
   }
@@ -1101,6 +1396,13 @@ class LayerBuilderContext {
       colorSource = convertColorSource(node->color);
     }
     if (colorSource == nullptr) {
+      // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
+      // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
+      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // keeps those shapes transparent until the image is ready, matching convertFill.
+      if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
+        return nullptr;
+      }
       colorSource = tgfx::SolidColor::Make();
     }
 
@@ -1131,18 +1433,26 @@ class LayerBuilderContext {
     if (node->placement != LayerPlacement::Background) {
       stroke->setPlacement(ToTGFX(node->placement));
     }
-    _result.binding.setWriter(node, "width",
-                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
-                                              &tgfx::StrokeStyle::setStrokeWidth>);
-    _result.binding.setWriter(node, "alpha",
-                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha,
-                                              &tgfx::StrokeStyle::setAlpha>);
-    _result.binding.setWriter(node, "miterLimit",
-                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit,
-                                              &tgfx::StrokeStyle::setMiterLimit>);
-    _result.binding.setWriter(node, "dashOffset",
-                              WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::dashOffset,
-                                              &tgfx::StrokeStyle::setDashOffset>);
+    if (node->color && node->color->nodeType() == NodeType::SolidColor) {
+      _result.binding.setAccessor(node, "color", WritePainterColor<tgfx::StrokeStyle>,
+                                  ReadPainterColor<tgfx::StrokeStyle>);
+    }
+    _result.binding.setAccessor(node, "width",
+                                WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth,
+                                                &tgfx::StrokeStyle::setStrokeWidth>,
+                                ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth>);
+    _result.binding.setAccessor(
+        node, "alpha",
+        WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha, &tgfx::StrokeStyle::setAlpha>,
+        ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha>);
+    _result.binding.setAccessor(node, "miterLimit",
+                                WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit,
+                                                &tgfx::StrokeStyle::setMiterLimit>,
+                                ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit>);
+    _result.binding.setAccessor(node, "dashOffset",
+                                WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::dashOffset,
+                                                &tgfx::StrokeStyle::setDashOffset>,
+                                ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::dashOffset>);
 
     return stroke;
   }
@@ -1157,6 +1467,50 @@ class LayerBuilderContext {
     solid->setColor(MixTGFXColor(solid->color(), target, mix));
   }
 
+  static void WriteImagePatternImage(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<std::shared_ptr<PAGImage>>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* pattern = static_cast<tgfx::ImagePattern*>(object);
+    pattern->setImage(LayerBuilder::GetTGFXImage(*v));
+  }
+
+  static bool ReadImagePatternImage(const void* object, KeyValue* out) {
+    auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
+    *out = KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    return true;
+  }
+
+  static bool ReadSolidColor(const void* object, KeyValue* out) {
+    auto c = static_cast<const tgfx::SolidColor*>(object)->color();
+    // tgfx::Color is always sRGB, so the read-back color is reported in sRGB color space.
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
+  }
+
+  template <typename PainterType>
+  static void WritePainterColor(void* object, const KeyValue& value, float mix) {
+    auto* painter = static_cast<PainterType*>(object);
+    auto colorSource = painter->colorSource();
+    auto* solid = static_cast<tgfx::SolidColor*>(colorSource.get());
+    if (solid == nullptr) {
+      return;
+    }
+    WriteSolidColor(solid, value, mix);
+  }
+
+  template <typename PainterType>
+  static bool ReadPainterColor(const void* object, KeyValue* out) {
+    auto* painter = static_cast<const PainterType*>(object);
+    auto colorSource = painter->colorSource();
+    auto* solid = static_cast<const tgfx::SolidColor*>(colorSource.get());
+    if (solid == nullptr) {
+      return false;
+    }
+    return ReadSolidColor(solid, out);
+  }
+
   std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
@@ -1168,7 +1522,7 @@ class LayerBuilderContext {
         auto tgfxSolid = tgfx::SolidColor::Make(ToTGFX(solid->color));
         if (tgfxSolid) {
           _result.binding.set(solid, tgfxSolid);
-          _result.binding.setWriter(solid, "color", WriteSolidColor);
+          _result.binding.setAccessor(solid, "color", WriteSolidColor, ReadSolidColor);
         }
         return tgfxSolid;
       }
@@ -1236,6 +1590,33 @@ class LayerBuilderContext {
     stop->gradient->setPositions(std::move(positions));
   }
 
+  static bool ReadColorStopColor(const void* object, KeyValue* out) {
+    auto* stop = GetColorStopBinding(const_cast<void*>(object));
+    if (stop == nullptr || stop->gradient == nullptr) {
+      return false;
+    }
+    auto colors = stop->gradient->colors();
+    if (stop->index >= colors.size()) {
+      return false;
+    }
+    auto c = colors[stop->index];
+    *out = KeyValue{Color{c.red, c.green, c.blue, c.alpha}};
+    return true;
+  }
+
+  static bool ReadColorStopOffset(const void* object, KeyValue* out) {
+    auto* stop = GetColorStopBinding(const_cast<void*>(object));
+    if (stop == nullptr || stop->gradient == nullptr) {
+      return false;
+    }
+    auto positions = stop->gradient->positions();
+    if (stop->index >= positions.size()) {
+      return false;
+    }
+    *out = KeyValue{positions[stop->index]};
+    return true;
+  }
+
   void extractGradientStops(const std::vector<ColorStop*>& colorStops,
                             std::vector<tgfx::Color>* colors, std::vector<float>* positions) {
     colors->reserve(colorStops.size());
@@ -1260,14 +1641,17 @@ class LayerBuilderContext {
         stopBinding->gradient = gradient;
         stopBinding->index = index;
         _result.binding.set(colorStops[index], stopBinding);
-        _result.binding.setWriter(colorStops[index], "color", WriteColorStopColor);
-        _result.binding.setWriter(colorStops[index], "offset", WriteColorStopOffset);
+        _result.binding.setAccessor(colorStops[index], "color", WriteColorStopColor,
+                                    ReadColorStopColor);
+        _result.binding.setAccessor(colorStops[index], "offset", WriteColorStopOffset,
+                                    ReadColorStopOffset);
       }
       gradient->setFitsToGeometry(node->fitsToGeometry);
       if (!node->matrix.isIdentity()) {
         gradient->setMatrix(ToTGFX(node->matrix));
       }
     }
+
     return gradient;
   }
 
@@ -1280,22 +1664,26 @@ class LayerBuilderContext {
                                    positions),
         node, node->colorStops);
     if (result != nullptr) {
-      _result.binding.setWriter(
+      _result.binding.setAccessor(
           node, "startPoint.x",
           WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
-                         &tgfx::LinearGradient::setStartPoint, true>);
-      _result.binding.setWriter(
+                         &tgfx::LinearGradient::setStartPoint, true>,
+          ReadPointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint, true>);
+      _result.binding.setAccessor(
           node, "startPoint.y",
           WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint,
-                         &tgfx::LinearGradient::setStartPoint, false>);
-      _result.binding.setWriter(
+                         &tgfx::LinearGradient::setStartPoint, false>,
+          ReadPointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::startPoint, false>);
+      _result.binding.setAccessor(
           node, "endPoint.x",
           WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
-                         &tgfx::LinearGradient::setEndPoint, true>);
-      _result.binding.setWriter(
+                         &tgfx::LinearGradient::setEndPoint, true>,
+          ReadPointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint, true>);
+      _result.binding.setAccessor(
           node, "endPoint.y",
           WritePointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint,
-                         &tgfx::LinearGradient::setEndPoint, false>);
+                         &tgfx::LinearGradient::setEndPoint, false>,
+          ReadPointAxis<tgfx::LinearGradient, &tgfx::LinearGradient::endPoint, false>);
     }
     return result;
   }
@@ -1308,15 +1696,21 @@ class LayerBuilderContext {
         tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
     if (result != nullptr) {
-      _result.binding.setWriter(node, "center.x",
-                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
-                                               &tgfx::RadialGradient::setCenter, true>);
-      _result.binding.setWriter(node, "center.y",
-                                WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
-                                               &tgfx::RadialGradient::setCenter, false>);
-      _result.binding.setWriter(node, "radius",
-                                WriteMixedFloat<tgfx::RadialGradient, &tgfx::RadialGradient::radius,
-                                                &tgfx::RadialGradient::setRadius>);
+      _result.binding.setAccessor(
+          node, "center.x",
+          WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                         &tgfx::RadialGradient::setCenter, true>,
+          ReadPointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center, true>);
+      _result.binding.setAccessor(
+          node, "center.y",
+          WritePointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center,
+                         &tgfx::RadialGradient::setCenter, false>,
+          ReadPointAxis<tgfx::RadialGradient, &tgfx::RadialGradient::center, false>);
+      _result.binding.setAccessor(
+          node, "radius",
+          WriteMixedFloat<tgfx::RadialGradient, &tgfx::RadialGradient::radius,
+                          &tgfx::RadialGradient::setRadius>,
+          ReadScalar<tgfx::RadialGradient, &tgfx::RadialGradient::radius>);
     }
     return result;
   }
@@ -1330,19 +1724,26 @@ class LayerBuilderContext {
                                                           node->endAngle, colors, positions),
                                 node, node->colorStops);
     if (result != nullptr) {
-      _result.binding.setWriter(node, "center.x",
-                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
-                                               &tgfx::ConicGradient::setCenter, true>);
-      _result.binding.setWriter(node, "center.y",
-                                WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
-                                               &tgfx::ConicGradient::setCenter, false>);
-      _result.binding.setWriter(
+      _result.binding.setAccessor(
+          node, "center.x",
+          WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                         &tgfx::ConicGradient::setCenter, true>,
+          ReadPointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center, true>);
+      _result.binding.setAccessor(
+          node, "center.y",
+          WritePointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center,
+                         &tgfx::ConicGradient::setCenter, false>,
+          ReadPointAxis<tgfx::ConicGradient, &tgfx::ConicGradient::center, false>);
+      _result.binding.setAccessor(
           node, "startAngle",
           WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::startAngle,
-                          &tgfx::ConicGradient::setStartAngle>);
-      _result.binding.setWriter(node, "endAngle",
-                                WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::endAngle,
-                                                &tgfx::ConicGradient::setEndAngle>);
+                          &tgfx::ConicGradient::setStartAngle>,
+          ReadScalar<tgfx::ConicGradient, &tgfx::ConicGradient::startAngle>);
+      _result.binding.setAccessor(
+          node, "endAngle",
+          WriteMixedFloat<tgfx::ConicGradient, &tgfx::ConicGradient::endAngle,
+                          &tgfx::ConicGradient::setEndAngle>,
+          ReadScalar<tgfx::ConicGradient, &tgfx::ConicGradient::endAngle>);
     }
     return result;
   }
@@ -1355,18 +1756,21 @@ class LayerBuilderContext {
         tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions), node,
         node->colorStops);
     if (result != nullptr) {
-      _result.binding.setWriter(
+      _result.binding.setAccessor(
           node, "center.x",
           WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
-                         &tgfx::DiamondGradient::setCenter, true>);
-      _result.binding.setWriter(
+                         &tgfx::DiamondGradient::setCenter, true>,
+          ReadPointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center, true>);
+      _result.binding.setAccessor(
           node, "center.y",
           WritePointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center,
-                         &tgfx::DiamondGradient::setCenter, false>);
-      _result.binding.setWriter(
+                         &tgfx::DiamondGradient::setCenter, false>,
+          ReadPointAxis<tgfx::DiamondGradient, &tgfx::DiamondGradient::center, false>);
+      _result.binding.setAccessor(
           node, "radius",
           WriteMixedFloat<tgfx::DiamondGradient, &tgfx::DiamondGradient::radius,
-                          &tgfx::DiamondGradient::setRadius>);
+                          &tgfx::DiamondGradient::setRadius>,
+          ReadScalar<tgfx::DiamondGradient, &tgfx::DiamondGradient::radius>);
     }
     return result;
   }
@@ -1377,29 +1781,23 @@ class LayerBuilderContext {
     }
 
     auto imageNode = node->image;
-    std::shared_ptr<tgfx::Image> image = nullptr;
-    if (imageNode->data) {
-      image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
-    } else if (imageNode->filePath.find("data:") == 0) {
-      image = ImageFromDataURI(imageNode->filePath);
-    } else if (!imageNode->filePath.empty()) {
-      // External file path (already resolved to absolute during import)
-      image = tgfx::Image::MakeFromFile(imageNode->filePath);
-    }
-
-    if (image) {
-      _result.binding.set(imageNode, image);
-    }
-
+    auto image = getOrCreateImage(imageNode);
     if (!image) {
+      // Image data is missing for this node (never loaded or decode failed); paint nothing
+      // rather than falling back to an opaque color that would be visibly wrong.
       return nullptr;
     }
+    _result.binding.set(imageNode, image);
 
     auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
     auto pattern =
         tgfx::ImagePattern::Make(image, ToTGFX(node->tileModeX), ToTGFX(node->tileModeY), sampling);
     if (pattern) {
       _result.binding.set(node, pattern);
+      // Two-way capable: ReadImagePatternImage wraps the pattern's current tgfx::Image in a fresh
+      // PAGImage, so DataBindRuntime::syncBack compares the underlying tgfx::Image (not the wrapper
+      // identity) to decide whether the image actually changed before writing it back.
+      _result.binding.setAccessor(node, "image", WriteImagePatternImage, ReadImagePatternImage);
       if (imageNode) {
         _result.binding.trackImage(imageNode, node);
       }
@@ -1412,6 +1810,50 @@ class LayerBuilderContext {
     return pattern;
   }
 
+  std::shared_ptr<tgfx::Image> getOrCreateImage(const Image* imageNode) {
+    auto it = _imageCache.find(imageNode);
+    if (it != _imageCache.end()) {
+      return it->second;
+    }
+    // Resolution chain. Two camps of sources exist:
+    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
+    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
+    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
+    //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
+    //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
+    //      not re-decode at every zoom level.
+    std::shared_ptr<tgfx::Image> image = nullptr;
+    bool isBackendTexture = false;
+    // Priority 1: query the provider for a platform-decoded image.
+    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
+    if (provider && !imageNode->filePath.empty()) {
+      image = provider->resolveImage(imageNode->filePath);
+      if (image) {
+        isBackendTexture = true;
+      }
+    }
+    // Priority 2: fallback to standard decoding chain.
+    if (!image) {
+      if (imageNode->data) {
+        image = tgfx::Image::MakeFromEncoded(ToTGFXData(imageNode->data));
+      } else if (imageNode->filePath.find("data:") == 0) {
+        image = ImageFromDataURI(imageNode->filePath);
+      } else if (!imageNode->filePath.empty()) {
+        image = tgfx::Image::MakeFromFile(imageNode->filePath);
+      }
+    }
+    if (image && !isBackendTexture) {
+      image = image->makeMipmapped(true);
+    }
+    // Only memoize successful results. A null entry would cache the absence of a provider-
+    // resolved image forever, so a later provider update would never take effect after
+    // invalidation.
+    if (image) {
+      _imageCache[imageNode] = image;
+    }
+    return image;
+  }
+
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
     auto trim = tgfx::TrimPath::Make();
     trim->setStart(node->start);
@@ -1421,15 +1863,17 @@ class LayerBuilderContext {
       trim->setTrimType(tgfx::TrimPathType::Continuous);
     }
     _result.binding.set(node, trim);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(
         node, "start",
-        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::start, &tgfx::TrimPath::setStart>);
-    _result.binding.setWriter(
-        node, "end",
-        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::end, &tgfx::TrimPath::setEnd>);
-    _result.binding.setWriter(
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::start, &tgfx::TrimPath::setStart>,
+        ReadScalar<tgfx::TrimPath, &tgfx::TrimPath::start>);
+    _result.binding.setAccessor(
+        node, "end", WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::end, &tgfx::TrimPath::setEnd>,
+        ReadScalar<tgfx::TrimPath, &tgfx::TrimPath::end>);
+    _result.binding.setAccessor(
         node, "offset",
-        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::offset, &tgfx::TrimPath::setOffset>);
+        WriteMixedFloat<tgfx::TrimPath, &tgfx::TrimPath::offset, &tgfx::TrimPath::setOffset>,
+        ReadScalar<tgfx::TrimPath, &tgfx::TrimPath::offset>);
     return trim;
   }
 
@@ -1457,9 +1901,10 @@ class LayerBuilderContext {
     auto round = tgfx::RoundCorner::Make();
     round->setRadius(node->radius);
     _result.binding.set(node, round);
-    _result.binding.setWriter(node, "radius",
-                              WriteMixedFloat<tgfx::RoundCorner, &tgfx::RoundCorner::radius,
-                                              &tgfx::RoundCorner::setRadius>);
+    _result.binding.setAccessor(node, "radius",
+                                WriteMixedFloat<tgfx::RoundCorner, &tgfx::RoundCorner::radius,
+                                                &tgfx::RoundCorner::setRadius>,
+                                ReadScalar<tgfx::RoundCorner, &tgfx::RoundCorner::radius>);
     return round;
   }
 
@@ -1483,39 +1928,50 @@ class LayerBuilderContext {
     repeater->setStartAlpha(node->startAlpha);
     repeater->setEndAlpha(node->endAlpha);
     _result.binding.set(node, repeater);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(
         node, "copies",
-        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::copies, &tgfx::Repeater::setCopies>);
-    _result.binding.setWriter(
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::copies, &tgfx::Repeater::setCopies>,
+        ReadScalar<tgfx::Repeater, &tgfx::Repeater::copies>);
+    _result.binding.setAccessor(
         node, "offset",
-        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::offset, &tgfx::Repeater::setOffset>);
-    _result.binding.setWriter(
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::offset, &tgfx::Repeater::setOffset>,
+        ReadScalar<tgfx::Repeater, &tgfx::Repeater::offset>);
+    _result.binding.setAccessor(
         node, "rotation",
-        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::rotation, &tgfx::Repeater::setRotation>);
-    _result.binding.setWriter(node, "startAlpha",
-                              WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::startAlpha,
-                                              &tgfx::Repeater::setStartAlpha>);
-    _result.binding.setWriter(
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::rotation, &tgfx::Repeater::setRotation>,
+        ReadScalar<tgfx::Repeater, &tgfx::Repeater::rotation>);
+    _result.binding.setAccessor(node, "startAlpha",
+                                WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::startAlpha,
+                                                &tgfx::Repeater::setStartAlpha>,
+                                ReadScalar<tgfx::Repeater, &tgfx::Repeater::startAlpha>);
+    _result.binding.setAccessor(
         node, "endAlpha",
-        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::endAlpha, &tgfx::Repeater::setEndAlpha>);
-    _result.binding.setWriter(
+        WriteMixedFloat<tgfx::Repeater, &tgfx::Repeater::endAlpha, &tgfx::Repeater::setEndAlpha>,
+        ReadScalar<tgfx::Repeater, &tgfx::Repeater::endAlpha>);
+    _result.binding.setAccessor(
         node, "anchor.x",
-        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, true>);
-    _result.binding.setWriter(
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, true>,
+        ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, true>);
+    _result.binding.setAccessor(
         node, "anchor.y",
-        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, false>);
-    _result.binding.setWriter(node, "position.x",
-                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
-                                             &tgfx::Repeater::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
-                                             &tgfx::Repeater::setPosition, false>);
-    _result.binding.setWriter(
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, &tgfx::Repeater::setAnchor, false>,
+        ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::anchor, false>);
+    _result.binding.setAccessor(node, "position.x",
+                                WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                               &tgfx::Repeater::setPosition, true>,
+                                ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::position, true>);
+    _result.binding.setAccessor(node, "position.y",
+                                WritePointAxis<tgfx::Repeater, &tgfx::Repeater::position,
+                                               &tgfx::Repeater::setPosition, false>,
+                                ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::position, false>);
+    _result.binding.setAccessor(
         node, "scale.x",
-        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, true>);
-    _result.binding.setWriter(
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, true>,
+        ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::scale, true>);
+    _result.binding.setAccessor(
         node, "scale.y",
-        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, false>);
+        WritePointAxis<tgfx::Repeater, &tgfx::Repeater::scale, &tgfx::Repeater::setScale, false>,
+        ReadPointAxis<tgfx::Repeater, &tgfx::Repeater::scale, false>);
     return repeater;
   }
 
@@ -1553,6 +2009,36 @@ class LayerBuilderContext {
     modifier->setStrokeWidth(current.has_value() ? MixFloat(*current, *v, mix) : *v);
   }
 
+  // Optional-valued TextModifier readers: report the resolved value, or return false when the
+  // optional is unset so syncBack skips the channel (an unset paint property has no value to flow
+  // back into the ViewModel, and reporting a fabricated default would clobber the source).
+  static bool ReadTextModifierFillColor(const void* object, KeyValue* out) {
+    auto c = static_cast<const tgfx::TextModifier*>(object)->fillColor();
+    if (!c.has_value()) {
+      return false;
+    }
+    *out = KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    return true;
+  }
+
+  static bool ReadTextModifierStrokeColor(const void* object, KeyValue* out) {
+    auto c = static_cast<const tgfx::TextModifier*>(object)->strokeColor();
+    if (!c.has_value()) {
+      return false;
+    }
+    *out = KeyValue{Color{c->red, c->green, c->blue, c->alpha}};
+    return true;
+  }
+
+  static bool ReadTextModifierStrokeWidth(const void* object, KeyValue* out) {
+    auto w = static_cast<const tgfx::TextModifier*>(object)->strokeWidth();
+    if (!w.has_value()) {
+      return false;
+    }
+    *out = KeyValue{*w};
+    return true;
+  }
+
   std::shared_ptr<tgfx::TextModifier> convertTextModifier(const TextModifier* node) {
     auto modifier = tgfx::TextModifier::Make();
 
@@ -1577,39 +2063,58 @@ class LayerBuilderContext {
     }
 
     _result.binding.set(node, modifier);
-    _result.binding.setWriter(node, "rotation",
-                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::rotation,
-                                              &tgfx::TextModifier::setRotation>);
-    _result.binding.setWriter(node, "skew",
-                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skew,
-                                              &tgfx::TextModifier::setSkew>);
-    _result.binding.setWriter(node, "skewAxis",
-                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skewAxis,
-                                              &tgfx::TextModifier::setSkewAxis>);
-    _result.binding.setWriter(node, "alpha",
-                              WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::alpha,
-                                              &tgfx::TextModifier::setAlpha>);
-    _result.binding.setWriter(node, "anchor.x",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
-                                             &tgfx::TextModifier::setAnchor, true>);
-    _result.binding.setWriter(node, "anchor.y",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
-                                             &tgfx::TextModifier::setAnchor, false>);
-    _result.binding.setWriter(node, "position.x",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
-                                             &tgfx::TextModifier::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
-                                             &tgfx::TextModifier::setPosition, false>);
-    _result.binding.setWriter(node, "scale.x",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
-                                             &tgfx::TextModifier::setScale, true>);
-    _result.binding.setWriter(node, "scale.y",
-                              WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
-                                             &tgfx::TextModifier::setScale, false>);
-    _result.binding.setWriter(node, "fillColor", WriteTextModifierFillColor);
-    _result.binding.setWriter(node, "strokeColor", WriteTextModifierStrokeColor);
-    _result.binding.setWriter(node, "strokeWidth", WriteTextModifierStrokeWidth);
+    _result.binding.setAccessor(node, "rotation",
+                                WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::rotation,
+                                                &tgfx::TextModifier::setRotation>,
+                                ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::rotation>);
+    _result.binding.setAccessor(node, "skew",
+                                WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skew,
+                                                &tgfx::TextModifier::setSkew>,
+                                ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::skew>);
+    _result.binding.setAccessor(node, "skewAxis",
+                                WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skewAxis,
+                                                &tgfx::TextModifier::setSkewAxis>,
+                                ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::skewAxis>);
+    _result.binding.setAccessor(node, "alpha",
+                                WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::alpha,
+                                                &tgfx::TextModifier::setAlpha>,
+                                ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::alpha>);
+    _result.binding.setAccessor(
+        node, "anchor.x",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                       &tgfx::TextModifier::setAnchor, true>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor, true>);
+    _result.binding.setAccessor(
+        node, "anchor.y",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor,
+                       &tgfx::TextModifier::setAnchor, false>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::anchor, false>);
+    _result.binding.setAccessor(
+        node, "position.x",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                       &tgfx::TextModifier::setPosition, true>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::position, true>);
+    _result.binding.setAccessor(
+        node, "position.y",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::position,
+                       &tgfx::TextModifier::setPosition, false>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::position, false>);
+    _result.binding.setAccessor(
+        node, "scale.x",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                       &tgfx::TextModifier::setScale, true>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale, true>);
+    _result.binding.setAccessor(
+        node, "scale.y",
+        WritePointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale,
+                       &tgfx::TextModifier::setScale, false>,
+        ReadPointAxis<tgfx::TextModifier, &tgfx::TextModifier::scale, false>);
+    _result.binding.setAccessor(node, "fillColor", WriteTextModifierFillColor,
+                                ReadTextModifierFillColor);
+    _result.binding.setAccessor(node, "strokeColor", WriteTextModifierStrokeColor,
+                                ReadTextModifierStrokeColor);
+    _result.binding.setAccessor(node, "strokeWidth", WriteTextModifierStrokeWidth,
+                                ReadTextModifierStrokeWidth);
 
     // Convert selectors
     std::vector<std::shared_ptr<tgfx::TextSelector>> tgfxSelectors;
@@ -1630,25 +2135,35 @@ class LayerBuilderContext {
         tgfxSelector->setRandomOrder(rangeSelector->randomOrder);
         tgfxSelector->setRandomSeed(static_cast<uint16_t>(rangeSelector->randomSeed));
         _result.binding.set(rangeSelector, tgfxSelector);
-        _result.binding.setWriter(rangeSelector, "start",
-                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::start,
-                                                  &tgfx::RangeSelector::setStart>);
-        _result.binding.setWriter(rangeSelector, "end",
-                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::end,
-                                                  &tgfx::RangeSelector::setEnd>);
-        _result.binding.setWriter(rangeSelector, "offset",
-                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::offset,
-                                                  &tgfx::RangeSelector::setOffset>);
-        _result.binding.setWriter(rangeSelector, "easeIn",
-                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeIn,
-                                                  &tgfx::RangeSelector::setEaseIn>);
-        _result.binding.setWriter(
+        _result.binding.setAccessor(
+            rangeSelector, "start",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::start,
+                            &tgfx::RangeSelector::setStart>,
+            ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::start>);
+        _result.binding.setAccessor(rangeSelector, "end",
+                                    WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::end,
+                                                    &tgfx::RangeSelector::setEnd>,
+                                    ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::end>);
+        _result.binding.setAccessor(
+            rangeSelector, "offset",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::offset,
+                            &tgfx::RangeSelector::setOffset>,
+            ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::offset>);
+        _result.binding.setAccessor(
+            rangeSelector, "easeIn",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeIn,
+                            &tgfx::RangeSelector::setEaseIn>,
+            ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::easeIn>);
+        _result.binding.setAccessor(
             rangeSelector, "easeOut",
             WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::easeOut,
-                            &tgfx::RangeSelector::setEaseOut>);
-        _result.binding.setWriter(rangeSelector, "weight",
-                                  WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::weight,
-                                                  &tgfx::RangeSelector::setWeight>);
+                            &tgfx::RangeSelector::setEaseOut>,
+            ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::easeOut>);
+        _result.binding.setAccessor(
+            rangeSelector, "weight",
+            WriteMixedFloat<tgfx::RangeSelector, &tgfx::RangeSelector::weight,
+                            &tgfx::RangeSelector::setWeight>,
+            ReadScalar<tgfx::RangeSelector, &tgfx::RangeSelector::weight>);
         tgfxSelectors.push_back(tgfxSelector);
       }
     }
@@ -1707,36 +2222,49 @@ class LayerBuilderContext {
     // Register transform channels. Group and TextBox share these; the node pointer is the source
     // node passed in (TextBox passes itself), so animation targets resolve to the right binding.
     _result.binding.set(node, group);
-    _result.binding.setWriter(node, "rotation",
-                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::rotation,
-                                              &tgfx::VectorGroup::setRotation>);
-    _result.binding.setWriter(node, "alpha",
-                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::alpha,
-                                              &tgfx::VectorGroup::setAlpha>);
-    _result.binding.setWriter(
+    _result.binding.setAccessor(node, "rotation",
+                                WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::rotation,
+                                                &tgfx::VectorGroup::setRotation>,
+                                ReadScalar<tgfx::VectorGroup, &tgfx::VectorGroup::rotation>);
+    _result.binding.setAccessor(
+        node, "alpha",
+        WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::alpha, &tgfx::VectorGroup::setAlpha>,
+        ReadScalar<tgfx::VectorGroup, &tgfx::VectorGroup::alpha>);
+    _result.binding.setAccessor(
         node, "skew",
-        WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skew, &tgfx::VectorGroup::setSkew>);
-    _result.binding.setWriter(node, "skewAxis",
-                              WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skewAxis,
-                                              &tgfx::VectorGroup::setSkewAxis>);
-    _result.binding.setWriter(node, "anchor.x",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
-                                             &tgfx::VectorGroup::setAnchor, true>);
-    _result.binding.setWriter(node, "anchor.y",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
-                                             &tgfx::VectorGroup::setAnchor, false>);
-    _result.binding.setWriter(node, "position.x",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
-                                             &tgfx::VectorGroup::setPosition, true>);
-    _result.binding.setWriter(node, "position.y",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
-                                             &tgfx::VectorGroup::setPosition, false>);
-    _result.binding.setWriter(node, "scale.x",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
-                                             &tgfx::VectorGroup::setScale, true>);
-    _result.binding.setWriter(node, "scale.y",
-                              WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
-                                             &tgfx::VectorGroup::setScale, false>);
+        WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skew, &tgfx::VectorGroup::setSkew>,
+        ReadScalar<tgfx::VectorGroup, &tgfx::VectorGroup::skew>);
+    _result.binding.setAccessor(node, "skewAxis",
+                                WriteMixedFloat<tgfx::VectorGroup, &tgfx::VectorGroup::skewAxis,
+                                                &tgfx::VectorGroup::setSkewAxis>,
+                                ReadScalar<tgfx::VectorGroup, &tgfx::VectorGroup::skewAxis>);
+    _result.binding.setAccessor(node, "anchor.x",
+                                WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor,
+                                               &tgfx::VectorGroup::setAnchor, true>,
+                                ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor, true>);
+    _result.binding.setAccessor(
+        node, "anchor.y",
+        WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor, &tgfx::VectorGroup::setAnchor,
+                       false>,
+        ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::anchor, false>);
+    _result.binding.setAccessor(
+        node, "position.x",
+        WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                       &tgfx::VectorGroup::setPosition, true>,
+        ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position, true>);
+    _result.binding.setAccessor(
+        node, "position.y",
+        WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position,
+                       &tgfx::VectorGroup::setPosition, false>,
+        ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::position, false>);
+    _result.binding.setAccessor(node, "scale.x",
+                                WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                               &tgfx::VectorGroup::setScale, true>,
+                                ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale, true>);
+    _result.binding.setAccessor(node, "scale.y",
+                                WritePointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale,
+                                               &tgfx::VectorGroup::setScale, false>,
+                                ReadPointAxis<tgfx::VectorGroup, &tgfx::VectorGroup::scale, false>);
 
     return group;
   }
@@ -1795,6 +2323,7 @@ class LayerBuilderContext {
     }
 
     // Layer filters
+#if !PAG_DISABLE_LAYER_FILTERS
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
     filters.reserve(node->filters.size());
     for (const auto& filter : node->filters) {
@@ -1806,6 +2335,7 @@ class LayerBuilderContext {
     if (!filters.empty()) {
       layer->setFilters(filters);
     }
+#endif  // !PAG_DISABLE_LAYER_FILTERS
   }
 
   std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
@@ -1815,6 +2345,9 @@ class LayerBuilderContext {
 
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const DropShadowStyle*>(node);
         auto tgfxStyle =
             tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
@@ -1825,8 +2358,12 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindDropShadowStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::InnerShadowStyle: {
+#if PAG_DISABLE_SHADOW_STYLES
+        return nullptr;
+#else
         auto style = static_cast<const InnerShadowStyle*>(node);
         auto tgfxStyle = tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
                                                       style->blurY, ToTGFX(style->color));
@@ -1836,8 +2373,12 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindInnerShadowStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::BackgroundBlurStyle: {
+#if PAG_DISABLE_BACKGROUND_BLUR_STYLE
+        return nullptr;
+#else
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
         auto tgfxStyle =
             tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY, ToTGFX(style->tileMode));
@@ -1847,6 +2388,7 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindBackgroundBlurStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::NoiseStyle: {
         auto style = static_cast<const pagx::NoiseStyle*>(node);
@@ -1936,12 +2478,22 @@ class LayerBuilderContext {
   }
 
   void bindDropShadowStyleChannels(const DropShadowStyle* node) {
-    _result.binding.setWriter(node, "offsetX", WriteDropShadowStyleOffsetX);
-    _result.binding.setWriter(node, "offsetY", WriteDropShadowStyleOffsetY);
-    _result.binding.setWriter(node, "blurX", WriteDropShadowStyleBlurX);
-    _result.binding.setWriter(node, "blurY", WriteDropShadowStyleBlurY);
-    _result.binding.setWriter(node, "color", WriteDropShadowStyleColor);
-    _result.binding.setWriter(node, "showBehindLayer", WriteDropShadowStyleShowBehindLayer);
+    _result.binding.setAccessor(node, "offsetX", WriteDropShadowStyleOffsetX,
+                                ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::offsetX>);
+    _result.binding.setAccessor(node, "offsetY", WriteDropShadowStyleOffsetY,
+                                ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::offsetY>);
+    _result.binding.setAccessor(
+        node, "blurX", WriteDropShadowStyleBlurX,
+        ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::blurrinessX>);
+    _result.binding.setAccessor(
+        node, "blurY", WriteDropShadowStyleBlurY,
+        ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::blurrinessY>);
+    _result.binding.setAccessor(
+        node, "color", WriteDropShadowStyleColor,
+        ReadColorChannel<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::color>);
+    _result.binding.setAccessor(
+        node, "showBehindLayer", WriteDropShadowStyleShowBehindLayer,
+        ReadBoolean<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::showBehindLayer>);
   }
 
   static void WriteInnerShadowStyleOffsetX(void* object, const KeyValue& value, float mix) {
@@ -1991,11 +2543,21 @@ class LayerBuilderContext {
   }
 
   void bindInnerShadowStyleChannels(const InnerShadowStyle* node) {
-    _result.binding.setWriter(node, "offsetX", WriteInnerShadowStyleOffsetX);
-    _result.binding.setWriter(node, "offsetY", WriteInnerShadowStyleOffsetY);
-    _result.binding.setWriter(node, "blurX", WriteInnerShadowStyleBlurX);
-    _result.binding.setWriter(node, "blurY", WriteInnerShadowStyleBlurY);
-    _result.binding.setWriter(node, "color", WriteInnerShadowStyleColor);
+    _result.binding.setAccessor(
+        node, "offsetX", WriteInnerShadowStyleOffsetX,
+        ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::offsetX>);
+    _result.binding.setAccessor(
+        node, "offsetY", WriteInnerShadowStyleOffsetY,
+        ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::offsetY>);
+    _result.binding.setAccessor(
+        node, "blurX", WriteInnerShadowStyleBlurX,
+        ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::blurrinessX>);
+    _result.binding.setAccessor(
+        node, "blurY", WriteInnerShadowStyleBlurY,
+        ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::blurrinessY>);
+    _result.binding.setAccessor(
+        node, "color", WriteInnerShadowStyleColor,
+        ReadColorChannel<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::color>);
   }
 
   static void WriteBackgroundBlurStyleBlurX(void* object, const KeyValue& value, float mix) {
@@ -2017,8 +2579,12 @@ class LayerBuilderContext {
   }
 
   void bindBackgroundBlurStyleChannels(const BackgroundBlurStyle* node) {
-    _result.binding.setWriter(node, "blurX", WriteBackgroundBlurStyleBlurX);
-    _result.binding.setWriter(node, "blurY", WriteBackgroundBlurStyleBlurY);
+    _result.binding.setAccessor(
+        node, "blurX", WriteBackgroundBlurStyleBlurX,
+        ReadScalar<tgfx::BackgroundBlurStyle, &tgfx::BackgroundBlurStyle::blurrinessX>);
+    _result.binding.setAccessor(
+        node, "blurY", WriteBackgroundBlurStyleBlurY,
+        ReadScalar<tgfx::BackgroundBlurStyle, &tgfx::BackgroundBlurStyle::blurrinessY>);
   }
 
   static void WriteNoiseStyleSize(void* object, const KeyValue& value, float mix) {
@@ -2088,19 +2654,30 @@ class LayerBuilderContext {
   }
 
   void bindNoiseStyleChannels(const pagx::NoiseStyle* node) {
-    _result.binding.setWriter(node, "size", WriteNoiseStyleSize);
-    _result.binding.setWriter(node, "density", WriteNoiseStyleDensity);
-    _result.binding.setWriter(node, "seed", WriteNoiseStyleSeed);
+    _result.binding.setAccessor(node, "size", WriteNoiseStyleSize,
+                                ReadScalar<tgfx::NoiseStyle, &tgfx::NoiseStyle::size>);
+    _result.binding.setAccessor(node, "density", WriteNoiseStyleDensity,
+                                ReadScalar<tgfx::NoiseStyle, &tgfx::NoiseStyle::density>);
+    _result.binding.setAccessor(node, "seed", WriteNoiseStyleSeed,
+                                ReadScalar<tgfx::NoiseStyle, &tgfx::NoiseStyle::seed>);
     switch (node->mode) {
       case NoiseMode::Mono:
-        _result.binding.setWriter(node, "color", WriteNoiseStyleColor);
+        _result.binding.setAccessor(
+            node, "color", WriteNoiseStyleColor,
+            ReadColorChannel<tgfx::MonoNoiseStyle, &tgfx::MonoNoiseStyle::color>);
         break;
       case NoiseMode::Duo:
-        _result.binding.setWriter(node, "firstColor", WriteNoiseStyleFirstColor);
-        _result.binding.setWriter(node, "secondColor", WriteNoiseStyleSecondColor);
+        _result.binding.setAccessor(
+            node, "firstColor", WriteNoiseStyleFirstColor,
+            ReadColorChannel<tgfx::DuoNoiseStyle, &tgfx::DuoNoiseStyle::firstColor>);
+        _result.binding.setAccessor(
+            node, "secondColor", WriteNoiseStyleSecondColor,
+            ReadColorChannel<tgfx::DuoNoiseStyle, &tgfx::DuoNoiseStyle::secondColor>);
         break;
       case NoiseMode::Multi:
-        _result.binding.setWriter(node, "opacity", WriteNoiseStyleOpacity);
+        _result.binding.setAccessor(
+            node, "opacity", WriteNoiseStyleOpacity,
+            ReadScalar<tgfx::MultiNoiseStyle, &tgfx::MultiNoiseStyle::opacity>);
         break;
     }
   }
@@ -2124,8 +2701,10 @@ class LayerBuilderContext {
   }
 
   void bindBlurFilterChannels(const BlurFilter* node) {
-    _result.binding.setWriter(node, "blurX", WriteBlurFilterX);
-    _result.binding.setWriter(node, "blurY", WriteBlurFilterY);
+    _result.binding.setAccessor(node, "blurX", WriteBlurFilterX,
+                                ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessX>);
+    _result.binding.setAccessor(node, "blurY", WriteBlurFilterY,
+                                ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessY>);
   }
 
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
@@ -2183,12 +2762,24 @@ class LayerBuilderContext {
   }
 
   void bindDropShadowFilterChannels(const DropShadowFilter* node) {
-    _result.binding.setWriter(node, "offsetX", WriteDropShadowFilterOffsetX);
-    _result.binding.setWriter(node, "offsetY", WriteDropShadowFilterOffsetY);
-    _result.binding.setWriter(node, "blurX", WriteDropShadowFilterBlurX);
-    _result.binding.setWriter(node, "blurY", WriteDropShadowFilterBlurY);
-    _result.binding.setWriter(node, "color", WriteDropShadowFilterColor);
-    _result.binding.setWriter(node, "shadowOnly", WriteDropShadowFilterShadowOnly);
+    _result.binding.setAccessor(
+        node, "offsetX", WriteDropShadowFilterOffsetX,
+        ReadScalar<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::offsetX>);
+    _result.binding.setAccessor(
+        node, "offsetY", WriteDropShadowFilterOffsetY,
+        ReadScalar<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::offsetY>);
+    _result.binding.setAccessor(
+        node, "blurX", WriteDropShadowFilterBlurX,
+        ReadScalar<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::blurrinessX>);
+    _result.binding.setAccessor(
+        node, "blurY", WriteDropShadowFilterBlurY,
+        ReadScalar<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::blurrinessY>);
+    _result.binding.setAccessor(
+        node, "color", WriteDropShadowFilterColor,
+        ReadColorChannel<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::color>);
+    _result.binding.setAccessor(
+        node, "shadowOnly", WriteDropShadowFilterShadowOnly,
+        ReadBoolean<tgfx::DropShadowFilter, &tgfx::DropShadowFilter::dropsShadowOnly>);
   }
 
   static void WriteInnerShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
@@ -2246,12 +2837,24 @@ class LayerBuilderContext {
   }
 
   void bindInnerShadowFilterChannels(const InnerShadowFilter* node) {
-    _result.binding.setWriter(node, "offsetX", WriteInnerShadowFilterOffsetX);
-    _result.binding.setWriter(node, "offsetY", WriteInnerShadowFilterOffsetY);
-    _result.binding.setWriter(node, "blurX", WriteInnerShadowFilterBlurX);
-    _result.binding.setWriter(node, "blurY", WriteInnerShadowFilterBlurY);
-    _result.binding.setWriter(node, "color", WriteInnerShadowFilterColor);
-    _result.binding.setWriter(node, "shadowOnly", WriteInnerShadowFilterShadowOnly);
+    _result.binding.setAccessor(
+        node, "offsetX", WriteInnerShadowFilterOffsetX,
+        ReadScalar<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::offsetX>);
+    _result.binding.setAccessor(
+        node, "offsetY", WriteInnerShadowFilterOffsetY,
+        ReadScalar<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::offsetY>);
+    _result.binding.setAccessor(
+        node, "blurX", WriteInnerShadowFilterBlurX,
+        ReadScalar<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::blurrinessX>);
+    _result.binding.setAccessor(
+        node, "blurY", WriteInnerShadowFilterBlurY,
+        ReadScalar<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::blurrinessY>);
+    _result.binding.setAccessor(
+        node, "color", WriteInnerShadowFilterColor,
+        ReadColorChannel<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::color>);
+    _result.binding.setAccessor(
+        node, "shadowOnly", WriteInnerShadowFilterShadowOnly,
+        ReadBoolean<tgfx::InnerShadowFilter, &tgfx::InnerShadowFilter::innerShadowOnly>);
   }
 
   static void WriteBlendFilterColor(void* object, const KeyValue& value, float mix) {
@@ -2265,7 +2868,8 @@ class LayerBuilderContext {
   }
 
   void bindBlendFilterChannels(const BlendFilter* node) {
-    _result.binding.setWriter(node, "color", WriteBlendFilterColor);
+    _result.binding.setAccessor(node, "color", WriteBlendFilterColor,
+                                ReadColorChannel<tgfx::BlendFilter, &tgfx::BlendFilter::color>);
   }
 
   static void WriteNoiseFilterSize(void* object, const KeyValue& value, float mix) {
@@ -2335,19 +2939,30 @@ class LayerBuilderContext {
   }
 
   void bindNoiseFilterChannels(const pagx::NoiseFilter* node) {
-    _result.binding.setWriter(node, "size", WriteNoiseFilterSize);
-    _result.binding.setWriter(node, "density", WriteNoiseFilterDensity);
-    _result.binding.setWriter(node, "seed", WriteNoiseFilterSeed);
+    _result.binding.setAccessor(node, "size", WriteNoiseFilterSize,
+                                ReadScalar<tgfx::NoiseFilter, &tgfx::NoiseFilter::size>);
+    _result.binding.setAccessor(node, "density", WriteNoiseFilterDensity,
+                                ReadScalar<tgfx::NoiseFilter, &tgfx::NoiseFilter::density>);
+    _result.binding.setAccessor(node, "seed", WriteNoiseFilterSeed,
+                                ReadScalar<tgfx::NoiseFilter, &tgfx::NoiseFilter::seed>);
     switch (node->mode) {
       case NoiseMode::Mono:
-        _result.binding.setWriter(node, "color", WriteNoiseFilterColor);
+        _result.binding.setAccessor(
+            node, "color", WriteNoiseFilterColor,
+            ReadColorChannel<tgfx::MonoNoiseFilter, &tgfx::MonoNoiseFilter::color>);
         break;
       case NoiseMode::Duo:
-        _result.binding.setWriter(node, "firstColor", WriteNoiseFilterFirstColor);
-        _result.binding.setWriter(node, "secondColor", WriteNoiseFilterSecondColor);
+        _result.binding.setAccessor(
+            node, "firstColor", WriteNoiseFilterFirstColor,
+            ReadColorChannel<tgfx::DuoNoiseFilter, &tgfx::DuoNoiseFilter::firstColor>);
+        _result.binding.setAccessor(
+            node, "secondColor", WriteNoiseFilterSecondColor,
+            ReadColorChannel<tgfx::DuoNoiseFilter, &tgfx::DuoNoiseFilter::secondColor>);
         break;
       case NoiseMode::Multi:
-        _result.binding.setWriter(node, "opacity", WriteNoiseFilterOpacity);
+        _result.binding.setAccessor(
+            node, "opacity", WriteNoiseFilterOpacity,
+            ReadScalar<tgfx::MultiNoiseFilter, &tgfx::MultiNoiseFilter::opacity>);
         break;
     }
   }
@@ -2426,6 +3041,8 @@ class LayerBuilderContext {
     }
   }
 
+  std::unordered_map<const Layer*, std::vector<std::shared_ptr<tgfx::Layer>>>
+      _tgfxLayersByPagxLayer = {};
   struct PathCacheKey {
     const PathData* data;
     float scale;
@@ -2444,6 +3061,22 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  // Maps pagx Image node pointers to their tgfx::Image wrappers. The raw pointer keys are stable
+  // as long as the document's node vector is not structurally modified. If the document undergoes
+  // structural changes (node additions/removals via notifyChange), callers must call
+  // invalidateAllImages() to prevent dangling-pointer lookups.
+  const PAGXDocument* _document = nullptr;
+  std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
+  // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
+  // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
+  // Sharing the same TextBlob shared_ptr across many Text nodes is what reclaims the bulk of
+  // the per-Text glyph-path memory cost we observed at 0% reuse before the cache was added.
+  struct TextBlobCacheEntry {
+    size_t glyphSum = 0;
+    std::shared_ptr<tgfx::TextBlob> textBlob;
+    std::vector<tgfx::Point> anchors;
+  };
+  std::unordered_map<uint64_t, TextBlobCacheEntry> _textBlobCache = {};
   bool _needsRuntimeData = false;
 };
 
@@ -2479,6 +3112,85 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
   return context.buildWithMap(*document);
 }
 
+// LayerBuilderSession PImpl: owns the LayerBuilderContext and a non-owning pointer back to the
+// PAGXDocument so rebuildForFilePath() can re-enumerate Image nodes and affected layers.
+// Lifetime guarantee: PAGXView always destroys builderSession before document (both in
+// parsePAGX() and in the destructor's member destruction order), so this pointer never dangles.
+struct LayerBuilderSession::Impl {
+  LayerBuilderContext context;
+  PAGXDocument* document = nullptr;
+};
+
+LayerBuilderSession::LayerBuilderSession() : impl(std::make_unique<Impl>()) {
+}
+
+LayerBuilderSession::~LayerBuilderSession() = default;
+
+LayerBuildResult LayerBuilderSession::build(PAGXDocument* document) {
+  if (document == nullptr) {
+    return {};
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE(
+        "LayerBuilderSession::build() called before applyLayout(). Call "
+        "document->applyLayout() first.");
+    DEBUG_ASSERT(false);
+    return {};
+  }
+  impl->document = document;
+  return impl->context.buildWithMap(*document);
+}
+
+void LayerBuilderSession::invalidateAllImages() {
+  impl->context.invalidateAllImages();
+}
+
+size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
+  if (!impl->document || filePath.empty()) {
+    return 0;
+  }
+  // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
+  // into convertImagePattern() re-queries the provider for the updated image.
+  impl->context.invalidateImagesByFilePath(*impl->document, filePath);
+
+  const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  if (affectedLayers.empty()) {
+    return 0;
+  }
+  size_t rebuiltCount = 0;
+  for (const auto* pagxLayer : affectedLayers) {
+    auto tgfxLayers = impl->context.getTgfxLayers(pagxLayer);
+    for (const auto& tgfxLayer : tgfxLayers) {
+      if (impl->context.rebuildVectorContents(pagxLayer, tgfxLayer.get())) {
+        ++rebuiltCount;
+      }
+    }
+  }
+  return rebuiltCount;
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayersByImageFilePath(
+    const std::string& filePath) const {
+  if (!impl->document || filePath.empty()) {
+    return {};
+  }
+  const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
+  if (affectedLayers.empty()) {
+    return {};
+  }
+  std::vector<std::shared_ptr<tgfx::Layer>> result;
+  for (const auto* pagxLayer : affectedLayers) {
+    auto tgfxLayers = impl->context.getTgfxLayers(pagxLayer);
+    result.insert(result.end(), tgfxLayers.begin(), tgfxLayers.end());
+  }
+  return result;
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilderSession::getTgfxLayers(
+    const Layer* pagxLayer) const {
+  return impl->context.getTgfxLayers(pagxLayer);
+}
+
 LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
   if (document == nullptr) {
     return {};
@@ -2505,23 +3217,37 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   return context.buildSubtree(composition);
 }
 
-bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding) {
+bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                       const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return false;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.refreshLayerInPlace(node, binding);
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
-                                                          RuntimeBinding* binding) {
+                                                          RuntimeBinding* binding,
+                                                          const PAGXDocument* document) {
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
   LayerBuilderContext context;
   context.setNeedsRuntimeData(true);
+  context.setDocument(document);
   return context.buildLayerInto(node, binding);
 }
 
+std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
+}
+
+std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
+}
 }  // namespace pagx

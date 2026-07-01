@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: uniform gradient text falls back to solid color. -->
+<pagx width="160" height="48">
+  <Layer width="160" height="48">
+    <Group>
+      <Text text="Done" fontFamily="PingFang SC" fontSize="14"/>
+      <Fill>
+        <LinearGradient matrix="2,0,0,2,0,0">
+          <ColorStop offset="0" color="#999999"/>
+          <ColorStop offset="1" color="#999999"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+    <TextBox lineHeight="24"/>
+  </Layer>
+</pagx>

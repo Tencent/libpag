@@ -18,13 +18,16 @@
 
 #include "pagx/SVGExporter.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -42,6 +45,7 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -74,11 +78,13 @@
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
+using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 using SVGBuilder = XMLBuilder;
 
@@ -87,6 +93,34 @@ using SVGBuilder = XMLBuilder;
 //==============================================================================
 // Utility types and static helpers
 //==============================================================================
+
+// Appends a CSS inline-style entry "name:value;" to the given style string.
+// Centralizes the colon/semicolon punctuation so call sites stay free of literal
+// separators and the property/value pair is the only thing the reader has to look at.
+static void AppendStyleEntry(std::string& style, const char* name, const std::string& value) {
+  style += name;
+  style += ':';
+  style += value;
+  style += ';';
+}
+
+// Joins floats formatted via FloatToString with a single-character separator. Used
+// for matrix(a,b,c,d,e,f), feColorMatrix values, and shadow color rows where the
+// repeated `result += FloatToString(...); result += sep;` pattern obscured intent.
+static std::string JoinFloats(const float* values, size_t count, char separator) {
+  std::string result;
+  if (count == 0) {
+    return result;
+  }
+  result.reserve(count * 12);
+  for (size_t i = 0; i < count; i++) {
+    if (i > 0) {
+      result += separator;
+    }
+    result += FloatToString(values[i]);
+  }
+  return result;
+}
 
 // Returns only the RGB hex string (#RRGGBB). Alpha is handled separately via
 // fill-opacity/stroke-opacity attributes, following standard SVG practice.
@@ -102,8 +136,8 @@ static std::string ColorToSVGString(const Color& color) {
 // Emits a CSS color(display-p3 ...) value. Only used when the color source has
 // Display P3 color space values; sRGB colors use the standard #RRGGBB format.
 static std::string ColorToDisplayP3String(const Color& color) {
-  return "color(display-p3 " + FloatToString(color.red) + " " + FloatToString(color.green) + " " +
-         FloatToString(color.blue) + ")";
+  float channels[3] = {color.red, color.green, color.blue};
+  return "color(display-p3 " + JoinFloats(channels, 3, ' ') + ")";
 }
 
 // feGaussianBlur stdDeviation string: one value when blurX == blurY, otherwise two.
@@ -131,9 +165,7 @@ static void AppendBlendModeStyle(std::string& styleStr, BlendMode mode) {
   if (!blendStr) {
     return;
   }
-  styleStr += "mix-blend-mode:";
-  styleStr += blendStr;
-  styleStr += ';';
+  AppendStyleEntry(styleStr, "mix-blend-mode", blendStr);
 }
 
 // Appends Display P3 color via CSS color() function when the color source has
@@ -151,18 +183,11 @@ static void AppendP3ColorStyle(std::string& styleStr, const char* property,
   if (solid->color.colorSpace != ColorSpace::DisplayP3) {
     return;
   }
-  styleStr += property;
-  styleStr += ':';
-  styleStr += srgbHex;
-  styleStr += ';';
-  styleStr += property;
-  styleStr += ':';
-  styleStr += ColorToDisplayP3String(solid->color);
-  styleStr += ';';
-  styleStr += property;
-  styleStr += "-opacity:";
-  styleStr += FloatToString(effectiveAlpha);
-  styleStr += ';';
+  AppendStyleEntry(styleStr, property, srgbHex);
+  AppendStyleEntry(styleStr, property, ColorToDisplayP3String(solid->color));
+  std::string opacityProp = property;
+  opacityProp += "-opacity";
+  AppendStyleEntry(styleStr, opacityProp.c_str(), FloatToString(effectiveAlpha));
 }
 
 static std::string MatrixToSVGTransform(const Matrix& matrix) {
@@ -173,22 +198,8 @@ static std::string MatrixToSVGTransform(const Matrix& matrix) {
   // [a c e]   [scaleX skewX  transX]
   // [b d f] = [skewY  scaleY transY]
   // [0 0 1]   [0      0      1     ]
-  std::string result;
-  result.reserve(80);
-  result += "matrix(";
-  result += FloatToString(matrix.a);
-  result += ',';
-  result += FloatToString(matrix.b);
-  result += ',';
-  result += FloatToString(matrix.c);
-  result += ',';
-  result += FloatToString(matrix.d);
-  result += ',';
-  result += FloatToString(matrix.tx);
-  result += ',';
-  result += FloatToString(matrix.ty);
-  result += ')';
-  return result;
+  float values[6] = {matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty};
+  return "matrix(" + JoinFloats(values, 6, ',') + ")";
 }
 
 // Returns true when the painter's color source is a gradient (of any kind).
@@ -212,6 +223,39 @@ static bool IsGradientSource(const ColorSource* source) {
     default:
       return false;
   }
+}
+
+// Returns true when `family` matches the unquoted CSS <custom-ident> grammar: ASCII letters,
+// digits, hyphen, underscore, with the first character being a letter or underscore. Such
+// identifiers can be emitted directly as `font-family="<name>"` without quotes; anything else
+// must be wrapped in quotes and CSS-escaped to keep the SVG attribute well-formed.
+static bool IsCssCustomIdent(const std::string& family) {
+  if (family.empty()) {
+    return false;
+  }
+  auto first = static_cast<unsigned char>(family[0]);
+  if (!(std::isalpha(first) || first == '_')) {
+    return false;
+  }
+  for (size_t i = 1; i < family.size(); ++i) {
+    auto c = static_cast<unsigned char>(family[i]);
+    if (!(std::isalnum(c) || c == '-' || c == '_')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Wraps `family` in single quotes when needed so it can safely sit inside an SVG attribute.
+// Unquoted CSS <custom-ident> values (the WOFF2 generator's "pagx-font-<id>" pattern matches
+// this) avoid the XMLBuilder turning `'` into `&apos;`, which Inkscape / Preview / older SVG
+// libs sometimes choke on. Anything else gets EscapeCssFontFamily so a hostile or accidental
+// special character cannot break out of the attribute context.
+static std::string QuoteFontFamilyIfNeeded(const std::string& family) {
+  if (IsCssCustomIdent(family)) {
+    return family;
+  }
+  return "'" + EscapeCssFontFamily(family) + "'";
 }
 
 // Detects an image MIME type from the leading bytes of the encoded stream so that
@@ -282,6 +326,50 @@ class SVGWriterContext {
     return prefix + std::to_string(nextDefId++);
   }
 
+  // Font* → Woff2FontResult mapping. Populated by SVGExporter::ToSVG's pre-processing pass for
+  // every embedded vector Font resource. emitGeometryWithFs checks this mapping to decide whether
+  // to render Text via the WOFF2 <text> path or fall back to the SVG <path> outline path.
+  // The relativeUrl field stores a `data:font/woff2;base64,...` URI so each SVG is self-contained.
+  // `woff2FontOrder` records the registration order so @font-face rules are emitted
+  // deterministically across runs — iterating the unordered_map directly would expose pointer-hash
+  // ordering which varies with ASLR and breaks byte-stable SVG diffs.
+  std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
+  std::vector<const Font*> woff2FontOrder = {};
+
+  // Layer → owning parent layer mapping. Built lazily once per export by ensureLayerParentMap
+  // walking the document tree, and used by writeMaskDef/writeClipPathDef to detect when a mask
+  // reference crosses a parent boundary. Cross-parent references surface a warning so consumers
+  // see the divergence between SVG mask placement (mask->matrix only) and the PAGX renderer's
+  // mask->getRelativeMatrix3D(owner) — emission itself is preserved so cross-parent owners are
+  // not silently dropped.
+  std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
+  bool layerParentMapReady = false;
+
+  // (mask layer, MaskType) → def-id cache. A single mask Layer can be referenced by many owners
+  // (PAGX allows it explicitly), and without this cache `<mask>` / `<clipPath>` definitions get
+  // re-emitted into <defs> on every reference, producing duplicate `id` values with undefined
+  // browser behaviour. The MaskType axis matters because the three values map to materially
+  // different SVG output: Alpha and Luminance both emit `<mask>` but differ in `mask-type`
+  // (alpha uses the alpha channel; luminance uses brightness, the SVG default), while Contour
+  // emits `<clipPath>` (geometry-only inside/outside test). Without keying on MaskType, the
+  // second reference for a layer used in two roles would silently inherit the first role's def
+  // — a luminance owner would render an alpha mask, a contour owner would receive a path mask
+  // — with no warning. The cache fast-paths every subsequent reference: same Layer + same
+  // MaskType reuses the original def-id and skips the second emission entirely.
+  struct MaskDefKey {
+    const Layer* layer;
+    MaskType maskType;
+    bool operator==(const MaskDefKey& other) const {
+      return layer == other.layer && maskType == other.maskType;
+    }
+  };
+  struct MaskDefKeyHash {
+    size_t operator()(const MaskDefKey& k) const noexcept {
+      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.maskType) << 1);
+    }
+  };
+  std::unordered_map<MaskDefKey, std::string, MaskDefKeyHash> emittedMaskDefs = {};
+
  private:
   int nextDefId = 0;
 };
@@ -351,12 +439,17 @@ class SVGWriter {
 
   // Layer / element writing
   void writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform = {},
-                          float alpha = 1.0f);
+                          float alpha = 1.0f,
+                          LayerPlacement targetPlacement = LayerPlacement::Background,
+                          bool acceptAnyPlacement = false);
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr);
+                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr,
+                     LayerPlacement targetPlacement = LayerPlacement::Background,
+                     bool acceptAnyPlacement = false);
   void processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
                           const Matrix& transform, float alpha, const TextBox* parentTextBox,
-                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart);
+                          std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                          LayerPlacement targetPlacement, bool acceptAnyPlacement);
   void emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
                           const FillStrokeInfo& fs, float alpha);
 
@@ -371,6 +464,12 @@ class SVGWriter {
                  float alpha);
   void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha);
+  // WOFF2 path: renders pre-shaped GlyphRun glyphs as a real <text> element referencing the
+  // generated @font-face font, using PUA Unicode characters mapped 1:1 to glyph IDs. Returns
+  // false when the run cannot be losslessly expressed as <text> (per-glyph scales / skews,
+  // bitmap font, or every glyph is GID 0); the caller falls back to writeTextAsPath in that case.
+  bool writeTextAsFont(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
+                       float alpha, const Woff2FontResult& fontResult);
   void writeTextWithLayout(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                            const TextLayoutResult& layoutResult, const Matrix& m, float alpha);
   void writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
@@ -435,26 +534,39 @@ class SVGWriter {
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
-  std::string writeMaskOrClipDef(const Layer* maskLayer, const char* tag, const char* idPrefix,
-                                 ContentWriter writer, MaskType maskType = MaskType::Contour);
+  std::string writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
                                      const Matrix& parentMatrix = {});
-  std::string writeMaskDef(const Layer* maskLayer, MaskType maskType = MaskType::Alpha);
-  std::string writeClipPathDef(const Layer* maskLayer);
+  std::string writeMaskDef(const Layer* maskLayer, const Layer* owner,
+                           MaskType maskType = MaskType::Alpha);
+  std::string writeClipPathDef(const Layer* maskLayer, const Layer* owner);
+  // Lazily builds and caches `_context->layerParentMap` covering the entire document tree on
+  // the first call, then returns the parent layer of `layer` (or nullptr for top-level layers /
+  // layers not reachable from any composition). Used by writeMaskDef/writeClipPathDef to detect
+  // cross-parent mask references; the SVG output assumes the mask shares the owner's parent
+  // space and would silently misplace the mask otherwise, so a warning is surfaced via
+  // addWarning when a cross-parent reference is detected.
+  const Layer* findLayerParent(const Layer* layer);
   // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
   // Caller wires the id onto the group as clip-path="url(#...)".
   std::string writeScrollRectClipDef(const Layer* layer);
   // Writes the non-content attributes of a layer's <g> (id, data-*, transform,
   // opacity, style, filter, mask/clipPath, scrollRect clip). Geometry and child
   // layers are emitted separately after closeElementStart() in writeLayer.
-  // `emitScrollClipHere` is false when the caller will emit the scrollRect
-  // clip-path on a deferred middle <g> wrapper to avoid colliding with a
-  // contour-mask clip-path on the same element (both share the SVG `clip-path`
-  // attribute, so writing both onto the outer <g> drops the first).
-  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
-                                 bool emitScrollClipHere = true);
+  // Used for the no-mask path that emits a single <g>; with a mask the writer
+  // splits attributes across an outer/inner pair via the helpers below.
+  void writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer);
+  // Outer-<g> attributes (no transform). These are interpreted in the layer's
+  // *parent* coordinate space — crucial for mask/clip-path so the mask
+  // userSpaceOnUse coordinates land in the same space tgfx evaluates the
+  // mask in (Layer::getMaskData uses mask->getRelativeMatrix3D(owner), which
+  // resolves to the parent space when mask and owner share a parent).
+  void writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer);
+  // Inner-<g> attributes (transform + scrollRect clip). Applied below the
+  // outer <g> so the layer's own transform never reinterprets the mask.
+  void writeLayerInnerAttributes(SVGBuilder& out, const Layer* layer);
   // Emits contents + composition layers + child layers. Used both for the
   // needs-group path (inside the <g>) and for the bare-through path.
   void writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha = 1.0f);
@@ -468,6 +580,12 @@ class SVGWriter {
                            std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
   void applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke, const Rect& shapeBounds = {},
                              std::string* p3Style = nullptr, float alphaMultiplier = 1.0f);
+  // Shared paint-color emission for both fill and stroke. Writes the paint attribute
+  // (e.g. "fill") plus its "-opacity" sibling and accumulates the Display P3 / blend-mode
+  // CSS fragments into p3Style. Centralizes the alpha math and the default-#000000 rule.
+  void applyPaintColor(SVGBuilder& out, const char* paintAttr, const ColorSource* color,
+                       float painterAlpha, BlendMode blendMode, const Rect& shapeBounds,
+                       float alphaMultiplier, std::string* p3Style);
   // Writes fill, stroke, and the optional collected P3 style fragment as SVG attributes.
   // Every geometry writer ends with this three-call sequence so keeping it together
   // avoids forgetting a step and makes the painter apply order explicit.
@@ -874,6 +992,9 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", inResult);
   _defs->addAttribute("type", "matrix");
+  // feColorMatrix row form: r g b a t — each row outputs <ch>*alpha + t.
+  // Here we drive only the constant column with the flood color so the source
+  // alpha is preserved in the output alpha channel.
   std::string values;
   values.reserve(80);
   values += "0 0 0 0 ";
@@ -933,15 +1054,7 @@ void SVGWriter::writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMa
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", currentSource);
   _defs->addAttribute("type", "matrix");
-  std::string values;
-  values.reserve(200);
-  for (size_t i = 0; i < cm->matrix.size(); i++) {
-    if (i > 0) {
-      values += " ";
-    }
-    values += FloatToString(cm->matrix[i]);
-  }
-  _defs->addAttribute("values", values);
+  _defs->addAttribute("values", JoinFloats(cm->matrix.data(), cm->matrix.size(), ' '));
   _defs->addAttribute("result", resultName);
   _defs->closeElementSelfClosing();
   currentSource = resultName;
@@ -1592,10 +1705,52 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* tag,
-                                          const char* idPrefix, ContentWriter writer,
-                                          MaskType maskType) {
-  std::string defId = maskLayer->id.empty() ? generateId(idPrefix) : maskLayer->id;
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
+  // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
+  // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements
+  // with the same id in <defs>, which is undefined per the SVG spec — browsers typically use
+  // the first and silently ignore the rest, but a regression that changes emission order would
+  // re-wire all owners to a different copy.
+  //
+  // MaskType participates in the key because the three values map to materially different SVG
+  // output: Alpha and Luminance both emit `<mask>` but differ in `mask-type` (alpha channel vs
+  // luminance, the SVG default), while Contour emits `<clipPath>` (geometry-only inside/outside
+  // test). Without keying on MaskType, the second reference for a layer used in two roles
+  // would silently inherit the first role's def — a luminance owner would render an alpha
+  // mask, or a contour owner would receive a path mask — with no warning.
+  bool isClipPath = (maskType == MaskType::Contour);
+  const char* tag = isClipPath ? "clipPath" : "mask";
+  const char* idPrefix = isClipPath ? "clip" : "mask";
+  ContentWriter writer =
+      isClipPath ? &SVGWriter::writeClipPathContent : &SVGWriter::writeMaskContent;
+
+  SVGWriterContext::MaskDefKey key{maskLayer, maskType};
+  auto cached = _context->emittedMaskDefs.find(key);
+  if (cached != _context->emittedMaskDefs.end()) {
+    return cached->second;
+  }
+  // When `maskLayer->id` is non-empty, the same layer used under multiple MaskType values
+  // would otherwise produce colliding def ids (e.g. one `<mask id="m">` and one
+  // `<clipPath id="m">`). Suffix the layer id with a MaskType-specific tag so each
+  // (layer, maskType) pair has a unique element id in <defs>, regardless of whether the
+  // layer carries a user-assigned id.
+  std::string defId;
+  if (maskLayer->id.empty()) {
+    defId = generateId(idPrefix);
+  } else {
+    defId = maskLayer->id;
+    switch (maskType) {
+      case MaskType::Alpha:
+        defId += "_a";
+        break;
+      case MaskType::Luminance:
+        defId += "_l";
+        break;
+      case MaskType::Contour:
+        defId += "_c";
+        break;
+    }
+  }
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
@@ -1611,13 +1766,39 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const char* ta
   if (!paintDefsStr.empty()) {
     _defs->addRawContent(paintDefsStr);
   }
+  _context->emittedMaskDefs[key] = defId;
   return defId;
 }
 
 void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
-  writeLayerContents(out, layer);
+  // The <mask> element itself lives in the owner's parent space (we attach
+  // mask="url(...)" on the layer's outer <g>, which has no transform). PAGX
+  // semantics: the mask layer's own matrix participates in mask placement
+  // (Layer::getMaskData computes mask->getRelativeMatrix3D(owner), which
+  // when mask and owner share a parent reduces to mask->matrix). Wrap the
+  // mask body in a <g transform="..."> so the mask layer's own left/top/
+  // matrix moves the mask shape correctly without leaking onto the owner.
+  std::string transform = BuildLayerTransform(layer);
+  bool needsWrapper = !transform.empty();
+  if (needsWrapper) {
+    out.openElement("g");
+    out.addAttribute("transform", transform);
+    out.closeElementStart();
+  }
+  // Masks/clipPaths consume the alpha union of every painter on the layer, regardless of
+  // placement (placement only affects on-canvas paint order, not which shapes participate
+  // in the mask). Emit ONCE with acceptAnyPlacement=true so foreground painters still
+  // contribute their geometry without producing duplicate <path>/<text> output (the prior
+  // approach emitted both passes back-to-back, which doubled the mask body and could
+  // diverge from "max alpha" semantics when background and foreground painters carried
+  // different alpha values).
+  writeLayerContents(out, layer, {}, 1.0f, LayerPlacement::Background,
+                     /*acceptAnyPlacement=*/true);
   for (const auto* child : layer->children) {
     writeLayer(out, child);
+  }
+  if (needsWrapper) {
+    out.closeElement();
   }
 }
 
@@ -1630,23 +1811,111 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
   Matrix layerMatrix = BuildLayerMatrix(layer);
   Matrix combined = parentMatrix * layerMatrix;
 
-  writeLayerContents(out, layer, combined);
+  // ClipPaths only sample path geometry for inside/outside testing, but downstream code
+  // walks every painter to surface its accumulated shapes. Emit ONCE with acceptAnyPlacement
+  // so foreground painters still contribute, matching the prior unfiltered behavior without
+  // emitting the geometry twice.
+  writeLayerContents(out, layer, combined, 1.0f, LayerPlacement::Background,
+                     /*acceptAnyPlacement=*/true);
   for (const auto* child : layer->children) {
     writeClipPathContentRecursive(out, child, combined);
   }
 }
 
-std::string SVGWriter::writeMaskDef(const Layer* maskLayer, MaskType maskType) {
-  return writeMaskOrClipDef(maskLayer, "mask", "mask", &SVGWriter::writeMaskContent, maskType);
+std::string SVGWriter::writeMaskDef(const Layer* maskLayer, const Layer* owner, MaskType maskType) {
+  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
+    // PAGX renders mask geometry in the owner's parent space via mask->getRelativeMatrix3D(
+    // owner), walking mask -> common-ancestor -> owner-parent. The SVG output here only
+    // applies the mask layer's own matrix (BuildLayerTransform), which coincides with the
+    // renderer's matrix when mask and owner share a parent and diverges otherwise. Surface
+    // a warning so CI / log readers see the divergence; emission is preserved so cross-
+    // parent owners are not silently dropped from the SVG. A follow-up PR can wire the full
+    // chain matrix through to restore exact correctness.
+    addWarning(
+        "mask layer '" + maskLayer->id + "' references owner '" + owner->id +
+        "' across parent boundaries; SVG <mask> placement may diverge from the PAGX renderer.");
+  }
+  return writeMaskOrClipDef(maskLayer, maskType);
 }
 
-std::string SVGWriter::writeClipPathDef(const Layer* maskLayer) {
-  return writeMaskOrClipDef(maskLayer, "clipPath", "clip", &SVGWriter::writeClipPathContent);
+std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* owner) {
+  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
+    addWarning("mask layer '" + maskLayer->id + "' references owner '" + owner->id +
+               "' across parent boundaries; SVG <clipPath> placement may diverge from the PAGX "
+               "renderer.");
+  }
+  return writeMaskOrClipDef(maskLayer, MaskType::Contour);
+}
+
+const Layer* SVGWriter::findLayerParent(const Layer* layer) {
+  if (layer == nullptr || _doc == nullptr) {
+    return nullptr;
+  }
+  if (!_context->layerParentMapReady) {
+    auto& map = _context->layerParentMap;
+    // Walk every Composition's layer subtree once. PAGX layers can appear under
+    // Layer::children or Layer::composition->layers; both relations form parent edges.
+    // `visited` provides two guarantees: (1) idempotent parent assignment when the same
+    // Layer appears in multiple subtrees (shared-resource references — legal in PAGX), so
+    // the parent of `child` is locked to the first walk that reached it rather than
+    // overwritten by hash-order-dependent later walks; (2) cycle safety, so an importer bug
+    // that produced a `composition -> layer -> composition` self-reference cannot blow the
+    // stack.
+    std::unordered_set<const Layer*> visited;
+    std::function<void(const Layer*)> visit = [&](const Layer* parent) {
+      if (!visited.insert(parent).second) {
+        return;
+      }
+      for (const auto* child : parent->children) {
+        if (map.find(child) == map.end()) {
+          map[child] = parent;
+        }
+        visit(child);
+      }
+      if (parent->composition != nullptr) {
+        for (const auto* compLayer : parent->composition->layers) {
+          if (map.find(compLayer) == map.end()) {
+            map[compLayer] = parent;
+          }
+          visit(compLayer);
+        }
+      }
+    };
+    for (const auto& nodePtr : _doc->nodes) {
+      if (nodePtr->nodeType() != NodeType::Layer) {
+        continue;
+      }
+      auto* topLayer = static_cast<Layer*>(nodePtr.get());
+      visit(topLayer);
+    }
+    _context->layerParentMapReady = true;
+  }
+  auto it = _context->layerParentMap.find(layer);
+  return it == _context->layerParentMap.end() ? nullptr : it->second;
 }
 
 //==============================================================================
 // SVGWriter – fill / stroke attribute helpers
 //==============================================================================
+
+void SVGWriter::applyPaintColor(SVGBuilder& out, const char* paintAttr, const ColorSource* color,
+                                float painterAlpha, BlendMode blendMode, const Rect& shapeBounds,
+                                float alphaMultiplier, std::string* p3Style) {
+  float alpha = 1.0f;
+  // Per PAGX spec, Fill/Stroke defaults to opaque black (#000000) when no color is specified.
+  std::string paintStr = color ? getColorSourceRef(color, &alpha, shapeBounds) : "#000000";
+  out.addAttribute(paintAttr, paintStr);
+  float effectiveAlpha = alpha * painterAlpha * alphaMultiplier;
+  std::string opacityAttr = paintAttr;
+  opacityAttr += "-opacity";
+  if (effectiveAlpha < 1.0f) {
+    out.addAttribute(opacityAttr.c_str(), FloatToString(effectiveAlpha));
+  }
+  if (p3Style) {
+    AppendP3ColorStyle(*p3Style, paintAttr, color, paintStr, effectiveAlpha);
+    AppendBlendModeStyle(*p3Style, blendMode);
+  }
+}
 
 void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds,
                                     std::string* p3Style, float alphaMultiplier) {
@@ -1654,21 +1923,10 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
     out.addAttribute("fill", "none");
     return;
   }
-  float alpha = 1.0f;
-  // Per PAGX spec, Fill defaults to opaque black (#000000) when no color is specified.
-  std::string fillStr =
-      fill->color ? getColorSourceRef(fill->color, &alpha, shapeBounds) : "#000000";
-  out.addAttribute("fill", fillStr);
-  float effectiveAlpha = alpha * fill->alpha * alphaMultiplier;
-  if (effectiveAlpha < 1.0f) {
-    out.addAttribute("fill-opacity", FloatToString(effectiveAlpha));
-  }
+  applyPaintColor(out, "fill", fill->color, fill->alpha, fill->blendMode, shapeBounds,
+                  alphaMultiplier, p3Style);
   if (fill->fillRule == FillRule::EvenOdd) {
     out.addAttribute("fill-rule", "evenodd");
-  }
-  if (p3Style) {
-    AppendP3ColorStyle(*p3Style, "fill", fill->color, fillStr, effectiveAlpha);
-    AppendBlendModeStyle(*p3Style, fill->blendMode);
   }
 }
 
@@ -1678,15 +1936,8 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   if (!stroke) {
     return;
   }
-  float alpha = 1.0f;
-  // Per PAGX spec, Stroke defaults to opaque black (#000000) when no color is specified.
-  std::string strokeStr =
-      stroke->color ? getColorSourceRef(stroke->color, &alpha, shapeBounds) : "#000000";
-  out.addAttribute("stroke", strokeStr);
-  float effectiveAlpha = alpha * stroke->alpha * alphaMultiplier;
-  if (effectiveAlpha < 1.0f) {
-    out.addAttribute("stroke-opacity", FloatToString(effectiveAlpha));
-  }
+  applyPaintColor(out, "stroke", stroke->color, stroke->alpha, stroke->blendMode, shapeBounds,
+                  alphaMultiplier, p3Style);
   if (stroke->width != 1.0f) {
     out.addAttribute("stroke-width", FloatToString(stroke->width));
   }
@@ -1704,21 +1955,11 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
     out.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
   }
   if (!stroke->dashes.empty()) {
-    std::string dashStr;
-    for (size_t i = 0; i < stroke->dashes.size(); i++) {
-      if (i > 0) {
-        dashStr += ",";
-      }
-      dashStr += FloatToString(stroke->dashes[i]);
-    }
-    out.addAttribute("stroke-dasharray", dashStr);
+    out.addAttribute("stroke-dasharray",
+                     JoinFloats(stroke->dashes.data(), stroke->dashes.size(), ','));
   }
   if (stroke->dashOffset != 0.0f) {
     out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
-  }
-  if (p3Style) {
-    AppendP3ColorStyle(*p3Style, "stroke", stroke->color, strokeStr, effectiveAlpha);
-    AppendBlendModeStyle(*p3Style, stroke->blendMode);
   }
 }
 
@@ -1842,37 +2083,41 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   // shapePath->setPosition(renderPosition()) + path data is scaled by renderScale().
   // Without applying both, raw path data emits at its authored origin and authored
   // size, losing any flex / centerX / layoutBounds-driven centring and sizing.
+  //
+  // The placement is baked into the path data rather than emitted as a `transform`
+  // attribute so the path's user coordinate system equals the parent VectorLayer /
+  // VectorGroup space. SVG resolves `userSpaceOnUse` gradients (and ImagePattern
+  // `patternUnits="userSpaceOnUse"`) in the *referencing element's* user coordinate
+  // system; if a `transform` were emitted, the gradient endPoints — authored in
+  // parent space per PAGX semantics (tgfx Gradient with fitsToGeometry=false) — would
+  // be reinterpreted as path-local pre-scale coordinates and the gradient would only
+  // cover the unscaled fraction of the geometry. Baking keeps SVG and the PAGX
+  // renderer's coordinate-space contract identical for fills, strokes, and patterns.
+  // PAGX's renderer also keeps `setStrokeWidth(node->width)` on the original (non-scaled)
+  // value while geometry is scaled — baking matches that behaviour without further work
+  // because stroke-width on this <path> is already evaluated in the same coordinate
+  // space as the now-baked path data.
   auto renderPos = path->renderPosition();
   float scale = path->renderScale();
+  bool needsBaking = (renderPos.x != 0.0f || renderPos.y != 0.0f || scale != 1.0f);
+
+  PathData baked = PathDataFromSVGString("");
+  if (needsBaking) {
+    baked = *path->data;
+    Matrix bakeMatrix = Matrix::Translate(renderPos.x, renderPos.y) * Matrix::Scale(scale, scale);
+    baked.transform(bakeMatrix);
+  }
+
   out.openElement("path");
   std::string transform = MatrixToSVGTransform(m);
-  std::string localTransform;
-  if (renderPos.x != 0.0f || renderPos.y != 0.0f) {
-    localTransform =
-        "translate(" + FloatToString(renderPos.x) + "," + FloatToString(renderPos.y) + ")";
-  }
-  if (scale != 1.0f) {
-    if (!localTransform.empty()) {
-      localTransform += " ";
-    }
-    localTransform += "scale(" + FloatToString(scale) + ")";
-  }
-  if (!transform.empty() && !localTransform.empty()) {
-    out.addAttribute("transform", transform + " " + localTransform);
-  } else if (!transform.empty()) {
+  if (!transform.empty()) {
     out.addAttribute("transform", transform);
-  } else if (!localTransform.empty()) {
-    out.addAttribute("transform", localTransform);
   }
-  out.addAttribute("d", PathDataToSVGString(*path->data));
-  // shapeBounds must reflect the painted region in the parent coordinate space so
-  // gradient `fitsToGeometry` and image patterns sample the right rectangle. The path
-  // data sits in pre-scale space, so multiply the raw bounds by the scale factor and
-  // translate them by renderPosition to match the on-canvas extent.
-  Rect dataBounds = path->data->getBounds();
-  Rect bounds =
-      Rect::MakeXYWH(renderPos.x + dataBounds.x * scale, renderPos.y + dataBounds.y * scale,
-                     dataBounds.width * scale, dataBounds.height * scale);
+  out.addAttribute("d", PathDataToSVGString(needsBaking ? baked : *path->data));
+  // After baking, getBounds() returns the painted region directly in parent space —
+  // which is the contract `applyPainters` expects for fitsToGeometry gradients and
+  // ImagePattern shapeBounds. No additional translate / scale arithmetic needed.
+  Rect bounds = needsBaking ? baked.getBounds() : path->data->getBounds();
   applyPainters(out, fs, bounds, alpha);
   out.closeElementSelfClosing();
 }
@@ -1996,6 +2241,143 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   }
 
   out.closeElement();
+}
+
+// ── writeTextAsFont ─────────────────────────────────────────────────────────
+//
+// Encodes a Unicode codepoint as UTF-8 and appends to the string. WOFF2 cmap maps
+// 0xE000 + (glyphID - 1) → glyphID, so the character we emit is the PUA codepoint that the
+// embedded font resolves back to the original glyph index.
+static void AppendUTF8Codepoint(std::string& out, uint32_t cp) {
+  if (cp < 0x80) {
+    out += static_cast<char>(cp);
+  } else if (cp < 0x800) {
+    out += static_cast<char>(0xC0 | (cp >> 6));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else if (cp < 0x10000) {
+    out += static_cast<char>(0xE0 | (cp >> 12));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (cp >> 18));
+    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  }
+}
+
+bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha, const Woff2FontResult& fontResult) {
+  // Plain SVG <text> can express per-character (x, y, rotate) positioning lists, but it cannot
+  // express per-glyph scale or skew — those would require a separate <text> element per glyph
+  // (defeating the purpose of using <text> for selectability). When the run carries any such
+  // transform, signal the caller to fall back to writeTextAsPath.
+  for (auto* run : text->glyphRuns) {
+    if (!run->scales.empty() || !run->skews.empty()) {
+      return false;
+    }
+  }
+  // Mixed font sizes across runs cannot be expressed in a single <text> element either: the
+  // glyph positions on the run are pre-shaped at each run's own size, but <text font-size>
+  // is single-valued and forces the renderer to scale all glyphs uniformly. Falling back to
+  // writeTextAsPath emits one <path> per glyph at the correct authored size.
+  float referenceSize = -1.0f;
+  for (auto* run : text->glyphRuns) {
+    if (run->fontSize <= 0.0f) {
+      continue;
+    }
+    if (referenceSize < 0.0f) {
+      referenceSize = run->fontSize;
+    } else if (!FloatNearlyEqual(referenceSize, run->fontSize)) {
+      return false;
+    }
+  }
+  // Gradient fills cannot be confined to glyph silhouettes in <text> the way they are in
+  // background-clip:text in HTML; SVG renders the gradient over the bounding rect and we'd lose
+  // visual fidelity. Fall back to writeTextAsPath where each glyph carries its own clipping path.
+  if (IsGradientSource(fs.fill ? fs.fill->color : nullptr) ||
+      IsGradientSource(fs.stroke ? fs.stroke->color : nullptr)) {
+    return false;
+  }
+
+  auto renderPos = text->renderPosition();
+  if (fs.textBox) {
+    renderPos.x += fs.textBox->padding.left;
+    renderPos.y += fs.textBox->padding.top;
+  }
+
+  // Walk every visible glyph and collect its absolute x/y/rotation. Skipping GID 0 (the .notdef
+  // sentinel) matches writeTextAsPath / HTMLWriter::writeEmbeddedShapeGlyphsAsFont so a missing
+  // glyph never paints a blank box.
+  std::string puaText;
+  std::string xList;
+  std::string yList;
+  std::string rotateList;
+  bool hasRotation = false;
+  // All runs share `referenceSize` (validated above); fall back to a sane default for the empty
+  // / zero-fontSize edge case so the <text font-size> attribute is always populated.
+  float fontSize = referenceSize > 0.0f ? referenceSize : 12.0f;
+  for (auto* run : text->glyphRuns) {
+    for (size_t i = 0; i < run->glyphs.size(); ++i) {
+      uint16_t gid = run->glyphs[i];
+      if (gid == 0) {
+        continue;
+      }
+      float gx = run->x;
+      float gy = run->y;
+      if (i < run->xOffsets.size()) {
+        gx += run->xOffsets[i];
+      }
+      if (i < run->positions.size()) {
+        gx += run->positions[i].x;
+        gy += run->positions[i].y;
+      }
+      gx += renderPos.x;
+      gy += renderPos.y;
+      if (!puaText.empty()) {
+        xList += ' ';
+        yList += ' ';
+        rotateList += ' ';
+      }
+      xList += FloatToString(gx);
+      yList += FloatToString(gy);
+      float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
+      rotateList += FloatToString(rotation);
+      if (!FloatNearlyZero(rotation)) {
+        hasRotation = true;
+      }
+      AppendUTF8Codepoint(puaText, 0xE000u + (gid - 1u));
+    }
+  }
+  if (puaText.empty()) {
+    return false;
+  }
+
+  std::string transform = MatrixToSVGTransform(m);
+  out.openElement("text");
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
+  // The WOFF2-generated familyName follows the "pagx-font-<id>" pattern (pure ASCII identifier
+  // characters, no whitespace or special characters), which is a valid CSS <custom-ident> and
+  // does not need to be quoted. Skipping the quotes also avoids the XMLBuilder turning `'` into
+  // `&apos;`, which some non-browser SVG renderers (Inkscape, Preview) handle inconsistently.
+  // For any future call site that supplies a non-conforming familyName, fall through to the
+  // quoted-and-escaped form so the value cannot break out of its attribute context.
+  out.addAttribute("font-family", QuoteFontFamilyIfNeeded(fontResult.familyName));
+  out.addAttribute("font-size", FloatToString(fontSize));
+  out.addAttribute("x", xList);
+  out.addAttribute("y", yList);
+  if (hasRotation) {
+    // SVG rotate="..." applies one degree value per character around that character's (x, y);
+    // omit when no glyph rotates so simple runs stay terse.
+    out.addAttribute("rotate", rotateList);
+  }
+  // Fill / stroke painting via the shared helper. Solid colors only — the gradient fallback above
+  // sent the run to writeTextAsPath. shapeBounds is empty because gradients are excluded.
+  applyPainters(out, fs, {}, alpha);
+  out.closeElementWithText(puaText);
+  return true;
 }
 
 // ── writeText ───────────────────────────────────────────────────────────────
@@ -2697,6 +3079,27 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
       if (!text->glyphRuns.empty()) {
+        // Prefer the WOFF2 <text> path when the GlyphRun's font is registered as an embedded
+        // vector font: the result is a real <text> element with PUA Unicode characters that
+        // browsers / Inkscape / Preview render via the embedded @font-face, preserving text
+        // selection, search, and per-character animation. Per-glyph scales / skews and bitmap
+        // fonts cannot be expressed in <text>, so writeTextAsFont returns false in those cases
+        // and the caller falls back to the SVG <path> outline path below.
+        const Font* font = nullptr;
+        for (auto* run : text->glyphRuns) {
+          if (run->font) {
+            font = run->font;
+            break;
+          }
+        }
+        if (font != nullptr) {
+          auto it = _context->woff2Fonts.find(font);
+          if (it != _context->woff2Fonts.end()) {
+            if (writeTextAsFont(out, text, localFs, entry.transform, alpha, it->second)) {
+              break;
+            }
+          }
+        }
         writeTextAsPath(out, text, localFs, entry.transform, alpha);
       } else {
         writeText(out, text, localFs, entry.transform, alpha);
@@ -2718,8 +3121,8 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
 void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
                                    const Matrix& transform, float alpha,
                                    const TextBox* parentTextBox,
-                                   std::vector<AccumulatedGeometry>& accumulator,
-                                   size_t scopeStart) {
+                                   std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
+                                   LayerPlacement targetPlacement, bool acceptAnyPlacement) {
   const TextBox* localTextBox = FindModifierTextBox(elements);
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
@@ -2731,10 +3134,25 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
       case NodeType::Fill:
       case NodeType::Stroke: {
         FillStrokeInfo painterFs = {};
+        LayerPlacement painterPlacement = LayerPlacement::Background;
         if (type == NodeType::Fill) {
-          painterFs.fill = static_cast<const Fill*>(element);
+          auto* fill = static_cast<const Fill*>(element);
+          painterFs.fill = fill;
+          painterPlacement = fill->placement;
         } else {
-          painterFs.stroke = static_cast<const Stroke*>(element);
+          auto* stroke = static_cast<const Stroke*>(element);
+          painterFs.stroke = stroke;
+          painterPlacement = stroke->placement;
+        }
+        // Painters at a non-matching placement do not paint in this pass — geometry still
+        // accumulates from prior elements, and the matching pass (background or foreground)
+        // will visit this same painter and emit it then. Mirrors the two-pass dispatch in
+        // HTMLWriter::writeLayerInner / writeGroup. Mask/clipPath consumers set
+        // acceptAnyPlacement to bypass this filter so the geometry is emitted exactly once,
+        // matching the renderer's behaviour where masks consume the alpha union of every
+        // painter regardless of placement.
+        if (!acceptAnyPlacement && painterPlacement != targetPlacement) {
+          break;
         }
         // The painter's effective alpha is the alpha of THIS scope, not the
         // alpha that was in effect when each geometry was collected. A Group
@@ -2773,7 +3191,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // path modifiers nested inside the box before walking.
           const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
           processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
-                             accumulator.size());
+                             accumulator.size(), targetPlacement, acceptAnyPlacement);
         } else {
           // Native text-box rendering: container TextBox owns its own paragraph
           // shaping and fill/stroke pairing. Don't add its child Text into the
@@ -2788,7 +3206,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         float groupAlpha = alpha * group->alpha;
         const std::vector<Element*> innerWalked = resolveIfEnabled(group->elements);
         processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
-                           accumulator.size());
+                           accumulator.size(), targetPlacement, acceptAnyPlacement);
         break;
       }
       case NodeType::Repeater:
@@ -2805,7 +3223,8 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
 }
 
 void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
-                              const Matrix& transform, float alpha, const TextBox* parentTextBox) {
+                              const Matrix& transform, float alpha, const TextBox* parentTextBox,
+                              LayerPlacement targetPlacement, bool acceptAnyPlacement) {
   // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
   // TrimPath / RoundCorner / MergePath -> editable Path). Painters, Group,
   // Text, and TextBox pass through unchanged so the accumulator walk below
@@ -2814,12 +3233,15 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
-  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0);
+  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0,
+                     targetPlacement, acceptAnyPlacement);
 }
 
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform,
-                                   float alpha) {
-  writeElements(out, layer->contents, transform, alpha, nullptr);
+                                   float alpha, LayerPlacement targetPlacement,
+                                   bool acceptAnyPlacement) {
+  writeElements(out, layer->contents, transform, alpha, nullptr, targetPlacement,
+                acceptAnyPlacement);
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
@@ -2868,18 +3290,31 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     return;
   }
 
-  out.openElement("g");
-  bool needsContourClip = layer->mask != nullptr && layer->maskType == MaskType::Contour;
-  // The outer <g> already gets the contour-mask clip-path from
-  // writeLayerGroupAttributes. SVG only allows one `clip-path` value per
-  // element, so when both contour mask and scrollRect are present we defer the
-  // scrollRect clip to a middle <g> wrapper below; otherwise the second
-  // attribute would silently overwrite the first.
-  bool needsScrollMiddleWrapper = layer->hasScrollRect && needsContourClip;
-  writeLayerGroupAttributes(out, layer, /*emitScrollClipHere=*/!needsScrollMiddleWrapper);
-
   bool hasContent =
       !layer->contents.empty() || !layer->children.empty() || layer->composition != nullptr;
+
+  // PAGX/tgfx mask semantics: the mask is evaluated in the layer owner's
+  // *parent* coordinate space (Layer::getMaskData uses
+  // mask->getRelativeMatrix3D(owner), which excludes owner's own matrix). SVG
+  // resolves `mask` / `clip-path` (with userSpaceOnUse) in the *referencing
+  // element's* user coordinate system, so the layer's own transform must NOT
+  // sit on the same <g> as the mask attribute — otherwise the mask gets
+  // dragged along with `left`/`top` and any rotation/scale on the layer,
+  // visibly drifting away from where the renderer places it.
+  //
+  // Solution: when the layer has a mask (alpha/luminance/contour), split into
+  // an outer <g> (mask + filter + opacity + blend, NO transform) and an inner
+  // <g> (transform + scrollRect clip). For layers without a mask, both sets
+  // collapse onto a single <g> as before.
+  bool hasMask = layer->mask != nullptr;
+
+  out.openElement("g");
+  if (hasMask) {
+    writeLayerOuterAttributes(out, layer);
+  } else {
+    writeLayerGroupAttributes(out, layer);
+  }
+
   if (!hasContent) {
     out.closeElementSelfClosing();
     return;
@@ -2887,15 +3322,13 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 
   out.closeElementStart();
 
-  // Middle <g> for scrollRect when a contour-mask clip-path occupies the outer
-  // <g>'s clip-path slot. The middle <g> carries no transform — its local
-  // coordinate space equals the outer's (post layer-matrix), so the scroll
-  // clipPath rect (anchored at 0,0 with sr.width × sr.height) is interpreted
-  // identically to the un-collided case where it sat on the outer <g>.
-  if (needsScrollMiddleWrapper) {
-    auto scrollClipId = writeScrollRectClipDef(layer);
+  // Inner <g> carrying the layer's own transform + scrollRect clip. Only
+  // emitted when the outer <g> took the mask attribute; otherwise everything
+  // already lives on the outer <g>.
+  bool needsInnerWrapper = hasMask && (!BuildLayerTransform(layer).empty() || layer->hasScrollRect);
+  if (needsInnerWrapper) {
     out.openElement("g");
-    out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
+    writeLayerInnerAttributes(out, layer);
     out.closeElementStart();
   }
 
@@ -2917,7 +3350,7 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     out.closeElement();
   }
 
-  if (needsScrollMiddleWrapper) {
+  if (needsInnerWrapper) {
     out.closeElement();
   }
 
@@ -2925,7 +3358,15 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChildAlpha) {
-  writeLayerContents(out, layer, {}, perChildAlpha);
+  // PAGX placement: Fill/Stroke with placement="foreground" paint AFTER child layers and
+  // composition layers, so they overlay child content. Mirror HTMLWriter::writeLayerInner's
+  // two-pass dispatch (Background → children → Foreground) so the SVG output matches the
+  // PAGX renderer and the HTML preview. The check recurses through Group / TextBox containers
+  // so a foreground painter buried inside a nested Group still triggers the second pass — the
+  // shallow flat-list scan would otherwise leave it suppressed by both passes' filters.
+  bool hasForeground = HasForegroundPainter(layer->contents);
+
+  writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Background);
   if (layer->composition != nullptr) {
     for (const auto* compLayer : layer->composition->layers) {
       if (perChildAlpha < 1.0f) {
@@ -2950,21 +3391,18 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
       writeLayer(out, child);
     }
   }
+  if (hasForeground) {
+    writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Foreground);
+  }
 }
 
-void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
-                                          bool emitScrollClipHere) {
+void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   if (!layer->id.empty()) {
     out.addAttribute("id", layer->id);
   }
 
   for (const auto& [key, value] : layer->customData) {
     out.addAttribute(("data-" + key).c_str(), value);
-  }
-
-  std::string transform = BuildLayerTransform(layer);
-  if (!transform.empty()) {
-    out.addAttribute("transform", transform);
   }
 
   if (layer->alpha < 1.0f && layer->groupOpacity) {
@@ -2988,25 +3426,39 @@ void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer,
   if (layer->mask != nullptr) {
     if (layer->maskType == MaskType::Contour) {
       // Contour masking uses <clipPath> which only supports geometry clipping.
-      auto clipId = writeClipPathDef(layer->mask);
+      auto clipId = writeClipPathDef(layer->mask, layer);
       out.addAttribute("clip-path", "url(#" + clipId + ")");
     } else {
       // Alpha and Luminance masking use <mask> which supports alpha channel.
-      auto maskId = writeMaskDef(layer->mask, layer->maskType);
+      auto maskId = writeMaskDef(layer->mask, layer, layer->maskType);
       out.addAttribute("mask", "url(#" + maskId + ")");
     }
   }
+}
+
+void SVGWriter::writeLayerInnerAttributes(SVGBuilder& out, const Layer* layer) {
+  std::string transform = BuildLayerTransform(layer);
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
 
   // scrollRect clips the layer's content to a viewport rectangle and offsets
-  // the content by the scroll origin. Unlike PPT (which must bake to PNG),
-  // SVG natively supports <clipPath> so we emit a vector clip. When the layer
-  // also carries a contour mask, the contour mask owns this <g>'s `clip-path`
-  // and `emitScrollClipHere` is false — the caller emits the scroll clip on a
-  // deferred middle <g> wrapper instead so both clips can coexist.
-  if (emitScrollClipHere && layer->hasScrollRect) {
+  // the content by the scroll origin. SVG natively supports <clipPath> so we
+  // emit a vector clip rooted in the layer's own (post-transform) coordinate
+  // space — same as the renderer, where ClipScrollRect runs after concat'ing
+  // the layer matrix.
+  if (layer->hasScrollRect) {
     auto scrollClipId = writeScrollRectClipDef(layer);
     out.addAttribute("clip-path", "url(#" + scrollClipId + ")");
   }
+}
+
+void SVGWriter::writeLayerGroupAttributes(SVGBuilder& out, const Layer* layer) {
+  // No mask path: outer and inner attributes collapse onto the same <g>. The
+  // contour-clip and scrollRect both want `clip-path`, but a no-mask layer
+  // never produces a contour clip, so there's no collision here.
+  writeLayerOuterAttributes(out, layer);
+  writeLayerInnerAttributes(out, layer);
 }
 
 std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
@@ -3044,6 +3496,48 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+
+  // Pre-pass: build WOFF2 fonts for embedded vector fonts. Only Font resources whose first glyph
+  // carries vector outline data (Glyph.path, no Glyph.image) participate — bitmap CBDT fonts
+  // remain on the per-glyph <image> rendering path because per-glyph scales/skews cannot be
+  // expressed in a plain SVG <text>. Each generated WOFF2 byte stream is base64-embedded as a
+  // `data:font/woff2;base64,...` URI so the SVG remains self-contained, avoiding the external
+  // resource directory the HTML exporter writes alongside the document. The id-keyed mapping
+  // is consumed by writeText / writeTextAsFont below to decide whether to emit <text> with
+  // PUA Unicode characters (WOFF2 path) or the SVG <path> outline path.
+  if (options.embedFontsAsWoff2 && options.convertTextToPath == false) {
+    for (auto& nodePtr : doc.nodes) {
+      if (nodePtr->nodeType() != NodeType::Font) {
+        continue;
+      }
+      auto* font = static_cast<Font*>(nodePtr.get());
+      if (font->glyphs.empty() || !font->glyphs[0]) {
+        continue;
+      }
+      // Skip bitmap fonts based on the first glyph: SVG <text> + CBDT works in browsers but not
+      // in Inkscape / Preview, and per-glyph scales/skews still need the <image> path. Sticking
+      // to vector fonts keeps the WOFF2 path coverage portable and predictable. The first-glyph
+      // check is a fast-path filter ONLY on the bitmap dimension — we deliberately do NOT
+      // reject a missing `path` here, because vector fonts are allowed to have blank/space
+      // glyphs (e.g. .notdef) whose Glyph.path is null. BuildWoff2FromFont below performs a full
+      // type-uniformity sweep over every glyph and returns empty when the font mixes path/image
+      // entries (or exceeds the PUA capacity), at which point the empty-result branch falls back
+      // to the per-glyph rendering path.
+      if (font->glyphs[0]->image != nullptr) {
+        continue;
+      }
+      std::string fontId = "f" + std::to_string(context.woff2Fonts.size());
+      auto result = BuildWoff2FromFont(font, fontId);
+      if (result.woff2Data.empty()) {
+        continue;
+      }
+      result.relativeUrl = "data:font/woff2;base64,";
+      result.relativeUrl += Base64Encode(result.woff2Data.data(), result.woff2Data.size());
+      context.woff2Fonts[font] = std::move(result);
+      context.woff2FontOrder.push_back(font);
+    }
+  }
+
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
                    &doc, options.bakeUnsupported, safeRasterScale, options.resolveModifiers,
                    warnings);
@@ -3066,10 +3560,37 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   }
 
   std::string defsStr = defs.release();
-  if (!defsStr.empty()) {
+  // Prepend @font-face rules to <defs> so embedded WOFF2 fonts are declared before any element
+  // references them via font-family. Browsers tolerate <style> inside <defs>, and keeping the
+  // rules in <defs> avoids a second top-level emission point.
+  std::string fontFaceRules;
+  if (!context.woff2Fonts.empty()) {
+    // Walk woff2FontOrder rather than the unordered_map directly so the emitted @font-face rules
+    // come out in registration order regardless of pointer-hash distribution. Without this,
+    // identical PAGX inputs would produce byte-different SVGs across runs / platforms.
+    for (const auto* font : context.woff2FontOrder) {
+      const auto& result = context.woff2Fonts[font];
+      // Mirror HTMLExporter::writeWoff2FontFaceRules: route the family name through
+      // EscapeCssFontFamily so a hostile or accidental special character in `familyName` cannot
+      // break out of the single-quoted CSS context. The current generator only ever produces
+      // ASCII-safe identifiers (`pagx-font-<id>`), but escaping is a one-line defence and keeps
+      // the SVG and HTML pipelines emitting identical strings for identical input.
+      fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
+                       "';src:url(" + result.relativeUrl + ") format('woff2')}\n";
+    }
+  }
+  if (!defsStr.empty() || !fontFaceRules.empty()) {
     svg.openElement("defs");
     svg.closeElementStart();
-    svg.addRawContent(defsStr);
+    if (!fontFaceRules.empty()) {
+      svg.openElement("style");
+      svg.closeElementStart();
+      svg.addRawContent(fontFaceRules);
+      svg.closeElement();
+    }
+    if (!defsStr.empty()) {
+      svg.addRawContent(defsStr);
+    }
     svg.closeElement();
   }
 

@@ -784,6 +784,11 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
   for (auto* child : layer->children) {
     writeClipContent(out, child, combined);
   }
+  if (layer->composition != nullptr) {
+    for (auto* compLayer : layer->composition->layers) {
+      writeClipContent(out, compLayer, combined);
+    }
+  }
 }
 
 }  // namespace pagx

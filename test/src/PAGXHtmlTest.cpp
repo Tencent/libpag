@@ -23,15 +23,16 @@
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
 
-static std::string LoadAndConvert(const std::string& pagxPath,
-                                  const pagx::HTMLExportOptions& options = {}) {
-  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+static std::string ConvertToHTML(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                 const pagx::HTMLExportOptions& options = {}) {
   if (doc == nullptr) {
     return "";
   }
@@ -40,6 +41,39 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   // collisions (e.g. dgc0.png from two different samples) are harmless.
   auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
   return pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment, options);
+}
+
+static std::string LoadAndConvert(const std::string& pagxPath,
+                                  const pagx::HTMLExportOptions& options = {}) {
+  return ConvertToHTML(pagx::PAGXImporter::FromFile(pagxPath), options);
+}
+
+static std::string LoadXMLAndConvert(const std::string& xml,
+                                     const pagx::HTMLExportOptions& options = {}) {
+  return ConvertToHTML(pagx::PAGXImporter::FromXML(xml), options);
+}
+
+static std::string FindTagContaining(const std::string& html, const std::string& marker) {
+  auto markerPos = html.find(marker);
+  if (markerPos == std::string::npos) {
+    return "";
+  }
+  auto tagStart = html.rfind('<', markerPos);
+  auto tagEnd = html.find('>', markerPos);
+  if (tagStart == std::string::npos || tagEnd == std::string::npos || tagEnd < tagStart) {
+    return "";
+  }
+  return html.substr(tagStart, tagEnd - tagStart + 1);
+}
+
+static size_t CountOccurrences(const std::string& text, const std::string& needle) {
+  size_t count = 0;
+  size_t pos = 0;
+  while ((pos = text.find(needle, pos)) != std::string::npos) {
+    count++;
+    pos += needle.size();
+  }
+  return count;
 }
 
 static std::vector<std::string> GetHtmlTestFiles() {
@@ -244,6 +278,38 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
   EXPECT_NE(html.find("opacity: 0.5"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/drop_shadow_styles.pagx"), options);
+  ASSERT_FALSE(html.empty());
+  size_t filterCount = 0;
+  for (size_t pos = 0; (pos = html.find("<filter ", pos)) != std::string::npos; pos++) {
+    filterCount++;
+  }
+  EXPECT_EQ(filterCount, static_cast<size_t>(1));
+  EXPECT_EQ(html.find(") url(#filter"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, ParentDropShadowWithShadowedChildAvoidsWrapperFilter) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/parent_child_drop_shadow.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"parent\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_EQ(tag.find("filter:"), std::string::npos);
+  EXPECT_NE(html.find("box-shadow:0 5px 10px rgba(0,0,0,0.102)"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, LayerNesting) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_nesting.pagx"));
   ASSERT_FALSE(html.empty());
@@ -263,6 +329,19 @@ CLI_TEST(PAGXHtmlTest, GeometryRectangle) {
   EXPECT_NE(html.find("border-radius"), std::string::npos);
   // Check center-point conversion: center=50,50 size=80,60 → left=10px, top=20px
   EXPECT_NE(html.find("width: 80px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, RectangleStrokeRoundnessIsClampedToBounds) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/rectangle_stroke_roundness.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("rx=\"18\""), std::string::npos);
+  EXPECT_NE(html.find("ry=\"18\""), std::string::npos);
+  EXPECT_EQ(html.find("rx=\"80\""), std::string::npos);
+  EXPECT_EQ(html.find("ry=\"80\""), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
@@ -285,6 +364,51 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/geometry_path.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("<path"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, MergePathAvoidsDuplicateFillRuleAttributes) {
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="120" height="120">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Path data="M10,10 L50,10 L50,50 L10,50 Z M20,20 L40,20 L40,40 L20,40 Z"/>
+    <Fill color="#EC4899" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="30,80" size="40,40"/>
+    <Ellipse position="50,80" size="40,40"/>
+    <MergePath mode="append"/>
+    <Fill color="#8B5CF6" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,30" size="40,40"/>
+    <Ellipse position="100,30" size="40,40"/>
+    <MergePath mode="intersect"/>
+    <Fill color="#F59E0B" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,80" size="40,40"/>
+    <Ellipse position="100,80" size="40,40"/>
+    <MergePath mode="xor"/>
+    <Fill color="#10B981" fillRule="evenOdd"/>
+  </Layer>
+</pagx>)");
+  ASSERT_FALSE(html.empty());
+
+  auto standaloneTag = FindTagContaining(html, "fill=\"#EC4899\"");
+  ASSERT_FALSE(standaloneTag.empty());
+  EXPECT_EQ(CountOccurrences(standaloneTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
+
+  auto appendTag = FindTagContaining(html, "fill=\"#8B5CF6\"");
+  ASSERT_FALSE(appendTag.empty());
+  EXPECT_EQ(CountOccurrences(appendTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
+
+  auto intersectTag = FindTagContaining(html, "fill=\"#F59E0B\"");
+  ASSERT_FALSE(intersectTag.empty());
+  EXPECT_EQ(CountOccurrences(intersectTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
+
+  auto xorTag = FindTagContaining(html, "fill=\"#10B981\"");
+  ASSERT_FALSE(xorTag.empty());
+  EXPECT_EQ(CountOccurrences(xorTag, "fill-rule=\"evenodd\""), static_cast<size_t>(1));
 }
 
 // =============================================================================
@@ -448,6 +572,145 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
   EXPECT_EQ(html.find("<path"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/low_units_per_em_font.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(16));
+  EXPECT_NEAR(fontResult.designScale, 16.0f, 0.001f);
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/low-upem-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/custom-charset-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/glyph_run_embedded_font.pagx"), options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  EXPECT_EQ(html.find("搜索"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/mixed_glyph_run_fonts.pagx"), options);
+  ASSERT_FALSE(html.empty());
+  size_t bulletFontCount = 0;
+  for (size_t pos = 0; (pos = html.find("pagx-font-f0", pos)) != std::string::npos; pos++) {
+    bulletFontCount++;
+  }
+  size_t textFontCount = 0;
+  for (size_t pos = 0; (pos = html.find("pagx-font-f1", pos)) != std::string::npos; pos++) {
+    textFontCount++;
+  }
+  EXPECT_GT(bulletFontCount, static_cast<size_t>(1));
+  EXPECT_GT(textFontCount, static_cast<size_t>(1));
+  EXPECT_NE(html.find("\xEE\x80\x81"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/single_group_text_box.pagx"), options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("word-wrap:break-word"), std::string::npos);
+  EXPECT_NE(html.find("line-height:20px"), std::string::npos);
+  EXPECT_EQ(html.find("line-height:1;white-space:pre\">abcdefgh"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/single_auto_size_glyph_run.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  EXPECT_EQ(html.find("智能模式"), std::string::npos);
+  EXPECT_NE(html.find("top:2px"), std::string::npos);
+  EXPECT_NE(html.find("line-height:1"), std::string::npos);
+  EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/rich_text_newline_group.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto titlePos = html.find("Title");
+  auto optionPos = html.find("Option");
+  ASSERT_NE(titlePos, std::string::npos);
+  ASSERT_NE(optionPos, std::string::npos);
+  ASSERT_LT(titlePos, optionPos);
+  auto firstBreak = html.find("<br>", titlePos);
+  ASSERT_NE(firstBreak, std::string::npos);
+  ASSERT_LT(firstBreak, optionPos);
+  auto secondBreak = html.find("<br>", firstBreak + 4);
+  EXPECT_TRUE(secondBreak == std::string::npos || secondBreak > optionPos);
+}
+
+CLI_TEST(PAGXHtmlTest, UniformGradientTextFallsBackToSolidColor) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/uniform_gradient_text.pagx"), options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("Done"), std::string::npos);
+  EXPECT_NE(html.find("#999999"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, TextRich) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/text_rich.pagx"));
   ASSERT_FALSE(html.empty());
@@ -495,6 +758,119 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
   // Inline SVG elements in HTML5 should NOT have xmlns.
   EXPECT_EQ(html.find("<svg xmlns="), std::string::npos)
       << "Inline SVG elements should not have xmlns in HTML5";
+}
+
+CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/scroll_rect_flex_flow.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto offsetStylePos = html.find("style=\"position:relative;left:-5px;top:-7px");
+  ASSERT_NE(offsetStylePos, std::string::npos);
+  auto offsetStyleEnd = html.find('"', offsetStylePos + 7);
+  ASSERT_NE(offsetStyleEnd, std::string::npos);
+  auto offsetStyle = html.substr(offsetStylePos, offsetStyleEnd - offsetStylePos);
+  EXPECT_NE(offsetStyle.find("display:flex"), std::string::npos);
+  EXPECT_NE(offsetStyle.find("flex-direction:row"), std::string::npos);
+  EXPECT_NE(offsetStyle.find("gap:12px"), std::string::npos);
+
+  auto firstPos = html.find("id=\"first\"", offsetStyleEnd);
+  auto secondPos = html.find("id=\"second\"", offsetStyleEnd);
+  ASSERT_NE(firstPos, std::string::npos);
+  ASSERT_NE(secondPos, std::string::npos);
+  EXPECT_LT(firstPos, secondPos);
+}
+
+CLI_TEST(PAGXHtmlTest, FixedFlexItemKeepsDeclaredWidthInScrollRectLayout) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/fixed_flex_item_scroll.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"fixed\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:120px"), std::string::npos);
+  EXPECT_NE(tag.find("flex-shrink:0"), std::string::npos);
+  EXPECT_EQ(tag.find("flex:1"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, VerticalFlexTextBoxResolvedHeightDoesNotCollapse) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/vertical_text_box_height.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"description\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("height:48px"), std::string::npos);
+  EXPECT_EQ(tag.find("flex:1"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, VerticalFlexScrollRectContainerKeepsResolvedHeight) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/vertical_scroll_rect_height.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"scroller\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("height:40px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, FlexItemWithChildLayerKeepsMeasuredWidth) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/flex_child_layer_width.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"wrapper\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:40px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, CompositionLayerWithFilterKeepsDeclaredSize) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/composition_filter_size.pagx"), options);
+  ASSERT_FALSE(html.empty());
+
+  auto idPos = html.find("id=\"iconLayer\"");
+  ASSERT_NE(idPos, std::string::npos);
+  auto tagStart = html.rfind('<', idPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  auto tagEnd = html.find('>', idPos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto tag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_NE(tag.find("width:20px"), std::string::npos);
+  EXPECT_NE(tag.find("height:20px"), std::string::npos);
 }
 
 // =============================================================================

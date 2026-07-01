@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: low unitsPerEm embedded vector font normalization. -->
+<pagx width="64" height="32">
+  <Resources>
+    <Font id="bad" unitsPerEm="1">
+      <Glyph advance="1" path="M 0,0 L 1,0 L 1,-1 L 0,-1 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="64" height="32">
+    <Text>
+      <GlyphRun font="@bad" fontSize="16" glyphs="1" x="8" y="24"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>

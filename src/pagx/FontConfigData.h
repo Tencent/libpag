@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -42,8 +42,7 @@ struct FontConfig::Data {
     }
   };
 
-  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces =
-      {};
+  std::unordered_map<FontKey, TypefaceHolder, FontKeyHash> registeredTypefaces = {};
   std::vector<TypefaceHolder> fallbackTypefaces = {};
 };
 

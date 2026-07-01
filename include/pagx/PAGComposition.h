@@ -28,17 +28,19 @@ namespace pagx {
 
 class PAGTimeline;
 class PAGScene;
+class PAGViewModel;
 class PAGXDocument;
 class Composition;
+class DataBindRuntime;
+class DataContext;
 class Node;
 struct RuntimeBinding;
 
 /**
  * PAGComposition is the runtime instance of a composition. It derives from PAGLayer, adding the
- * ability to drive the animations declared inside the composition and to answer hit-test queries
- * against its content. When the same composition is referenced from multiple places, each reference
- * produces an independent PAGComposition with its own playback state, so animating or hit-testing
- * one does not affect the others.
+ * ability to drive the animations declared inside the composition. When the same composition is
+ * referenced from multiple places, each reference produces an independent PAGComposition with its
+ * own playback state, so animating or rendering one does not affect the others.
  */
 class PAGComposition : public PAGLayer {
  public:
@@ -46,30 +48,14 @@ class PAGComposition : public PAGLayer {
 
   LayerType layerType() const override;
 
-  /**
-   * Advances the animations that play automatically inside this composition, including those in
-   * nested child compositions, by the given amount of time.
-   * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
-   */
-  void advance(int64_t deltaMicroseconds);
+  void advance(int64_t deltaMicroseconds) override;
+  void apply(float mix = 1.0f) override;
 
   /**
-   * Applies the current state of the animations that play automatically inside this composition,
-   * including those in nested child compositions, to the displayed content.
-   * @param mix blend weight, defaults to 1.0 (full overwrite).
+   * Returns the ViewModel instance for this composition, or nullptr if the composition has no
+   * ViewModel schema.
    */
-  void apply(float mix = 1.0f);
-
-  /**
-   * Returns the leaf layers under the given point in this composition's coordinate space.
-   * Composition nodes are excluded from results; only concrete renderable layers are returned.
-   * The first layer in the array is the top-most under the point, the last is the bottom-most.
-   * Returns an empty array if nothing is hit. Hit testing does not require the content to have
-   * been drawn first.
-   * @param x the x coordinate in this composition's coordinate space.
-   * @param y the y coordinate in this composition's coordinate space.
-   */
-  virtual std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float x, float y);
+  std::shared_ptr<PAGViewModel> viewModel() const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
@@ -88,20 +74,36 @@ class PAGComposition : public PAGLayer {
                                                    std::unordered_set<const Composition*>& visited);
 
   // Builds the persistent per-layer runtime node tree for this composition: one PAGLayer node per
-  // source layer (PAGComposition for layers that reference a composition, plain PAGLayer otherwise),
-  // associating each node's runtimeLayer with this composition's tgfx layer for that source layer.
-  // Composition children's tgfx roots are attached into their slot containers. Must be called after
-  // the subtree and binding are built. visited carries the ancestor composition path for cycle
-  // detection and is threaded into nested MakeChild calls.
+  // source layer (PAGComposition for layers that reference a composition, plain PAGLayer for
+  // others), associating each node's runtimeLayer with this composition's tgfx layer for that
+  // source layer. Composition children's tgfx roots are attached into their slot containers. Must
+  // be called after the subtree and binding are built. visited carries the ancestor composition
+  // path for cycle detection and is threaded into nested MakeChild calls.
   void buildChildren(const std::vector<Layer*>& layers,
                      std::unordered_set<const Composition*>& visited);
 
-  // Resolves a hit tgfx layer to the persistent PAGLayer node whose runtimeLayer matches it,
-  // searching this composition's children and recursing into descendant composition children.
-  // Returns nullptr if no persistent node owns the layer (internal sub-layer).
-  std::shared_ptr<PAGLayer> findChildForLayer(const tgfx::Layer* hitLayer);
-
  private:
+  // Builds a new runtime PAGLayer or PAGComposition for the given source layer, attaching its
+  // tgfx subtree into the parent binding's slots. Shared by syncChildren and
+  // refreshPlainContainerChildren so the construction logic stays in one place.
+  static std::shared_ptr<PAGLayer> BuildChildLayer(
+      const Layer* layer, RuntimeBinding* binding, const std::shared_ptr<PAGScene>& scene,
+      std::unordered_set<const Composition*>& visited);
+
+  // Builds the persistent per-layer runtime node tree into outChildren. Internal static helper used
+  // by BuildChildLayer and buildChildren.
+  static void BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
+                            std::vector<std::shared_ptr<PAGLayer>>& outChildren,
+                            const std::shared_ptr<PAGScene>& scene,
+                            std::unordered_set<const Composition*>& visited);
+
+  // Collects the direct child compositions of a layer into outChildren, transparently descending
+  // through plain PAGLayer containers (which may nest compositions) but not into the child
+  // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
+  // update, view-model advance) so that compositions nested under plain container layers are not
+  // skipped.
+  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
+
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
   // visited carries the source compositions on the current ancestor path: when this method recurses
@@ -109,6 +111,7 @@ class PAGComposition : public PAGLayer {
   // return, so any newly added layer that references an ancestor composition is detected at the top
   // of MakeChild rather than one frame deeper.
   void refreshNodes(const std::vector<Node*>& dirtyNodes,
+                    const std::unordered_set<const Node*>& dirtySet,
                     std::unordered_set<const Composition*>& visited);
 
   // Reconciles this composition's runtime children with the given source layer list: reuses
@@ -125,21 +128,39 @@ class PAGComposition : public PAGLayer {
   // when a timeline node changes. The root composition has no owner layer and spawns no timelines.
   void spawnTimelines(const std::shared_ptr<PAGScene>& scene);
 
+  // Spawns timelines for this composition using its own scene reference. Internal helper.
+  void spawnTimelinesFromScene();
+
+  // Static visitor for PAGLayer::forEachComposition. Calls spawnTimelinesFromScene on each
+  // PAGComposition in the tree.
+  static void ResetCompositionTimelines(PAGComposition* comp);
+
   // Resets the timelines of this composition and all descendant compositions. Called when an edit
   // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
+
+  // Override to include this PAGComposition node itself in the traversal after visiting children.
+  void forEachComposition(void (*visitor)(PAGComposition*)) override;
+
+  // Rebuilds children of a plain PAGLayer container whose source node is dirty, and recurses into
+  // its descendant plain containers. Called by refreshNodes.
+  void refreshPlainContainerChildren(PAGLayer* container,
+                                     const std::vector<Node*>& dirtyNodes,
+                                     std::unordered_set<const Composition*>& visited,
+                                     const std::unordered_set<const Node*>& dirtySet);
 
   // Document used to resolve channel target IDs for timelines spawned by this composition. For a
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-  // The full per-layer runtime node tree of this composition, one entry per source layer, mixing
-  // plain PAGLayer leaves and PAGComposition children. Persistent for the PAGScene lifetime.
-  std::vector<std::shared_ptr<PAGLayer>> children = {};
+  std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
+  std::unique_ptr<DataBindRuntime> dataBindRuntime = {};
+  std::shared_ptr<DataContext> dataContext = nullptr;
+
+  void updateDataBinds(float mix = 1.0f);
 
   friend class PAGScene;
-  friend class PAGTimeline;
 };
 
 }  // namespace pagx

@@ -1,0 +1,214 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "pagx/DataConverterRegistry.h"
+#include <cstdlib>
+#include <iomanip>
+#include <sstream>
+#include "base/utils/MathUtil.h"
+#include "pagx/nodes/DataConverter.h"
+
+namespace pagx {
+
+using pag::DegreesToRadians;
+using pag::RadiansToDegrees;
+
+static constexpr float DEFAULT_FRAME_RATE = 30.0f;
+static constexpr float DEFAULT_RANGE_INPUT_MIN = 0.0f;
+static constexpr float DEFAULT_RANGE_INPUT_MAX = 1.0f;
+static constexpr float DEFAULT_RANGE_OUTPUT_MIN = 0.0f;
+static constexpr float DEFAULT_RANGE_OUTPUT_MAX = 100.0f;
+
+DataConverterRegistry::DataConverterRegistry() {
+  registerConverter("secondsToFrames", ConvertSecondsToFrames);
+  registerConverter("priceFormat", ConvertPriceFormat);
+  registerConverter("rangeMapper", ConvertRangeMapper);
+  registerConverter("degsToRads", ConvertDegsToRads);
+  registerInverseConverter("secondsToFrames", ConvertInverseSecondsToFrames);
+  registerInverseConverter("priceFormat", ConvertInversePriceFormat);
+  registerInverseConverter("rangeMapper", ConvertInverseRangeMapper);
+  registerInverseConverter("degsToRads", ConvertInverseDegsToRads);
+}
+
+DataConverterRegistry& DataConverterRegistry::GetInstance() {
+  static DataConverterRegistry registry;
+  return registry;
+}
+
+KeyValue DataConverterRegistry::ConvertSecondsToFrames(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) {
+    return input;
+  }
+  float seconds = std::get<float>(input);
+  float frameRate = DEFAULT_FRAME_RATE;
+  auto it = params.find("frameRate");
+  if (it != params.end()) {
+    frameRate = std::strtof(it->second.c_str(), nullptr);
+  }
+  // strtof returns 0 on a malformed frameRate; fall back to the default so the forward conversion
+  // does not silently collapse every value to zero (mirrors the inverse converter's guard).
+  if (frameRate == 0.0f) {
+    frameRate = DEFAULT_FRAME_RATE;
+  }
+  return KeyValue{seconds * frameRate};
+}
+
+KeyValue DataConverterRegistry::ConvertPriceFormat(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  float value = 0.0f;
+  if (std::holds_alternative<float>(input)) {
+    value = std::get<float>(input);
+  } else if (std::holds_alternative<int>(input)) {
+    value = static_cast<float>(std::get<int>(input));
+  } else {
+    return input;
+  }
+  std::string prefix = "";
+  std::string suffix = "";
+  int decimals = 0;
+  auto it = params.find("prefix");
+  if (it != params.end()) prefix = it->second;
+  it = params.find("suffix");
+  if (it != params.end()) suffix = it->second;
+  it = params.find("decimals");
+  if (it != params.end()) decimals = std::atoi(it->second.c_str());
+
+  std::ostringstream oss;
+  oss << prefix;
+  oss << std::fixed << std::setprecision(decimals) << value;
+  oss << suffix;
+  return KeyValue{oss.str()};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseSecondsToFrames(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float frames = std::get<float>(input);
+  float frameRate = DEFAULT_FRAME_RATE;
+  auto it = params.find("frameRate");
+  if (it != params.end()) frameRate = std::strtof(it->second.c_str(), nullptr);
+  // A malformed frameRate (strtof returns 0) falls back to the default, matching the forward
+  // converter so a bad parameter does not silently drop the conversion.
+  if (frameRate == 0.0f) frameRate = DEFAULT_FRAME_RATE;
+  return KeyValue{frames / frameRate};
+}
+
+KeyValue DataConverterRegistry::ConvertInversePriceFormat(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  std::string str;
+  if (std::holds_alternative<std::string>(input)) {
+    str = std::get<std::string>(input);
+  } else {
+    return input;
+  }
+  auto it = params.find("prefix");
+  if (it != params.end() && str.find(it->second) == 0) str = str.substr(it->second.size());
+  it = params.find("suffix");
+  if (it != params.end() && str.size() >= it->second.size() &&
+      str.compare(str.size() - it->second.size(), it->second.size(), it->second) == 0)
+    str = str.substr(0, str.size() - it->second.size());
+  return KeyValue{std::strtof(str.c_str(), nullptr)};
+}
+
+KeyValue DataConverterRegistry::ConvertRangeMapper(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float value = std::get<float>(input);
+  float inputMin = DEFAULT_RANGE_INPUT_MIN;
+  float inputMax = DEFAULT_RANGE_INPUT_MAX;
+  float outputMin = DEFAULT_RANGE_OUTPUT_MIN;
+  float outputMax = DEFAULT_RANGE_OUTPUT_MAX;
+  auto it = params.find("inputMin");
+  if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("inputMax");
+  if (it != params.end()) inputMax = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMin");
+  if (it != params.end()) outputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMax");
+  if (it != params.end()) outputMax = std::strtof(it->second.c_str(), nullptr);
+  if (inputMax == inputMin) return KeyValue{outputMin};
+  float t = (value - inputMin) / (inputMax - inputMin);
+  return KeyValue{outputMin + t * (outputMax - outputMin)};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseRangeMapper(
+    const KeyValue& input, const std::map<std::string, std::string>& params) {
+  if (!std::holds_alternative<float>(input)) return input;
+  float value = std::get<float>(input);
+  float inputMin = DEFAULT_RANGE_INPUT_MIN;
+  float inputMax = DEFAULT_RANGE_INPUT_MAX;
+  float outputMin = DEFAULT_RANGE_OUTPUT_MIN;
+  float outputMax = DEFAULT_RANGE_OUTPUT_MAX;
+  auto it = params.find("inputMin");
+  if (it != params.end()) inputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("inputMax");
+  if (it != params.end()) inputMax = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMin");
+  if (it != params.end()) outputMin = std::strtof(it->second.c_str(), nullptr);
+  it = params.find("outputMax");
+  if (it != params.end()) outputMax = std::strtof(it->second.c_str(), nullptr);
+  if (outputMax == outputMin) return KeyValue{inputMin};
+  float t = (value - outputMin) / (outputMax - outputMin);
+  return KeyValue{inputMin + t * (inputMax - inputMin)};
+}
+
+KeyValue DataConverterRegistry::ConvertDegsToRads(const KeyValue& input,
+                                                  const std::map<std::string, std::string>&) {
+  if (!std::holds_alternative<float>(input)) return input;
+  return KeyValue{DegreesToRadians(std::get<float>(input))};
+}
+
+KeyValue DataConverterRegistry::ConvertInverseDegsToRads(
+    const KeyValue& input, const std::map<std::string, std::string>&) {
+  if (!std::holds_alternative<float>(input)) return input;
+  return KeyValue{RadiansToDegrees(std::get<float>(input))};
+}
+
+void DataConverterRegistry::registerConverter(const std::string& typeName, ConverterFn fn) {
+  converters[typeName] = std::move(fn);
+}
+
+void DataConverterRegistry::registerInverseConverter(const std::string& typeName, ConverterFn fn) {
+  inverseConverters[typeName] = std::move(fn);
+}
+
+KeyValue DataConverterRegistry::apply(const DataConverter* converter, const KeyValue& input) const {
+  if (converter == nullptr || converter->converterType.empty()) {
+    return input;
+  }
+  auto it = converters.find(converter->converterType);
+  if (it == converters.end()) {
+    return input;
+  }
+  return it->second(input, converter->params);
+}
+
+KeyValue DataConverterRegistry::applyInverse(const DataConverter* converter,
+                                             const KeyValue& input) const {
+  if (converter == nullptr || converter->converterType.empty()) {
+    return input;
+  }
+  auto it = inverseConverters.find(converter->converterType);
+  if (it == inverseConverters.end()) {
+    return input;
+  }
+  return it->second(input, converter->params);
+}
+
+}  // namespace pagx

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: parent drop shadow with shadowed child avoids wrapper filter. -->
+<pagx width="240" height="200">
+  <Layer id="parent" width="180" height="140" matrix="1,0,0,1,30,30">
+    <Rectangle position="90,70" size="180,140" roundness="12"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetY="5" blurX="10" blurY="10" color="#0000001A" showBehindLayer="false"/>
+    <Layer id="child" width="80" height="50" matrix="1,0,0,1,50,70">
+      <Rectangle position="40,25" size="80,50" roundness="8"/>
+      <Fill color="#1E1E1E"/>
+      <DropShadowStyle offsetY="2" blurX="4" blurY="4" color="#00000033" showBehindLayer="false"/>
+    </Layer>
+  </Layer>
+</pagx>

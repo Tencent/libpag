@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: rectangle stroke roundness clamps to half bounds. -->
+<pagx width="240" height="60">
+  <Layer width="224" height="36">
+    <Rectangle position="112,18" size="224,36" roundness="80"/>
+    <Fill color="#FFFFFF"/>
+    <Stroke color="#EDEDED" width="2" align="inside" placement="foreground"/>
+  </Layer>
+</pagx>

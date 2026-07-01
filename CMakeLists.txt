@@ -276,7 +276,7 @@ if (PAG_BUILD_PAGX)
     list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
-    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)
+    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
     set(WOFF2_DIR third_party/woff2)
     set(BROTLI_DIR ${WOFF2_DIR}/brotli)
     set(WOFF2_SOURCES

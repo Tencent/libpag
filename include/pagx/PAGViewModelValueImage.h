@@ -1,0 +1,73 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <memory>
+#include "pagx/PAGImage.h"
+#include "pagx/PAGViewModelValue.h"
+
+namespace pagx {
+
+class Image;
+
+/**
+ * PAGViewModelValueImage holds an image ViewModel property value. The value is a PAGImage object
+ * wrapping a decoded image, so DataBind writers receive a ready-to-render image without per-frame
+ * decoding.
+ */
+class PAGViewModelValueImage : public PAGViewModelValue {
+ public:
+  /**
+   * Returns the current image value, or nullptr if none is set.
+   */
+  std::shared_ptr<PAGImage> value() const {
+    return propertyValue;
+  }
+
+  /**
+   * Sets the image value; subsequent reads return it. Setting the same value notifies no observers.
+   * Any assignment, even of the same image or null, takes ownership of the property so it is no
+   * longer updated when the underlying image resource reloads.
+   */
+  void value(std::shared_ptr<PAGImage> v);
+
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(std::shared_ptr<PAGImage> v, bool fromVM);
+
+ private:
+  std::shared_ptr<PAGImage> propertyValue = nullptr;
+
+  // The <Image> resource node this value was decoded from at build time (null if the property had
+  // no default image). Used to re-decode when that resource changes (e.g. host loadFileData).
+  Image* sourceImage = nullptr;
+  // True once the business side has assigned a value through the public value() setter. A resource
+  // change only re-decodes the schema default while this is false; an explicit assignment (even
+  // assigning null) marks the value as owned by the business side and is never overwritten.
+  bool userAssigned = false;
+
+  friend class PAGViewModel;
+  friend class PAGScene;
+  friend class DataBindRuntime;
+};
+
+}  // namespace pagx

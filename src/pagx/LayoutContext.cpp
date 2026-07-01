@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -55,14 +55,14 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     key.style = fontStyle.empty() ? "Regular" : fontStyle;
     auto it = fontConfig->data->registeredTypefaces.find(key);
     if (it != fontConfig->data->registeredTypefaces.end()) {
-      return it->second;
+      return it->second.getTypeface();
     }
 
     // Stage 2: Family-name match in registered typefaces (prefer Regular style)
     std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
     int bestPriority = 4;
     std::string bestStyle = {};
-    for (const auto& pair : fontConfig->data->registeredTypefaces) {
+    for (auto& pair : fontConfig->data->registeredTypefaces) {
       if (pair.first.family != fontFamily) {
         continue;
       }
@@ -70,7 +70,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
       bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
                        (priority == bestPriority && pair.first.style < bestStyle);
       if (preferred) {
-        bestTypeface = pair.second;
+        bestTypeface = pair.second.getTypeface();
         bestPriority = priority;
         bestStyle = pair.first.style;
       }

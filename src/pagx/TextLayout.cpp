@@ -1675,15 +1675,16 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
     return {};
   }
   TextLayoutContext layoutContext(context);
+  TextLayoutResult result = {};
   if (AllHaveEmbeddedGlyphRuns(textElements)) {
     // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
-    TextLayoutResult result = {};
     result.bounds = MergeEmbeddedBounds(textElements);
-    return result;
+  } else {
+    auto mutableElements = textElements;
+    result = layoutContext.processTextWithLayout(mutableElements, params);
   }
-  auto mutableElements = textElements;
-  return layoutContext.processTextWithLayout(mutableElements, params);
+  return result;
 }
 
 }  // namespace pagx
