@@ -35,7 +35,6 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
-#include "pagx/tgfx.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
