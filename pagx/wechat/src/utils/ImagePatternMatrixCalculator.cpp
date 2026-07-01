@@ -34,8 +34,8 @@ namespace pagx {
 // ResolveImagePatternMatrix() overwrites pattern->matrix with the baked result, so we stash the
 // original 6-float affine here on first call to make the whole routine idempotent: later calls
 // (for example after progressive image upgrades replace the thumbnail with a higher-resolution
-// full image in the provider) can re-bake against the correct source matrix instead of
-// re-baking the already baked matrix.
+// full image in the node's runtimeImage) can re-bake against the correct source matrix instead
+// of re-baking the already baked matrix.
 static constexpr const char* kPaintTransformKey = "paint-transform";
 
 // Same idempotency stash but for the "new PAGX standard format" path: the exporter already
