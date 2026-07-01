@@ -47,6 +47,47 @@ import type { Page } from './browser-engine';
 export const PAGX_ANIM_PREFIX = 'pagxAnim';
 export const PAGX_ANIM_STYLE_ID = '__pagx_anim_keyframes';
 
+// Init-script injected before any page script runs, keeping animations
+// *suspended* across the settle wait so they can be measured and seeked later.
+//   1. A `<style>` rule pinning `animation-play-state: paused` on every element
+//      so finite CSS animations do not tick through the settle, finish, drop
+//      into `idle`, and disappear from `document.getAnimations()`.
+//   2. An `Element.prototype.animate` wrapper that pauses every WAAPI animation
+//      on creation (CSS play-state does not apply to WAAPI animations).
+// Both must be installed before any page script runs, so callers ship this via
+// page-loader's `initScripts`. The capture pipeline (lib/snapshot-runner.ts)
+// and the baseline (eval-animation/baseline-frames.js) install the identical
+// script so both observe the same suspended animations; the seek path drives
+// playback explicitly via `currentTime` / GSAP `time()` / anime `seek()`.
+export const PAGX_ANIM_PAUSE_INIT_SCRIPT = `(function() {
+  var STYLE_ID = '__pagxBaselinePauseAnims';
+  var STYLE_TEXT = '*, *::before, *::after { animation-play-state: paused !important; }';
+  function inject() {
+    if (document.getElementById(STYLE_ID)) return;
+    var parent = document.head || document.documentElement;
+    if (!parent) return;
+    var s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = STYLE_TEXT;
+    parent.appendChild(s);
+  }
+  inject();
+  if (!document.getElementById(STYLE_ID)) {
+    document.addEventListener('DOMContentLoaded', inject, { once: true });
+  }
+  try {
+    var proto = window.Element && Element.prototype;
+    var orig = proto && proto.animate;
+    if (typeof orig === 'function') {
+      proto.animate = function() {
+        var anim = orig.apply(this, arguments);
+        try { if (anim && typeof anim.pause === 'function') anim.pause(); } catch (_) {}
+        return anim;
+      };
+    }
+  } catch (_) {}
+})();`;
+
 export interface CaptureAnimationsOptions {
   // Number of samples taken across a library timeline (GSAP / anime.js) before
   // per-channel RDP decimation. Higher is denser/more faithful; RDP keeps the
@@ -837,6 +878,257 @@ export function pagxSampleTimeline(
   }
 }
 
+// ===== Shared "clock": global-duration measurement + deterministic seek =====
+//
+// These three browser-side functions are the shared timeline that both the
+// animation *capture* (the universal sampler below, bundled into the in-page
+// IIFE) and the animation *baseline* (eval-animation/baseline-frames.js, which
+// injects them via `page.evaluate(fn)`) run against. Keeping one copy is what
+// lets the two share a clock: the capture samples each animation at the same
+// absolute playback times the baseline seeks to. They MUST be self-contained
+// (only browser globals + the `window.__pagxBaselineAnime` handoff) so they
+// survive both `.toString()` bundling and standalone `page.evaluate(fn)`.
+
+// Longest single-iteration period (delay + duration) in ms across every
+// animation the page reports. WAAPI (CSS animations, Motion One,
+// web-animations-js) surface via `document.getAnimations()`; GSAP and anime.js
+// drive their tweens off their own clocks and never appear there, so they are
+// reconstructed from `gsap.globalTimeline` children / `anime.running`. One
+// period is enough: looping animations realign every period, so sampling
+// [0, period] covers a full visual cycle and matches how `pagx render --time`
+// loops the imported timelines.
+export function pagxMeasureGlobalDurationMs(): number {
+  let maxMs = 0;
+
+  let anims = [];
+  try {
+    anims = document.getAnimations ? document.getAnimations() : [];
+  } catch (_) {
+    anims = [];
+  }
+  for (const a of anims) {
+    let ct = null;
+    try {
+      ct = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+    } catch (_) {
+      ct = null;
+    }
+    if (!ct) continue;
+    const dur = typeof ct.duration === 'number' && isFinite(ct.duration) ? ct.duration : 0;
+    if (dur <= 0) continue;
+    const delay = typeof ct.delay === 'number' && isFinite(ct.delay) ? ct.delay : 0;
+    const end = delay + dur;
+    if (end > maxMs) maxMs = end;
+  }
+
+  // GSAP: reconstruct one forward-iteration period from the global timeline's
+  // top-level children. `globalTimeline.duration()` is unusable when any tween
+  // repeats forever (GSAP reports ~1e10 s), which would scatter samples across
+  // random loop phases. Each child exposes its single-iteration `duration()` /
+  // `startTime()`, from which the true loop period is derived.
+  try {
+    const gsap = window.gsap;
+    if (gsap && gsap.globalTimeline) {
+      const tl = gsap.globalTimeline;
+      let children = [];
+      try {
+        children = typeof tl.getChildren === 'function' ? tl.getChildren(false, true, true) : [];
+      } catch (_) {
+        children = [];
+      }
+      let windowSec = 0;
+      for (const c of children) {
+        let start = 0;
+        let iterDur = 0;
+        try { start = typeof c.startTime === 'function' ? c.startTime() : 0; } catch (_) { start = 0; }
+        try { iterDur = typeof c.duration === 'function' ? c.duration() : 0; } catch (_) { iterDur = 0; }
+        if (!isFinite(iterDur) || iterDur <= 0) continue;
+        const end = (isFinite(start) ? start : 0) + iterDur;
+        if (end > windowSec) windowSec = end;
+      }
+      if (windowSec > 0 && windowSec * 1000 > maxMs) {
+        maxMs = windowSec * 1000;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  // anime.js: longest running instance.
+  try {
+    const anime = window.anime;
+    if (anime && anime.running) {
+      for (const inst of anime.running) {
+        const dur = inst && typeof inst.duration === 'number' ? inst.duration : 0;
+        if (isFinite(dur) && dur > maxMs) maxMs = dur;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  return maxMs;
+}
+
+// Snapshot the rAF-driven anime.js instances *before* any seek pauses them.
+// anime.js removes paused instances from `anime.running` on its next tick, so
+// once a seek pauses the first instance, `anime.running` empties and every
+// later seek finds nothing. We keep our own references on `window` and seek
+// those instead.
+export function pagxCaptureAnimeInstances(): void {
+  try {
+    const anime = window.anime;
+    window.__pagxBaselineAnime = (anime && anime.running) ? anime.running.slice() : [];
+  } catch (_) {
+    window.__pagxBaselineAnime = [];
+  }
+}
+
+// Pause every animation and pin its playback time to `timeMs`. Setting
+// `currentTime` on a WAAPI animation honours its own delay / iteration /
+// direction, so a single absolute time seeks all animations to a consistent
+// frame regardless of their individual periods. GSAP / anime.js tweens are
+// seeked on their own clocks so the captured keyframes line up with the ground
+// truth. Call `pagxCaptureAnimeInstances()` once before the first seek.
+export function pagxSeekAllToTime(timeMs: number): void {
+  const t = timeMs;
+  let anims = [];
+  try {
+    anims = document.getAnimations ? document.getAnimations() : [];
+  } catch (_) {
+    anims = [];
+  }
+  for (const a of anims) {
+    try {
+      a.pause();
+      a.currentTime = t;
+    } catch (_) {
+      /* skip this animation */
+    }
+  }
+
+  // GSAP: seek the global timeline to the same absolute time. `suppressEvents =
+  // true` renders the exact frame state without firing timeline events (the
+  // event-firing path renders lazily and drops zero-duration `.set()` values
+  // pinned to a boundary).
+  try {
+    const gsap = window.gsap;
+    if (gsap && gsap.globalTimeline) {
+      const tl = gsap.globalTimeline;
+      tl.pause();
+      tl.time(t / 1000, true);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  // anime.js: seek each instance captured up front by pagxCaptureAnimeInstances.
+  try {
+    const captured = window.__pagxBaselineAnime;
+    const instances = (Array.isArray(captured) && captured.length)
+      ? captured
+      : (window.anime && window.anime.running ? window.anime.running : []);
+    for (const inst of instances) {
+      try {
+        if (inst.pause) inst.pause();
+        const dur = typeof inst.duration === 'number' ? inst.duration : t;
+        if (!isFinite(dur) || dur <= 0) continue;
+        // Match the capture layer's iteration math: anime.js loop is tri-state
+        // (true | number | falsy) and direction may be 'alternate' or 'reverse'.
+        let iterations = 1;
+        if (inst.loop === true) iterations = Infinity;
+        else if (typeof inst.loop === 'number' && inst.loop > 0) iterations = inst.loop;
+        const totalDur = isFinite(iterations) ? dur * iterations : Infinity;
+        let local = t;
+        if (isFinite(totalDur) && local >= totalDur) {
+          local = totalDur;
+        }
+        let iterIndex = Math.floor(local / dur);
+        if (!isFinite(iterations) || iterIndex >= iterations) {
+          iterIndex = isFinite(iterations) ? Math.max(0, iterations - 1) : 0;
+        }
+        let phase = local - iterIndex * dur;
+        if (phase > dur) phase = dur;
+        if (inst.direction === 'reverse') {
+          phase = dur - phase;
+        } else if (inst.direction === 'alternate' && (iterIndex % 2) === 1) {
+          phase = dur - phase;
+        }
+        inst.seek(Math.max(0, Math.min(phase, dur)));
+      } catch (_) {
+        /* skip instance */
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  try { void document.body.offsetHeight; } catch (_) { /* ignore */ }
+}
+
+// Even sample grid over [0, globalMs]: N points including both endpoints. Pure
+// (no DOM), used Node-side by baseline-frames.js so the PAGX render can be
+// driven at the identical times.
+export function pagxSampleTimesMs(globalMs: number, samples: number): number[] {
+  if (!(globalMs > 0) || samples <= 1) return [0];
+  const out: number[] = [];
+  for (let i = 0; i < samples; i++) {
+    out.push((i / (samples - 1)) * globalMs);
+  }
+  return out;
+}
+
+// Universal capture: sample the *whole page* on one shared global clock instead
+// of walking each animation source separately. This mirrors exactly what
+// eval-animation/baseline-frames.js does for the pixel ground truth — measure
+// the global timeline length (`pagxMeasureGlobalDurationMs`), then seek every
+// animation (WAAPI / CSS / GSAP / anime) to N evenly-spaced absolute times
+// (`pagxSeekAllToTime`) and read `getComputedStyle`. Any element whose tracked
+// channels (opacity / translate / color / background-color) vary across the
+// window becomes one `@keyframes` spanning the full global window
+// (`duration = globalMs`, `iterations = 1`, `direction = normal`, linear
+// timing with the keyframe stops carrying the curve), so the imported PAGX
+// timeline and the baseline share one clock and line up frame-for-frame.
+//
+// Requires the page to have been loaded with PAGX_ANIM_PAUSE_INIT_SCRIPT so
+// finite animations are still seekable at capture time (they would otherwise
+// have finished during settle and dropped out of `document.getAnimations()`).
+// The whole sampling loop runs synchronously inside a single `page.evaluate`,
+// so rAF-driven library tweens only advance when we explicitly seek them.
+export function pagxCollectGlobalSampled(
+  captured: unknown[],
+  seen: Set<Element>,
+  sampleCount: number,
+  maxElements: number,
+): void {
+  let globalMs = 0;
+  try {
+    globalMs = pagxMeasureGlobalDurationMs();
+  } catch (_) {
+    globalMs = 0;
+  }
+  if (!(globalMs > 0) || !isFinite(globalMs)) return;
+  try {
+    pagxCaptureAnimeInstances();
+  } catch (_) {
+    /* ignore */
+  }
+  // Reuse the dense-sample -> per-channel RDP path. The seek closure maps the
+  // 0..1 progress the sampler walks onto the shared absolute clock. Emit as a
+  // single non-looping window (iterations = 1, delay = 0, normal direction):
+  // any per-animation loop within [0, globalMs] is baked into the stops, which
+  // is what keeps playback aligned with the baseline's per-time seek.
+  pagxSampleTimeline(
+    captured, seen, globalMs, (p) => pagxSeekAllToTime(p * globalMs),
+    1, sampleCount, maxElements, 'normal', 0,
+  );
+  try {
+    pagxSeekAllToTime(0);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 // Compute the sampling window for GSAP's global timeline: one *forward iteration*
 // of the longest top-level child, plus whether the composition repeats forever
 // and whether any repeating child uses `yoyo`. Also returns the maximum finite
@@ -1225,13 +1517,17 @@ export function pagxAnimMain(opts: {
 
   const captured: Array<{ el: HTMLElement } & PagxAnimDescriptor> = [];
   const seen = new Set<Element>();
-  pagxCollectWAAPI(captured, seen);
-  pagxCollectCSS(captured, seen, maxElements);
-  pagxCollectGsap(captured, seen, sampleCount, maxElements);
-  pagxCollectAnime(captured, seen, sampleCount, maxElements);
-  // Runs last so elements already captured as @keyframes / WAAPI / library
-  // tweens keep that higher-fidelity result; only purely transition-driven
-  // motion (recorded early by pagxTransitionInstall) is added here.
+  // Universal path: one shared-clock global sampler replaces the per-source
+  // collectors (WAAPI / CSS / GSAP / anime). Seeking the whole page to N
+  // absolute times and reading computed style captures motion from every
+  // source uniformly and on the same clock the baseline seeks to, so the
+  // imported timeline aligns frame-for-frame with the ground truth.
+  pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements);
+  // Runs last, as a supplement: CSS transitions only interpolate on a property
+  // change and are not seekable, so the global sampler cannot reconstruct one
+  // that already finished during settle. The `transitionrun` recorder
+  // (pagxTransitionInstall) captured its start value at load; pair it with the
+  // settled end here for any element the global sampler did not already cover.
   pagxCollectTransitions(captured, seen);
   if (captured.length === 0) return { count: 0, names: [] };
   return pagxEmitCaptured(captured, prefix, styleId);
@@ -1271,6 +1567,13 @@ const PAGX_ANIM_FNS = [
   pagxGsapWindow,
   pagxCollectGsap,
   pagxCollectAnime,
+  // Shared-clock helpers (from animation-clock.ts) + the universal global
+  // sampler that pagxAnimMain now drives. Bundled by name so the in-page IIFE
+  // can call them; they are self-contained (see animation-clock.ts).
+  pagxMeasureGlobalDurationMs,
+  pagxCaptureAnimeInstances,
+  pagxSeekAllToTime,
+  pagxCollectGlobalSampled,
   pagxEmitCaptured,
   pagxAnimMain,
 ];

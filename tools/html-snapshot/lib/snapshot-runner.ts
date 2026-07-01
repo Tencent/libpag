@@ -19,6 +19,7 @@ import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
   capturePagxAnimationsOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
+  PAGX_ANIM_PAUSE_INIT_SCRIPT,
 } from './animation-capture';
 import {
   makeFontCaptureListener,
@@ -377,9 +378,15 @@ export async function runSnapshot(
     // ~80 KB helper source for every snapshot.
     // The transition recorder must be installed before the page's own scripts
     // run so load-triggered entrance transitions are observed at their start;
-    // only register it when animation capture is enabled.
+    // only register it when animation capture is enabled. PAGX_ANIM_PAUSE_INIT_SCRIPT
+    // (same script the baseline uses) is registered alongside it so finite
+    // animations stay paused across settle and remain seekable when the
+    // universal global sampler drives them to each sample time — otherwise a
+    // finite animation that finished during settle would drop out of
+    // `document.getAnimations()` and be missed, and the capture would no longer
+    // share the baseline's clock.
     initScripts: captureAnimations
-      ? [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT]
+      ? [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT, PAGX_ANIM_PAUSE_INIT_SCRIPT]
       : [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
   });
 

@@ -28,6 +28,17 @@ const path = require('path');
 const { openAndSettlePage } = require('../dist/lib/page-loader');
 const { makeFail, parseNumber } = require('../dist/lib/common');
 const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/browser-engine');
+// Shared "clock": the same global-duration measurement, deterministic seek, and
+// pause init-script the animation *capture* (lib/animation-capture.ts) uses, so
+// the baseline and the imported PAGX timeline are sampled on one clock. These
+// are browser-side functions injected via `page.evaluate(fn, arg)`.
+const {
+  pagxMeasureGlobalDurationMs,
+  pagxCaptureAnimeInstances,
+  pagxSeekAllToTime,
+  pagxSampleTimesMs,
+  PAGX_ANIM_PAUSE_INIT_SCRIPT,
+} = require('../dist/lib/animation-capture');
 
 const fail = makeFail('baseline-frames');
 
@@ -39,61 +50,6 @@ const fail = makeFail('baseline-frames');
 // corpus; keep it as a named constant so the rationale is obvious to future
 // edits.
 const SEEK_SETTLE_MS = 60;
-
-// Init-script injected into the baseline page before any of its own scripts
-// run. Two pieces of work, both aimed at keeping animations *suspended* across
-// `openAndSettlePage`'s settle wait so we can measure and seek them later:
-//
-//   1. A `<style>` rule pinning `animation-play-state: paused` on every
-//      element. Without this, CSS animations with a finite iteration count
-//      (e.g. `animation: pop 0.8s ease-out 1`) tick through the 800 ms settle,
-//      finish, drop into the `idle` phase, and disappear from
-//      `document.getAnimations()` — at which point `measureGlobalDurationMs()`
-//      reads zero and `seekToTime()` has nothing to seek. Pausing all CSS
-//      animations holds them at their first-frame state, keeps them in
-//      `getAnimations()`, and still lets `seekToTime()` advance them via
-//      `currentTime` (WAAPI honours the playhead write regardless of CSS
-//      play-state).
-//
-//   2. An `Element.prototype.animate` wrapper that pauses every WAAPI
-//      animation immediately on creation. CSS `animation-play-state` does not
-//      apply to WAAPI animations (`element.animate(...)`), so a finite
-//      `element.animate(..., { duration: 500 })` would still play to
-//      completion during settle and the same disappearance happens.
-//
-// Both must be installed before any page script runs, so this is shipped via
-// `page-loader.ts`'s `initScripts` (puppeteer `evaluateOnNewDocument` /
-// playwright `addInitScript`). The pause stays on for the whole capture: the
-// seek path drives playback explicitly via `currentTime` / GSAP `time()` /
-// anime `seek()`, never via the natural timeline clock.
-const BASELINE_PAUSE_INIT_SCRIPT = `(function() {
-  var STYLE_ID = '__pagxBaselinePauseAnims';
-  var STYLE_TEXT = '*, *::before, *::after { animation-play-state: paused !important; }';
-  function inject() {
-    if (document.getElementById(STYLE_ID)) return;
-    var parent = document.head || document.documentElement;
-    if (!parent) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = STYLE_TEXT;
-    parent.appendChild(s);
-  }
-  inject();
-  if (!document.getElementById(STYLE_ID)) {
-    document.addEventListener('DOMContentLoaded', inject, { once: true });
-  }
-  try {
-    var proto = window.Element && Element.prototype;
-    var orig = proto && proto.animate;
-    if (typeof orig === 'function') {
-      proto.animate = function() {
-        var anim = orig.apply(this, arguments);
-        try { if (anim && typeof anim.pause === 'function') anim.pause(); } catch (_) {}
-        return anim;
-      };
-    }
-  } catch (_) {}
-})();`;
 
 function parseArgs(argv) {
   const opts = {
@@ -186,207 +142,6 @@ async function captureBodyRect(page) {
   });
 }
 
-// Longest single-iteration period (delay + duration) in ms across every animation the page reports.
-// One period is enough: looping animations realign every period, so sampling [0, period] covers a
-// full visual cycle and matches how `pagx render --time` loops the imported timelines.
-//
-// WAAPI (CSS animations, Motion One, web-animations-js) surfaces via `document.getAnimations()`, but
-// rAF libraries like GSAP / anime.js drive their tweens off their own clock and never appear there —
-// the snapshot capture layer (lib/animation-capture.ts) reads them from `gsap.globalTimeline` /
-// `anime.running` instead. We mirror that here so a GSAP-only page reports a real duration rather
-// than 0 (which would otherwise collapse the sample grid to a single frame).
-async function measureGlobalDurationMs(page) {
-  return page.evaluate(() => {
-    let maxMs = 0;
-
-    let anims = [];
-    try {
-      anims = document.getAnimations ? document.getAnimations() : [];
-    } catch (_) {
-      anims = [];
-    }
-    for (const a of anims) {
-      let ct = null;
-      try {
-        ct = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
-      } catch (_) {
-        ct = null;
-      }
-      if (!ct) continue;
-      const dur = typeof ct.duration === 'number' && isFinite(ct.duration) ? ct.duration : 0;
-      if (dur <= 0) continue;
-      const delay = typeof ct.delay === 'number' && isFinite(ct.delay) ? ct.delay : 0;
-      const end = delay + dur;
-      if (end > maxMs) maxMs = end;
-    }
-
-    // GSAP: reconstruct one forward-iteration period from the global timeline's top-level children
-    // (the same window lib/animation-capture.ts samples over). `globalTimeline.duration()` is
-    // unusable when any tween repeats forever — GSAP reports it as ~1e10 s, which would scatter the
-    // baseline samples across random loop phases. Each child exposes its single-iteration
-    // `duration()` / `startTime()`, from which the true loop period is derived.
-    try {
-      const gsap = window.gsap;
-      if (gsap && gsap.globalTimeline) {
-        const tl = gsap.globalTimeline;
-        let children = [];
-        try {
-          children = typeof tl.getChildren === 'function' ? tl.getChildren(false, true, true) : [];
-        } catch (_) {
-          children = [];
-        }
-        let windowSec = 0;
-        for (const c of children) {
-          let start = 0;
-          let iterDur = 0;
-          try { start = typeof c.startTime === 'function' ? c.startTime() : 0; } catch (_) { start = 0; }
-          try { iterDur = typeof c.duration === 'function' ? c.duration() : 0; } catch (_) { iterDur = 0; }
-          if (!isFinite(iterDur) || iterDur <= 0) continue;
-          const end = (isFinite(start) ? start : 0) + iterDur;
-          if (end > windowSec) windowSec = end;
-        }
-        if (windowSec > 0 && windowSec * 1000 > maxMs) {
-          maxMs = windowSec * 1000;
-        }
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    // anime.js: longest running instance.
-    try {
-      const anime = window.anime;
-      if (anime && anime.running) {
-        for (const inst of anime.running) {
-          const dur = inst && typeof inst.duration === 'number' ? inst.duration : 0;
-          if (isFinite(dur) && dur > maxMs) maxMs = dur;
-        }
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    return maxMs;
-  });
-}
-
-// Pause every animation and pin its playback time to `timeMs`. Setting `currentTime` on a WAAPI
-// animation honours its own delay / iteration / direction, so a single absolute time seeks all
-// animations to a consistent frame regardless of their individual periods. GSAP / anime.js tweens
-// are seeked on their own clocks (same as the capture layer) so the baseline frames line up with the
-// keyframes the importer derived from those libraries.
-async function seekToTime(page, timeMs) {
-  await page.evaluate((t) => {
-    let anims = [];
-    try {
-      anims = document.getAnimations ? document.getAnimations() : [];
-    } catch (_) {
-      anims = [];
-    }
-    for (const a of anims) {
-      try {
-        a.pause();
-        a.currentTime = t;
-      } catch (_) {
-        /* skip this animation */
-      }
-    }
-
-    // GSAP: seek the global timeline to the same absolute time. `time()` honours each tween's own
-    // repeat / yoyo / delay, matching how the capture layer ticked it via progress().
-    try {
-      const gsap = window.gsap;
-      if (gsap && gsap.globalTimeline) {
-        const tl = gsap.globalTimeline;
-        tl.pause();
-        // suppressEvents = true: render the exact frame state without firing the
-        // timeline's events. GSAP's event-firing seek (the `false` default)
-        // renders lazily and drops zero-duration `.set()` values pinned to a
-        // timeline boundary (e.g. a wrapper's `autoAlpha: 1` at position 0),
-        // which would otherwise leave that element invisible for its whole
-        // window. Mirrors the capture layer (lib/animation-capture.ts) so the
-        // baseline and the PAGX render stay on one clock AND one render path.
-        tl.time(t / 1000, true);
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    // anime.js: seek each instance captured up front by captureAnimeInstances(). anime.js removes
-    // *paused* instances from `anime.running` on its next rAF tick, so re-reading `anime.running`
-    // here would find an empty list after the first frame's settle wait and freeze every later
-    // frame at the t=0 state. Holding our own references keeps the seek working once the instances
-    // are paused. (Fall back to `anime.running` if the capture step found nothing.)
-    try {
-      const captured = window.__pagxBaselineAnime;
-      const instances = (Array.isArray(captured) && captured.length)
-        ? captured
-        : (window.anime && window.anime.running ? window.anime.running : []);
-      for (const inst of instances) {
-        try {
-          if (inst.pause) inst.pause();
-          const dur = typeof inst.duration === 'number' ? inst.duration : t;
-          if (!isFinite(dur) || dur <= 0) continue;
-          // Match the capture layer's iteration math: anime.js loop is tri-state (true |
-          // number | falsy) and direction may be 'alternate' or 'reverse'. Translate the
-          // global frame time into the active iteration's local time so the ground-truth
-          // sample matches what the importer's keyframes will replay.
-          let iterations = 1;
-          if (inst.loop === true) iterations = Infinity;
-          else if (typeof inst.loop === 'number' && inst.loop > 0) iterations = inst.loop;
-          const totalDur = isFinite(iterations) ? dur * iterations : Infinity;
-          let local = t;
-          if (isFinite(totalDur) && local >= totalDur) {
-            local = totalDur;
-          }
-          let iterIndex = Math.floor(local / dur);
-          if (!isFinite(iterations) || iterIndex >= iterations) {
-            iterIndex = isFinite(iterations) ? Math.max(0, iterations - 1) : 0;
-          }
-          let phase = local - iterIndex * dur;
-          if (phase > dur) phase = dur;
-          if (inst.direction === 'reverse') {
-            phase = dur - phase;
-          } else if (inst.direction === 'alternate' && (iterIndex % 2) === 1) {
-            phase = dur - phase;
-          }
-          inst.seek(Math.max(0, Math.min(phase, dur)));
-        } catch (_) {
-          /* skip instance */
-        }
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    void document.body.offsetHeight;
-  }, timeMs);
-}
-
-// Snapshot the rAF-driven anime.js instances *before* the seek loop pauses any of them. anime.js
-// removes paused instances from `anime.running` on its next tick, so once seekToTime() pauses the
-// first frame's instance, `anime.running` empties and every subsequent seek finds nothing — leaving
-// all frames frozen at t=0. We keep our own references on `window` and seek those instead.
-async function captureAnimeInstances(page) {
-  await page.evaluate(() => {
-    try {
-      const anime = window.anime;
-      window.__pagxBaselineAnime = (anime && anime.running) ? anime.running.slice() : [];
-    } catch (_) {
-      window.__pagxBaselineAnime = [];
-    }
-  });
-}
-
-function sampleTimesMs(globalMs, samples) {
-  if (!(globalMs > 0) || samples <= 1) return [0];
-  const out = [];
-  for (let i = 0; i < samples; i++) {
-    out.push((i / (samples - 1)) * globalMs);
-  }
-  return out;
-}
-
 async function main() {
   const opts = parseArgs(process.argv);
   if (!fs.existsSync(opts.input)) {
@@ -404,9 +159,11 @@ async function main() {
       selector: opts.selector,
       // Pause every CSS / WAAPI animation as soon as it is created so finite
       // animations cannot run to completion during settle (and thus disappear
-      // from `document.getAnimations()` before the seek loop sees them). See
-      // BASELINE_PAUSE_INIT_SCRIPT for the full rationale.
-      initScripts: [BASELINE_PAUSE_INIT_SCRIPT],
+      // from `document.getAnimations()` before the seek loop sees them). The
+      // capture pipeline installs the identical script (lib/snapshot-runner.ts),
+      // so both sides observe the same suspended animations. See
+      // PAGX_ANIM_PAUSE_INIT_SCRIPT (lib/animation-clock.ts) for the rationale.
+      initScripts: [PAGX_ANIM_PAUSE_INIT_SCRIPT],
       onPageError: (err) => {
         console.error(`page exception: ${err.message}`);
       },
@@ -415,13 +172,16 @@ async function main() {
     const { width, height } = await captureBodyRect(page);
     await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
 
-    const globalDurationMs = await measureGlobalDurationMs(page);
-    await captureAnimeInstances(page);
-    const timesMs = sampleTimesMs(globalDurationMs, opts.samples);
+    // Measure + seek via the shared clock (lib/animation-clock.ts) so the
+    // baseline and the animation capture sample on one timeline. The functions
+    // are self-contained browser-side code injected with `page.evaluate(fn)`.
+    const globalDurationMs = await page.evaluate(pagxMeasureGlobalDurationMs);
+    await page.evaluate(pagxCaptureAnimeInstances);
+    const timesMs = pagxSampleTimesMs(globalDurationMs, opts.samples);
 
     const samples = [];
     for (let i = 0; i < timesMs.length; i++) {
-      await seekToTime(page, timesMs[i]);
+      await page.evaluate(pagxSeekAllToTime, timesMs[i]);
       // Give the engine a frame to flush the seeked styles before the screenshot.
       await new Promise((r) => setTimeout(r, SEEK_SETTLE_MS));
       const framePath = path.join(opts.outDir, `frame-${String(i).padStart(3, '0')}.png`);
