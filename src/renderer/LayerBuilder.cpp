@@ -1472,6 +1472,7 @@ class LayerBuilderContext {
     if (v == nullptr) {
       return;
     }
+    (*v)->ensureTGFXImage();
     auto* pattern = static_cast<tgfx::ImagePattern*>(object);
     pattern->setImage(LayerBuilder::GetTGFXImage(*v));
   }
@@ -1826,6 +1827,7 @@ class LayerBuilderContext {
     // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
     auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
     if (runtimeImage != nullptr) {
+      runtimeImage->ensureTGFXImage();
       image = LayerBuilder::GetTGFXImage(runtimeImage);
     }
     // Priority 2: fallback to standard decoding chain.

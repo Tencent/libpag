@@ -63,20 +63,31 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
                                                     pag::ImageOrigin origin) {
+  if (!texture.isValid()) {
+    return nullptr;
+  }
+  auto nativeHandle = tgfx::GLDevice::CurrentNativeHandle();
+  if (nativeHandle == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(texture, origin));
+}
+
+void PAGImage::ensureTGFXImage() {
+  if (_tgfxImage != nullptr || !_deferredTexture.isValid()) {
+    return;
+  }
   auto device = tgfx::GLDevice::Current();
   if (device == nullptr) {
-    return nullptr;
+    return;
   }
   auto* context = device->lockContext();
   if (context == nullptr) {
-    return nullptr;
+    return;
   }
-  auto image = tgfx::Image::MakeFrom(context, pag::ToTGFX(texture), pag::ToTGFX(origin));
+  _tgfxImage =
+      tgfx::Image::MakeFrom(context, pag::ToTGFX(_deferredTexture), pag::ToTGFX(_deferredOrigin));
   device->unlock();
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
 }
 
 const std::string& PAGImage::source() const {
@@ -84,6 +95,10 @@ const std::string& PAGImage::source() const {
 }
 PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
     : _tgfxImage(std::move(image)), _source(std::move(source)) {
+}
+
+PAGImage::PAGImage(pag::BackendTexture texture, pag::ImageOrigin origin)
+    : _deferredTexture(std::move(texture)), _deferredOrigin(origin) {
 }
 
 }  // namespace pagx

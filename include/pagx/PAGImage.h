@@ -62,10 +62,10 @@ class PAGImage {
   /**
    * Creates a PAGImage that wraps an existing GPU backend texture, so the host can supply a texture
    * it already owns without re-decoding. Requires an active GL context on the calling thread. The
-   * texture must be a GL-backend texture.
+   * texture is resolved lazily on first access during rendering.
    * @param texture the backend texture to wrap.
    * @param origin the texture's origin (top-left or bottom-left).
-   * @return a PAGImage, or nullptr if there is no current GL context or the texture is invalid.
+   * @return a PAGImage, or nullptr if the texture is invalid or there is no current GL context.
    */
   static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
                                                    pag::ImageOrigin origin);
@@ -76,10 +76,21 @@ class PAGImage {
    */
   const std::string& source() const;
 
+  /**
+   * Ensures the underlying tgfx::Image is created, resolving deferred texture-backed
+   * PAGImages on first access. Idempotent; safe to call multiple times.
+   */
+  void ensureTGFXImage();
+
  private:
   PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
+  PAGImage(pag::BackendTexture texture, pag::ImageOrigin origin);
   std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
   std::string _source = {};
+  // Deferred texture-backed image: stored when created via MakeFromTexture, resolved lazily on
+  // first access during rendering.
+  pag::BackendTexture _deferredTexture = {};
+  pag::ImageOrigin _deferredOrigin = pag::ImageOrigin::TopLeft;
 
   friend class LayerBuilder;
 };

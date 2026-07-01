@@ -347,7 +347,11 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     if (entry.source->valueType() == ViewModelPropertyType::Image) {
       auto* imageValue = static_cast<PAGViewModelValueImage*>(entry.source);
       auto* targetImage = std::get_if<std::shared_ptr<PAGImage>>(&kv);
+      if (targetImage != nullptr) {
+        (*targetImage)->ensureTGFXImage();
+      }
       auto targetTGFX = targetImage != nullptr ? LayerBuilder::GetTGFXImage(*targetImage) : nullptr;
+      imageValue->value()->ensureTGFXImage();
       if (LayerBuilder::GetTGFXImage(imageValue->value()) == targetTGFX) {
         continue;
       }
