@@ -1040,7 +1040,20 @@ export function pagxSampleTimeline(
       const props: Record<string, string> = {};
       for (const pr of varying) {
         const v = samples[i][pr];
-        if (v != null) props[pr] = v;
+        if (v != null) {
+          props[pr] = v;
+        } else if (pr === 'transform') {
+          // `pagxExtractTranslate` returns null for an identity / `none`
+          // transform, so a base-positioned sample would otherwise omit the
+          // channel entirely. When `transform` is a varying channel (e.g. an
+          // element that sits at translate(0) until a class toggle slides it
+          // out), the missing stops let the browser interpolate `transform`
+          // from the element's base value across the whole gap up to the first
+          // explicit keyframe — the element drifts from t=0 instead of holding
+          // still until the change. Pin the identity value explicitly so the
+          // keyframe holds the base position until the real transition point.
+          props[pr] = 'translate(0px, 0px)';
+        }
       }
       if (Object.keys(props).length > 0) norm.push({ offset, props });
     }
