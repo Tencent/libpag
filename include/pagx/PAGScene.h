@@ -28,8 +28,10 @@
 #include "pagx/PAGTimeline.h"
 
 namespace tgfx {
+class Context;
 class DisplayList;
 class Layer;
+class Recording;
 }  // namespace tgfx
 
 namespace pagx {
@@ -192,6 +194,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   tgfx::DisplayList* getDisplayListForOptions() const;
 
+  // Renders the scene into the surface without locking or managing the GPU context. The caller
+  // must hold a valid context lock. Internal method used by draw() and pagx::Record().
+  bool renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context,
+                bool autoClear);
+
   // Converts a surface-space point to the layer tree's root coordinate space using the display
   // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
   // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
@@ -224,6 +231,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   friend class PAGLayer;
   friend class PAGViewModelValue;
   friend class SuppressDelegation;
+  friend std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
+                                                  tgfx::Context* context,
+                                                  const std::shared_ptr<PAGSurface>& surface,
+                                                  bool autoClear);
 };
 
 }  // namespace pagx

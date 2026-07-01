@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include "pagx/tgfx.h"
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -415,15 +416,23 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   if (context == nullptr) {
     return false;
   }
-  auto tgfxSurface = drawable->getSurface(context);
-  if (tgfxSurface == nullptr) {
+  if (!renderTo(surface, context, autoClear)) {
     device->unlock();
     return false;
   }
-  displayList->render(tgfxSurface.get(), autoClear);
   drawable->present(context);
   device->unlock();
   clearAllViewModelsDirty();
+  return true;
+}
+
+bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context,
+                        bool autoClear) {
+  auto tgfxSurface = surface->drawable->getSurface(context);
+  if (tgfxSurface == nullptr) {
+    return false;
+  }
+  displayList->render(tgfxSurface.get(), autoClear);
   return true;
 }
 
@@ -639,6 +648,20 @@ RuntimeBinding* PAGScene::mutableBinding() {
 
 tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
   return displayList.get();
+}
+
+std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
+                                        tgfx::Context* context,
+                                        const std::shared_ptr<PAGSurface>& surface,
+                                        bool autoClear) {
+  if (scene == nullptr || context == nullptr || surface == nullptr) {
+    return nullptr;
+  }
+  scene->flushDataBinds();
+  if (!scene->renderTo(surface, context, autoClear)) {
+    return nullptr;
+  }
+  return context->flush();
 }
 
 }  // namespace pagx

@@ -20,25 +20,30 @@
 
 #include <memory>
 #include "pagx/PAGImage.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/gpu/Recording.h"
 
 namespace pagx {
 
-/**
- * Creates a PAGImage that wraps an existing tgfx::Image, sharing ownership via shared_ptr. Use
- * this when the host already has a tgfx::Image (e.g. created via tgfx::Image::MakeFrom within a
- * held GL context) and wants to pass it to PAGXDocument::loadFileData without re-decoding.
- * @param image the tgfx::Image to wrap. Must not be nullptr.
- * @return a PAGImage sharing ownership of the given image.
- */
 std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image);
+std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
 
 /**
- * Returns the underlying tgfx::Image wrapped by a PAGImage, or nullptr if the PAGImage is null.
- * The returned shared_ptr shares ownership with the PAGImage.
- * @param image the PAGImage to unwrap.
- * @return the underlying tgfx::Image, or nullptr if image is null.
+ * Renders the scene into the surface using the given GPU context, flushes rendering commands,
+ * and returns a Recording that can be submitted later. This allows tgfx power users to batch
+ * multiple scene renderings and their own tgfx work under a single GPU submission.
+ * The caller must hold the context lock (via Device::lockContext()). Does not submit or present.
+ * @param scene the scene to render.
+ * @param context the locked GPU context.
+ * @param surface the surface to render into.
+ * @param autoClear whether to clear the surface before rendering.
+ * @return a Recording ready for submission, or nullptr on failure.
  */
-std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
+                                        tgfx::Context* context,
+                                        const std::shared_ptr<PAGSurface>& surface,
+                                        bool autoClear = true);
 
 }  // namespace pagx
