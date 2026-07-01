@@ -46,6 +46,9 @@ class Drawable {
    * lifetime of the Drawable.
    */
   static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface) {
+    if (surface == nullptr) {
+      return nullptr;
+    }
     return std::shared_ptr<Drawable>(new Drawable(std::move(surface)));
   }
 
