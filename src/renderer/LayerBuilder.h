@@ -442,7 +442,6 @@ class LayerBuilder {
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
    * @param document The owning document, used to decode image resources.
-   * @param document The owning document, used to decode image resources.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
   static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
