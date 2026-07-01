@@ -671,7 +671,7 @@ class LayerBuilderContext {
   }
 
   // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
-  // conversion goes through getOrCreateImage() again and re-queries the provider.
+  // conversion goes through getOrCreateImage() again and re-reads the node's runtimeImage.
   void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
     if (filePath.empty()) {
       return;
