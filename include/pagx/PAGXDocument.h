@@ -163,12 +163,12 @@ class PAGXDocument : public Node {
   /**
    * Supplies a host-decoded image for the given external file path. Every Image node whose filePath
    * matches (in this document and its resolved external documents) renders with this image instead
-   * of decoding from its own data or file path; passing nullptr clears a previous one. The image is
-   * runtime-only state and is not serialized. Use this for resources the host loads itself (e.g.
-   * asynchronously, or from a GPU texture via PAGImage::MakeFromTexture). Existing scenes refresh
-   * the affected layers in place.
+   * of decoding from its own data or file path; passing an empty shared_ptr clears a previous one.
+   * The image is runtime-only state and is not serialized. Use this for resources the host loads
+   * itself (e.g. asynchronously, or from a GPU texture via PAGImage::MakeFromTexture). Existing
+   * scenes refresh the affected layers in place.
    * @param filePath the external file path as declared in the document's Image nodes
-   * @param image the decoded image to use, or nullptr to clear it
+   * @param image the decoded image to use, or an empty shared_ptr to clear it
    * @return true if a matching Image node was found
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image);
