@@ -3243,12 +3243,4 @@ std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
 std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
   return image ? image->_tgfxImage : nullptr;
 }
-
-std::shared_ptr<PAGImage> LayerBuilder::MakeFromTGFXImage(
-    const std::shared_ptr<tgfx::Image>& image) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
-}
 }  // namespace pagx

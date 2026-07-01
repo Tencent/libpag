@@ -363,7 +363,6 @@ class LayerBuilder {
  public:
   static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
   static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
-  static std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.
