@@ -38,10 +38,16 @@ namespace pagx {
  */
 class Drawable {
  public:
-  Drawable() = default;
-  explicit Drawable(std::shared_ptr<tgfx::Surface> surface) : surface(std::move(surface)) {
-  }
   virtual ~Drawable() = default;
+
+  /**
+   * Creates a Drawable from an existing tgfx::Surface. The Drawable adopts the surface and
+   * returns it from getSurface(). The caller must keep the tgfx::Surface alive for the
+   * lifetime of the Drawable.
+   */
+  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface) {
+    return std::shared_ptr<Drawable>(new Drawable(std::move(surface)));
+  }
 
   virtual int width() const {
     return surface ? surface->width() : 0;
@@ -67,6 +73,10 @@ class Drawable {
   }
 
  protected:
+  Drawable() = default;
+  explicit Drawable(std::shared_ptr<tgfx::Surface> surface) : surface(std::move(surface)) {
+  }
+
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 };
 

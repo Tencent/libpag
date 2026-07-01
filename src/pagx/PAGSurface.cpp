@@ -59,7 +59,7 @@ PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(
 }
 
 PAGSurface::PAGSurface(std::shared_ptr<tgfx::Surface> surface)
-    : drawable(std::make_shared<Drawable>(std::move(surface))) {
+    : drawable(Drawable::MakeFrom(std::move(surface))) {
 }
 
 PAGSurface::~PAGSurface() = default;
