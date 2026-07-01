@@ -25,7 +25,9 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
@@ -198,7 +200,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (!ensureWindow() || canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
-  if (pagSurface != nullptr && lastSurfaceWidth == canvasWidth &&
+  if (tgfxSurface != nullptr && lastSurfaceWidth == canvasWidth &&
       lastSurfaceHeight == canvasHeight) {
     return;
   }
@@ -207,13 +209,9 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (context == nullptr) {
     return;
   }
-  pag::GLFrameBufferInfo frameBufferInfo = {};
-  frameBufferInfo.id = 0;
-  frameBufferInfo.format = GL_RGBA8;
-  pag::BackendRenderTarget renderTarget(frameBufferInfo, canvasWidth, canvasHeight);
-  pagSurface = PAGSurface::MakeFrom(renderTarget, pag::ImageOrigin::BottomLeft);
+  tgfxSurface = tgfx::Surface::MakeFrom(context, window);
   device->unlock();
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
     return;
   }
   lastSurfaceWidth = canvasWidth;
@@ -318,7 +316,10 @@ void PAGXView::draw() {
   int currentCanvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
   syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
+    return;
+  }
+  if (tgfxSurface == nullptr) {
     return;
   }
   if (useCustomBackgroundColor) {
@@ -329,6 +330,7 @@ void PAGXView::draw() {
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context != nullptr) {
+    auto pagSurface = pagx::MakeFrom(tgfxSurface);
     auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
       presentImmediately = false;
