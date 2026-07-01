@@ -581,34 +581,35 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
 
     tgfx::GLTextureInfo glInfo = {};
     glInfo.id = static_cast<unsigned>(textureId);
-    tgfx::BackendTexture backendTex(glInfo, p.width, p.height);
-    // Use MakeFrom (non-adopted) rather than MakeAdopted: tgfx wraps the GL texture without
-    // claiming ownership, so when our shared_ptr<Image> drops the underlying TextureView is
-    // removed from the ResourceCache immediately instead of being parked in the scratch pool
-    // to wait for an LRU sweep. We retain the textureId on the entry and call gl.deleteTexture
-    // ourselves at the end of draw() (drainPendingTextureDeletes), guaranteeing the GPU memory
-    // is released in the same frame the entry is dropped.
-    auto tgfxImage = tgfx::Image::MakeFrom(context, backendTex, tgfx::ImageOrigin::TopLeft);
+    // Build a pag::BackendTexture from the GL texture info so PAGImage::MakeFromTexture can wrap
+    // the host-uploaded texture without exposing tgfx types to the viewer layer.
+    pag::GLTextureInfo pagGlInfo = {};
+    pagGlInfo.id = glInfo.id;
+    pagGlInfo.target = 0x0DE1;  // GL_TEXTURE_2D
+    pagGlInfo.format = 0x8058;  // GL_RGBA8
+    pag::BackendTexture pagBackendTex(pagGlInfo, p.width, p.height);
+    auto pagImage = PAGImage::MakeFromTexture(pagBackendTex, pag::ImageOrigin::TopLeft);
+    if (!pagImage) {
+      LOGI("[PAGX] attachNativeImage: MakeFromTexture failed path=%s", p.filePath.c_str());
+      retireTextureId(static_cast<unsigned>(textureId));
+      continue;
+    }
+    // Extract the underlying tgfx::Image for width/height and the external-texture entry.
+    auto tgfxImage = LayerBuilder::GetTGFXImage(pagImage);
     if (!tgfxImage) {
-      LOGI("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
-      // The GL texture was created successfully but tgfx refused to wrap it. Reclaim the
-      // texture immediately so we don't leak the GPU memory; queueing into
-      // pendingTextureDeletes keeps the actual gl.deleteTexture call inside the same
-      // drainPendingTextureDeletes() pass that handles eviction-side retirements.
       retireTextureId(static_cast<unsigned>(textureId));
       continue;
     }
 
     if (p.quality == ImageQuality::Full) {
-      // Replace the previous full entry. The old entry's tgfxImage drops here, immediately
-      // freeing tgfx's TextureView; retire the previous textureId so its GPU memory is
-      // reclaimed at the end of this same draw().
+      // Replace the previous full entry. The old entry's PAGImage drops here; retire the previous
+      // textureId so its GPU memory is reclaimed at the end of this same draw().
       auto& entry = externalTextures[p.filePath];
       if (entry.image) {
         externalTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       externalTexturesTotalBytes += p.sizeBytes;
@@ -617,37 +618,28 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
                                             static_cast<float>(tgfxImage->width()),
                                             static_cast<float>(tgfxImage->height()));
-      // Wrap the uploaded tgfx::Image as a PAGImage and push it onto the matching Image nodes.
-      // loadFileData sets Image::runtimeImage and refreshes affected layers in place via
-      // notifyChange, replacing the previous provider->putFullImage + rebuildForFilePath pair.
-      document->loadFileData(p.filePath, LayerBuilder::WrapTGFXImage(tgfxImage));
+      // Push the PAGImage onto matching Image nodes. loadFileData sets Image::runtimeImage and
+      // refreshes affected layers in place, replacing the previous provider->putFullImage +
+      // rebuildForFilePath pair.
+      document->loadFileData(p.filePath, pagImage);
     } else {
       // Thumbnail: budget enforcement and silent LRU eviction happen up front in
-      // attachNativeImage() so flushPendingUploads only sees
-      // uploads that already fit.
+      // attachNativeImage() so flushPendingUploads only sees uploads that already fit.
       auto& entry = thumbnailTextures[p.filePath];
       if (entry.image) {
         thumbnailTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       thumbnailTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel
-      // dimensions. Without this, fills that have never seen a Full attach yet would keep
-      // the matrix baked at parsePAGX time (orig-image-* dimensions), which scales the UV
-      // mapping for a thumbnail-sized texture by the original full-resolution divisor —
-      // sampling lands outside the thumbnail's [0,1] domain and the fill renders blank
-      // (clamped to edge). The override dimensions keep this correct after a later
-      // Full attach overwrites the matrix to the full-resolution dimensions.
+      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel dimensions.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
                                             static_cast<float>(tgfxImage->width()),
                                             static_cast<float>(tgfxImage->height()));
-      // Install the thumbnail as the runtime image so the renderer picks it up. loadFileData
-      // refreshes affected layers in place, replacing the previous provider->putThumbnailImage +
-      // rebuildForFilePath pair.
-      document->loadFileData(p.filePath, LayerBuilder::WrapTGFXImage(tgfxImage));
+      // Install the thumbnail as the runtime image so the renderer picks it up.
+      document->loadFileData(p.filePath, pagImage);
     }
   }
 }

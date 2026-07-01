@@ -471,7 +471,7 @@ class PAGXView {
   // "still attached" turned out to mark every entry as equally fresh, which silently disabled
   // LRU pressure entirely.
   struct ExternalTextureEntry {
-    std::shared_ptr<tgfx::Image> image = nullptr;
+    std::shared_ptr<PAGImage> image = nullptr;
     uint64_t sizeBytes = 0;
     unsigned textureId = 0;
   };
