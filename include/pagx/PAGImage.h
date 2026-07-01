@@ -61,10 +61,11 @@ class PAGImage {
 
   /**
    * Creates a PAGImage that wraps an existing GPU backend texture, so the host can supply a texture
-   * it already owns without re-decoding. Requires an active GPU context on the calling thread.
+   * it already owns without re-decoding. Requires an active GL context on the calling thread. The
+   * texture must be a GL-backend texture.
    * @param texture the backend texture to wrap.
    * @param origin the texture's origin (top-left or bottom-left).
-   * @return a PAGImage, or nullptr if there is no current GPU context or the texture is invalid.
+   * @return a PAGImage, or nullptr if there is no current GL context or the texture is invalid.
    */
   static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
                                                    pag::ImageOrigin origin);
