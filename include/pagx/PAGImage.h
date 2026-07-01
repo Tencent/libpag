@@ -29,14 +29,49 @@ class Image;
 
 namespace pagx {
 
+/**
+ * PAGImage wraps a decoded image with its source path or data URI. It is the value type carried by
+ * image-valued ViewModel properties and DataBind channels, so that writers receive a ready-to-
+ * render image object instead of a raw path string that would need per-frame decoding.
+ */
 class PAGImage {
  public:
+  /**
+   * Creates a PAGImage from a file path.
+   * @param path a file path.
+   * @return a PAGImage, or nullptr if the image could not be decoded.
+   */
   static std::shared_ptr<PAGImage> MakeFromPath(const std::string& path);
+
+  /**
+   * Creates a PAGImage from a data URI (e.g. "data:image/png;base64,...").
+   * @param dataURI a data URI string.
+   * @return a PAGImage, or nullptr if the image could not be decoded.
+   */
   static std::shared_ptr<PAGImage> MakeFromDataURI(const std::string& dataURI);
+
+  /**
+   * Creates a PAGImage from raw encoded image data (PNG, JPEG, WebP, etc.).
+   * @param data the encoded image bytes.
+   * @return a PAGImage, or nullptr if the image could not be decoded.
+   */
   static std::shared_ptr<PAGImage> MakeFromData(const std::shared_ptr<Data>& data);
+
+  /**
+   * Creates a PAGImage that wraps an existing GPU backend texture, so the host can supply a texture
+   * it already owns without re-decoding. Requires an active GL context on the calling thread. The
+   * texture must be a GL-backend texture.
+   * @param texture the backend texture to wrap.
+   * @param origin the texture's origin (top-left or bottom-left).
+   * @return a PAGImage, or nullptr if there is no current GL context or the texture is invalid.
+   */
   static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
                                                    pag::ImageOrigin origin);
 
+  /**
+   * Returns the source string (file path or data URI) this PAGImage was created from, or an empty
+   * string if created from raw data.
+   */
   const std::string& source() const;
 
  private:
