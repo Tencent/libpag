@@ -155,7 +155,7 @@ class PAGComposition : public PAGLayer {
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
-  std::unique_ptr<DataBindRuntime> dataBindRuntime = {};
+  std::unique_ptr<DataBindRuntime> dataBindRuntime;
   std::shared_ptr<DataContext> dataContext = nullptr;
 
   void updateDataBinds(float mix = 1.0f);
