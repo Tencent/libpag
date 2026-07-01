@@ -36,6 +36,7 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
 #include "pagx/PAGImage.h"
+#include "pagx/tgfx.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/PAGXImporter.h"
@@ -581,25 +582,23 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
 
     tgfx::GLTextureInfo glInfo = {};
     glInfo.id = static_cast<unsigned>(textureId);
-    // Build a pag::BackendTexture from the GL texture info so PAGImage::MakeFromTexture can wrap
-    // the host-uploaded texture without exposing tgfx types to the viewer layer.
-    pag::GLTextureInfo pagGlInfo = {};
-    pagGlInfo.id = glInfo.id;
-    pagGlInfo.target = 0x0DE1;  // GL_TEXTURE_2D
-    pagGlInfo.format = 0x8058;  // GL_RGBA8
-    pag::BackendTexture pagBackendTex(pagGlInfo, p.width, p.height);
-    auto pagImage = PAGImage::MakeFromTexture(pagBackendTex, pag::ImageOrigin::TopLeft);
-    if (!pagImage) {
-      LOGI("[PAGX] attachNativeImage: MakeFromTexture failed path=%s", p.filePath.c_str());
-      retireTextureId(static_cast<unsigned>(textureId));
-      continue;
-    }
-    // Extract the underlying tgfx::Image for width/height and the external-texture entry.
-    auto tgfxImage = LayerBuilder::GetTGFXImage(pagImage);
+    glInfo.target = 0x0DE1;  // GL_TEXTURE_2D
+    glInfo.format = 0x8058;  // GL_RGBA8
+    tgfx::BackendTexture backendTex(glInfo, p.width, p.height);
+    // Use MakeFrom (non-adopted) rather than MakeAdopted: tgfx wraps the GL texture without
+    // claiming ownership, so when our shared_ptr<Image> drops the underlying TextureView is
+    // removed from the ResourceCache immediately instead of being parked in the scratch pool
+    // to wait for an LRU sweep. We retain the textureId on the entry and call gl.deleteTexture
+    // ourselves at the end of draw() (drainPendingTextureDeletes), guaranteeing the GPU memory
+    // is released in the same frame the entry is dropped.
+    auto tgfxImage = tgfx::Image::MakeFrom(context, backendTex, tgfx::ImageOrigin::TopLeft);
     if (!tgfxImage) {
+      LOGI("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
       retireTextureId(static_cast<unsigned>(textureId));
       continue;
     }
+    // Wrap the uploaded tgfx::Image as a PAGImage without re-locking the context.
+    auto pagImage = pagx::MakeFromTGFXImage(tgfxImage);
 
     if (p.quality == ImageQuality::Full) {
       // Replace the previous full entry. The old entry's PAGImage drops here; retire the previous

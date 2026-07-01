@@ -19,34 +19,26 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include "pag/gpu.h"
-#include "pagx/types/Data.h"
-
-namespace tgfx {
-class Image;
-}
+#include "pagx/PAGImage.h"
+#include "tgfx/core/Image.h"
 
 namespace pagx {
 
-class PAGImage {
- public:
-  static std::shared_ptr<PAGImage> MakeFromPath(const std::string& path);
-  static std::shared_ptr<PAGImage> MakeFromDataURI(const std::string& dataURI);
-  static std::shared_ptr<PAGImage> MakeFromData(const std::shared_ptr<Data>& data);
-  static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
-                                                   pag::ImageOrigin origin);
+/**
+ * Creates a PAGImage that wraps an existing tgfx::Image, sharing ownership via shared_ptr. Use
+ * this when the host already has a tgfx::Image (e.g. created via tgfx::Image::MakeFrom within a
+ * held GL context) and wants to pass it to PAGXDocument::loadFileData without re-decoding.
+ * @param image the tgfx::Image to wrap. Must not be nullptr.
+ * @return a PAGImage sharing ownership of the given image.
+ */
+std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
-  const std::string& source() const;
-
- private:
-  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
-  std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
-  std::string _source = {};
-
-  friend std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>&);
-  friend std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>&);
-  friend class LayerBuilder;
-};
+/**
+ * Returns the underlying tgfx::Image wrapped by a PAGImage, or nullptr if the PAGImage is null.
+ * The returned shared_ptr shares ownership with the PAGImage.
+ * @param image the PAGImage to unwrap.
+ * @return the underlying tgfx::Image, or nullptr if image is null.
+ */
+std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
 
 }  // namespace pagx

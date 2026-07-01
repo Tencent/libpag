@@ -18,6 +18,7 @@
 
 #include "pagx/PAGImage.h"
 #include "base/utils/TGFXCast.h"
+#include "pagx/tgfx.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Image.h"
@@ -63,31 +64,20 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
                                                     pag::ImageOrigin origin) {
-  if (!texture.isValid()) {
-    return nullptr;
-  }
-  auto nativeHandle = tgfx::GLDevice::CurrentNativeHandle();
-  if (nativeHandle == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(texture, origin));
-}
-
-void PAGImage::ensureTGFXImage() {
-  if (_tgfxImage != nullptr || !_deferredTexture.isValid()) {
-    return;
-  }
   auto device = tgfx::GLDevice::Current();
   if (device == nullptr) {
-    return;
+    return nullptr;
   }
   auto* context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return nullptr;
   }
-  _tgfxImage =
-      tgfx::Image::MakeFrom(context, pag::ToTGFX(_deferredTexture), pag::ToTGFX(_deferredOrigin));
+  auto image = tgfx::Image::MakeFrom(context, pag::ToTGFX(texture), pag::ToTGFX(origin));
   device->unlock();
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
 }
 
 const std::string& PAGImage::source() const {
@@ -97,8 +87,15 @@ PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
     : _tgfxImage(std::move(image)), _source(std::move(source)) {
 }
 
-PAGImage::PAGImage(pag::BackendTexture texture, pag::ImageOrigin origin)
-    : _deferredTexture(std::move(texture)), _deferredOrigin(origin) {
+std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
+}
+
+std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
 }
 
 }  // namespace pagx

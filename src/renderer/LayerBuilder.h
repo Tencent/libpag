@@ -362,25 +362,11 @@ struct LayerBuildResult {
 class LayerBuilder {
  public:
   /**
-   * Returns the tgfx::Image wrapped by a PAGImage. For internal use by channel writers that need
-   * to apply the image to a runtime object.
-   */
-  static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
-
-  /**
    * Returns the host-supplied runtime image cached on an Image node (set via
    * PAGXDocument::loadFileData(path, PAGImage)), or nullptr if none. Internal accessor that reads
    * the node's private runtime cache during build.
    */
   static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
-
-  /**
-   * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
-   * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
-   * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
-   * for change detection, so the empty source does not cause spurious writebacks.
-   */
-  static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.

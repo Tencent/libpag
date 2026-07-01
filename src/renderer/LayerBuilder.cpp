@@ -63,6 +63,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/MixUtils.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/FillRule.h"
@@ -1472,14 +1473,13 @@ class LayerBuilderContext {
     if (v == nullptr) {
       return;
     }
-    (*v)->ensureTGFXImage();
     auto* pattern = static_cast<tgfx::ImagePattern*>(object);
-    pattern->setImage(LayerBuilder::GetTGFXImage(*v));
+    pattern->setImage(GetTGFXImage(*v));
   }
 
   static bool ReadImagePatternImage(const void* object, KeyValue* out) {
     auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
-    *out = KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    *out = KeyValue{MakeFromTGFXImage(image)};
     return true;
   }
 
@@ -1827,8 +1827,7 @@ class LayerBuilderContext {
     // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
     auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
     if (runtimeImage != nullptr) {
-      runtimeImage->ensureTGFXImage();
-      image = LayerBuilder::GetTGFXImage(runtimeImage);
+      image = GetTGFXImage(runtimeImage);
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -3237,18 +3236,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   return context.buildLayerInto(node, binding);
 }
 
-std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
-  return image ? image->_tgfxImage : nullptr;
-}
-
 std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
   return node != nullptr ? node->runtimeImage : nullptr;
-}
-
-std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
 }
 }  // namespace pagx
