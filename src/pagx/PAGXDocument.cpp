@@ -152,7 +152,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     return;
   }
   if (config != nullptr) {
-    fontConfig_.merge(*config);
+    _fontConfig = *config;
   }
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
@@ -182,7 +182,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       }
     }
   }
-  LayoutContext context(&fontConfig_);
+  LayoutContext context(&_fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Composition) {
@@ -199,7 +199,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
         // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
         // so external compositions are measured and rendered with the host's fonts, keeping text
         // consistent across the embedded boundary rather than using the external doc's own config.
-        layer->externalDoc->applyLayout(&fontConfig_, visited);
+        layer->externalDoc->applyLayout(&_fontConfig, visited);
       }
     }
   }

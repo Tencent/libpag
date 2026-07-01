@@ -35,10 +35,9 @@ class LayoutContext;
 class PAGScene;
 
 /**
- * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and
- * font configuration of a parsed/authored document, and tracks the live PAGScene instances
- * created from it so post-build edits issued through `notifyChange()` can be broadcast to
- * each scene. Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document.
+ * It contains resources and layers. This is a pure data structure class.
+ * Use PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
@@ -149,10 +148,10 @@ class PAGXDocument : public Node {
    * additional typefaces or fallbacks directly before invoking `applyLayout`.
    */
   FontConfig& fontConfig() {
-    return fontConfig_;
+    return _fontConfig;
   }
   const FontConfig& fontConfig() const {
-    return fontConfig_;
+    return _fontConfig;
   }
 
   /**
@@ -162,11 +161,8 @@ class PAGXDocument : public Node {
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
    * current fields.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
-   *                   its typefaces and fallback fonts are MERGED into the internal config —
-   *                   importer-injected fallback fonts (e.g. from the HTML importer) are
-   *                   preserved, and the caller's entries layer on top with caller-supplied
-   *                   registered typefaces winning on key conflicts. Pass nullptr to use the
-   *                   internal config unchanged.
+   *                   updates the internal config before layout. Pass nullptr to use the
+   *                   previously set config (or no config).
    */
   void applyLayout(const FontConfig* fontConfig = nullptr);
 
@@ -247,7 +243,7 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
-  FontConfig fontConfig_;
+  FontConfig _fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
 

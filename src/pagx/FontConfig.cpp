@@ -17,44 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/FontConfig.h"
-#include <unordered_set>
 #include "FontConfigData.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
-
-namespace {
-struct FallbackKey {
-  std::string path = {};
-  std::string family = {};
-  std::string style = {};
-  int ttcIndex = 0;
-
-  bool operator==(const FallbackKey& other) const {
-    return path == other.path && family == other.family && style == other.style &&
-           ttcIndex == other.ttcIndex;
-  }
-};
-
-struct FallbackKeyHash {
-  size_t operator()(const FallbackKey& key) const {
-    size_t h = std::hash<std::string>()(key.path);
-    h ^= std::hash<std::string>()(key.family) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= std::hash<std::string>()(key.style) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= std::hash<int>()(key.ttcIndex) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    return h;
-  }
-};
-
-FallbackKey MakeFallbackKey(const TypefaceHolder& holder) {
-  FallbackKey key = {};
-  key.path = holder.getPath();
-  key.family = holder.getFontFamily();
-  key.style = holder.getFontStyle();
-  key.ttcIndex = holder.getTTCIndex();
-  return key;
-}
-}  // namespace
 
 TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface)
     : typeface(std::move(typeface)) {
@@ -87,14 +53,6 @@ const std::string& TypefaceHolder::getFontFamily() const {
 
 const std::string& TypefaceHolder::getFontStyle() const {
   return fontStyle;
-}
-
-const std::string& TypefaceHolder::getPath() const {
-  return path;
-}
-
-int TypefaceHolder::getTTCIndex() const {
-  return ttcIndex;
 }
 
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
@@ -134,25 +92,6 @@ void FontConfig::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface
 void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
   data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
-}
-
-void FontConfig::merge(const FontConfig& other) {
-  if (this == &other || data == nullptr || other.data == nullptr) {
-    return;
-  }
-  for (const auto& entry : other.data->registeredTypefaces) {
-    data->registeredTypefaces[entry.first] = entry.second;
-  }
-  std::unordered_set<FallbackKey, FallbackKeyHash> seen = {};
-  seen.reserve(data->fallbackTypefaces.size() + other.data->fallbackTypefaces.size());
-  for (const auto& holder : data->fallbackTypefaces) {
-    seen.insert(MakeFallbackKey(holder));
-  }
-  for (const auto& holder : other.data->fallbackTypefaces) {
-    if (seen.insert(MakeFallbackKey(holder)).second) {
-      data->fallbackTypefaces.push_back(holder);
-    }
-  }
 }
 
 std::vector<std::string> FontConfig::fallbackFamilyNames() const {
