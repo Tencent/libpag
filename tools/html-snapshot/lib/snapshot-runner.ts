@@ -20,6 +20,7 @@ import {
   capturePagxAnimationsOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
   PAGX_ANIM_PAUSE_INIT_SCRIPT,
+  PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
 } from './animation-capture';
 import {
   makeFontCaptureListener,
@@ -385,12 +386,32 @@ export async function runSnapshot(
     // finite animation that finished during settle would drop out of
     // `document.getAnimations()` and be missed, and the capture would no longer
     // share the baseline's clock.
+    // PAGX_VIRTUAL_CLOCK_INIT_SCRIPT is installed first so it wraps
+    // setTimeout/setInterval/rAF before any page script schedules on them; the
+    // page's timer-driven state machine then stays frozen at t=0 until the
+    // animation sampler advances it deterministically (via pagxSeekAllToTime).
     initScripts: captureAnimations
-      ? [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT, PAGX_ANIM_PAUSE_INIT_SCRIPT]
+      ? [PAGX_VIRTUAL_CLOCK_INIT_SCRIPT, SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT, PAGX_ANIM_PAUSE_INIT_SCRIPT]
       : [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
   });
 
   try {
+    // With the virtual clock installed the page's timers are frozen at t=0.
+    // Flush zero-delay init timers (advanceTo(0)) before measuring the body so
+    // the canvas size reflects the same t=0 layout the eval baseline measures
+    // (baseline-frames.js does the identical advanceTo(0) before its rect read).
+    // Best-effort: no-op when animation capture / the clock are disabled.
+    if (captureAnimations) {
+      try {
+        await page.evaluate(() => {
+          const clock = (window as unknown as { __pagxClock?: { advanceTo?: (ms: number) => void } }).__pagxClock;
+          if (clock && typeof clock.advanceTo === 'function') clock.advanceTo(0);
+        });
+      } catch (err) {
+        if (log) log(`virtual-clock advanceTo(0) skipped: ${errMessage(err)}`);
+      }
+    }
+
     // Second-pass viewport settle. Some pages register a `resize` handler that
     // reads `window.innerWidth/innerHeight` and writes a derived transform
     // back onto a fixed-size stage element — e.g. a 1920x1080 mock with

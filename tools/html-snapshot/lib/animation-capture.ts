@@ -88,6 +88,119 @@ export const PAGX_ANIM_PAUSE_INIT_SCRIPT = `(function() {
   } catch (_) {}
 })();`;
 
+// Init-script installing a *virtual clock* that freezes the page's JS timers
+// (`setTimeout` / `setInterval` / `requestAnimationFrame`) and time sources
+// (`Date.now` / `performance.now`) so they only advance when driven explicitly
+// via `window.__pagxClock.advanceTo(ms)`.
+//
+// Why: many "animated" pages are not declarative at all — they run a
+// setTimeout/interval state machine that toggles classes (or calls
+// `element.click()`) to swap whole scenes over time (e.g. a menu that slides
+// out and a skill panel that fades in). `document.getAnimations()` sees none of
+// that at snapshot time, and left on the wall clock the mutations fire
+// nondeterministically during load/settle. By intercepting the timers at
+// document-start and advancing them on the SAME absolute clock the animation
+// sampler and the eval baseline already seek declarative animations to
+// (`pagxSeekAllToTime` → `advanceTo`), the JS-driven scene changes become part
+// of the sampled timeline: the sampler observes each element's opacity /
+// transform / color as the scene switches, and encodes it as canonical
+// `@keyframes` the importer can replay.
+//
+// Must be installed before any page script runs (page-loader `initScripts`),
+// alongside PAGX_ANIM_PAUSE_INIT_SCRIPT. `advanceTo` is forward-only (fired
+// timers cannot be un-fired); callers seek monotonically. Frame ticks for rAF
+// are only generated while rAF callbacks are pending, so a page that uses no
+// rAF costs nothing. Exceptions thrown by page callbacks are swallowed so one
+// bad handler cannot abort the whole advance.
+export const PAGX_VIRTUAL_CLOCK_INIT_SCRIPT = `(function(){
+  if (window.__pagxClock) return;
+  var FRAME = 1000 / 60;
+  var EPOCH = 1700000000000;
+  var GUARD = 5000000;
+  var virtualNow = 0;
+  var lastFrame = 0;
+  var seq = 1;
+  var timers = [];
+  var rafs = [];
+
+  function schedule(fn, delay, args, repeat){
+    if (typeof fn !== 'function') {
+      var code = String(fn);
+      fn = function(){ try { (0, eval)(code); } catch(_){} };
+    }
+    var d = +delay; if (!isFinite(d) || d < 0) d = 0;
+    var id = seq++;
+    timers.push({ id: id, time: virtualNow + d, fn: fn, args: args || [],
+                  interval: repeat ? Math.max(1, d) : null, cancelled: false });
+    return id;
+  }
+  window.setTimeout = function(fn, delay){
+    return schedule(fn, delay, Array.prototype.slice.call(arguments, 2), false);
+  };
+  window.setInterval = function(fn, delay){
+    return schedule(fn, delay, Array.prototype.slice.call(arguments, 2), true);
+  };
+  window.clearTimeout = function(id){
+    for (var i = 0; i < timers.length; i++){ if (timers[i].id === id){ timers[i].cancelled = true; return; } }
+  };
+  window.clearInterval = window.clearTimeout;
+  window.requestAnimationFrame = function(cb){ var id = seq++; rafs.push({ id: id, cb: cb, cancelled: false }); return id; };
+  window.cancelAnimationFrame = function(id){
+    for (var i = 0; i < rafs.length; i++){ if (rafs[i].id === id){ rafs[i].cancelled = true; return; } }
+  };
+  try { window.Date.now = function(){ return EPOCH + Math.round(virtualNow); }; } catch(_){}
+  try { if (window.performance) window.performance.now = function(){ return virtualNow; }; } catch(_){}
+
+  function earliestTimer(){
+    var m = Infinity;
+    for (var i = 0; i < timers.length; i++){ var t = timers[i]; if (!t.cancelled && t.time < m) m = t.time; }
+    return m;
+  }
+  function fireDue(now){
+    var guard = 0;
+    while (guard++ < GUARD){
+      var best = null;
+      for (var i = 0; i < timers.length; i++){
+        var t = timers[i];
+        if (t.cancelled || t.time > now) continue;
+        if (best === null || t.time < best.time || (t.time === best.time && t.id < best.id)) best = t;
+      }
+      if (best === null) break;
+      if (best.interval != null) best.time += best.interval; else best.cancelled = true;
+      try { best.fn.apply(window, best.args); } catch(_){}
+    }
+    if (timers.length > 4096){
+      var kept = [];
+      for (var j = 0; j < timers.length; j++){ if (!timers[j].cancelled) kept.push(timers[j]); }
+      timers = kept;
+    }
+  }
+  function flushRaf(ts){
+    var due = rafs; rafs = [];
+    for (var i = 0; i < due.length; i++){ if (due[i].cancelled) continue; try { due[i].cb(ts); } catch(_){} }
+  }
+  function advanceTo(target){
+    target = +target;
+    if (!isFinite(target)) return;
+    if (target < virtualNow) target = virtualNow;
+    var guard = 0;
+    while (guard++ < GUARD){
+      var nt = earliestTimer();
+      var nf = rafs.length ? (lastFrame + FRAME) : Infinity;
+      var next = nt < nf ? nt : nf;
+      if (!(next <= target)) break;
+      if (next < virtualNow) next = virtualNow;
+      virtualNow = next;
+      if (nf <= nt && rafs.length && next === nf){ lastFrame = nf; flushRaf(virtualNow); }
+      fireDue(virtualNow);
+    }
+    if (target > virtualNow) virtualNow = target;
+    if (rafs.length === 0) lastFrame = virtualNow;
+  }
+
+  window.__pagxClock = { now: function(){ return virtualNow; }, advanceTo: advanceTo };
+})();`;
+
 export interface CaptureAnimationsOptions {
   // Number of samples taken across a library timeline (GSAP / anime.js) before
   // per-channel RDP decimation. Higher is denser/more faithful; RDP keeps the
@@ -682,6 +795,77 @@ export function pagxCandidateElements(maxElements: number): HTMLElement[] {
   return list;
 }
 
+// Record the initial DOM state (every element's `class` + inline `style`, and
+// the set of live nodes) so it can be restored after the global sampler has
+// advanced the virtual clock through the timeline. Advancing the clock fires
+// the page's timer-driven state machine, which mutates the DOM (toggles scene
+// classes, sometimes appends transient nodes like countdown digits); the
+// snapshot that follows capture must serialise the *initial* scene (menu
+// visible, later panels at opacity 0 with a pagxAnim that fades them in), not
+// whatever end state the timeline left behind.
+export function pagxDomCheckpoint(): {
+  records: Array<{ el: Element; className: string | null; style: string | null }>;
+  set: Set<Element>;
+} {
+  const records: Array<{ el: Element; className: string | null; style: string | null }> = [];
+  const set = new Set<Element>();
+  let list: Element[] = [];
+  try {
+    list = Array.prototype.slice.call(document.body.querySelectorAll('*'));
+  } catch (_) {
+    list = [];
+  }
+  for (const el of list) {
+    set.add(el);
+    records.push({
+      el,
+      className: el.getAttribute('class'),
+      style: el.getAttribute('style'),
+    });
+  }
+  return { records, set };
+}
+
+// Restore the DOM to a checkpoint taken by pagxDomCheckpoint: drop any node the
+// timeline appended after the checkpoint, then restore each original element's
+// `class` + inline `style`. This reverts the scene-switching class flips (and
+// the inline `animation-delay` a demo sequence may have written on perks, etc.)
+// so `pagxEmitCaptured` and the snapshot walker see the initial scene. Nodes
+// that were detached by the timeline (rare for the class-toggle idiom) are left
+// alone — there is nothing to reattach them to.
+export function pagxDomRestore(cp: {
+  records: Array<{ el: Element; className: string | null; style: string | null }>;
+  set: Set<Element>;
+} | null): void {
+  if (!cp) return;
+  try {
+    let now: Element[] = [];
+    try {
+      now = Array.prototype.slice.call(document.body.querySelectorAll('*'));
+    } catch (_) {
+      now = [];
+    }
+    for (const el of now) {
+      if (!cp.set.has(el) && el.parentNode) {
+        try { el.parentNode.removeChild(el); } catch (_) { /* ignore */ }
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  for (const r of cp.records) {
+    try {
+      if ((r.el as { isConnected?: boolean }).isConnected === false) continue;
+      if (r.className === null) r.el.removeAttribute('class');
+      else r.el.setAttribute('class', r.className);
+      if (r.style === null) r.el.removeAttribute('style');
+      else r.el.setAttribute('style', r.style);
+    } catch (_) {
+      /* ignore this element */
+    }
+  }
+}
+
 export function pagxBuildKeyframesIndex(): Record<string, unknown> {
   const idx: Record<string, unknown> = {};
   let sheets: StyleSheet[] = [];
@@ -992,6 +1176,17 @@ export function pagxCaptureAnimeInstances(): void {
 // truth. Call `pagxCaptureAnimeInstances()` once before the first seek.
 export function pagxSeekAllToTime(timeMs: number): void {
   const t = timeMs;
+  // Drive the virtual clock (PAGX_VIRTUAL_CLOCK_INIT_SCRIPT) to this absolute
+  // time FIRST, so any setTimeout/setInterval-driven scene changes (class
+  // toggles, scripted `.click()`s) have mutated the DOM before we seek the
+  // declarative animations and read computed style. Forward-only; no-op when
+  // the clock init script was not installed.
+  try {
+    const clock = (window as unknown as { __pagxClock?: { advanceTo?: (ms: number) => void } }).__pagxClock;
+    if (clock && typeof clock.advanceTo === 'function') clock.advanceTo(t);
+  } catch (_) {
+    /* ignore */
+  }
   let anims = [];
   try {
     anims = document.getAnimations ? document.getAnimations() : [];
@@ -1113,6 +1308,29 @@ export function pagxCollectGlobalSampled(
   } catch (_) {
     /* ignore */
   }
+  // Suppress CSS transitions for the duration of the sampling seeks. When the
+  // virtual clock (pagxSeekAllToTime → advanceTo) fires a timer that toggles a
+  // scene class, the resulting CSS *transition* would need real wall-clock time
+  // (or a compositor tick) to interpolate — but the whole sampler runs in one
+  // synchronous `page.evaluate`, so a transitioned property would read its
+  // *start* value at every sample and the change would be invisible (e.g. a
+  // panel revealed by `transition: opacity .55s` on a `.show` class would never
+  // appear to fade in, and its element would be dropped as opacity:0). Forcing
+  // `transition: none` makes each class flip apply its *end* value instantly at
+  // the exact virtual time it happens, so the sampler captures it as a step on
+  // the timeline. This is safe for load-time entrance transitions: their class
+  // flip already happened before t=0, so with transitions off they read their
+  // settled end value with zero variance across the window and are skipped here
+  // — leaving them to the dedicated transitionrun recorder (pagxCollectTransitions),
+  // which reconstructs their real tween.
+  let txBlocker: HTMLStyleElement | null = null;
+  try {
+    txBlocker = document.createElement('style');
+    txBlocker.textContent = '*, *::before, *::after { transition: none !important; }';
+    (document.head || document.documentElement).appendChild(txBlocker);
+  } catch (_) {
+    txBlocker = null;
+  }
   // Reuse the dense-sample -> per-channel RDP path. The seek closure maps the
   // 0..1 progress the sampler walks onto the shared absolute clock. Emit as a
   // single non-looping window (iterations = 1, delay = 0, normal direction):
@@ -1122,6 +1340,11 @@ export function pagxCollectGlobalSampled(
     captured, seen, globalMs, (p) => pagxSeekAllToTime(p * globalMs),
     1, sampleCount, maxElements, 'normal', 0,
   );
+  try {
+    if (txBlocker && txBlocker.parentNode) txBlocker.parentNode.removeChild(txBlocker);
+  } catch (_) {
+    /* ignore */
+  }
   try {
     pagxSeekAllToTime(0);
   } catch (_) {
@@ -1517,12 +1740,38 @@ export function pagxAnimMain(opts: {
 
   const captured: Array<{ el: HTMLElement } & PagxAnimDescriptor> = [];
   const seen = new Set<Element>();
+  // Flush zero-delay init timers (e.g. a page that defers layout setup via
+  // setTimeout(0)) onto the virtual clock so the checkpoint below captures the
+  // page's true t=0 state. No-op when the clock init script was not installed.
+  try {
+    const clock = (window as unknown as { __pagxClock?: { advanceTo?: (ms: number) => void } }).__pagxClock;
+    if (clock && typeof clock.advanceTo === 'function') clock.advanceTo(0);
+  } catch (_) {
+    /* ignore */
+  }
+  // Checkpoint the initial DOM before the sampler advances the virtual clock:
+  // timer-driven scene changes will mutate the DOM as the timeline plays, and
+  // the snapshot that follows must serialise the initial scene, not the end
+  // state. Restored right after sampling (before emit).
+  let checkpoint: ReturnType<typeof pagxDomCheckpoint> | null = null;
+  try {
+    checkpoint = pagxDomCheckpoint();
+  } catch (_) {
+    checkpoint = null;
+  }
   // Universal path: one shared-clock global sampler replaces the per-source
   // collectors (WAAPI / CSS / GSAP / anime). Seeking the whole page to N
   // absolute times and reading computed style captures motion from every
   // source uniformly and on the same clock the baseline seeks to, so the
-  // imported timeline aligns frame-for-frame with the ground truth.
+  // imported timeline aligns frame-for-frame with the ground truth. Each seek
+  // also advances the virtual clock, so JS timer-driven scene changes are
+  // sampled as opacity / transform curves too.
   pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements);
+  try {
+    pagxDomRestore(checkpoint);
+  } catch (_) {
+    /* ignore */
+  }
   // Runs last, as a supplement: CSS transitions only interpolate on a property
   // change and are not seekable, so the global sampler cannot reconstruct one
   // that already finished during settle. The `transitionrun` recorder
@@ -1559,6 +1808,8 @@ const PAGX_ANIM_FNS = [
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
   pagxCandidateElements,
+  pagxDomCheckpoint,
+  pagxDomRestore,
   pagxBuildKeyframesIndex,
   pagxCollectWAAPI,
   pagxCollectCSS,

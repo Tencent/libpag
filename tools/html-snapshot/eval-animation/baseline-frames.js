@@ -38,6 +38,7 @@ const {
   pagxSeekAllToTime,
   pagxSampleTimesMs,
   PAGX_ANIM_PAUSE_INIT_SCRIPT,
+  PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
 } = require('../dist/lib/animation-capture');
 
 const fail = makeFail('baseline-frames');
@@ -163,10 +164,30 @@ async function main() {
       // capture pipeline installs the identical script (lib/snapshot-runner.ts),
       // so both sides observe the same suspended animations. See
       // PAGX_ANIM_PAUSE_INIT_SCRIPT (lib/animation-clock.ts) for the rationale.
-      initScripts: [PAGX_ANIM_PAUSE_INIT_SCRIPT],
+      //
+      // PAGX_VIRTUAL_CLOCK_INIT_SCRIPT (installed first) freezes the page's JS
+      // timers (setTimeout / setInterval / rAF / Date / performance) so a
+      // timer-driven state machine (class-toggle scene switches, scripted
+      // `.click()` sequences) does NOT run on the wall clock during load /
+      // settle / the seek loop. Instead pagxSeekAllToTime(t) advances it to the
+      // same absolute time it seeks the declarative animations to, so the
+      // baseline is deterministic AND reproduces the JS-driven scene changes on
+      // the identical clock the animation capture samples — otherwise the
+      // baseline would drift into later scenes by wall-clock timing that the
+      // captured PAGX (which only advances on seek) can never match.
+      initScripts: [PAGX_VIRTUAL_CLOCK_INIT_SCRIPT, PAGX_ANIM_PAUSE_INIT_SCRIPT],
       onPageError: (err) => {
         console.error(`page exception: ${err.message}`);
       },
+    });
+
+    // Flush zero-delay init timers onto the virtual clock (advanceTo(0)) before
+    // measuring the body rect, so the baseline canvas size reflects the same
+    // t=0 layout the snapshot path measures (snapshot-runner.ts does the
+    // identical advanceTo(0) before its body read).
+    await page.evaluate(() => {
+      const clock = window.__pagxClock;
+      if (clock && typeof clock.advanceTo === 'function') clock.advanceTo(0);
     });
 
     const { width, height } = await captureBodyRect(page);
