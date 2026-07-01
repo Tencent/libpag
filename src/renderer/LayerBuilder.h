@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "tgfx/layers/Layer.h"
@@ -52,6 +53,12 @@ struct RuntimeColorStop {
  */
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
+// Reads the current value of a channel back from a runtime object into *out. Returns false when the
+// channel currently has no value to sync back (e.g. an unset optional property), in which case the
+// channel is skipped by DataBind syncBack. Symmetric to RuntimeWriter; used to flow target changes
+// back into ViewModel properties.
+using RuntimeReader = bool (*)(const void* object, KeyValue* out);
+
 struct RuntimeTarget {
   virtual ~RuntimeTarget() = default;
 
@@ -75,6 +82,12 @@ struct RuntimeTarget {
     }
   }
 
+  void setReader(const std::string& channel, RuntimeReader reader) {
+    if (!channel.empty() && reader != nullptr) {
+      readers[channel] = reader;
+    }
+  }
+
   // Returns true if this target can apply the given channel. Virtual so a subclass that intercepts
   // channels in apply() (LayerRuntimeTarget's x / y / matrix) reports them as handled even though
   // they are not in the writers map.
@@ -93,9 +106,22 @@ struct RuntimeTarget {
     return true;
   }
 
+  // Reads the current value of a channel back from the bound object. Virtual so a subclass
+  // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y). Returns
+  // false if no reader is registered for the channel, the object is null, or the reader reports the
+  // channel currently has no value to sync back.
+  virtual bool read(const std::string& channel, KeyValue* out) const {
+    auto it = readers.find(channel);
+    if (it == readers.end() || object == nullptr || out == nullptr) {
+      return false;
+    }
+    return it->second(object.get(), out);
+  }
+
  protected:
   std::shared_ptr<void> object = nullptr;
   std::unordered_map<std::string, RuntimeWriter> writers = {};
+  std::unordered_map<std::string, RuntimeReader> readers = {};
 };
 
 struct RuntimeBinding {
@@ -107,11 +133,16 @@ struct RuntimeBinding {
     ensureTarget(node)->setObject(std::move(object));
   }
 
-  void setWriter(const Node* node, const std::string& channel, RuntimeWriter writer) {
+  // Registers a writer and its symmetric reader for a channel in one call, declaring the channel as
+  // two-way capable (ViewModel -> target via the writer, target -> ViewModel via the reader).
+  void setAccessor(const Node* node, const std::string& channel, RuntimeWriter writer,
+                   RuntimeReader reader) {
     if (node == nullptr) {
       return;
     }
-    ensureTarget(node)->setWriter(channel, std::move(writer));
+    auto* target = ensureTarget(node);
+    target->setWriter(channel, std::move(writer));
+    target->setReader(channel, std::move(reader));
   }
 
   template <typename T>
@@ -234,6 +265,16 @@ struct RuntimeBinding {
     return it->second->apply(channel, value, mix);
   }
 
+  // Reads the current value of a node's channel back into out. Returns false if the node has no
+  // target or no reader for the channel. Used by DataBind syncBack.
+  bool read(const Node* node, const std::string& channel, KeyValue* out) const {
+    auto it = targets.find(node);
+    if (it == targets.end()) {
+      return false;
+    }
+    return it->second->read(channel, out);
+  }
+
   // Returns true if the node has a target that can apply the given channel. Used by tests to verify
   // every Animatable channel in the reflection registry has a matching runtime writer.
   bool hasWriter(const Node* node, const std::string& channel) const {
@@ -320,6 +361,20 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
+  /**
+   * Returns the tgfx::Image wrapped by a PAGImage. For internal use by channel writers that need
+   * to apply the image to a runtime object.
+   */
+  static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+
+  /**
+   * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
+   * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
+   * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
+   * for change detection, so the empty source does not cause spurious writebacks.
+   */
+  static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
+
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from. Must have had applyLayout() called.

@@ -18,58 +18,42 @@
 
 #pragma once
 
-#include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/PAGViewModelValue.h"
 
 namespace pagx {
 
-class Animation;
-class DataBind;
-class Layer;
-class ViewModel;
-
 /**
- * Composition represents a reusable composition resource that contains a set of layers. It can be
- * referenced by a Layer's composition property to create instances.
+ * PAGViewModelValueEnum holds an enum ViewModel property value as a zero-based option index into
+ * the property's option list.
  */
-class Composition : public Node {
+class PAGViewModelValueEnum : public PAGViewModelValue {
  public:
   /**
-   * The width of the composition in pixels.
+   * Returns the current option index.
    */
-  float width = 0.0f;
-
-  /**
-   * The height of the composition in pixels.
-   */
-  float height = 0.0f;
-
-  /**
-   * The layers contained in this composition.
-   */
-  std::vector<Layer*> layers = {};
-
-  /**
-   * The animations contained in this composition.
-   */
-  std::vector<Animation*> animations = {};
-  /**
-   * The ViewModel schema bound to this composition.
-   */
-  ViewModel* viewModel = nullptr;
-  /**
-   * DataBind nodes that bind ViewModel properties to this composition's layers.
-   */
-  std::vector<DataBind*> dataBinds = {};
-
-  NodeType nodeType() const override {
-    return NodeType::Composition;
+  int value() const {
+    return propertyValue;
   }
 
- private:
-  Composition() = default;
+  /**
+   * Sets the option index. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
+   */
+  void value(int v);
 
-  friend class PAGXDocument;
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(int v, bool fromVM);
+
+ private:
+  int propertyValue = 0;
+
+  friend class PAGViewModel;
+  friend class PAGScene;
+  friend class DataBindRuntime;
 };
 
 }  // namespace pagx

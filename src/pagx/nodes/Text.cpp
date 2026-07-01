@@ -36,6 +36,10 @@ void Text::onMeasure(LayoutContext* context) {
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({this}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
+  // The cached TextBlob was shaped from the previous layoutRuns; clear it so a re-layout (e.g. a
+  // font or text change applied through applyLayout) re-shapes from the new runs instead of the
+  // render-time cache returning the stale blob.
+  glyphData->textBlob = nullptr;
   textBounds = result.bounds;
   // position is the text origin (x, baseline); textBounds is relative to position.
   preferredX = position.x + textBounds.x;
@@ -65,6 +69,8 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
     params.textScale = scale;
     auto result = TextLayout::Layout({this}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
+    // Re-shaped runs invalidate the cached TextBlob; clear it so the render-time cache rebuilds.
+    glyphData->textBlob = nullptr;
     textBounds = result.bounds;
   }
   // Use mathematically scaled dimensions instead of textBounds from re-typesetting, because font

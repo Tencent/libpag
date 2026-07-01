@@ -593,6 +593,53 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
 }
 
 /**
+ * Test case: editing a Text node's font size and calling notifyChange(layoutChanged=true) re-runs
+ * layout and refreshes the runtime tree so the cached TextBlob is rebuilt from the new layout runs
+ * (a stale blob would otherwise be returned by the render-time cache and ignore the edit).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRebuildsTextBlobOnFontEdit) {
+  auto doc = pagx::PAGXDocument::Make(240, 140);
+  auto* textLayer = MakeTextLayer(doc.get(), "Hello", 20, {0, 0, 0, 1});
+  doc->layers.push_back(textLayer);
+
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
+  // Locate the Text node inside the layer's Group content.
+  pagx::Text* text = nullptr;
+  for (auto* element : textLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Group) {
+      for (auto* child : static_cast<pagx::Group*>(element)->elements) {
+        if (child->nodeType() == pagx::NodeType::Text) {
+          text = static_cast<pagx::Text*>(child);
+        }
+      }
+    }
+  }
+  ASSERT_NE(text, nullptr);
+
+  // Building the scene shapes the text and populates the cached TextBlob.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  auto oldBlob = text->glyphData->textBlob;
+  float oldHeight = text->textBounds.height;
+
+  // Edit the font size and notify with layoutChanged=true: this re-runs layout (clearing the cached
+  // blob) and refreshes the runtime tree in place, re-shaping from the new layout runs.
+  text->fontSize = 40;
+  doc->notifyChange({text}, true);
+
+  // The runtime tree now holds a freshly shaped blob (not the original) reflecting the larger font.
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  EXPECT_NE(text->glyphData->textBlob, oldBlob);
+  EXPECT_GT(text->textBounds.height, oldHeight);
+}
+
+/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
@@ -7575,7 +7622,8 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
 
 /**
  * Test case: hit test resolves a leaf layer nested under a container layer that has no composition
- * reference. The container itself is not returned; only the leaf is.
+ * reference. The leaf is the top-most hit, with its ancestor container and the root composition
+ * following in the result.
  */
 PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10146,10 +10194,11 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   EXPECT_EQ(hits[1]->name(), "Middle");
   EXPECT_EQ(hits[2]->name(), "Root");
+  EXPECT_EQ(hits[3], scene->rootComposition());
 
   // Add a grandchild under middle and notify.
   auto grandchild = doc->makeNode<pagx::Layer>("Grandchild");
@@ -10167,10 +10216,10 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   hits = scene->getLayersUnderPoint(120, 120);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Grandchild");
 
   // Remove the grandchild and notify; it is no longer hit.
@@ -10178,7 +10227,7 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   // No content covers (120,120) after removing grandchild: Middle has no direct content.
   hits = scene->getLayersUnderPoint(120, 120);
@@ -10192,6 +10241,37 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   ASSERT_EQ(hits.size(), 0u);
   hits = scene->getLayersUnderPoint(120, 120);
   ASSERT_EQ(hits.size(), 0u);
+}
+
+/**
+ * Test case: hit testing returns authored PAGComposition nodes, not only plain layers. A Layer slot
+ * referencing a composition is hit, and the composition instance itself appears in the result chain
+ * because a composition is a PAGLayer.
+ */
+PAGX_TEST(PAGXTest, HitTestReturnsCompositionNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto slot = doc->makeNode<pagx::Layer>("Slot");
+  slot->name = "Slot";
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  scene->advanceAndApply(500'000);
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  bool hasComposition = false;
+  for (const auto& hit : hits) {
+    if (hit->layerType() == pagx::LayerType::Composition) {
+      hasComposition = true;
+    }
+  }
+  EXPECT_TRUE(hasComposition);
 }
 
 /**

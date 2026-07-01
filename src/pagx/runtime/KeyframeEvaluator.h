@@ -119,6 +119,7 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   }
   double rawT = (framePosition - leftTime) / span;
   switch (left->interpolation) {
+    case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Hold:
       return left->value;
     case KeyframeInterpolationType::Bezier: {
@@ -127,7 +128,6 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
           static_cast<double>(right->bezierIn.x), static_cast<double>(right->bezierIn.y), rawT);
       return LerpKeyframeValue<T>(left->value, right->value, eased);
     }
-    case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Linear:
     default:
       return LerpKeyframeValue<T>(left->value, right->value, rawT);

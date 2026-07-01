@@ -19,9 +19,11 @@
 #include "pagx/PAGComposition.h"
 #include <unordered_map>
 #include <unordered_set>
+#include "pagx/DataBindRuntime.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -42,6 +44,10 @@ PAGComposition::~PAGComposition() = default;
 
 LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
+}
+
+std::shared_ptr<PAGViewModel> PAGComposition::viewModel() const {
+  return compositionViewModel;
 }
 
 void PAGComposition::advance(int64_t deltaMicroseconds) {
@@ -174,6 +180,25 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
+void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+                                              std::vector<PAGComposition*>& outChildren) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto& child : layer->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() == LayerType::Composition) {
+      outChildren.push_back(static_cast<PAGComposition*>(child.get()));
+    } else {
+      // A plain layer container holds no view model of its own but may nest compositions; descend
+      // through it so those compositions are still reached.
+      CollectChildCompositions(child.get(), outChildren);
+    }
+  }
+}
+
 void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
                                   const std::unordered_set<const Node*>& dirtySet,
                                   std::unordered_set<const Composition*>& visited) {
@@ -192,6 +217,7 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
   }
 
   if (binding != nullptr) {
+    bool refreshedLayer = false;
     for (auto* dirty : dirtyNodes) {
       if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
         continue;
@@ -199,7 +225,14 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
       auto* dirtyLayer = static_cast<Layer*>(dirty);
       if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
         LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document);
+        refreshedLayer = true;
       }
+    }
+    // A refreshed layer rebuilds its runtime targets, resetting their channels to the node
+    // defaults. Re-mark this composition's bindings dirty so the next updateDataBinds re-applies
+    // the current ViewModel values instead of leaving the rebuilt targets at their defaults.
+    if (refreshedLayer && dataBindRuntime != nullptr) {
+      dataBindRuntime->markAllDirty();
     }
   }
   for (auto& child : children) {
@@ -391,6 +424,18 @@ void PAGComposition::refreshPlainContainerChildren(
     } else if (!child->children.empty()) {
       refreshPlainContainerChildren(child.get(), dirtyNodes, visited, dirtySet);
     }
+  }
+}
+
+void PAGComposition::updateDataBinds(float mix) {
+  if (dataBindRuntime != nullptr) {
+    dataBindRuntime->syncBack(binding.get());
+    dataBindRuntime->update(binding.get(), mix);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->updateDataBinds(mix);
   }
 }
 
