@@ -13,6 +13,7 @@
 //
 // What ships:
 //   - snapshot.js            (CLI driver, copied verbatim)
+//   - ensure-built.js        (preflight helper snapshot.js requires at startup)
 //   - dist/                  (compiled TypeScript: dist/lib/*.js)
 //   - node_modules/          (the pure-JS runtime deps: opentype.js, wawoff2)
 //   - package.json           (generated; declares only the pure-JS deps)
@@ -90,13 +91,16 @@ function main() {
 
   // 2. Reset the generated parts of DEST while preserving the maintained
   //    launch.js source file.
-  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'package.json']) {
+  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'ensure-built.js', 'package.json']) {
     fs.rmSync(path.join(DEST_DIR, entry), { recursive: true, force: true });
   }
   fs.mkdirSync(DEST_DIR, { recursive: true });
 
-  // 3. Copy the CLI driver and the compiled output.
+  // 3. Copy the CLI driver, its startup preflight helper, and the compiled output.
+  //    snapshot.js does `require('./ensure-built')` on its first line, so the helper
+  //    must ship alongside it or the installed package fails with MODULE_NOT_FOUND.
   fs.copyFileSync(path.join(TOOL_DIR, 'snapshot.js'), path.join(DEST_DIR, 'snapshot.js'));
+  fs.copyFileSync(path.join(TOOL_DIR, 'ensure-built.js'), path.join(DEST_DIR, 'ensure-built.js'));
   fs.cpSync(distDir, path.join(DEST_DIR, 'dist'), { recursive: true });
 
   // 3a. Strip the compiled TypeScript source maps. Their `sources` point at the
