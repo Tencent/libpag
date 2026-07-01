@@ -582,8 +582,6 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
 
     tgfx::GLTextureInfo glInfo = {};
     glInfo.id = static_cast<unsigned>(textureId);
-    glInfo.target = 0x0DE1;  // GL_TEXTURE_2D
-    glInfo.format = 0x8058;  // GL_RGBA8
     tgfx::BackendTexture backendTex(glInfo, p.width, p.height);
     // Use MakeFrom (non-adopted) rather than MakeAdopted: tgfx wraps the GL texture without
     // claiming ownership, so when our shared_ptr<Image> drops the underlying TextureView is
