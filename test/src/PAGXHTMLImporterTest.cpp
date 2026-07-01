@@ -1414,6 +1414,24 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgCurrentColorRespectsInnerColorOverride) 
   EXPECT_NE(content.find("fill=\"#112233\""), std::string::npos);
 }
 
+// `currentColor` matching is case-insensitive per CSS, and the `stroke` paint property is
+// resolved just like `fill`. A mixed-case `CurrentColor` on a `stroke` attribute must tint.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgResolvesCurrentColorCaseInsensitiveStroke) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px;color:#22AA44">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <rect x="10" y="10" width="60" height="60" fill="none" stroke="CurrentColor"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_EQ(content.find("urrentColor"), std::string::npos);
+  EXPECT_NE(content.find("stroke=\"#22AA44\""), std::string::npos);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
   auto doc = ParseFromString(R"HTML(
     <html><head><style>.box{background-color:#123456;border-radius:8px}</style></head>
@@ -2838,6 +2856,60 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatMapsToNoneTiled) {
   EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
   EXPECT_FLOAT_EQ(pattern->matrix.tx, -20.0f);
   EXPECT_FLOAT_EQ(pattern->matrix.ty, -30.0f);
+}
+
+// `background-repeat: repeat-x` is a single-axis shorthand — X tiles, Y clamps to Decal.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatXTilesHorizontalOnly) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-repeat:repeat-x;background-size:40px 40px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Repeat);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Decal);
+}
+
+// `background-repeat: repeat-y` tiles Y only; X clamps to Decal.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatYTilesVerticalOnly) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-repeat:repeat-y;background-size:40px 40px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Decal);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
+}
+
+// `background-repeat: no-repeat` clamps both axes to Decal so the image paints once.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageNoRepeatClampsBothAxes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url(logo.png);
+                  background-repeat:no-repeat;background-size:40px 40px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Decal);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Decal);
 }
 
 // Folding rule also handles asymmetric `border-radius`: the image-pattern fill rides on top
@@ -6474,6 +6546,91 @@ PAG_TEST(PAGXHTMLImporterTest, MaskSizeScalesMaskLayerNonUniformly) {
   EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 0.0f, 0.001f));
 }
 
+// `mask-size: contain` fits the mask uniformly inside the element box using the smaller per-axis
+// ratio. A 100x100 mask in a 200x100 box scales by min(2, 1) = 1 on both axes.
+PAG_TEST(PAGXHTMLImporterTest, MaskSizeContainFitsUniformlyBySmallerRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:contain;mask-repeat:no-repeat">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 1.0f, 0.001f));
+}
+
+// `mask-size: cover` fits the mask uniformly using the larger per-axis ratio. The same 100x100
+// mask in a 200x100 box scales by max(2, 1) = 2 on both axes.
+PAG_TEST(PAGXHTMLImporterTest, MaskSizeCoverFitsUniformlyByLargerRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:cover;mask-repeat:no-repeat">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 2.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 2.0f, 0.001f));
+}
+
+// A single `mask-size` length applies to the width; the height axis is `auto`, tied to the width
+// ratio so the aspect ratio is preserved. A 50px width on a 100x100 mask scales both axes by 0.5.
+PAG_TEST(PAGXHTMLImporterTest, MaskSizeSingleLengthTiesHeightToWidthRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:50px;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 0.5f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 0.5f, 0.001f));
+}
+
+// `mask-position: right bottom` anchors a mask smaller than the element to the far corner:
+// tx = boxW - maskW, ty = boxH - maskH.
+PAG_TEST(PAGXHTMLImporterTest, MaskPositionRightBottomKeywordsAnchorToFarCorner) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:100px 100px;mask-position:right bottom;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 100.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 100.0f, 0.001f));
+}
+
+// `mask-position` percentages resolve against the free space (boxAxis - maskAxis). 50% of a
+// (200 - 100) gap centres the mask at offset 50 on both axes.
+PAG_TEST(PAGXHTMLImporterTest, MaskPositionPercentageResolvesAgainstFreeSpace) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:100px 100px;mask-position:50% 50%;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 50.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 50.0f, 0.001f));
+}
+
 // `mask-position` offsets the rebuilt mask layer by the authored pixel offset, anchored at the
 // masked element's top-left origin, so a mask smaller than the element lands where CSS placed it.
 PAG_TEST(PAGXHTMLImporterTest, MaskPositionOffsetsMaskLayer) {
@@ -7097,6 +7254,45 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, BuilderRunsCustomPass) {
   auto result = builder.run(root);
   EXPECT_TRUE(result.ok);
   EXPECT_TRUE(HasDiagnostic(result, "test:recording-pass-ran"));
+}
+
+//==================================================================================================
+// MarginToGapPromotionPass — bail conditions not covered by the promotion tests above
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsWhenChildHasFlexGrow) {
+  // A grow child makes the leftover space route into the child, so the margins are not a pure
+  // gap surrogate; the pass bails and leaves margins intact.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:50px">
+               <div style="display:flex;width:200px;height:50px">
+                 <div style="flex:1;height:50px;margin-right:8px"></div>
+                 <div style="width:30px;height:50px;margin-right:8px"></div>
+               </div>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
+  auto container = FirstBodyChild(root, "div");
+  ASSERT_NE(container, nullptr);
+  EXPECT_FALSE(StyleContains(container, "gap:"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapSkipsFlexWrapContainer) {
+  // Wrapping reflows children onto multiple lines, where uniform margins are not equivalent to a
+  // single-line gap; the pass must bail.
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:100px;height:100px">
+               <div style="display:flex;flex-wrap:wrap;width:100px;height:100px">
+                 <div style="width:50px;height:50px;margin-bottom:8px"></div>
+                 <div style="width:50px;height:50px;margin-bottom:8px"></div>
+               </div>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:margin-promoted-to-gap"));
 }
 
 //==================================================================================================

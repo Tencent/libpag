@@ -2637,6 +2637,72 @@ CLI_TEST(PAGXCliTest, Resolve_LayerWithChildrenSkipsResolve) {
   EXPECT_TRUE(doc->hasUnresolvedImports());
 }
 
+CLI_TEST(PAGXCliTest, Resolve_Help) {
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_HelpShort) {
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_MissingInput) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("missing input file"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_UnknownOption) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "--bogus", "in.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("unknown option"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_UnexpectedArgument) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "a.pagx", "b.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("unexpected argument"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_WriteFailure) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_write_fail_input.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret =
+      CallRun(pagx::cli::RunResolve, {"resolve", pagxPath, "-o", "/nonexistent_dir_xyz/out.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("failed to write"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_SvgFlattenTransformsOption) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_svg_opt_input.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto outputPath = TempDir() + "/resolve_svg_opt_out.pagx";
+  auto ret = CallRun(pagx::cli::RunResolve,
+                     {"resolve", pagxPath, "--svg-flatten-transforms", "-o", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
 //==============================================================================
 // CLI unresolved import checks
 //==============================================================================
