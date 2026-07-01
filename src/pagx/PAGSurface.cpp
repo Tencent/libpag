@@ -22,7 +22,6 @@
 #include "pagx/runtime/OffscreenDrawable.h"
 #include "pagx/runtime/RenderTargetDrawable.h"
 #include "pagx/runtime/TextureDrawable.h"
-#include "pagx/runtime/TGFSurfaceDrawable.h"
 #include "pagx/tgfx.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
@@ -60,7 +59,7 @@ PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(
 }
 
 PAGSurface::PAGSurface(std::shared_ptr<tgfx::Surface> surface)
-    : drawable(std::make_shared<TGFSurfaceDrawable>(std::move(surface))) {
+    : drawable(std::make_shared<Drawable>(std::move(surface))) {
 }
 
 PAGSurface::~PAGSurface() = default;
