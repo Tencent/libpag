@@ -41,9 +41,8 @@ class Drawable {
   virtual ~Drawable() = default;
 
   /**
-   * Creates a Drawable from an existing tgfx::Surface. The Drawable adopts the surface and
-   * returns it from getSurface(). The caller must keep the tgfx::Surface alive for the
-   * lifetime of the Drawable.
+   * Creates a Drawable that takes ownership of the given tgfx::Surface. The surface is returned
+   * from getSurface() and kept alive for the lifetime of the Drawable.
    */
   static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface);
 
