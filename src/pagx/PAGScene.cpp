@@ -422,7 +422,6 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   }
   drawable->present(context);
   device->unlock();
-  clearAllViewModelsDirty();
   return true;
 }
 
@@ -433,6 +432,7 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     return false;
   }
   displayList->render(tgfxSurface.get(), autoClear);
+  clearAllViewModelsDirty();
   return true;
 }
 
@@ -661,7 +661,8 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
   if (!scene->renderTo(surface, context, autoClear)) {
     return nullptr;
   }
-  return context->flush();
+  auto recording = context->flush();
+  return recording;
 }
 
 }  // namespace pagx
