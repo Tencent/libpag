@@ -4503,7 +4503,9 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   auto& binding = *scene->rootComposition()->binding;
   auto tgfxPattern = binding.get<tgfx::ImagePattern>(pattern);
   ASSERT_TRUE(tgfxPattern != nullptr);
-  EXPECT_EQ(tgfxPattern->image(), expectedTgfx);
+  ASSERT_TRUE(tgfxPattern->image() != nullptr);
+  EXPECT_EQ(tgfxPattern->image()->width(), expectedTgfx->width());
+  EXPECT_EQ(tgfxPattern->image()->height(), expectedTgfx->height());
 
   // Supplying a different image for the same path switches the pattern to it, and only the
   // referencing layers are refreshed in place (the tree is not rebuilt).
@@ -4515,7 +4517,9 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage2));
   auto tgfxPattern2 = scene->rootComposition()->binding->get<tgfx::ImagePattern>(pattern);
   ASSERT_TRUE(tgfxPattern2 != nullptr);
-  EXPECT_EQ(tgfxPattern2->image(), expectedTgfx2);
+  ASSERT_TRUE(tgfxPattern2->image() != nullptr);
+  EXPECT_EQ(tgfxPattern2->image()->width(), expectedTgfx2->width());
+  EXPECT_EQ(tgfxPattern2->image()->height(), expectedTgfx2->height());
 }
 
 // =====================================================================================

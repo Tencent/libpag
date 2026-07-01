@@ -1823,12 +1823,10 @@ class LayerBuilderContext {
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    bool isHostProvided = false;
     // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
     auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
     if (runtimeImage != nullptr) {
       image = LayerBuilder::GetTGFXImage(runtimeImage);
-      isHostProvided = image != nullptr;
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -1840,7 +1838,7 @@ class LayerBuilderContext {
         image = tgfx::Image::MakeFromFile(imageNode->filePath);
       }
     }
-    if (image && !isHostProvided) {
+    if (image && !image->isTextureBacked()) {
       image = image->makeMipmapped(true);
     }
     // Only memoize successful results. A null entry would cache the absence of a host-provided
