@@ -90,15 +90,30 @@ On native Windows, invoke it through `node` (the shebang/executable bit is a Uni
 | `--wait-ms <ms>` | Extra settle delay after load (default 800); raise for late-rendering charts/animations |
 | `--selector <css>` | Wait for this selector before snapshotting |
 | `--embed-fonts` | Download the page's web fonts and embed them into the `.pagx` (self-contained, correct text). Implies `--download-fonts` |
-| `--download-fonts` | Register downloaded fonts as render fallbacks without embedding them |
+| `--download-fonts` | Download the page's web fonts and register them as render fallbacks **without** embedding them into the `.pagx` |
+| `--font-dir <dir>` | Where downloaded fonts are written (default `<outputDir>/<name>.fonts`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 (keeps the `.pagx` small) |
+| `--image-dir <dir>` | Where downloaded images are written (default `<outputDir>/<name>.images`) |
+| `--no-inline-icon-fonts` | Disable webfont-glyph → inline `<svg>` conversion (icon inlining is on by default) |
 | `--no-render` | Stop after resolve (no PNG) |
 | `--no-resolve` | Stop after import (no resolve/render) |
 | `--no-subset-html` | Do not keep `<input>.subset.html` |
 | `--pagx-bin <path>` | Path to the `pagx` binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
 | `--browser-engine <name>` | `puppeteer` (default) or `playwright` |
 | `--cookie <name=value>` / `--header <Key: Value>` | URL inputs only; repeatable |
-| `--batch <dir>` | Convert every `.html` under a directory with one shared browser |
+| `--batch <dir>` | Convert every `.html` under a directory with one shared browser (see batch flags below) |
+
+### Batch mode flags
+
+`--batch <dir>` walks a directory and converts every `.html` with one shared browser. Batch mode is
+incompatible with a positional input, `--output-name`, and `-o`/`--output-dir` — use `--output-root`
+to choose where mirrored outputs land.
+
+| Flag | Use |
+|------|-----|
+| `--output-root <dir>` | Mirror the batch's output tree under this directory (batch only) |
+| `--skip-existing` | Skip an input whose target `.pagx` already exists (batch only) |
+| `--dry-run` | List the files that would be converted without launching the browser or `pagx` (batch only) |
 
 ## Fonts
 

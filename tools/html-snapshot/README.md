@@ -130,7 +130,13 @@ Options:
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
 | `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
+| `--download-images` | _disabled_ | Save external images to disk instead of inlining them as base64 data URIs |
+| `--image-dir <dir>` | `<output>.images/` | Destination for `--download-images` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
+
+`snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
+`pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
+only `--download-fonts` (embedding happens in the `pagx font embed` step downstream).
 
 ### Inline icon fonts
 
@@ -263,11 +269,18 @@ Options:
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
-| `--download-fonts` | Download the page's web fonts, embed them into the `.pagx` (`pagx font embed`) and register them as render fallbacks |
+| `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
+| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
+| `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
+| `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |
+| `--batch <dir>` | Convert every `.html` under a directory with one shared browser. Incompatible with a positional input, `--output-name`, and `-o`; use `--output-root` for the output location |
+| `--output-root <dir>` | Mirror the batch's outputs under this directory (batch only) |
+| `--skip-existing` | Skip an input whose target `.pagx` already exists (batch only) |
+| `--dry-run` | List the files that would be converted without running the browser or `pagx` (batch only) |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--browser-engine <name>` | Headless driver to use (`puppeteer` or `playwright`); forwarded to `snapshot.js`. Honours `$HTML_SNAPSHOT_BROWSER`. |
-| `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
+| `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` (defaults 1400 / 900 / 800) |
 
 ### Browser bundle (no Node, no puppeteer)
 
