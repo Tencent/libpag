@@ -650,8 +650,8 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
   return displayList.get();
 }
 
-std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
-                                        tgfx::Context* context,
+std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
+                                        const std::shared_ptr<PAGScene>& scene,
                                         const std::shared_ptr<PAGSurface>& surface,
                                         bool autoClear) {
   if (scene == nullptr || context == nullptr || surface == nullptr) {

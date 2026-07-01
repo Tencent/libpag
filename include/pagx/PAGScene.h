@@ -231,8 +231,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   friend class PAGLayer;
   friend class PAGViewModelValue;
   friend class SuppressDelegation;
-  friend std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
-                                                  tgfx::Context* context,
+  friend std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
+                                                  const std::shared_ptr<PAGScene>& scene,
                                                   const std::shared_ptr<PAGSurface>& surface,
                                                   bool autoClear);
 };

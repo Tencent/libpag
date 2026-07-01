@@ -41,8 +41,8 @@ std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image
  * @param autoClear whether to clear the surface before rendering.
  * @return a Recording ready for submission, or nullptr on failure.
  */
-std::unique_ptr<tgfx::Recording> Record(const std::shared_ptr<PAGScene>& scene,
-                                        tgfx::Context* context,
+std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
+                                        const std::shared_ptr<PAGScene>& scene,
                                         const std::shared_ptr<PAGSurface>& surface,
                                         bool autoClear = true);
 
