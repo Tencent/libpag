@@ -3147,7 +3147,7 @@ size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
     return 0;
   }
   // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
-  // into convertImagePattern() re-queries the provider for the updated image.
+  // into convertImagePattern() re-reads the node's runtimeImage for the updated image.
   impl->context.invalidateImagesByFilePath(*impl->document, filePath);
 
   const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
