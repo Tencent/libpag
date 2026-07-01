@@ -19,33 +19,26 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include "pag/gpu.h"
-#include "pagx/types/Data.h"
+#include "Drawable.h"
 
 namespace tgfx {
-class Image;
-}
+class Device;
+class Surface;
+}  // namespace tgfx
 
 namespace pagx {
 
-class PAGImage {
+class TGFSurfaceDrawable : public Drawable {
  public:
-  static std::shared_ptr<PAGImage> MakeFromPath(const std::string& path);
-  static std::shared_ptr<PAGImage> MakeFromDataURI(const std::string& dataURI);
-  static std::shared_ptr<PAGImage> MakeFromData(const std::shared_ptr<Data>& data);
-  static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
-                                                   pag::ImageOrigin origin);
+  explicit TGFSurfaceDrawable(std::shared_ptr<tgfx::Surface> surface);
 
-  const std::string& source() const;
+  int width() const override;
+  int height() const override;
+  std::shared_ptr<tgfx::Device> getDevice() override;
+  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
-  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
-  std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
-  std::string _source = {};
-
-  friend std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>&);
-  friend class LayerBuilder;
+  std::shared_ptr<tgfx::Surface> ownedSurface;
 };
 
 }  // namespace pagx

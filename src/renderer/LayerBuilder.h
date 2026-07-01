@@ -361,12 +361,9 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
-  /**
-   * Returns the host-supplied runtime image cached on an Image node (set via
-   * PAGXDocument::loadFileData(path, PAGImage)), or nullptr if none. Internal accessor that reads
-   * the node's private runtime cache during build.
-   */
   static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
+  static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+  static std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.

@@ -22,6 +22,8 @@
 #include "pagx/runtime/OffscreenDrawable.h"
 #include "pagx/runtime/RenderTargetDrawable.h"
 #include "pagx/runtime/TextureDrawable.h"
+#include "pagx/runtime/TGFSurfaceDrawable.h"
+#include "pagx/tgfx.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -57,6 +59,10 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget&
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
 }
 
+PAGSurface::PAGSurface(std::shared_ptr<tgfx::Surface> surface)
+    : drawable(std::make_shared<TGFSurfaceDrawable>(std::move(surface))) {
+}
+
 PAGSurface::~PAGSurface() = default;
 
 int PAGSurface::width() const {
@@ -90,6 +96,13 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);
   device->unlock();
   return ok;
+}
+
+std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>& surface) {
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGSurface>(new PAGSurface(surface));
 }
 
 }  // namespace pagx

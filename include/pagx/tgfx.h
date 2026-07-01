@@ -27,16 +27,21 @@
 
 namespace pagx {
 
-std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image);
-std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+/**
+ * Creates a PAGImage wrapping an existing tgfx::Image, sharing ownership. Use this when the host
+ * already has a tgfx::Image and wants to pass it to PAGXDocument::loadFileData without re-decoding
+ * or re-locking the GPU context.
+ * @param image the tgfx::Image to wrap.
+ * @return a PAGImage sharing ownership, or nullptr if image is null.
+ */
+std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>& image);
 
 /**
- * Renders the scene into the surface using the given GPU context, flushes rendering commands,
- * and returns a Recording that can be submitted later. This allows tgfx power users to batch
- * multiple scene renderings and their own tgfx work under a single GPU submission.
- * The caller must hold the context lock (via Device::lockContext()). Does not submit or present.
- * @param scene the scene to render.
+ * Renders a scene into a surface using a locked GPU context and returns a Recording that can be
+ * submitted later. This allows batching multiple scene renders and custom tgfx work under a single
+ * GPU submission. Does not submit or present — the caller controls both.
  * @param context the locked GPU context.
+ * @param scene the scene to render.
  * @param surface the surface to render into.
  * @param autoClear whether to clear the surface before rendering.
  * @return a Recording ready for submission, or nullptr on failure.
@@ -45,5 +50,14 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
                                         const std::shared_ptr<PAGScene>& scene,
                                         const std::shared_ptr<PAGSurface>& surface,
                                         bool autoClear = true);
+
+/**
+ * Creates a PAGSurface wrapping an existing tgfx::Surface, sharing ownership. Use this when the
+ * host already has a tgfx::Surface and wants to render a PAGScene into it via Record() without
+ * creating a separate render target.
+ * @param surface the tgfx::Surface to wrap.
+ * @return a PAGSurface sharing ownership, or nullptr if surface is null.
+ */
+std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>& surface);
 
 }  // namespace pagx

@@ -1384,10 +1384,10 @@ PAGX_TEST(PAGXViewModelTest, ImageTwoWaySyncBack) {
   ASSERT_NE(binding, nullptr);
   auto runtimePattern = binding->get<tgfx::ImagePattern>(pattern);
   ASSERT_NE(runtimePattern, nullptr);
-  runtimePattern->setImage(pagx::GetTGFXImage(greenImage));
+  runtimePattern->setImage(pagx::LayerBuilder::GetTGFXImage(greenImage));
   EXPECT_TRUE(scene->draw(surface));
   ASSERT_NE(imgProp->value(), nullptr);
-  EXPECT_EQ(pagx::GetTGFXImage(imgProp->value()), pagx::GetTGFXImage(greenImage));
+  EXPECT_EQ(pagx::LayerBuilder::GetTGFXImage(imgProp->value()), pagx::LayerBuilder::GetTGFXImage(greenImage));
   EXPECT_EQ(obs, 1);
 }
 
@@ -1559,7 +1559,7 @@ PAGX_TEST(PAGXViewModelTest, ImageResourceLoadPropagatesThroughDataBind) {
   ASSERT_NE(binding, nullptr);
   auto runtimePattern = binding->get<tgfx::ImagePattern>(pattern);
   ASSERT_NE(runtimePattern, nullptr);
-  EXPECT_EQ(runtimePattern->image(), pagx::GetTGFXImage(imgProp->value()));
+  EXPECT_EQ(runtimePattern->image(), pagx::LayerBuilder::GetTGFXImage(imgProp->value()));
 }
 
 // A nested composition's own ViewModel image default must also refresh when its referenced <Image>

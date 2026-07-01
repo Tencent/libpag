@@ -1474,12 +1474,12 @@ class LayerBuilderContext {
       return;
     }
     auto* pattern = static_cast<tgfx::ImagePattern*>(object);
-    pattern->setImage(GetTGFXImage(*v));
+    pattern->setImage(LayerBuilder::GetTGFXImage(*v));
   }
 
   static bool ReadImagePatternImage(const void* object, KeyValue* out) {
     auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
-    *out = KeyValue{MakeFromTGFXImage(image)};
+    *out = KeyValue{MakeFrom(image)};
     return true;
   }
 
@@ -1827,7 +1827,7 @@ class LayerBuilderContext {
     // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
     auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
     if (runtimeImage != nullptr) {
-      image = GetTGFXImage(runtimeImage);
+      image = LayerBuilder::GetTGFXImage(runtimeImage);
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -3238,5 +3238,17 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
 
 std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
   return node != nullptr ? node->runtimeImage : nullptr;
+}
+
+std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
+}
+
+std::shared_ptr<PAGImage> LayerBuilder::MakeFromTGFXImage(
+    const std::shared_ptr<tgfx::Image>& image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
 }
 }  // namespace pagx

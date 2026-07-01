@@ -598,7 +598,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
       continue;
     }
     // Wrap the uploaded tgfx::Image as a PAGImage without re-locking the context.
-    auto pagImage = pagx::MakeFromTGFXImage(tgfxImage);
+    auto pagImage = pagx::MakeFrom(tgfxImage);
 
     if (p.quality == ImageQuality::Full) {
       // Replace the previous full entry. The old entry's PAGImage drops here; retire the previous

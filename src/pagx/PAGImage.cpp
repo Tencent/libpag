@@ -87,15 +87,11 @@ PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
     : _tgfxImage(std::move(image)), _source(std::move(source)) {
 }
 
-std::shared_ptr<PAGImage> MakeFromTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
+std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>& image) {
   if (image == nullptr) {
     return nullptr;
   }
   return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
-}
-
-std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
-  return image ? image->_tgfxImage : nullptr;
 }
 
 }  // namespace pagx

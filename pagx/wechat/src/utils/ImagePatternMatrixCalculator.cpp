@@ -23,7 +23,6 @@
 #include <string>
 
 #include "pagx/nodes/Image.h"
-#include "pagx/tgfx.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
@@ -207,7 +206,7 @@ static void ReadActualImageDimensions(const pagx::Image* imageNode,
     return;
   }
   auto runtimeImage = pagx::LayerBuilder::GetNodeRuntimeImage(imageNode);
-  auto tgfxImage = pagx::GetTGFXImage(runtimeImage);
+  auto tgfxImage = LayerBuilder::GetTGFXImage(runtimeImage);
   if (tgfxImage && tgfxImage->width() > 0 && tgfxImage->height() > 0) {
     *outWidth = static_cast<float>(tgfxImage->width());
     *outHeight = static_cast<float>(tgfxImage->height());

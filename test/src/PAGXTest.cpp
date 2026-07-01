@@ -87,7 +87,6 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
-#include "pagx/tgfx.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/LayoutMode.h"
@@ -4493,7 +4492,7 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   auto hostImage =
       pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
   ASSERT_TRUE(hostImage != nullptr);
-  auto expectedTgfx = pagx::GetTGFXImage(hostImage);
+  auto expectedTgfx = pagx::LayerBuilder::GetTGFXImage(hostImage);
   ASSERT_TRUE(expectedTgfx != nullptr);
 
   auto scene = pagx::PAGScene::Make(doc);
@@ -4513,7 +4512,7 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   auto hostImage2 =
       pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
   ASSERT_TRUE(hostImage2 != nullptr);
-  auto expectedTgfx2 = pagx::GetTGFXImage(hostImage2);
+  auto expectedTgfx2 = pagx::LayerBuilder::GetTGFXImage(hostImage2);
   ASSERT_TRUE(expectedTgfx2 != nullptr);
   EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage2));
   auto tgfxPattern2 = scene->rootComposition()->binding->get<tgfx::ImagePattern>(pattern);

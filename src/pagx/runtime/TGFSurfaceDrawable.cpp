@@ -16,36 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include <string>
-#include "pag/gpu.h"
-#include "pagx/types/Data.h"
-
-namespace tgfx {
-class Image;
-}
+#include "TGFSurfaceDrawable.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
-class PAGImage {
- public:
-  static std::shared_ptr<PAGImage> MakeFromPath(const std::string& path);
-  static std::shared_ptr<PAGImage> MakeFromDataURI(const std::string& dataURI);
-  static std::shared_ptr<PAGImage> MakeFromData(const std::shared_ptr<Data>& data);
-  static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
-                                                   pag::ImageOrigin origin);
+TGFSurfaceDrawable::TGFSurfaceDrawable(std::shared_ptr<tgfx::Surface> surface)
+    : ownedSurface(std::move(surface)) {
+}
 
-  const std::string& source() const;
+int TGFSurfaceDrawable::width() const {
+  return ownedSurface ? ownedSurface->width() : 0;
+}
 
- private:
-  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
-  std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
-  std::string _source = {};
+int TGFSurfaceDrawable::height() const {
+  return ownedSurface ? ownedSurface->height() : 0;
+}
 
-  friend std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>&);
-  friend class LayerBuilder;
-};
+std::shared_ptr<tgfx::Device> TGFSurfaceDrawable::getDevice() {
+  return tgfx::GLDevice::Current();
+}
+
+std::shared_ptr<tgfx::Surface> TGFSurfaceDrawable::getSurface(tgfx::Context*) {
+  return ownedSurface;
+}
 
 }  // namespace pagx

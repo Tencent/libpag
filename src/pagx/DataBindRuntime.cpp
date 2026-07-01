@@ -33,7 +33,6 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
-#include "pagx/tgfx.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "renderer/LayerBuilder.h"
@@ -348,8 +347,8 @@ void DataBindRuntime::syncBack(RuntimeBinding* binding) {
     if (entry.source->valueType() == ViewModelPropertyType::Image) {
       auto* imageValue = static_cast<PAGViewModelValueImage*>(entry.source);
       auto* targetImage = std::get_if<std::shared_ptr<PAGImage>>(&kv);
-      auto targetTGFX = targetImage != nullptr ? GetTGFXImage(*targetImage) : nullptr;
-      if (GetTGFXImage(imageValue->value()) == targetTGFX) {
+      auto targetTGFX = targetImage != nullptr ? LayerBuilder::GetTGFXImage(*targetImage) : nullptr;
+      if (LayerBuilder::GetTGFXImage(imageValue->value()) == targetTGFX) {
         continue;
       }
     } else if (entry.source->valueType() == ViewModelPropertyType::Color) {
