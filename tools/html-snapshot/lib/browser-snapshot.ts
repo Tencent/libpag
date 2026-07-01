@@ -245,11 +245,43 @@ function nonZero(rect) {
 // `autoAlpha: 0`, for instance, sets BOTH `opacity: 0` and `visibility: hidden`
 // on every element waiting to fly in, so the capture-reset frame (timeline at
 // t=0) reports the not-yet-entered text as `visibility: hidden`.
-function isVisible(computed) {
+function isVisible(computed, el) {
   if (computed.display === 'none') return false;
-  if (computed.visibility === 'hidden' && !hasPagxAnimation(computed)) return false;
+  if (computed.visibility === 'hidden' && !hasPagxAnimation(computed) &&
+      !hasHiddenAnimatedAncestor(el)) return false;
   if (parseFloat(computed.opacity) === 0 && !hasPagxAnimation(computed)) return false;
   return true;
+}
+
+// True when `el`'s computed `visibility: hidden` is inherited from an ancestor
+// that carries a pagxAnimation (a captured reveal), rather than being the
+// element's own resting state. `visibility` is an *inherited* property, so an
+// element whose base state is `visibility: hidden` — but which a class toggle
+// later reveals, and whose reveal the capture pass baked into a `pagxAnim*`
+// animation on that element (e.g. a skill panel that fades in from
+// `opacity:0; visibility:hidden`) — propagates `hidden` to every descendant.
+// The animated ancestor itself survives `isVisible` via `hasPagxAnimation`, and
+// browser-snapshot never emits `visibility` at all, so at playback the whole
+// subtree is visible. Without this, the ancestor's non-animated descendants
+// (e.g. the panel's `display:grid` icon container and every perk inside it)
+// read `visibility: hidden` at snapshot time and would be dropped — silently
+// erasing the entire subtree even though its leaves were captured with their
+// own reveal animations. Walk up until the first ancestor whose own visibility
+// is not hidden: if any hidden ancestor along that contiguous chain is
+// pagx-animated, the element's hidden is an inherited reveal state, so keep it.
+function hasHiddenAnimatedAncestor(el) {
+  if (!el || !el.parentElement) return false;
+  let p = el.parentElement;
+  while (p && p !== document.body) {
+    const cs = getComputedStyle(p);
+    // The contiguous inherited-hidden chain ends here — anything above set its
+    // own visibility, so `el`'s hidden did not originate from an animated
+    // reveal ancestor.
+    if (cs.visibility !== 'hidden') return false;
+    if (hasPagxAnimation(cs)) return true;
+    p = p.parentElement;
+  }
+  return false;
 }
 
 // True when the element carries a canonical `pagxAnim*` animation injected by
@@ -542,7 +574,7 @@ function applyTextTransform(text, computed) {
 function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
   if (DROP_TAGS.has(tag)) return null;
-  if (!isVisible(computed)) return null;
+  if (!isVisible(computed, el)) return null;
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
   if (tag === 'canvas') {
@@ -1236,8 +1268,17 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
 // thumbnails authored with `object-fit: cover` (CMS hero images, avatar
 // crops, …) would render with the wrong aspect ratio against the live
 // browser baseline.
-function imageInnerStyle(rect, flexItem, objectFit) {
-  const base = flexItem
+function imageInnerStyle(rect, flexItem, objectFit, forceExplicitSize) {
+  // Under flex mode the wrapper is not absolutely positioned, so a raster image
+  // fills the wrapper via flow sizing (`width/height: 100%`). A *vector* source
+  // (`.svg`) is different: `pagx resolve` inlines the SVG as vector paths and
+  // must scale them to a concrete target read off this layer's width/height. A
+  // percentage size is NaN at resolve time (layout has not run), so the SVG
+  // falls back to its own intrinsic size (e.g. a potrace `width="477pt"` = 636
+  // px) and overflows the flex-sized box, rendering as a clipped corner. Emit
+  // the browser-measured pixel size so resolve gets a real target — this is
+  // also more faithful, since it is exactly the size the page painted the icon.
+  const base = (flexItem && !forceExplicitSize)
     ? `width: 100%; height: 100%`
     : `position: absolute; left: 0px; top: 0px; ` +
       `width: ${px(rect.width)}; height: ${px(rect.height)}`;
@@ -1245,6 +1286,17 @@ function imageInnerStyle(rect, flexItem, objectFit) {
     return `${base}; object-fit: ${objectFit}`;
   }
   return base;
+}
+
+// True when an <img> source is an SVG (by extension or `data:` MIME). SVG
+// sources are inlined as resolvable vector paths downstream, so their host
+// layer needs an explicit pixel size (see imageInnerStyle); raster sources do
+// not. Query strings / fragments after the extension are tolerated.
+function isSvgSource(src) {
+  const s = (src || '').trim().toLowerCase();
+  if (!s) return false;
+  if (s.indexOf('data:image/svg+xml') === 0) return true;
+  return /\.svg(?:[?#]|$)/.test(s);
 }
 
 // Walk an SVG subtree and freeze the CSS-resolved paint state onto each
@@ -1920,7 +1972,7 @@ function flexItemChildren(el) {
     const tag = c.tagName.toLowerCase();
     if (DROP_TAGS.has(tag)) continue;
     const cs = getComputedStyle(c);
-    if (!isVisible(cs)) continue;
+    if (!isVisible(cs, c)) continue;
     if (cs.display === 'contents') return null;
     const pos = cs.position;
     if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
@@ -2127,7 +2179,7 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(el.getAttribute('alt') || '');
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
+  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
   const inner = `<img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
@@ -2401,7 +2453,7 @@ function isInlineRunChild(el) {
   const tag = el.tagName.toLowerCase();
   if (!INLINE_RUN_TAGS.has(tag)) return false;
   const cs = getComputedStyle(el);
-  if (!isVisible(cs)) return false;
+  if (!isVisible(cs, el)) return false;
   const display = cs.display;
   if (display !== 'inline' && display !== 'inline-block') return false;
   if (cs.position !== 'static') return false;
@@ -3409,6 +3461,7 @@ const HELPER_FNS = [
   paddingShorthand,
   nonZero,
   hasPagxAnimation,
+  hasHiddenAnimatedAncestor,
   isVisible,
   readNum,
   readBox,
@@ -3452,6 +3505,7 @@ const HELPER_FNS = [
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,
+  isSvgSource,
   freezeSvg,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
