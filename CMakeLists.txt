@@ -201,8 +201,6 @@ if (PAG_BUILD_PAGX)
     file(GLOB_RECURSE PAGX_RUNTIME_SOURCES CONFIGURE_DEPENDS src/pagx/runtime/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_RUNTIME_SOURCES})
     file(GLOB_RECURSE PAGX_UTILS_SOURCES CONFIGURE_DEPENDS src/pagx/utils/*.*)
-    # Woff2FontGenerator depends on woff2 which is added later with its own include paths.
-    list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "Woff2FontGenerator")
     file(GLOB_RECURSE PAGX_XML_SOURCES CONFIGURE_DEPENDS src/pagx/xml/*.*)
     # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
     list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
@@ -230,6 +228,7 @@ if (PAG_BUILD_PAGX)
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
     set(WOFF2_DIR third_party/woff2)
+    list(APPEND PAG_DEFINES PAG_USE_WOFF2)
     set(BROTLI_DIR ${WOFF2_DIR}/brotli)
     set(WOFF2_SOURCES
             ${WOFF2_DIR}/src/font.cc
@@ -244,8 +243,6 @@ if (PAG_BUILD_PAGX)
     file(GLOB BROTLI_COMMON_SOURCES ${BROTLI_DIR}/c/common/*.c)
     file(GLOB BROTLI_ENC_SOURCES ${BROTLI_DIR}/c/enc/*.c)
     set(WOFF2_ALL_SOURCES ${WOFF2_SOURCES} ${BROTLI_COMMON_SOURCES} ${BROTLI_ENC_SOURCES})
-    list(APPEND WOFF2_ALL_SOURCES src/pagx/utils/Woff2FontGenerator.cpp)
-    list(APPEND WOFF2_ALL_SOURCES src/pagx/utils/Woff2FontGenerator.h)
     list(APPEND PAG_FILES ${WOFF2_ALL_SOURCES})
     list(APPEND PAG_INCLUDES ${WOFF2_DIR}/include ${BROTLI_DIR}/c/include)
     # Suppress warnings for third-party woff2/brotli code that does not pass -Werror -Weffc++.
