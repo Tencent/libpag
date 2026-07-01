@@ -1399,7 +1399,7 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
       // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
-      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // an ImagePattern before its runtimeImage is set via loadFileData; leaving the stroke empty
       // keeps those shapes transparent until the image is ready, matching convertFill.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
