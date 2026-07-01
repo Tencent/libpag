@@ -1816,9 +1816,9 @@ class LayerBuilderContext {
       return it->second;
     }
     // Resolution chain. Two camps of sources exist:
-    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
-    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
-    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
+    //   1. Host-supplied texture-backed images (from PAGImage::MakeFromTexture): already mipmapped
+    //      at upload time by the host. Re-wrapping with makeMipmapped(true) would force tgfx to
+    //      allocate a parallel mipmapped texture and copy the pixels. Use as-is.
     //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
