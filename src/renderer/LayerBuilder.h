@@ -455,9 +455,9 @@ class LayerBuilder {
  * version). The class is intended for the progressive image loading flow on WeChat; other
  * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
  *
-   * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
-   * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
-   * changes (new image attached or evicted). Destroying the session releases all
+ * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
+ * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
+ * changes (new image attached or evicted). Destroying the session releases all
  * cached layer/image state.
  *
  * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
