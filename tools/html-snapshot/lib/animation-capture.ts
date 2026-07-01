@@ -1710,6 +1710,25 @@ export function pagxEmitCaptured(
     // the resolved transform reflects only the static base. Inline-author
     // transforms (set via `el.style.transform` directly) win over class rules,
     // so this override doesn't lose any user intent the runtime could play.
+    //
+    // Critical exception: when the captured keyframes *themselves* drive a
+    // `transform` channel, that channel is sampled from computed style, which
+    // already folds the element's static base translate into every stop (e.g. a
+    // `.namebar { transform: translate(-88px,-50px) }` whose exit animation
+    // toggles to `translateX(-560px)` samples as `translate(-88,-50)` at rest).
+    // Pinning that same base translate inline would then double-apply it: the
+    // PAGX importer writes the inline base into `Layer.matrix` AND plays the
+    // keyframe translate on top, so the element lands an extra (base) offset
+    // away from where the browser paints it. In that case pin `none` and let
+    // the keyframes be the single source of translation. Any non-translatable
+    // base (scale/rotate/skew) is unplayable by the runtime and is dropped by
+    // `pagxExtractTranslate` regardless, so `none` loses nothing the
+    // transform-driven path could have reproduced. The base translate is only
+    // pinned when the keyframes carry no transform channel (e.g. an opacity-only
+    // fade on a statically-translated element, which must keep its offset).
+    const keyframesDriveTransform = cap.keyframes.some(
+      (s) => s.props && s.props['transform'] != null,
+    );
     const elRect = cap.el.getBoundingClientRect();
     const elBox = { width: elRect.width, height: elRect.height };
     const blocker = document.createElement('style');
@@ -1719,7 +1738,7 @@ export function pagxEmitCaptured(
     void document.body.offsetHeight;
     const baseT = pagxExtractTranslate(getComputedStyle(cap.el).transform || '', elBox);
     if (blocker.parentNode) blocker.parentNode.removeChild(blocker);
-    cap.el.style.transform = baseT || 'none';
+    cap.el.style.transform = keyframesDriveTransform ? 'none' : (baseT || 'none');
     cap.el.style.animation = built.animationShorthand;
     names.push(built.name);
   }
