@@ -616,8 +616,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
                                             static_cast<float>(tgfxImage->width()),
                                             static_cast<float>(tgfxImage->height()));
       // Push the PAGImage onto matching Image nodes. loadFileData sets Image::runtimeImage and
-      // refreshes affected layers in place, replacing the previous provider->putFullImage +
-      // rebuildForFilePath pair.
+      // refreshes affected layers in place.
       document->loadFileData(p.filePath, pagImage);
     } else {
       // Thumbnail: budget enforcement and silent LRU eviction happen up front in
