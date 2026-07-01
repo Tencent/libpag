@@ -97,6 +97,14 @@ class HTMLParserContext {
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 
+  // Recovers a CSS `url(...)` background into an `ImagePattern` Fill appended to `layer`
+  // (the inverse of `HTMLWriter`'s ImagePattern emission). `background-size` selects the
+  // scaleMode (contain/cover/100% 100% → LetterBox/Zoom/Stretch); any explicit pixel size or a
+  // tiling `background-repeat` falls back to ScaleMode::None with the pattern matrix carrying the
+  // per-axis scale and the position offset. Returns true when a fill was emitted. The layer's
+  // background geometry must already be present (added by `applyBackgroundVisuals`).
+  bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
+
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
   // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
@@ -117,8 +125,39 @@ class HTMLParserContext {
   // their final outer Layer through this helper to ensure animation capture is exhaustive.
   void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
 
+  // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
+  // `clip-path: url(#id)` (contour) and attaches it to `layer` as `layer->mask` / `maskType`
+  // (the inverse of `HTMLWriter::writeMaskCSS` / `writeClipDef`). The mask geometry SVG is parsed
+  // through `SVGImporter`, and its nodes are transplanted into `_document`. The mask layer is added
+  // as an invisible, layout-excluded child of `layer` so it shares the masked layer's local
+  // coordinate space and is reachable by the renderer's mask lookup. No-op when the box carries
+  // neither a mask nor a clip-path reference. `box` supplies the masked layer's resolved size used
+  // to frame a contour clip-path SVG.
+  void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
+
+  // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
+  // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
+  // is imported at its intrinsic pixel size; CSS then scales it to `mask-size` and offsets it by
+  // `mask-position`, both anchored at the masked element's top-left origin and resolved against
+  // its box for percentage / keyword values. `intrinsicW` / `intrinsicH` are the mask SVG's own
+  // dimensions; `box` supplies the masked element's size. No-op when size and position are absent
+  // or `auto`, or when the intrinsic size is degenerate.
+  void applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBoxAttributes& box, float intrinsicW,
+                                float intrinsicH);
+
+  // Resolves one axis of CSS `mask-position` into a top-left pixel offset. `token` is a length, a
+  // percentage, or an edge keyword (`left`/`right`/`top`/`bottom`/`center`); percentages and
+  // keywords resolve against `(boxAxis - maskAxis)` per the CSS background/mask positioning model,
+  // while a bare length is the offset from the box's leading edge.
+  float resolveMaskPositionAxis(const std::string& token, float boxAxis, float maskAxis);
+
   // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
+  // path). Returns {0, 0} when the bytes cannot be decoded. Used to recover the per-axis scale
+  // of a tiled `background-image` (CSS tile px / native px).
+  std::pair<int, int> decodeImageNativeSize(const Image* image);
 
   // Resolves a raw `<img src>` URL via `_imageResources->resolveSource`.
   std::string resolveImageSource(const std::string& src) const;

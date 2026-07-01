@@ -184,8 +184,11 @@ std::string TransformBackgroundImage(const std::string& value, const PropertyCon
     return Trim(value);
   }
   if (lc.find("url(") != std::string::npos) {
-    return DropProperty("background-image", value, "url() backgrounds require <img/> instead",
-                        diags);
+    // A `url(...)` background round-trips into an `ImagePattern` fill (the inverse of the
+    // exporter's emission). The accompanying `background-size` / `background-repeat` /
+    // `background-position` are kept too (see the property table) so the importer can recover
+    // the pattern's scaleMode / tile modes / matrix.
+    return Trim(value);
   }
   if (Trim(lc) == "none") return std::string();
   return DropProperty("background-image", value, "is not a supported value", diags);
@@ -202,6 +205,18 @@ std::string TransformBackgroundClip(const std::string& value, const PropertyCont
   if (lc == "text") return "text";
   if (lc == "padding-box" || lc == "content-box") return std::string();
   return DropProperty("background-clip", value, "is not a supported value", diags);
+}
+
+// `clip-path` is modelled only as a reference to a `<clipPath>` def (`url(#id)`), which the
+// importer rebuilds into a contour mask layer. Geometric forms (`inset()` / `circle()` /
+// `ellipse()` / `polygon()` / `path()`) have no PAGX geometry primitive and are dropped with a
+// diagnostic (the strict-mode trigger), matching the snapshot's own `normalizeClipPath` filter.
+std::string TransformClipPath(const std::string& value, const PropertyContext&,
+                              HTMLTransformContext& diags) {
+  std::string lc = ToLower(Trim(value));
+  if (lc.empty() || lc == "none") return std::string();
+  if (lc.compare(0, 4, "url(") == 0) return Trim(value);
+  return DropProperty("clip-path", value, "only url(#id) references are supported", diags);
 }
 
 std::string TransformBorder(const std::string& value, const PropertyContext&,
@@ -277,10 +292,13 @@ std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTr
 // translate[X|Y]) populate the discrete fields and TextBox uses them
 // directly. The `matrix(a, b, c, d, tx, ty)` shorthand is also accepted —
 // the resolver writes the six floats straight into `HTMLTransform.matrix`
-// so non-text Layers can forward the affine onto `Layer.matrix`. Compound
-// chains like `skewX(-5deg) rotate(10deg)` and 3D variants
-// (`matrix3d`/`rotate3d`/`perspective`) still require decomposition that
-// the importer does not implement, so they are dropped with a warning.
+// so non-text Layers can forward the affine onto `Layer.matrix`. The
+// `matrix3d(...)` 3D form is accepted too: the resolver projects it
+// orthographically onto its 2D affine subset (exact for matrices without
+// perspective, approximate otherwise). Compound chains like
+// `skewX(-5deg) rotate(10deg)` and the remaining 3D variants
+// (`rotate3d`/`perspective`) still require decomposition that the importer
+// does not implement, so they are dropped with a warning.
 std::string TransformTransform(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
@@ -303,12 +321,12 @@ std::string TransformTransform(const std::string& value, const PropertyContext&,
   }
   if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
       fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey" ||
-      fn == "matrix") {
+      fn == "matrix" || fn == "matrix3d") {
     return trimmed;
   }
   return DropProperty("transform", value,
                       "is not in the supported function set "
-                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix)",
+                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix/matrix3d)",
                       diags);
 }
 
@@ -357,6 +375,25 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-color", PropAction::Keep, nullptr, nullptr},
     {"background-image", PropAction::Transform, &TransformBackgroundImage, nullptr},
     {"background-clip", PropAction::Transform, &TransformBackgroundClip, nullptr},
+    // `background-size` / `background-repeat` / `background-position` are kept verbatim and
+    // consumed only when paired with a `url(...)` background, where they drive the recovered
+    // ImagePattern's scaleMode / tile modes / matrix.
+    {"background-size", PropAction::Keep, nullptr, nullptr},
+    {"background-repeat", PropAction::Keep, nullptr, nullptr},
+    {"background-position", PropAction::Keep, nullptr, nullptr},
+    // Alpha / luminance masks. `mask-image` carries a `url(data:image/svg+xml,...)` whose SVG the
+    // importer turns back into a PAGX mask layer; `mask-mode` selects Alpha vs Luminance and
+    // `mask-size` / `mask-position` drive the mask layer's scale / offset. Kept verbatim and
+    // consumed in HTMLStyleCascade::parseBoxVisuals (the inverse of HTMLWriter::writeMaskCSS).
+    {"mask-image", PropAction::Keep, nullptr, nullptr},
+    {"mask-mode", PropAction::Keep, nullptr, nullptr},
+    {"mask-size", PropAction::Keep, nullptr, nullptr},
+    {"mask-position", PropAction::Keep, nullptr, nullptr},
+    {"mask-repeat", PropAction::Keep, nullptr, nullptr},
+    // `clip-path: url(#id)` references a hidden <clipPath> def; the importer resolves it into a
+    // contour mask layer (the inverse of HTMLWriter::writeClipDef). Geometric clip-path forms
+    // (inset/circle/ellipse/polygon/path) have no PAGX primitive and are dropped with a diagnostic.
+    {"clip-path", PropAction::Transform, &TransformClipPath, nullptr},
     {"border", PropAction::Transform, &TransformBorder, nullptr},
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
     {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
@@ -381,6 +418,15 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"white-space", PropAction::Keep, nullptr, nullptr},
     {"text-overflow", PropAction::Keep, nullptr, nullptr},
     {"writing-mode", PropAction::Keep, nullptr, nullptr},
+    // `-webkit-text-stroke` (and its two longhands) round-trips into a PAGX text `<Stroke>`
+    // (the inverse of HTMLWriter::ResolveTextStrokeCss). The shorthand carries a width token
+    // plus a colour token, so it cannot be length-resolved as a unit; keep it verbatim and let
+    // HTMLStyleCascade split it. The longhands are kept verbatim too so hand-authored subset
+    // HTML that sets them separately still round-trips. The cascade prefers the shorthand and
+    // falls back to the longhands.
+    {"-webkit-text-stroke", PropAction::Keep, nullptr, nullptr},
+    {"-webkit-text-stroke-width", PropAction::Keep, nullptr, nullptr},
+    {"-webkit-text-stroke-color", PropAction::Keep, nullptr, nullptr},
     // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the
     // function back onto the TextBox / Group transform fields. The handler enforces the
     // supported single-function subset; compound chains and matrix(...) forms are dropped.
@@ -413,7 +459,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
-    {"clip-path", PropAction::Drop, nullptr, "is not in the subset"},
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
@@ -429,9 +474,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"min-height", PropAction::Drop, nullptr, "is not in the subset"},
     {"max-height", PropAction::Drop, nullptr, "is not in the subset"},
     {"aspect-ratio", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-size", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-repeat", PropAction::Drop, nullptr, "is not in the subset"},
-    {"background-position", PropAction::Drop, nullptr, "is not in the subset"},
     {"text-transform", PropAction::Drop, nullptr, "is not in the subset"},
     {"text-indent", PropAction::Drop, nullptr, "is not in the subset"},
     {"word-spacing", PropAction::Drop, nullptr, "is not in the subset"},

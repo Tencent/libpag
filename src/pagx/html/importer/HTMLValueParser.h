@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
@@ -58,16 +59,18 @@ class HTMLValueParser {
   };
 
   /**
-   * One step of a CSS `filter` / `backdrop-filter` chain. `Unsupported` is emitted for
-   * anything outside the {`blur`, `drop-shadow`} subset; the caller can surface a diagnostic
-   * using `raw`.
+   * One step of a CSS `filter` / `backdrop-filter` chain. `SvgRef` carries a `url(#id)`
+   * reference to an SVG `<filter>` def, whose `refId` the caller resolves through the
+   * shared-defs table. `Unsupported` is emitted for anything outside the
+   * {`blur`, `drop-shadow`, `url(#…)`} subset; the caller can surface a diagnostic using `raw`.
    */
   struct FilterStep {
-    enum class Kind { Blur, DropShadow, Unsupported };
+    enum class Kind { Blur, DropShadow, SvgRef, Unsupported };
     Kind kind = Kind::Unsupported;
     float blurX = 0;
     float blurY = 0;
     ShadowSpec shadow = {};
+    std::string refId = {};
     std::string raw = {};
   };
 
@@ -86,8 +89,18 @@ class HTMLValueParser {
   std::vector<ShadowSpec> parseShadowList(const std::string& value);
   std::vector<FilterStep> parseFilterChain(const std::string& value);
 
-  LinearGradient* parseLinearGradient(const std::string& value);
-  RadialGradient* parseRadialGradient(const std::string& value);
+  /** Parses a CSS `linear-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px;
+   *  when both are known the gradient line is resolved in absolute pixel space (using the CSS
+   *  magic-corner extent) with `fitsToGeometry=false`, so the equal-color lines stay perpendicular
+   *  on any aspect ratio. Pass NaN when the box size is unknown to keep the geometry-normalised
+   *  (0,0)-(1,1) space, which is only exact for axis-aligned gradients. */
+  LinearGradient* parseLinearGradient(const std::string& value, float boxWidth = NAN,
+                                      float boxHeight = NAN);
+  /** Parses a CSS `radial-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px
+   *  used to normalise the `<size> at <position>` descriptor back into the gradient's (0,0)-(1,1)
+   *  geometry space; pass NaN when unknown to keep the centered, box-filling default. */
+  RadialGradient* parseRadialGradient(const std::string& value, float boxWidth = NAN,
+                                      float boxHeight = NAN);
   ConicGradient* parseConicGradient(const std::string& value);
 
   /** Parses the comma-separated tail of a gradient call into (offset, color) pairs. Offsets that
@@ -104,6 +117,14 @@ class HTMLValueParser {
   void emitColorStops(T& targetStops, const GradientStops& stops);
 
  private:
+  // Parses a radial-gradient leading descriptor ("circle 50px at 50px 50px") and writes the
+  // recovered center / radius onto `grad`, normalised against the box size.
+  void parseRadialDescriptor(const std::string& descriptor, float boxWidth, float boxHeight,
+                             RadialGradient* grad);
+  // Resolves a single radial size/position length token to a value normalised against `boxAxis`.
+  // Handles px lengths and `<pct>%`; returns NaN when the token is not a length.
+  float resolveRadialLength(const std::string& token, float boxAxis);
+
   HTMLDiagnosticSink& _diagnostics;
   PAGXDocument* _document = nullptr;
   const float& _canvasWidth;

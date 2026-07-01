@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -17,65 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/FontConfig.h"
-#include <unordered_set>
 #include "FontConfigData.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
-namespace {
-struct FallbackKey {
-  std::string path = {};
-  std::string family = {};
-  std::string style = {};
-  int ttcIndex = 0;
-
-  bool operator==(const FallbackKey& other) const {
-    return path == other.path && family == other.family && style == other.style &&
-           ttcIndex == other.ttcIndex;
-  }
-};
-
-struct FallbackKeyHash {
-  size_t operator()(const FallbackKey& key) const {
-    size_t h = std::hash<std::string>()(key.path);
-    h ^= std::hash<std::string>()(key.family) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= std::hash<std::string>()(key.style) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= std::hash<int>()(key.ttcIndex) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    return h;
-  }
-};
-
-FallbackKey MakeFallbackKey(const TypefaceHolder& holder) {
-  FallbackKey key = {};
-  key.path = holder.getPath();
-  key.family = holder.getFontFamily();
-  key.style = holder.getFontStyle();
-  key.ttcIndex = holder.getTTCIndex();
-  return key;
-}
-}  // namespace
-
-TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface)
-    : typeface(std::move(typeface)) {
-  if (this->typeface != nullptr) {
-    fontFamily = this->typeface->fontFamily();
-    fontStyle = this->typeface->fontStyle();
-  }
+// Normalizes an empty style to "Regular" so the stored registration key matches the lookup key
+// built by LayoutContext::findTypeface, which applies the same normalization at query time.
+static const std::string& NormalizeStyle(const std::string& style) {
+  static const std::string regular = "Regular";
+  return style.empty() ? regular : style;
 }
 
-TypefaceHolder::TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily,
-                               std::string fontStyle)
-    : path(std::move(path)), fontFamily(std::move(fontFamily)), fontStyle(std::move(fontStyle)),
-      ttcIndex(ttcIndex) {
+TypefaceHolder::TypefaceHolder(std::string path, int ttcIndex, std::string family,
+                               std::string style)
+    : path(std::move(path)), ttcIndex(ttcIndex), fontFamily(std::move(family)),
+      fontStyle(std::move(style)) {
+}
+
+TypefaceHolder::TypefaceHolder(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                               std::string family, std::string style)
+    : bytes(std::move(bytes)), ttcIndex(ttcIndex), fontFamily(std::move(family)),
+      fontStyle(std::move(style)) {
+}
+
+TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::string family,
+                               std::string style)
+    : fontFamily(std::move(family)), fontStyle(std::move(style)), typeface(std::move(typeface)) {
 }
 
 std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
   if (typeface == nullptr) {
     if (!path.empty()) {
       typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
-    } else if (!fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    } else if (bytes != nullptr && !bytes->empty()) {
+      typeface = tgfx::Typeface::MakeFromBytes(bytes->data(), bytes->size(), ttcIndex);
     }
   }
   return typeface;
@@ -87,14 +63,6 @@ const std::string& TypefaceHolder::getFontFamily() const {
 
 const std::string& TypefaceHolder::getFontStyle() const {
   return fontStyle;
-}
-
-const std::string& TypefaceHolder::getPath() const {
-  return path;
-}
-
-int TypefaceHolder::getTTCIndex() const {
-  return ttcIndex;
 }
 
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
@@ -115,44 +83,138 @@ FontConfig& FontConfig::operator=(const FontConfig& other) {
 FontConfig::FontConfig(FontConfig&& other) noexcept = default;
 FontConfig& FontConfig::operator=(FontConfig&& other) noexcept = default;
 
-void FontConfig::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
-  if (typeface == nullptr) {
-    return;
-  }
-  Data::FontKey key = {};
-  key.family = typeface->fontFamily();
-  key.style = typeface->fontStyle();
-  data->registeredTypefaces[key] = std::move(typeface);
+void FontConfig::registerFont(const PAGFont& font, const std::string& path, int ttcIndex) {
+  registerFont(path, ttcIndex, font.fontFamily, font.fontStyle);
 }
 
-void FontConfig::addFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
-  for (auto& tf : typefaces) {
-    data->fallbackTypefaces.emplace_back(std::move(tf));
+void FontConfig::registerFont(const PAGFont& font, const void* bytes, size_t length, int ttcIndex) {
+  registerFont(bytes, length, ttcIndex, font.fontFamily, font.fontStyle);
+}
+
+void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::string& fontFamily,
+                              const std::string& fontStyle) {
+  if (fontFamily.empty()) {
+    // Reverse-lookup: build typeface now to read its family/style, then hold the typeface directly
+    // to avoid a second lazy build.
+    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    Data::FontKey key = {};
+    key.family = typeface->fontFamily();
+    key.style = typeface->fontStyle();
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(typeface), key.family, key.style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    Data::FontKey key = {};
+    key.family = fontFamily;
+    key.style = normalizedStyle;
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(path, ttcIndex, fontFamily, normalizedStyle));
   }
+}
+
+void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
+                              const std::string& fontFamily, const std::string& fontStyle) {
+  if (fontFamily.empty()) {
+    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    Data::FontKey key = {};
+    key.family = typeface->fontFamily();
+    key.style = typeface->fontStyle();
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(typeface), key.family, key.style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    Data::FontKey key = {};
+    key.family = fontFamily;
+    key.style = normalizedStyle;
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::make_shared<const std::vector<uint8_t>>(
+                                static_cast<const uint8_t*>(bytes),
+                                static_cast<const uint8_t*>(bytes) + length),
+                            ttcIndex, fontFamily, normalizedStyle));
+  }
+}
+
+void FontConfig::addFallbackFont(const PAGFont& font, const std::string& path, int ttcIndex) {
+  addFallbackFont(path, ttcIndex, font.fontFamily, font.fontStyle);
+}
+
+void FontConfig::addFallbackFont(const PAGFont& font, const void* bytes, size_t length,
+                                 int ttcIndex) {
+  addFallbackFont(bytes, length, ttcIndex, font.fontFamily, font.fontStyle);
 }
 
 void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
-  data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, fontStyle);
+  if (fontFamily.empty()) {
+    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    auto family = typeface->fontFamily();
+    auto style = typeface->fontStyle();
+    data->fallbackTypefaces.emplace_back(std::move(typeface), std::move(family), std::move(style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    data->fallbackTypefaces.emplace_back(path, ttcIndex, fontFamily, normalizedStyle);
+  }
 }
 
-void FontConfig::merge(const FontConfig& other) {
-  if (this == &other || data == nullptr || other.data == nullptr) {
-    return;
-  }
-  for (const auto& entry : other.data->registeredTypefaces) {
-    data->registeredTypefaces[entry.first] = entry.second;
-  }
-  std::unordered_set<FallbackKey, FallbackKeyHash> seen = {};
-  seen.reserve(data->fallbackTypefaces.size() + other.data->fallbackTypefaces.size());
-  for (const auto& holder : data->fallbackTypefaces) {
-    seen.insert(MakeFallbackKey(holder));
-  }
-  for (const auto& holder : other.data->fallbackTypefaces) {
-    if (seen.insert(MakeFallbackKey(holder)).second) {
-      data->fallbackTypefaces.push_back(holder);
+void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
+                                 const std::string& fontFamily, const std::string& fontStyle) {
+  if (fontFamily.empty()) {
+    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    if (typeface == nullptr) {
+      return;
     }
+    auto family = typeface->fontFamily();
+    auto style = typeface->fontStyle();
+    data->fallbackTypefaces.emplace_back(std::move(typeface), std::move(family), std::move(style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    data->fallbackTypefaces.emplace_back(
+        std::make_shared<const std::vector<uint8_t>>(static_cast<const uint8_t*>(bytes),
+                                                     static_cast<const uint8_t*>(bytes) + length),
+        ttcIndex, fontFamily, normalizedStyle);
   }
+}
+
+bool FontConfig::registerSystemFont(const std::string& fontFamily, const std::string& fontStyle) {
+  auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto normalizedStyle = NormalizeStyle(fontStyle);
+  Data::FontKey key = {};
+  key.family = fontFamily;
+  key.style = normalizedStyle;
+  data->registeredTypefaces.insert_or_assign(
+      key, TypefaceHolder(std::move(typeface), fontFamily, normalizedStyle));
+  return true;
+}
+
+bool FontConfig::registerSystemFont(const PAGFont& font) {
+  return registerSystemFont(font.fontFamily, font.fontStyle);
+}
+
+bool FontConfig::addFallbackSystemFont(const std::string& fontFamily,
+                                       const std::string& fontStyle) {
+  auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto normalizedStyle = NormalizeStyle(fontStyle);
+  data->fallbackTypefaces.emplace_back(std::move(typeface), fontFamily, normalizedStyle);
+  return true;
+}
+
+bool FontConfig::addFallbackSystemFont(const PAGFont& font) {
+  return addFallbackSystemFont(font.fontFamily, font.fontStyle);
 }
 
 std::vector<std::string> FontConfig::fallbackFamilyNames() const {

@@ -61,7 +61,10 @@ file:line: description. Fix: suggested check direction
 - Single-node problems: single line number.
 - Two-node problems (e.g., overlap): two line numbers comma-separated.
 - Spatial problems include bounds in the description.
-- No output when there are no problems (when both `--skip-render` and `--skip-layout` are set).
+- Text diagnostics: nothing is printed to stderr when there are no problems.
+- `--json`: diagnostics are always written to **stdout** as JSON (e.g. `{"ok": true, "diagnostics": []}`
+  when clean), and the text diagnostics above are suppressed.
+- The layout XML is written silently; only the screenshot prints a `Wrote …` confirmation line.
 
 Example:
 
@@ -70,7 +73,6 @@ input.pagx:8: unknown attribute "borderRadius" on Rectangle, use "roundness" ins
 input.pagx:18,22: overlapping siblings (20,10,200,40) and (180,10,40,40) in container layout. Fix: check parent layout direction, gap, padding, and children sizes
 input.pagx:60,75: duplicate PathData, identical to line 60. Fix: extract to <Resources> and reference via @id
 Wrote input.png (786x852 @2x)
-Wrote input.layout.xml
 ```
 
 ### File output
@@ -314,21 +316,24 @@ The output is optimized via `PAGXOptimizer` (PathData is inlined rather than sha
 result is close to hand-authored PAGX and can be polished further with the other CLI tools.
 
 Unsupported constructs are handled on a best-effort basis: offending elements/properties are
-skipped or downgraded and reported as warnings on stderr (use `--html-strict` to turn HTML
-warnings into hard errors).
+skipped or downgraded and recorded as warnings. Conversion warnings are **suppressed by default**
+(they are noisy and non-fatal); pass `--verbose` / `-v` to print them to stderr. Errors are always
+printed regardless of `--verbose`.
 
 ```bash
 pagx import --input icon.svg                      # SVG to icon.pagx
 pagx import --input icon.svg --output out.pagx    # SVG to out.pagx
 pagx import --input layout.html                   # HTML to layout.pagx
 pagx import --input page.html --output card.pagx  # HTML to card.pagx
+pagx import --input page.html -v                  # print conversion warnings
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file\|url>` | Input file or URL to import (required; URL inputs require `--html-snapshot`) |
-| `--output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
+| `--input <file\|url>` | Input file or URL to import (required) |
+| `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
+| `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### SVG options
 
@@ -338,40 +343,40 @@ pagx import --input page.html --output card.pagx  # HTML to card.pagx
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
 
-### HTML options
+### HTML import behavior
 
-| Option | Description |
-|--------|-------------|
-| `--html-strict` | Treat HTML import warnings (unsupported elements/properties) as hard errors |
-| `--html-preserve-unknown` | Keep unknown HTML tags as empty Layers tagged `data-html-unknown="<tag>"` (debug) |
-| `--html-no-prefer-body-size` | Prefer the caller-provided target size over the `<body>` intrinsic/declared size |
-| `--html-no-normalize` | Skip the HTML subset normalizer (debug; importer then sees raw DOM) |
-| `--html-infer-flex` | Recover `display:flex` semantics from an absolute-positioned layout (lossy heuristic) |
-| `--html-snapshot` | Pre-render the input through `tools/html-snapshot/snapshot.js` before import |
-| `--html-snapshot-bin <path>` | Override the path to `snapshot.js` |
+HTML import behavior is fixed in code (there are no `--html-*` flags). Every HTML input is:
 
-By default the importer runs a subset normalizer that resolves the `<style>` cascade into
-inline styles, drops disallowed properties, and prunes unsupported elements so it only ever
-sees subset-compliant HTML. `--html-no-normalize` disables this (debug only).
+- **rendered through `tools/html-snapshot/snapshot.js`** (a headless browser) first, so
+  JS/React/Tailwind-driven pages are flattened into a static, absolute-positioned HTML subset
+  the importer understands;
+- **normalized** by the subset normalizer, which resolves the `<style>` cascade into inline
+  styles, drops disallowed properties, and prunes unsupported elements;
+- **flex-recovered** via flex inference (on by default), which recovers `display:flex` semantics
+  from the absolute-positioned snapshot output;
+- sized from the `<body>` intrinsic/declared size (preferred over any caller-provided target);
+- imported non-strictly — unsupported constructs become warnings, not hard errors.
 
-### HTML snapshot workflow
+The snapshot step requires `node` on `PATH` and a `snapshot.js` install. The script is located
+in this order:
 
-`--html-snapshot` pipes the input through a headless-browser renderer (`snapshot.js`) before
-importing. This is how JS/React/Tailwind-driven pages are flattened into a static,
-absolute-positioned HTML subset that the importer understands. It is typically paired with
-`--html-infer-flex` to recover flex layout from the absolute output. It requires `node` on
-`PATH` and a `snapshot.js` install; the script is located in this order:
-
-1. `--html-snapshot-bin <path>` (explicit override)
+1. relative `tools/html-snapshot/snapshot.js` from the current directory
 2. `PAGX_HTML_SNAPSHOT_BIN` environment variable
-3. Upward search from the current directory for `tools/html-snapshot/snapshot.js`
+3. Upward search from the current directory for `tools/html-snapshot/snapshot.js` (up to 8
+   parent levels)
 
-URL inputs (`http://` / `https://`) are only valid with `--html-snapshot` (the importer
-cannot fetch URLs itself) and require an explicit `--output`.
+URL inputs (`http://` / `https://`) are imported the same way (the snapshot renderer fetches
+the page) and require an explicit `--output`.
+
+**Disabling the snapshot pre-pass.** Set `PAGX_HTML_SNAPSHOT=0` (also accepts
+`false`/`no`/`off`) to skip the browser step and import the HTML file directly — useful when the
+input is *already* a flat, subset-compliant snapshot (this is what the `html2pagx` tooling sets,
+since it renders the snapshot itself). With the pre-pass disabled, URL inputs are rejected (the
+importer cannot fetch them).
 
 ```bash
-pagx import --input app.html --html-snapshot --html-infer-flex      # React/Tailwind page
-pagx import --input https://example.com/demo --html-snapshot --output demo.pagx   # URL input
+pagx import --input app.html                                        # React/Tailwind page
+pagx import --input https://example.com/demo --output demo.pagx     # URL input
 ```
 
 ---
@@ -399,12 +404,13 @@ Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see abov
 
 ## pagx export
 
-Export a PAGX file to another format (SVG or HTML). The output format is inferred from the
-output file extension. If neither `--format` nor a recognizable output extension is provided,
-the command reports an error.
+Export a PAGX file to another format (SVG, PPTX, or HTML). The output format is inferred from the
+output file extension. If neither `--format` nor an output file with a recognizable extension is
+provided, the command reports an error (there is no implicit default format — `--input icon.pagx`
+alone fails). Once the format is known, `--output` defaults to `<input>.<format>`.
 
 ```bash
-pagx export --input icon.pagx                    # PAGX to icon.svg
+pagx export --format svg --input icon.pagx       # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
 pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
@@ -423,5 +429,5 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
+| `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, wide-gamut color, and `BackgroundBlurStyle`. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes and `BackgroundBlurStyle` the backdrop beneath the layer is baked into the PNG too, so the blend/frosted-glass composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 

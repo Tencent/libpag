@@ -304,3 +304,156 @@ describe('runBatch — live execution (mocked engine + pipeline)', () => {
     expect(stderr).toMatch(/browser close error: close exploded/);
   });
 });
+
+// The in-process snapshot adapter (`makeInProcessSnapshot`) is private — it is
+// only reachable as `opts.snapshotImpl` inside `runHtmlToPagx`. We mock
+// `runHtmlToPagx` to invoke that adapter (and the per-file `log` callback)
+// directly, and mock `snapshot-runner.runSnapshot` so no real browser work
+// happens. This drives the file:// / http URL building, cookie/header parsing,
+// snapshot write, and the success / failure return shapes.
+describe('runBatch — in-process snapshot adapter', () => {
+  function withCapturedIO(fn) {
+    const realOut = process.stdout.write.bind(process.stdout);
+    const realErr = process.stderr.write.bind(process.stderr);
+    const out = [];
+    const err = [];
+    process.stdout.write = (s) => { out.push(String(s)); return true; };
+    process.stderr.write = (s) => { err.push(String(s)); return true; };
+    return Promise.resolve(fn())
+      .finally(() => {
+        process.stdout.write = realOut;
+        process.stderr.write = realErr;
+      })
+      .then((r) => ({ result: r, stdout: out.join(''), stderr: err.join('') }));
+  }
+
+  function loadBatchWithRunner({ runSnapshot, runHtmlToPagx }) {
+    jest.resetModules();
+    jest.doMock('../dist/lib/browser-engine', () => {
+      const real = jest.requireActual('../dist/lib/browser-engine');
+      return {
+        ...real,
+        launchBrowser: async () => ({ browser: { close: async () => {} }, engine: 'puppeteer' }),
+      };
+    });
+    jest.doMock('../dist/lib/snapshot-runner', () => {
+      const real = jest.requireActual('../dist/lib/snapshot-runner');
+      return { ...real, runSnapshot };
+    });
+    jest.doMock('../dist/lib/pipeline', () => {
+      const real = jest.requireActual('../dist/lib/pipeline');
+      return { ...real, runHtmlToPagx };
+    });
+    return require('../dist/lib/batch');
+  }
+
+  afterEach(() => {
+    jest.dontMock('../dist/lib/browser-engine');
+    jest.dontMock('../dist/lib/snapshot-runner');
+    jest.dontMock('../dist/lib/pipeline');
+    jest.resetModules();
+  });
+
+  test('builds a file:// URL, parses cookies/headers, writes the snapshot, and reports code 0', async () => {
+    touch('page.html');
+    const outFile = path.join(dir, 'page.subset.html');
+    let snapshotResult = null;
+    let seenUrl = null;
+    let seenOpts = null;
+    const { runBatch: liveRun } = loadBatchWithRunner({
+      runSnapshot: async (engineHandle, url, opts) => {
+        seenUrl = url;
+        seenOpts = opts;
+        opts.log('snapshot progress note');
+        return { html: '<flat/>', width: 100, height: 50, fonts: [], images: [] };
+      },
+      runHtmlToPagx: async (opts) => {
+        snapshotResult = await opts.snapshotImpl({
+          input: path.join(dir, 'page.html'),
+          output: outFile,
+          viewportWidth: 800,
+          viewportHeight: 600,
+          waitMs: 10,
+          selector: '#root',
+          cookies: ['session=abc', 'bare'],
+          headers: ['X-Test: yes', 'NoColonHeader'],
+          inlineIconFonts: true,
+          downloadFonts: false,
+          downloadImages: false,
+        });
+        opts.log('pipeline line');
+        return { subsetHtml: outFile, pagx: '', png: null, fonts: [] };
+      },
+    });
+
+    const { result, stdout, stderr } = await withCapturedIO(() => liveRun({
+      inputDir: dir, pagxBin: '/p', scriptDir: dir,
+    }));
+
+    expect(result.processed).toBe(1);
+    expect(snapshotResult.code).toBe(0);
+    expect(typeof snapshotResult.durationMs).toBe('number');
+    // file:// URL was synthesised from the local input path.
+    expect(seenUrl.startsWith('file://')).toBe(true);
+    expect(seenUrl.endsWith('page.html')).toBe(true);
+    // Cookies / headers were split into name/value pairs (bare entries → empty value).
+    expect(seenOpts.cookies).toEqual([
+      { name: 'session', value: 'abc' },
+      { name: 'bare', value: '' },
+    ]);
+    expect(seenOpts.headers).toEqual([
+      ['X-Test', 'yes'],
+      ['NoColonHeader', ''],
+    ]);
+    expect(seenOpts.inlineIconFonts).toBe(true);
+    // The flattened HTML was written to the requested output path.
+    expect(fs.readFileSync(outFile, 'utf8')).toBe('<flat/>');
+    // The adapter forwarded runSnapshot's log line to stderr.
+    expect(stderr).toMatch(/snapshot progress note/);
+    // The pipeline's own log callback writes to stdout.
+    expect(stdout).toMatch(/pipeline line/);
+  });
+
+  test('passes an http(s) input through untouched as the target URL', async () => {
+    touch('ignored.html');
+    let seenUrl = null;
+    const { runBatch: liveRun } = loadBatchWithRunner({
+      runSnapshot: async (engineHandle, url) => {
+        seenUrl = url;
+        return { html: '<x/>', width: 1, height: 1, fonts: [], images: [] };
+      },
+      runHtmlToPagx: async (opts) => {
+        await opts.snapshotImpl({
+          input: 'https://example.com/live',
+          output: path.join(dir, 'http.subset.html'),
+        });
+        return { subsetHtml: '', pagx: '', png: null, fonts: [] };
+      },
+    });
+    await withCapturedIO(() => liveRun({ inputDir: dir, pagxBin: '/p', scriptDir: dir }));
+    expect(seenUrl).toBe('https://example.com/live');
+  });
+
+  test('returns code 1 with the error text when runSnapshot throws', async () => {
+    touch('page.html');
+    let snapshotResult = null;
+    const { runBatch: liveRun } = loadBatchWithRunner({
+      runSnapshot: async () => { throw new Error('navigation timed out'); },
+      runHtmlToPagx: async (opts) => {
+        snapshotResult = await opts.snapshotImpl({
+          input: path.join(dir, 'page.html'),
+          output: path.join(dir, 'page.subset.html'),
+        });
+        // Surface the adapter failure the way the real pipeline would.
+        if (snapshotResult.code !== 0) {
+          throw new Error('snapshot exited with code ' + snapshotResult.code);
+        }
+        return { subsetHtml: '', pagx: '', png: null, fonts: [] };
+      },
+    });
+    const { result } = await withCapturedIO(() => liveRun({ inputDir: dir, pagxBin: '/p', scriptDir: dir }));
+    expect(snapshotResult.code).toBe(1);
+    expect(snapshotResult.stderr).toMatch(/navigation timed out/);
+    expect(result.failed).toBe(1);
+  });
+});

@@ -93,6 +93,19 @@ struct SVGExportOptions {
    * default of HTMLExportOptions::rasterScale.
    */
   float rasterScale = 2.0f;
+
+  /**
+   * Whether to embed vector Font resources as WOFF2 @font-face rules with base64 data URIs and
+   * render their Text elements via &lt;text&gt; with PUA Unicode characters. When enabled, Text
+   * nodes whose GlyphRun references an embeddable vector Font become real &lt;text&gt; elements —
+   * selectable, searchable, and animatable per character — instead of opaque outline &lt;path&gt;
+   * elements. Bitmap (CBDT) fonts and GlyphRuns that carry per-glyph scales / skews remain on the
+   * outline path because plain SVG &lt;text&gt; cannot express them. When disabled, every Text
+   * with GlyphRun data is emitted as &lt;path&gt; (the legacy behaviour). Has no effect when
+   * `convertTextToPath` is true (the user has explicitly requested outline geometry). The default
+   * value is true.
+   */
+  bool embedFontsAsWoff2 = true;
 };
 
 /**

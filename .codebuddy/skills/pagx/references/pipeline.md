@@ -28,8 +28,10 @@ relative to the repository root.
 1. **snapshot** — render `<input>.html` in headless Chromium and emit `<input>.subset.html`, a
    flat, absolute-positioned page that conforms to `spec/html_subset.md` (computed styles baked in,
    Tailwind/utility classes dropped, icon fonts and `<canvas>` inlined).
-2. **import** — `pagx import --format html` turns the subset HTML into `<input>.pagx`
-   (with `--html-infer-flex` to recover flex layout from the absolute boxes).
+2. **import** — `pagx import --format html` turns the subset HTML into `<input>.pagx` (flex
+   layout is recovered from the absolute boxes automatically). The wrapper runs this with
+   `PAGX_HTML_SNAPSHOT=0` so the importer consumes the subset from step 1 instead of
+   re-rendering it in a second browser pass.
 3. **resolve** — expand inline `<svg>`/import directives into native PAGX nodes.
 4. **render** — write `<input>.png`, a preview at `--scale` (default 1).
 
@@ -40,7 +42,8 @@ browser actually captured.
 
 **Installed via npm (no repo).** `npm install -g @libpag/pagx` ships the snapshot tool bundled
 inside the package, so `tools/html-snapshot/` is not needed. The wrapper points the native binary's
-`--html-snapshot` bridge (`PAGX_HTML_SNAPSHOT_BIN`) at the bundled launcher automatically. Puppeteer
+snapshot bridge (`PAGX_HTML_SNAPSHOT_BIN`) at the bundled launcher automatically, so a plain
+`pagx import` of HTML renders through it. Puppeteer
 and its Chromium build are **not** installed by `npm install`; the launcher installs them on the
 first snapshot run into a per-user cache (`~/.cache/libpag-pagx/html-snapshot`, or `%LOCALAPPDATA%`
 on Windows; override with `PAGX_HTML_SNAPSHOT_CACHE`). Set `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL=1` to
@@ -87,16 +90,30 @@ On native Windows, invoke it through `node` (the shebang/executable bit is a Uni
 | `--wait-ms <ms>` | Extra settle delay after load (default 800); raise for late-rendering charts/animations |
 | `--selector <css>` | Wait for this selector before snapshotting |
 | `--embed-fonts` | Download the page's web fonts and embed them into the `.pagx` (self-contained, correct text). Implies `--download-fonts` |
-| `--download-fonts` | Register downloaded fonts as render fallbacks without embedding them |
+| `--download-fonts` | Download the page's web fonts and register them as render fallbacks **without** embedding them into the `.pagx` |
+| `--font-dir <dir>` | Where downloaded fonts are written (default `<outputDir>/<name>.fonts`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 (keeps the `.pagx` small) |
+| `--image-dir <dir>` | Where downloaded images are written (default `<outputDir>/<name>.images`) |
+| `--no-inline-icon-fonts` | Disable webfont-glyph → inline `<svg>` conversion (icon inlining is on by default) |
 | `--no-render` | Stop after resolve (no PNG) |
 | `--no-resolve` | Stop after import (no resolve/render) |
-| `--no-infer-flex` | Disable flex inference (keep pure absolute layout) |
 | `--no-subset-html` | Do not keep `<input>.subset.html` |
 | `--pagx-bin <path>` | Path to the `pagx` binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
 | `--browser-engine <name>` | `puppeteer` (default) or `playwright` |
 | `--cookie <name=value>` / `--header <Key: Value>` | URL inputs only; repeatable |
-| `--batch <dir>` | Convert every `.html` under a directory with one shared browser |
+| `--batch <dir>` | Convert every `.html` under a directory with one shared browser (see batch flags below) |
+
+### Batch mode flags
+
+`--batch <dir>` walks a directory and converts every `.html` with one shared browser. Batch mode is
+incompatible with a positional input, `--output-name`, and `-o`/`--output-dir` — use `--output-root`
+to choose where mirrored outputs land.
+
+| Flag | Use |
+|------|-----|
+| `--output-root <dir>` | Mirror the batch's output tree under this directory (batch only) |
+| `--skip-existing` | Skip an input whose target `.pagx` already exists (batch only) |
+| `--dry-run` | List the files that would be converted without launching the browser or `pagx` (batch only) |
 
 ## Fonts
 
@@ -165,30 +182,30 @@ For debugging a single step, run them individually:
 
 ```bash
 node tools/html-snapshot/snapshot.js page.html            # → page.subset.html
-pagx import --format html --html-infer-flex \
-  --input page.subset.html --output page.pagx             # → page.pagx
+PAGX_HTML_SNAPSHOT=0 pagx import --format html \
+  --input page.subset.html --output page.pagx             # → page.pagx (skip re-snapshot)
 pagx resolve page.pagx                                     # expand svg/import
 pagx render page.pagx -o page.png --scale 2                # preview
 ```
 
-Inspecting `page.subset.html` shows exactly what the browser captured — the fastest way to see why
-an element is missing or mispositioned. `pagx verify page.pagx` runs diagnostics + layout + render
-in one call.
+`PAGX_HTML_SNAPSHOT=0` disables the importer's built-in snapshot so it imports the already-rendered
+subset directly instead of running the browser a second time. Inspecting `page.subset.html` shows
+exactly what the browser captured — the fastest way to see why an element is missing or
+mispositioned. `pagx verify page.pagx` runs diagnostics + layout + render in one call.
 
 ## Direct subset import without a browser
 
 If the HTML is *already* simple and subset-compliant (static markup, inline styles, no JS, only the
-properties in `spec/html_subset.md`), skip the browser entirely:
+properties in `spec/html_subset.md`), skip the browser entirely with `PAGX_HTML_SNAPSHOT=0`:
 
 ```bash
-pagx import --format html --input page.html --output page.pagx
+PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.html --output page.pagx
 pagx verify page.pagx
 ```
 
 This is lighter (no Chromium) but unforgiving — anything outside the subset is dropped or warned.
-For AI-generated designs that use modern CSS, the browser path (`html2pagx`) is more reliable.
-`pagx import --input page.html --html-snapshot --html-infer-flex` is a middle ground: `pagx` invokes
-`snapshot.js` itself, but still needs the snapshot tool installed and produces no preview PNG.
+For AI-generated designs that use modern CSS, the default browser path (a plain `pagx import`, which
+snapshots automatically, or the `html2pagx` wrapper with its preview/font extras) is more reliable.
 
 ## Conversion warnings
 
@@ -206,13 +223,11 @@ usually-harmless ones:
   so flex was not inferred (kept absolute). Usually fine; tidy the source layout if alignment looks
   off.
 
-`--html-strict` turns warnings into hard errors — useful for CI, not for normal use.
-
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| First `pagx import --html-snapshot` is slow / downloads ~150 MB | Expected one-time install of the bundled headless browser into the per-user cache. Subsequent runs are fast. To pre-install or relocate it, see §Setup details (`PAGX_HTML_SNAPSHOT_CACHE`, `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL`). |
+| First `pagx import` of HTML is slow / downloads ~150 MB | Expected one-time install of the bundled headless browser into the per-user cache (HTML import always snapshots). Subsequent runs are fast. To pre-install or relocate it, see §Setup details (`PAGX_HTML_SNAPSHOT_CACHE`, `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL`). |
 | `pagx html-snapshot: error: failed to install puppeteer` (npm path) | The launcher could not auto-install the browser (no network / no `npm` on PATH). Run the exact command it printed, then retry; or use a machine with the repo (Case B). |
 | `pagx binary not found or not executable` | Install `pagx` (`npm install -g @libpag/pagx`) or pass `--pagx-bin <path>`. |
 | `'puppeteer' is not installed` / `bundled Chrome is missing` | Run `npm install` in `tools/html-snapshot`, then the `puppeteer browsers install chrome` command the tool prints. |
@@ -222,4 +237,4 @@ usually-harmless ones:
 | An element is missing | It was hidden (`display:none`/`opacity:0`), an unsupported/interactive widget, or a tainted/WebGL `<canvas>`. Include only visible content; use a styled `<div>` for controls and same-origin/CORS image sources. |
 | Chart is missing or empty | Canvas captured before it drew (raise `--wait-ms`/`--selector`) or it is tainted/WebGL (use same-origin/CORS sources). |
 | Relative `<img>`/CSS not loading (local file) | Local relative resources do not resolve. Inline as data URIs or use absolute URLs; or convert from a URL instead. |
-| Layout looks absolute, not flex | Add `--html-infer-flex` (on by default in `html2pagx`); some layouts are intentionally skipped — see `subset:flex-inference-skipped`. |
+| Layout looks absolute, not flex | Flex inference is always on; some layouts are intentionally skipped — see `subset:flex-inference-skipped`. Tidy the source so children form a clean row/column with consistent gaps. |

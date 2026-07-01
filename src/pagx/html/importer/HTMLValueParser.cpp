@@ -119,6 +119,54 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return color;
     }
   }
+  // CSS Color 4 color() function. The exporter round-trips DisplayP3 fills as
+  // `color(display-p3 r g b)` / `color(display-p3 r g b / a)` with channels already in [0, 1],
+  // so without this branch every wide-gamut swatch falls through to the unrecognised-color
+  // path and renders opaque black. Chrome's getComputedStyle also normalises colors mixed with
+  // currentColor or color-mix into `color(srgb ...)` even when the source was plain rgba(), so
+  // the srgb form is recovered too (via ParseCSSColorFunction). Any other color space cannot be
+  // mapped to PAGX's sRGB pipeline, so it degrades to opaque black with a targeted diagnostic.
+  if (lowered.compare(0, 6, "color(") == 0) {
+    auto open = value.find('(');
+    auto close = value.rfind(')');
+    if (open != std::string::npos && close != std::string::npos && close > open) {
+      std::string inner = Trim(value.substr(open + 1, close - open - 1));
+      std::string loweredInner = ToLower(inner);
+      if (loweredInner.compare(0, 11, "display-p3 ") == 0 ||
+          loweredInner.compare(0, 11, "display-p3\t") == 0) {
+        std::string channels = inner.substr(10);
+        float alpha = 1.0f;
+        auto slash = channels.find('/');
+        if (slash != std::string::npos) {
+          auto alphaComps = ParseFloatList(channels.substr(slash + 1));
+          if (!alphaComps.empty()) {
+            alpha = alphaComps[0];
+          }
+          channels = channels.substr(0, slash);
+        }
+        auto comps = ParseFloatList(channels);
+        if (comps.size() >= 3) {
+          Color color = {};
+          color.colorSpace = ColorSpace::DisplayP3;
+          color.red = comps[0];
+          color.green = comps[1];
+          color.blue = comps[2];
+          color.alpha = alpha;
+          return color;
+        }
+      }
+    }
+    Color colorFn = {};
+    if (ParseCSSColorFunction(value, colorFn)) {
+      return colorFn;
+    }
+    // Reach here only when the value is well-formed CSS but uses a color space we cannot map
+    // to PAGX's sRGB pipeline. Emitting a dedicated diagnostic prevents users from chasing
+    // the generic "unrecognised color value" message which would suggest a typo instead.
+    _diagnostics.warn("html: unsupported color() with non-sRGB color space '" + value +
+                      "'; falling back to opaque black");
+    return {0, 0, 0, 1, ColorSpace::SRGB};
+  }
   // CSS hsl()/hsla() (CSS Color 3 comma syntax + CSS Color 4 space syntax). Authored CSS
   // such as `background: hsl(120 100% 50%)` reaches us verbatim because the snapshot stage
   // can leave the function call intact (Chrome only normalises `hsl()` to `rgb()` on certain
@@ -129,23 +177,6 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
     if (ParseCSSHSLColor(value, hsl)) {
       return hsl;
     }
-  }
-  // CSS Color 4 `color()` functional notation. Chrome's getComputedStyle normalises authored
-  // colors mixed with currentColor or color-mix into this form even when the source is plain
-  // rgba(), so any captured `background-color: rgba(...)` may surface here as
-  // `color(srgb 0.15 0.88 0.81 / 0.6)`. Without this path the value falls through to opaque
-  // black, which manifests as solid black borders/glows in PAGX renders of complex HUDs.
-  if (lowered.compare(0, 6, "color(") == 0) {
-    Color colorFn = {};
-    if (ParseCSSColorFunction(value, colorFn)) {
-      return colorFn;
-    }
-    // Reach here only when the value is well-formed CSS but uses a color space we cannot map
-    // to PAGX's sRGB pipeline. Emitting a dedicated diagnostic prevents users from chasing
-    // the generic "unrecognised color value" message which would suggest a typo instead.
-    _diagnostics.warn("html: color() with non-sRGB color space '" + value +
-                      "' is not supported; falling back to opaque black");
-    return {0, 0, 0, 1, ColorSpace::SRGB};
   }
   // Named color
   const auto& named = NamedColors();
@@ -309,6 +340,19 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       if (!shadows.empty()) {
         step.shadow = shadows.front();
       }
+    } else if (name == "url") {
+      // `filter: url(#id)` references an SVG `<filter>` def. Strip optional quotes and the
+      // leading '#'; the caller resolves the id through the shared-defs table.
+      std::string ref = Trim(args);
+      if (ref.size() >= 2 && (ref.front() == '"' || ref.front() == '\'') &&
+          ref.back() == ref.front()) {
+        ref = Trim(ref.substr(1, ref.size() - 2));
+      }
+      if (!ref.empty() && ref.front() == '#') {
+        ref = ref.substr(1);
+      }
+      step.kind = ref.empty() ? FilterStep::Kind::Unsupported : FilterStep::Kind::SvgRef;
+      step.refId = ref;
     } else {
       step.kind = FilterStep::Kind::Unsupported;
     }
@@ -318,7 +362,8 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
   return out;
 }
 
-LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
+LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, float boxWidth,
+                                                     float boxHeight) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   float cssAngle = 180.0f;  // CSS default: to bottom
@@ -339,15 +384,38 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value) {
 
   auto grad = _document->makeNode<LinearGradient>();
   float angle = CssToPagxAngle(cssAngle) * HtmlPi / 180.0f;
-  float cx = 0.5f, cy = 0.5f;
-  float half = 0.5f;
-  grad->startPoint = {cx - std::cos(angle) * half, cy - std::sin(angle) * half};
-  grad->endPoint = {cx + std::cos(angle) * half, cy + std::sin(angle) * half};
+  float dirX = std::cos(angle);
+  float dirY = std::sin(angle);
+  if (std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f) {
+    // Box size unknown (e.g. a text fill, or an unsized box): fall back to the geometry-normalised
+    // (0,0)-(1,1) space. The gradient line spans a fixed unit half-length through the center, which
+    // is only exact for axis-aligned gradients but keeps the default fitsToGeometry behaviour.
+    grad->startPoint = {0.5f - dirX * 0.5f, 0.5f - dirY * 0.5f};
+    grad->endPoint = {0.5f + dirX * 0.5f, 0.5f + dirY * 0.5f};
+    emitColorStops(grad->colorStops, stops);
+    return grad;
+  }
+
+  // With a concrete box, resolve the gradient line in absolute pixel space and disable per-geometry
+  // fitting (matching the SVG importer). PAGX's fitsToGeometry=true non-uniformly scales the
+  // normalised (0,0)-(1,1) line by the box size, which tilts the equal-color lines off perpendicular
+  // on a non-square box; pixel-space endpoints keep them perpendicular for any aspect ratio. The CSS
+  // gradient-line length is the "magic corners" extent L = |W*sinφ| + |H*cosφ| (φ is the PAGX angle,
+  // 0deg = +X), centred on the box, so the 0% / 100% stops land exactly on the covering corners.
+  float lineLength = std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY);
+  float halfX = dirX * lineLength * 0.5f;
+  float halfY = dirY * lineLength * 0.5f;
+  float cx = boxWidth * 0.5f;
+  float cy = boxHeight * 0.5f;
+  grad->startPoint = {cx - halfX, cy - halfY};
+  grad->endPoint = {cx + halfX, cy + halfY};
+  grad->fitsToGeometry = false;
   emitColorStops(grad->colorStops, stops);
   return grad;
 }
 
-RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
+RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, float boxWidth,
+                                                     float boxHeight) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
@@ -364,23 +432,24 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
       "closest-side", "closest-corner", "farthest-side", "farthest-corner",
   };
   std::string first = ToLower(Trim(parts[0]));
-  auto looksLikeShapeHeader = [&]() {
-    for (const char* kw : kShapeKeywords) {
-      if (first.find(kw) != std::string::npos) return true;
+  bool hasDescriptor = false;
+  for (const char* kw : kShapeKeywords) {
+    if (first.find(kw) != std::string::npos) {
+      hasDescriptor = true;
+      break;
     }
-    // Two-number form e.g. "60% 40%" / "120px 90px" (followed optionally by "at ..."). A pure
-    // numeric/length token would never start a valid color stop in CSS, so treat any leading
-    // segment that begins with a digit, sign or dot as the shape header. Authors who wrote a
-    // single bare number per color stop hit `parseGradientStops`'s offset handling, which
-    // expects the offset to follow the color, not precede it — so the leading-digit form is
-    // unambiguous here.
-    if (!first.empty()) {
-      char c = first[0];
-      if (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9')) return true;
-    }
-    return false;
-  };
-  if (looksLikeShapeHeader()) {
+  }
+  // Two-number form e.g. "60% 40%" / "120px 90px" (followed optionally by "at ..."). A pure
+  // numeric/length token would never start a valid color stop in CSS, so treat any leading
+  // segment that begins with a digit, sign or dot as the shape header. Authors who wrote a
+  // single bare number per color stop hit `parseGradientStops`'s offset handling, which
+  // expects the offset to follow the color, not precede it — so the leading-digit form is
+  // unambiguous here.
+  if (!hasDescriptor && !first.empty()) {
+    char c = first[0];
+    if (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9')) hasDescriptor = true;
+  }
+  if (hasDescriptor) {
     stopStart = 1;
   }
   GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
@@ -389,8 +458,116 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value) {
   auto grad = _document->makeNode<RadialGradient>();
   grad->center = {0.5f, 0.5f};
   grad->radius = 0.5f;
+  if (hasDescriptor) {
+    parseRadialDescriptor(first, boxWidth, boxHeight, grad);
+  }
   emitColorStops(grad->colorStops, stops);
   return grad;
+}
+
+void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float boxWidth,
+                                            float boxHeight, RadialGradient* grad) {
+  auto tokens = SplitTopLevelWhitespace(descriptor);
+  std::vector<std::string> sizeTokens;
+  std::vector<std::string> positionTokens;
+  bool afterAt = false;
+  bool explicitCircle = false;
+  bool explicitEllipse = false;
+  for (auto& token : tokens) {
+    if (token == "at") {
+      afterAt = true;
+      continue;
+    }
+    if (token == "circle") {
+      explicitCircle = true;
+      continue;
+    }
+    if (token == "ellipse") {
+      explicitEllipse = true;
+      continue;
+    }
+    if (afterAt) {
+      positionTokens.push_back(token);
+    } else {
+      sizeTokens.push_back(token);
+    }
+  }
+
+  // Radius: the exporter writes `rx = radius * boxWidth` (and an ellipse's `ry` is implied by the
+  // box height under PAGX's single-radius + fitsToGeometry model), so a length token divided by
+  // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative. Track whether
+  // the radius came from an explicit px length so a circle on a non-square box can later switch to
+  // the fitsToGeometry=false pixel model (see below).
+  bool radiusFromPxLength = false;
+  if (!sizeTokens.empty() && boxWidth > 0) {
+    float radius = resolveRadialLength(sizeTokens[0], boxWidth);
+    if (!std::isnan(radius)) {
+      grad->radius = radius;
+      radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
+    } else {
+      // Extent keywords (closest-side / farthest-corner / ...) have no scalar PAGX radius; keep
+      // the box-filling default and surface a diagnostic instead of silently mis-sizing.
+      _diagnostics.warn("html: radial-gradient size '" + sizeTokens[0] +
+                        "' not supported; using box-filling radius");
+    }
+  }
+
+  // Position: `at <x> <y>`. Axis-locked keywords (left/right -> x, top/bottom -> y) are assigned
+  // first so author order is irrelevant (`at top left` == `at left top`); the remaining `center`
+  // and length tokens then fill the still-unset axes in x-then-y order, matching CSS.
+  float cx = NAN;
+  float cy = NAN;
+  std::vector<std::string> freeTokens;
+  for (auto& token : positionTokens) {
+    if (token == "left") {
+      cx = 0.0f;
+    } else if (token == "right") {
+      cx = 1.0f;
+    } else if (token == "top") {
+      cy = 0.0f;
+    } else if (token == "bottom") {
+      cy = 1.0f;
+    } else {
+      freeTokens.push_back(token);
+    }
+  }
+  for (auto& token : freeTokens) {
+    if (std::isnan(cx) && boxWidth > 0) {
+      cx = (token == "center") ? 0.5f : resolveRadialLength(token, boxWidth);
+    } else if (std::isnan(cy) && boxHeight > 0) {
+      cy = (token == "center") ? 0.5f : resolveRadialLength(token, boxHeight);
+    }
+  }
+  if (!std::isnan(cx)) grad->center.x = cx;
+  if (!std::isnan(cy)) grad->center.y = cy;
+
+  // A CSS `circle <r>px` keeps a single uniform radius regardless of box aspect ratio. PAGX's
+  // default fitsToGeometry=true model stretches the normalised radius by box width and height
+  // independently, so on a non-square box it would render the circle as an ellipse. Switch such a
+  // circle to the fitsToGeometry=false pixel model (center/radius in the geometry's local px
+  // space, where the box spans (0,0)-(boxWidth,boxHeight)) so the radius stays isotropic. Square
+  // boxes, ellipses, and percentage/extent sizes keep the compact normalised representation.
+  bool isCircle = explicitCircle || (!explicitEllipse && sizeTokens.size() == 1);
+  if (isCircle && radiusFromPxLength && boxWidth > 0 && boxHeight > 0 &&
+      std::abs(boxWidth - boxHeight) > 0.01f) {
+    grad->center = {grad->center.x * boxWidth, grad->center.y * boxHeight};
+    grad->radius = grad->radius * boxWidth;
+    grad->fitsToGeometry = false;
+  }
+}
+
+float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAxis) {
+  if (token.empty()) return NAN;
+  if (token.back() == '%') {
+    float fraction = NAN;
+    if (ParseCssPercentage(token, fraction)) {
+      return fraction;
+    }
+    return NAN;
+  }
+  float px = parseAbsoluteLengthPx(token);
+  if (std::isnan(px)) return NAN;
+  return px / boxAxis;
 }
 
 ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
@@ -428,11 +605,9 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
         // Validate the percent token end-to-end so '50%' parses while 'abc%' is rejected.
         // strtof silently returns 0 on a leading non-digit, which would otherwise be treated
         // as a valid 0% offset and shift the entire gradient stop layout.
-        char* endPtr = nullptr;
-        float pct = std::strtof(off.c_str(), &endPtr);
-        if (endPtr != nullptr && endPtr != off.c_str() &&
-            static_cast<size_t>(endPtr - off.c_str()) == off.size() - 1) {
-          offset = pct / 100.0f;
+        float fraction = NAN;
+        if (ParseCssPercentage(off, fraction)) {
+          offset = fraction;
         } else {
           _diagnostics.warn("html: malformed gradient stop offset '" + off +
                             "'; inferring position");

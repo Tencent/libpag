@@ -331,6 +331,27 @@ std::shared_ptr<DOMNode> MakeStrayTextSpan(const std::string& text) {
   return span;
 }
 
+std::shared_ptr<DOMNode> CloneDOMSubtree(const std::shared_ptr<DOMNode>& node, int depth) {
+  if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return nullptr;
+  auto copy = std::make_shared<DOMNode>();
+  copy->name = node->name;
+  copy->type = node->type;
+  copy->line = node->line;
+  copy->attributes = node->attributes;
+  std::shared_ptr<DOMNode> lastChild = nullptr;
+  for (auto child = node->firstChild; child; child = child->nextSibling) {
+    auto childCopy = CloneDOMSubtree(child, depth + 1);
+    if (!childCopy) continue;
+    if (lastChild) {
+      lastChild->nextSibling = childCopy;
+    } else {
+      copy->firstChild = childCopy;
+    }
+    lastChild = childCopy;
+  }
+  return copy;
+}
+
 void UnlinkChild(const std::shared_ptr<DOMNode>& parent, const std::shared_ptr<DOMNode>& prev,
                  const std::shared_ptr<DOMNode>& child) {
   if (!parent || !child) return;
@@ -382,6 +403,19 @@ std::string EscapeXml(const std::string& text, bool isAttribute) {
     }
   }
   return out;
+}
+
+bool ParseCssPercentage(const std::string& token, float& outFraction) {
+  std::string trimmed = Trim(token);
+  if (trimmed.empty() || trimmed.back() != '%') return false;
+  char* end = nullptr;
+  float pct = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str()) return false;
+  // The numeric parse must stop exactly at the trailing '%', so a token like "5x%" is rejected
+  // instead of being silently read as 5%.
+  if (static_cast<size_t>(end - trimmed.c_str()) != trimmed.size() - 1) return false;
+  outFraction = pct / 100.0f;
+  return true;
 }
 
 float ParseAngle(const std::string& raw) {

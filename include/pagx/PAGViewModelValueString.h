@@ -18,24 +18,42 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
-#include <vector>
+#include "pagx/PAGViewModelValue.h"
 
 namespace pagx {
 
-class Font;
-
-struct Woff2FontResult {
-  std::vector<uint8_t> woff2Data;
-  std::string familyName;
-  std::string relativeUrl;
-};
-
 /**
- * Builds a WOFF2 font file from a PAGX Font node containing vector glyph outlines. Returns an
- * empty result if the font contains any bitmap glyphs or has no glyphs.
+ * PAGViewModelValueString holds a string ViewModel property value.
  */
-Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId);
+class PAGViewModelValueString : public PAGViewModelValue {
+ public:
+  /**
+   * Returns the current string value.
+   */
+  const std::string& value() const {
+    return propertyValue;
+  }
+
+  /**
+   * Sets the string value. Setting the same value is a no-op. Triggers observer callbacks
+   * (unless suppressed) and marks dependent DataBinds dirty.
+   */
+  void value(const std::string& v);
+
+ protected:
+  /**
+   * Internal write entry point. When fromVM is true, behaves exactly like value(v). When fromVM
+   * is false, notifies observers but does not mark dirty or notify dependents.
+   */
+  void setValueInternal(const std::string& v, bool fromVM);
+
+ private:
+  std::string propertyValue = {};
+
+  friend class PAGViewModel;
+  friend class PAGScene;
+  friend class DataBindRuntime;
+};
 
 }  // namespace pagx

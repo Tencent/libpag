@@ -164,6 +164,49 @@ tgfx::BlendMode ToTGFX(BlendMode mode) {
   return tgfx::BlendMode::SrcOver;
 }
 
+BlendMode FromTGFX(tgfx::BlendMode mode) {
+  switch (mode) {
+    case tgfx::BlendMode::SrcOver:
+      return BlendMode::Normal;
+    case tgfx::BlendMode::Multiply:
+      return BlendMode::Multiply;
+    case tgfx::BlendMode::Screen:
+      return BlendMode::Screen;
+    case tgfx::BlendMode::Overlay:
+      return BlendMode::Overlay;
+    case tgfx::BlendMode::Darken:
+      return BlendMode::Darken;
+    case tgfx::BlendMode::Lighten:
+      return BlendMode::Lighten;
+    case tgfx::BlendMode::ColorDodge:
+      return BlendMode::ColorDodge;
+    case tgfx::BlendMode::ColorBurn:
+      return BlendMode::ColorBurn;
+    case tgfx::BlendMode::HardLight:
+      return BlendMode::HardLight;
+    case tgfx::BlendMode::SoftLight:
+      return BlendMode::SoftLight;
+    case tgfx::BlendMode::Difference:
+      return BlendMode::Difference;
+    case tgfx::BlendMode::Exclusion:
+      return BlendMode::Exclusion;
+    case tgfx::BlendMode::Hue:
+      return BlendMode::Hue;
+    case tgfx::BlendMode::Saturation:
+      return BlendMode::Saturation;
+    case tgfx::BlendMode::Color:
+      return BlendMode::Color;
+    case tgfx::BlendMode::Luminosity:
+      return BlendMode::Luminosity;
+    case tgfx::BlendMode::PlusLighter:
+      return BlendMode::PlusLighter;
+    case tgfx::BlendMode::PlusDarker:
+      return BlendMode::PlusDarker;
+    default:
+      return BlendMode::Normal;
+  }
+}
+
 tgfx::FillRule ToTGFX(FillRule rule) {
   return rule == FillRule::EvenOdd ? tgfx::FillRule::EvenOdd : tgfx::FillRule::Winding;
 }

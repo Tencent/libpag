@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace pagx {
 
@@ -38,6 +39,15 @@ struct Color;
  *      root colour. Mirrors browser-snapshot's `freezeSvg`.
  *   2. `serialize` walks the subtree and produces XML preserving the original tag / attribute
  *      casing (SVG names are case-sensitive) and self-closing void elements.
+ *
+ * HTMLExporter output commonly hoists shared paint servers (gradients, patterns, clip paths) into
+ * a single hidden `<svg><defs>` at the top of the document and references them by id from many
+ * sibling `<svg>`s via `fill="url(#id)"`. A browser resolves those references through a global id
+ * lookup, but each inline `<svg>` here becomes an independent import directive, so a reference to
+ * a def living in another `<svg>` would fail and fall back to the SVG default fill (opaque black,
+ * rendered red after error recovery). `collectSharedDefs` indexes every id-bearing `<defs>` child
+ * up front; `injectReferencedDefs` then clones the transitive closure of defs a given `<svg>`
+ * references but does not itself define into that `<svg>` before serialisation.
  */
 class HTMLInlineSvgEmitter {
  public:
@@ -51,10 +61,41 @@ class HTMLInlineSvgEmitter {
   void resolveCurrentColor(const std::shared_ptr<DOMNode>& svgRoot, const std::string& rootColor);
 
   /**
+   * Indexes every id-bearing element nested inside a `<defs>` anywhere under `root` into the
+   * shared-defs table, so a later inline `<svg>` that references one by id can have it injected.
+   * Safe to call once per document before any `serialize` call.
+   */
+  void collectSharedDefs(const std::shared_ptr<DOMNode>& root);
+
+  /**
+   * Ensures `svgRoot` carries a local definition for every `url(#id)` / `href="#id"` reference it
+   * makes but does not itself define, by cloning the referenced nodes (and their transitive id
+   * references) from the shared-defs table into a synthesized `<defs>` prepended to `svgRoot`.
+   * No-op when the SVG references nothing external or the references are already local.
+   */
+  void injectReferencedDefs(const std::shared_ptr<DOMNode>& svgRoot);
+
+  /**
+   * Removes the root `<svg>`'s own `opacity` (both the presentation attribute and the inline
+   * `style="...;opacity:..."` declaration) so it is not applied a second time by the downstream
+   * SVG importer. The caller hoists the SVG element's CSS `opacity` onto the enclosing PAGX
+   * layer's alpha; leaving it on the serialized root would multiply the two. CSS `opacity` does
+   * not inherit, so only the root's own value is stripped — descendants keep their opacity.
+   */
+  void stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot);
+
+  /**
    * Serialises the subtree rooted at `svgNode` into XML suitable for embedding in
    * `Layer::importDirective::content`. Recursion is bounded by `MAX_HTML_RECURSION_DEPTH`.
    */
   std::string serialize(const std::shared_ptr<DOMNode>& svgNode);
+
+  /**
+   * Returns the shared `<defs>` child previously indexed by `collectSharedDefs` under `id`, or
+   * nullptr when no such id was seen. Used to resolve a `clip-path: url(#id)` reference back to
+   * its `<clipPath>` definition so the importer can rebuild a contour mask layer from it.
+   */
+  std::shared_ptr<DOMNode> lookupSharedDef(const std::string& id) const;
 
   /**
    * Formats a `Color` as the colour token spelling accepted by PAGX's SVG importer for
@@ -62,6 +103,11 @@ class HTMLInlineSvgEmitter {
    * caller can pre-resolve the SVG root's colour before invoking `resolveCurrentColor`.
    */
   static std::string formatColorForAttribute(const Color& color);
+
+ private:
+  // id -> the shared definition node (a `<defs>` child) bearing that id. Populated by
+  // `collectSharedDefs`; read by `injectReferencedDefs`.
+  std::unordered_map<std::string, std::shared_ptr<DOMNode>> _sharedDefs = {};
 };
 
 }  // namespace pagx

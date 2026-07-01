@@ -26,12 +26,14 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
+#include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowStyle.h"
@@ -119,12 +121,14 @@ void ResetLayoutAnchors(Layer* inner) {
 
 }  // namespace
 
-HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser)
-    : _diagnostics(sink), _valueParser(valueParser) {
+HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
+                                   HTMLInlineSvgEmitter& svgEmitter)
+    : _diagnostics(sink), _valueParser(valueParser), _filterDecoder(sink, svgEmitter, valueParser) {
 }
 
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+  _filterDecoder.bindDocument(document);
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
@@ -153,15 +157,16 @@ Fill* HTMLLayerBuilder::buildSolidFill(const Color& color) {
   return fill;
 }
 
-ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value) {
+ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, float boxWidth,
+                                                    float boxHeight) {
   std::string trimmed = Trim(value);
   if (trimmed.empty()) return nullptr;
   std::string lower = ToLower(trimmed);
   if (lower.compare(0, 16, "linear-gradient(") == 0) {
-    return _valueParser.parseLinearGradient(trimmed);
+    return _valueParser.parseLinearGradient(trimmed, boxWidth, boxHeight);
   }
   if (lower.compare(0, 16, "radial-gradient(") == 0) {
-    return _valueParser.parseRadialGradient(trimmed);
+    return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight);
   }
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
     return _valueParser.parseConicGradient(trimmed);
@@ -252,11 +257,23 @@ void HTMLLayerBuilder::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribut
 }
 
 Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box) {
+  // `border-radius: 50%` (and the equivalent `50% / 50%`) inscribes a true ellipse in the box.
+  // PAGX `Rectangle` only carries a single scalar roundness, so on a non-square box it would
+  // render a pill (semicircular ends + a straight middle) instead of the ellipse CSS intends.
+  // Emit a PAGX `Ellipse` sized to 100% of the layer so it adapts to the laid-out box, exactly
+  // like the Rectangle fast path below.
+  if (box.borderRadiusEllipse) {
+    auto* ellipse = _document->makeNode<Ellipse>();
+    ellipse->percentWidth = 100.0f;
+    ellipse->percentHeight = 100.0f;
+    return ellipse;
+  }
+
   // Fast path: no border-radius authored, or every corner shares the same radius. PAGX
   // `Rectangle` collapses to a single uniform `roundness`, so emit it as a `percentWidth /
   // percentHeight = 100%` shape that adapts to whatever the parent layer ends up being. This
-  // keeps the common case (border-radius: 12px, border-radius: 50%, all-zeros, ...) on the
-  // same compact representation older optimisations and tests rely on.
+  // keeps the common case (border-radius: 12px, all-zeros, ...) on the same compact
+  // representation older optimisations and tests rely on.
   if (!box.borderRadiusSet || box.borderRadiusUniform) {
     auto* rect = _document->makeNode<Rectangle>();
     rect->percentWidth = 100.0f;
@@ -335,6 +352,11 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   }
   if (box.backgroundImage.empty()) return;
 
+  // A `url(...)` background is recovered as an `ImagePattern` fill by `HTMLParserContext`
+  // (it owns the image-resource registry and native-size decoding). The geometry is already
+  // on the layer; leave the fill to the caller and emit nothing here.
+  if (ToLower(box.backgroundImage).find("url(") != std::string::npos) return;
+
   // CSS allows stacking multiple gradients in `background-image` separated by top-level
   // commas, with the first listed gradient painted on top. PAGX paints Fills in the order
   // they appear in `contents` (later Fills cover earlier ones), so we emit gradients in
@@ -345,7 +367,7 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   colors.reserve(layers.size());
   bool anyUnsupported = false;
   for (const auto& part : layers) {
-    if (auto* color = parseGradientByValue(part)) {
+    if (auto* color = parseGradientByValue(part, box.widthPx, box.heightPx)) {
       colors.push_back(color);
     } else {
       anyUnsupported = true;
@@ -515,6 +537,11 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         drop->blurY = step.shadow.blur;
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
+        auto decoded = _filterDecoder.decode(step.refId);
+        for (auto* f : decoded) {
+          layer->filters.push_back(f);
+        }
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }

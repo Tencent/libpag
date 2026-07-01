@@ -130,7 +130,13 @@ Options:
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
 | `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
+| `--download-images` | _disabled_ | Save external images to disk instead of inlining them as base64 data URIs |
+| `--image-dir <dir>` | `<output>.images/` | Destination for `--download-images` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
+
+`snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
+`pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
+only `--download-fonts` (embedding happens in the `pagx font embed` step downstream).
 
 ### Inline icon fonts
 
@@ -263,11 +269,18 @@ Options:
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
-| `--download-fonts` | Download the page's web fonts, embed them into the `.pagx` (`pagx font embed`) and register them as render fallbacks |
+| `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
+| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
+| `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
+| `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |
+| `--batch <dir>` | Convert every `.html` under a directory with one shared browser. Incompatible with a positional input, `--output-name`, and `-o`; use `--output-root` for the output location |
+| `--output-root <dir>` | Mirror the batch's outputs under this directory (batch only) |
+| `--skip-existing` | Skip an input whose target `.pagx` already exists (batch only) |
+| `--dry-run` | List the files that would be converted without running the browser or `pagx` (batch only) |
 | `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
 | `--browser-engine <name>` | Headless driver to use (`puppeteer` or `playwright`); forwarded to `snapshot.js`. Honours `$HTML_SNAPSHOT_BROWSER`. |
-| `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` |
+| `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` (defaults 1400 / 900 / 800) |
 
 ### Browser bundle (no Node, no puppeteer)
 
@@ -383,7 +396,7 @@ Endpoints:
   convenience route for "fetch this URL and snapshot it". No body required.
   Same response semantics as `POST /snapshot`. Supported query params:
   `url` (required), `format`, `viewportWidth`, `viewportHeight`, `waitMs`,
-  `selector`, `inlineIconFonts`, `inferFlex` (booleans accept any of
+  `selector`, `inlineIconFonts` (booleans accept any of
   `true`/`false`/`1`/`0`).
 - `GET /health` — `200 { status, engine, pagxBin, pagxBinExists, activeRequests }`.
 
@@ -396,7 +409,6 @@ Endpoints:
 | `waitMs` | number | `800` | Extra settle delay after networkidle |
 | `selector` | string | _(auto)_ | Wait for this CSS selector before snapshotting |
 | `inlineIconFonts` | boolean | `true` | Convert webfont icon glyphs to inline `<svg>` |
-| `inferFlex` | boolean | `true` | _PAGX output only_; passes `--html-infer-flex` to `pagx import` |
 | `cookies` | `[{name, value}]` | — | _URL inputs only_; scoped to the target URL |
 | `headers` | `[[key, value]]` or `{key: value}` | — | _URL inputs only_; extra request headers |
 
@@ -446,9 +458,9 @@ curl -s -H 'Content-Type: application/json' \
      }' \
      http://127.0.0.1:8787/snapshot > dashboard.subset.html
 
-# Pipe straight into pagx import:
-curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot \
-  | pagx import --format html --html-infer-flex --input - --output page.pagx
+# Save the subset, then import it (PAGX_HTML_SNAPSHOT=0 skips re-snapshotting it):
+curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot > page.subset.html
+PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
 
 # …or skip the local pagx step and ask the server to do it for you:
 curl -s --data-binary @page.html \
@@ -460,8 +472,7 @@ curl -s -H 'Content-Type: application/json' \
      -H 'Accept: application/json' \
      --data '{
        "html": "<!doctype html><html><body><h1>hi</h1></body></html>",
-       "format": "both",
-       "options": { "inferFlex": true }
+       "format": "both"
      }' \
      http://127.0.0.1:8787/snapshot
 # → {"width":1400,"height":900,"html":"<!DOCTYPE html>…","pagx":"<?xml …"}

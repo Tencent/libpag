@@ -6,6 +6,83 @@ const path = require('path');
 const { PNG } = require('pngjs');
 const { pixelMetrics, countImporterWarnings } = require('../eval/compare');
 
+// `countFlexInRenderedHtml` drives a real browser through
+// `openAndSettlePage`. We mock that collaborator so the flex-counting logic
+// (including the in-page `getComputedStyle` walk) runs in node without
+// Chromium: the stub page `evaluate` executes the supplied function against a
+// fake `document` / `getComputedStyle`, and `close` is asserted to run.
+describe('countFlexInRenderedHtml', () => {
+  let saved;
+  beforeEach(() => {
+    saved = { document: global.document, getComputedStyle: global.getComputedStyle };
+    jest.resetModules();
+  });
+  afterEach(() => {
+    global.document = saved.document;
+    global.getComputedStyle = saved.getComputedStyle;
+    jest.dontMock('../dist/lib/page-loader');
+    jest.resetModules();
+  });
+
+  // Stand up a fake DOM where each element's display is read via getComputedStyle.
+  function installFakeDom(displays) {
+    const elements = displays.map((d) => ({ __display: d }));
+    global.document = { body: { querySelectorAll: () => elements } };
+    global.getComputedStyle = (el) => ({ display: el.__display });
+  }
+
+  // Load compare.js with a mocked page-loader whose page.evaluate runs the
+  // passed function in-process (so the in-page walk is actually executed and
+  // counted). `closeSpy` records that the page was closed.
+  function loadCompareWithPage({ closeSpy, openImpl } = {}) {
+    jest.doMock('../dist/lib/page-loader', () => ({
+      openAndSettlePage: openImpl || (async () => ({
+        evaluate: async (fn) => fn(),
+        close: async () => { if (closeSpy) closeSpy(); },
+      })),
+    }));
+    return require('../eval/compare');
+  }
+
+  test('counts only flex / inline-flex descendants and closes the page', async () => {
+    installFakeDom(['block', 'flex', 'inline-flex', 'grid', 'flex']);
+    let closed = 0;
+    const { countFlexInRenderedHtml } = loadCompareWithPage({ closeSpy: () => { closed++; } });
+    const count = await countFlexInRenderedHtml({ browser: {}, engine: 'puppeteer' }, '/tmp/page.html');
+    expect(count).toBe(3);
+    expect(closed).toBe(1);
+  });
+
+  test('forwards viewport / wait options to openAndSettlePage', async () => {
+    installFakeDom(['flex']);
+    let seenUrl = null;
+    let seenOpts = null;
+    const { countFlexInRenderedHtml } = loadCompareWithPage({
+      openImpl: async (browser, url, opts) => {
+        seenUrl = url;
+        seenOpts = opts;
+        return { evaluate: async (fn) => fn(), close: async () => {} };
+      },
+    });
+    await countFlexInRenderedHtml({}, '/abs/path.html', { viewportWidth: 320, viewportHeight: 480, waitMs: 25 });
+    expect(seenUrl).toBe('file:///abs/path.html');
+    expect(seenOpts).toEqual({ viewportWidth: 320, viewportHeight: 480, waitMs: 25 });
+  });
+
+  test('closes the page even when the in-page evaluate rejects', async () => {
+    let closed = 0;
+    jest.doMock('../dist/lib/page-loader', () => ({
+      openAndSettlePage: async () => ({
+        evaluate: async () => { throw new Error('evaluate boom'); },
+        close: async () => { closed++; },
+      }),
+    }));
+    const { countFlexInRenderedHtml } = require('../eval/compare');
+    await expect(countFlexInRenderedHtml({}, '/tmp/x.html')).rejects.toThrow(/evaluate boom/);
+    expect(closed).toBe(1);
+  });
+});
+
 let dir;
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-test-'));

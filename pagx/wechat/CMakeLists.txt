@@ -1,0 +1,137 @@
+cmake_minimum_required(VERSION 3.13)
+project(PAGXViewer)
+
+# Include vendor tools from libpag root
+set(_VENDOR_CMAKE ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
+if (NOT EXISTS "${_VENDOR_CMAKE}")
+    message(FATAL_ERROR "vendor.cmake not found at ${_VENDOR_CMAKE}. Run sync_deps.sh first.")
+endif ()
+include(${_VENDOR_CMAKE})
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 17)
+
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif ()
+
+# Set TGFX_DIR for libpag structure (tgfx is in third_party/tgfx)
+if (NOT TGFX_DIR)
+    set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/tgfx)
+endif ()
+get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
+if (NOT EXISTS "${TGFX_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "TGFX not found at ${TGFX_DIR}. Run sync_deps.sh first.")
+endif ()
+
+# Enable WASM SIMD optimization globally (must be set before add_subdirectory)
+# This enables 128-bit SIMD instructions for faster image processing and matrix operations.
+# Highway library in tgfx will automatically use SIMD code paths when compiled with -msimd128.
+# Supported: iOS WeChat (iOS 14.5+), Android WeChat (most devices), Chrome 91+.
+# NOTE: Currently disabled because enabling -msimd128 causes abnormal preview rendering
+# on iOS WeChat mini programs.
+# if (DEFINED EMSCRIPTEN)
+#     message(STATUS "WASM SIMD optimization enabled (-msimd128)")
+#     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
+#     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msimd128")
+# endif ()
+
+# Add tgfx and pagx as dependencies
+if (NOT TARGET tgfx)
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    set(TGFX_BUILD_SVG ON CACHE BOOL "" FORCE)
+    set(TGFX_BUILD_LAYERS ON CACHE BOOL "" FORCE)
+    set(TGFX_USE_FREETYPE ON)
+    add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
+endif ()
+
+# Build pagx static library
+file(GLOB PAGX_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/*.cpp)
+file(GLOB_RECURSE PAGX_ANIMATION_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/animation/*.cpp)
+file(GLOB_RECURSE PAGX_NODES_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/nodes/*.cpp)
+file(GLOB_RECURSE PAGX_RUNTIME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/runtime/*.cpp)
+file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/utils/*.cpp)
+# Woff2FontGenerator depends on the woff2 library which is only needed for HTML/SVG export.
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "Woff2FontGenerator\\.cpp$")
+file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/xml/*.cpp)
+# Only SVGPathParser is needed (used by PAGXImporter for path data). SVG/HTML exporters are not
+# used in the wechat viewer and depend on woff2 which is not available in this build.
+set(PAGX_SVG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/svg/SVGPathParser.cpp)
+if (NOT TARGET pagx)
+    add_library(pagx STATIC ${PAGX_CORE_SOURCES} ${PAGX_ANIMATION_SOURCES} ${PAGX_NODES_SOURCES} ${PAGX_RUNTIME_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES} ${PAGX_SVG_SOURCES})
+    target_include_directories(pagx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+    target_include_directories(pagx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/expat/expat/lib)
+    target_compile_definitions(pagx PUBLIC PAG_USE_HARFBUZZ PAG_BUILD_PAGX)
+    if(WIN32)
+        target_compile_definitions(pagx PRIVATE XML_STATIC)
+    endif()
+    add_vendor_target(pagx-vendor STATIC_VENDORS expat SheenBidi harfbuzz CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+    find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
+    target_link_libraries(pagx PUBLIC tgfx)
+    add_dependencies(pagx pagx-vendor)
+    merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})
+endif ()
+
+# Build renderer sources as a static library
+file(GLOB_RECURSE RENDERER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/renderer/*.cpp)
+if (NOT TARGET pagx-renderer)
+    add_library(pagx-renderer STATIC ${RENDERER_SOURCES})
+    target_include_directories(pagx-renderer PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src/renderer)
+    target_include_directories(pagx-renderer PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/harfbuzz/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/SheenBidi/Headers)
+    target_link_libraries(pagx-renderer PUBLIC pagx tgfx)
+endif ()
+
+# For Emscripten builds, pagx needs the same compile options as tgfx
+if (DEFINED EMSCRIPTEN)
+    target_compile_options(pagx PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    target_compile_options(pagx-renderer PRIVATE -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+endif ()
+
+file(GLOB_RECURSE PAGX_VIEWER_FILES src/*.cpp)
+
+if (DEFINED EMSCRIPTEN)
+    add_executable(pagx-viewer ${PAGX_VIEWER_FILES})
+    list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    list(APPEND PAGX_VIEWER_LINK_OPTIONS --no-entry -lembind -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -sEXPORT_NAME='PAGXWasm' -sWASM=1
+            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sMODULARIZE=1
+            -sENVIRONMENT=web,worker)
+    set(unsupported_emsdk_versions "4.0.11")
+    foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
+        if (${EMSCRIPTEN_VERSION} VERSION_EQUAL ${unsupported_version})
+            message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported.")
+        endif ()
+    endforeach ()
+    if (EMSCRIPTEN_PTHREADS)
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -sUSE_PTHREADS=1 -sINITIAL_MEMORY=32MB -sALLOW_MEMORY_GROWTH=1
+                -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency
+                -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=mimalloc)
+        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -fPIC -pthread)
+    else ()
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -sINITIAL_MEMORY=128MB -sALLOW_MEMORY_GROWTH=1)
+    endif ()
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -O0 -g3)
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
+    else ()
+        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -Oz)
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -Oz)
+    endif ()
+else ()
+    add_library(pagx-viewer SHARED ${PAGX_VIEWER_FILES})
+endif ()
+
+target_include_directories(pagx-viewer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+
+if (NO_LOG)
+    target_compile_definitions(pagx-viewer PRIVATE NO_LOG)
+endif()
+
+target_compile_options(pagx-viewer PUBLIC ${PAGX_VIEWER_COMPILE_OPTIONS})
+target_link_options(pagx-viewer PUBLIC ${PAGX_VIEWER_LINK_OPTIONS})
+target_link_libraries(pagx-viewer pagx-renderer)

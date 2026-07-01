@@ -36,6 +36,7 @@ class HTMLStyleCascade;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
+class Stroke;
 class Text;
 
 /**
@@ -67,6 +68,11 @@ class HTMLTextFragmentBuilder {
     float letterSpacing = 0.0f;
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};
+    // CSS `-webkit-text-stroke` resolved into a stroke width (px) and colour. `strokeWidth` is
+    // NaN (or <= 0) when the run carries no stroke; a positive value drives a PAGX text
+    // `<Stroke>` emitted after the Fill so it paints over the fill (CSS default paint-order).
+    float strokeWidth = NAN;
+    Color strokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
     // Gradient string copied from `HTMLInheritedStyle::textFillImage`. When non-empty,
     // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
     // `background-clip: text` semantics from the nearest clip-to-text ancestor).
@@ -78,6 +84,14 @@ class HTMLTextFragmentBuilder {
     // no explicit line-height — `convertTextLeaf` then leaves `TextBox.lineHeight` at its
     // auto default.
     float lineHeight = NAN;
+    // Derived from the run's CSS `white-space`. `collapseWhitespace` folds runs of
+    // spaces / tabs into a single space (normal / nowrap / pre-line); when false
+    // (pre / pre-wrap) the source spaces are emitted verbatim. `preserveNewlines` keeps a
+    // source `\n` as a hard line break (pre / pre-wrap / pre-line); when false
+    // (normal / nowrap) newlines collapse to spaces like any other whitespace. Defaults
+    // match `white-space: normal`.
+    bool collapseWhitespace = true;
+    bool preserveNewlines = false;
   };
 
   HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
@@ -99,8 +113,20 @@ class HTMLTextFragmentBuilder {
    *  otherwise falls back to `_layerBuilder.buildSolidFill(fragment.color)`. */
   Fill* buildTextFill(const TextFragment& fragment);
 
+  /** Builds a solid `Stroke` from a fragment's `-webkit-text-stroke` resolution, or nullptr
+   *  when the run carries no stroke (`strokeWidth` NaN / <= 0). Uses `StrokeAlign::Center` to
+   *  match CSS, which always centres the stroke band on the glyph edge. */
+  Stroke* buildTextStroke(const TextFragment& fragment);
+
  private:
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
+
+  /** Derives the two whitespace-handling flags from a CSS `white-space` value:
+   *  `outCollapseWhitespace` is false for `pre` / `pre-wrap` (source spaces kept verbatim),
+   *  `outPreserveNewlines` is true for `pre` / `pre-wrap` / `pre-line` (source newlines kept
+   *  as hard breaks). Unrecognised values fall back to `white-space: normal`. */
+  static void ResolveWhiteSpaceFlags(const std::string& whiteSpace, bool& outCollapseWhitespace,
+                                     bool& outPreserveNewlines);
 
   /** Returns true when two fragments share every style fingerprint (everything except `text`),
    *  and therefore can be merged into a single run. */

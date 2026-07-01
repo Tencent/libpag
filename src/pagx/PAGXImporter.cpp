@@ -37,6 +37,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -69,6 +71,8 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
@@ -148,6 +152,9 @@ static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc);
 static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc);
+static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc);
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc);
+static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc);
 static Rectangle* ParseRectangle(const DOMNode* node, PAGXDocument* doc);
 static Ellipse* ParseEllipse(const DOMNode* node, PAGXDocument* doc);
 static Polystar* ParsePolystar(const DOMNode* node, PAGXDocument* doc);
@@ -187,6 +194,18 @@ static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc);
 static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
 static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc);
 static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc);
+
+// A `mask="@id"` reference whose target Layer was not yet registered when the owning Layer was
+// parsed. A mask layer is commonly authored as a (later-parsed) descendant of the masked layer —
+// e.g. the HTML importer attaches the rebuilt mask as an invisible child — so its id is unknown at
+// the moment the parent's `mask` attribute is read. These are collected during the layer walk and
+// resolved once the whole tree (and therefore `nodeMap`) is complete. See ResolvePendingMasks.
+struct PendingMaskRef {
+  Layer* owner = nullptr;
+  std::string maskId = {};
+  const DOMNode* node = nullptr;  // owning Layer's DOM node, for error reporting
+};
+static std::vector<PendingMaskRef> gPendingMaskRefs = {};
 
 //==============================================================================
 // Custom data parsing
@@ -308,6 +327,10 @@ static bool PreRegisterResource(const DOMNode* node, PAGXDocument* doc) {
     doc->makeNode<DiamondGradient>(id);
   } else if (node->name == "ImagePattern") {
     doc->makeNode<ImagePattern>(id);
+  } else if (node->name == "ViewModel") {
+    doc->makeNode<ViewModel>(id);
+  } else if (node->name == "DataConverter") {
+    doc->makeNode<DataConverter>(id);
   } else {
     return false;
   }
@@ -327,6 +350,10 @@ static bool ParseResource(const DOMNode* node, PAGXDocument* doc) {
     ParseFont(node, doc);
   } else if (node->name == "Composition") {
     ParseComposition(node, doc);
+  } else if (node->name == "ViewModel") {
+    ParseViewModel(node, doc);
+  } else if (node->name == "DataConverter") {
+    ParseDataConverter(node, doc);
   } else {
     return ParseColorSource(node, doc) != nullptr;
   }
@@ -343,6 +370,7 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+
   // Second pass: fully parse each resource. Pre-registered nodes are reused by makeNodeFromXML.
   child = node->firstChild;
   while (child) {
@@ -356,8 +384,8 @@ static void ParseResources(const DOMNode* node, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'Resources'."
                       " Expected: Image, PathData, Composition, Font,"
-                      " SolidColor, LinearGradient, RadialGradient,"
-                      " ConicGradient, DiamondGradient, ImagePattern.");
+                      " ViewModel, DataConverter, SolidColor, LinearGradient,"
+                      " RadialGradient, ConicGradient, DiamondGradient, ImagePattern.");
     }
   }
 }
@@ -492,7 +520,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   if (!maskAttr.empty() && maskAttr[0] == '@') {
     layer->mask = doc->findNode<Layer>(maskAttr.substr(1));
     if (!layer->mask) {
-      ReportError(doc, node, "Resource '" + maskAttr + "' not found for 'mask' attribute.");
+      // The mask layer is often a later-parsed descendant of this layer (the HTML importer
+      // attaches the rebuilt mask as an invisible child), so its id is not yet in nodeMap. Defer
+      // resolution to ResolvePendingMasks after the full tree is parsed instead of erroring now.
+      gPendingMaskRefs.push_back({layer, maskAttr.substr(1), node});
     }
   }
   layer->maskType = GET_ENUM(node, "maskType", "alpha", doc, MaskType);
@@ -508,6 +539,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     layer->compositionFilePath = compositionAttr;
   }
   layer->timelines.clear();
+  layer->vmContext = GetAttribute(node, "vmContext");
 
   // Build directive attributes.
   layer->importDirective.source = GetAttribute(node, "import");
@@ -1000,15 +1032,19 @@ static Fill* ParseFill(const DOMNode* node, PAGXDocument* doc) {
   if (!fill) {
     return nullptr;
   }
-  fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    fill->color = childColor;
+  } else {
+    fill->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   fill->alpha = GetFloatAttribute(node, "alpha", Default<Fill>().alpha, doc);
   fill->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   fill->fillRule = GET_ENUM(node, "fillRule", "winding", doc, FillRule);
   fill->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    fill->color = childColor;
-  }
   return fill;
 }
 
@@ -1017,7 +1053,15 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
   if (!stroke) {
     return nullptr;
   }
-  stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  // Child ColorSource takes precedence over the color attribute. Parse the child first so the
+  // attribute-built SolidColor is not created and orphaned in the document's node list when a
+  // child is present.
+  auto childColor = ParseChildColorSource(node, doc);
+  if (childColor) {
+    stroke->color = childColor;
+  } else {
+    stroke->color = ParseColorAttr(GetAttribute(node, "color"), doc, node);
+  }
   stroke->width = GetFloatAttribute(node, "width", Default<Stroke>().width, doc);
   stroke->alpha = GetFloatAttribute(node, "alpha", Default<Stroke>().alpha, doc);
   stroke->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
@@ -1033,10 +1077,6 @@ static Stroke* ParseStroke(const DOMNode* node, PAGXDocument* doc) {
       GetBoolAttribute(node, "dashAdaptive", Default<Stroke>().dashAdaptive, doc);
   stroke->align = GET_ENUM(node, "align", "center", doc, StrokeAlign);
   stroke->placement = GET_ENUM(node, "placement", "background", doc, LayerPlacement);
-  auto childColor = ParseChildColorSource(node, doc);
-  if (childColor) {
-    stroke->color = childColor;
-  }
   return stroke;
 }
 
@@ -1481,6 +1521,13 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
   }
   comp->width = GetFloatAttribute(node, "width", Default<Composition>().width, doc);
   comp->height = GetFloatAttribute(node, "height", Default<Composition>().height, doc);
+  auto viewModelAttr = GetAttribute(node, "viewModel");
+  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
+    comp->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
+    if (!comp->viewModel)
+      ReportError(doc, node,
+                  "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
+  }
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -1491,10 +1538,14 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
         }
       } else if (child->name == "Animations") {
         ParseAnimations(child.get(), &comp->animations, doc);
+      } else if (child->name == "DataBind") {
+        auto bind = ParseDataBind(child.get(), doc);
+        if (bind) comp->dataBinds.push_back(bind);
       } else {
-        ReportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'Composition'. Expected: Layer, Animations.");
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name +
+                "' is not allowed in 'Composition'. Expected: Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
@@ -2642,11 +2693,20 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
+  gPendingMaskRefs.clear();
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
   if (child) {
     ParseResources(child.get(), doc);
+  }
+
+  auto viewModelAttr = GetAttribute(root, "viewModel");
+  if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
+    doc->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));
+    if (!doc->viewModel)
+      ReportError(doc, root,
+                  "Resource '" + viewModelAttr + "' not found for 'viewModel' attribute.");
   }
 
   // Second pass: Parse Layers.
@@ -2660,14 +2720,232 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
         }
       } else if (child->name == "Animations") {
         ParseAnimations(child.get(), &doc->animations, doc);
+      } else if (child->name == "DataBind") {
+        auto bind = ParseDataBind(child.get(), doc);
+        if (bind) doc->dataBinds.push_back(bind);
       } else if (child->name != "Resources") {
-        ReportError(doc, child.get(),
-                    "Element '" + child->name +
-                        "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations.");
+        ReportError(
+            doc, child.get(),
+            "Element '" + child->name +
+                "' is not allowed in 'pagx'. Expected: Resources, Layer, Animations, DataBind.");
       }
     }
     child = child->nextSibling;
   }
+
+  // Third pass: resolve any forward `mask="@id"` references now that every Layer id is in nodeMap.
+  for (const auto& pending : gPendingMaskRefs) {
+    auto* maskLayer = doc->findNode<Layer>(pending.maskId);
+    if (maskLayer) {
+      pending.owner->mask = maskLayer;
+    } else {
+      ReportError(doc, pending.node,
+                  "Resource '@" + pending.maskId + "' not found for 'mask' attribute.");
+    }
+  }
+  gPendingMaskRefs.clear();
+}
+
+// Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:
+// "\\" decodes to a literal backslash and "\," to a literal comma, so an option value containing a
+// comma round-trips correctly. A token is emitted on every comma boundary regardless of whether it
+// is empty, so empty option values are preserved and option indices stay aligned with export. An
+// empty options string yields no options (not a single empty one).
+static std::vector<std::string> SplitEnumOptions(const std::string& optionsStr) {
+  std::vector<std::string> options;
+  std::string current;
+  bool escaped = false;
+  bool inList = false;
+  for (char c : optionsStr) {
+    inList = true;
+    if (escaped) {
+      current += c;
+      escaped = false;
+    } else if (c == '\\') {
+      escaped = true;
+    } else if (c == ',') {
+      options.push_back(current);
+      current.clear();
+    } else {
+      current += c;
+    }
+  }
+  if (inList) options.push_back(current);
+  return options;
+}
+
+static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
+  auto vm = makeNodeFromXML<ViewModel>(node, doc);
+  if (!vm) return nullptr;
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Property") {
+      auto prop = makeNodeFromXML<ViewModelProperty>(child.get(), doc);
+      if (prop) {
+        prop->name = GetAttribute(child.get(), "name");
+        auto typeStr = GetAttribute(child.get(), "type");
+        if (typeStr == "Number" || typeStr == "number") {
+          prop->propertyType = ViewModelPropertyType::Number;
+          prop->defaultNumber = GetFloatAttribute(child.get(), "default", prop->defaultNumber, doc);
+        } else if (typeStr == "String" || typeStr == "string") {
+          prop->propertyType = ViewModelPropertyType::String;
+          prop->defaultString = GetAttribute(child.get(), "default");
+        } else if (typeStr == "Boolean" || typeStr == "boolean") {
+          prop->propertyType = ViewModelPropertyType::Boolean;
+          prop->defaultBoolean =
+              GetBoolAttribute(child.get(), "default", prop->defaultBoolean, doc);
+        } else if (typeStr == "Color" || typeStr == "color") {
+          prop->propertyType = ViewModelPropertyType::Color;
+          prop->defaultColor = GetColorAttribute(child.get(), "default", doc);
+        } else if (typeStr == "Image" || typeStr == "image") {
+          prop->propertyType = ViewModelPropertyType::Image;
+          auto imageAttr = GetAttribute(child.get(), "default");
+          if (!imageAttr.empty()) {
+            if (imageAttr[0] == '@') {
+              prop->defaultImage = doc->findNode<Image>(imageAttr.substr(1));
+              if (!prop->defaultImage) {
+                ReportError(doc, child.get(),
+                            "Resource '" + imageAttr + "' not found for 'default' attribute.");
+              }
+            } else {
+              ReportError(doc, child.get(),
+                          "Image 'default' must reference an Image resource by id (e.g. "
+                          "\"@imageId\"), got '" +
+                              imageAttr + "'.");
+            }
+          }
+        } else if (typeStr == "ViewModel" || typeStr == "viewModel") {
+          prop->propertyType = ViewModelPropertyType::ViewModel;
+        } else if (typeStr == "Enum" || typeStr == "enum") {
+          prop->propertyType = ViewModelPropertyType::Enum;
+          prop->defaultEnum = GetIntAttribute(child.get(), "default", prop->defaultEnum, doc);
+        } else if (typeStr == "Trigger" || typeStr == "trigger") {
+          prop->propertyType = ViewModelPropertyType::Trigger;
+        } else {
+          ReportError(doc, child.get(), "Invalid value '" + typeStr + "' for 'type' attribute.");
+        }
+        if (prop->propertyType == ViewModelPropertyType::Number) {
+          prop->minValue = GetOptionalFloatAttribute(child.get(), "min", doc);
+          prop->maxValue = GetOptionalFloatAttribute(child.get(), "max", doc);
+        }
+        auto optionsStr = GetAttribute(child.get(), "options");
+        if (!optionsStr.empty()) {
+          prop->enumOptions = SplitEnumOptions(optionsStr);
+        }
+        // An out-of-range Enum default would otherwise be silently accepted and dereference past
+        // the option list at runtime. With no options the default is unconstrained, so skip the
+        // check: the exporter omits both the option list and a zero default, and re-importing that
+        // output must not raise a spurious error.
+        if (prop->propertyType == ViewModelPropertyType::Enum) {
+          auto optionCount = static_cast<int>(prop->enumOptions.size());
+          if (optionCount > 0 && (prop->defaultEnum < 0 || prop->defaultEnum >= optionCount)) {
+            ReportError(doc, child.get(),
+                        "Enum 'default' index " + std::to_string(prop->defaultEnum) +
+                            " is out of range for " + std::to_string(optionCount) + " option(s).");
+            prop->defaultEnum = prop->defaultEnum < 0 ? 0 : optionCount - 1;
+          }
+        }
+        auto converterId = GetAttribute(child.get(), "dataConverter");
+        if (!converterId.empty() && converterId[0] == '@') {
+          prop->dataConverter = doc->findNode<DataConverter>(converterId.substr(1));
+          if (!prop->dataConverter)
+            ReportError(doc, child.get(),
+                        "Resource '" + converterId + "' not found for 'dataConverter' attribute.");
+        }
+        if (prop->propertyType == ViewModelPropertyType::ViewModel) {
+          auto vmRef = GetAttribute(child.get(), "viewModelRef");
+          if (!vmRef.empty() && vmRef[0] == '@') {
+            prop->viewModelRef = doc->findNode<ViewModel>(vmRef.substr(1));
+            if (!prop->viewModelRef)
+              ReportError(doc, child.get(),
+                          "Resource '" + vmRef + "' not found for 'viewModelRef' attribute.");
+          }
+        }
+        // A property name is the key used to resolve DataBind sources and typed accessors, so an
+        // empty or duplicate name would make the schema ambiguous. Report and skip such properties
+        // rather than letting a later one silently shadow an earlier one.
+        if (prop->name.empty()) {
+          ReportError(doc, child.get(), "ViewModel 'Property' is missing a non-empty 'name'.");
+        } else {
+          bool duplicate = false;
+          for (auto* existing : vm->properties) {
+            if (existing != nullptr && existing->name == prop->name) {
+              duplicate = true;
+              break;
+            }
+          }
+          if (duplicate) {
+            ReportError(doc, child.get(),
+                        "Duplicate ViewModel property name '" + prop->name + "' is ignored.");
+          } else {
+            vm->properties.push_back(prop);
+          }
+        }
+      }
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(
+          doc, child.get(),
+          "Element '" + child->name + "' is not allowed in 'ViewModel'. Expected: Property.");
+    }
+    child = child->nextSibling;
+  }
+  return vm;
+}
+
+static DataBind* ParseDataBind(const DOMNode* node, PAGXDocument* doc) {
+  auto bind = makeNodeFromXML<DataBind>(node, doc);
+  if (!bind) return nullptr;
+  bind->source = GetAttribute(node, "source");
+  bind->target = GetAttribute(node, "target");
+  bind->channel = GetAttribute(node, "channel");
+  if (bind->source.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'source' attribute.");
+  }
+  if (bind->target.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'target' attribute.");
+  }
+  if (bind->channel.empty()) {
+    ReportError(doc, node, "DataBind requires a non-empty 'channel' attribute.");
+  }
+  auto directionStr = GetAttribute(node, "direction");
+  if (!directionStr.empty()) {
+    if (directionStr == "ToTarget") {
+      bind->direction = DataBindDirection::ToTarget;
+    } else if (directionStr == "ToSource") {
+      bind->direction = DataBindDirection::ToSource;
+    } else if (directionStr == "TwoWay") {
+      bind->direction = DataBindDirection::TwoWay;
+    } else if (directionStr == "Once") {
+      bind->direction = DataBindDirection::Once;
+    } else {
+      ReportError(doc, node, "Invalid value '" + directionStr + "' for 'direction' attribute.");
+    }
+  }
+  return bind;
+}
+
+static DataConverter* ParseDataConverter(const DOMNode* node, PAGXDocument* doc) {
+  auto converter = makeNodeFromXML<DataConverter>(node, doc);
+  if (!converter) return nullptr;
+  converter->converterType = GetAttribute(node, "type");
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Param") {
+      auto name = GetAttribute(child.get(), "name");
+      auto value = GetAttribute(child.get(), "value");
+      if (!name.empty()) {
+        converter->params[name] = value;
+      } else {
+        ReportError(doc, child.get(), "Param requires a non-empty 'name' attribute.");
+      }
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(
+          doc, child.get(),
+          "Element '" + child->name + "' is not allowed in 'DataConverter'. Expected: Param.");
+    }
+    child = child->nextSibling;
+  }
+  return converter;
 }
 
 }  // namespace pagx

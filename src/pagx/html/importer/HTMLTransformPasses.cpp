@@ -53,9 +53,20 @@ bool ApproxEqual(float a, float b, float eps) {
 // importer so that the cascade carries identical semantics through both layers.
 const std::vector<std::string>& InheritableProperties() {
   static const std::vector<std::string> v = {
-      "color",           "font-family",           "font-size",   "font-weight",
-      "font-style",      "letter-spacing",        "line-height", "text-align",
-      "text-decoration", "text-decoration-color", "white-space",
+      "color",
+      "font-family",
+      "font-size",
+      "font-weight",
+      "font-style",
+      "letter-spacing",
+      "line-height",
+      "text-align",
+      "text-decoration",
+      "text-decoration-color",
+      "white-space",
+      "-webkit-text-stroke",
+      "-webkit-text-stroke-width",
+      "-webkit-text-stroke-color",
   };
   return v;
 }
@@ -754,11 +765,9 @@ bool ResolveChildMainSize(const PropertyMap& props, bool row, float containerMai
   }
   std::string trimmed = Trim(raw);
   if (trimmed.size() >= 2 && trimmed.back() == '%' && std::isfinite(containerMain)) {
-    std::string num = trimmed.substr(0, trimmed.size() - 1);
-    char* end = nullptr;
-    float pct = std::strtof(num.c_str(), &end);
-    if (end != num.c_str() && std::isfinite(pct)) {
-      outMain = containerMain * pct / 100.0f;
+    float fraction = NAN;
+    if (ParseCssPercentage(trimmed, fraction) && std::isfinite(fraction)) {
+      outMain = containerMain * fraction;
       return true;
     }
   }

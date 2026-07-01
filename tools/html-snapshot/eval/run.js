@@ -47,7 +47,6 @@ function parseArgs(argv) {
     corpus: process.env.EVAL_CORPUS || '',
     outDir: '',
     pagxBin: process.env.PAGX_BIN || '',
-    inferFlex: true,
     skipExisting: false,
     only: '',
     label: 'current',
@@ -82,7 +81,6 @@ function parseArgs(argv) {
     if (a === '--corpus') opts.corpus = argv[++i];
     else if (a === '--out') opts.outDir = argv[++i];
     else if (a === '--pagx-bin') opts.pagxBin = argv[++i];
-    else if (a === '--no-infer-flex') opts.inferFlex = false;
     else if (a === '--skip-existing') opts.skipExisting = true;
     else if (a === '--only') opts.only = argv[++i];
     else if (a === '--label') opts.label = argv[++i];
@@ -114,7 +112,6 @@ const USAGE = `Usage: node run.js [options]
   --corpus <dir>      Directory of original HTML files (required; or set $EVAL_CORPUS)
   --out <dir>         Output directory (default: tools/html-snapshot/eval/out/<label>)
   --pagx-bin <path>   pagx binary (default: \$PAGX_BIN or repo cmake-build-debug/pagx)
-  --no-infer-flex     Disable C++ AbsoluteToFlexInferencePass
   --skip-existing     Reuse existing baseline.png / subset.png if present
   --only <substr>     Only run cases whose relative path contains <substr>
   --label <name>      Sub-directory name under out/ (default: current)
@@ -299,7 +296,6 @@ async function processCase(entry, outDir, opts, browser) {
       pagxBin: opts.pagxBin,
       subsetHtml,
       pagxFile: subsetPagx,
-      inferFlex: opts.inferFlex,
       stderrPath: importStderr,
     });
     row.importMs = r.durationMs;

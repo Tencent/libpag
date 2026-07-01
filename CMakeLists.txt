@@ -251,6 +251,8 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLSubsetPropertyTable.h
             src/pagx/html/importer/HTMLSubsetTransformer.cpp
             src/pagx/html/importer/HTMLSubsetTransformer.h
+            src/pagx/html/importer/HTMLSvgFilterDecoder.cpp
+            src/pagx/html/importer/HTMLSvgFilterDecoder.h
             src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
             src/pagx/html/importer/HTMLTextFragmentBuilder.h
             src/pagx/html/importer/HTMLTransformContext.h
@@ -276,7 +278,7 @@ if (PAG_BUILD_PAGX)
     list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
-    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML exporter)
+    # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
     set(WOFF2_DIR third_party/woff2)
     set(BROTLI_DIR ${WOFF2_DIR}/brotli)
     set(WOFF2_SOURCES

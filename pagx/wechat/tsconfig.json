@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "ES5",
+      "ES6",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "target": "ES2020",
+    "module": "ES2020",
+    "allowJs": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "moduleResolution": "Node",
+    "experimentalDecorators": true,
+    "strict": true,
+    "outDir": "./wasm-mt",
+    "baseUrl": ".",
+    "resolveJsonModule": true,
+    "paths": {
+      "@tgfx/*": [
+        "../../third_party/tgfx/web/src/*"
+      ],
+    }
+  },
+  "include": ["*.ts", "ts/**/*.ts"]
+}

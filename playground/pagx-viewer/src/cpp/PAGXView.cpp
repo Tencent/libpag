@@ -90,22 +90,14 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(fontData->data(), fontData->size(), 0);
   }
   auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(emojiFontData->data(), emojiFontData->size(), 0);
   }
-  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -176,11 +168,11 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  if (scene != nullptr) {
-    scene->advanceAndApply(deltaUs);
-  }
   if (defaultTimeline != nullptr) {
     defaultTimeline->advanceAndApply(deltaUs);
+  }
+  if (scene != nullptr) {
+    scene->advanceAndApply(deltaUs);
   }
 }
 

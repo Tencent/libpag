@@ -32,6 +32,8 @@
 #include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
 
@@ -129,8 +131,12 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     _viewBoxHeight = sourceH;
   }
 
+  // A zero-size SVG (e.g. a hidden `<svg width="0" height="0">` that only hosts
+  // <defs>, a common pattern in snapshotted HTML) is legal but paints nothing.
+  // Return an empty document rather than failing the whole import: the caller
+  // gets a valid result with no layers, and any visible siblings still resolve.
   if (sourceW <= 0 || sourceH <= 0) {
-    return nullptr;
+    return PAGXDocument::Make(0, 0);
   }
 
   // Determine target dimensions: external target > SVG explicit size > viewBox size.
@@ -151,7 +157,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   if (targetW <= 0 || targetH <= 0) {
-    return nullptr;
+    return PAGXDocument::Make(0, 0);
   }
 
   _document = PAGXDocument::Make(targetW, targetH);
@@ -839,10 +845,12 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     return;
   }
 
-  // Check if this is a use element referencing an image.
+  // Check if this is a use element referencing an image, or a direct image element.
   // In that case, we don't add fill/stroke because the image already has its own fill.
   bool skipFillStroke = false;
-  if (tag == "use") {
+  if (tag == "image") {
+    skipFillStroke = true;
+  } else if (tag == "use") {
     std::string refId = resolveUrl(getHrefAttribute(element));
     auto it = _defs.find(refId);
     if (it != _defs.end() && it->second->name == "image") {
@@ -895,6 +903,8 @@ Element* SVGParserContext::convertElement(const std::shared_ptr<DOMNode>& elemen
     result = convertPath(element);
   } else if (tag == "use") {
     result = convertUse(element);
+  } else if (tag == "image") {
+    result = convertImage(element);
   }
   if (result) {
     parseCustomData(element, result);
@@ -1030,6 +1040,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
 
   // Get text content from child text nodes and tspan elements.
   std::string textContent;
+  std::shared_ptr<DOMNode> textPathElement = nullptr;
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
@@ -1045,6 +1056,26 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
           textContent += tspanChild->name;
         }
         tspanChild = tspanChild->getNextSibling();
+      }
+    } else if (child->name == "textPath") {
+      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
+      // text into the same content buffer the Text node consumes; the path geometry and offset
+      // descriptors are converted separately into a TextPath modifier sibling below.
+      textPathElement = child;
+      auto pathChild = child->getFirstChild();
+      while (pathChild) {
+        if (pathChild->type == DOMNodeType::Text) {
+          textContent += pathChild->name;
+        } else if (pathChild->name == "tspan") {
+          auto tspanChild = pathChild->getFirstChild();
+          while (tspanChild) {
+            if (tspanChild->type == DOMNodeType::Text) {
+              textContent += tspanChild->name;
+            }
+            tspanChild = tspanChild->getNextSibling();
+          }
+        }
+        pathChild = pathChild->getNextSibling();
       }
     }
     child = child->getNextSibling();
@@ -1130,10 +1161,70 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     } else if (anchor == "end") {
       text->textAnchor = TextAnchor::End;
     }
+
+    // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
+    // right after the Text so the resulting [Text, TextPath, Fill] ordering matches what the
+    // PAGX renderer and HTML exporter expect for path text.
+    if (textPathElement) {
+      auto textPath = convertTextPath(textPathElement, element);
+      if (textPath) {
+        group->elements.push_back(textPath);
+      }
+    }
   }
 
   addFillStroke(element, group->elements, inheritedStyle);
   return group;
+}
+TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
+                                            const std::shared_ptr<DOMNode>& textElement) {
+  std::string refId = resolveUrl(getHrefAttribute(textPathElement));
+  if (refId.empty()) {
+    return nullptr;
+  }
+  auto it = _defs.find(refId);
+  if (it == _defs.end() || it->second->name != "path") {
+    return nullptr;
+  }
+  std::string d = getAttribute(it->second, "d");
+  if (d.empty()) {
+    return nullptr;
+  }
+  auto pathData = _document->makeNode<PathData>();
+  *pathData = PathDataFromSVGString(d);
+  if (pathData->isEmpty()) {
+    return nullptr;
+  }
+  registerPathDataResource(pathData);
+
+  auto textPath = _document->makeNode<TextPath>();
+  textPath->path = pathData;
+
+  // startOffset shifts the text start along the path. SVG allows a length or a percentage of
+  // the total path length; parseLength resolves the percentage against the measured length.
+  std::string startOffset = getAttribute(textPathElement, "startOffset");
+  float pathLength = computePathTotalLength(it->second);
+  if (!startOffset.empty()) {
+    textPath->firstMargin = parseLength(startOffset, pathLength);
+  }
+
+  // textLength + lengthAdjust="spacing" stretches the run to fill a fixed span: PAGX models this
+  // as forceAlignment, which redistributes glyph spacing across the path region between the
+  // first and last margins. Recover lastMargin so the stretched span ends where SVG places it.
+  std::string textLength = getAttribute(textElement, "textLength");
+  std::string lengthAdjust = getAttribute(textElement, "lengthAdjust");
+  if (!textLength.empty() && (lengthAdjust.empty() || lengthAdjust == "spacing")) {
+    textPath->forceAlignment = true;
+    float span = parseLength(textLength, pathLength);
+    if (span > 0 && pathLength > 0) {
+      float lastMargin = pathLength - textPath->firstMargin - span;
+      if (lastMargin > 0) {
+        textPath->lastMargin = lastMargin;
+      }
+    }
+  }
+
+  return textPath;
 }
 Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   std::string refId = resolveUrl(getHrefAttribute(element));
@@ -1162,34 +1253,7 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
     // image dimensions without applying the transform again.
     float imageWidth = parseLength(getAttribute(it->second, "width"), _viewBoxWidth);
     float imageHeight = parseLength(getAttribute(it->second, "height"), _viewBoxHeight);
-
-    // Register the image resource.
-    auto imageNode = registerImageResource(imageHref);
-
-    // Create a rectangle to display the image at original size.
-    // The transform will be applied by the parent Layer's matrix.
-    auto rect = _document->makeNode<Rectangle>();
-    rect->position.x = x + imageWidth / 2;
-    rect->position.y = y + imageHeight / 2;
-    rect->size.width = imageWidth;
-    rect->size.height = imageHeight;
-
-    // Create an ImagePattern fill for the rectangle.
-    auto pattern = _document->makeNode<ImagePattern>();
-    pattern->image = imageNode;
-    // Position the pattern at the rectangle's origin.
-    pattern->matrix = Matrix::Translate(x, y);
-
-    // Create a fill with the image pattern.
-    auto fill = _document->makeNode<Fill>();
-    fill->color = pattern;
-
-    // Create a group containing the rectangle and fill.
-    auto group = _document->makeNode<Group>();
-    group->elements.push_back(rect);
-    group->elements.push_back(fill);
-
-    return group;
+    return buildImageGroup(imageHref, x, y, imageWidth, imageHeight);
   }
 
   if (_options.expandUseReferences) {
@@ -1212,6 +1276,52 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   auto group = _document->makeNode<Group>();
   // group->name (removed) = "_useRef:" + refId;
   return group;
+}
+// Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
+// direct <image> element and <use> references to an image. The box (x, y, width, height) is in the
+// element's own coordinate space; any transform on the host element is applied by the parent Layer.
+Group* SVGParserContext::buildImageGroup(const std::string& imageHref, float x, float y,
+                                         float width, float height) {
+  if (imageHref.empty() || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+
+  auto imageNode = registerImageResource(imageHref);
+  if (!imageNode) {
+    return nullptr;
+  }
+
+  auto rect = _document->makeNode<Rectangle>();
+  rect->position.x = x + width / 2;
+  rect->position.y = y + height / 2;
+  rect->size.width = width;
+  rect->size.height = height;
+
+  auto pattern = _document->makeNode<ImagePattern>();
+  pattern->image = imageNode;
+  // Position the pattern at the rectangle's origin so the image covers the box.
+  pattern->matrix = Matrix::Translate(x, y);
+
+  auto fill = _document->makeNode<Fill>();
+  fill->color = pattern;
+
+  auto group = _document->makeNode<Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  return group;
+}
+// Converts a direct <image> element into a Rectangle + ImagePattern fill group. The element's
+// transform / clip-path / mask are handled by convertToLayer on the owning Layer.
+Element* SVGParserContext::convertImage(const std::shared_ptr<DOMNode>& element) {
+  std::string imageHref = getHrefAttribute(element);
+  if (imageHref.empty()) {
+    return nullptr;
+  }
+  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+  float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+  float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+  return buildImageGroup(imageHref, x, y, width, height);
 }
 LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DOMNode>& element,
                                                         const Rect& shapeBounds) {
@@ -1724,6 +1834,19 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     fill = inheritedStyle.fill;
   }
 
+  // Determine the effective fill-rule once so it applies to every fill branch below. Inside a
+  // <clipPath> the winding rule is carried by `clip-rule` rather than `fill-rule`, and a clip
+  // child usually has no `fill` attribute (taking the default-black branch), so honour either
+  // spelling here to keep an even-odd clip's interior hole intact.
+  std::string fillRule = getAttribute(element, "fill-rule");
+  if (fillRule.empty()) {
+    fillRule = getAttribute(element, "clip-rule");
+  }
+  if (fillRule.empty()) {
+    fillRule = inheritedStyle.fillRule;
+  }
+  FillRule effectiveFillRule = (fillRule == "evenodd") ? FillRule::EvenOdd : FillRule::Winding;
+
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
@@ -1734,6 +1857,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
+      fillNode->fillRule = effectiveFillRule;
       contents.push_back(fillNode);
     } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
@@ -1752,6 +1876,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       if (!fillOpacity.empty()) {
         fillNode->alpha = strtof(fillOpacity.c_str(), nullptr);
       }
+      fillNode->fillRule = effectiveFillRule;
       contents.push_back(fillNode);
     } else {
       auto fillNode = _document->makeNode<Fill>();
@@ -1771,15 +1896,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = parsedColor;
       fillNode->color = solidColor;
-
-      // Determine effective fill-rule.
-      std::string fillRule = getAttribute(element, "fill-rule");
-      if (fillRule.empty()) {
-        fillRule = inheritedStyle.fillRule;
-      }
-      if (fillRule == "evenodd") {
-        fillNode->fillRule = FillRule::EvenOdd;
-      }
+      fillNode->fillRule = effectiveFillRule;
 
       contents.push_back(fillNode);
     }
@@ -1889,6 +2006,26 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
 
+    // SVG `pathLength` lets the author normalise the path to a chosen total length, so
+    // `stroke-dasharray` / `stroke-dashoffset` values are expressed in that normalised space
+    // (e.g. HTMLExporter emits `pathLength="1"` with fractional dashes to encode a trim path).
+    // Scale the dash values back into user units by the real-to-author length ratio; without
+    // this the fractional dashes are treated as absolute pixels and collapse into a solid line.
+    std::string pathLengthStr = getAttribute(element, "pathLength");
+    if (!strokeNode->dashes.empty() && !pathLengthStr.empty()) {
+      float authorLength = strtof(pathLengthStr.c_str(), nullptr);
+      if (authorLength > 0.0f) {
+        float realLength = computePathTotalLength(element);
+        if (realLength > 0.0f) {
+          float scale = realLength / authorLength;
+          for (auto& dash : strokeNode->dashes) {
+            dash *= scale;
+          }
+          strokeNode->dashOffset *= scale;
+        }
+      }
+    }
+
     // SVG <circle>/<ellipse> path starts at 3 o'clock (cx+r, cy) and proceeds
     // clockwise. PAGX <Ellipse> path starts at 12 o'clock, also clockwise. The
     // 90-degree phase difference would offset every dash by perimeter/4 if left
@@ -1992,6 +2129,67 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   }
 
   return Rect::MakeXYWH(0, 0, 0, 0);
+}
+float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& element) {
+  const auto& tag = element->name;
+  tgfx::Path path = {};
+
+  if (tag == "path") {
+    std::string d = getAttribute(element, "d");
+    if (!d.empty()) {
+      path = ToTGFX(PathDataFromSVGString(d));
+    }
+  } else if (tag == "polyline" || tag == "polygon") {
+    std::string pointsStr = getAttribute(element, "points");
+    if (!pointsStr.empty()) {
+      path = ToTGFX(parsePoints(pointsStr, tag == "polygon"));
+    }
+  } else if (tag == "line") {
+    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
+    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
+    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
+    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
+    path.moveTo(x1, y1);
+    path.lineTo(x2, y2);
+  } else if (tag == "circle") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
+    path.addOval(tgfx::Rect::MakeXYWH(cx - r, cy - r, r * 2, r * 2));
+  } else if (tag == "ellipse") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+    path.addOval(tgfx::Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2));
+  } else if (tag == "rect") {
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+    if (rx == 0) {
+      rx = ry;
+    }
+    if (ry == 0) {
+      ry = rx;
+    }
+    path.addRoundRect(tgfx::Rect::MakeXYWH(x, y, width, height), rx, ry);
+  }
+
+  if (path.isEmpty()) {
+    return 0.0f;
+  }
+  auto measure = tgfx::PathMeasure::MakeFrom(path);
+  if (measure == nullptr) {
+    return 0.0f;
+  }
+  float total = 0.0f;
+  do {
+    total += measure->getLength();
+  } while (measure->nextContour());
+  return total;
 }
 InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                        const InheritedStyle& parentStyle) {

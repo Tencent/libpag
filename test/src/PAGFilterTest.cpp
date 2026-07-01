@@ -345,6 +345,22 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
 }
 
 /**
+ * 用例描述: GradientOverlayFilter_Scale
+ */
+PAG_TEST(PAGFilterTest, GradientOverlayFilter_Scale) {
+  auto pagFile = LoadPAGFile("resources/filter/GradientOverlayScale.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.0);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/GradientOverlayFilter_Scale"));
+}
+
+/**
  * 用例描述: FeatherMask
  */
 PAG_TEST(PAGFilterTest, FeatherMask) {

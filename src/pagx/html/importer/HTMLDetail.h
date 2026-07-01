@@ -142,6 +142,13 @@ std::shared_ptr<DOMNode> MakeStrayTextSpan(const std::string& text);
 // Escape XML text/attribute values for round-tripping inline SVG content.
 std::string EscapeXml(const std::string& text, bool isAttribute);
 
+// Deep-copies a DOM subtree, duplicating the node, its attributes, and every descendant into
+// fresh `DOMNode`s with their own `firstChild` / `nextSibling` links. Used when the same source
+// node must be embedded into several independent trees (e.g. a shared SVG gradient injected into
+// multiple inline `<svg>` import directives) without aliasing the original's sibling pointers.
+// Recursion is bounded by `MAX_HTML_RECURSION_DEPTH`.
+std::shared_ptr<DOMNode> CloneDOMSubtree(const std::shared_ptr<DOMNode>& node, int depth = 0);
+
 // Linked-list child operations. Several importer passes need to splice / remove children
 // of a DOM element while iterating; these helpers keep the prev/next bookkeeping in one
 // place so a fix to one path applies everywhere. They do not own the unlinked nodes —
@@ -163,6 +170,14 @@ std::shared_ptr<DOMNode> ReplaceChild(const std::shared_ptr<DOMNode>& parent,
                                       const std::shared_ptr<DOMNode>& replacement);
 
 // ----- Numeric / unit helpers ---------------------------------------------------------------
+
+// Parses a CSS `<number>%` token end-to-end into its fractional value (so "50%" -> 0.5). The
+// '%' must be the final character and every preceding character must be consumed by the numeric
+// parse: `strtof` silently returns the leading prefix on input like "5x%", which would otherwise
+// be mistaken for a valid 5% and shift the layout. Returns true and writes `outFraction` (the
+// percentage divided by 100) on success; returns false and leaves `outFraction` untouched when
+// the token is not a well-formed percentage. Callers multiply by the relevant axis length.
+bool ParseCssPercentage(const std::string& token, float& outFraction);
 
 // Try to parse a CSS angle in `deg`, `rad`, `turn`, or unitless (deg).
 float ParseAngle(const std::string& raw);

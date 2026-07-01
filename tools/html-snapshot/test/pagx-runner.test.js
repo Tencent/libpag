@@ -55,6 +55,11 @@ describe('runPagxImport — input validation', () => {
     await expect(runPagxImport({ pagxBin: '/bin/pagx' }))
       .rejects.toThrow(/html payload is required/);
   });
+
+  test('rejects when called with no options at all (default {} applies)', async () => {
+    await expect(runPagxImport())
+      .rejects.toThrow(/pagxBin is required/);
+  });
 });
 
 describe('runPagxImport — spawn behaviour', () => {
@@ -103,6 +108,36 @@ describe('runPagxImport — spawn behaviour', () => {
       const joined = logs.join('\n');
       expect(joined).toMatch(/real warning: keep me/);
       expect(joined).not.toMatch(/position: absolute on text leaf/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('does not log when every stderr warning is filtered away', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pagx-allfiltered-'));
+    const wrapper = path.join(dir, 'pagx');
+    // Emits only a known/filtered warning, so `filterKnownWarnings` returns ''
+    // and the `if (filtered)` guard skips the log call entirely.
+    fs.writeFileSync(wrapper, [
+      '#!/bin/sh',
+      'out=""',
+      'while [ "$#" -gt 0 ]; do',
+      '  if [ "$1" = "--output" ]; then out="$2"; shift; fi',
+      '  shift',
+      'done',
+      'echo "warning: html: position: absolute on text leaf" 1>&2',
+      'printf "<pag/>" > "$out"',
+    ].join('\n'));
+    fs.chmodSync(wrapper, 0o755);
+    const logs = [];
+    try {
+      const pagx = await runPagxImport({
+        pagxBin: wrapper,
+        html: '<div>hi</div>',
+        log: (m) => logs.push(m),
+      });
+      expect(pagx).toBe('<pag/>');
+      expect(logs).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -29,6 +29,8 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/xml/XMLDOM.h"
@@ -36,6 +38,22 @@
 namespace pagx {
 
 using namespace pagx::html;
+
+namespace {
+
+// Two runs share a stroke when both carry no stroke (NaN / <= 0 width), or both carry the same
+// width (within rounding tolerance) and colour. Keeps stroke in the fragment-merge fingerprint
+// so a stroked run never collapses into an unstroked neighbour (or vice versa).
+bool StrokesMatch(float widthA, const Color& colorA, float widthB, const Color& colorB) {
+  bool hasA = !std::isnan(widthA) && widthA > 0.0f;
+  bool hasB = !std::isnan(widthB) && widthB > 0.0f;
+  if (hasA != hasB) return false;
+  if (!hasA) return true;
+  constexpr float epsilon = 1e-3f;
+  return std::fabs(widthA - widthB) < epsilon && colorA == colorB;
+}
+
+}  // namespace
 
 HTMLTextFragmentBuilder::HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink,
                                                  HTMLValueParser& valueParser,
@@ -76,6 +94,22 @@ Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
   return fill;
 }
 
+Stroke* HTMLTextFragmentBuilder::buildTextStroke(const TextFragment& fragment) {
+  if (std::isnan(fragment.strokeWidth) || fragment.strokeWidth <= 0.0f) {
+    return nullptr;
+  }
+  auto stroke = _document->makeNode<Stroke>();
+  auto solid = _document->makeNode<SolidColor>();
+  solid->color = fragment.strokeColor;
+  stroke->color = solid;
+  stroke->width = fragment.strokeWidth;
+  // CSS `-webkit-text-stroke` is always centred on the glyph edge; mirror that with
+  // StrokeAlign::Center. Emitted after the Fill so it paints on top (the inverse of
+  // HTMLWriter::ResolveTextStrokeCss, which relies on CSS's default `fill stroke` paint-order).
+  stroke->align = StrokeAlign::Center;
+  return stroke;
+}
+
 HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
@@ -88,12 +122,27 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.letterSpacing = inherited.letterSpacingPx;
   frag.color = inherited.resolvedTextColor;
   frag.textDecoration = inherited.textDecoration;
+  frag.strokeWidth = inherited.textStrokeWidthPx;
+  frag.strokeColor = inherited.textStrokeColor;
   frag.fillImage = inherited.textFillImage;
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
   frag.lineHeight = _valueParser.resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+  ResolveWhiteSpaceFlags(inherited.whiteSpace, frag.collapseWhitespace, frag.preserveNewlines);
   return frag;
+}
+
+void HTMLTextFragmentBuilder::ResolveWhiteSpaceFlags(const std::string& whiteSpace,
+                                                     bool& outCollapseWhitespace,
+                                                     bool& outPreserveNewlines) {
+  // CSS `white-space` controls two independent behaviours used here. `pre` and `pre-wrap`
+  // keep every source space (no folding); `pre`, `pre-wrap` and `pre-line` all turn a
+  // source newline into a hard line break. `normal` and `nowrap` fold whitespace and drop
+  // newlines. Anything unrecognised falls back to `normal`.
+  std::string ws = ToLower(Trim(whiteSpace));
+  outCollapseWhitespace = !(ws == "pre" || ws == "pre-wrap");
+  outPreserveNewlines = ws == "pre" || ws == "pre-wrap" || ws == "pre-line";
 }
 
 bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const TextFragment& b) {
@@ -105,7 +154,8 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
          a.fauxBold == b.fauxBold && a.fauxItalic == b.fauxItalic &&
          std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
-         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage;
+         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
+         StrokesMatch(a.strokeWidth, a.strokeColor, b.strokeWidth, b.strokeColor);
 }
 
 bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
@@ -114,12 +164,22 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
   const bool familyMatch = inherited.primaryFontFamily.empty()
                                ? a.fontFamily == HTML_DEFAULT_FONT_FAMILY
                                : a.fontFamily == inherited.primaryFontFamily;
+  // The white-space flags must match too: two runs with identical glyph styling but different
+  // collapsing rules (e.g. a `pre` span next to a `normal` one) cannot share a fragment,
+  // because `collapseFragmentWhitespace` folds each fragment as a unit and would apply the
+  // wrong rule to half of a merged run.
+  bool incomingCollapse = true;
+  bool incomingPreserveNewlines = false;
+  ResolveWhiteSpaceFlags(inherited.whiteSpace, incomingCollapse, incomingPreserveNewlines);
   return familyMatch && a.fontStyleName == inherited.fontStyleName &&
          a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
-         a.fillImage == inherited.textFillImage;
+         a.fillImage == inherited.textFillImage && a.collapseWhitespace == incomingCollapse &&
+         a.preserveNewlines == incomingPreserveNewlines &&
+         StrokesMatch(a.strokeWidth, a.strokeColor, inherited.textStrokeWidthPx,
+                      inherited.textStrokeColor);
 }
 
 void HTMLTextFragmentBuilder::appendFragment(std::vector<TextFragment>& out,
@@ -163,21 +223,34 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
-      // Map every collapsible whitespace character in the text node — newline,
-      // carriage return, tab — to a regular space before handing the run to
-      // `appendFragment`. CSS treats these as equivalent to spaces inside a
-      // `white-space: normal | nowrap` inline-formatting-context, so the
-      // downstream `CollapseHTMLWhitespace` pass (whose front-trim only drops
-      // ASCII spaces, intentionally, to preserve `<br>`-originated `\n`) can
-      // collapse and trim them away just like the browser would. Without this
-      // step, indented source HTML such as `<h1>\n        Title</h1>` leaks
-      // its source newline into the first fragment ("\n Title"), shifting the
-      // rendered baseline by one space and / or introducing a phantom line
-      // break. `<br>` keeps its hard `\n` because that path appends the
+      // Normalise the raw text node's whitespace per the run's CSS `white-space`. For
+      // collapsing modes (normal / nowrap / pre-line) every newline / carriage-return / tab
+      // becomes a regular space so the downstream `CollapseHTMLWhitespace` pass can fold and
+      // trim them exactly like the browser; without this, indented source HTML such as
+      // `<h1>\n        Title</h1>` would leak its source newline into the first fragment.
+      // `pre-line` is the exception that still keeps newlines as hard breaks, so its `\n`
+      // (and `\r`, mapped to `\n`) survive while tabs / spaces collapse. Preserving modes
+      // (pre / pre-wrap) keep both spaces and newlines verbatim; only `\r` is mapped to `\n`
+      // so a hard break renders. `<br>` keeps its hard `\n` because that path appends the
       // newline directly (not via a text node), so its semantics are unaffected.
+      bool collapseWs = true;
+      bool preserveNl = false;
+      ResolveWhiteSpaceFlags(inherited.whiteSpace, collapseWs, preserveNl);
       std::string text = child->name;
-      for (char& c : text) {
-        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+      if (collapseWs && !preserveNl) {
+        for (char& c : text) {
+          if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+        }
+      } else if (collapseWs && preserveNl) {
+        for (char& c : text) {
+          if (c == '\r') c = '\n';
+          else if (c == '\t')
+            c = ' ';
+        }
+      } else {
+        for (char& c : text) {
+          if (c == '\r') c = '\n';
+        }
       }
       appendFragment(out, inherited, std::move(text));
     } else if (child->type == DOMNodeType::Element) {
@@ -210,7 +283,11 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
 
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   bool hasMultipleFragments = fragments.size() > 1;
-  bool hasNoWrap = !inherited.whiteSpace.empty() && ToLower(Trim(inherited.whiteSpace)) == "nowrap";
+  // CSS `white-space` suppresses automatic line breaking for both `nowrap` and `pre`
+  // (`pre` preserves runs of whitespace / newlines and never soft-wraps). `pre-wrap` and
+  // `pre-line` still wrap, so they keep the default word-wrap behaviour.
+  std::string ws = ToLower(Trim(inherited.whiteSpace));
+  bool hasNoWrap = ws == "nowrap" || ws == "pre";
   std::string wm = ToLower(Trim(inherited.writingMode));
   bool isVertical = wm == "vertical-rl" || wm == "vertical-lr";
   // A child inline run that carries an explicit `line-height` (e.g. the digit-badge idiom
@@ -255,10 +332,23 @@ void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragmen
   // leading whitespace; intermediate fragments keep both ends; cross-fragment boundary
   // whitespace is collapsed by trimming a fragment's leading whitespace when the previous
   // fragment ended with whitespace; trailing whitespace at the very end of the run is removed
-  // in a post-pass on the last surviving fragment.
+  // in a post-pass on the last surviving fragment. A fragment whose `white-space` is `pre` /
+  // `pre-wrap` (collapseWhitespace == false) is exempt from all of this: its source spaces
+  // and newlines are emitted verbatim, so it neither folds nor trims and only updates the
+  // boundary state for its collapsing neighbours.
   size_t writeIndex = 0;
   bool prevEndsWithWhitespace = false;
   for (size_t i = 0; i < fragments.size(); ++i) {
+    if (!fragments[i].collapseWhitespace) {
+      if (fragments[i].text.empty()) continue;
+      char back = fragments[i].text.back();
+      prevEndsWithWhitespace = (back == ' ' || back == '\n' || back == '\t');
+      if (writeIndex != i) {
+        fragments[writeIndex] = std::move(fragments[i]);
+      }
+      ++writeIndex;
+      continue;
+    }
     bool trimLeading = (writeIndex == 0) || prevEndsWithWhitespace;
     fragments[i].text =
         CollapseHTMLWhitespace(fragments[i].text, trimLeading, /*trimTrailing=*/false);
@@ -271,7 +361,10 @@ void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragmen
     ++writeIndex;
   }
   while (writeIndex > 0) {
-    auto& last = fragments[writeIndex - 1].text;
+    auto& lastFrag = fragments[writeIndex - 1];
+    // A trailing `pre` / `pre-wrap` run keeps its whitespace, so stop trimming at it.
+    if (!lastFrag.collapseWhitespace) break;
+    auto& last = lastFrag.text;
     while (!last.empty() && (last.back() == ' ' || last.back() == '\n')) {
       last.pop_back();
     }
@@ -323,13 +416,23 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
     const auto& f = fragments.front();
     textHost->contents.push_back(buildTextElement(f));
     textHost->contents.push_back(buildTextFill(f));
+    if (auto* stroke = buildTextStroke(f)) {
+      textHost->contents.push_back(stroke);
+    }
     return;
   }
 
   auto textBox = _document->makeNode<TextBox>();
-  // Anchor the TextBox to the host layer's content width so that wordWrap can engage. Without
-  // this the TextBox would adopt its single-line natural width and overflow the parent box.
-  textBox->percentWidth = 100.0f;
+  // Anchor the TextBox to the host layer's content size along the wrap axis so that wordWrap can
+  // engage. Without this the TextBox would adopt its single-line natural extent and overflow the
+  // parent box. The wrap axis is the block-progression axis: width for horizontal writing modes
+  // (lines stack vertically, wrap on width), height for vertical writing modes (columns stack
+  // horizontally, wrap on height).
+  if (isVertical) {
+    textBox->percentHeight = 100.0f;
+  } else {
+    textBox->percentWidth = 100.0f;
+  }
   std::string ta = ToLower(Trim(inherited.textAlign));
   if (!ta.empty()) {
     if (ta == "left" || ta == "start") textBox->textAlign = TextAlign::Start;
@@ -373,10 +476,16 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
     if (i == 0) {
       textBox->elements.push_back(buildTextElement(f));
       textBox->elements.push_back(buildTextFill(f));
+      if (auto* stroke = buildTextStroke(f)) {
+        textBox->elements.push_back(stroke);
+      }
     } else {
       auto group = _document->makeNode<Group>();
       group->elements.push_back(buildTextElement(f));
       group->elements.push_back(buildTextFill(f));
+      if (auto* stroke = buildTextStroke(f)) {
+        group->elements.push_back(stroke);
+      }
       textBox->elements.push_back(group);
     }
   }

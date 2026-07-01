@@ -26,7 +26,6 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
-#include "pagx/html/Woff2FontGenerator.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -47,6 +46,7 @@
 #include "pagx/types/Padding.h"
 #include "pagx/types/Rect.h"
 #include "pagx/types/SelectorTypes.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 
 namespace pagx {
 
@@ -83,17 +83,6 @@ std::string Matrix3DToCSS(const Matrix3D& m);
 const char* BlendModeToMixBlendMode(BlendMode mode);
 
 std::string LayerTransformCSS(const Layer* layer);
-
-/**
- * HTML-local wrapper around pagx::BuildGroupMatrix that negates the `group->skew` angle so the
- * resulting shear matches tgfx native rendering (VectorGroup::ApplySkew uses
- * `DegreesToRadians(-skew)`). The shared pagx::BuildGroupMatrix follows the SVG matrix sign
- * convention asserted by main's PAGXSVGTest.SVGExport_GroupSkew, so we cannot fix the sign at
- * that layer without breaking the SVG / PPT exporters and their pinned test expectations. Use
- * this wrapper everywhere the HTML exporter would have called BuildGroupMatrix on a Group node
- * (path bake in flattenGroup, transform emission in writeGroup, etc.).
- */
-Matrix BuildGroupMatrixForHTML(const Group* group);
 
 const char* AlignmentToCSS(Alignment alignment);
 const char* ArrangementToCSS(Arrangement arrangement);
@@ -473,7 +462,7 @@ class HTMLWriter {
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
   // layer's <div> is emitted.
   void emitPlusDarkerFilterDef(const PlusDarkerBackdrop& backdrop);
-  std::string emitDropShadowFilterDef(const DropShadowStyle* ds);
+  std::string emitDropShadowFilterDef(const std::vector<const DropShadowStyle*>& dropShadows);
   std::string emitInnerShadowFilterDef(const InnerShadowStyle* is);
   void renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
                  const Stroke* stroke, float alpha, bool hasTrim, const TrimPath* trim,
@@ -504,17 +493,14 @@ class HTMLWriter {
                          const TextBox* tb, float alpha);
   void writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const TextPath* textPath,
                      const Fill* fill, const Stroke* stroke, const TextBox* tb, float alpha);
-  // Renders a Text node whose glyphRuns hold embedded vector/bitmap shapes (not real text).
-  // Only call when text->text is empty or text->fontFamily is empty. Real text must go through
-  // the CSS span path in writeText to preserve gradient fills and layout semantics.
+  // Renders a Text node from its embedded GlyphRuns using generated WOFF2 glyphs. Prefer the
+  // normal CSS span path when text semantics/layout must stay browser-native.
   void writeEmbeddedShapeGlyphs(HTMLBuilder& out, const Text* text, const Fill* fill,
                                 const Stroke* stroke, float alpha);
-  // WOFF2 path: renders embedded vector glyphs as <span> elements referencing a generated
-  // @font-face WOFF2 font, using PUA Unicode characters. Falls through to the SVG <path>
-  // path in writeEmbeddedShapeGlyphs when no WOFF2 font is available for this Font resource.
+  // WOFF2 path: renders embedded glyph runs as <span> elements referencing generated @font-face
+  // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
-                                      const Stroke* stroke, float alpha,
-                                      const Woff2FontResult& fontResult);
+                                      const Stroke* stroke, float alpha);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
@@ -556,7 +542,7 @@ class HTMLWriter {
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,
-                    float bboxW = 0, float bboxH = 0);
+                    float bboxW = 0, float bboxH = 0, bool emitFillRule = true);
   void applySVGStroke(HTMLBuilder& out, const Stroke* stroke, float pathLength = 0.0f);
 
   // Returns the ID for a path definition in the global <defs>. If the d-string was already

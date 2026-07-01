@@ -27,6 +27,12 @@
 'use strict';
 
 const fs = require('fs');
+
+// Fail fast with a copy-pasteable `npm install` / `npm run build` hint if `dist/` (the
+// compiled TypeScript this script loads below) hasn't been built yet. Must run before the
+// `require('./dist/...')` calls, which would otherwise throw an opaque MODULE_NOT_FOUND.
+require('./ensure-built').ensureBuilt();
+
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
@@ -79,8 +85,8 @@ async function main() {
     });
 
     if (opts.outputToStdout) {
-      // Stdout mode (triggered by `-o -`, used by pagx's `--html-snapshot`
-      // integration): the HTML is the sole stdout payload, and the
+      // Stdout mode (triggered by `-o -`, used by pagx's html-snapshot
+      // bridge for HTML import): the HTML is the sole stdout payload, and the
       // "wrote ..." progress line goes to stderr so the parent process can
       // read stdout as a pure HTML string without parsing.
       process.stdout.write(result.html);

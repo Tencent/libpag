@@ -36,7 +36,7 @@ reference:
 Before running any `pagx` command, ensure it is installed and meets the minimum version:
 
 ```bash
-PAGX_MIN="0.3.24"
+PAGX_MIN="0.3.29"
 if ! command -v pagx &>/dev/null; then
   npm install -g @libpag/pagx
 elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
@@ -176,7 +176,7 @@ built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically 
 triggers the one-time browser download):
 
 ```bash
-pagx import --html-snapshot --html-infer-flex --input <name>.html --output <name>.pagx
+pagx import --input <name>.html --output <name>.pagx
 pagx resolve <name>.pagx
 pagx render <name>.pagx -o <name>.png   # preview; add --scale 2 for a crisp image
 ```

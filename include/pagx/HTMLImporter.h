@@ -58,10 +58,10 @@ class HTMLImporter {
     float targetHeight = NAN;
 
     /**
-     * When true, the canvas size declared by `<body>` is preferred over `targetWidth`
-     * / `targetHeight`. Default false (caller-provided target wins).
+     * When true (default), the canvas size declared by `<body>` is preferred over
+     * `targetWidth` / `targetHeight`.
      */
-    bool preferBodySize = false;
+    bool preferBodySize = true;
 
     /**
      * When true, treats unsupported elements/properties as hard errors. Default false
@@ -90,10 +90,10 @@ class HTMLImporter {
      * `position: absolute` with explicit `left/top/width/height` (the canonical output of
      * `tools/html-snapshot/snapshot.js`). Containers whose children form a clean 1D row or
      * column with consistent gaps and uniform alignment are rewritten into flex; containers
-     * that don't admit a clean inference are left untouched. Default false (lossy
-     * heuristic — opt in explicitly). No effect when `autoNormalize` is false.
+     * that don't admit a clean inference are left untouched. Default true. No effect when
+     * `autoNormalize` is false.
      */
-    bool inferFlexFromAbsolute = false;
+    bool inferFlexFromAbsolute = true;
 
     /**
      * Optional FontConfig seeded into the produced document's `fontConfig()`. When provided,

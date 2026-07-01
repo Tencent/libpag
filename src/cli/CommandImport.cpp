@@ -49,20 +49,6 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
       options->svgFlattenTransforms = true;
     } else if (arg == "--svg-preserve-unknown") {
       options->svgPreserveUnknown = true;
-    } else if (arg == "--html-strict") {
-      options->htmlStrict = true;
-    } else if (arg == "--html-preserve-unknown") {
-      options->htmlPreserveUnknown = true;
-    } else if (arg == "--html-no-prefer-body-size") {
-      options->htmlPreferBodySize = false;
-    } else if (arg == "--html-no-normalize") {
-      options->htmlAutoNormalize = false;
-    } else if (arg == "--html-infer-flex") {
-      options->htmlInferFlex = true;
-    } else if (arg == "--html-snapshot") {
-      options->htmlSnapshot = true;
-    } else if (arg == "--html-snapshot-bin" && i + 1 < argc) {
-      options->htmlSnapshotBin = argv[++i];
     }
   }
 }
@@ -144,16 +130,18 @@ static std::string ShellQuote(const std::string& value) {
   return out;
 }
 
-// Resolve the path to `tools/html-snapshot/snapshot.js` for `--html-snapshot`. Resolution
-// order (first non-empty hit wins):
-//   1. `--html-snapshot-bin <path>` (explicit override),
+// Resolve the path to the html-snapshot driver script. The path is fixed in code; resolution
+// order (first hit wins):
+//   1. the relative path `tools/html-snapshot/snapshot.js` when it resolves from cwd,
 //   2. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
 //   3. Upward search from cwd for `tools/html-snapshot/snapshot.js` (max 8 levels — covers
 //      the common case of running `pagx` from anywhere under the repo).
 // Returns empty when nothing matched; the caller surfaces a clear error in that case.
-static std::string ResolveSnapshotBin(const std::string& explicitPath) {
-  if (!explicitPath.empty()) {
-    return explicitPath;
+static std::string ResolveSnapshotBin() {
+  std::error_code existsEc;
+  const std::string relativeDefault = "tools/html-snapshot/snapshot.js";
+  if (std::filesystem::exists(relativeDefault, existsEc) && !existsEc) {
+    return relativeDefault;
   }
   if (const char* env = std::getenv("PAGX_HTML_SNAPSHOT_BIN")) {
     if (env[0] != '\0') {
@@ -180,6 +168,24 @@ static std::string ResolveSnapshotBin(const std::string& explicitPath) {
   return {};
 }
 
+// Whether the html-snapshot pre-pass runs before the HTML importer. Enabled by default; set
+// the `PAGX_HTML_SNAPSHOT` environment variable to a falsy value (`0`, `false`, `no`, `off`,
+// case-insensitive) to disable it. The html-snapshot tooling (`html2pagx`, the snapshot
+// server) sets this when it has already rendered the page to a flat subset and hands that
+// directly to the importer — a second in-importer snapshot would be redundant (and would
+// require a browser the tool already ran).
+static bool HTMLSnapshotEnabled() {
+  const char* env = std::getenv("PAGX_HTML_SNAPSHOT");
+  if (env == nullptr || env[0] == '\0') {
+    return true;
+  }
+  std::string value = env;
+  for (auto& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return !(value == "0" || value == "false" || value == "no" || value == "off");
+}
+
 struct SnapshotResult {
   std::string html = {};
   std::string error = {};
@@ -189,14 +195,13 @@ struct SnapshotResult {
 // subset). snapshot.js routes its `wrote ...` progress line and any browser errors to
 // stderr, which `popen` leaves connected to the parent's stderr — so the user still sees
 // progress and diagnostics while we get a clean HTML payload back on stdout.
-static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, const std::string& binPath) {
+static SnapshotResult RunHTMLSnapshot(const std::string& inputPath) {
   SnapshotResult result;
-  auto bin = ResolveSnapshotBin(binPath);
+  auto bin = ResolveSnapshotBin();
   if (bin.empty()) {
     result.error =
-        "html-snapshot script not found; pass --html-snapshot-bin <path>, set "
-        "PAGX_HTML_SNAPSHOT_BIN, or run from a directory that contains "
-        "tools/html-snapshot/snapshot.js";
+        "html-snapshot script not found; set PAGX_HTML_SNAPSHOT_BIN or run from a directory "
+        "that contains tools/html-snapshot/snapshot.js";
     return result;
   }
   std::string command = "node ";
@@ -265,14 +270,11 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
   return svgOptions;
 }
 
-static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOptions,
-                                           float targetWidth = NAN, float targetHeight = NAN) {
+// HTML import behaviour is fixed in code (no longer exposed via CLI/ImportFormatOptions): the
+// importer always normalizes the subset, prefers the <body> intrinsic size, recovers flex from
+// absolute layout, and downgrades unsupported constructs to warnings rather than hard errors.
+static HTMLImporter::Options ToHTMLOptions(float targetWidth = NAN, float targetHeight = NAN) {
   HTMLImporter::Options options = {};
-  options.strict = formatOptions.htmlStrict;
-  options.preserveUnknownElements = formatOptions.htmlPreserveUnknown;
-  options.preferBodySize = formatOptions.htmlPreferBodySize;
-  options.autoNormalize = formatOptions.htmlAutoNormalize;
-  options.inferFlexFromAbsolute = formatOptions.htmlInferFlex;
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
   return options;
@@ -290,34 +292,38 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
                         const ImportFormatOptions& formatOptions, float targetWidth,
                         float targetHeight) {
   ImportResult result = {};
-  // URL inputs (http/https) are only meaningful when html-snapshot is enabled — the
-  // SVG/HTML importers can't fetch them on their own. Force the effective format to
-  // html for URLs (the extension heuristic would otherwise pick up nonsense like
+  // URL inputs (http/https) are routed through html-snapshot (the snapshot renderer fetches
+  // the page) — the SVG/HTML importers can't fetch them on their own. Force the effective
+  // format to html for URLs (the extension heuristic would otherwise pick up nonsense like
   // "com" from the hostname).
   bool isUrl = IsHttpUrl(filePath);
   std::string effectiveFormat =
       isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
-  if (isUrl && !formatOptions.htmlSnapshot) {
-    result.error = "URL inputs require --html-snapshot (the importer cannot fetch http(s) URLs)";
+  bool snapshotEnabled = HTMLSnapshotEnabled();
+  if (isUrl && !snapshotEnabled) {
+    result.error =
+        "URL inputs require the html-snapshot pre-pass, but it is disabled via "
+        "PAGX_HTML_SNAPSHOT; the importer cannot fetch http(s) URLs itself";
     return result;
   }
   if (effectiveFormat == "svg") {
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    auto htmlOptions = ToHTMLOptions(formatOptions, targetWidth, targetHeight);
-    if (formatOptions.htmlSnapshot) {
-      // Run snapshot.js as a subprocess and feed its stdout (a flat,
-      // absolute-positioned subset HTML) straight to the importer. No temp file
-      // touches the disk; the HTML lives in this string for the duration of the
-      // call.
-      auto snap = RunHTMLSnapshot(filePath, formatOptions.htmlSnapshotBin);
+    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
+    if (snapshotEnabled) {
+      // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
+      // subset HTML) straight to the importer. No temp file touches the disk; the HTML
+      // lives in this string for the duration of the call.
+      auto snap = RunHTMLSnapshot(filePath);
       if (!snap.error.empty()) {
         result.error = snap.error;
         return result;
       }
       result.document = HTMLImporter::ParseString(snap.html, htmlOptions);
     } else {
+      // Snapshot disabled (PAGX_HTML_SNAPSHOT): the caller already handed us a flat subset
+      // (e.g. html2pagx pre-snapshotted), so import the file directly.
       result.document = HTMLImporter::Parse(filePath, htmlOptions);
     }
   } else {
@@ -342,8 +348,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    result.document =
-        HTMLImporter::ParseString(content, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
+    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
   } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
@@ -366,6 +371,10 @@ struct ImportOptions {
   std::string outputFile = {};
   std::string format = {};
   ImportFormatOptions formatOptions = {};
+  // Conversion warnings (e.g. flex inference fallbacks, unsupported constructs) are noisy and
+  // non-fatal. They are suppressed by default; `--verbose`/`-v` opts back in. Errors are always
+  // printed.
+  bool verbose = false;
 };
 
 static void PrintUsage() {
@@ -375,39 +384,21 @@ static void PrintUsage() {
       << "Import a file from another format and convert it to PAGX.\n"
       << "\n"
       << "Options:\n"
-      << "  --input <file|url>             Input file or URL to import (required;\n"
-      << "                                 URL inputs require --html-snapshot)\n"
+      << "  --input <file|url>             Input file or URL to import (required)\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
+      << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
       << "  --svg-no-expand-use            Do not expand <use> references\n"
       << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
       << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
       << "\n"
-      << "HTML options:\n"
-      << "  --html-strict                  Treat HTML import warnings as errors\n"
-      << "  --html-preserve-unknown        Keep unknown HTML tags as empty Layers\n"
-      << "  --html-no-prefer-body-size     Prefer --target* over <body> intrinsic size\n"
-      << "  --html-no-normalize            Skip the HTML subset normalizer (debug)\n"
-      << "  --html-infer-flex              Recover display:flex from absolute layout (lossy)\n"
-      << "  --html-snapshot                Pre-process the input through\n"
-      << "                                 tools/html-snapshot/snapshot.js before import\n"
-      << "                                 (renders JS/React-driven pages in a headless\n"
-      << "                                 browser; typically paired with --html-infer-flex).\n"
-      << "                                 Requires `node` on PATH and a snapshot.js install.\n"
-      << "  --html-snapshot-bin <path>     Override the path to snapshot.js\n"
-      << "                                 (default: $PAGX_HTML_SNAPSHOT_BIN, else search\n"
-      << "                                  upward from cwd for tools/html-snapshot/snapshot.js)\n"
-      << "\n"
       << "Examples:\n"
       << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
       << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
-      << "  pagx import --input app.html --html-snapshot --html-infer-flex\n"
-      << "                                                    # React/Tailwind page via snapshot\n"
-      << "  pagx import --input https://example.com/demo --html-snapshot --output demo.pagx\n"
-      << "                                                    # URL input requires snapshot\n";
+      << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
@@ -420,17 +411,11 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
+    } else if (arg == "--verbose" || arg == "-v") {
+      options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
-               arg == "--svg-preserve-unknown" || arg == "--html-strict" ||
-               arg == "--html-preserve-unknown" || arg == "--html-no-prefer-body-size" ||
-               arg == "--html-no-normalize" || arg == "--html-infer-flex" ||
-               arg == "--html-snapshot") {
+               arg == "--svg-preserve-unknown") {
       // Handled by ParseFormatOptions below.
-    } else if (arg == "--html-snapshot-bin" && i + 1 < argc) {
-      // Same — ParseFormatOptions will pick this up. We still need to skip the
-      // value here so the trailing path doesn't trip the unknown-argument
-      // branch below.
-      ++i;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -473,12 +458,14 @@ int RunImport(int argc, char* argv[]) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;
   }
-  for (auto& warning : result.warnings) {
-    std::cerr << "pagx import: warning: " << warning << "\n";
+  if (options.verbose) {
+    for (auto& warning : result.warnings) {
+      std::cerr << "pagx import: warning: " << warning << "\n";
+    }
   }
 
   auto optimizeResult = PAGXOptimizer::Optimize(result.document.get());
-  if (!optimizeResult.converged) {
+  if (options.verbose && !optimizeResult.converged) {
     std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }

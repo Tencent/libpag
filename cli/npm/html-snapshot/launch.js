@@ -4,7 +4,7 @@
 // Lazy bootstrap for the bundled html-snapshot tool.
 //
 // The native `pagx` binary runs `node <PAGX_HTML_SNAPSHOT_BIN> <input> -o -`
-// for `pagx import --html-snapshot` / URL inputs. The package's bin/pagx.js
+// for `pagx import` of HTML / URL inputs. The package's bin/pagx.js
 // wrapper points PAGX_HTML_SNAPSHOT_BIN at this file, so we get a hook to make
 // the snapshot tool self-sufficient on a machine that only `npm install`-ed
 // @libpag/pagx (no git checkout, no puppeteer).

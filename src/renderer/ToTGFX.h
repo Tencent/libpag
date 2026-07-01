@@ -86,6 +86,8 @@ tgfx::LineJoin ToTGFX(LineJoin join);
 
 tgfx::BlendMode ToTGFX(BlendMode mode);
 
+BlendMode FromTGFX(tgfx::BlendMode mode);
+
 tgfx::FillRule ToTGFX(FillRule rule);
 
 tgfx::LayerPlacement ToTGFX(LayerPlacement placement);

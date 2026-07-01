@@ -9,7 +9,7 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
+//  Unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace tgfx {
 class Typeface;
@@ -27,22 +28,30 @@ class Typeface;
 
 namespace pagx {
 
+/**
+ * Internal holder that owns a font source (file path, in-memory bytes, or pre-built
+ * tgfx::Typeface) and lazily loads the underlying tgfx::Typeface on demand. The
+ * fontFamily/fontStyle are always provided externally (from PAGFont) and used as the registration
+ * name for FontConfig lookup. This class is an internal implementation detail of FontConfig and is
+ * not part of the public API.
+ */
 class TypefaceHolder {
  public:
-  explicit TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface);
-  TypefaceHolder(std::string path, int ttcIndex, std::string fontFamily, std::string fontStyle);
+  TypefaceHolder(std::string path, int ttcIndex, std::string family, std::string style);
+  TypefaceHolder(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                 std::string family, std::string style);
+  TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::string family, std::string style);
 
   std::shared_ptr<tgfx::Typeface> getTypeface();
   const std::string& getFontFamily() const;
   const std::string& getFontStyle() const;
-  const std::string& getPath() const;
-  int getTTCIndex() const;
 
  private:
   std::string path = {};
+  std::shared_ptr<const std::vector<uint8_t>> bytes = {};
+  int ttcIndex = 0;
   std::string fontFamily = {};
   std::string fontStyle = {};
-  int ttcIndex = 0;
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
 };
 

@@ -189,4 +189,35 @@ describe('makeCaptureListener', () => {
     expect(cache.size).toBe(0);
     expect(logs[0]).toMatch(/custom timeout label/);
   });
+
+  test('falls back to the default timeout message built from the label', async () => {
+    const logs = [];
+    const listener = makeCaptureListener({
+      resourceType: 'font',
+      engine: 'puppeteer',
+      cache: new Map(),
+      timeoutMs: 5,
+      label: 'font',
+      log: (m) => logs.push(m),
+    });
+    await listener({
+      request: () => ({ resourceType: () => 'font', url: () => 'https://x/hang2' }),
+      ok: () => true,
+      buffer: () => new Promise(() => {}),
+    });
+    expect(logs[0]).toMatch(/timed out reading font body/);
+  });
+
+  test('swallows a body-read error silently when no logger is supplied', async () => {
+    const cache = new Map();
+    const listener = makeCaptureListener({
+      resourceType: 'font',
+      engine: 'puppeteer',
+      cache,
+    });
+    await expect(listener(makeResp({
+      bufferImpl: async () => { throw new Error('detached'); },
+    }))).resolves.toBeUndefined();
+    expect(cache.size).toBe(0);
+  });
 });

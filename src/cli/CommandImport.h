@@ -39,46 +39,6 @@ struct ImportFormatOptions {
   bool svgExpandUse = true;
   bool svgFlattenTransforms = false;
   bool svgPreserveUnknown = false;
-  bool htmlStrict = false;
-  bool htmlPreserveUnknown = false;
-  bool htmlPreferBodySize = true;
-  /**
-   * Run the HTML subset normalizer as a pre-pass inside the importer. Default true. Set to
-   * false (via `--html-no-normalize`) when debugging the raw importer behaviour against
-   * already-subset HTML.
-   */
-  bool htmlAutoNormalize = true;
-  /**
-   * Recover `display: flex` semantics from a flat absolute-positioned input (typically
-   * `tools/html-snapshot/snapshot.js` output). Lossy heuristic; default false. Enable via
-   * `--html-infer-flex`.
-   */
-  bool htmlInferFlex = false;
-
-  /**
-   * Pre-process the HTML input through `tools/html-snapshot/snapshot.js` (a headless-browser
-   * snapshotter) before handing it off to the HTML importer. Use this for JS/React-driven
-   * pages that only materialise their DOM at runtime: the snapshot script renders the page
-   * in Chromium and emits a flat, absolute-positioned HTML subset that the importer can
-   * consume directly. Default false. Enable via `--html-snapshot`.
-   *
-   * Requires Node.js on PATH and a working snapshot.js install (run `npm install` inside
-   * `tools/html-snapshot`). The snapshot script is located via, in order:
-   *   1. `htmlSnapshotBin` (CLI: `--html-snapshot-bin <path>`),
-   *   2. the `PAGX_HTML_SNAPSHOT_BIN` environment variable,
-   *   3. upward search from cwd for `tools/html-snapshot/snapshot.js`.
-   *
-   * The snapshot output is the canonical input for `inferFlexFromAbsolute`; the two options
-   * are typically used together.
-   */
-  bool htmlSnapshot = false;
-
-  /**
-   * Path to the html-snapshot driver script (`tools/html-snapshot/snapshot.js`). Empty
-   * means "auto-detect" (see `htmlSnapshot` for the resolution order). CLI:
-   * `--html-snapshot-bin <path>`.
-   */
-  std::string htmlSnapshotBin = {};
 };
 
 /**

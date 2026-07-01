@@ -333,4 +333,19 @@ describe('inlineIconFontsOnPage', () => {
     // No logger -> inlineIconFontsOnPage must not throw on the rejected evaluate.
     await expect(inlineIconFontsOnPage(page)).resolves.toEqual({ inlined: 0, total: 0 });
   });
+
+  test('logs SVG-resolution failures and still runs the applicator cleanup', async () => {
+    const logs = [];
+    // The collector returns a truthy-but-non-iterable "targets" value: its
+    // `.length` clears the empty guard, but `resolveIconFontSvgs`'s `for..of`
+    // throws on it, exercising the resolver-failure catch branch.
+    const { page, calls } = pageStub([
+      { length: 1 },
+      undefined, // applicator (cleanup) still runs
+    ]);
+    const out = await inlineIconFontsOnPage(page, { logger: (m) => logs.push(m) });
+    expect(out).toEqual({ inlined: 0, total: 1 });
+    expect(calls).toHaveLength(2);
+    expect(logs.some((m) => /SVG resolution failed/.test(m))).toBe(true);
+  });
 });

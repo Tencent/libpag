@@ -67,7 +67,7 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
   _animationBuilder =
       std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser);
+  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
@@ -200,6 +200,12 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
 
   _idAllocator->collectAll(root, *_diagnostics);
 
+  // HTMLExporter hoists shared paint servers (gradients/patterns/clip paths) into a hidden
+  // top-level `<svg><defs>` and references them by id from many sibling `<svg>`s. Each inline
+  // `<svg>` becomes an independent import directive, so index those shared defs now and inject
+  // the ones each `<svg>` references into it during conversion.
+  _svgEmitter->collectSharedDefs(root);
+
   Layer* bodyLayer = convertBody(body, canvasW, canvasH);
   if (_diagnostics->hadHardError()) {
     return nullptr;
@@ -312,6 +318,10 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
+    if (!box.backgroundImage.empty() &&
+        ToLower(box.backgroundImage).find("url(") != std::string::npos) {
+      applyBackgroundImageFill(box, layer);
+    }
   }
   _layerBuilder->applyLayerAttributes(layer, body, box);
 
@@ -430,6 +440,13 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
+    // A `url(...)` background is recovered as an ImagePattern fill here (it needs the image
+    // registry + native-size decoding the layer builder has no access to). Runs right after the
+    // background geometry is emitted so the fill stacks on top of it.
+    if (!box.backgroundImage.empty() &&
+        ToLower(box.backgroundImage).find("url(") != std::string::npos) {
+      applyBackgroundImageFill(box, layer);
+    }
   }
 
   _layerBuilder->applyBoxTransform(layer, box, element);
@@ -495,6 +512,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     }
     child = child->getNextSibling();
   }
+  // Rebuild any CSS mask / clip-path into a PAGX mask layer on the masked content layer. Runs
+  // after children are attached so the mask layer is appended last; it shares `layer`'s local
+  // coordinate origin (the mask SVG geometry is in the masked element's own 0..W/0..H space).
+  applyMaskOrClip(layer, box);
   assignElementId(wrapper, element);
   return wrapper;
 }

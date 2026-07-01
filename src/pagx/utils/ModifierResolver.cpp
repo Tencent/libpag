@@ -36,6 +36,7 @@
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/PathTypes.h"
 
 namespace pagx {
@@ -339,6 +340,135 @@ Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* tr
   return makePathFromData(MakePathDataFromTGFX(_doc, tp));
 }
 
+// Distribute a Continuous-mode TrimPath across in-scope shapes by cumulative
+// path length, mirroring tgfx::TrimPath::ApplyTrimContinuous. Each shape keeps
+// its own identity in `output` so downstream gradient fitting (which fits each
+// path to its own bounding box) matches the renderer's per-shape semantics.
+// Earlier this branch baked every contour into one path: that produced a single
+// SVG <path> whose union bbox drove every gradient fit, while the renderer
+// fits gradients per-shape — yielding visibly different gradient colors
+// between render.png and svg.png.
+void ModifierResolver::applyContinuousTrim(std::vector<Element*>& output,
+                                           std::vector<size_t>& shapeSlots,
+                                           const TrimPath* trim) const {
+  float offset = trim->offset / 360.0f;
+  float start = trim->start + offset;
+  float end = trim->end + offset;
+  bool reversed = end < start;
+  if (reversed) {
+    start = 1.0f - start;
+    end = 1.0f - end;
+  }
+  float shift = std::floor(start);
+  start -= shift;
+  end -= shift;
+
+  size_t shapeCount = shapeSlots.size();
+  std::vector<tgfx::Path> paths(shapeCount);
+  std::vector<float> lengths(shapeCount, 0.0f);
+  float totalLength = 0.0f;
+  for (size_t i = 0; i < shapeCount; ++i) {
+    size_t order = reversed ? (shapeCount - 1 - i) : i;
+    auto path = PrimitiveToTGFXPath(output[shapeSlots[order]]);
+    if (reversed) {
+      path.reverse();
+    }
+    auto pathMeasure = tgfx::PathMeasure::MakeFrom(path);
+    float length = 0.0f;
+    if (pathMeasure != nullptr) {
+      do {
+        length += pathMeasure->getLength();
+      } while (pathMeasure->nextContour());
+    }
+    lengths[order] = length;
+    totalLength += length;
+    paths[order] = std::move(path);
+  }
+  if (totalLength <= 0.0f) {
+    return;
+  }
+
+  float trimStart = start * totalLength;
+  float trimEnd = end * totalLength;
+  float addedLength = 0.0f;
+  std::vector<size_t> slotsToErase;
+  for (size_t i = 0; i < shapeCount; ++i) {
+    size_t order = reversed ? (shapeCount - 1 - i) : i;
+    float shapeLength = lengths[order];
+    if (shapeLength <= 0.0f) {
+      slotsToErase.push_back(shapeSlots[order]);
+      continue;
+    }
+    float shapeStart = addedLength;
+    float shapeEnd = addedLength + shapeLength;
+    float localStart = 0.0f;
+    float localEnd = 0.0f;
+    bool hasSegment = false;
+    if (trimEnd <= totalLength) {
+      if (trimStart < shapeEnd && trimEnd > shapeStart) {
+        localStart = std::max(0.0f, trimStart - shapeStart) / shapeLength;
+        localEnd = std::min(shapeLength, trimEnd - shapeStart) / shapeLength;
+        hasSegment = true;
+      }
+    } else {
+      float seg1Start = trimStart;
+      float seg1End = totalLength;
+      float seg2Start = 0.0f;
+      float seg2End = trimEnd - totalLength;
+      bool hasSeg1 = seg1Start < shapeEnd && seg1End > shapeStart;
+      bool hasSeg2 = seg2Start < shapeEnd && seg2End > shapeStart;
+      if (hasSeg1 && hasSeg2) {
+        // Both halves of the wrap-around fall on the same shape: encode
+        // as a [localStart, localEnd + 1] range so MakeTrim itself wraps
+        // the segment back through the contour start, matching tgfx.
+        localStart = std::max(0.0f, seg1Start - shapeStart) / shapeLength;
+        localEnd = std::min(shapeLength, seg2End - shapeStart) / shapeLength + 1.0f;
+        hasSegment = true;
+      } else if (hasSeg1) {
+        localStart = std::max(0.0f, seg1Start - shapeStart) / shapeLength;
+        localEnd = std::min(shapeLength, seg1End - shapeStart) / shapeLength;
+        hasSegment = true;
+      } else if (hasSeg2) {
+        localStart = std::max(0.0f, seg2Start - shapeStart) / shapeLength;
+        localEnd = std::min(shapeLength, seg2End - shapeStart) / shapeLength;
+        hasSegment = true;
+      }
+    }
+    addedLength += shapeLength;
+    if (!hasSegment) {
+      slotsToErase.push_back(shapeSlots[order]);
+      continue;
+    }
+    auto effect = tgfx::PathEffect::MakeTrim(localStart, localEnd);
+    auto& path = paths[order];
+    // PathEffect::MakeTrim returns nullptr when the range covers the
+    // full path; in that case the prepared (and possibly reversed)
+    // path is already the desired result.
+    if (effect != nullptr) {
+      effect->filterPath(&path);
+    }
+    output[shapeSlots[order]] = makePathFromData(MakePathDataFromTGFX(_doc, path));
+  }
+
+  // Drop shapes that have no surviving segment so downstream painters
+  // do not stroke them. Erase from output in descending index order to
+  // keep earlier indices valid, then fix up shapeSlots.
+  std::sort(slotsToErase.begin(), slotsToErase.end(), std::greater<size_t>());
+  for (auto idx : slotsToErase) {
+    output.erase(output.begin() + static_cast<long>(idx));
+    for (auto it = shapeSlots.begin(); it != shapeSlots.end();) {
+      if (*it == idx) {
+        it = shapeSlots.erase(it);
+      } else {
+        if (*it > idx) {
+          --(*it);
+        }
+        ++it;
+      }
+    }
+  }
+}
+
 // Apply a RoundCorner modifier to `shape`, returning a freshly allocated Path (or `shape`
 // unchanged when the radius is non-positive or the shape is degenerate).
 Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
@@ -479,23 +609,7 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
             output[idx] = applyTrimToElement(output[idx], trim);
           }
         } else {
-          // Continuous: concatenate into a single tgfx::Path so the trim spans
-          // every contour in length space, then split back per-shape using
-          // PathMeasure. We approximate by trimming the union and emitting it
-          // as a single Path. Multi-contour shapes remain editable.
-          tgfx::Path combined = {};
-          for (auto idx : shapeSlots) {
-            combined.addPath(PrimitiveToTGFXPath(output[idx]), tgfx::PathOp::Append);
-          }
-          if (combined.isEmpty()) {
-            break;
-          }
-          float offset = trim->offset / 360.0f;
-          auto effect = tgfx::PathEffect::MakeTrim(trim->start + offset, trim->end + offset);
-          if (effect != nullptr && effect->filterPath(&combined)) {
-            auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
-            CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
-          }
+          applyContinuousTrim(output, shapeSlots, trim);
         }
         break;
       }

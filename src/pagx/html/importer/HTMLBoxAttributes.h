@@ -76,6 +76,13 @@ struct HTMLInheritedStyle {
   std::string textDecorationColor = {};
   std::string whiteSpace = {};
   std::string writingMode = {};
+  // CSS `-webkit-text-stroke` resolved by HTMLStyleCascade into a stroke width (px) and a
+  // concrete colour. `textStrokeWidthPx` is NaN when no stroke is authored (or the width is
+  // zero, which paints nothing); a positive value drives an extra PAGX text `<Stroke>` emitted
+  // after the Fill (the inverse of HTMLWriter's `-webkit-text-stroke` emission). The colour
+  // defaults to the resolved text colour when the shorthand omits it, matching CSS.
+  float textStrokeWidthPx = NAN;
+  Color textStrokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
   // Gradient string ("linear-gradient(...)" / "radial-gradient(...)" / "conic-gradient(...)")
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.
@@ -102,10 +109,11 @@ struct HTMLInheritedStyle {
 /**
  * Resolved CSS `transform` for a single HTML element. Populated when the
  * `transform` declaration uses one of the supported single-function forms
- * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]) or the `matrix(a, b, c, d,
- * tx, ty)` shorthand. Compound function chains and 3D variants
- * (`matrix3d`/`rotate3d`/`perspective`/…) are dropped earlier in the subset
- * transformer.
+ * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]), the `matrix(a, b, c, d,
+ * tx, ty)` shorthand, or the `matrix3d(...)` 3D form (projected
+ * orthographically onto its 2D affine subset). Compound function chains and
+ * the remaining 3D variants (`rotate3d`/`perspective`/…) are dropped earlier
+ * in the subset transformer.
  *
  * The single-function variants populate the discrete fields (skew/rotation/
  * scale/translate) so the existing TextBox path can map them straight onto
@@ -176,7 +184,11 @@ struct HTMLBoxAttributes {
 
   // Layout
   bool displayFlex = false;
-  bool flexRow = true;  // default of CSS flex
+  // True when the flex main axis is geometrically horizontal. Starts from CSS `flex-direction`
+  // (row → true) and is then rotated by the element's writing-mode in `parseBoxLayout`: a vertical
+  // writing mode flips the inline/block axes, so `flex-direction: column` under `vertical-rl/lr`
+  // ends up horizontal. Maps directly to LayoutMode (Horizontal when true, Vertical otherwise).
+  bool flexRow = true;
   float gapPx = 0.0f;
   bool gapSet = false;
   Padding padding = {};
@@ -210,6 +222,19 @@ struct HTMLBoxAttributes {
   // painting a rectangle on this element.
   bool backgroundClipText = false;
 
+  // CSS `background-size` / `background-repeat` / `background-position`, kept lower-cased and
+  // trimmed. Only meaningful when `backgroundImage` is a `url(...)` reference; the importer maps
+  // them back onto an `ImagePattern` fill — the inverse of `HTMLWriter`'s exporter emission:
+  //   - size `contain` / `cover` / `100% 100%` → ScaleMode LetterBox / Zoom / Stretch (a fitted
+  //     mode that centres the image and ignores repeat/position).
+  //   - any other case (explicit `<w>px <h>px` size, or `repeat`) → ScaleMode None with the
+  //     pattern matrix carrying the per-axis scale (tile px / native px) and the position offset,
+  //     and tile modes taken from `background-repeat`.
+  // Empty means "not authored" and the property falls back to its CSS default.
+  std::string backgroundSize = {};
+  std::string backgroundRepeat = {};
+  std::string backgroundPosition = {};
+
   // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
   // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
   // exceed the box's edge length). When the input was uniform — or all four resolved values are
@@ -221,6 +246,12 @@ struct HTMLBoxAttributes {
   float borderRadiusBLPx = 0.0f;
   bool borderRadiusSet = false;
   bool borderRadiusUniform = true;
+  // True when every corner's horizontal radius equals half the box width and every corner's
+  // vertical radius equals half the box height — the exact condition under which a CSS
+  // rounded rectangle degenerates into an ellipse inscribed in the box (`border-radius: 50%`
+  // being the canonical author syntax). The importer then emits a PAGX `Ellipse` instead of a
+  // `Rectangle`, so a non-square box renders a true ellipse rather than a pill approximation.
+  bool borderRadiusEllipse = false;
 
   float borderWidthPx = 0.0f;
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
@@ -230,6 +261,22 @@ struct HTMLBoxAttributes {
   std::string boxShadow = {};
   std::string filter = {};
   std::string backdropFilter = {};
+
+  // CSS `mask-image` / `mask-mode` / `mask-size` / `mask-position` for alpha and luminance masks.
+  // `maskImage` is the raw `url(data:image/svg+xml,...)` the HTML exporter emitted; the importer
+  // decodes the embedded SVG and rebuilds a PAGX mask layer from it (the inverse of
+  // `HTMLWriter::writeMaskCSS`). `maskMode` is the lower-cased keyword (`alpha` / `luminance`);
+  // `maskSize` / `maskPosition` are lower-cased and trimmed and drive the mask layer's scale /
+  // offset. All empty means "no mask authored".
+  std::string maskImage = {};
+  std::string maskMode = {};
+  std::string maskSize = {};
+  std::string maskPosition = {};
+
+  // CSS `clip-path: url(#id)` reference (raw, including the `url(...)` wrapper and any quotes).
+  // The importer resolves the referenced hidden `<clipPath>` def into a contour mask layer (the
+  // inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path authored".
+  std::string clipPathRef = {};
 
   float opacity = 1.0f;
   bool opacitySet = false;

@@ -82,6 +82,17 @@ describe('parseNumber', () => {
     expect(code).toBe(2);
     expect(messages[0]).toContain(LOG_PREFIX);
   });
+
+  test('accepts a value within an explicit max bound', () => {
+    expect(parseNumber('--scale', '2', { min: 1, max: 4 })).toBe(2);
+  });
+
+  test('rejects a value above the max with a "between" message', () => {
+    const calls = [];
+    parseNumber('--scale', '9', { min: 1, max: 4, fail: (m) => calls.push(m) });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/between 1 and 4/);
+  });
 });
 
 describe('fail / makeFail', () => {

@@ -3,5 +3,6 @@
 /dist/
 /node_modules/
 /snapshot.js
+/ensure-built.js
 /package.json
 /package-lock.json

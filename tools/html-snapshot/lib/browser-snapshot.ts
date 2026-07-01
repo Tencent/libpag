@@ -81,18 +81,39 @@ function normalizeBorderRadius(value) {
   return value;
 }
 
-// PAGX supports `background-image` only when the value is one of the gradient
-// functions (linear/radial/conic). `url(...)` backgrounds — which would
-// otherwise originate from CSS-in-JS or stylesheets — must be authored as
-// <img> elements; drop them silently here so the importer doesn't have to
-// warn for every blob the page paints over its decoration layer.
+// PAGX supports `background-image` when the value is one of the gradient
+// functions (linear/radial/conic) or a single `url(...)` reference. A url
+// background round-trips into an `ImagePattern` fill on import (the inverse of
+// the HTML exporter's emission). Chromium reports the url already resolved to
+// an absolute form; rewrite a local `file://` url to a plain absolute path
+// (the form the PAGX importer + tgfx load directly, matching the `<img>`
+// `data-snapshot-src` path), and keep `data:` / `http(s)` urls verbatim (the
+// `inlineExternalImages` pre-pass converts remote bytes to a data URI).
+// Compound url + gradient stacks and the `none` keyword are dropped.
 function normalizeBackgroundImage(value) {
   if (!value) return '';
   if (value === 'none') return '';
-  if (/url\(/i.test(value)) return '';
   if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value)) {
     return value;
   }
+  const trimmed = value.trim();
+  if (/^url\(/i.test(trimmed)) {
+    const m = /^url\(\s*(['"]?)([^'")]+)\1\s*\)$/i.exec(trimmed);
+    if (!m) return '';
+    let url = m[2];
+    if (/^file:/i.test(url)) {
+      try {
+        const u = new URL(url);
+        let p = decodeURIComponent(u.pathname);
+        if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+        url = p;
+      } catch (_) {
+        return '';
+      }
+    }
+    return `url("${url.replace(/"/g, "'")}")`;
+  }
+  if (/url\(/i.test(value)) return '';
   return '';
 }
 
@@ -106,6 +127,16 @@ function normalizeBackgroundImage(value) {
 function normalizeBackgroundClip(value) {
   if (!value) return '';
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
+}
+
+// PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
+// which the importer turns into a contour mask layer. Chromium reports the
+// reference verbatim as `url("#id")`. Geometric forms (`inset()`, `circle()`,
+// `ellipse()`, `polygon()`, `path()`) and `none` are out of subset and collapse
+// to '' so STYLE_SCHEMA's `defaults` filter drops the property entirely.
+function normalizeClipPath(value) {
+  if (!value) return '';
+  return /^url\(/i.test(value.trim()) ? value.trim() : '';
 }
 
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
@@ -171,13 +202,14 @@ function joinStyles(...parts) {
 // white-space. Used in every spot where a single-line text span sits inside a
 // flex item or rides on a wrapper whose width was measured by Chromium —
 // prevents PAGX's text engine from re-wrapping at a sub-pixel divergence.
-// Skipped for vertical writing-mode spans: PAGX breaks vertical TextBoxes
-// by column height, and a forced `white-space: nowrap` would mis-trigger
-// the importer's `hasNoWrap` branch (disabling wordWrap on what should be
-// a multi-column vertical layout).
+// Applies to vertical writing-mode spans too: `emitVerticalTextSpans` now
+// splits a run into one span PER COLUMN exactly as the horizontal path splits
+// per line, so forcing `nowrap` (which routes through the importer's
+// `hasNoWrap` branch to disable wordWrap) is precisely what stops PAGX from
+// re-breaking a Chromium-measured single column into two when its vertical
+// glyph metrics diverge.
 function withNowrap(style) {
   if (!style) return 'white-space: nowrap';
-  if (/writing-mode:\s*vertical-(rl|lr)/.test(style)) return style;
   return /white-space:/.test(style) ? style : `${style}; white-space: nowrap`;
 }
 
@@ -554,7 +586,12 @@ function appendStyleProp(parts, computed, entry, ctx) {
   if (entry.defaults && entry.defaults.includes(v)) return;
   if (entry.skipIfEqualsTextColor && ctx && v === ctx.textColor) return;
   const outProp = entry.outProp || entry.prop;
-  parts.push(`${outProp}: ${v}`);
+  // Rewrite embedded double quotes as single quotes so the value embeds safely
+  // inside the surrounding style="…" attribute. CSS treats single- and double-
+  // quoted strings (and url("…") / url('…')) equivalently, so a value like
+  // `filter: url("#blur")` round-trips while no longer prematurely closing the
+  // attribute and breaking the XML parse on import.
+  parts.push(`${outProp}: ${v.replace(/"/g, "'")}`);
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -605,6 +642,71 @@ function appendAnimation(parts, computed) {
     const v = (computed.getPropertyValue(prop) || '').trim();
     if (v) parts.push(`${prop}: ${v}`);
   }
+}
+
+// Coalesce the two `-webkit-text-stroke` longhands Chromium's computed style
+// exposes (`-webkit-text-stroke-width` / `-webkit-text-stroke-color`) into the
+// single shorthand the HTML exporter emits and the importer parses. The
+// shorthand round-trips into a PAGX text `<Stroke>` (the inverse of
+// HTMLWriter::ResolveTextStrokeCss). Returns '' for a zero / missing width
+// (the CSS default, which paints nothing) so unstroked text stays compact.
+// `text-stroke-color` defaults to the resolved `color`; it is forwarded
+// verbatim so the importer reproduces the authored stroke tint rather than
+// re-deriving it from the fill.
+function resolveTextStroke(computed) {
+  const widthRaw = computed.getPropertyValue('-webkit-text-stroke-width').trim();
+  const width = parseFloat(widthRaw);
+  if (!(width > 0)) return '';
+  let color = computed.getPropertyValue('-webkit-text-stroke-color').trim();
+  if (!color) color = computed.getPropertyValue('color').trim();
+  return `${widthRaw} ${color}`;
+}
+
+function appendTextStroke(parts, computed) {
+  const value = resolveTextStroke(computed);
+  if (value) parts.push(`-webkit-text-stroke: ${value}`);
+}
+
+// Forward `background-size` / `background-repeat` / `background-position` when the element
+// carries a `url(...)` background image. The importer recovers them into the ImagePattern's
+// scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
+// properties, so emitting them there would be noise; only forward for url backgrounds. Each
+// value is suppressed when it equals the CSS default so the common fitted card stays compact.
+function appendBackgroundImageFitting(parts, computed) {
+  const bgImage = computed.getPropertyValue('background-image').trim();
+  if (!/^url\(/i.test(bgImage)) return;
+  const size = computed.getPropertyValue('background-size').trim();
+  if (size && size !== 'auto') parts.push(`background-size: ${size}`);
+  // `background-repeat` is always forwarded for url backgrounds (never suppressed against the
+  // CSS default `repeat`): the importer maps `repeat` to the tiling ScaleMode::None pattern, so
+  // dropping it would silently turn a tiled card into a single off-screen image.
+  const repeat = computed.getPropertyValue('background-repeat').trim();
+  if (repeat) parts.push(`background-repeat: ${repeat}`);
+  const position = computed.getPropertyValue('background-position').trim();
+  if (position && position !== '0% 0%') parts.push(`background-position: ${position}`);
+}
+
+// Forward the `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`
+// descriptors when the element carries a `mask-image`. The importer needs them
+// to rebuild the PAGX mask layer at the right type, scale and offset (the inverse
+// of HTMLWriter::writeMaskCSS, which always pins size/repeat and shifts position
+// by the masked layer's render origin). On an unmasked box these descriptors are
+// pure noise, so gate the whole group on a non-`none` `mask-image`. Each value is
+// forwarded verbatim (no default suppression) because the exporter only emits them
+// when they matter, and the importer treats a missing descriptor as the CSS default.
+function appendMaskFitting(parts, computed) {
+  const maskImage = computed.getPropertyValue('mask-image').trim();
+  if (!maskImage || maskImage === 'none') return;
+  const mode = computed.getPropertyValue('mask-mode').trim();
+  if (mode && mode !== 'match-source') parts.push(`mask-mode: ${mode}`);
+  const size = computed.getPropertyValue('mask-size').trim();
+  if (size && size !== 'auto') parts.push(`mask-size: ${size}`);
+  const position = computed.getPropertyValue('mask-position').trim();
+  if (position && position !== '0% 0%' && position !== '0px 0px') {
+    parts.push(`mask-position: ${position}`);
+  }
+  const repeat = computed.getPropertyValue('mask-repeat').trim();
+  if (repeat && repeat !== 'repeat') parts.push(`mask-repeat: ${repeat}`);
 }
 
 // Build the style string for a kept element. `opts.box` includes background/
@@ -724,6 +826,8 @@ function buildStyle(left, top, width, height, computed, opts) {
     // rationale.
     appendBorder(parts, computed);
     appendBoxShadow(parts, computed);
+    appendBackgroundImageFitting(parts, computed);
+    appendMaskFitting(parts, computed);
   }
 
   if (opts.text) {
@@ -732,6 +836,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     for (const entry of STYLE_SCHEMA_TEXT) {
       appendStyleProp(parts, computed, entry, ctx);
     }
+    appendTextStroke(parts, computed);
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -1207,6 +1312,42 @@ function freezeSvg(svgEl, rect) {
     return out;
   };
   const clone = svgEl.cloneNode(true);
+  // Drop the SVG's own positioning: `renderSvg` wraps the frozen markup in a
+  // flex-centring `<div>` that already carries the SVG's measured `(left, top)`
+  // against its parent. An author-emitted `style="position:absolute;top:..;left:.."`
+  // on the `<svg>` (as the PAGX HTMLExporter writes for absolutely-placed icons)
+  // would then offset the shape a second time relative to that wrapper, landing it
+  // at roughly double its intended position. Stripping these here mirrors how the
+  // inner `<img>` anchors to its wrapper's origin (see `imageInnerStyle`).
+  if (clone.nodeType === 1 && clone.style) {
+    clone.style.removeProperty('position');
+    clone.style.removeProperty('top');
+    clone.style.removeProperty('left');
+    clone.style.removeProperty('right');
+    clone.style.removeProperty('bottom');
+    // `margin` is the same class of offset: getBoundingClientRect already
+    // reports the position margin pushed the SVG to, so a retained margin would
+    // shift it a second time inside the centring wrapper. Strip the shorthand
+    // and each longhand (the SVG may carry either spelling).
+    clone.style.removeProperty('margin');
+    clone.style.removeProperty('margin-top');
+    clone.style.removeProperty('margin-right');
+    clone.style.removeProperty('margin-bottom');
+    clone.style.removeProperty('margin-left');
+    // `opacity` is a wrapper-owned box property too: `renderSvg`'s flex-centring
+    // `<div>` already carries the SVG's computed `opacity` (it is in STYLE_SCHEMA's
+    // `box` scope). Leaving the same opacity on the `<svg>` would composite it twice
+    // — wrapper × svg — washing the shape out (0.7 × 0.7 ≈ 0.49). Strip the root's own
+    // opacity here; the walk below also skips freezing it back as an attribute. Only the
+    // root is affected — CSS `opacity` does not inherit, so descendants keep theirs.
+    clone.style.removeProperty('opacity');
+  }
+  // A directly-authored `opacity` attribute on the root <svg> is the same wrapper-owned
+  // value in attribute form; drop it so the walk's freeze pass treats the root as having
+  // no opacity to carry.
+  if (clone.nodeType === 1 && clone.removeAttribute) {
+    clone.removeAttribute('opacity');
+  }
   // Inline SVGs in real pages usually rely on CSS classes (e.g. Tailwind `w-4
   // h-4`) to set their on-screen size and leave the `<svg>` element itself
   // without `width`/`height` attributes. PAGX's import pipeline does not
@@ -1219,7 +1360,7 @@ function freezeSvg(svgEl, rect) {
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor, inheritedAttrs) => {
+  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot) => {
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
@@ -1250,6 +1391,10 @@ function freezeSvg(svgEl, rect) {
       // `<style>.cls path { stroke: ... }` rules into the snapshot.
       for (let i = 0; i < SVG_PRESENTATION_ATTRS.length; i++) {
         const name = SVG_PRESENTATION_ATTRS[i];
+        // The root <svg>'s own `opacity` is hoisted onto the wrapper `<div>` (see the
+        // strip above), so never freeze it back onto the root. Descendants still freeze
+        // their opacity normally — it composites under the wrapper exactly once.
+        if (isRoot && name === 'opacity') continue;
         if (dst.hasAttribute(name)) continue;
         const value = resolvedAttrs[name];
         if (!value) continue;
@@ -1261,53 +1406,224 @@ function freezeSvg(svgEl, rect) {
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false);
   };
-  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS);
-  return clone.outerHTML;
+  walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS, true);
+  // outerHTML serialises U+00A0 as the named entity &nbsp;, which the importer's
+  // XML parser rejects (XML predefines only &amp; &lt; &gt; &quot; &apos;).
+  // Rewrite it to the numeric character reference so the frozen SVG stays valid
+  // XML; every other entity the HTML serialiser emits is already XML-legal.
+  return clone.outerHTML.replace(/&nbsp;/g, '&#160;');
 }
 
 // ===== Multi-line text emission =====
 
-// Split a text node into one entry per visually-rendered line. We use
-// Range.getClientRects() to obtain the per-line bounding boxes from the
+// Collapse client rects that belong to the SAME visual line/column into one
+// rect spanning their inline-axis union. `blockAxis` names the wrap-progression
+// axis ('y' = horizontal lines stacking down; 'x-rl'/'x-lr' = vertical columns
+// stacking sideways): two rects are on the same line/column when their extents
+// ALONG that axis overlap. Chromium hands back a separate rect per glyph run on
+// a line (a soft-hyphen's visible hyphen, a bidi direction switch, etc.); the
+// caller's line bisection assumes one rect per line, so without this merge a
+// stray same-line rect would split that line's text at an arbitrary offset.
+//
+// Rects arrive in document order, which is also block-axis order, so a single
+// forward pass that extends the current group while the next rect overlaps it
+// on the block axis suffices. The merged rect keeps the group's block-axis
+// position/size (top/height for 'y', left/width for the vertical modes) and
+// unions the inline-axis interval so its leading edge and extent cover every
+// glyph run on the line.
+function mergeRectsOnSameLine(rects, blockAxis) {
+  if (rects.length <= 1) return rects.slice();
+  // blockLo/blockHi read the wrap-axis interval; inlineLo/inlineHi the
+  // cross-axis interval that gets unioned.
+  const blockLo = (r) => (blockAxis === 'y' ? r.top : r.left);
+  const blockHi = (r) => (blockAxis === 'y' ? r.top + r.height : r.left + r.width);
+  const inlineLo = (r) => (blockAxis === 'y' ? r.left : r.top);
+  const inlineHi = (r) => (blockAxis === 'y' ? r.left + r.width : r.top + r.height);
+  const out = [];
+  let curBlockLo = blockLo(rects[0]);
+  let curBlockHi = blockHi(rects[0]);
+  let curInlineLo = inlineLo(rects[0]);
+  let curInlineHi = inlineHi(rects[0]);
+  const flush = () => {
+    if (blockAxis === 'y') {
+      out.push({
+        left: curInlineLo, top: curBlockLo,
+        width: curInlineHi - curInlineLo, height: curBlockHi - curBlockLo,
+      });
+    } else {
+      out.push({
+        left: curBlockLo, top: curInlineLo,
+        width: curBlockHi - curBlockLo, height: curInlineHi - curInlineLo,
+      });
+    }
+  };
+  for (let i = 1; i < rects.length; i++) {
+    const r = rects[i];
+    // Overlap on the block axis (with a sub-pixel tolerance so adjacent-but-not
+    // -overlapping antialiased lines don't merge) means "same line/column".
+    const overlaps = blockLo(r) < curBlockHi - 0.5 && blockHi(r) > curBlockLo + 0.5;
+    if (overlaps) {
+      curBlockLo = Math.min(curBlockLo, blockLo(r));
+      curBlockHi = Math.max(curBlockHi, blockHi(r));
+      curInlineLo = Math.min(curInlineLo, inlineLo(r));
+      curInlineHi = Math.max(curInlineHi, inlineHi(r));
+    } else {
+      flush();
+      curBlockLo = blockLo(r);
+      curBlockHi = blockHi(r);
+      curInlineLo = inlineLo(r);
+      curInlineHi = inlineHi(r);
+    }
+  }
+  flush();
+  return out;
+}
+
+// Split a text node into one entry per visually-rendered line (horizontal
+// writing modes) or column (vertical writing modes). We use
+// Range.getClientRects() to obtain the per-line/column bounding boxes from the
 // browser's own layout, then binary-search the character offsets at which one
-// line gives way to the next. This matches Chromium's line-break decisions
-// exactly while keeping the work to O(lines · log n) getBoundingClientRect
-// calls instead of the O(n) per-character scan the original implementation
-// performed.
+// line/column gives way to the next. This matches Chromium's line-break
+// decisions exactly while keeping the work to O(lines · log n)
+// getBoundingClientRect calls instead of the O(n) per-character scan the
+// original implementation performed.
+//
+// `axis` selects the block-progression axis along which the run wraps:
+//   - 'y' (horizontal writing modes): lines stack downward, so the per-line
+//     rects arrive in increasing `top` order and the bisection key is a
+//     character's mid-Y.
+//   - 'x-rl' (vertical-rl): columns stack leftward, so the rects arrive in
+//     DECREASING `left` order (rightmost column first, matching document
+//     order); the bisection key is the NEGATED mid-X so it stays monotonically
+//     increasing like the 'y' case.
+//   - 'x-lr' (vertical-lr): columns stack rightward, rects in increasing
+//     `left`; key is mid-X.
+// Treating all three as "a monotonically increasing key along the block axis"
+// lets one bisection serve every writing mode.
 //
 // The host element's `white-space` controls whether embedded whitespace is
 // collapsed (`normal`, `nowrap`) or preserved (`pre`, `pre-wrap`, `pre-line`).
 // Collapsing in preserve modes would mangle code snippets, indentation, and
 // other pre-formatted content.
-function splitTextNodeIntoLines(textNode, whiteSpace) {
+function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
+  const blockAxis = axis || 'y';
+  // Map a rect to its block-axis LEADING edge (the side a column/line starts
+  // from in progression order) and a character's mid-point to the same
+  // monotonically-increasing key, so "first char whose key >= the next rect's
+  // leading-edge key" lands exactly on that rect's first character.
+  //   - 'y': lines advance downward, leading edge = rect.top, char key = mid-Y.
+  //   - 'x-lr': columns advance rightward, leading edge = rect.left, char key
+  //     = mid-X.
+  //   - 'x-rl': columns advance leftward; once X is negated to make the order
+  //     ascending, the leading edge becomes the column's RIGHT edge
+  //     -(left + width), NOT -left. Using -left would place the threshold at
+  //     the column's trailing edge, half a column past the glyph centres, so
+  //     every column's characters would be misassigned to the column before it.
+  const rectKey = (r) => {
+    if (blockAxis === 'x-rl') return -(r.left + r.width);
+    if (blockAxis === 'x-lr') return r.left;
+    return r.top;
+  };
+  const charKey = (r) => {
+    if (blockAxis === 'x-rl') return -(r.left + r.width / 2);
+    if (blockAxis === 'x-lr') return r.left + r.width / 2;
+    return r.top + r.height / 2;
+  };
   const text = textNode.nodeValue || '';
   if (!text.trim()) return [];
   const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
-  const cleanLine = (s) => (preserve ? s : s.replace(/\s+/g, ' ').trim());
+  // A preserve-mode slice can be bounded by the forced break characters that
+  // visually terminate the line above/below it: a trailing run on the line it
+  // ends, and (only for the whole text's leading blank lines, which collapse to
+  // a single rect) a leading run. Strip both runs of `\r` / `\n` so the emitted
+  // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
+  // indentation — stay intact. The line's vertical offset is already encoded in
+  // its rect, so dropping the break characters never loses positioning.
+  // Collapsing modes fold + trim all whitespace as before.
+  const cleanLine = (s) => {
+    const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
+    return preserve ? stripped : stripped.replace(/\s+/g, ' ').trim();
+  };
   const range = document.createRange();
   range.selectNodeContents(textNode);
-  const lineRects = Array.from(range.getClientRects());
+  // Chromium emits a spurious zero-width client rect at a forced `\n` break that
+  // shares the SAME visual line (and `top`) as the preceding text. The
+  // bisection below treats every rect as a distinct line, so that
+  // zero-width rect would split one line's text at an arbitrary character offset
+  // (e.g. `Hello\nWorld` → `H` + `ello`). Drop zero-area rects up front: they
+  // paint nothing, and a genuinely empty line is discarded later anyway because
+  // its sliced text is whitespace-only.
+  const rawRects = Array.from(range.getClientRects()).filter(
+    (r) => r.width > 0 && r.height > 0,
+  );
+  // Soft hyphens (U+00AD) are zero-width and invisible EXCEPT where Chromium
+  // breaks the line at one, which paints a visible hyphen. A soft hyphen's OWN
+  // bounding rect is the ground truth for that decision: width > 0 exactly at a
+  // rendered break, 0 everywhere else — independent of how the rects below get
+  // grouped into lines. Pre-measure every soft hyphen so each emitted slice can
+  // swap a rendered one for '-' and drop the invisible rest, matching the text
+  // the browser actually painted. Guarded so the common (no soft hyphen) path
+  // pays nothing.
+  let softHyphenVisible = null;
+  if (text.indexOf('­') !== -1) {
+    softHyphenVisible = new Map();
+    for (let idx = text.indexOf('­'); idx !== -1; idx = text.indexOf('­', idx + 1)) {
+      range.setStart(textNode, idx);
+      range.setEnd(textNode, idx + 1);
+      const r = range.getBoundingClientRect();
+      softHyphenVisible.set(idx, r.width > 0 || r.height > 0);
+    }
+  }
+  // Resolve the [start, end) slice's soft hyphens against the measured map,
+  // THEN run the whitespace cleanup. A visible (break) soft hyphen becomes a
+  // literal hyphen; every other soft hyphen is dropped. Returns the final
+  // line/column text.
+  const sliceText = (start, end) => {
+    const raw = text.slice(start, end);
+    if (!softHyphenVisible) return cleanLine(raw);
+    let resolved = '';
+    for (let j = 0; j < raw.length; j++) {
+      if (raw.charCodeAt(j) === 0x00ad) {
+        resolved += softHyphenVisible.get(start + j) ? '-' : '';
+      } else {
+        resolved += raw[j];
+      }
+    }
+    return cleanLine(resolved);
+  };
+  // A single text node can hand back MORE than one client rect for the same
+  // visual line/column. The common trigger is a soft-hyphen (U+00AD) wrap:
+  // Chromium materialises the visible hyphen glyph as its own rect that shares
+  // the line's `top` (and height) but sits to the right of the text rect —
+  // e.g. `Compre­hensive` wrapped at 100px yields [Compre]+[-] both at top=0,
+  // then [hensive], then [overview]. The bisection treats every rect as a
+  // distinct line, so the stray hyphen rect would split the first line into
+  // `C` + `ompre­` at an arbitrary offset. Bidi runs split a line the same way.
+  // Merge rects whose block-axis intervals overlap (same line/column) into one
+  // inline-union rect BEFORE bisecting, so one visual line maps to exactly one
+  // entry regardless of how many glyph runs Chromium reported for it.
+  const lineRects = mergeRectsOnSameLine(rawRects, blockAxis);
   if (lineRects.length === 0) {
     range.detach && range.detach();
     return [];
   }
   if (lineRects.length === 1) {
     const out = [{
-      text: cleanLine(text),
+      text: sliceText(0, text.length),
       rect: lineRects[0],
     }];
     range.detach && range.detach();
     return out.filter((b) => b.text);
   }
 
-  // Binary-search the first character index whose mid-Y is >= `lineTop`
-  // within [lo, hi). When the candidate char has an empty rect (whitespace
-  // collapsed at a wrap point) we treat it as below the boundary and step
-  // right; this keeps the search O(log n) at the cost of binding collapsed
-  // whitespace to whichever side wins the bisection (visually invisible
-  // either way).
+  // Binary-search the first character index whose block-axis mid-key is >=
+  // `lineKey` within [lo, hi). When the candidate char has an empty rect
+  // (whitespace collapsed at a wrap point) we treat it as before the boundary
+  // and step right; this keeps the search O(log n) at the cost of binding
+  // collapsed whitespace to whichever side wins the bisection (visually
+  // invisible either way).
   //
   // `loStart` lets the caller pass the previously-found boundary as the
   // lower bound, since boundaries are strictly increasing across lines.
@@ -1315,7 +1631,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // layout for the leading characters that we already know belong to a
   // higher line — for a 1000-char × 20-line block that's the difference
   // between log2(1000)·20 ≈ 200 layout flushes and roughly half that.
-  function findFirstCharAtOrBelow(lineTop, loStart) {
+  function findFirstCharAtOrBelow(lineKey, loStart) {
     let lo = loStart;
     let hi = text.length;
     while (lo < hi) {
@@ -1324,8 +1640,8 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
       range.setEnd(textNode, mid + 1);
       const r = range.getBoundingClientRect();
       const empty = r.width === 0 && r.height === 0;
-      const midY = empty ? -Infinity : r.top + r.height / 2;
-      if (empty || midY < lineTop) {
+      const key = empty ? -Infinity : charKey(r);
+      if (empty || key < lineKey) {
         lo = mid + 1;
       } else {
         hi = mid;
@@ -1337,15 +1653,14 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
   // Boundary i = first char index of line i (boundaries[0] = 0).
   const boundaries = [0];
   for (let k = 1; k < lineRects.length; k++) {
-    boundaries.push(findFirstCharAtOrBelow(lineRects[k].top, boundaries[k - 1] + 1));
+    boundaries.push(findFirstCharAtOrBelow(rectKey(lineRects[k]), boundaries[k - 1] + 1));
   }
   boundaries.push(text.length);
   range.detach && range.detach();
 
   const out = [];
   for (let i = 0; i < lineRects.length; i++) {
-    const slice = text.slice(boundaries[i], boundaries[i + 1]);
-    const cleaned = cleanLine(slice);
+    const cleaned = sliceText(boundaries[i], boundaries[i + 1]);
     if (cleaned) out.push({ text: cleaned, rect: lineRects[i] });
   }
   return out;
@@ -1388,10 +1703,10 @@ function splitTextNodeIntoLines(textNode, whiteSpace) {
 function emitTextSpans(textNode, parentRect, computed) {
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
-    return emitVerticalTextSpan(textNode, parentRect, computed);
+    return emitVerticalTextSpans(textNode, parentRect, computed, wm);
   }
   const ws = computed.getPropertyValue('white-space');
-  const lines = splitTextNodeIntoLines(textNode, ws);
+  const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
   for (const line of lines) {
@@ -1418,37 +1733,50 @@ function emitTextSpans(textNode, parentRect, computed) {
   return out;
 }
 
-// Emit a single absolutely-positioned <span> for a text node whose host
-// element uses `writing-mode: vertical-rl` or `vertical-lr`. The horizontal
-// `splitTextNodeIntoLines` path can't be reused because Chromium's
-// `getClientRects()` reports glyph rects in column order under vertical
-// writing modes, not line order, so its Y-axis bisection would produce
-// nonsense boundaries. Instead we hand the entire text fragment to PAGX as
-// one column-shaped span and let `TextLayout::layoutColumns` perform the
-// vertical glyph layout itself. The span's bounding box (from the union
-// `Range.getBoundingClientRect()`) gives PAGX the column width / total
-// height it needs; `writing-mode` propagates through STYLE_SCHEMA's
-// `text` scope; `white-space: nowrap` is intentionally NOT forced because
-// vertical TextBoxes break columns by height, and a forced nowrap would
-// mis-trigger the importer's `hasNoWrap` path.
-function emitVerticalTextSpan(textNode, parentRect, computed) {
-  const text = textNode.nodeValue || '';
-  if (!text.trim()) return [];
+// Emit one absolutely-positioned, nowrap <span> per COLUMN of a vertical
+// writing-mode (`vertical-rl` / `vertical-lr`) text node — the column-axis
+// mirror of `emitTextSpans`'s line loop. The earlier implementation handed the
+// whole fragment to PAGX as one un-split column-shaped span and let
+// `TextLayout::layoutColumns` re-break it by column height; but PAGX's vertical
+// glyph metrics (rotated Latin advances, `line-height: normal` interpretation)
+// diverge from Chromium's by sub-pixel amounts, so a column Chromium fit in one
+// pass would spill its last glyph into an extra column under PAGX, shifting the
+// whole run sideways. Splitting here — exactly as the horizontal path splits by
+// line — pins every column to Chromium's break decisions and forces `nowrap` so
+// PAGX never re-breaks, isolating the metric divergence entirely.
+//
+// `line-height` in a vertical writing mode sets each column's WIDTH (the inline
+// cross-size). `getClientRects()` reports the column's ink width, which can be
+// narrower; expand each column to the line-height width and re-centre it around
+// the measured mid-X so consecutive columns tile on the line-height stride —
+// the direct analogue of the horizontal line-height re-centring above.
+function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
+  const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
-  const preserve = typeof ws === 'string' && ws.startsWith('pre');
-  const cleaned = preserve ? text : text.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return [];
-  const range = document.createRange();
-  range.selectNodeContents(textNode);
-  const rect = range.getBoundingClientRect();
-  range.detach && range.detach();
-  if (!rect || (rect.width === 0 && rect.height === 0)) return [];
-  const tl = rect.left - parentRect.left;
-  const tt = rect.top - parentRect.top;
-  const style = buildStyle(tl, tt, rect.width, rect.height, computed, {
-    box: false, text: true,
-  });
-  return [`<span style="${style}">${escapeHtml(applyTextTransform(cleaned, computed))}</span>`];
+  const columns = splitTextNodeIntoLines(textNode, ws, axis);
+  const lineHeightPx = readNum(computed, 'line-height');
+  const out = [];
+  for (const col of columns) {
+    let cl = col.rect.left;
+    let cw = col.rect.width;
+    if (lineHeightPx > cw + 0.1) {
+      const delta = (lineHeightPx - cw) / 2;
+      cl -= delta;
+      cw = lineHeightPx;
+    } else if (lineHeightPx > 0 && cw > lineHeightPx + 0.1) {
+      const delta = (cw - lineHeightPx) / 2;
+      cl += delta;
+      cw = lineHeightPx;
+    }
+    const tl = cl - parentRect.left;
+    const tt = col.rect.top - parentRect.top;
+    const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+      box: false, text: true,
+    });
+    const transformed = applyTextTransform(col.text, computed);
+    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+  }
+  return out;
 }
 
 // ===== Flex container detection =====
@@ -1483,6 +1811,19 @@ function collectFlexProps(computed, hasMultipleVisibleItems) {
   const parts = [];
   parts.push('display: flex');
   parts.push(`flex-direction: ${dirOut}`);
+  // A vertical writing mode rotates the flex main axis 90° (CSS resolves
+  // `flex-direction` against the inline/block axes, which swap under
+  // `vertical-rl/lr`). `writing-mode` is a `scope: text` property, so the
+  // generic box walker never emits it onto a flex container — but the PAGX
+  // importer needs it on the container to fold that rotation into its
+  // geometric LayoutMode (HTMLStyleCascade::parseBoxLayout). Emit it here when
+  // the container itself is vertical so `justify-content` lands on the axis the
+  // browser used (otherwise a `flex-direction: column` + `vertical-rl` centred
+  // column renders flush against an edge instead of centred).
+  const wm = normalizeWritingMode(computed.getPropertyValue('writing-mode'));
+  if (wm === 'vertical-rl' || wm === 'vertical-lr') {
+    parts.push(`writing-mode: ${wm}`);
+  }
   if (hasMultipleVisibleItems) {
     const gap = flexMainGapPx(computed, dirOut);
     if (gap) parts.push(`gap: ${gap}`);
@@ -2228,6 +2569,14 @@ function emitInlineRunMarkup(el, parentComputed) {
       if (v === parentV) continue;
       const outProp = entry.outProp || entry.prop;
       deltaParts.push(`${outProp}: ${v}`);
+    }
+    // `-webkit-text-stroke` is not in STYLE_SCHEMA_TEXT (it coalesces two
+    // longhands rather than mapping one property), so emit it as an explicit
+    // delta: forward it only when this run's resolved stroke differs from the
+    // wrapper's, matching the minimal-delta strategy used for the schema props.
+    const stroke = resolveTextStroke(cs);
+    if (stroke && stroke !== resolveTextStroke(parentComputed)) {
+      deltaParts.push(`-webkit-text-stroke: ${stroke}`);
     }
     const inner = emitInlineRunMarkup(c, cs);
     if (deltaParts.length === 0) {
@@ -3002,6 +3351,19 @@ const STYLE_SCHEMA = [
   { prop: 'filter',           scope: 'box',  defaults: ['none'] },
   { prop: 'backdrop-filter',  scope: 'box',  defaults: ['none'] },
   { prop: 'mix-blend-mode',   scope: 'box',  defaults: ['normal'] },
+  // Alpha / luminance masks (mask-image: url(data:image/svg+xml,...)) and the
+  // mask-mode / mask-size / mask-position / mask-repeat descriptors the HTML
+  // exporter emits alongside them. The importer rebuilds a PAGX mask layer from
+  // the data-URI SVG (the inverse of HTMLWriter::writeMaskCSS), so the whole
+  // group must survive the snapshot. mask-image defaults to none and is dropped;
+  // the descriptors are forwarded only when the element actually carries a mask,
+  // gated by appendMaskFitting below (they are noise on unmasked boxes).
+  { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
+  // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
+  // inline svg; the importer resolves the def into a contour mask layer (the
+  // inverse of HTMLWriter::writeClipDef). Geometric clip-path forms (inset/ellipse)
+  // are out of subset and collapse to '' so the defaults filter drops them.
+  { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
@@ -3036,6 +3398,7 @@ const HELPER_FNS = [
   normalizeBorderRadius,
   normalizeBackgroundImage,
   normalizeBackgroundClip,
+  normalizeClipPath,
   normalizeWritingMode,
   roundPx,
   px,
@@ -3072,6 +3435,10 @@ const HELPER_FNS = [
   appendBorder,
   appendBoxShadow,
   appendAnimation,
+  resolveTextStroke,
+  appendTextStroke,
+  appendBackgroundImageFitting,
+  appendMaskFitting,
   buildStyle,
   readCornerRadii,
   roundedUniformBorderSvg,
@@ -3086,9 +3453,10 @@ const HELPER_FNS = [
   renderBorderTriangle,
   imageInnerStyle,
   freezeSvg,
+  mergeRectsOnSameLine,
   splitTextNodeIntoLines,
   emitTextSpans,
-  emitVerticalTextSpan,
+  emitVerticalTextSpans,
   hasBoxVisualsForInline,
   multiplyColorAlpha,
   resolveInlineTextValue,
@@ -3286,6 +3654,53 @@ async function inlineExternalImages(cachedMap) {
     const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOne));
   }
+
+  // Pass 2: remote CSS `background-image: url(...)`. Chromium reports the url already resolved
+  // to an absolute form. Local `file://` urls are handled at emit time by
+  // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
+  // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
+  // `background-image` with a `data:` URI so the walker emits a self-contained reference. Only
+  // the first layer of a comma-separated stack is handled: that is the single-image case the
+  // exporter produces and the only one the importer recovers.
+  function firstCssUrl(value) {
+    const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
+    return m ? m[2] : '';
+  }
+
+  const bgPending = [];
+  const allEls = Array.from(document.querySelectorAll('*'));
+  for (const el of allEls) {
+    const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
+    if (!bg || !/^url\(/i.test(bg)) continue;
+    const url = firstCssUrl(bg);
+    if (!url || url.startsWith('data:') || /^file:/i.test(url)) continue;
+    if (!/^https?:/i.test(url)) continue;
+    const cached = cache[url];
+    if (cached) {
+      el.style.backgroundImage = `url("${cached.replace(/"/g, '\\"')}")`;
+      continue;
+    }
+    bgPending.push({ el, url });
+  }
+
+  async function processOneBg(entry) {
+    try {
+      const res = await fetch(entry.url, { credentials: 'omit' });
+      if (!res.ok) {
+        console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
+        return;
+      }
+      const dataUri = await blobToDataUri(await res.blob());
+      entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
+    } catch (err) {
+      console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
+    }
+  }
+
+  for (let i = 0; i < bgPending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(processOneBg));
+  }
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
@@ -3477,7 +3892,12 @@ async function materializeDecorativePseudoElements() {
       if (!raw) continue;
       const def = DEFAULTS.get(prop);
       if (def !== undefined && raw === def) continue;
-      parts.push(`${prop}: ${raw}`);
+      // Rewrite embedded double quotes (e.g. `filter: url("#blur")`,
+      // `font-family: "Inter"`) as single quotes — CSS treats them equivalently
+      // — so the value embeds safely inside the surrounding style="…" attribute
+      // and doesn't break the importer's XML parse. Mirrors appendStyleProp on
+      // the main snapshot path.
+      parts.push(`${prop}: ${raw.replace(/"/g, "'")}`);
     }
     return parts.join('; ');
   }
