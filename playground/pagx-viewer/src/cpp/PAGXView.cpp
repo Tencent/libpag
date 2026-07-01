@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGXImporter.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
@@ -325,11 +326,10 @@ void PAGXView::draw() {
   } else {
     scene->getDisplayOptions()->setBackgroundColor({});
   }
-  scene->draw(pagSurface, true);
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context != nullptr) {
-    auto recording = context->flush();
+    auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
       presentImmediately = false;
       lastRecording = nullptr;
