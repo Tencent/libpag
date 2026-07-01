@@ -45,12 +45,7 @@ class Drawable {
    * returns it from getSurface(). The caller must keep the tgfx::Surface alive for the
    * lifetime of the Drawable.
    */
-  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface) {
-    if (surface == nullptr) {
-      return nullptr;
-    }
-    return std::shared_ptr<Drawable>(new Drawable(std::move(surface)));
-  }
+  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface);
 
   virtual int width() const {
     return surface ? surface->width() : 0;
