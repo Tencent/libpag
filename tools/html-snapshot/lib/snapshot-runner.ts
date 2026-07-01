@@ -18,7 +18,6 @@ import {
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
   capturePagxAnimationsOnPage,
-  captureRuntimeAnimationsOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
 } from './animation-capture';
 import {
@@ -191,14 +190,6 @@ export interface RunSnapshotOptions {
   headers?: Array<[string, string]>;
   inlineIconFonts?: boolean;
   captureAnimations?: boolean;
-  // When > 0, capture animations by sampling the live page over this many
-  // milliseconds of wall-clock time (instead of the single-instant pass), so
-  // motion driven by non-seekable mechanisms — setTimeout chains, class
-  // toggles, auto-demo sequences — is captured. 0 = disabled (instant pass).
-  runtimeAnimWindowMs?: number;
-  // Explicit sample count for the real-time window; 0/undefined = auto (derived
-  // from the window at ~20 samples/s).
-  runtimeAnimSampleCount?: number;
   scrollReveal?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
@@ -332,8 +323,6 @@ export async function runSnapshot(
     headers = [],
     inlineIconFonts = true,
     captureAnimations = true,
-    runtimeAnimWindowMs = 0,
-    runtimeAnimSampleCount = 0,
     scrollReveal = false,
     downloadFonts = false,
     fontDir = '',
@@ -527,19 +516,9 @@ export async function runSnapshot(
     // frame.
     if (captureAnimations) {
       try {
-        // When a real-time window is requested, sample the still-running page
-        // over wall-clock time (captures setTimeout / class-toggle / auto-demo
-        // motion the instant pass cannot see); otherwise take the single-
-        // instant pass. Both emit the same canonical pagxAnim* form.
-        const stats = runtimeAnimWindowMs > 0
-          ? await captureRuntimeAnimationsOnPage(page, {
-              windowMs: runtimeAnimWindowMs,
-              sampleCount: runtimeAnimSampleCount || 0,
-              logger: log || (() => {}),
-            })
-          : await capturePagxAnimationsOnPage(page, {
-              logger: log || (() => {}),
-            });
+        const stats = await capturePagxAnimationsOnPage(page, {
+          logger: log || (() => {}),
+        });
         if (log && stats.count > 0) {
           log(`captured ${stats.count} animation(s)`);
         }

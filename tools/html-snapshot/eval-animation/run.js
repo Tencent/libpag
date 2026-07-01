@@ -56,12 +56,7 @@ const USAGE = `Usage: node run.js [options]
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus
   --concurrency, -j N Process N cases in parallel (default: 1)
-  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js
-  --runtime-anim-window <ms>   Forwarded to snapshot.js: sample the live page
-                               over <ms> of wall-clock time so JS / setTimeout-
-                               driven motion is captured (default: 0)
-  --runtime-anim-samples <n>   Forwarded to snapshot.js: sample count across
-                               --runtime-anim-window (default: auto)`;
+  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js`;
 
 function parseArgs(argv) {
   const opts = {
@@ -77,8 +72,6 @@ function parseArgs(argv) {
     recursive: false,
     concurrency: 1,
     browserEngine: '',
-    runtimeAnimWindowMs: 0,
-    runtimeAnimSampleCount: 0,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -99,15 +92,6 @@ function parseArgs(argv) {
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--browser-engine') opts.browserEngine = argv[++i];
-    else if (a === '--runtime-anim-window') {
-      const v = parseInt(argv[++i], 10);
-      if (!Number.isFinite(v) || v < 0) fail(`--runtime-anim-window requires a non-negative integer, got '${argv[i]}'`);
-      opts.runtimeAnimWindowMs = v;
-    } else if (a === '--runtime-anim-samples') {
-      const v = parseInt(argv[++i], 10);
-      if (!Number.isFinite(v) || v < 2) fail(`--runtime-anim-samples requires an integer >= 2, got '${argv[i]}'`);
-      opts.runtimeAnimSampleCount = v;
-    }
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -304,8 +288,6 @@ async function processCase(entry, outDir, opts) {
       output: subsetHtml,
       scriptDir: TOOL_DIR,
       browserEngine: opts.browserEngine || undefined,
-      runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
-      runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
       stderrPath: snapshotStderr,
     });
     if (r.code !== 0) {

@@ -75,8 +75,6 @@ async function main() {
       headers: opts.headers,
       inlineIconFonts: opts.inlineIconFonts,
       scrollReveal: opts.scrollReveal,
-      runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
-      runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
       downloadFonts: opts.downloadFonts,
       fontDir: opts.fontDir,
       downloadImages: opts.downloadImages,

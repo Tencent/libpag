@@ -72,16 +72,6 @@ Options (any unknown flag is forwarded to snapshot.js):
                              bottom before snapshotting so scroll-triggered
                              reveal animations fire and lazy media loads
                              (default: disabled)
-  --runtime-anim-window <ms> Forwarded to snapshot.js: capture animations by
-                             sampling the live, still-running page over <ms> of
-                             wall-clock time instead of a single instant, so
-                             motion driven by setTimeout chains / class toggles
-                             / JS auto-demo sequences is captured. Default: 0
-                             (single-instant pass). Only opacity / translate /
-                             color / background-color on elements that persist
-                             in the snapshot tree can be captured.
-  --runtime-anim-samples <n> Forwarded to snapshot.js: sample count across
-                             --runtime-anim-window (default: auto, ~20/s)
   --download-fonts           Download the web fonts the page uses and register
                              them as render fallbacks so text in uninstalled
                              web fonts renders correctly. The fonts are not
@@ -136,8 +126,6 @@ function parseArgs(argv) {
     keepSubsetHtml: true,
     inlineIconFonts: true,
     scrollReveal: false,
-    runtimeAnimWindowMs: 0,
-    runtimeAnimSampleCount: 0,
     downloadFonts: false,
     embedFonts: false,
     fontDir: '',
@@ -212,12 +200,6 @@ function parseArgs(argv) {
         break;
       case '--scroll-reveal':
         opts.scrollReveal = true;
-        break;
-      case '--runtime-anim-window':
-        opts.runtimeAnimWindowMs = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 0 });
-        break;
-      case '--runtime-anim-samples':
-        opts.runtimeAnimSampleCount = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 2 });
         break;
       case '--download-fonts':
         opts.downloadFonts = true;
@@ -405,8 +387,6 @@ async function main() {
         browserEngine: opts.browserEngine,
         inlineIconFonts: opts.inlineIconFonts,
         scrollReveal: opts.scrollReveal,
-        runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
-        runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
         cookies: opts.cookies,
         headers: opts.headers,
         viewportWidth: opts.viewportWidth,
@@ -451,8 +431,6 @@ async function main() {
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
       scrollReveal: opts.scrollReveal,
-      runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
-      runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,

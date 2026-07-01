@@ -119,8 +119,6 @@ export interface BuildSnapshotArgsOptions {
   browserEngine?: string;
   inlineIconFonts?: boolean;
   scrollReveal?: boolean;
-  runtimeAnimWindowMs?: number;
-  runtimeAnimSampleCount?: number;
   viewportWidth?: number;
   viewportHeight?: number;
   waitMs?: number;
@@ -144,12 +142,6 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
   if (opts.scrollReveal) args.push('--scroll-reveal');
-  if (typeof opts.runtimeAnimWindowMs === 'number' && opts.runtimeAnimWindowMs > 0) {
-    args.push('--runtime-anim-window', String(opts.runtimeAnimWindowMs));
-    if (typeof opts.runtimeAnimSampleCount === 'number' && opts.runtimeAnimSampleCount >= 2) {
-      args.push('--runtime-anim-samples', String(opts.runtimeAnimSampleCount));
-    }
-  }
   if (typeof opts.viewportWidth === 'number') args.push('--viewport-width', String(opts.viewportWidth));
   if (typeof opts.viewportHeight === 'number') args.push('--viewport-height', String(opts.viewportHeight));
   if (typeof opts.waitMs === 'number') args.push('--wait-ms', String(opts.waitMs));
@@ -344,8 +336,6 @@ export interface RunHtmlToPagxOptions {
   browserEngine?: string;
   inlineIconFonts?: boolean;
   scrollReveal?: boolean;
-  runtimeAnimWindowMs?: number;
-  runtimeAnimSampleCount?: number;
   cookies?: string[];
   headers?: string[];
   viewportWidth?: number;
@@ -443,8 +433,6 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
       scrollReveal: opts.scrollReveal,
-      runtimeAnimWindowMs: opts.runtimeAnimWindowMs,
-      runtimeAnimSampleCount: opts.runtimeAnimSampleCount,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,
