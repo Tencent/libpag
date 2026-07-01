@@ -214,6 +214,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (tgfxSurface == nullptr) {
     return;
   }
+  pagSurface = pagx::MakeFrom(tgfxSurface);
   lastSurfaceWidth = canvasWidth;
   lastSurfaceHeight = canvasHeight;
   updateContentTransform();
@@ -319,9 +320,6 @@ void PAGXView::draw() {
   if (tgfxSurface == nullptr) {
     return;
   }
-  if (tgfxSurface == nullptr) {
-    return;
-  }
   if (useCustomBackgroundColor) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   } else {
@@ -330,7 +328,6 @@ void PAGXView::draw() {
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context != nullptr) {
-    auto pagSurface = pagx::MakeFrom(tgfxSurface);
     auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
       presentImmediately = false;
