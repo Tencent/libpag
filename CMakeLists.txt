@@ -228,6 +228,7 @@ if (PAG_BUILD_PAGX)
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
     set(WOFF2_DIR third_party/woff2)
+    list(APPEND PAG_DEFINES PAG_USE_WOFF2)
     set(BROTLI_DIR ${WOFF2_DIR}/brotli)
     set(WOFF2_SOURCES
             ${WOFF2_DIR}/src/font.cc

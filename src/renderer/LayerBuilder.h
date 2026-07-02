@@ -361,19 +361,8 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
-  /**
-   * Returns the tgfx::Image wrapped by a PAGImage. For internal use by channel writers that need
-   * to apply the image to a runtime object.
-   */
+  static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
   static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
-
-  /**
-   * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
-   * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
-   * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
-   * for change detection, so the empty source does not cause spurious writebacks.
-   */
-  static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.
@@ -420,7 +409,7 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
   static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
@@ -434,7 +423,7 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
   static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
@@ -449,8 +438,8 @@ class LayerBuilder {
  * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
  *
  * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
- * cycle), and then call rebuildForFilePath() whenever the ImageResourceProvider's state changes
- * for a given filePath (new image attached or evicted). Destroying the session releases all
+ * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
+ * changes (new image attached or evicted). Destroying the session releases all
  * cached layer/image state.
  *
  * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
@@ -479,8 +468,8 @@ class LayerBuilderSession {
   /**
    * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
    * ImagePattern backed by an Image node whose filePath matches the given value. Call this
-   * after the ImageResourceProvider's state changes for the path so the renderer re-queries
-   * the provider and picks up the new tgfx::Image. A single filePath may match multiple Image
+   * after the decoded image for the path changes so the renderer re-resolves it and picks up
+   * the new tgfx::Image. A single filePath may match multiple Image
    * nodes and each Image node may be referenced by multiple Layers, which in turn may have
    * been duplicated by Composition instancing; all such copies are refreshed in one call.
    * @return The number of tgfx layers whose contents were regenerated. Zero means no layer

@@ -35,6 +35,8 @@
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
+#include "pagx/PAGImage.h"
+#include "pagx/tgfx.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/PAGXImporter.h"
@@ -280,7 +282,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // Drop the per-document layer builder state before releasing the document itself; its
   // internal maps hold pagx::Layer* pointers that would dangle once `document` resets.
   builderSession = nullptr;
-  imageProvider = nullptr;
   document = nullptr;
   // Drop snapshots so the new document doesn't blit pixels from the old one.
   fitSnapshot = nullptr;
@@ -349,8 +350,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   size_t xmlSize = data->size();
   document = PAGXImporter::FromXML(data->bytes(), data->size());
   if (document) {
-    imageProvider = std::make_shared<PAGXImageResourceProvider>();
-    document->setImageResourceProvider(imageProvider);
     // Surface document dimensions and document-level custom data (background, bounds origin)
     // immediately after parse so contentWidth()/contentHeight()/getContentTransform() are usable
     // before buildLayers(). The progressive loader reads getContentTransform().fitScale right
@@ -543,13 +542,11 @@ uint64_t PAGXView::evictOldestThumbnailsUntilFits(uint64_t neededBytes) {
     thumbnailTexturesTotalBytes -= it->second.sizeBytes;
     retireTextureId(it->second.textureId);
     thumbnailTextures.erase(it);
-    // Remove the thumbnail from the provider and rebuild affected layers so a subsequent draw
-    // does not keep referencing a tgfx::Image that no longer has a cache entry pinning its
-    // lifetime.
-    imageProvider->clearThumbnailImage(path);
-    if (builderSession) {
-      builderSession->rebuildForFilePath(path);
-    }
+    // Clear the runtime image on matching Image nodes so a subsequent draw does not keep
+    // referencing a tgfx::Image that no longer has a cache entry pinning its lifetime.
+    // loadFileData with an empty shared_ptr clears Image::runtimeImage and refreshes the
+    // affected layers in place.
+    document->loadFileData(path, std::shared_ptr<PAGImage>{});
   }
   return freed;
 }
@@ -595,66 +592,50 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     auto tgfxImage = tgfx::Image::MakeFrom(context, backendTex, tgfx::ImageOrigin::TopLeft);
     if (!tgfxImage) {
       LOGI("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
-      // The GL texture was created successfully but tgfx refused to wrap it. Reclaim the
-      // texture immediately so we don't leak the GPU memory; queueing into
-      // pendingTextureDeletes keeps the actual gl.deleteTexture call inside the same
-      // drainPendingTextureDeletes() pass that handles eviction-side retirements.
       retireTextureId(static_cast<unsigned>(textureId));
       continue;
     }
+    // Wrap the uploaded tgfx::Image as a PAGImage without re-locking the context.
+    auto pagImage = pagx::MakeFrom(tgfxImage);
 
     if (p.quality == ImageQuality::Full) {
-      // Store the tgfx::Image in the provider so the renderer picks it up via
-      // resolveImage() on the next getOrCreateImage call after cache invalidation.
-      imageProvider->putFullImage(p.filePath, tgfxImage);
-      // Replace the previous full entry. The old entry's tgfxImage drops here, immediately
-      // freeing tgfx's TextureView; retire the previous textureId so its GPU memory is
-      // reclaimed at the end of this same draw().
+      // Replace the previous full entry. The old entry's PAGImage drops here; retire the previous
+      // textureId so its GPU memory is reclaimed at the end of this same draw().
       auto& entry = externalTextures[p.filePath];
       if (entry.image) {
         externalTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       externalTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the newly attached image dimensions so
-      // progressive thumbnail->full swaps stay aligned.
+      // Refresh ImagePattern matrices against the newly attached image dimensions before
+      // installing the runtime image, so the in-place refresh picks up the updated matrix.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
-                                            imageProvider.get());
-      if (builderSession) {
-        builderSession->rebuildForFilePath(p.filePath);
-      }
+                                            static_cast<float>(tgfxImage->width()),
+                                            static_cast<float>(tgfxImage->height()));
+      // Push the PAGImage onto matching Image nodes. loadFileData sets Image::runtimeImage and
+      // refreshes affected layers in place.
+      document->loadFileData(p.filePath, pagImage);
     } else {
-      // Thumbnail: store in the provider's thumbnail slot. Budget enforcement and silent LRU
-      // eviction happen up front in attachNativeImage() so flushPendingUploads only sees
-      // uploads that already fit.
-      imageProvider->putThumbnailImage(p.filePath, tgfxImage);
+      // Thumbnail: budget enforcement and silent LRU eviction happen up front in
+      // attachNativeImage() so flushPendingUploads only sees uploads that already fit.
       auto& entry = thumbnailTextures[p.filePath];
       if (entry.image) {
         thumbnailTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       thumbnailTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel
-      // dimensions. Without this, fills that have never seen a Full attach yet would keep
-      // the matrix baked at parsePAGX time (orig-image-* dimensions), which scales the UV
-      // mapping for a thumbnail-sized texture by the original full-resolution divisor —
-      // sampling lands outside the thumbnail's [0,1] domain and the fill renders blank
-      // (clamped to edge). ResolveImagePatternMatrix's source priority falls through to
-      // the provider's thumbnail when full is absent so this stays correct after a later
-      // Full attach overwrites the matrix to the full-resolution dimensions.
+      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel dimensions.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
-                                            imageProvider.get());
-      // Regenerate the affected layers' vector contents so the newly attached thumbnail is
-      // picked up by the cached layer tree.
-      if (builderSession) {
-        builderSession->rebuildForFilePath(p.filePath);
-      }
+                                            static_cast<float>(tgfxImage->width()),
+                                            static_cast<float>(tgfxImage->height()));
+      // Install the thumbnail as the runtime image so the renderer picks it up.
+      document->loadFileData(p.filePath, pagImage);
     }
   }
 }
@@ -728,22 +709,12 @@ void PAGXView::enforceFullBudget() {
     // those draws keep working until the buffer drains.
     retireTextureId(it->second.textureId);
     externalTextures.erase(it);
-    // Remove the full-quality image from the provider so the renderer falls back to thumbnail
-    // on the next rebuild. scanAndRequestMissingTextures() will pick the dropped paths up on
-    // the same frame and emit onTextureRequest, so the host can start fetching a replacement
-    // immediately.
-    imageProvider->clearFullImage(c.path);
-    // The render loop will fall back to thumbnail on the next draw. Recompute the
-    // ImagePattern matrix so it matches the thumbnail's pixel dimensions instead of the
-    // full-resolution dimensions that were baked when the now-evicted full image was
-    // attached; otherwise the fallback fill would sample outside the thumbnail's UV domain
-    // and render blank (clamp-to-edge). When a replacement Full is later re-attached, the
-    // upload path runs the same resolve again with the full-resolution dimensions.
-    ResolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes,
-                                          imageProvider.get());
-    if (builderSession) {
-      builderSession->rebuildForFilePath(c.path);
-    }
+    // Clear the runtime image on matching Image nodes so the renderer falls back to thumbnail
+    // (or blank) on the next draw. loadFileData with an empty shared_ptr clears
+    // Image::runtimeImage and refreshes the affected layers in place.
+    // scanAndRequestMissingTextures() will pick the dropped paths up on the same frame and
+    // emit onTextureRequest, so the host can start fetching a replacement immediately.
+    document->loadFileData(c.path, std::shared_ptr<PAGImage>{});
     evictedPaths.push_back(c.path);
     // Mark the path as a candidate for the next scanAndRequestMissingTextures sweep so the
     // host receives onTextureRequest the same draw and can start re-fetching immediately.
@@ -924,10 +895,10 @@ void PAGXView::scanAndRequestMissingTextures() {
     return;
   }
   // We deliberately scan only paths that have been evicted by a previous LRU sweep. The
-  // initial-attach window — where the provider has no full image because the host has not yet
-  // downloaded and called attachNativeImage(Full) for the first time — is owned by the host's
-  // own progressive image flow, not by us. Emitting onTextureRequest there would force the
-  // host into an "always fetch full" mode and defeat thumbnail-first loading.
+  // initial-attach window — where externalTextures has no full image because the host has not
+  // yet downloaded and called attachNativeImage(Full) for the first time — is owned by the
+  // host's own progressive image flow, not by us. Emitting onTextureRequest there would force
+  // the host into an "always fetch full" mode and defeat thumbnail-first loading.
   //
   // Snapshot into a vector so the inFlight bookkeeping below can mutate evictedFullPaths
   // without invalidating an in-progress iterator.
@@ -1184,7 +1155,7 @@ void PAGXView::buildLayers() {
   // to compute the final ImagePattern matrices. PAGX files generated by libpag embed image data
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
-  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes, imageProvider.get());
+  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
 
   document->applyLayout(&fontConfig);
   LogMemProbe("buildLayers.afterApplyLayout");
@@ -1814,9 +1785,9 @@ bool PAGXView::draw() {
   }
 
   // Backend-texture cache bookkeeping. The call runs after lockContext has been released
-  // because it only mutates provider and tgfx layer state, never GL state. enforceFullBudget
-  // sweeps the full bucket against fullBudget; entries pushed past the budget are removed from
-  // the provider and the next draw falls back to thumbnail.
+  // because it only mutates externalTextures and runtimeImage state, never GL state.
+  // enforceFullBudget sweeps the full bucket against fullBudget; entries pushed past the
+  // budget are removed and the next draw falls back to thumbnail.
   enforceFullBudget();
   // After eviction, any path that just lost its full texture is now a candidate for the
   // request scan. Emitting onTextureRequest on the same draw shortens the time-to-recovery

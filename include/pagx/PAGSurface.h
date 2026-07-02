@@ -22,6 +22,10 @@
 #include <memory>
 #include "pag/gpu.h"
 
+namespace tgfx {
+class Surface;
+}
+
 namespace pagx {
 
 class Drawable;
@@ -101,10 +105,12 @@ class PAGSurface {
 
  private:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable);
+  explicit PAGSurface(std::shared_ptr<tgfx::Surface> surface);
 
   std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGScene;
+  friend std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>&);
 };
 
 }  // namespace pagx
