@@ -1386,7 +1386,8 @@ PAGX_TEST(PAGXViewModelTest, ImageTwoWaySyncBack) {
   runtimePattern->setImage(pagx::LayerBuilder::GetTGFXImage(greenImage));
   EXPECT_TRUE(scene->draw(surface));
   ASSERT_NE(imgProp->value(), nullptr);
-  EXPECT_EQ(pagx::LayerBuilder::GetTGFXImage(imgProp->value()), pagx::LayerBuilder::GetTGFXImage(greenImage));
+  EXPECT_EQ(pagx::LayerBuilder::GetTGFXImage(imgProp->value()),
+            pagx::LayerBuilder::GetTGFXImage(greenImage));
   EXPECT_EQ(obs, 1);
 }
 

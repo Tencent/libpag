@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
-#include "pagx/tgfx.h"
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -35,6 +34,7 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/runtime/Drawable.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
