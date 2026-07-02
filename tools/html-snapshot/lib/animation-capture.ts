@@ -156,6 +156,23 @@ export const PAGX_VIRTUAL_CLOCK_INIT_SCRIPT = `(function(){
     for (var i = 0; i < timers.length; i++){ var t = timers[i]; if (!t.cancelled && t.time < m) m = t.time; }
     return m;
   }
+  // Tag every animation that is live *now* with its birth time (the virtual
+  // instant it first appeared) unless already tagged. CSS animations created by
+  // a timer-driven class toggle / scripted click get birth = the firing timer's
+  // virtual time; anything present before the first timer fires stays untagged
+  // and is treated as born at 0 by the seek. This runs on the deterministic
+  // virtual clock, so the same births are recorded regardless of how densely a
+  // caller samples — keeping the baseline and the capture on one clock.
+  function tagBirths(birth){
+    try {
+      if (typeof document.getAnimations !== 'function') return;
+      var live = document.getAnimations();
+      for (var i = 0; i < live.length; i++){
+        var a = live[i];
+        try { if (a.__pagxBirth === undefined) a.__pagxBirth = birth; } catch(_){}
+      }
+    } catch(_){}
+  }
   function fireDue(now){
     var guard = 0;
     while (guard++ < GUARD){
@@ -166,8 +183,12 @@ export const PAGX_VIRTUAL_CLOCK_INIT_SCRIPT = `(function(){
         if (best === null || t.time < best.time || (t.time === best.time && t.id < best.id)) best = t;
       }
       if (best === null) break;
+      var firedAt = best.time;
       if (best.interval != null) best.time += best.interval; else best.cancelled = true;
       try { best.fn.apply(window, best.args); } catch(_){}
+      // Any animation the callback just created (e.g. a click-class toggling on
+      // a 0.42s pulse) is born at this timer's virtual time.
+      tagBirths(firedAt);
     }
     if (timers.length > 4096){
       var kept = [];
@@ -318,6 +339,86 @@ export function pagxExtractTranslate(
   return 'translate(' + resolveAxis(tx, wPx) + ', ' + resolveAxis(ty, hPx) + ')';
 }
 
+// Like `pagxExtractTranslate`, but preserves the full 2D affine transform when
+// its linear part (scale / rotation / skew) is not identity. The runtime CAN
+// play a general affine via the importer's `matrix` channel
+// (HTMLAnimationBuilder `ParseTransformMatrix` -> matrixKeys), so a click "pop"
+// (`transform: scale(1.3)`), a spin (`rotate`), etc. survive capture instead of
+// being flattened to their static frame. Pure-translate transforms still
+// collapse to `translate(xpx, ypx)` so the common slide / position path keeps
+// its `tx`/`ty` decimation and output shape byte-for-byte unchanged.
+//
+// `getComputedStyle().transform` always resolves to a `matrix(...)` /
+// `matrix3d(...)` / `none` form (never the friendly `scale()` / `translate()`
+// functions), so the matrix branch is the one the global sampler exercises. The
+// friendly compound-string branch only reaches here from the WAAPI / transition
+// path; there we still fold a non-identity linear part into a `matrix(...)` via
+// a temporary element so scale / rotate authored directly in keyframes is kept
+// too, and fall back to translate-only extraction when the value cannot be
+// resolved to a matrix (e.g. a 3D transform).
+export function pagxExtractTransform(
+  transformStr: string,
+  box?: { width: number; height: number } | null,
+): string | null {
+  const s = (transformStr || '').trim().toLowerCase();
+  if (!s || s === 'none') return null;
+  const m = s.match(/^matrix\(([^)]+)\)$/);
+  if (m) {
+    const n = m[1].split(',').map((x) => parseFloat(x.trim()));
+    if (n.length === 6 && n.every((v) => !isNaN(v))) {
+      const linearIsIdentity =
+        Math.abs(n[0] - 1) < 1e-6 && Math.abs(n[1]) < 1e-6 &&
+        Math.abs(n[2]) < 1e-6 && Math.abs(n[3] - 1) < 1e-6;
+      if (linearIsIdentity) return 'translate(' + n[4] + 'px, ' + n[5] + 'px)';
+      return 'matrix(' + n.join(', ') + ')';
+    }
+    return null;
+  }
+  // matrix3d(...) has no 2D affine equivalent the runtime can play; keep only
+  // its translation (mirrors pagxExtractTranslate's matrix3d branch).
+  if (/^matrix3d\(/.test(s)) return pagxExtractTranslate(transformStr, box);
+  // Friendly compound string (WAAPI / transition keyframe author value): if it
+  // is pure translate, reuse the percentage-resolving translate path; otherwise
+  // resolve the whole chain to a matrix via a throwaway element so any scale /
+  // rotate / skew is preserved.
+  if (!/\b(scale|rotate|skew|matrix)/.test(s)) {
+    return pagxExtractTranslate(transformStr, box);
+  }
+  try {
+    const probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.transform = transformStr;
+    (document.body || document.documentElement).appendChild(probe);
+    const resolved = getComputedStyle(probe).transform;
+    probe.remove();
+    if (resolved && resolved !== 'none') return pagxExtractTransform(resolved, box);
+  } catch (_) {
+    /* fall through to translate-only */
+  }
+  return pagxExtractTranslate(transformStr, box);
+}
+
+// Resolve any tracked transform value the sampler / emitter produces
+// (`translate(xpx, ypx)` or `matrix(a,b,c,d,e,f)`) to its six affine
+// components, so decimation can run RDP over a single uniform representation.
+// A translate collapses to `[1, 0, 0, 1, tx, ty]`; identical scalar output to
+// the old `tx`/`ty` path for pure-translate animations (the constant linear
+// channels reduce to their endpoints), plus real scale / rotation curvature for
+// matrix keyframes. Returns null when the value is neither form.
+export function pagxTransformToMatrix6(value: string): number[] | null {
+  const v = (value || '').trim();
+  if (!v) return null;
+  const mm = v.match(/^matrix\(([^)]+)\)$/i);
+  if (mm) {
+    const parts = mm[1].split(',').map((x) => parseFloat(x.trim()));
+    if (parts.length === 6 && parts.every((x) => !isNaN(x))) return parts;
+    return null;
+  }
+  const t = pagxParseTranslateXY(v);
+  if (t) return [1, 0, 0, 1, t[0], t[1]];
+  return null;
+}
+
 export function pagxPickProp(
   obj: Record<string, unknown>,
   kebab: string,
@@ -342,7 +443,7 @@ export function pagxNormalizeProps(
   if (op != null) out['opacity'] = op;
   const tr = pagxPickProp(raw, 'transform', 'transform');
   if (tr != null && tr !== 'none') {
-    const t = pagxExtractTranslate(tr, box);
+    const t = pagxExtractTransform(tr, box);
     if (t) out['transform'] = t;
   }
   const col = pagxPickProp(raw, 'color', 'color');
@@ -472,10 +573,19 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
       if (!isNaN(o)) put('opacity', i, o);
     }
     if (p['transform'] != null) {
-      const t = pagxParseTranslateXY(p['transform']);
-      if (t) {
-        put('tx', i, t[0]);
-        put('ty', i, t[1]);
+      // Decompose to the six affine components so RDP sees scale / rotation /
+      // skew curvature, not just translation. A pure-translate value folds to
+      // [1,0,0,1,tx,ty]: the constant linear channels collapse to endpoints and
+      // m4/m5 behave exactly like the old tx/ty channels, so translate-only
+      // output is unchanged while scale/rotate keyframes now survive.
+      const mtx = pagxTransformToMatrix6(p['transform']);
+      if (mtx) {
+        put('m0', i, mtx[0]);
+        put('m1', i, mtx[1]);
+        put('m2', i, mtx[2]);
+        put('m3', i, mtx[3]);
+        put('m4', i, mtx[4]);
+        put('m5', i, mtx[5]);
       }
     }
     if (p['color'] != null) {
@@ -1018,7 +1128,7 @@ export function pagxSampleTimeline(
       const cs = getComputedStyle(el);
       const snap: Record<string, string | null> = {
         opacity: cs.opacity,
-        transform: pagxExtractTranslate(cs.transform),
+        transform: pagxExtractTransform(cs.transform),
         color: cs.color,
         'background-color': cs.backgroundColor,
       };
@@ -1209,7 +1319,26 @@ export function pagxSeekAllToTime(timeMs: number): void {
   for (const a of anims) {
     try {
       a.pause();
-      a.currentTime = t;
+      // Seek relative to the animation's own birth time on the virtual clock.
+      // An animation attached at load is born at 0, so this is the absolute `t`
+      // (its own delay / iteration / direction still resolve from `currentTime`).
+      // A short animation created mid-timeline by a class toggle / scripted
+      // click (e.g. a 0.42s `perkPulse` born at ~6.1s) would, under a plain
+      // `currentTime = t`, be seeked far past its end and freeze on its final
+      // frame — erasing the effect from BOTH the baseline and the capture.
+      // Subtracting its birth plays it at the correct local phase during its
+      // brief lifetime, so click "pop" / flash effects survive. `__pagxBirth`
+      // is tagged deterministically by the virtual clock (PAGX_VIRTUAL_CLOCK_INIT_SCRIPT),
+      // so the baseline and the capture record identical births and stay aligned.
+      let birth = 0;
+      try {
+        const b = (a as unknown as { __pagxBirth?: number }).__pagxBirth;
+        if (typeof b === 'number' && isFinite(b)) birth = b;
+      } catch (_) {
+        birth = 0;
+      }
+      const local = t - birth;
+      a.currentTime = local > 0 ? local : 0;
     } catch (_) {
       /* skip this animation */
     }
@@ -1822,6 +1951,8 @@ export function pagxAnimMain(opts: {
 // relies on for its HELPER_FNS bundle).
 const PAGX_ANIM_FNS = [
   pagxExtractTranslate,
+  pagxExtractTransform,
+  pagxTransformToMatrix6,
   pagxPickProp,
   pagxNormalizeProps,
   pagxFillOffsets,
