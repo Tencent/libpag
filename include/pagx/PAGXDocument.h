@@ -222,10 +222,13 @@ class PAGXDocument : public Node {
    * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
    * supported — edit the Text node with layoutChanged = true instead.
    *
-   * Only the listed nodes are refreshed, so include every node an edit affects: the whole chain for
-   * an "@id" reference change, and every Layer a layoutChanged re-layout repositions (or pass the
-   * container Layer). For external compositions, notify the document that owns the nodes; foreign
-   * nodes are skipped (see ownsNode()).
+   * When layoutChanged is true, layout is re-run and any Layer whose layoutBounds changed as a
+   * side effect of the re-layout (for example, a sibling pushed by a flex container when one child
+   * is resized) is auto-refreshed as well — callers do not need to list such repositioned siblings.
+   * Only list nodes directly edited or whose own authored fields / child lists changed: the whole
+   * chain for an "@id" reference change, or the container Layer for a structural child-list edit.
+   * For external compositions, notify the document that owns the nodes; foreign nodes are skipped
+   * (see ownsNode()).
    *
    * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
    * null and foreign entries are skipped; an empty list is a no-op.
@@ -261,8 +264,12 @@ class PAGXDocument : public Node {
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
-  // is detected and stops the recursion instead of overflowing the stack.
-  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
+  // is detected and stops the recursion instead of overflowing the stack. When changedOut is not
+  // null and the document was already laid out, every Layer whose layoutBounds differ from before
+  // the re-layout is appended to it, so notifyChange can auto-refresh siblings that auto layout
+  // repositioned without the caller having to list them.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited,
+                   std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
