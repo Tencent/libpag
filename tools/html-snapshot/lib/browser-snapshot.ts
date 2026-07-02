@@ -1402,9 +1402,19 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   };
   for (let i = 1; i < rects.length; i++) {
     const r = rects[i];
-    // Overlap on the block axis (with a sub-pixel tolerance so adjacent-but-not
-    // -overlapping antialiased lines don't merge) means "same line/column".
-    const overlaps = blockLo(r) < curBlockHi - 0.5 && blockHi(r) > curBlockLo + 0.5;
+    // "Same line/column" means the two rects overlap on the block axis by a
+    // MAJORITY of the smaller rect's block extent — not merely by a sub-pixel
+    // sliver. A fixed pixel tolerance is wrong here: getClientRects reports
+    // glyph INK bounds, which routinely exceed the line-height (e.g. a 16px
+    // line renders ~17px of ink), so two ADJACENT lines whose tops differ by
+    // exactly the line-height still overlap by ~1px of ink. That sliver must
+    // NOT merge them. Same-line glyph runs (soft-hyphen glyph, bidi split)
+    // instead share the line's top/height, so they overlap almost fully.
+    // Requiring the overlap to cover ≥ half the smaller extent cleanly
+    // separates "next line, ink bleeds up by 1px" from "same line, split run".
+    const overlap = Math.min(blockHi(r), curBlockHi) - Math.max(blockLo(r), curBlockLo);
+    const minExtent = Math.min(blockHi(r) - blockLo(r), curBlockHi - curBlockLo);
+    const overlaps = overlap > 0 && overlap >= minExtent * 0.5;
     if (overlaps) {
       curBlockLo = Math.min(curBlockLo, blockLo(r));
       curBlockHi = Math.max(curBlockHi, blockHi(r));
@@ -3841,6 +3851,7 @@ export {
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  mergeRectsOnSameLine,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
