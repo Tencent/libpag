@@ -74,8 +74,14 @@ using ImageOriginalSizeMap = std::unordered_map<std::string, std::pair<float, fl
 //      ("orig-image-width"/"orig-image-height", written by the new exporter); if missing,
 //      fall back to origSizeMap[filePath] populated by the host via setImageOriginalSize();
 //      if both are unavailable the authored matrix is left unchanged.
+//
+// overrideWidth/overrideHeight, when positive, are used directly as the actual image pixel
+// dimensions instead of reading them from the Image node's runtimeImage. This lets the caller
+// refresh the matrix against a just-uploaded image before loadFileData installs it on the node.
 bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
-                               const ImageOriginalSizeMap* origSizeMap = nullptr);
+                               const ImageOriginalSizeMap* origSizeMap = nullptr,
+                               float overrideWidth = 0.0f,
+                               float overrideHeight = 0.0f);
 
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().
@@ -87,9 +93,8 @@ void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
 // progressive image upgrade path: when a higher-resolution image replaces the initial one, the
 // baked pattern matrix must be recomputed against the new image dimensions.
 //
-// overrideWidth/overrideHeight, when positive, are used directly as the actual image pixel
-// dimensions instead of reading them from the Image node's runtimeImage. This lets the caller
-// refresh the matrix against a just-uploaded image before loadFileData installs it on the node.
+// overrideWidth/overrideHeight, when positive, are forwarded to ResolveImagePatternMatrix as
+// the actual image pixel dimensions instead of reading them from the Image node's runtimeImage.
 size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
                                              const std::string& filePath,
                                              const ImageOriginalSizeMap* origSizeMap = nullptr,

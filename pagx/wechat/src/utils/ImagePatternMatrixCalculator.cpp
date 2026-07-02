@@ -303,7 +303,8 @@ static bool ResolveNewFormatPattern(pagx::ImagePattern* pattern,
 }
 
 bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
-                               const ImageOriginalSizeMap* origSizeMap) {
+                               const ImageOriginalSizeMap* origSizeMap,
+                               float overrideWidth, float overrideHeight) {
   if (!pattern || !pattern->image) {
     return false;
   }
@@ -313,7 +314,7 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
     // No legacy customData: try the new PAGX standard format. When that path is also unable to
     // produce a meaningful result (e.g. origSize hasn't been registered yet), leave the
     // authored matrix unchanged and report unresolved.
-    return ResolveNewFormatPattern(pattern, origSizeMap, 0.0f, 0.0f);
+    return ResolveNewFormatPattern(pattern, origSizeMap, overrideWidth, overrideHeight);
   }
 
   char* end = nullptr;
@@ -353,8 +354,8 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
   // no decoded asset has arrived yet (placeholder layout during progressive loading).
   float actualImageWidth = 0.0f;
   float actualImageHeight = 0.0f;
-  ReadActualImageDimensions(pattern->image, 0.0f, 0.0f, origImageWidth, origImageHeight,
-                            &actualImageWidth, &actualImageHeight);
+  ReadActualImageDimensions(pattern->image, overrideWidth, overrideHeight, origImageWidth,
+                            origImageHeight, &actualImageWidth, &actualImageHeight);
 
   // The matrix stored during export is paint->transform() (normalized transform). After the
   // first successful resolve, pattern->matrix is overwritten with the baked result, so we keep
@@ -408,62 +409,7 @@ size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
     if (!pattern->image || pattern->image->filePath != filePath) {
       continue;
     }
-    // Inline of ResolveImagePatternMatrix with the override dimensions forwarded, so the
-    // legacy-format and new-format paths both see the caller-supplied actual size without
-    // adding an override parameter to the public single-pattern API.
-    auto scaleModeIt = pattern->customData.find("image-scale-mode");
-    bool resolved = false;
-    if (scaleModeIt == pattern->customData.end()) {
-      resolved = ResolveNewFormatPattern(pattern, origSizeMap, overrideWidth, overrideHeight);
-    } else {
-      // Legacy path: re-run the full resolve with override forwarded to ReadActualImageDimensions.
-      char* end = nullptr;
-      int scaleModeInt = static_cast<int>(std::strtol(scaleModeIt->second.c_str(), &end, 10));
-      if (end != scaleModeIt->second.c_str()) {
-        auto scaleMode = static_cast<ImageScaleMode>(scaleModeInt);
-        float nodeWidth = 0.0f, nodeHeight = 0.0f;
-        auto nwIt = pattern->customData.find("node-width");
-        auto nhIt = pattern->customData.find("node-height");
-        if (nwIt != pattern->customData.end()) {
-          nodeWidth = std::strtof(nwIt->second.c_str(), nullptr);
-        }
-        if (nhIt != pattern->customData.end()) {
-          nodeHeight = std::strtof(nhIt->second.c_str(), nullptr);
-        }
-        float origImageWidth = 0.0f, origImageHeight = 0.0f;
-        auto oiwIt = pattern->customData.find("orig-image-width");
-        auto oihIt = pattern->customData.find("orig-image-height");
-        if (oiwIt != pattern->customData.end()) {
-          origImageWidth = std::strtof(oiwIt->second.c_str(), nullptr);
-        }
-        if (oihIt != pattern->customData.end()) {
-          origImageHeight = std::strtof(oihIt->second.c_str(), nullptr);
-        }
-        float scaleFactor = 0.5f;
-        auto sfIt = pattern->customData.find("scale-factor");
-        if (sfIt != pattern->customData.end()) {
-          scaleFactor = std::strtof(sfIt->second.c_str(), nullptr);
-        }
-        float actualImageWidth = 0.0f;
-        float actualImageHeight = 0.0f;
-        ReadActualImageDimensions(pattern->image, overrideWidth, overrideHeight, origImageWidth,
-                                  origImageHeight, &actualImageWidth, &actualImageHeight);
-        pagx::Matrix paintTransform = {};
-        auto ptIt = pattern->customData.find(kPaintTransformKey);
-        if (ptIt != pattern->customData.end() &&
-            DeserializePaintTransform(ptIt->second, &paintTransform)) {
-          // Already cached; use the original paint transform.
-        } else {
-          paintTransform = pattern->matrix;
-          pattern->customData[kPaintTransformKey] = SerializePaintTransform(paintTransform);
-        }
-        pattern->matrix = CalculateImagePatternMatrix(
-            scaleMode, actualImageWidth, actualImageHeight, nodeWidth, nodeHeight,
-            paintTransform, scaleFactor, origImageWidth, origImageHeight);
-        resolved = true;
-      }
-    }
-    if (resolved) {
+    if (ResolveImagePatternMatrix(pattern, origSizeMap, overrideWidth, overrideHeight)) {
       ++updated;
     }
   }
