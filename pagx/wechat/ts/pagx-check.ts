@@ -212,7 +212,7 @@ const LOCAL_RISK_PATHS = {
   imageLoadMP: { yellow: 80, red: 220 },
   imageRuntimeRisk: { yellow: 45, red: 95 },
 };
-const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = { yellow: 2000, red: 4000 };
+const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = BASE_RISK_PATHS.A_bg_x_uncacheable;
 const BARELY_USABLE_SCORE = 50;
 const NEUTRAL_SDK_GREEN_SCORE = 75;
 const SMALL_AREA_BLUR_RISK = 25;
@@ -814,27 +814,8 @@ function uint8ArrayToString(data: Uint8Array): string {
 // ============================================================================
 //
 // The WeChat WebGL RENDERER returns a generic string. Use the WEBGL_debug_renderer_info
-// extension to obtain the real GPU name from UNMASKED_RENDERER: Mali-G925 (9400) / Mali-G1-Ultra (9500).
-// Fall back to precise model matching when the extension is unavailable.
-
-/** Confirmed models with Dimensity 9500 (fallback; GPU extension takes priority). */
-const DIMENSITY_9500_MODELS: RegExp[] = [
-  /^V2502A$/,    // vivo Dimensity 9500 confirmed device
-];
-/** Confirmed models with Dimensity 9400+. */
-const DIMENSITY_9400P_MODELS: RegExp[] = [
-];
-/** Confirmed models with Dimensity 9400. */
-const DIMENSITY_9400_MODELS: RegExp[] = [
-];
-
-function detectDimensityByModel(model: string): string | null {
-  if (!model) return null;
-  for (const p of DIMENSITY_9500_MODELS) { if (p.test(model)) return 'Dimensity 9500'; }
-  for (const p of DIMENSITY_9400P_MODELS) { if (p.test(model)) return 'Dimensity 9400+'; }
-  for (const p of DIMENSITY_9400_MODELS) { if (p.test(model)) return 'Dimensity 9400'; }
-  return null;
-}
+// extension to obtain the real GPU name from UNMASKED_RENDERER: Mali-G925 (Dimensity 9400)
+// / Mali-G1-Ultra (Dimensity 9500). Dimensity 9300 (Mali-G720) is unaffected.
 
 interface DimensityDetectionResult {
   isUnsupported: boolean;
@@ -842,15 +823,9 @@ interface DimensityDetectionResult {
   gpuRenderer: string;
 }
 
-function detectDimensityUnsupported(gpuRenderer: string, model: string): DimensityDetectionResult | null {
-  // Match via GPU renderer (UNMASKED_RENDERER from WEBGL_debug_renderer_info).
+function detectDimensityUnsupported(gpuRenderer: string): DimensityDetectionResult | null {
   if (gpuRenderer && DIMENSITY_GPU_RENDERER_PATTERN.test(gpuRenderer)) {
     return { isUnsupported: true, gpuRenderer };
-  }
-  // Path 2: gl.RENDERER returns a generic string in WeChat; fall back to precise model matching.
-  const chipLabel = detectDimensityByModel(model);
-  if (chipLabel) {
-    return { isUnsupported: true, gpuRenderer: `${chipLabel}(${model})` };
   }
   return null;
 }
@@ -899,7 +874,7 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   const deviceInfo = await fetchDeviceInfoAsync();
 
   // Dimensity 9400 / 9400+ / 9500 (Mali-G925 GPU) have a driver-level memory defect; block immediately.
-  const dimensityCheck = detectDimensityUnsupported(deviceInfo.gpuRenderer, deviceInfo.model);
+  const dimensityCheck = detectDimensityUnsupported(deviceInfo.gpuRenderer);
   if (dimensityCheck?.isUnsupported) {
     return {
       score: DIMENSITY_UNSUPPORTED_SCORE,
@@ -936,9 +911,9 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   // Adjust the thresholds by device tier and platform.
   const riskPaths = getAdjustedRiskPaths(deviceInfo.tier, deviceInfo.platform);
 
-  // Read the document dimensions.
-  const docWidth = parseFloat(root.attribs.width || '0') || 0;
-  const docHeight = parseFloat(root.attribs.height || '0') || 0;
+  // Read the document dimensions (use readNumericAttr like scanLocalRisk for consistency).
+  const docWidth = readNumericAttr(root.attribs, 'width');
+  const docHeight = readNumericAttr(root.attribs, 'height');
 
   // Count the raw XML tags (not expanded, used by the layer_xml risk path).
   const rawTagCounts = countTagsRaw(root);
