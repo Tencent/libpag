@@ -7100,6 +7100,72 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
 }
 
+// A raster `mask-image: url(...)` (a PNG here, referenced via a `data:image/png` URI) is rebuilt
+// into an image-backed alpha mask layer rather than dropped: the mask layer holds a Rectangle sized
+// to the image's native pixels filled by an ImagePattern of that image, attached invisibly and
+// excluded from layout — the same shape as the SVG-mask path but with a raster source.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageRasterUrlRebuildsImageMaskLayer) {
+  // 1x1 PNG so the intrinsic mask box is trivially known; `mask-size:2px 2px` then scales it 2x.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');mask-mode:alpha;mask-size:2px 2px;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+  EXPECT_FALSE(masked->mask->visible);
+  EXPECT_FALSE(masked->mask->includeInLayout);
+  // Geometry is the image's native 1x1 box; mask-size:2px scales the whole layer by 2 on each axis.
+  auto* rect = FindElementOfType<pagx::Rectangle>(masked->mask);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_TRUE(NearlyEqual(rect->size.width, 1.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rect->size.height, 1.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 2.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 2.0f, 0.001f));
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// `mask-mode: luminance` on a raster mask opts into the luminance-keyed mask type (the alpha-keyed
+// `match-source` default is exercised by the test above).
+PAG_TEST(PAGXHTMLImporterTest, MaskImageRasterUrlLuminanceModeSetsLuminanceType) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');mask-mode:luminance;mask-size:cover;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Luminance);
+}
+
+// A `mask-image: url(...)` that is neither a decodable SVG data URI nor a loadable raster image is
+// dropped with a diagnostic, leaving the element unmasked (an undecodable data:image/png here).
+PAG_TEST(PAGXHTMLImporterTest, MaskImageUndecodableUrlIsDroppedWithDiagnostic) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,notarealimage');mask-mode:alpha;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  EXPECT_EQ(masked->mask, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "loadable raster image"));
+}
+
 // A `mask-size` larger than the mask SVG's intrinsic size scales the rebuilt mask layer by the
 // per-axis ratio so the mask geometry covers the element CSS rendered it across, rather than
 // staying pinned at the smaller intrinsic size in the top-left corner. The ratios differ per axis

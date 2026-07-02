@@ -135,6 +135,15 @@ class HTMLParserContext {
   // to frame a contour clip-path SVG.
   void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
 
+  // Rebuilds an alpha / luminance mask layer from a raster `mask-image: url(...)` (a PNG / JPEG /
+  // WebP referenced by file path, `http(s)` URL, or `data:image/<raster>` URI) and attaches it to
+  // `layer`. The image is loaded into an `ImagePattern` fill on a Rectangle sized to the image's
+  // native pixels, then `mask-size` / `mask-position` scale and offset it onto the masked box (via
+  // `applyMaskSizeAndPosition`), mirroring the SVG-mask path. Returns false when `url` is empty or
+  // the image cannot be loaded / decoded, so the caller can fall back to warning and dropping the
+  // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
+  bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
+
   // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
   // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
   // is imported at its intrinsic pixel size; CSS then scales it to `mask-size` and offsets it by

@@ -32,6 +32,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Rectangle.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
@@ -387,7 +388,15 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
     std::string url = ExtractCssUrl(box.maskImage);
     svgContent = DecodeSvgDataUri(url);
     if (svgContent.empty()) {
-      warn("html: mask-image is not a decodable data:image/svg+xml URI; ignored");
+      // Not an SVG data URI. A raster `mask-image` (PNG / JPEG / WebP via a file path, `http(s)`
+      // URL, or `data:image/<raster>` URI) is masked through an image-backed layer instead of the
+      // SVG geometry path below. Fall back to warning and dropping only when that also fails.
+      if (applyRasterImageMask(layer, box, url)) {
+        return;
+      }
+      warn(
+          "html: mask-image is not a decodable data:image/svg+xml URI or loadable raster image; "
+          "ignored");
       return;
     }
     maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
@@ -469,6 +478,50 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   // child satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set) nor
   // laid out (includeInLayout is false).
   layer->children.push_back(maskLayer);
+}
+
+bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box,
+                                             const std::string& url) {
+  if (url.empty()) return false;
+  auto* imageNode = registerImageResource(resolveImageSource(url));
+  if (imageNode == nullptr) return false;
+  // The mask is scaled / positioned relative to its intrinsic pixel box (the CSS `mask-size` /
+  // `mask-position` model), so the native dimensions must be decodable up front. A zero size means
+  // the bytes could not be read — let the caller warn and drop rather than emit a degenerate mask.
+  auto nativeSize = decodeImageNativeSize(imageNode);
+  if (nativeSize.first <= 0 || nativeSize.second <= 0) return false;
+  float intrinsicW = static_cast<float>(nativeSize.first);
+  float intrinsicH = static_cast<float>(nativeSize.second);
+
+  // Build the mask layer as a native-sized rectangle filled with the image, anchored at the origin
+  // — the same coordinate convention the SVG-mask path relies on. `ScaleMode::Stretch` paints the
+  // image across the full rectangle box; since the rectangle is the image's native size the paint
+  // is 1:1, and `applyMaskSizeAndPosition` below then scales / offsets the whole layer to match CSS.
+  auto* maskLayer = _document->makeNode<Layer>();
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->size = {intrinsicW, intrinsicH};
+  maskLayer->contents.push_back(rect);
+  auto* fill = _document->makeNode<Fill>();
+  auto* pattern = _document->makeNode<ImagePattern>();
+  pattern->image = imageNode;
+  pattern->scaleMode = ScaleMode::Stretch;
+  fill->color = pattern;
+  maskLayer->contents.push_back(fill);
+
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  applyMaskSizeAndPosition(maskLayer, box, intrinsicW, intrinsicH);
+  // A stable id keeps the `mask="@id"` reference intact across a PAGX export / re-import round-trip.
+  if (maskLayer->id.empty()) {
+    maskLayer->id = _idAllocator->generateUnique("mask");
+  }
+
+  layer->mask = maskLayer;
+  // A raster `mask-image` defaults to `mask-mode: match-source`, which for an image source reads its
+  // alpha channel; `mask-mode: luminance` opts into the luma-keyed form instead.
+  layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  layer->children.push_back(maskLayer);
+  return true;
 }
 
 float HTMLParserContext::resolveMaskPositionAxis(const std::string& token, float boxAxis,

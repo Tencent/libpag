@@ -129,6 +129,18 @@ function normalizeBackgroundClip(value) {
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
 }
 
+// PAGX's mask-image supports the same value forms as background-image: a
+// gradient function, an SVG `data:image/svg+xml,...` URI (rebuilt into a
+// contour/alpha mask layer), or a raster `url(...)` (PNG/JPEG/WebP) turned into
+// an image-backed alpha/luminance mask layer. All three share background-image's
+// URL handling, so reuse it verbatim: a local `file://` mask url is rewritten to
+// the plain absolute path the importer + tgfx load directly (an un-normalized
+// `file://` url reaches `ImageCodec::MakeFrom` as-is and fails to decode, which
+// silently drops the mask), while `data:` / `http(s)` urls pass through untouched.
+function normalizeMaskImage(value) {
+  return normalizeBackgroundImage(value);
+}
+
 // PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
 // which the importer turns into a contour mask layer. Chromium reports the
 // reference verbatim as `url("#id")`. Geometric forms (`inset()`, `circle()`,
@@ -3410,7 +3422,7 @@ const STYLE_SCHEMA = [
   // group must survive the snapshot. mask-image defaults to none and is dropped;
   // the descriptors are forwarded only when the element actually carries a mask,
   // gated by appendMaskFitting below (they are noise on unmasked boxes).
-  { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
+  { prop: 'mask-image',       scope: 'box',  defaults: ['none'], normalize: normalizeMaskImage },
   // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
   // inline svg; the importer resolves the def into a contour mask layer (the
   // inverse of HTMLWriter::writeClipDef). Geometric clip-path forms (inset/ellipse)
@@ -3449,6 +3461,7 @@ const HELPER_FNS = [
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,
+  normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
   normalizeWritingMode,
