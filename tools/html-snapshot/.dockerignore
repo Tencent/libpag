@@ -1,0 +1,12 @@
+node_modules
+dist
+eval
+bench/out
+*.log
+.DS_Store
+.git
+.gitignore
+README.md
+test
+coverage
+babel.config.js

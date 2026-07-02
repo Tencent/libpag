@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include "base/utils/MathUtil.h"
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
@@ -123,7 +124,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   std::string resolvedFromDesc;
 
   if (hasImportSource) {
-    auto filePath = baseDir + layer->importDirective.source;
+    auto filePath = JoinPath(baseDir, layer->importDirective.source);
     result = ImportFile(filePath, layer->importDirective.format, formatOptions, layer->width,
                         layer->height);
     resolvedFromDesc = layer->importDirective.source;
@@ -262,6 +263,33 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   return true;
 }
 
+// Each inline <svg> is imported by its own SVGImporter instance, which numbers auto-generated ids
+// (image1, path1, color1, ...) from scratch. When several inline SVGs in one document are resolved
+// and their nodes merged into the same target document, those counters collide — e.g. two unrelated
+// <image> elements both become Image id="image1". On reload the second registration overwrites the
+// first in the id index, so every reference (@image1) binds to the same node and the other resource
+// is lost. Walk the merged node list and rename any id that repeats to a fresh unique one; node
+// references are in-memory pointers, so the exporter picks up the new id automatically.
+static void DeduplicateNodeIds(PAGXDocument* doc) {
+  std::unordered_set<std::string> usedIds;
+  for (auto& node : doc->nodes) {
+    if (node->id.empty()) {
+      continue;
+    }
+    if (usedIds.insert(node->id).second) {
+      continue;
+    }
+    std::string base = node->id;
+    std::string candidate;
+    int suffix = 2;
+    do {
+      candidate = base + "_" + std::to_string(suffix++);
+    } while (usedIds.count(candidate) > 0);
+    node->id = candidate;
+    usedIds.insert(candidate);
+  }
+}
+
 static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& baseDir,
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
@@ -317,6 +345,10 @@ int RunResolve(int argc, char* argv[]) {
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
   }
+
+  // Merging several inline-SVG imports into one document can collide their auto-generated ids;
+  // rename the duplicates before the optimizer and exporter consume the merged tree.
+  DeduplicateNodeIds(doc.get());
 
   // Always run the optimizer so the resolve output is stable regardless of whether the input
   // contained imports or already-authored structure. The optimizer is conservative: any Layer

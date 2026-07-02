@@ -106,6 +106,43 @@ inline std::string GetDirectory(const std::string& path) {
 }
 
 /**
+ * True when `path` is already absolute (POSIX `/...`) or a Windows drive path
+ * (`C:/...` / `C:\...`), or carries an explicit scheme (`data:` / `http(s):`).
+ * Such paths must not be re-rooted against a base directory.
+ */
+inline bool IsAbsoluteOrSchemePath(const std::string& path) {
+  if (path.empty()) {
+    return false;
+  }
+  if (path[0] == '/' || path[0] == '\\') {
+    return true;  // POSIX absolute (or UNC).
+  }
+  if (path.size() >= 2 && path[1] == ':' &&
+      ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))) {
+    return true;  // Windows drive-absolute, e.g. C:/dir.
+  }
+  // Explicit scheme such as data: or http(s):, which is self-contained.
+  if (path.rfind("data:", 0) == 0 || path.rfind("http://", 0) == 0 ||
+      path.rfind("https://", 0) == 0) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Joins a base directory (expected to end with a slash) and a referenced path.
+ * Absolute / scheme-qualified references are returned unchanged so they are not
+ * incorrectly re-rooted against the base directory (e.g. `./` + `/Users/x.svg`
+ * → `.//Users/x.svg`).
+ */
+inline std::string JoinPath(const std::string& baseDir, const std::string& path) {
+  if (IsAbsoluteOrSchemePath(path)) {
+    return path;
+  }
+  return baseDir + path;
+}
+
+/**
  * Extracts the base name from a path (filename without directory and extension).
  */
 inline std::string GetBaseName(const std::string& path) {

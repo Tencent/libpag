@@ -65,6 +65,7 @@
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -441,9 +442,10 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
         if (!pattern->image->id.empty()) {
           xml.addAttribute("image", "@" + pattern->image->id);
         } else if (pattern->image->data) {
-          xml.addAttribute("image",
-                           "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
-                                                                   pattern->image->data->size()));
+          const auto* bytes = pattern->image->data->bytes();
+          auto size = pattern->image->data->size();
+          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                        ";base64," + Base64Encode(bytes, size));
         } else if (!pattern->image->filePath.empty()) {
           xml.addAttribute("image", pattern->image->filePath);
         }
@@ -1182,8 +1184,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
       if (image->data) {
-        xml.addAttribute("source", "data:image/png;base64," +
-                                       Base64Encode(image->data->bytes(), image->data->size()));
+        const auto* bytes = image->data->bytes();
+        auto size = image->data->size();
+        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                       ";base64," + Base64Encode(bytes, size));
       } else {
         xml.addAttribute("source", image->filePath);
       }
@@ -1249,9 +1253,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
             } else if (glyph->image->data) {
-              xml.addAttribute("image",
-                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
-                                                                       glyph->image->data->size()));
+              const auto* bytes = glyph->image->data->bytes();
+              auto size = glyph->image->data->size();
+              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                            ";base64," + Base64Encode(bytes, size));
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
             }
