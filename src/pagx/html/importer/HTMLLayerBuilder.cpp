@@ -455,6 +455,13 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
       drop->blurX = sigma;
       drop->blurY = sigma;
       drop->color = s.color;
+      // A CSS outer `box-shadow` is always clipped to *outside* the element's border box, so it is
+      // never visible under the box itself — even when the box has a translucent (or absent)
+      // background. PAGX's default `showBehindLayer=true` instead paints the shadow behind the whole
+      // layer, so with a translucent fill the shadow bleeds through and washes the box in the shadow
+      // colour. Setting `showBehindLayer=false` makes the layer knock the shadow out of its own
+      // coverage, matching the CSS clip and leaving only the exterior glow.
+      drop->showBehindLayer = false;
       layer->styles.push_back(drop);
     }
   }

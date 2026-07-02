@@ -454,6 +454,9 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
   EXPECT_FLOAT_EQ(drop->blurY, 4.0f);
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000, 0.2f), 0.02f));
+  // A CSS outer box-shadow is clipped to outside the border box, so it must not paint behind the
+  // (possibly translucent) layer — otherwise the shadow bleeds through and tints the box.
+  EXPECT_FALSE(drop->showBehindLayer);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
