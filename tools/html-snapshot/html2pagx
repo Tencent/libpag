@@ -1,0 +1,444 @@
+#!/usr/bin/env node
+// html2pagx — one-shot pipeline for converting a JS/React-driven HTML page or
+// URL into a rendered PAGX. Wraps four steps:
+//
+//   1. snapshot.js     <input>.html        → <input>.subset.html
+//   2. pagx import     <input>.subset.html → <input>.pagx
+//   3. pagx resolve    <input>.pagx
+//   4. pagx render     <input>.pagx        → <input>.png
+//
+// Pipeline orchestration lives in `lib/pipeline.js`; this file is the CLI
+// front-end. eval/run.js consumes the same pipeline module so a behaviour
+// change here automatically lands on both entry points.
+//
+// `--batch <dir>` switches to the recursive directory mode (formerly the
+// separate `batch-html2pagx.sh` wrapper). Batch runs route through
+// `lib/batch.js`, which launches one browser, then loops calling
+// `runHtmlToPagx` with an in-process snapshot adapter so Chromium startup
+// is paid once for the whole batch instead of once per file.
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const {
+  defaultPagxBin,
+  PipelineStepError,
+  runHtmlToPagx,
+  isHttpUrl,
+} = require('./dist/lib/pipeline');
+const { runBatch } = require('./dist/lib/batch');
+const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
+const { parseNumber } = require('./dist/lib/common');
+
+const SCRIPT_DIR = __dirname;
+const TOOL_NAME = 'html2pagx';
+
+const USAGE = `html2pagx — one-shot pipeline for converting a JS/React-driven HTML page into a
+rendered PAGX. Wraps four steps:
+
+  1. snapshot.js     <input>.html        → <input>.subset.html
+  2. pagx import     <input>.subset.html → <input>.pagx
+  3. pagx resolve    <input>.pagx
+  4. pagx render     <input>.pagx        → <input>.png
+
+Usage:
+  html2pagx <input.html | http(s)://url> [options]
+  html2pagx --batch <input-dir> [options]
+
+Options (any unknown flag is forwarded to snapshot.js):
+  -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
+  --output-name <name>       Base name for outputs (required when input is a URL,
+                             rejected in --batch mode)
+  --batch <dir>              Recursively scan <dir> for .html/.htm (excluding
+                             *.subset.html / *.subset.htm) and run the pipeline
+                             on each file with one shared headless browser
+  --output-root <dir>        Mirror batch outputs under <dir> instead of next
+                             to inputs (--batch only)
+  --skip-existing            In --batch mode, skip files whose target .pagx
+                             already exists
+  --dry-run                  In --batch mode, list the files that would be
+                             processed without launching a browser or pagx
+  --pagx-bin <path>          Path to the pagx CLI (default: $PAGX_BIN or
+                             ../../cmake-build-debug/pagx relative to this script)
+  --scale <N>                Render scale factor (default: 1)
+  --no-render                Stop after pagx resolve; do not produce PNG
+  --no-resolve               Stop after pagx import; do not run resolve/render
+  --no-subset-html           Do not write <input>.subset.html (use a temp file
+                             that is removed after import); default keeps it
+  --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
+                             → inline SVG conversion (default: enabled)
+  --download-fonts           Download the web fonts the page uses and register
+                             them as render fallbacks so text in uninstalled
+                             web fonts renders correctly. The fonts are not
+                             embedded into the .pagx. Default: disabled.
+  --embed-fonts              On top of --download-fonts, embed the downloaded
+                             faces into the .pagx (pagx font embed) so the
+                             document is self-contained and its glyph metrics
+                             match the snapshot on any host. Implies
+                             --download-fonts. Default: disabled.
+  --font-dir <dir>           Where downloaded fonts are written
+                             (default: <output>.fonts/)
+  --download-images          Download the external images the page uses and
+                             reference them by local file path instead of
+                             inlining them as base64 data URIs. Keeps the
+                             .pagx small for image-heavy pages; the images are
+                             read from disk at render time. Default: disabled.
+  --image-dir <dir>          Where downloaded images are written
+                             (default: <output>.images/)
+  --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+  --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+  --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
+                             or 'playwright'. Forwarded to snapshot.js.
+                             Honours $HTML_SNAPSHOT_BROWSER.
+  -h, --help                 Show this help`;
+
+function fail(msg, code = 1) {
+  process.stderr.write(`${TOOL_NAME}: ${msg}\n`);
+  process.exit(code);
+}
+
+function failArg(msg) {
+  process.stderr.write(`${TOOL_NAME}: ${msg}\n`);
+  process.stderr.write(`Run with --help for usage.\n`);
+  process.exit(2);
+}
+
+// Parse argv into a normalised options object. Unknown flags abort with exit
+// code 2 to match the old bash wrapper's contract — the wrapper's "any
+// unknown flag is forwarded to snapshot.js" claim was never actually true
+// (the bash had a hard-coded forward list and rejected anything else), so we
+// reproduce the strict behaviour here. If new snapshot flags need passing
+// through, add them to this table.
+function parseArgs(argv) {
+  const opts = {
+    input: '',
+    outputDir: '',
+    outputName: '',
+    pagxBin: process.env.PAGX_BIN || defaultPagxBin(),
+    scale: 1,
+    doResolve: true,
+    doRender: true,
+    keepSubsetHtml: true,
+    inlineIconFonts: true,
+    downloadFonts: false,
+    embedFonts: false,
+    fontDir: '',
+    downloadImages: false,
+    imageDir: '',
+    cookies: [],
+    headers: [],
+    viewportWidth: undefined,
+    viewportHeight: undefined,
+    waitMs: undefined,
+    selector: '',
+    // Batch-mode flags. `batchDir` doubling as the mode switch keeps the
+    // single-file CLI intact when the flag is absent.
+    batchDir: '',
+    outputRoot: '',
+    skipExisting: false,
+    dryRun: false,
+    // Browser engine: defaults to puppeteer; --browser-engine wins over the
+    // env var which wins over this default. Captured separately from the
+    // flag pass-through so the preflight check below can read it.
+    browserEngine: process.env.HTML_SNAPSHOT_BROWSER || DEFAULT_ENGINE,
+  };
+  const requireValue = (flag, value) => {
+    if (value === undefined) failArg(`'${flag}' requires a value`);
+    return value;
+  };
+  // CLI-style numeric parser shared with snapshot.js / server.js: routes
+  // failures through `failArg` so html2pagx prints its own usage hint
+  // alongside the diagnostic, instead of cli.js's bare exit-code-2 fallback.
+  const parseFlagNumber = (flag, value, opts) =>
+    parseNumber(flag, value, { ...(opts || {}), fail: failArg });
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    switch (a) {
+      case '-h':
+      case '--help':
+        process.stdout.write(USAGE + '\n');
+        process.exit(0);
+        break;
+      case '-o':
+      case '--output-dir':
+        opts.outputDir = requireValue(a, argv[++i]);
+        break;
+      case '--output-name':
+        opts.outputName = requireValue(a, argv[++i]);
+        break;
+      case '--pagx-bin':
+        opts.pagxBin = requireValue(a, argv[++i]);
+        break;
+      case '--scale': {
+        const raw = requireValue(a, argv[++i]);
+        const v = Number(raw);
+        // Allow fractional scales (0.5, 1.5, 2x), but reject 0/negatives — the
+        // CLI parseNumber's `>= ${min}` template would print an unreadable
+        // `>= 5e-324` here, so keep this check inline.
+        if (!Number.isFinite(v) || v <= 0) failArg(`--scale expects a positive number, got '${raw}'`);
+        opts.scale = v;
+        break;
+      }
+      case '--no-render':
+        opts.doRender = false;
+        break;
+      case '--no-resolve':
+        opts.doResolve = false;
+        opts.doRender = false;
+        break;
+      case '--no-subset-html':
+        opts.keepSubsetHtml = false;
+        break;
+      case '--no-inline-icon-fonts':
+        opts.inlineIconFonts = false;
+        break;
+      case '--download-fonts':
+        opts.downloadFonts = true;
+        break;
+      case '--embed-fonts':
+        // Embedding the faces requires them to be downloaded first, so
+        // --embed-fonts implies --download-fonts.
+        opts.embedFonts = true;
+        opts.downloadFonts = true;
+        break;
+      case '--font-dir':
+        opts.fontDir = requireValue(a, argv[++i]);
+        break;
+      case '--download-images':
+        opts.downloadImages = true;
+        break;
+      case '--image-dir':
+        opts.imageDir = requireValue(a, argv[++i]);
+        break;
+      case '--cookie':
+        opts.cookies.push(requireValue(a, argv[++i]));
+        break;
+      case '--header':
+        opts.headers.push(requireValue(a, argv[++i]));
+        break;
+      case '--viewport-width':
+        opts.viewportWidth = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 1 });
+        break;
+      case '--viewport-height':
+        opts.viewportHeight = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 1 });
+        break;
+      case '--wait-ms':
+        opts.waitMs = parseFlagNumber(a, requireValue(a, argv[++i]), { min: 0 });
+        break;
+      case '--selector':
+        opts.selector = requireValue(a, argv[++i]);
+        break;
+      case '--browser-engine':
+        opts.browserEngine = requireValue(a, argv[++i]);
+        break;
+      case '--batch':
+        opts.batchDir = requireValue(a, argv[++i]);
+        break;
+      case '--output-root':
+        opts.outputRoot = requireValue(a, argv[++i]);
+        break;
+      case '--skip-existing':
+        opts.skipExisting = true;
+        break;
+      case '--dry-run':
+        opts.dryRun = true;
+        break;
+      case '--':
+        // Everything past `--` would have been forwarded to snapshot.js by
+        // the old bash wrapper. None of the supported flags are positional,
+        // so in practice the marker just absorbs trailing args. Preserve
+        // that behaviour by treating remaining tokens as positional input
+        // candidates.
+        i++;
+        while (i < argv.length) {
+          if (!opts.input) opts.input = argv[i];
+          else failArg(`unexpected positional argument '${argv[i]}'`);
+          i++;
+        }
+        break;
+      default:
+        if (a.startsWith('-')) failArg(`unknown option '${a}'`);
+        if (!opts.input) opts.input = a;
+        else failArg(`unexpected positional argument '${a}'`);
+        break;
+    }
+  }
+  if (opts.batchDir) {
+    // Batch mode owns the input slot — accepting a positional `input` here
+    // would let the user accidentally pass both an HTML file and a directory.
+    if (opts.input) {
+      failArg(`--batch is incompatible with positional input '${opts.input}'`);
+    }
+    if (opts.outputName) {
+      failArg('--batch is incompatible with --output-name (each file derives its own name)');
+    }
+    if (opts.outputDir) {
+      failArg('--batch uses --output-root, not --output-dir');
+    }
+  } else {
+    if (opts.outputRoot) failArg('--output-root only applies in --batch mode');
+    if (opts.skipExisting) failArg('--skip-existing only applies in --batch mode');
+    if (opts.dryRun) failArg('--dry-run only applies in --batch mode');
+    if (!opts.input) {
+      failArg('missing input HTML file');
+    }
+  }
+  return opts;
+}
+
+// Validate that the headless browser engine the user asked for is known and
+// has its npm package on disk. The bash wrapper used to do this; we keep the
+// same checks so a "puppeteer not installed" diagnosis stays a clear up-front
+// error instead of an opaque stack trace from snapshot.js.
+function preflightBrowser(opts) {
+  if (!SUPPORTED_ENGINES.includes(opts.browserEngine)) {
+    fail(`unsupported --browser-engine '${opts.browserEngine}' (expected ${SUPPORTED_ENGINES.join(' or ')})`, 2);
+  }
+  const enginePkgDir = path.join(SCRIPT_DIR, 'node_modules', opts.browserEngine);
+  if (!fs.existsSync(enginePkgDir)) {
+    process.stderr.write(`${TOOL_NAME}: '${opts.browserEngine}' is not installed. Run:\n`);
+    if (opts.browserEngine === 'playwright') {
+      process.stderr.write(`  cd ${SCRIPT_DIR} && npm install playwright\n`);
+      process.stderr.write(`  npx --prefix ${SCRIPT_DIR} playwright install chromium\n`);
+    } else {
+      process.stderr.write(`  cd ${SCRIPT_DIR} && npm install\n`);
+    }
+    process.exit(1);
+  }
+  if (opts.browserEngine === 'puppeteer') {
+    // Puppeteer ships with a pinned Chromium build cached in
+    // $PUPPETEER_CACHE_DIR (defaults to ~/.cache/puppeteer). When it's
+    // missing — for example because npm install ran inside a sandbox with a
+    // redirected cache — surface a clear remediation rather than letting
+    // puppeteer-core throw a stack trace.
+    const cacheDir = process.env.PUPPETEER_CACHE_DIR
+      || path.join(process.env.HOME || '', '.cache', 'puppeteer');
+    const chromeDir = path.join(cacheDir, 'chrome');
+    let installed = false;
+    try {
+      installed = fs.existsSync(chromeDir) && fs.readdirSync(chromeDir).length > 0;
+    } catch (_e) {
+      installed = false;
+    }
+    if (!installed) {
+      process.stderr.write(`${TOOL_NAME}: puppeteer's bundled Chrome is missing from\n`);
+      process.stderr.write(`          ${chromeDir}\n`);
+      process.stderr.write(`Install it with:\n`);
+      process.stderr.write(`  PUPPETEER_CACHE_DIR="${cacheDir}" \\\n`);
+      process.stderr.write(`    npx --prefix ${SCRIPT_DIR} puppeteer browsers install chrome\n`);
+      process.exit(1);
+    }
+  }
+}
+
+function preflightPagxBin(opts) {
+  if (!opts.doResolve && !opts.doRender) return;
+  let stat;
+  try {
+    stat = fs.statSync(opts.pagxBin);
+  } catch (_e) {
+    stat = null;
+  }
+  // statSync().mode bit 0o111 covers user/group/other execute. The previous
+  // bash check (`[[ ! -x ]]`) accepted any of the three, so we mirror that.
+  if (!stat || !stat.isFile() || (stat.mode & 0o111) === 0) {
+    process.stderr.write(`${TOOL_NAME}: pagx binary not found or not executable: ${opts.pagxBin}\n`);
+    process.stderr.write(`Pass --pagx-bin <path> or build it (cmake --build cmake-build-debug --target pagx).\n`);
+    process.exit(1);
+  }
+}
+
+async function main() {
+  const opts = parseArgs(process.argv);
+
+  // Batch mode forks the control flow early: lib/batch.js owns directory
+  // walking, browser lifecycle, and progress prints. The single-file path
+  // below stays unchanged so existing CLI invocations are unaffected.
+  if (opts.batchDir) {
+    preflightBrowser(opts);
+    preflightPagxBin(opts);
+    let result;
+    try {
+      result = await runBatch({
+        inputDir: opts.batchDir,
+        outputRoot: opts.outputRoot,
+        skipExisting: opts.skipExisting,
+        dryRun: opts.dryRun,
+        scriptDir: SCRIPT_DIR,
+        pagxBin: opts.pagxBin,
+        scale: opts.scale,
+        doResolve: opts.doResolve,
+        doRender: opts.doRender,
+        keepSubsetHtml: opts.keepSubsetHtml,
+        embedFonts: opts.embedFonts,
+        downloadFonts: opts.downloadFonts,
+        fontDir: opts.fontDir,
+        downloadImages: opts.downloadImages,
+        imageDir: opts.imageDir,
+        browserEngine: opts.browserEngine,
+        inlineIconFonts: opts.inlineIconFonts,
+        cookies: opts.cookies,
+        headers: opts.headers,
+        viewportWidth: opts.viewportWidth,
+        viewportHeight: opts.viewportHeight,
+        waitMs: opts.waitMs,
+        selector: opts.selector,
+      });
+    } catch (err) {
+      fail(err && err.message ? err.message : String(err), 1);
+    }
+    if (result.failed > 0) process.exit(1);
+    return;
+  }
+
+  if (isHttpUrl(opts.input)) {
+    if (!opts.outputName) {
+      fail('--output-name <name> is required when input is a URL', 2);
+    }
+  } else if (!fs.existsSync(opts.input)) {
+    fail(`input not found: ${opts.input}`, 1);
+  }
+
+  preflightBrowser(opts);
+  preflightPagxBin(opts);
+
+  try {
+    await runHtmlToPagx({
+      input: opts.input,
+      outputDir: opts.outputDir,
+      outputName: opts.outputName,
+      pagxBin: opts.pagxBin,
+      scriptDir: SCRIPT_DIR,
+      scale: opts.scale,
+      doResolve: opts.doResolve,
+      doRender: opts.doRender,
+      keepSubsetHtml: opts.keepSubsetHtml,
+      embedFonts: opts.embedFonts,
+      downloadFonts: opts.downloadFonts,
+      fontDir: opts.fontDir,
+      downloadImages: opts.downloadImages,
+      imageDir: opts.imageDir,
+      browserEngine: opts.browserEngine,
+      inlineIconFonts: opts.inlineIconFonts,
+      cookies: opts.cookies,
+      headers: opts.headers,
+      viewportWidth: opts.viewportWidth,
+      viewportHeight: opts.viewportHeight,
+      waitMs: opts.waitMs,
+      selector: opts.selector,
+      log: (line) => process.stdout.write(line + '\n'),
+    });
+  } catch (err) {
+    if (err instanceof PipelineStepError) {
+      fail(`${err.step} failed`, 1);
+    }
+    process.stderr.write(`${TOOL_NAME}: ${err && err.message ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+}
+
+main().catch((err) => {
+  process.stderr.write(`${TOOL_NAME}: ${err && err.stack ? err.stack : String(err)}\n`);
+  process.exit(1);
+});

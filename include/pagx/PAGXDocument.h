@@ -162,6 +162,19 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
+   * Returns the document's font configuration. Importers populate fallback fonts here
+   * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
+   * so glyph-level fallback can pick them up at layout time). Callers may also register
+   * additional typefaces or fallbacks directly before invoking `applyLayout`.
+   */
+  FontConfig& fontConfig() {
+    return _fontConfig;
+  }
+  const FontConfig& fontConfig() const {
+    return _fontConfig;
+  }
+
+  /**
    * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
    * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
    * decoded counterpart. The renderer queries the provider during layer building via
@@ -273,7 +286,7 @@ class PAGXDocument : public Node {
   void unregisterLiveScene(PAGScene* scene);
 
   std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
-  FontConfig fontConfig;
+  FontConfig _fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.

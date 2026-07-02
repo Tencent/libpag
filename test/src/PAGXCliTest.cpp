@@ -21,6 +21,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "base/PAGTest.h"
 #include "cli/CommandBounds.h"
@@ -35,6 +36,8 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -2513,6 +2516,44 @@ CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
 }
 
+CLI_TEST(PAGXCliTest, Resolve_DeduplicatesInlineSvgImageIds) {
+  // Each inline <svg> is imported by its own SVGImporter, which restarts auto-generated id
+  // numbering from scratch, so two unrelated <image> elements both become Image id="image1".
+  // Resolving must rename the collision so the two ImagePatterns keep pointing at distinct images.
+  auto pagxPath = CopyToTemp("import_resolve_dup_image_id.pagx", "resolve_dup_image_id.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& error : doc->errors) {
+    EXPECT_EQ(error.find("Duplicate node id"), std::string::npos) << error;
+  }
+
+  std::unordered_set<std::string> imageIds;
+  std::vector<const pagx::Image*> images;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<const pagx::Image*>(node.get());
+      EXPECT_TRUE(imageIds.insert(image->id).second) << "duplicate Image id " << image->id;
+      images.push_back(image);
+    }
+  }
+  ASSERT_EQ(images.size(), 2u);
+  EXPECT_NE(images[0], images[1]);
+
+  std::vector<const pagx::Image*> patternTargets;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::ImagePattern) {
+      auto* pattern = static_cast<const pagx::ImagePattern*>(node.get());
+      ASSERT_NE(pattern->image, nullptr);
+      patternTargets.push_back(pattern->image);
+    }
+  }
+  ASSERT_EQ(patternTargets.size(), 2u);
+  EXPECT_NE(patternTargets[0], patternTargets[1]);
+}
+
 CLI_TEST(PAGXCliTest, Resolve_AddsResolvedFromComment) {
   auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_comment.pagx");
   CopyToTemp("import_external.svg", "import_external.svg");
@@ -2594,6 +2635,72 @@ CLI_TEST(PAGXCliTest, Resolve_LayerWithChildrenSkipsResolve) {
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_Help) {
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "--help"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_HelpShort) {
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "-h"});
+  EXPECT_EQ(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_MissingInput) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("missing input file"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_UnknownOption) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "--bogus", "in.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("unknown option"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_UnexpectedArgument) {
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", "a.pagx", "b.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("unexpected argument"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_WriteFailure) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_write_fail_input.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret =
+      CallRun(pagx::cli::RunResolve, {"resolve", pagxPath, "-o", "/nonexistent_dir_xyz/out.pagx"});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(oss.str().find("failed to write"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_SvgFlattenTransformsOption) {
+  auto pagxPath = CopyToTemp("import_node_basic.pagx", "resolve_svg_opt_input.pagx");
+  CopyToTemp("import_external.svg", "import_external.svg");
+  auto outputPath = TempDir() + "/resolve_svg_opt_out.pagx";
+  auto ret = CallRun(pagx::cli::RunResolve,
+                     {"resolve", pagxPath, "--svg-flatten-transforms", "-o", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
 }
 
 //==============================================================================
