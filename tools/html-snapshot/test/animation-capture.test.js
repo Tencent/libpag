@@ -20,6 +20,7 @@ const {
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
+  pagxGlobalSampleCount,
   buildAnimationCapturePayload,
   capturePagxAnimationsOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
@@ -233,8 +234,10 @@ describe('pagxStopScalarSeries', () => {
     ];
     const series = pagxStopScalarSeries(stops);
     expect(series.opacity).toEqual([0, 1]);
-    expect(series.tx).toEqual([0, 40]);
-    expect(series.ty).toEqual([0, 10]);
+    // transform decomposes into the six affine components; a pure translate
+    // folds to [1,0,0,1,tx,ty], so m4/m5 carry the translation.
+    expect(series.m4).toEqual([0, 40]);
+    expect(series.m5).toEqual([0, 10]);
   });
 });
 
@@ -481,6 +484,36 @@ describe('PAGX_TRANSITION_INIT_SCRIPT', () => {
   });
 });
 
+describe('pagxGlobalSampleCount', () => {
+  test('keeps at least the base count for a short timeline', () => {
+    // 500ms @ 40ms → 14 wanted, floored back up to the base 24.
+    expect(pagxGlobalSampleCount(500, 24)).toBe(24);
+    // 1s @ 40ms → 26 (just above the floor); step stays ~40ms.
+    expect(pagxGlobalSampleCount(1000, 24)).toBe(26);
+  });
+
+  test('scales up for a long timeline so the step stays near stepMs', () => {
+    // 28.9s @ 40ms → ~724 samples: the fixed 24 would resolve only ~1.25s,
+    // collapsing a 45ms staggered entrance into one step.
+    const n = pagxGlobalSampleCount(28900, 24);
+    expect(n).toBe(724);
+    // resulting temporal resolution is ~40ms, not ~1.25s
+    expect(28900 / (n - 1)).toBeCloseTo(40, 0);
+  });
+
+  test('caps at maxCount for a pathologically long timeline', () => {
+    expect(pagxGlobalSampleCount(10 * 60 * 1000, 24)).toBe(900);
+    expect(pagxGlobalSampleCount(1e9, 24, 40, 900)).toBe(900);
+  });
+
+  test('honours custom stepMs / maxCount and falls back on a non-positive duration', () => {
+    expect(pagxGlobalSampleCount(2000, 24, 20)).toBe(101);
+    expect(pagxGlobalSampleCount(0, 24)).toBe(24);
+    expect(pagxGlobalSampleCount(-5, 24)).toBe(24);
+    expect(pagxGlobalSampleCount(Infinity, 24)).toBe(24);
+  });
+});
+
 describe('buildAnimationCapturePayload', () => {
   test('produces a self-contained IIFE that calls pagxAnimMain with inlined opts', () => {
     const payload = buildAnimationCapturePayload({ sampleCount: 6, maxElements: 100 });
@@ -488,6 +521,7 @@ describe('buildAnimationCapturePayload', () => {
     expect(payload).toContain('function pagxAnimMain');
     expect(payload).toContain('function pagxExtractTranslate');
     expect(payload).toContain('function pagxCollectTransitions');
+    expect(payload).toContain('function pagxGlobalSampleCount');
     expect(payload).toContain(`"prefix":"${PAGX_ANIM_PREFIX}"`);
     expect(payload).toContain(`"styleId":"${PAGX_ANIM_STYLE_ID}"`);
     expect(payload).toContain('"sampleCount":6');

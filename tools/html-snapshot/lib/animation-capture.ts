@@ -1415,6 +1415,31 @@ export function pagxSampleTimesMs(globalMs: number, samples: number): number[] {
   return out;
 }
 
+// Choose how many evenly-spaced samples the global sampler takes across a
+// timeline of `globalMs`. Because the sampler drives the whole page on one
+// clock, its temporal resolution is `globalMs / (count - 1)`: a *fixed* count
+// (fine for a short 1–3s loop) becomes far too coarse on a long timer-driven
+// demo. A 28.9s auto-play timeline at the base 24 samples resolves only ~1.25s,
+// which collapses fast staggered entrances (e.g. 20 skill perks fading in 45ms
+// apart) and brief click pulses into a single indistinguishable step — every
+// perk then shares one set of keyframes and pops in together instead of in a
+// wave. Scaling the count keeps the step near `stepMs` so those short motions
+// survive, floored at `baseCount` (short loops keep their proven density) and
+// capped at `maxCount` so a pathologically long timeline cannot blow up the
+// O(count × elements) probe. RDP decimation (`pagxDecimateStops`) still
+// collapses the denser grid back to the few keyframes each channel needs, so
+// the extra samples buy temporal fidelity without bloating the output.
+export function pagxGlobalSampleCount(
+  globalMs: number,
+  baseCount: number,
+  stepMs = 40,
+  maxCount = 900,
+): number {
+  if (!(globalMs > 0) || !isFinite(globalMs)) return baseCount;
+  const want = Math.ceil(globalMs / stepMs) + 1;
+  return Math.max(baseCount, Math.min(maxCount, want));
+}
+
 // Universal capture: sample the *whole page* on one shared global clock instead
 // of walking each animation source separately. This mirrors exactly what
 // eval-animation/baseline-frames.js does for the pixel ground truth — measure
@@ -1477,10 +1502,14 @@ export function pagxCollectGlobalSampled(
   // 0..1 progress the sampler walks onto the shared absolute clock. Emit as a
   // single non-looping window (iterations = 1, delay = 0, normal direction):
   // any per-animation loop within [0, globalMs] is baked into the stops, which
-  // is what keeps playback aligned with the baseline's per-time seek.
+  // is what keeps playback aligned with the baseline's per-time seek. The
+  // sample count scales with `globalMs` so a long timeline keeps a fine enough
+  // temporal step to preserve short staggered entrances / brief pulses (see
+  // pagxGlobalSampleCount); short loops fall back to the base density.
+  const effectiveSamples = pagxGlobalSampleCount(globalMs, sampleCount);
   pagxSampleTimeline(
     captured, seen, globalMs, (p) => pagxSeekAllToTime(p * globalMs),
-    1, sampleCount, maxElements, 'normal', 0,
+    1, effectiveSamples, maxElements, 'normal', 0,
   );
   try {
     if (txBlocker && txBlocker.parentNode) txBlocker.parentNode.removeChild(txBlocker);
@@ -1987,6 +2016,7 @@ const PAGX_ANIM_FNS = [
   pagxMeasureGlobalDurationMs,
   pagxCaptureAnimeInstances,
   pagxSeekAllToTime,
+  pagxGlobalSampleCount,
   pagxCollectGlobalSampled,
   pagxEmitCaptured,
   pagxAnimMain,
