@@ -33,7 +33,7 @@ type Platform = 'ios' | 'android' | 'other';
 
 /** Full result returned by checkPagx. */
 export interface PagxCheckResult {
-  /** Score (0-100), higher means smoother; Android >= 65 renders normally, other platforms >= 75. */
+  /** Score (0-100), higher means smoother. Always purely a file risk score (see deviceSupported for hardware checks). */
   score: number;
   /** Device performance level (raw value returned by the WeChat API, -1 means unknown). */
   benchmarkLevel: number;
@@ -41,6 +41,10 @@ export interface PagxCheckResult {
   deviceTier: DeviceTier;
   /** Platform. */
   platform: Platform;
+  /** Whether the device hardware is capable of rendering PAGX files. */
+  deviceSupported: boolean;
+  /** Reason why the hardware is unsupported (e.g., 'Mali-G925 driver defect'). Only set when deviceSupported is false. */
+  unsupportedReason?: string;
   /** Device brand. */
   brand?: string;
   /** Device model. */
@@ -817,24 +821,14 @@ function uint8ArrayToString(data: Uint8Array): string {
 // extension to obtain the real GPU name from UNMASKED_RENDERER: Mali-G925 (Dimensity 9400)
 // / Mali-G1-Ultra (Dimensity 9500). Dimensity 9300 (Mali-G720) is unaffected.
 
-interface DimensityDetectionResult {
-  isUnsupported: boolean;
-  /** Detection source, for logging. */
-  gpuRenderer: string;
-}
+const MALI_DEFECT_REASON = 'Mali-G925 driver defect';
 
-function detectDimensityUnsupported(gpuRenderer: string): DimensityDetectionResult | null {
+function getUnsupportedReason(gpuRenderer: string): string | null {
   if (gpuRenderer && DIMENSITY_GPU_RENDERER_PATTERN.test(gpuRenderer)) {
-    return { isUnsupported: true, gpuRenderer };
+    return MALI_DEFECT_REASON;
   }
   return null;
 }
-
-/**
- * Dimensity 9500 / 9400+ / 9400 devices are unsupported; returns this special value.
- * Consumers check score === DIMENSITY_UNSUPPORTED_SCORE.
- */
-export const DIMENSITY_UNSUPPORTED_SCORE = -1;
 
 // ============================================================================
 // Main Export Function
@@ -842,6 +836,10 @@ export const DIMENSITY_UNSUPPORTED_SCORE = -1;
 
 /**
  * Evaluate the render-stutter risk of a PAGX file; a higher score means smoother rendering.
+ *
+ * Check `deviceSupported` first to determine whether the device hardware can render PAGX files
+ * at all (e.g., Mali-G925 GPU driver defect). Only when `deviceSupported` is true should the
+ * `score` field be used to assess file-level stutter risk.
  *
  * Rendering recommendation (decided by runtime platform):
  * - Android: score >= 65 renders normally.
@@ -853,7 +851,7 @@ export const DIMENSITY_UNSUPPORTED_SCORE = -1;
  * - Low-end (benchmarkLevel <=22/29): thresholds tightened further.
  *
  * @param pagxData - Binary data of the PAGX file (Uint8Array).
- * @returns Promise<PagxCheckResult> - contains the score, device performance level and device tier.
+ * @returns Promise<PagxCheckResult> - contains the score, device support info, device performance level and device tier.
  *
  * @example
  * ```typescript
@@ -863,6 +861,10 @@ export const DIMENSITY_UNSUPPORTED_SCORE = -1;
  * const data = fs.readFileSync(filePath);
  * const result = await CheckPagx(new Uint8Array(data));
  *
+ * if (!result.deviceSupported) {
+ *   wx.showToast({ title: 'This device cannot render PAGX files', icon: 'none' });
+ *   return;
+ * }
  * const minScore = result.platform === 'android' ? 65 : 75;
  * if (result.score < minScore) {
  *   wx.showToast({ title: 'This file may cause stutter', icon: 'none' });
@@ -873,14 +875,16 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   // Fetch device info first (device info must be returned even if parsing fails).
   const deviceInfo = await fetchDeviceInfoAsync();
 
-  // Dimensity 9400 / 9400+ / 9500 (Mali-G925 GPU) have a driver-level memory defect; block immediately.
-  const dimensityCheck = detectDimensityUnsupported(deviceInfo.gpuRenderer);
-  if (dimensityCheck?.isUnsupported) {
+  // Dimensity 9400 / 9400+ / 9500 have a driver-level memory defect; the hardware cannot render.
+  const unsupportedReason = getUnsupportedReason(deviceInfo.gpuRenderer);
+  if (unsupportedReason) {
     return {
-      score: DIMENSITY_UNSUPPORTED_SCORE,
+      score: 0,
       benchmarkLevel: deviceInfo.benchmarkLevel,
       deviceTier: deviceInfo.tier,
       platform: deviceInfo.platform,
+      deviceSupported: false,
+      unsupportedReason,
       brand: deviceInfo.brand,
       model: deviceInfo.model,
       gpuRenderer: deviceInfo.gpuRenderer,
@@ -893,6 +897,7 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     benchmarkLevel: deviceInfo.benchmarkLevel,
     deviceTier: deviceInfo.tier,
     platform: deviceInfo.platform,
+    deviceSupported: true,
     gpuRenderer: deviceInfo.gpuRenderer,
   };
 
@@ -981,6 +986,7 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     benchmarkLevel: deviceInfo.benchmarkLevel,
     deviceTier: deviceInfo.tier,
     platform: deviceInfo.platform,
+    deviceSupported: true,
     brand: deviceInfo.brand,
     model: deviceInfo.model,
     gpuRenderer: deviceInfo.gpuRenderer,
