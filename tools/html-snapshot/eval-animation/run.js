@@ -491,15 +491,19 @@ function writeIndexHtml(rows, outDir, label) {
       <label class="loop"><input type="checkbox" class="loop-chk" checked/> loop</label>
     </div>
   </div>`;
-      const rowFor = (sub, label2) => {
-        let cells = '';
-        for (let i = 0; i < r.frames; i++) {
-          const idx = String(i).padStart(3, '0');
-          cells += `<img src="${dir}/${sub}/frame-${idx}.png" loading="lazy"/>`;
-        }
-        return `<div class="strip"><span class="strip-label">${label2}</span><div class="frames">${cells}</div></div>`;
-      };
-      const strips = rowFor('baseline', 'baseline') + rowFor('render', 'pagx') + rowFor('diff', 'diff');
+      // One column per frame: the frame number once (shared by all three channels), then the
+      // baseline / pagx / diff thumbnails stacked. A single scroll container holds every column, so
+      // there is exactly one scrollbar and one number row driving all three channels.
+      const subs = [['baseline', 'baseline'], ['render', 'pagx'], ['diff', 'diff']];
+      let cells = '';
+      for (let i = 0; i < r.frames; i++) {
+        const idx = String(i).padStart(3, '0');
+        let imgs = '';
+        for (const [sub] of subs) imgs += `<img src="${dir}/${sub}/frame-${idx}.png" loading="lazy"/>`;
+        cells += `<div class="frame-cell" data-frame="${i}"><span class="frame-no">${i + 1}</span>${imgs}</div>`;
+      }
+      const labels = '<span class="lbl-spacer"></span>' + subs.map(([, l]) => `<span class="strip-label">${l}</span>`).join('');
+      const strips = `<div class="strips-body"><div class="strip-labels">${labels}</div><div class="frames">${cells}</div></div>`;
       body = `${player}
   <details class="strips">
     <summary>frame strip</summary>
@@ -555,10 +559,16 @@ function writeIndexHtml(rows, outDir, label) {
   .controls .speed, .controls .loop { font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 4px; }
   .strips { margin-top: 12px; }
   .strips summary { font-size: 12px; color: #64748b; cursor: pointer; }
-  .strip { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-  .strip-label { width: 64px; font-size: 12px; color: #64748b; flex: none; }
+  .strips-body { display: flex; align-items: flex-start; gap: 10px; margin: 8px 0; }
+  .strip-labels { display: flex; flex-direction: column; gap: 6px; flex: none; }
+  .strip-labels .lbl-spacer { height: 12px; }
+  .strip-labels .strip-label { height: 140px; display: flex; align-items: center; font-size: 12px; color: #64748b; }
   .frames { display: flex; gap: 6px; overflow-x: auto; }
-  .frames img { height: 140px; width: auto; background: #f1f5f9; border-radius: 4px; image-rendering: pixelated; }
+  .frame-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; cursor: pointer; }
+  .frame-no { height: 12px; line-height: 12px; font-size: 10px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .frames img { height: 140px; width: auto; background: #f1f5f9; border-radius: 4px; image-rendering: pixelated; display: block; }
+  .frame-cell.active .frame-no { color: #2563eb; font-weight: 700; }
+  .frame-cell.active img { outline: 2px solid #2563eb; outline-offset: -2px; }
   p { color: #475569; font-size: 13px; }
 </style>
 </head>
@@ -626,7 +636,40 @@ class Player {
       this.setFrame(parseInt(this.scrub.value, 10) || 0);
       this.elapsedMs = this.progressForFrame(this.frame) * this.playbackMs;
     });
+
+    // Frame strip: one column per frame (number + baseline/pagx/diff stacked) in a single scroll
+    // container. The player highlights the active frame's column and clicking a column seeks.
+    const section = root.closest('.case') || document;
+    this.stripBox = section.querySelector('.strips .frames');
+    this.stripCells = this.stripBox ? Array.from(this.stripBox.querySelectorAll('.frame-cell')) : [];
+    if (this.stripBox) {
+      this.stripBox.addEventListener('click', (e) => {
+        const cell = e.target.closest('.frame-cell');
+        if (!cell || !this.stripBox.contains(cell)) return;
+        this.pause();
+        this.setFrame(parseInt(cell.getAttribute('data-frame'), 10) || 0);
+        this.elapsedMs = this.progressForFrame(this.frame) * this.playbackMs;
+        this.centerStrips();
+      });
+    }
+
     this.setFrame(0);
+  }
+
+  // Highlight the active frame's column.
+  highlightStrips() {
+    for (let i = 0; i < this.stripCells.length; i++) {
+      this.stripCells[i].classList.toggle('active', i === this.frame);
+    }
+  }
+
+  // Scroll the strip so the active frame's column is centred.
+  centerStrips() {
+    const box = this.stripBox;
+    const cell = this.stripCells[this.frame];
+    if (!box || !cell) return;
+    const target = cell.offsetLeft - (box.clientWidth - cell.offsetWidth) / 2;
+    box.scrollLeft = Math.max(0, target);
   }
 
   frameTimeMs(i) {
@@ -668,6 +711,7 @@ class Player {
       suffix = '(' + Math.round(this.progressForFrame(this.frame) * 100) + '%)';
     }
     this.timeLabel.textContent = 'frame ' + (this.frame + 1) + '/' + n + '  ' + suffix;
+    this.highlightStrips();
   }
 
   toggle() { this.playing ? this.pause() : this.play(); }
@@ -694,7 +738,9 @@ class Player {
         }
       }
       // Map wall-clock elapsed back onto the captured timeline to pick the frame.
+      const prev = this.frame;
       this.setFrame(this.frameForTimeMs((this.elapsedMs / this.playbackMs) * this.durationMs));
+      if (this.frame !== prev) this.centerStrips();
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
