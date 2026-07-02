@@ -74,6 +74,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private String filePath = "";
     private boolean isAttachedToWindow = false;
     private EGLContext sharedContext = null;
+    // Serializes the asynchronous flush() with surface lifecycle changes (create/destroy/release).
+    // Without it, an in-flight async render on the worker thread may present to an ANativeWindow
+    // while the framework is tearing down its SurfaceTexture, leading to a double-close of the
+    // underlying GraphicBuffer fd. This mirrors the std::mutex used in the iOS/macOS PAGView.
+    private final Object renderLock = new Object();
 
     /**
      * [Deprecated](Please use PAGViewListener's onAnimationUpdate instead.)
@@ -497,16 +502,20 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        if (pagSurface != null) {
-            pagSurface.release();
-            pagSurface = null;
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.release();
+                pagSurface = null;
+            }
+            pagSurface = PAGSurface.FromSurfaceTexture(surface, sharedContext);
+            pagPlayer.setSurface(pagSurface);
+            if (pagSurface != null) {
+                pagSurface.clearAll();
+            }
         }
-        pagSurface = PAGSurface.FromSurfaceTexture(surface, sharedContext);
-        pagPlayer.setSurface(pagSurface);
         if (pagSurface == null) {
             return;
         }
-        pagSurface.clearAll();
         animator.update();
         if (mListener != null) {
             mListener.onSurfaceTextureAvailable(surface, width, height);
@@ -515,9 +524,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.updateSize();
+                pagSurface.clearAll();
+            }
+        }
         if (pagSurface != null) {
-            pagSurface.updateSize();
-            pagSurface.clearAll();
             animator.update();
         }
         if (mListener != null) {
@@ -527,12 +540,14 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        pagPlayer.setSurface(null);
+        synchronized (renderLock) {
+            pagPlayer.setSurface(null);
+            if (pagSurface != null) {
+                pagSurface.freeCache();
+            }
+        }
         if (mListener != null) {
             mListener.onSurfaceTextureDestroyed(surface);
-        }
-        if (pagSurface != null) {
-            pagSurface.freeCache();
         }
         // 延迟释放 SurfaceTexture，否则Android 4.4之前版本会在 onDetachedFromWindow() 时 Crash:
         // https://www.jianshu.com/p/675455c225bd
@@ -564,9 +579,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onDetachedFromWindow() {
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
-        if (pagSurface != null) {
-            pagSurface.release();
-            pagSurface = null;
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.release();
+                pagSurface = null;
+            }
         }
         checkVisible();
     }
@@ -670,7 +687,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (isVisible) {
             animator.setDuration(pagPlayer.duration());
         }
-        boolean changed = flush();
+        boolean changed;
+        synchronized (renderLock) {
+            changed = flush();
+        }
         if (changed) {
             updateTextureView();
         }
