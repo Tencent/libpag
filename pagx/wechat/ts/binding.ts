@@ -18,7 +18,6 @@
 
 import { PAGX } from './types';
 import { View } from './pagx-view';
-import { CheckPagx } from './pagx-check';
 import { createBackendTexture, destroyBackendTextures } from './backend-texture';
 import { TGFXBind } from '@tgfx/wechat/binding';
 import type { EmscriptenGL, WindowColorSpace } from '@tgfx/types';
@@ -30,7 +29,6 @@ import type { EmscriptenGL, WindowColorSpace } from '@tgfx/types';
 export const binding = (module: PAGX) => {
   TGFXBind(module);
   module.View = View;
-  module.CheckPagx = CheckPagx;
   // Augment the tgfx adapter namespace with PAGX-specific GL helpers so the C++ side can
   // resolve them via val::module_property("tgfx").call("createBackendTexture", ...). The
   // helpers themselves are PAGX-specific (mipmap-always semantics, WeChat OffscreenCanvas

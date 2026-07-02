@@ -19,7 +19,6 @@
 import type {TGFX} from '@tgfx/types';
 
 import type {View} from './pagx-view';
-import type {CheckPagx} from './pagx-check';
 
 /**
  * Native C++ PAGXView interface exposed via Emscripten bindings.
@@ -222,8 +221,6 @@ export interface PAGX extends TGFX {
      * PAGXInit() resolves. Use View.init(module, canvas, options?) to create an instance.
      */
     View: typeof View;
-    /** PAGX 渲染风险评分函数，返回 0-100 分数或 -1（Mali-G925 设备不支持） */
-    CheckPagx: typeof CheckPagx;
     VectorString: any;
     module: PAGX;
 }
