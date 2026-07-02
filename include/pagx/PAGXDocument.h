@@ -167,6 +167,8 @@ class PAGXDocument : public Node {
    * The image is runtime-only state and is not serialized. Use this for resources the host loads
    * itself (e.g. asynchronously, or from a GPU texture via PAGImage::MakeFromTexture). Existing
    * scenes refresh the affected layers in place.
+   * The PAGImage should be fully resolved before calling this method while holding the GPU context
+   * lock; use pagx::MakeFrom from pagx/tgfx.h in tgfx environments.
    * @param filePath the external file path as declared in the document's Image nodes
    * @param image the decoded image to use, or an empty shared_ptr to clear it
    * @return true if a matching Image node was found
