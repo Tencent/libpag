@@ -20,6 +20,7 @@ const {
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
+  pagxTextSegments,
   pagxGlobalSampleCount,
   buildAnimationCapturePayload,
   capturePagxAnimationsOnPage,
@@ -312,6 +313,37 @@ describe('pagxNormalizeTiming', () => {
   test('defaults empty to linear, passes others through', () => {
     expect(pagxNormalizeTiming('')).toBe('linear');
     expect(pagxNormalizeTiming('ease-in-out')).toBe('ease-in-out');
+  });
+});
+
+describe('pagxTextSegments', () => {
+  test('groups a scripted counter into one segment per value', () => {
+    // combo counter: empty until each value pops in for a few samples.
+    const texts = ['', '', '+1', '+1', '', '+2', '+2', '+2', '', '+3'];
+    const segs = pagxTextSegments(texts);
+    expect(segs).toEqual([
+      { text: '+1', startIdx: 2, endIdx: 3 },
+      { text: '+2', startIdx: 5, endIdx: 7 },
+      { text: '+3', startIdx: 9, endIdx: 9 },
+    ]);
+  });
+
+  test('skips empty samples and starts no segment for them', () => {
+    expect(pagxTextSegments(['', '', ''])).toEqual([]);
+  });
+
+  test('a recurring value in non-adjacent runs yields separate segments', () => {
+    const segs = pagxTextSegments(['GO', 'GO', '', 'GO']);
+    expect(segs).toEqual([
+      { text: 'GO', startIdx: 0, endIdx: 1 },
+      { text: 'GO', startIdx: 3, endIdx: 3 },
+    ]);
+  });
+
+  test('a single stable value is one segment spanning the window', () => {
+    expect(pagxTextSegments(['3', '3', '3'])).toEqual([
+      { text: '3', startIdx: 0, endIdx: 2 },
+    ]);
   });
 });
 

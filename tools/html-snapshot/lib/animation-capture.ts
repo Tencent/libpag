@@ -256,6 +256,34 @@ export interface PagxAnimDescriptor {
   timing: string;
 }
 
+// One distinct text value a dynamic-text element shows during the timeline,
+// together with the styling it carried while visible and the opacity curve to
+// fade it in/out. `pagxBuildTextOverlays` materialises each segment as a
+// separate overlay text layer so the imported PAGX can show the changing
+// glyph (e.g. a combo counter's `+1 … +20`) that a single static text node
+// could never reproduce.
+export interface PagxTextSegment {
+  text: string;
+  fontSize: string | null;
+  // Text paint captured at the segment's most-visible sample. `color` drives
+  // HTML text; `fill` drives SVG `<text>` (whose visible paint is `fill`, not
+  // `color`) — both are pinned on the overlay so either element kind renders in
+  // the right hue. Cloning drops the source `id`, which would otherwise break an
+  // author `#id` fill rule, so the sampled paint is the only reliable source.
+  color: string | null;
+  fill: string | null;
+  // Opacity keyframes over the *whole* global window (offsets 0..1): the
+  // element's sampled opacity inside this segment's window, 0 everywhere else.
+  stops: PagxAnimStop[];
+}
+
+// A text-leaf element whose `textContent` changed across the sampled timeline,
+// with one segment per contiguous run of a distinct non-empty value.
+export interface PagxTextDynamic {
+  el: HTMLElement;
+  segments: PagxTextSegment[];
+}
+
 // ===== Pure helpers (module scope, exported, unit-tested) =====
 
 // transform → translate-only normalisation. The runtime can only play
@@ -1100,6 +1128,31 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
   }
 }
 
+// Group a per-sample text series into contiguous runs of the same *non-empty*
+// value. Each run becomes one `{ text, startIdx, endIdx }` segment (inclusive
+// sample indices); empty samples are gaps and start no segment. A value that
+// recurs in two non-adjacent runs yields two segments, so a counter that shows
+// `+1 … +20` and a countdown that shows `3 2 1 GO` both decompose into one
+// segment per visible number. Pure so it can be unit-tested off-DOM.
+export function pagxTextSegments(
+  texts: string[],
+): Array<{ text: string; startIdx: number; endIdx: number }> {
+  const out: Array<{ text: string; startIdx: number; endIdx: number }> = [];
+  let i = 0;
+  while (i < texts.length) {
+    const t = texts[i];
+    if (!t) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < texts.length && texts[j + 1] === t) j++;
+    out.push({ text: t, startIdx: i, endIdx: j });
+    i = j + 1;
+  }
+  return out;
+}
+
 export function pagxSampleTimeline(
   captured: unknown[],
   seen: Set<Element>,
@@ -1110,9 +1163,19 @@ export function pagxSampleTimeline(
   maxElements: number,
   direction: string,
   delayMs: number,
+  textDynamics?: PagxTextDynamic[],
 ): void {
   const candidates = pagxCandidateElements(maxElements);
   const series = new Map<HTMLElement, Array<Record<string, string | null>>>();
+  // Parallel per-sample record of every text-leaf element (an element with no
+  // element children) so a `textContent` that the timeline mutates — a combo
+  // counter, a 3-2-1 countdown — can be reconstructed as overlay layers. Only
+  // populated when the caller wants it (the global sampler); the library-timeline
+  // callers (GSAP / anime) pass no `textDynamics` and skip the extra bookkeeping.
+  const wantText = Array.isArray(textDynamics);
+  const textLeaf = wantText
+    ? new Map<HTMLElement, { texts: string[]; fontSizes: string[]; colors: string[]; fills: string[]; opacities: number[] }>()
+    : null;
   // Guard sampleCount === 1 so the offset math (i / (sampleCount - 1)) does not divide by zero.
   // Callers normally pass >= 2, but the function is exported and unit-tested as a pure helper.
   if (sampleCount < 2) sampleCount = 2;
@@ -1138,6 +1201,84 @@ export function pagxSampleTimeline(
         series.set(el, arr);
       }
       arr.push(snap);
+      // Only HTML text leaves: an SVG `<text>` (namespace svg) whose glyph the
+      // timeline swaps (e.g. a `<text>`-based 3-2-1-GO countdown) cannot be
+      // reproduced by overlays — the importer converts inline SVG as a unit and
+      // does not animate individual SVG sub-elements as PAG layers, so overlay
+      // clones would stack at a constant opacity instead of alternating. Leaving
+      // SVG text to the existing static path is strictly better than that.
+      if (textLeaf && el.children.length === 0
+        && el.namespaceURI !== 'http://www.w3.org/2000/svg') {
+        let rec = textLeaf.get(el);
+        if (!rec) {
+          rec = { texts: [], fontSizes: [], colors: [], fills: [], opacities: [] };
+          textLeaf.set(el, rec);
+        }
+        let txt = '';
+        try {
+          txt = (el.textContent || '').trim();
+        } catch (_) {
+          txt = '';
+        }
+        rec.texts.push(txt);
+        rec.fontSizes.push(cs.fontSize);
+        rec.colors.push(cs.color);
+        rec.fills.push((cs as unknown as { fill?: string }).fill || '');
+        rec.opacities.push(parseFloat(cs.opacity) || 0);
+      }
+    }
+  }
+  if (textLeaf && textDynamics) {
+    // An element is "dynamic text" when some sample carries a non-empty value
+    // that differs from its t=0 (sample 0) text — i.e. the timeline scripted
+    // the glyph in. Static labels (their text is the same across the window)
+    // vary nowhere and are skipped, so this only fires for scripted counters /
+    // countdowns and leaves ordinary text untouched.
+    for (const [el, rec] of textLeaf) {
+      const base = rec.texts[0];
+      let dynamic = false;
+      for (let i = 1; i < rec.texts.length; i++) {
+        if (rec.texts[i] && rec.texts[i] !== base) {
+          dynamic = true;
+          break;
+        }
+      }
+      if (!dynamic) continue;
+      const ranges = pagxTextSegments(rec.texts);
+      if (ranges.length === 0) continue;
+      const n = rec.texts.length;
+      const segments: PagxTextSegment[] = [];
+      for (const seg of ranges) {
+        // Representative sample = the frame this value is most visible on, used
+        // to snapshot the size / color it carried while shown (a combo scales
+        // its font and shifts its hue with the count).
+        let repIdx = seg.startIdx;
+        let best = -1;
+        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+          if (rec.opacities[i] > best) {
+            best = rec.opacities[i];
+            repIdx = i;
+          }
+        }
+        // Opacity over the whole window: the real sampled fade inside the
+        // segment, 0 outside, so the overlay pops in and out at the exact
+        // global times the baseline shows this value. RDP trims the flat runs.
+        let stops: PagxAnimStop[] = [];
+        for (let i = 0; i < n; i++) {
+          const inSeg = i >= seg.startIdx && i <= seg.endIdx;
+          const op = inSeg ? rec.opacities[i] : 0;
+          stops.push({ offset: n > 1 ? i / (n - 1) : 0, props: { opacity: String(op) } });
+        }
+        stops = pagxDecimateStops(stops);
+        segments.push({
+          text: seg.text,
+          fontSize: rec.fontSizes[repIdx],
+          color: rec.colors[repIdx],
+          fill: rec.fills[repIdx],
+          stops,
+        });
+      }
+      if (segments.length > 0) textDynamics.push({ el, segments });
     }
   }
   for (const [el, samples] of series) {
@@ -1462,6 +1603,7 @@ export function pagxCollectGlobalSampled(
   seen: Set<Element>,
   sampleCount: number,
   maxElements: number,
+  textDynamics?: PagxTextDynamic[],
 ): void {
   let globalMs = 0;
   try {
@@ -1509,7 +1651,7 @@ export function pagxCollectGlobalSampled(
   const effectiveSamples = pagxGlobalSampleCount(globalMs, sampleCount);
   pagxSampleTimeline(
     captured, seen, globalMs, (p) => pagxSeekAllToTime(p * globalMs),
-    1, effectiveSamples, maxElements, 'normal', 0,
+    1, effectiveSamples, maxElements, 'normal', 0, textDynamics,
   );
   try {
     if (txBlocker && txBlocker.parentNode) txBlocker.parentNode.removeChild(txBlocker);
@@ -1520,6 +1662,78 @@ export function pagxCollectGlobalSampled(
     pagxSeekAllToTime(0);
   } catch (_) {
     /* ignore */
+  }
+}
+
+// Materialise the dynamic-text elements the global sampler found into overlay
+// text layers. Runs *after* pagxDomRestore (so the created nodes survive into
+// the snapshot — restore drops anything appended during sampling) and *before*
+// pagxEmitCaptured, pushing one opacity-animated descriptor per segment so the
+// shared emit path installs its `@keyframes` uniformly.
+//
+// For each element (e.g. `#energyCombo`, whose text the demo scripts through
+// `+1 … +20`) the base node's own text is cleared — its box / bg keeps whatever
+// opacity/transform the sampler already captured — and each distinct value it
+// showed becomes a shallow clone stacked right after it, carrying that value's
+// glyph, the size / color it wore while visible, and an opacity window that
+// fades it in and out at the exact global times the baseline shows it. Clones
+// keep the element's class + base inline style (so position, font family, glow
+// and transform-origin all match) but drop its `id` to avoid duplicate ids in
+// the serialised DOM. This targets bare text leaves; a leaf that also painted a
+// background would see that bg duplicated on each overlay, but scripted
+// counters / countdowns are glyph-only in practice.
+export function pagxBuildTextOverlays(
+  textDynamics: PagxTextDynamic[],
+  captured: unknown[],
+  globalMs: number,
+): void {
+  if (!Array.isArray(textDynamics) || textDynamics.length === 0) return;
+  for (const dyn of textDynamics) {
+    const el = dyn.el;
+    if (!el || (el as { isConnected?: boolean }).isConnected === false) continue;
+    if (!el.parentNode) continue;
+    // Clear the base element's own text nodes so the animated box no longer
+    // carries a stale glyph; the overlays below own the changing text.
+    try {
+      for (const node of Array.prototype.slice.call(el.childNodes)) {
+        if (node.nodeType === 3 && node.parentNode) node.parentNode.removeChild(node);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    for (const seg of dyn.segments) {
+      let clone: HTMLElement;
+      try {
+        clone = el.cloneNode(false) as HTMLElement;
+      } catch (_) {
+        continue;
+      }
+      try {
+        clone.removeAttribute('id');
+        clone.textContent = seg.text;
+        if (seg.fontSize) clone.style.fontSize = seg.fontSize;
+        if (seg.color) clone.style.color = seg.color;
+        // SVG `<text>` paints with `fill`, not `color`, and dropping the source
+        // `id` above severs any `#id { fill }` author rule — so pin the sampled
+        // fill directly. Harmless on HTML text (which ignores `fill`). Skip
+        // `none` / gradient-reference paints, which are not plain colors.
+        if (seg.fill && seg.fill !== 'none' && seg.fill.indexOf('url(') === -1) {
+          try { clone.style.setProperty('fill', seg.fill); } catch (_) { /* ignore */ }
+        }
+        el.parentNode.insertBefore(clone, el.nextSibling);
+      } catch (_) {
+        continue;
+      }
+      captured.push({
+        el: clone,
+        keyframes: seg.stops,
+        durationMs: globalMs,
+        delayMs: 0,
+        iterations: 1,
+        direction: 'normal',
+        timing: 'linear',
+      });
+    }
   }
 }
 
@@ -1956,11 +2170,36 @@ export function pagxAnimMain(opts: {
   // imported timeline aligns frame-for-frame with the ground truth. Each seek
   // also advances the virtual clock, so JS timer-driven scene changes are
   // sampled as opacity / transform curves too.
-  pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements);
+  // Elements whose `textContent` the timeline scripts through several values
+  // (a combo counter, a countdown). The sampler records them here; after the
+  // DOM is restored they are rebuilt as overlay text layers so the changing
+  // glyph survives into the snapshot (a single static text node cannot show
+  // `+1` then `+4` then `+20` at different times).
+  const textDynamics: PagxTextDynamic[] = [];
+  pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements, textDynamics);
   try {
     pagxDomRestore(checkpoint);
   } catch (_) {
     /* ignore */
+  }
+  // Rebuild the scripted-text elements as overlays now that the DOM is back to
+  // its initial scene (so the clones we append are not stripped by the restore
+  // above). Recompute the global window — deterministic after the seek-to-0 the
+  // sampler ends on — to time each overlay's fade against the same clock.
+  if (textDynamics.length > 0) {
+    let overlayMs = 0;
+    try {
+      overlayMs = pagxMeasureGlobalDurationMs();
+    } catch (_) {
+      overlayMs = 0;
+    }
+    if (overlayMs > 0 && isFinite(overlayMs)) {
+      try {
+        pagxBuildTextOverlays(textDynamics, captured, overlayMs);
+      } catch (_) {
+        /* ignore */
+      }
+    }
   }
   // Runs last, as a supplement: CSS transitions only interpolate on a property
   // change and are not seekable, so the global sampler cannot reconstruct one
@@ -1999,6 +2238,8 @@ const PAGX_ANIM_FNS = [
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
+  pagxTextSegments,
+  pagxBuildTextOverlays,
   pagxCandidateElements,
   pagxDomCheckpoint,
   pagxDomRestore,
