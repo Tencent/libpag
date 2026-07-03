@@ -478,6 +478,11 @@ export function pagxNormalizeProps(
   if (col != null) out['color'] = col;
   const bg = pagxPickProp(raw, 'background-color', 'backgroundColor');
   if (bg != null) out['background-color'] = bg;
+  // `filter` (glow / shadow / blur). Kept verbatim (including `none`) so a
+  // none <-> drop-shadow(...) transition is preserved as a varying channel; the
+  // importer lowers it onto animatable DropShadowFilter / BlurFilter channels.
+  const flt = pagxPickProp(raw, 'filter', 'filter');
+  if (flt != null) out['filter'] = flt;
   return out;
 }
 
@@ -513,7 +518,7 @@ export function pagxParseTimeMs(v: string): number {
 // Given N computed-style samples for one element, return the subset properties
 // whose value changes across the timeline (so static properties are dropped).
 export function pagxWhichVary(samples: Array<Record<string, string | null>>): string[] {
-  const props = ['opacity', 'transform', 'color', 'background-color'];
+  const props = ['opacity', 'transform', 'color', 'background-color', 'filter'];
   const out: string[] = [];
   for (const p of props) {
     let varies = false;
@@ -572,6 +577,69 @@ export function pagxParseColorChannels(value: string): number[] | null {
   if (parts.length < 3 || parts.slice(0, 3).some((x) => isNaN(x))) return null;
   const a = parts.length >= 4 && !isNaN(parts[3]) ? parts[3] : 1;
   return [parts[0], parts[1], parts[2], a];
+}
+
+// Decompose a computed `filter` string into the scalar channels the RDP
+// decimator tracks, so a glow / shadow / blur animation keeps its curve instead
+// of being flattened. `getComputedStyle().filter` is either `none` or a chain of
+// space-separated functions (`drop-shadow(rgb(...) 0px 0px 16px) blur(4px) …`).
+// We fold every drop-shadow onto ONE representative shadow — the one with the
+// largest `blur * alpha` (the dominant glow) — and every `blur()` onto a single
+// radius, matching how the importer lowers the chain onto a single animatable
+// DropShadowFilter / BlurFilter. `none` (or no recognised function) yields all
+// zeros so a none <-> shadow transition reads as an alpha / blur ramp from 0.
+// Unrecognised functions (brightness, contrast, …) are ignored (dropped, as the
+// runtime has no channel for them).
+export function pagxParseFilterChannels(value: string): {
+  fdx: number; fdy: number; fdb: number;
+  fdr: number; fdg: number; fdbl: number; fda: number;
+  fblur: number;
+} {
+  const zero = { fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0 };
+  const s = (value || '').trim();
+  if (!s || s.toLowerCase() === 'none') return zero;
+  const out = { ...zero };
+  let bestScore = -1;
+  let fblur = 0;
+  // Paren-aware walk of `name( args )` functions (drop-shadow args themselves
+  // contain `rgb(...)`, so a naive regex would mis-split them).
+  let i = 0;
+  while (i < s.length) {
+    while (i < s.length && /\s/.test(s[i])) i++;
+    const open = s.indexOf('(', i);
+    if (open < 0) break;
+    const name = s.slice(i, open).trim().toLowerCase();
+    let depth = 1;
+    let j = open + 1;
+    for (; j < s.length && depth > 0; j++) {
+      if (s[j] === '(') depth++;
+      else if (s[j] === ')') depth--;
+    }
+    const args = s.slice(open + 1, j - 1).trim();
+    if (name === 'drop-shadow') {
+      const color = pagxParseColorChannels(args) || [0, 0, 0, 1];
+      // Strip the color token, then read the remaining lengths in order:
+      // offsetX offsetY [blur].
+      const rest = args.replace(/rgba?\([^)]*\)/i, ' ');
+      const nums = (rest.match(/-?[\d.]+/g) || []).map((n) => parseFloat(n));
+      const ox = nums[0] || 0;
+      const oy = nums[1] || 0;
+      const blur = nums[2] || 0;
+      const score = blur * (color[3] != null ? color[3] : 1);
+      if (score >= bestScore) {
+        bestScore = score;
+        out.fdx = ox; out.fdy = oy; out.fdb = blur;
+        out.fdr = color[0]; out.fdg = color[1]; out.fdbl = color[2];
+        out.fda = color[3] != null ? color[3] : 1;
+      }
+    } else if (name === 'blur') {
+      const m = args.match(/-?[\d.]+/);
+      if (m) fblur = Math.max(fblur, parseFloat(m[0]));
+    }
+    i = j;
+  }
+  out.fblur = fblur;
+  return out;
 }
 
 // Parse the x/y pixels of a normalised `translate(xpx, ypx)` string (the shape
@@ -633,6 +701,17 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
         put('bb', i, c[2]);
         put('ba', i, c[3]);
       }
+    }
+    if (p['filter'] != null) {
+      const f = pagxParseFilterChannels(p['filter']);
+      put('fdx', i, f.fdx);
+      put('fdy', i, f.fdy);
+      put('fdb', i, f.fdb);
+      put('fdr', i, f.fdr);
+      put('fdg', i, f.fdg);
+      put('fdbl', i, f.fdbl);
+      put('fda', i, f.fda);
+      put('fblur', i, f.fblur);
     }
   }
   return series;
@@ -822,6 +901,7 @@ export function pagxBuildCanonicalAnimation(
     if (s.props['background-color'] != null) {
       decls.push('background-color: ' + s.props['background-color']);
     }
+    if (s.props['filter'] != null) decls.push('filter: ' + s.props['filter']);
     if (decls.length === 0) continue;
     lines.push((Math.round(s.offset * 1000) / 10) + '% { ' + decls.join('; ') + '; }');
   }
@@ -1103,6 +1183,7 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
         transform: kf.style.transform,
         color: kf.style.color,
         backgroundColor: kf.style.backgroundColor,
+        filter: kf.style.filter,
       }, elBox);
       if (Object.keys(props).length === 0) continue;
       for (const o of offsets) {
@@ -1194,6 +1275,11 @@ export function pagxSampleTimeline(
         transform: pagxExtractTransform(cs.transform),
         color: cs.color,
         'background-color': cs.backgroundColor,
+        // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
+        // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the
+        // computed string; the importer maps a varying drop-shadow / blur onto
+        // the runtime's animatable DropShadowFilter / BlurFilter channels.
+        filter: cs.filter,
       };
       let arr = series.get(el);
       if (!arr) {
@@ -2229,6 +2315,7 @@ const PAGX_ANIM_FNS = [
   pagxWhichVary,
   pagxReduceKeyframes,
   pagxParseColorChannels,
+  pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxStopScalarSeries,
   pagxRdpKeep,

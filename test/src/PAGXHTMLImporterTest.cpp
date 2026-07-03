@@ -4423,6 +4423,98 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
   EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
 }
 
+// A `filter: drop-shadow(...)` glow authored in @keyframes (with `none` at rest) lowers onto the
+// runtime's animatable DropShadowFilter channels: blurX/blurY ramp with the glow radius and the
+// color channel ramps its alpha in/out. The filter node is minted on the layer (no static filter)
+// and an AnimationObject targets it.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterDropShadowGlowMapsToDropShadowChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes glow {
+        0%   { filter: none; }
+        50%  { filter: drop-shadow(rgba(40, 224, 208, 1) 0px 0px 16px); }
+        100% { filter: none; }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="g" style="width:50px;height:50px;background-color:#000;
+                         animation:glow 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+
+  // The layer gained a DropShadowFilter to drive.
+  auto* div = doc->layers.front()->children.front();
+  pagx::DropShadowFilter* drop = nullptr;
+  for (auto* f : div->filters) {
+    if (auto* d = As<pagx::DropShadowFilter>(f)) {
+      drop = d;
+      break;
+    }
+  }
+  ASSERT_NE(drop, nullptr);
+  ASSERT_FALSE(drop->id.empty());
+
+  // The blur channel ramps up to the authored glow radius (~16px) and back.
+  auto* blurCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "blurX"));
+  ASSERT_NE(blurCh, nullptr);
+  float maxBlur = 0.0f;
+  for (const auto& k : blurCh->keyframes) {
+    if (k.value > maxBlur) maxBlur = k.value;
+  }
+  EXPECT_NEAR(maxBlur, 16.0f, 0.5f);
+
+  // The color channel ramps its alpha from 0 (glow off) up to 1 (glow on) and back.
+  auto* colorCh = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(FindChannel(anim, "color"));
+  ASSERT_NE(colorCh, nullptr);
+  float maxAlpha = 0.0f;
+  float minAlpha = 1.0f;
+  for (const auto& k : colorCh->keyframes) {
+    if (k.value.alpha > maxAlpha) maxAlpha = k.value.alpha;
+    if (k.value.alpha < minAlpha) minAlpha = k.value.alpha;
+  }
+  EXPECT_NEAR(maxAlpha, 1.0f, 0.01f);
+  EXPECT_NEAR(minAlpha, 0.0f, 0.01f);
+
+  // The drop-shadow channels target the minted filter node, not the layer.
+  auto* obj = FindObjectByTarget(anim, drop->id);
+  ASSERT_NE(obj, nullptr);
+}
+
+// A `filter: blur(...)` animation lowers onto a BlurFilter's blurX/blurY channels.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterBlurMapsToBlurChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes soften {
+        0%   { filter: blur(0px); }
+        100% { filter: blur(8px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="b" style="width:50px;height:50px;background-color:#000;
+                         animation:soften 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  auto* blurCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "blurX"));
+  ASSERT_NE(blurCh, nullptr);
+  float maxBlur = 0.0f;
+  for (const auto& k : blurCh->keyframes) {
+    if (k.value > maxBlur) maxBlur = k.value;
+  }
+  EXPECT_NEAR(maxBlur, 8.0f, 0.01f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationAlternateDirectionIsPingPong) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;

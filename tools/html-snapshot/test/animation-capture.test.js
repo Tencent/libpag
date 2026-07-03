@@ -12,6 +12,7 @@ const {
   pagxWhichVary,
   pagxReduceKeyframes,
   pagxParseColorChannels,
+  pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxStopScalarSeries,
   pagxRdpKeep,
@@ -214,6 +215,38 @@ describe('pagxParseColorChannels', () => {
   });
 });
 
+describe('pagxParseFilterChannels', () => {
+  test('none / empty yields all-zero channels', () => {
+    expect(pagxParseFilterChannels('none')).toEqual({
+      fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0,
+    });
+    expect(pagxParseFilterChannels('')).toEqual({
+      fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0,
+    });
+  });
+  test('parses a color-first drop-shadow (computed serialization)', () => {
+    const f = pagxParseFilterChannels('drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
+    expect(f.fdx).toBe(0);
+    expect(f.fdy).toBe(0);
+    expect(f.fdb).toBe(16);
+    expect([f.fdr, f.fdg, f.fdbl]).toEqual([40, 224, 208]);
+    expect(f.fda).toBe(1);
+  });
+  test('folds multiple drop-shadows onto the strongest (blur*alpha) glow', () => {
+    const f = pagxParseFilterChannels(
+      'drop-shadow(rgb(40, 224, 208) 0px 0px 16px) ' +
+      'drop-shadow(rgba(40, 224, 208, 0.85) 0px 0px 28px) brightness(1.3)');
+    // 28 * 0.85 = 23.8 beats 16 * 1 = 16, so the second shadow wins.
+    expect(f.fdb).toBe(28);
+    expect(f.fda).toBeCloseTo(0.85, 5);
+  });
+  test('captures a blur() radius and ignores unsupported functions', () => {
+    const f = pagxParseFilterChannels('blur(5px) brightness(1.2)');
+    expect(f.fblur).toBe(5);
+    expect(f.fdb).toBe(0);
+  });
+});
+
 describe('pagxParseTranslateXY', () => {
   test('parses x and y px', () => {
     expect(pagxParseTranslateXY('translate(12px, -4px)')).toEqual([12, -4]);
@@ -239,6 +272,17 @@ describe('pagxStopScalarSeries', () => {
     // folds to [1,0,0,1,tx,ty], so m4/m5 carry the translation.
     expect(series.m4).toEqual([0, 40]);
     expect(series.m5).toEqual([0, 10]);
+  });
+  test('decomposes a filter drop-shadow into scalar glow channels', () => {
+    const stops = [
+      { offset: 0, props: { filter: 'none' } },
+      { offset: 0.5, props: { filter: 'drop-shadow(rgb(40, 224, 208) 0px 0px 16px)' } },
+      { offset: 1, props: { filter: 'none' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.fdb).toEqual([0, 16, 0]);
+    expect(series.fda).toEqual([0, 1, 0]);
+    expect(series.fdg).toEqual([0, 224, 0]);
   });
 });
 
@@ -445,6 +489,19 @@ describe('pagxBuildCanonicalAnimation', () => {
     });
     const out = pagxBuildCanonicalAnimation(odd, 0, PAGX_ANIM_PREFIX);
     expect(out.keyframesCss).toContain('33.3% {');
+  });
+
+  test('emits filter keyframes (glow / halo)', () => {
+    const glow = Object.assign({}, cap, {
+      keyframes: [
+        { offset: 0, props: { filter: 'none' } },
+        { offset: 0.32, props: { filter: 'drop-shadow(rgb(40, 224, 208) 0px 0px 16px)' } },
+        { offset: 1, props: { filter: 'none' } },
+      ],
+    });
+    const out = pagxBuildCanonicalAnimation(glow, 0, PAGX_ANIM_PREFIX);
+    expect(out.keyframesCss).toContain('filter: none');
+    expect(out.keyframesCss).toContain('filter: drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
   });
 });
 
