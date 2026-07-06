@@ -4122,6 +4122,20 @@ async function materializeDecorativePseudoElements() {
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align',
+    // Animation longhands are forwarded so an *animated* decorative pseudo
+    // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
+    // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
+    // declared against the pseudo selector, which the synthetic `<div>` does
+    // not match, so without copying these the div would freeze at whatever
+    // phase the capture-pause init script left the pseudo in (t=0 = the 0%
+    // keyframe, typically `opacity: 0` / `scaleX(0)`) and then be dropped by
+    // the walker's `isVisible` (opacity 0, no `pagxAnim*`) or collapse to a
+    // zero-size box (`scaleX(0)`). `animation-play-state` is intentionally
+    // omitted: the global capture-pause rule owns it and the sampler drives
+    // `currentTime` directly.
+    'animation-name', 'animation-duration', 'animation-timing-function',
+    'animation-delay', 'animation-iteration-count', 'animation-direction',
+    'animation-fill-mode',
   ];
 
   // Defaults emitted by Chromium for properties that don't change anything.
@@ -4151,6 +4165,10 @@ async function materializeDecorativePseudoElements() {
     ['transform', 'none'],
     ['z-index', 'auto'],
     ['box-sizing', 'content-box'],
+    ['animation-name', 'none'], ['animation-duration', '0s'],
+    ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
+    ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
+    ['animation-fill-mode', 'none'],
   ]);
 
   // A pseudo's `content` value reaches us with quotes preserved
@@ -4211,6 +4229,46 @@ async function materializeDecorativePseudoElements() {
     return parts.join('; ');
   }
 
+  // Return the pseudo's *resting* (un-animated) computed style so the copied
+  // box reflects the state the walker will measure after `takeSnapshot`
+  // cancels every animation — not the frozen 0%-keyframe phase the
+  // capture-pause init script leaves running pseudos in. When the pipeline
+  // freezes the page at t=0, an entrance-animated pseudo (e.g. `animation:
+  // nbLine ... { 0% { opacity: 0; transform: scaleX(0) } }`) reads as
+  // invisible / zero-scaled; baking that in would bury the box's real
+  // geometry and paint colour under transient keyframe values. Cancelling the
+  // pseudo's own WAAPI animation reverts its computed style to the base rule
+  // (the animatable channels fall back to their static / initial values)
+  // while leaving `animation-*` longhands intact for the forwarding copy, so
+  // the synthetic div lands with correct resting geometry AND the animation
+  // that the capture pass then re-samples into a `pagxAnim*`. The pseudo is
+  // never serialised itself (the walker only sees DOM nodes), so cancelling
+  // its animation on the live page has no output-visible side effect. Falls
+  // back to the original style object if `getAnimations` is unavailable or
+  // throws (older engines) — the frozen state is still better than dropping
+  // the box entirely.
+  function restingPseudoStyle(el, pseudo, cs) {
+    const animName = (cs.getPropertyValue('animation-name') || '').trim();
+    if (!animName || animName === 'none') return cs;
+    try {
+      if (typeof el.getAnimations !== 'function') return cs;
+      const anims = el.getAnimations({ subtree: true });
+      let cancelledAny = false;
+      for (let a = 0; a < anims.length; a++) {
+        const eff = anims[a].effect;
+        if (eff && eff.target === el && eff.pseudoElement === pseudo) {
+          try { anims[a].cancel(); cancelledAny = true; } catch (_) { /* ignore */ }
+        }
+      }
+      if (!cancelledAny) return cs;
+      // Flush style/layout so the fresh read reflects the cancelled state.
+      void el.offsetHeight;
+      return getComputedStyle(el, pseudo);
+    } catch (_) {
+      return cs;
+    }
+  }
+
   // `<svg>` subtrees are an opaque resolver target downstream — leaving
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
@@ -4265,7 +4323,11 @@ async function materializeDecorativePseudoElements() {
 
       const div = document.createElement('div');
       div.setAttribute('data-snapshot-pseudo', slot.pseudo);
-      const style = emitInlineStyle(slot.cs);
+      // Read the pseudo's resting style (cancelling its own animation) so an
+      // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
+      // forwarded `animation-*` longhands (see COPY_PROPS) keep the motion.
+      const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
+      const style = emitInlineStyle(restingCs);
       if (style) div.setAttribute('style', style);
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
