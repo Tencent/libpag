@@ -242,12 +242,14 @@ describe('runPagxImportToFile', () => {
     });
     expect(r.code).toBe(0);
     const argv = readArgv(argvPath);
-    // No --html-infer-flex (flex inference is hardcoded on in the importer now).
+    // No --html-infer-flex (flex inference is hardcoded on in the importer now). `--no-resolve`
+    // is passed because this pipeline owns resolution in its dedicated runPagxResolve step.
     expect(argv).toEqual([
       'import',
       '--input', '/in.html',
       '--output', '/out.pagx',
       '--format', 'html',
+      '--no-resolve',
     ]);
     // The subset is already rendered, so the importer's own snapshot is disabled.
     expect(fs.readFileSync(envPath, 'utf8')).toBe('0');

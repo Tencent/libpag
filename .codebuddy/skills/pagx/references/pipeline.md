@@ -173,8 +173,8 @@ curl -sG --data-urlencode 'url=https://example.com/' \
 ```
 
 The server needs the `pagx` binary for `format=pagx`/`both`; point it with `--pagx-bin` if it is not
-at the default location. After getting the `.pagx`, run `pagx resolve` + `pagx render` (or
-`pagx verify`) to preview.
+at the default location. The server's `pagx import` already resolves inline `<svg>`/import
+directives, so after getting the `.pagx` just run `pagx render` (or `pagx verify`) to preview.
 
 ## Manual step-by-step pipeline
 
@@ -183,15 +183,16 @@ For debugging a single step, run them individually:
 ```bash
 node tools/html-snapshot/snapshot.js page.html            # → page.subset.html
 PAGX_HTML_SNAPSHOT=0 pagx import --format html \
-  --input page.subset.html --output page.pagx             # → page.pagx (skip re-snapshot)
-pagx resolve page.pagx                                     # expand svg/import
+  --input page.subset.html --output page.pagx             # → page.pagx (skip re-snapshot, auto-resolves)
 pagx render page.pagx -o page.png --scale 2                # preview
 ```
 
 `PAGX_HTML_SNAPSHOT=0` disables the importer's built-in snapshot so it imports the already-rendered
-subset directly instead of running the browser a second time. Inspecting `page.subset.html` shows
-exactly what the browser captured — the fastest way to see why an element is missing or
-mispositioned. `pagx verify page.pagx` runs diagnostics + layout + render in one call.
+subset directly instead of running the browser a second time. `pagx import` resolves inline
+`<svg>`/import directives by default (pass `--no-resolve` to inspect them before expansion, then
+`pagx resolve page.pagx` manually). Inspecting `page.subset.html` shows exactly what the browser
+captured — the fastest way to see why an element is missing or mispositioned. `pagx verify
+page.pagx` runs diagnostics + layout + render in one call.
 
 ## Direct subset import without a browser
 

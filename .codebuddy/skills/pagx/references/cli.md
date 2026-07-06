@@ -320,11 +320,20 @@ skipped or downgraded and recorded as warnings. Conversion warnings are **suppre
 (they are noisy and non-fatal); pass `--verbose` / `-v` to print them to stderr. Errors are always
 printed regardless of `--verbose`.
 
+**Import directives are resolved by default.** The HTML importer represents external SVG
+`<img src="….svg">` and inline `<svg>…</svg>` as unresolved `import` directives on a Layer.
+`import` expands those into native PAGX nodes in the same pass, so the output is fully flattened
+and a separate `pagx resolve` is normally unnecessary. Pass `--no-resolve` to keep the directives
+in place (e.g. to preserve external references, or to resolve later with different options).
+Resolve failures are non-fatal: the file is still written with the failed directives left in
+place, and the process exits non-zero so scripts can detect it.
+
 ```bash
 pagx import --input icon.svg                      # SVG to icon.pagx
 pagx import --input icon.svg --output out.pagx    # SVG to out.pagx
-pagx import --input layout.html                   # HTML to layout.pagx
+pagx import --input layout.html                   # HTML to layout.pagx (import directives resolved)
 pagx import --input page.html --output card.pagx  # HTML to card.pagx
+pagx import --input page.html --no-resolve        # keep inline <svg>/import directives unexpanded
 pagx import --input page.html -v                  # print conversion warnings
 ```
 
@@ -333,6 +342,7 @@ pagx import --input page.html -v                  # print conversion warnings
 | `--input <file\|url>` | Input file or URL to import (required) |
 | `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
+| `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### SVG options
@@ -388,6 +398,10 @@ nodes. When a Layer has explicit `width`/`height`, content is uniformly scaled t
 (centered, aspect ratio preserved). Otherwise, the Layer's size is set from the source
 dimensions. Adds a comment indicating the source (e.g., `<!-- Resolved from: inline svg -->`
 or `<!-- Resolved from: assets/logo.svg -->`).
+
+`pagx import` already runs this pass by default, so this command is mainly for **hand-authored**
+PAGX files that reference external SVG or embed inline `<svg>`, or for PAGX produced with
+`pagx import --no-resolve`. It is idempotent — running it on an already-resolved file is a no-op.
 
 ```bash
 pagx resolve design.pagx                          # resolve in place

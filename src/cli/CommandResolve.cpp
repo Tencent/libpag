@@ -312,6 +312,36 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
 }
 
 //--------------------------------------------------------------------------------------------------
+// Reusable document resolve
+//--------------------------------------------------------------------------------------------------
+
+ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
+                             const ImportFormatOptions& formatOptions) {
+  ResolveStats stats = {};
+  if (doc == nullptr) {
+    return stats;
+  }
+
+  ResolveLayers(doc->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
+
+  // Also resolve in Composition layers.
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
+                    stats.errorCount);
+    }
+  }
+
+  if (stats.resolvedCount > 0) {
+    // Merging several inline-SVG imports into one document can collide their auto-generated ids;
+    // rename the duplicates before the optimizer and exporter consume the merged tree.
+    DeduplicateNodeIds(doc);
+  }
+  return stats;
+}
+
+//--------------------------------------------------------------------------------------------------
 // Entry point
 //--------------------------------------------------------------------------------------------------
 
@@ -328,27 +358,13 @@ int RunResolve(int argc, char* argv[]) {
   }
 
   auto baseDir = GetDirectory(options.inputFile);
-  int resolvedCount = 0;
-  int errorCount = 0;
-
-  ResolveLayers(doc->layers, baseDir, options.formatOptions, doc.get(), resolvedCount, errorCount);
-
-  // Also resolve in Composition layers.
-  for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      ResolveLayers(comp->layers, baseDir, options.formatOptions, doc.get(), resolvedCount,
-                    errorCount);
-    }
-  }
+  auto stats = ResolveDocument(doc.get(), baseDir, options.formatOptions);
+  int resolvedCount = stats.resolvedCount;
+  int errorCount = stats.errorCount;
 
   if (resolvedCount == 0 && errorCount == 0) {
     return 0;
   }
-
-  // Merging several inline-SVG imports into one document can collide their auto-generated ids;
-  // rename the duplicates before the optimizer and exporter consume the merged tree.
-  DeduplicateNodeIds(doc.get());
 
   // Always run the optimizer so the resolve output is stable regardless of whether the input
   // contained imports or already-authored structure. The optimizer is conservative: any Layer

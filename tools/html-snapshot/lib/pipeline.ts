@@ -201,7 +201,11 @@ export async function runPagxImportToFile(
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
-  const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html'];
+  // `--no-resolve`: `pagx import` resolves import directives by default now, but this pipeline
+  // has its own dedicated resolve step (runPagxResolve) that owns diagnostics, progress logging,
+  // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
+  const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
+    '--no-resolve'];
   // Flex inference is always on inside the importer now. The subset is already rendered, so
   // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
   const result = await spawnCapture(pagxBin, args, {
