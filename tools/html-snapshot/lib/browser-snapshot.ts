@@ -2539,6 +2539,105 @@ function emitInlineRunMarkup(el, parentComputed) {
   return out;
 }
 
+// The `<mark>` highlighter idiom paints a gradient over only a short band near
+// the text baseline via `background-size: 100% 0.6em; background-position: 0 88%;
+// background-repeat: no-repeat` — the tint hugs the lower part of the glyphs
+// rather than filling the whole line box. The snapshot bakes browser layout into
+// flat boxes, so instead of forwarding these properties (the importer paints a
+// gradient across the entire geometry) we compute the tile the browser actually
+// paints and emit the fill only over that sub-rect.
+//
+// `backgroundBandDescriptor` recognises the shape and returns the parsed
+// size/position/repeat, or null. It is deliberately restricted to a lone
+// gradient `background-image` with no border / shadow / background-color: those
+// visuals need the full box, so mixing them would require painting two rects.
+function backgroundBandDescriptor(computed) {
+  const img = (computed.getPropertyValue('background-image') || '').trim();
+  if (!img || img === 'none' || !/gradient/i.test(img)) return null;
+  const bg = (computed.getPropertyValue('background-color') || '').trim();
+  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return null;
+  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
+      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) return null;
+  const shadow = (computed.getPropertyValue('box-shadow') || '').trim();
+  if (shadow && shadow !== 'none') return null;
+  const size = (computed.getPropertyValue('background-size') || '').trim().toLowerCase();
+  if (!size || size === 'auto' || size === 'auto auto') return null;
+  // `contain` / `cover` scale to the box, so there is nothing to inset.
+  if (size.includes('contain') || size.includes('cover')) return null;
+  const sizeTokens = size.split(/\s+/);
+  if (sizeTokens.length > 2) return null;
+  const posTokens = (computed.getPropertyValue('background-position') || '0% 0%')
+    .trim().toLowerCase().split(/\s+/);
+  if (posTokens.length > 2) return null; // 3/4-value edge syntax: leave full box
+  const repeat = (computed.getPropertyValue('background-repeat') || 'repeat').trim().toLowerCase();
+  const rTokens = repeat.split(/\s+/);
+  let repeatX;
+  let repeatY;
+  if (repeat === 'repeat-x') {
+    repeatX = true;
+    repeatY = false;
+  } else if (repeat === 'repeat-y') {
+    repeatX = false;
+    repeatY = true;
+  } else if (rTokens.length === 2) {
+    repeatX = rTokens[0] !== 'no-repeat';
+    repeatY = rTokens[1] !== 'no-repeat';
+  } else {
+    repeatX = repeatY = rTokens[0] !== 'no-repeat';
+  }
+  return { sizeTokens, posTokens, repeatX, repeatY };
+}
+
+// Resolve one axis of `background-size` (a computed length or percentage; `em`
+// is already px in computed style) against the box extent `base`. Returns null
+// for an unparseable token so the caller keeps the full box.
+function resolveBandSizeAxis(tok, base) {
+  if (tok == null || tok === 'auto') return base;
+  if (tok.endsWith('%')) return (parseFloat(tok) / 100) * base;
+  const v = parseFloat(tok);
+  return Number.isFinite(v) ? v : null;
+}
+
+// Resolve one axis of `background-position` into a pixel offset of the tile
+// inside the box, following CSS: a percentage aligns the same percentage point
+// of the tile with that of the box, a length is a direct offset, keywords map to
+// 0% / 50% / 100%.
+function resolveBandPosAxis(tok, base, tile, axis) {
+  if (tok == null) return 0;
+  if (tok === 'center') return (base - tile) / 2;
+  if (axis === 'x') {
+    if (tok === 'left') return 0;
+    if (tok === 'right') return base - tile;
+  } else {
+    if (tok === 'top') return 0;
+    if (tok === 'bottom') return base - tile;
+  }
+  if (tok.endsWith('%')) return (base - tile) * (parseFloat(tok) / 100);
+  const v = parseFloat(tok);
+  return Number.isFinite(v) ? v : 0;
+}
+
+// Given a box rect, return the sub-rect the highlighter gradient actually paints
+// (per `backgroundBandDescriptor`), or null when no band applies or it fills the
+// whole box. An axis that repeats fills that axis (offset 0, extent = box).
+function bandInsetRect(r, computed) {
+  const d = backgroundBandDescriptor(computed);
+  if (!d) return null;
+  let tileW = resolveBandSizeAxis(d.sizeTokens[0], r.width);
+  let tileH = resolveBandSizeAxis(d.sizeTokens.length > 1 ? d.sizeTokens[1] : 'auto', r.height);
+  if (tileW == null || tileH == null) return null;
+  if (d.repeatX) tileW = r.width;
+  if (d.repeatY) tileH = r.height;
+  const offX = d.repeatX ? 0 : resolveBandPosAxis(d.posTokens[0], r.width, tileW, 'x');
+  const offY = d.repeatY
+    ? 0
+    : resolveBandPosAxis(d.posTokens.length > 1 ? d.posTokens[1] : 'center', r.height, tileH, 'y');
+  const rect = { left: r.left + offX, top: r.top + offY, width: tileW, height: tileH };
+  const unchanged = Math.abs(rect.left - r.left) < 0.01 && Math.abs(rect.top - r.top) < 0.01 &&
+    Math.abs(rect.width - r.width) < 0.01 && Math.abs(rect.height - r.height) < 0.01;
+  return unchanged ? null : rect;
+}
+
 // An inline-level box (`display: inline`) that wraps across several lines
 // paints its background / border / radius / shadow ONCE PER LINE FRAGMENT —
 // never as one rectangle spanning the union bounding box. `getBoundingClientRect`
@@ -2548,26 +2647,30 @@ function emitInlineRunMarkup(el, parentComputed) {
 // the last, instead of the tight per-line highlight the browser actually draws.
 //
 // `inlineBoxLineRects` decides whether the element is a wrapped inline box and,
-// if so, returns one per-line border-box rect (each relative to `parentRect`).
-// `getClientRects()` reports one border box per line fragment for an inline
-// element (block / inline-block / flex boxes report a single box, so those fall
-// through to the single-box path); `mergeRectsOnSameLine` coalesces same-line
-// glyph-run splits (bidi / soft-hyphen) back to one rect per visual line.
-// Returns null when the element is not an inline box, carries no box visuals, or
-// occupies a single fragment — in every such case the caller keeps its existing
-// single-box emission. Kept free of `buildStyle` so it stays unit-testable in
-// Node (the style schema lives only in the browser payload).
+// if so, returns one per-line border-box rect (each relative to `parentRect`),
+// with any highlighter band (see bandInsetRect) already applied. `getClientRects`
+// reports one border box per line fragment for an inline element (block /
+// inline-block / flex boxes report a single box, so those fall through to the
+// single-box path); `mergeRectsOnSameLine` coalesces same-line glyph-run splits
+// (bidi / soft-hyphen) back to one rect per visual line. Returns null when the
+// element is not an inline box, carries no box visuals, or occupies a single
+// unbanded fragment — in every such case the caller keeps its existing
+// single-box emission. A single-line box whose band shrinks the paint rect still
+// takes this path so the band is honoured. Kept free of `buildStyle` so it stays
+// unit-testable in Node (the style schema lives only in the browser payload).
 function inlineBoxLineRects(el, parentRect, computed) {
   if (computed.display !== 'inline') return null;
   if (!hasBoxVisualsForInline(computed)) return null;
   if (typeof el.getClientRects !== 'function') return null;
   const raw = Array.from(el.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
-  if (raw.length <= 1) return null;
+  if (raw.length < 1) return null;
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   const blockAxis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
   const lineRects = mergeRectsOnSameLine(raw, blockAxis);
-  if (lineRects.length <= 1) return null;
-  return lineRects.map((r) => ({
+  const painted = lineRects.map((r) => bandInsetRect(r, computed) || r);
+  const banded = painted.some((p, i) => p !== lineRects[i]);
+  if (lineRects.length <= 1 && !banded) return null;
+  return painted.map((r) => ({
     left: r.left - parentRect.left,
     top: r.top - parentRect.top,
     width: r.width,
@@ -3406,6 +3509,10 @@ const HELPER_FNS = [
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
+  backgroundBandDescriptor,
+  resolveBandSizeAxis,
+  resolveBandPosAxis,
+  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   renderInlineTextLeaf,
@@ -3925,6 +4032,7 @@ export {
   inlineCanvases,
   materializeDecorativePseudoElements,
   mergeRectsOnSameLine,
+  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   HELPERS_SRC,
