@@ -237,8 +237,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     if (pagComposition) {
       pagDecoder = pag::PAGDecoder::MakeFrom(pagComposition, self.maxFrameRate, scaleFactor);
     } else if (filePath) {
-      auto file = pag::PAGFile::Load([filePath UTF8String]);
-      pagDecoder = pag::PAGDecoder::MakeFrom(file, self.maxFrameRate, scaleFactor);
+      PAGFile* pagFile = [PAGFile Load:filePath];
+      if (pagFile != nil) {
+        auto layer = [[pagFile impl] pagLayer];
+        auto composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+        pagDecoder = pag::PAGDecoder::MakeFrom(composition, self.maxFrameRate, scaleFactor);
+      }
     }
     if (pagDecoder) {
       width = pagDecoder->width();
@@ -639,7 +643,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGComposition*)getComposition {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (filePath == nil && pagComposition == nullptr) {
+  if (filePath || pagComposition == nullptr) {
     return nil;
   }
   return (PAGComposition*)[PAGLayerImpl ToPAGLayer:pagComposition];
