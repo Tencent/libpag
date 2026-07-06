@@ -481,8 +481,17 @@ export function pagxNormalizeProps(
   // `filter` (glow / shadow / blur). Kept verbatim (including `none`) so a
   // none <-> drop-shadow(...) transition is preserved as a varying channel; the
   // importer lowers it onto animatable DropShadowFilter / BlurFilter channels.
+  // An animated `box-shadow` glow is folded in as an equivalent drop-shadow so
+  // it rides the same channel (the runtime has no box-shadow animation channel).
   const flt = pagxPickProp(raw, 'filter', 'filter');
-  if (flt != null) out['filter'] = flt;
+  const shadowFilter = pagxBoxShadowToFilter(pagxPickProp(raw, 'box-shadow', 'boxShadow'));
+  let filterVal = flt;
+  if (shadowFilter) {
+    filterVal = filterVal != null && filterVal !== 'none'
+      ? filterVal + ' ' + shadowFilter
+      : shadowFilter;
+  }
+  if (filterVal != null) out['filter'] = filterVal;
   return out;
 }
 
@@ -832,6 +841,73 @@ export function pagxSplitTopLevelCommas(value: string): string[] {
   }
   out.push(value.slice(start).trim());
   return out;
+}
+
+// Convert a computed `box-shadow` string into an equivalent `drop-shadow(...)`
+// filter chain, so a glow that only appears in an animated state (e.g. a `.on`
+// class toggled by JS over the timeline) rides the runtime's animatable filter
+// channel.
+//
+// The capture pipeline only plays back opacity / transform / color /
+// background-color / filter (see pagxWhichVary): `box-shadow` has no animation
+// channel, so a shadow that toggles across the timeline silently drops its glow
+// (only a co-declared `opacity` survives). CSS `box-shadow` and
+// `filter: drop-shadow()` are visually equivalent for the zero-spread outer
+// glows these UIs use, and the importer already lowers an animated
+// `filter: drop-shadow(...)` onto a DropShadowFilter — so folding the shadow into
+// the filter channel is all that is needed. Static box-shadows are unaffected:
+// a shadow present in every sample stays constant on the filter channel and is
+// dropped by pagxWhichVary, leaving the static snapshot path to paint it.
+//
+// Computed form is `<color> <offX> <offY> <blur> [<spread>]` per shadow (comma
+// separated). `inset` shadows have no drop-shadow analogue and are skipped;
+// `spread` is dropped (the importer ignores it anyway). Returns the space-joined
+// `drop-shadow(...)` chain, or null when nothing convertible remains.
+export function pagxBoxShadowToFilter(boxShadow: string | null | undefined): string | null {
+  const raw = (boxShadow || '').trim();
+  if (!raw || raw.toLowerCase() === 'none') return null;
+  const parts: string[] = [];
+  for (const item of pagxSplitTopLevelCommas(raw)) {
+    const spec = item.trim();
+    if (!spec) continue;
+    // Top-level whitespace tokeniser that keeps `rgb(...)` / `rgba(...)` intact.
+    const tokens: string[] = [];
+    let depth = 0;
+    let cur = '';
+    for (let i = 0; i < spec.length; i++) {
+      const c = spec[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth = Math.max(0, depth - 1);
+      if (depth === 0 && /\s/.test(c)) {
+        if (cur) {
+          tokens.push(cur);
+          cur = '';
+        }
+      } else {
+        cur += c;
+      }
+    }
+    if (cur) tokens.push(cur);
+    let inset = false;
+    const lengths: string[] = [];
+    const colors: string[] = [];
+    for (const t of tokens) {
+      if (t.toLowerCase() === 'inset') {
+        inset = true;
+        continue;
+      }
+      if (/^-?[\d.]+(px)?$/.test(t)) lengths.push(t);
+      else colors.push(t);
+    }
+    if (inset) continue; // inner shadow: no drop-shadow analogue
+    if (lengths.length < 2) continue; // need at least offX / offY
+    const offX = lengths[0];
+    const offY = lengths[1];
+    const blur = lengths.length >= 3 ? lengths[2] : '0px';
+    const color = colors.length ? colors.join(' ') : 'rgb(0, 0, 0)';
+    parts.push('drop-shadow(' + offX + ' ' + offY + ' ' + blur + ' ' + color + ')');
+  }
+  return parts.length ? parts.join(' ') : null;
 }
 
 // Resolve the effective CSS-style timing-function for a WAAPI animation.
@@ -1270,16 +1346,27 @@ export function pagxSampleTimeline(
     void document.body.offsetHeight; // force reflow
     for (const el of candidates) {
       const cs = getComputedStyle(el);
+      // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
+      // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the
+      // computed string; the importer maps a varying drop-shadow / blur onto
+      // the runtime's animatable DropShadowFilter / BlurFilter channels. An
+      // animated `box-shadow` glow (e.g. a `.on` class toggled by JS) has no
+      // channel of its own, so it is folded into the filter channel here as an
+      // equivalent drop-shadow (constant shadows stay flat and get dropped by
+      // pagxWhichVary — see pagxBoxShadowToFilter).
+      const shadowFilter = pagxBoxShadowToFilter(cs.boxShadow);
+      let filterVal = cs.filter;
+      if (shadowFilter) {
+        filterVal = filterVal && filterVal !== 'none'
+          ? filterVal + ' ' + shadowFilter
+          : shadowFilter;
+      }
       const snap: Record<string, string | null> = {
         opacity: cs.opacity,
         transform: pagxExtractTransform(cs.transform),
         color: cs.color,
         'background-color': cs.backgroundColor,
-        // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
-        // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the
-        // computed string; the importer maps a varying drop-shadow / blur onto
-        // the runtime's animatable DropShadowFilter / BlurFilter channels.
-        filter: cs.filter,
+        filter: filterVal,
       };
       let arr = series.get(el);
       if (!arr) {
@@ -2322,6 +2409,7 @@ const PAGX_ANIM_FNS = [
   pagxDecimateStops,
   pagxNormalizeTiming,
   pagxSplitTopLevelCommas,
+  pagxBoxShadowToFilter,
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,

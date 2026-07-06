@@ -430,6 +430,45 @@ PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {
 }
 
 /**
+ * Test case: a LayerFilter carrying an id must serialize that id so animations can target the
+ * filter node. Regression for the exporter dropping filter ids, which left every animated
+ * DropShadowFilter / BlurFilter target dangling (the animation bound to nothing and never played).
+ */
+PAGX_TEST(PAGXTest, LayerFilterIdSerialization) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->id = "seg";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 60;
+  rect->size.height = 30;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
+  solidColor->color = {0.16f, 0.88f, 0.82f, 1.0f};
+  fill->color = solidColor;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->id = "seg_glow";
+  layer->filters.push_back(shadow);
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("id=\"seg_glow\""), std::string::npos);
+
+  // The id must survive a round-trip so the node stays addressable by animation targets.
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  ASSERT_EQ(doc2->layers[0]->filters.size(), 1u);
+  EXPECT_EQ(doc2->layers[0]->filters[0]->id, "seg_glow");
+}
+
+/**
  * Test case: PAGXDocument XML round-trip (create -> export -> parse)
  */
 PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {

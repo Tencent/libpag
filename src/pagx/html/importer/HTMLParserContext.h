@@ -176,6 +176,16 @@ class HTMLParserContext {
   // import directive content.
   std::string serializeSvg(const std::shared_ptr<DOMNode>& svgNode);
 
+  // Post-tree cleanup: drops `BackgroundBlurStyle` (CSS `backdrop-filter: blur`) from any layer
+  // that sits under an ancestor (or is itself) whose opacity is animated below 1. PAGX renders an
+  // `opacity < 1` group into an isolated offscreen surface, so a descendant backdrop-filter samples
+  // that empty/self surface instead of the page behind and tints the box with its own colour.
+  // Chromium samples the real backdrop, so the blur is invisible when nothing sits behind the box;
+  // dropping it matches the baseline far better than the tint artifact. Runs after the animation
+  // pass so the fading layers are known. Static `opacity < 1` is handled separately by the
+  // box-shadow fallback path in the HTML writer.
+  void suppressBackdropBlurUnderOpacityFade();
+
   // Diagnostics ------------------------------------------------------------------------
   // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
   // sites where the unique_ptr-deref boilerplate would dominate the surrounding code.

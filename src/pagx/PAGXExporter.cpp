@@ -1084,6 +1084,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
       xml.openElement("BlurFilter");
+      if (!node->id.empty()) xml.addAttribute("id", node->id);
       xml.addRequiredAttribute("blurX", filter->blurX);
       xml.addRequiredAttribute("blurY", filter->blurY);
       if (filter->tileMode != Default<BlurFilter>().tileMode) {
@@ -1096,6 +1097,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
+      if (!node->id.empty()) xml.addAttribute("id", node->id);
       WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<DropShadowFilter>().shadowOnly);
@@ -1106,6 +1108,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
+      if (!node->id.empty()) xml.addAttribute("id", node->id);
       WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<InnerShadowFilter>().shadowOnly);
@@ -1116,6 +1119,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
+      if (!node->id.empty()) xml.addAttribute("id", node->id);
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       if (filter->blendMode != Default<BlendFilter>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
@@ -1127,6 +1131,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::ColorMatrixFilter: {
       auto filter = static_cast<const ColorMatrixFilter*>(node);
       xml.openElement("ColorMatrixFilter");
+      if (!node->id.empty()) xml.addAttribute("id", node->id);
       xml.addAttribute("matrix", FloatListToString(filter->matrix.data(), filter->matrix.size()));
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();

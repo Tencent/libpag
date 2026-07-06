@@ -184,6 +184,18 @@ inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   return solid->color;
 }
 
+// Counts `BackgroundBlurStyle` nodes across `layer` and its whole subtree. Used to assert the
+// backdrop-filter suppression pass without depending on the exact wrapper-layer nesting.
+inline size_t CountBackgroundBlurStyles(pagx::Layer* layer) {
+  if (!layer) return 0;
+  size_t count = 0;
+  for (auto* s : layer->styles) {
+    if (As<pagx::BackgroundBlurStyle>(s)) count++;
+  }
+  for (auto* c : layer->children) count += CountBackgroundBlurStyles(c);
+  return count;
+}
+
 // Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
 inline pagx::Channel* FindChannel(pagx::Animation* anim, const std::string& name) {
   if (!anim) return nullptr;
@@ -987,6 +999,72 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
     }
   }
   EXPECT_TRUE(foundBlur);
+}
+
+// A `backdrop-filter: blur` under an ancestor whose opacity is animated below 1 is dropped: PAGX
+// isolates the fading group into an offscreen surface, so the child backdrop-filter would sample
+// that surface (its own tint) instead of the page behind. See
+// HTMLParserContext::suppressBackdropBlurUnderOpacityFade.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedUnderAnimatedOpacityAncestor) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes leave { 0% { opacity: 1; } 100% { opacity: 0; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="group" style="position:absolute;left:0;top:0;width:100px;height:100px;
+                             animation:leave 2s linear">
+        <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                    background-color:#FFFFFF88;backdrop-filter:blur(6px)"></div>
+      </div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+}
+
+// The element that itself animates its opacity also isolates into an offscreen surface, so its own
+// backdrop-filter blur is dropped as well.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedWhenElementAnimatesOwnOpacity) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes appear { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                  background-color:#FFFFFF88;backdrop-filter:blur(6px);
+                  animation:appear 2s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+}
+
+// Without any opacity animation on the element or an ancestor, the backdrop-filter blur stays: a
+// statically fully-opaque group is not isolated, so PAGX samples the real backdrop correctly.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurKeptWithoutOpacityAnimation) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes slide { 0% { transform: translateX(0px); } 100% { transform: translateX(20px); } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="group" style="position:absolute;left:0;top:0;width:100px;height:100px;
+                             animation:slide 2s linear">
+        <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                    background-color:#FFFFFF88;backdrop-filter:blur(6px)"></div>
+      </div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 1u);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {

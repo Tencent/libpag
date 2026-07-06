@@ -22,6 +22,9 @@
 #include <utility>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Text.h"
@@ -45,6 +48,48 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
   result.canvasHeight = opts.targetHeight;
   result.inferFlexFromAbsolute = opts.inferFlexFromAbsolute;
   return result;
+}
+
+// True when an `alpha` channel ever drops below 1 (a fade-in from 0 or a fade-out toward 0). Such
+// an animation drives the layer's group opacity below 1 at some point, isolating it into an
+// offscreen surface that breaks descendant backdrop-filter sampling.
+bool AlphaChannelDipsBelowOne(const Channel* channel) {
+  if (channel == nullptr || channel->name != "alpha" ||
+      channel->valueType() != ChannelValueType::Float) {
+    return false;
+  }
+  const auto* typed = static_cast<const TypedChannel<float>*>(channel);
+  for (const auto& kf : typed->keyframes) {
+    if (kf.value < 1.0f - 1e-3f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Recursively strips `BackgroundBlurStyle` from `layer` and its descendants once `ancestorFades`
+// (or the layer's own id) marks the subtree as living under an animated-opacity group. Returns the
+// number of styles removed.
+size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::string>& fadingIds,
+                                  bool ancestorFades) {
+  if (layer == nullptr) {
+    return 0;
+  }
+  const bool fades =
+      ancestorFades || (!layer->id.empty() && fadingIds.count(layer->id) > 0);
+  size_t removed = 0;
+  if (fades && !layer->styles.empty()) {
+    auto& styles = layer->styles;
+    auto it = std::remove_if(styles.begin(), styles.end(), [](const LayerStyle* ls) {
+      return ls != nullptr && ls->nodeType() == NodeType::BackgroundBlurStyle;
+    });
+    removed += static_cast<size_t>(std::distance(it, styles.end()));
+    styles.erase(it, styles.end());
+  }
+  for (auto* child : layer->children) {
+    removed += StripBackdropBlurUnderFade(child, fadingIds, fades);
+  }
+  return removed;
 }
 
 }  // namespace
@@ -219,8 +264,47 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     const auto& style = _styleCascade->getResolvedStyle(entry.first);
     _animationBuilder->buildForElement(style, entry.second);
   }
+  suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();
   return _document;
+}
+
+void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
+  if (!_document) {
+    return;
+  }
+  // Gather the ids of every layer whose opacity is animated below 1 at some point in the timeline.
+  std::unordered_set<std::string> fadingIds;
+  for (const auto* anim : _document->animations) {
+    if (anim == nullptr) {
+      continue;
+    }
+    for (const auto* obj : anim->objects) {
+      if (obj == nullptr || obj->target.empty()) {
+        continue;
+      }
+      for (const auto* ch : obj->channels) {
+        if (AlphaChannelDipsBelowOne(ch)) {
+          fadingIds.insert(obj->target);
+          break;
+        }
+      }
+    }
+  }
+  if (fadingIds.empty()) {
+    return;
+  }
+  size_t removed = 0;
+  for (auto* root : _document->layers) {
+    removed += StripBackdropBlurUnderFade(root, fadingIds, /*ancestorFades=*/false);
+  }
+  if (removed > 0) {
+    warn("html: dropped " + std::to_string(removed) +
+         " backdrop-filter blur(s) under an animated-opacity group; PAGX isolates such groups into "
+         "an offscreen surface and cannot sample the page behind them, which would tint the box "
+         "with its own colour instead of blurring the backdrop "
+         "(subset:backdrop-blur-dropped-under-opacity-fade)");
+  }
 }
 
 void HTMLParserContext::recordFontFallbacks(const std::vector<std::string>& chain) {

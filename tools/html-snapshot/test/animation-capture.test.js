@@ -18,6 +18,7 @@ const {
   pagxRdpKeep,
   pagxDecimateStops,
   pagxNormalizeTiming,
+  pagxBoxShadowToFilter,
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
@@ -113,6 +114,55 @@ describe('pagxNormalizeProps', () => {
   test('drops a non-translate transform but keeps other channels', () => {
     const out = pagxNormalizeProps({ opacity: '1', transform: 'rotate(10deg)' });
     expect(out).toEqual({ opacity: '1' });
+  });
+
+  test('folds a box-shadow glow into the filter channel as drop-shadow', () => {
+    const out = pagxNormalizeProps({
+      opacity: '1',
+      boxShadow: 'rgb(40, 224, 208) 0px 0px 6px 0px, rgb(40, 224, 208) 0px 0px 12px 0px',
+    });
+    expect(out).toEqual({
+      opacity: '1',
+      filter: 'drop-shadow(0px 0px 6px rgb(40, 224, 208)) drop-shadow(0px 0px 12px rgb(40, 224, 208))',
+    });
+  });
+
+  test('appends the box-shadow drop-shadow after an existing filter', () => {
+    const out = pagxNormalizeProps({
+      filter: 'blur(2px)',
+      boxShadow: 'rgb(0, 0, 0) 1px 2px 3px 0px',
+    });
+    expect(out.filter).toBe('blur(2px) drop-shadow(1px 2px 3px rgb(0, 0, 0))');
+  });
+});
+
+describe('pagxBoxShadowToFilter', () => {
+  test('returns null for none / empty', () => {
+    expect(pagxBoxShadowToFilter('none')).toBeNull();
+    expect(pagxBoxShadowToFilter('')).toBeNull();
+    expect(pagxBoxShadowToFilter(null)).toBeNull();
+  });
+
+  test('converts a single outer shadow, dropping the spread', () => {
+    expect(pagxBoxShadowToFilter('rgb(40, 224, 208) 0px 0px 12px 0px'))
+      .toBe('drop-shadow(0px 0px 12px rgb(40, 224, 208))');
+  });
+
+  test('converts a multi-layer glow into a drop-shadow chain', () => {
+    expect(pagxBoxShadowToFilter(
+      'rgb(40, 224, 208) 0px 0px 6px 0px, rgb(40, 224, 208) 0px 0px 12px 0px',
+    )).toBe('drop-shadow(0px 0px 6px rgb(40, 224, 208)) drop-shadow(0px 0px 12px rgb(40, 224, 208))');
+  });
+
+  test('skips inset shadows (no drop-shadow analogue)', () => {
+    expect(pagxBoxShadowToFilter('rgb(0, 0, 0) 0px 0px 4px 0px inset')).toBeNull();
+    expect(pagxBoxShadowToFilter(
+      'rgb(0, 0, 0) 0px 0px 4px 0px inset, rgb(1, 2, 3) 0px 0px 8px 0px',
+    )).toBe('drop-shadow(0px 0px 8px rgb(1, 2, 3))');
+  });
+
+  test('defaults blur to 0px when only offsets are present', () => {
+    expect(pagxBoxShadowToFilter('rgb(9, 9, 9) 2px 3px')).toBe('drop-shadow(2px 3px 0px rgb(9, 9, 9))');
   });
 });
 
