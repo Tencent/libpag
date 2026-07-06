@@ -109,8 +109,8 @@ export class PAGView extends PAGWebGLView {
           // region (MP4Width/MP4Height) is sampled, excluding the padding that would otherwise
           // squeeze and distort the visible image.
           this.scale = {
-            x: this.frameData.width / this.videoParam.MP4Width,
-            y: this.frameData.height / this.videoParam.MP4Height,
+            x: frameData.width / this.videoParam.MP4Width,
+            y: frameData.height / this.videoParam.MP4Height,
           };
         }
         draw();
