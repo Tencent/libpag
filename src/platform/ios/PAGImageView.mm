@@ -594,9 +594,14 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     filePath = nil;
   }
   filePath = [path retain];
-  auto file = pag::PAGFile::Load([path UTF8String]);
-  [self setCompositionInternal:file maxFrameRate:maxFrameRate];
-  return file != nullptr;
+  PAGFile* pagFile = [PAGFile Load:path];
+  std::shared_ptr<pag::PAGComposition> composition = nullptr;
+  if (pagFile != nil) {
+    auto layer = [[pagFile impl] pagLayer];
+    composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+  }
+  [self setCompositionInternal:composition maxFrameRate:maxFrameRate];
+  return composition != nullptr;
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
@@ -634,7 +639,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGComposition*)getComposition {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (filePath || pagComposition == nullptr) {
+  if (filePath == nil && pagComposition == nullptr) {
     return nil;
   }
   return (PAGComposition*)[PAGLayerImpl ToPAGLayer:pagComposition];
