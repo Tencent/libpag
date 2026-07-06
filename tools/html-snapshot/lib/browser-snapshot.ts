@@ -2539,6 +2539,58 @@ function emitInlineRunMarkup(el, parentComputed) {
   return out;
 }
 
+// An inline-level box (`display: inline`) that wraps across several lines
+// paints its background / border / radius / shadow ONCE PER LINE FRAGMENT —
+// never as one rectangle spanning the union bounding box. `getBoundingClientRect`
+// (the single-box path every renderer uses by default) returns that union box,
+// so a wrapped `<mark>` or inline `<span class="badge">` would emit a solid slab
+// covering the empty leading space on the first line and the trailing space on
+// the last, instead of the tight per-line highlight the browser actually draws.
+//
+// `inlineBoxLineRects` decides whether the element is a wrapped inline box and,
+// if so, returns one per-line border-box rect (each relative to `parentRect`).
+// `getClientRects()` reports one border box per line fragment for an inline
+// element (block / inline-block / flex boxes report a single box, so those fall
+// through to the single-box path); `mergeRectsOnSameLine` coalesces same-line
+// glyph-run splits (bidi / soft-hyphen) back to one rect per visual line.
+// Returns null when the element is not an inline box, carries no box visuals, or
+// occupies a single fragment — in every such case the caller keeps its existing
+// single-box emission. Kept free of `buildStyle` so it stays unit-testable in
+// Node (the style schema lives only in the browser payload).
+function inlineBoxLineRects(el, parentRect, computed) {
+  if (computed.display !== 'inline') return null;
+  if (!hasBoxVisualsForInline(computed)) return null;
+  if (typeof el.getClientRects !== 'function') return null;
+  const raw = Array.from(el.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+  if (raw.length <= 1) return null;
+  const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
+  const blockAxis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
+  const lineRects = mergeRectsOnSameLine(raw, blockAxis);
+  if (lineRects.length <= 1) return null;
+  return lineRects.map((r) => ({
+    left: r.left - parentRect.left,
+    top: r.top - parentRect.top,
+    width: r.width,
+    height: r.height,
+  }));
+}
+
+// `emitInlineBoxFragments` turns the per-line rects into one absolutely-
+// positioned, visuals-only <div> per line fragment; the caller emits them behind
+// a transparent positioning wrapper that still anchors the inner text/children.
+// Returns null (single-box path) when `inlineBoxLineRects` declines.
+function emitInlineBoxFragments(el, parentRect, computed) {
+  const rects = inlineBoxLineRects(el, parentRect, computed);
+  if (!rects) return null;
+  const out = [];
+  for (const r of rects) {
+    const style = buildStyle(r.left, r.top, r.width, r.height, computed, { box: true });
+    const overlays = borderOverlayHTML(computed, r.width, r.height).join('');
+    out.push(`<div style="${style}">${overlays}</div>`);
+  }
+  return out.join('');
+}
+
 // Emit `el` as a single text-leaf wrapper containing inline runs.
 // See `isInlineTextLeafCandidate` for the eligibility rationale.
 function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
@@ -2697,6 +2749,16 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
     : [];
+  // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
+  // visuals once per line fragment behind a transparent positioning wrapper so
+  // the highlight hugs each line instead of filling the union bounding box. The
+  // text spans are unchanged — they already anchor to the union rect's padding
+  // box origin, so only the background moves off the wrapper.
+  const fragments = emitInlineBoxFragments(el, parentRect, computed);
+  if (fragments) {
+    const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {});
+    return `${fragments}<div style="${wrapperStyle}">${lineSpans.join('')}</div>`;
+  }
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
 }
 
@@ -2847,6 +2909,15 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed);
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  // Wrapped inline box with element children (e.g. a `<mark>` containing nested
+  // styling that spans multiple lines): paint the box visuals per line fragment
+  // behind a transparent positioning wrapper, matching how the browser paints a
+  // wrapped inline box. See emitInlineBoxFragments.
+  const fragments = emitInlineBoxFragments(el, parentRect, computed);
+  if (fragments) {
+    const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
+    return `${fragments}<div style="${wrapperStyle}">${childHTML}</div>`;
+  }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
     box: true, ...opts,
   });
@@ -3335,6 +3406,8 @@ const HELPER_FNS = [
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
+  inlineBoxLineRects,
+  emitInlineBoxFragments,
   renderInlineTextLeaf,
   flexMainGapPx,
   collectFlexProps,
@@ -3852,6 +3925,8 @@ export {
   inlineCanvases,
   materializeDecorativePseudoElements,
   mergeRectsOnSameLine,
+  inlineBoxLineRects,
+  emitInlineBoxFragments,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
