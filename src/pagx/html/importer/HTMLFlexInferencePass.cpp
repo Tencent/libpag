@@ -250,11 +250,19 @@ const char* AxisName(FlexAxis a) {
 }
 
 // Mutates the parent's resolved style to declare the inferred flex layout. Strips any
-// per-side padding overrides we just folded into the shorthand.
+// per-side padding overrides we just folded into the shorthand. When `centerMain` is set the
+// content is centred on the main axis via `justify-content: center` instead of symmetric
+// padding (the caller has already zeroed the main-axis padding sides).
 void ApplyFlexToParent(PropertyMap& parentProps, FlexAxis axis, float padTop, float padRight,
-                       float padBottom, float padLeft, float gap, CrossAlign align) {
+                       float padBottom, float padLeft, float gap, CrossAlign align,
+                       bool centerMain) {
   parentProps["display"] = "flex";
   parentProps["flex-direction"] = AxisName(axis);
+  if (centerMain) {
+    parentProps["justify-content"] = "center";
+  } else {
+    parentProps.erase("justify-content");
+  }
   if (gap > 0.0f) {
     parentProps["gap"] = EmitPx(gap);
   } else {
@@ -470,12 +478,31 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   float padRight =
       axis == FlexAxis::Row ? fit.paddingTrailing : padRightExisting + extraCrossTrailing;
 
+  // When the parent has an explicit main-axis size and the content sits with (near-)equal
+  // leading/trailing insets, the author's intent is "centre the group", not "reserve this many
+  // pixels of padding". Express it as `justify-content: center` and drop the symmetric main-axis
+  // padding so the layout stays correct if the content later changes size. Requires an explicit
+  // dimension: a content-measured parent shrinks to its children, leaving no free space to
+  // centre within.
+  bool centerMain = mainFromExplicit && fit.paddingLeading > tol &&
+                    std::fabs(fit.paddingLeading - fit.paddingTrailing) <= tol;
+  if (centerMain) {
+    if (axis == FlexAxis::Row) {
+      padLeft = 0.0f;
+      padRight = 0.0f;
+    } else {
+      padTop = 0.0f;
+      padBottom = 0.0f;
+    }
+  }
+
   if (!parentResolved) {
     PropertyMap fresh;
     ctx.setResolved(parent.get(), std::move(fresh));
     parentResolved = ctx.findResolved(parent.get());
   }
-  ApplyFlexToParent(*parentResolved, axis, padTop, padRight, padBottom, padLeft, fit.gap, align);
+  ApplyFlexToParent(*parentResolved, axis, padTop, padRight, padBottom, padLeft, fit.gap, align,
+                    centerMain);
 
   for (auto& b : boxes) {
     auto* cp = ctx.findResolved(b.node.get());
@@ -490,6 +517,7 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   ctx.warn("subset:flex-inferred",
            "html: <" + tag + "> rewritten as display:flex (" + AxisName(axis) + ", " +
                std::to_string(boxes.size()) + " children" +
+               (centerMain ? ", justify-content:center" : "") +
                (reordered ? ", reordered to match position" : "") + ")",
            parent);
 }

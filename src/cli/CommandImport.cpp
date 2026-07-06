@@ -29,6 +29,7 @@
 #include <string>
 #include <system_error>
 #include "cli/CliUtils.h"
+#include "cli/CommandResolve.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -375,6 +376,10 @@ struct ImportOptions {
   // non-fatal. They are suppressed by default; `--verbose`/`-v` opts back in. Errors are always
   // printed.
   bool verbose = false;
+  // Some importers (notably HTML) leave `import` directives behind for external SVG `<img>`
+  // references and inline `<svg>` elements. These are expanded into native PAGX nodes in the
+  // same pass by default so the output is fully flattened; `--no-resolve` keeps the directives.
+  bool resolve = true;
 };
 
 static void PrintUsage() {
@@ -387,6 +392,8 @@ static void PrintUsage() {
       << "  --input <file|url>             Input file or URL to import (required)\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
+      << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
+      << "                                 <svg>) instead of expanding them into native nodes\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -398,6 +405,7 @@ static void PrintUsage() {
       << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
       << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
+      << "  pagx import --input page.html --no-resolve        # keep import directives\n"
       << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
@@ -411,6 +419,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
+    } else if (arg == "--no-resolve") {
+      options->resolve = false;
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
@@ -461,6 +471,17 @@ int RunImport(int argc, char* argv[]) {
   if (options.verbose) {
     for (auto& warning : result.warnings) {
       std::cerr << "pagx import: warning: " << warning << "\n";
+    }
+  }
+
+  if (options.resolve) {
+    // The HTML importer records external SVG `<img>` sources as already-resolved paths and
+    // inline `<svg>` as directive content, so no base directory prefix is needed here.
+    auto resolveStats = ResolveDocument(result.document.get(), "", options.formatOptions);
+    if (resolveStats.errorCount > 0) {
+      std::cerr << "pagx import: error: failed to resolve " << resolveStats.errorCount
+                << " import directive(s)\n";
+      return 1;
     }
   }
 

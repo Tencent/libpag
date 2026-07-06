@@ -154,9 +154,12 @@ class HTMLTextFragmentBuilder {
   /** Builds the outer / wrapper / text-host Layer chain for the leaf, applying size,
    *  position, transforms, background visuals (when present), padding, and the
    *  shadow-from-clip split. Returns the wrapper Layer that the caller publishes upwards;
-   *  writes the inner host (where text contents land) into `outTextHost`. */
+   *  writes the inner host (where text contents land) into `outTextHost`. When
+   *  `shrinkWidth` / `shrinkHeight` is set the corresponding authored inline-axis size is
+   *  dropped so the box shrinks to its shaped text (CSS shrink-to-fit, see `convertTextLeaf`). */
   Layer* buildTextHostLayers(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
-                             bool hasBgVisuals, Layer*& outTextHost);
+                             bool hasBgVisuals, bool shrinkWidth, bool shrinkHeight,
+                             Layer*& outTextHost);
 
   /** Populates `textHost->contents` with either a bare `<Text>+<Fill>` pair (single-style
    *  run) or a `TextBox` carrying per-fragment `Group`s. `inherited` and `box` supply the

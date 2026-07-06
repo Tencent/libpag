@@ -18,7 +18,29 @@
 
 #pragma once
 
+#include <string>
+#include "cli/CommandImport.h"
+
+namespace pagx {
+class PAGXDocument;
+}
+
 namespace pagx::cli {
+
+struct ResolveStats {
+  int resolvedCount = 0;
+  int errorCount = 0;
+};
+
+/**
+ * Resolves all import directives (inline <svg> and `import` attribute) in `doc` in place,
+ * expanding them into native PAGX nodes. External `import` sources are resolved relative to
+ * `baseDir` (pass an empty string when the directive sources are already absolute/resolved,
+ * e.g. straight out of the HTML importer). After merging, colliding auto-generated ids from
+ * multiple inline SVGs are renamed to be unique. Does not run the optimizer.
+ */
+ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
+                             const ImportFormatOptions& formatOptions);
 
 /**
  * Resolves all import directives (inline <svg> and `import` attribute) in a PAGX file,

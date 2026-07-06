@@ -173,11 +173,11 @@ empty/blank PNG means the design needs a fix (Step 4) or setup is incomplete (St
 
 **Installed via npm, no repo (Case A):** the one-shot `html2pagx` wrapper is not on PATH, so run the
 built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically (the first call
-triggers the one-time browser download):
+triggers the one-time browser download). `pagx import` snapshots, imports, **and resolves** inline
+`<svg>`/import directives in one command, so no separate `pagx resolve` step is needed:
 
 ```bash
 pagx import --input <name>.html --output <name>.pagx
-pagx resolve <name>.pagx
 pagx render <name>.pagx -o <name>.png   # preview; add --scale 2 for a crisp image
 ```
 

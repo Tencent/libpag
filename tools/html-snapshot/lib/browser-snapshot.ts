@@ -1525,9 +1525,19 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   };
   for (let i = 1; i < rects.length; i++) {
     const r = rects[i];
-    // Overlap on the block axis (with a sub-pixel tolerance so adjacent-but-not
-    // -overlapping antialiased lines don't merge) means "same line/column".
-    const overlaps = blockLo(r) < curBlockHi - 0.5 && blockHi(r) > curBlockLo + 0.5;
+    // "Same line/column" means the two rects overlap on the block axis by a
+    // MAJORITY of the smaller rect's block extent — not merely by a sub-pixel
+    // sliver. A fixed pixel tolerance is wrong here: getClientRects reports
+    // glyph INK bounds, which routinely exceed the line-height (e.g. a 16px
+    // line renders ~17px of ink), so two ADJACENT lines whose tops differ by
+    // exactly the line-height still overlap by ~1px of ink. That sliver must
+    // NOT merge them. Same-line glyph runs (soft-hyphen glyph, bidi split)
+    // instead share the line's top/height, so they overlap almost fully.
+    // Requiring the overlap to cover ≥ half the smaller extent cleanly
+    // separates "next line, ink bleeds up by 1px" from "same line, split run".
+    const overlap = Math.min(blockHi(r), curBlockHi) - Math.max(blockLo(r), curBlockLo);
+    const minExtent = Math.min(blockHi(r) - blockLo(r), curBlockHi - curBlockLo);
+    const overlaps = overlap > 0 && overlap >= minExtent * 0.5;
     if (overlaps) {
       curBlockLo = Math.min(curBlockLo, blockLo(r));
       curBlockHi = Math.max(curBlockHi, blockHi(r));
@@ -1730,6 +1740,44 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   return out;
 }
 
+// True when `node` is an element that shares its line box with adjacent text —
+// i.e. any inline-level display (`inline`, `inline-block`, `inline-flex`, …).
+// A block-level sibling starts a new line, so the whitespace at the seam
+// collapses to nothing; an inline-level one keeps it as a single visible space.
+function isInlineLevelSibling(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+  const cs = getComputedStyle(node);
+  if (!isVisible(cs)) return false;
+  return String(cs.display || '').startsWith('inline');
+}
+
+// CSS keeps the whitespace at the seam between a text run and an adjacent
+// INLINE-LEVEL sibling as one collapsed space — it is only dropped at the
+// start/end of a line or against a block boundary. The container path emits
+// each direct text node as its own absolutely-positioned span, so `cleanLine`
+// (which `.trim()`s every line) would erase that seam space, gluing the run
+// against its sibling (`人与自然 · <span>关键知识点</span>` → `人与自然 ·关键知识点`,
+// or a `<mark>…</mark> 构成…` body run losing the gap after the highlight).
+// Report whether a leading / trailing space must be re-materialised so the
+// caller can inject it back. Skipped in `pre*` modes, where `cleanLine` already
+// keeps the source spaces verbatim.
+function boundarySpacePreservation(textNode, computed) {
+  const ws = String(computed.getPropertyValue('white-space') || '').trim().toLowerCase();
+  if (ws.startsWith('pre')) return { leading: false, trailing: false };
+  const raw = textNode.nodeValue || '';
+  return {
+    leading: /^\s/.test(raw) && isInlineLevelSibling(textNode.previousSibling),
+    trailing: /\s$/.test(raw) && isInlineLevelSibling(textNode.nextSibling),
+  };
+}
+
+// The seam space is emitted as U+00A0 (NBSP) rather than an ASCII space so it
+// survives every downstream whitespace fold: this file's own `cleanLine`/`trim`
+// and the C++ importer's fragment collapsing + leading/trailing trim (both of
+// which only treat ASCII space/tab/newline as whitespace). It therefore rides
+// through shrink-to-fit and flex inference as a real glyph, reproducing the gap.
+const BOUNDARY_SPACE = '\u00a0';
+
 // Emit one absolutely-positioned, nowrap <span> per line of `textNode`,
 // positioned relative to `parentRect`. Chromium's `Range.getClientRects()`
 // reports glyph INK bounds, not line-box bounds — and the two diverge in
@@ -1765,15 +1813,17 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed) {
+  const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
-    return emitVerticalTextSpans(textNode, parentRect, computed, wm);
+    return emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve);
   }
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     let lt = line.rect.top;
     let lh = line.rect.height;
     if (lineHeightPx > lh + 0.1) {
@@ -1791,7 +1841,11 @@ function emitTextSpans(textNode, parentRect, computed) {
       box: false, text: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
-    const transformed = applyTextTransform(line.text, computed);
+    let transformed = applyTextTransform(line.text, computed);
+    // Re-materialise the seam whitespace the browser rendered against an
+    // inline sibling: leading on the first line, trailing on the last.
+    if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
+    if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -1814,13 +1868,15 @@ function emitTextSpans(textNode, parentRect, computed) {
 // narrower; expand each column to the line-height width and re-centre it around
 // the measured mid-X so consecutive columns tile on the line-height stride —
 // the direct analogue of the horizontal line-height re-centring above.
-function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
+function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
+  const seam = preserve || { leading: false, trailing: false };
   const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
   const columns = splitTextNodeIntoLines(textNode, ws, axis);
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
-  for (const col of columns) {
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
     let cl = col.rect.left;
     let cw = col.rect.width;
     if (lineHeightPx > cw + 0.1) {
@@ -1837,7 +1893,9 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
     const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
       box: false, text: true,
     });
-    const transformed = applyTextTransform(col.text, computed);
+    let transformed = applyTextTransform(col.text, computed);
+    if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
+    if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -2652,6 +2710,161 @@ function emitInlineRunMarkup(el, parentComputed) {
   return out;
 }
 
+// The `<mark>` highlighter idiom paints a gradient over only a short band near
+// the text baseline via `background-size: 100% 0.6em; background-position: 0 88%;
+// background-repeat: no-repeat` — the tint hugs the lower part of the glyphs
+// rather than filling the whole line box. The snapshot bakes browser layout into
+// flat boxes, so instead of forwarding these properties (the importer paints a
+// gradient across the entire geometry) we compute the tile the browser actually
+// paints and emit the fill only over that sub-rect.
+//
+// `backgroundBandDescriptor` recognises the shape and returns the parsed
+// size/position/repeat, or null. It is deliberately restricted to a lone
+// gradient `background-image` with no border / shadow / background-color: those
+// visuals need the full box, so mixing them would require painting two rects.
+function backgroundBandDescriptor(computed) {
+  const img = (computed.getPropertyValue('background-image') || '').trim();
+  if (!img || img === 'none' || !/gradient/i.test(img)) return null;
+  const bg = (computed.getPropertyValue('background-color') || '').trim();
+  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return null;
+  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
+      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) return null;
+  const shadow = (computed.getPropertyValue('box-shadow') || '').trim();
+  if (shadow && shadow !== 'none') return null;
+  const size = (computed.getPropertyValue('background-size') || '').trim().toLowerCase();
+  if (!size || size === 'auto' || size === 'auto auto') return null;
+  // `contain` / `cover` scale to the box, so there is nothing to inset.
+  if (size.includes('contain') || size.includes('cover')) return null;
+  const sizeTokens = size.split(/\s+/);
+  if (sizeTokens.length > 2) return null;
+  const posTokens = (computed.getPropertyValue('background-position') || '0% 0%')
+    .trim().toLowerCase().split(/\s+/);
+  if (posTokens.length > 2) return null; // 3/4-value edge syntax: leave full box
+  const repeat = (computed.getPropertyValue('background-repeat') || 'repeat').trim().toLowerCase();
+  const rTokens = repeat.split(/\s+/);
+  let repeatX;
+  let repeatY;
+  if (repeat === 'repeat-x') {
+    repeatX = true;
+    repeatY = false;
+  } else if (repeat === 'repeat-y') {
+    repeatX = false;
+    repeatY = true;
+  } else if (rTokens.length === 2) {
+    repeatX = rTokens[0] !== 'no-repeat';
+    repeatY = rTokens[1] !== 'no-repeat';
+  } else {
+    repeatX = repeatY = rTokens[0] !== 'no-repeat';
+  }
+  return { sizeTokens, posTokens, repeatX, repeatY };
+}
+
+// Resolve one axis of `background-size` (a computed length or percentage; `em`
+// is already px in computed style) against the box extent `base`. Returns null
+// for an unparseable token so the caller keeps the full box.
+function resolveBandSizeAxis(tok, base) {
+  if (tok == null || tok === 'auto') return base;
+  if (tok.endsWith('%')) return (parseFloat(tok) / 100) * base;
+  const v = parseFloat(tok);
+  return Number.isFinite(v) ? v : null;
+}
+
+// Resolve one axis of `background-position` into a pixel offset of the tile
+// inside the box, following CSS: a percentage aligns the same percentage point
+// of the tile with that of the box, a length is a direct offset, keywords map to
+// 0% / 50% / 100%.
+function resolveBandPosAxis(tok, base, tile, axis) {
+  if (tok == null) return 0;
+  if (tok === 'center') return (base - tile) / 2;
+  if (axis === 'x') {
+    if (tok === 'left') return 0;
+    if (tok === 'right') return base - tile;
+  } else {
+    if (tok === 'top') return 0;
+    if (tok === 'bottom') return base - tile;
+  }
+  if (tok.endsWith('%')) return (base - tile) * (parseFloat(tok) / 100);
+  const v = parseFloat(tok);
+  return Number.isFinite(v) ? v : 0;
+}
+
+// Given a box rect, return the sub-rect the highlighter gradient actually paints
+// (per `backgroundBandDescriptor`), or null when no band applies or it fills the
+// whole box. An axis that repeats fills that axis (offset 0, extent = box).
+function bandInsetRect(r, computed) {
+  const d = backgroundBandDescriptor(computed);
+  if (!d) return null;
+  let tileW = resolveBandSizeAxis(d.sizeTokens[0], r.width);
+  let tileH = resolveBandSizeAxis(d.sizeTokens.length > 1 ? d.sizeTokens[1] : 'auto', r.height);
+  if (tileW == null || tileH == null) return null;
+  if (d.repeatX) tileW = r.width;
+  if (d.repeatY) tileH = r.height;
+  const offX = d.repeatX ? 0 : resolveBandPosAxis(d.posTokens[0], r.width, tileW, 'x');
+  const offY = d.repeatY
+    ? 0
+    : resolveBandPosAxis(d.posTokens.length > 1 ? d.posTokens[1] : 'center', r.height, tileH, 'y');
+  const rect = { left: r.left + offX, top: r.top + offY, width: tileW, height: tileH };
+  const unchanged = Math.abs(rect.left - r.left) < 0.01 && Math.abs(rect.top - r.top) < 0.01 &&
+    Math.abs(rect.width - r.width) < 0.01 && Math.abs(rect.height - r.height) < 0.01;
+  return unchanged ? null : rect;
+}
+
+// An inline-level box (`display: inline`) that wraps across several lines
+// paints its background / border / radius / shadow ONCE PER LINE FRAGMENT —
+// never as one rectangle spanning the union bounding box. `getBoundingClientRect`
+// (the single-box path every renderer uses by default) returns that union box,
+// so a wrapped `<mark>` or inline `<span class="badge">` would emit a solid slab
+// covering the empty leading space on the first line and the trailing space on
+// the last, instead of the tight per-line highlight the browser actually draws.
+//
+// `inlineBoxLineRects` decides whether the element is a wrapped inline box and,
+// if so, returns one per-line border-box rect (each relative to `parentRect`),
+// with any highlighter band (see bandInsetRect) already applied. `getClientRects`
+// reports one border box per line fragment for an inline element (block /
+// inline-block / flex boxes report a single box, so those fall through to the
+// single-box path); `mergeRectsOnSameLine` coalesces same-line glyph-run splits
+// (bidi / soft-hyphen) back to one rect per visual line. Returns null when the
+// element is not an inline box, carries no box visuals, or occupies a single
+// unbanded fragment — in every such case the caller keeps its existing
+// single-box emission. A single-line box whose band shrinks the paint rect still
+// takes this path so the band is honoured. Kept free of `buildStyle` so it stays
+// unit-testable in Node (the style schema lives only in the browser payload).
+function inlineBoxLineRects(el, parentRect, computed) {
+  if (computed.display !== 'inline') return null;
+  if (!hasBoxVisualsForInline(computed)) return null;
+  if (typeof el.getClientRects !== 'function') return null;
+  const raw = Array.from(el.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+  if (raw.length < 1) return null;
+  const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
+  const blockAxis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
+  const lineRects = mergeRectsOnSameLine(raw, blockAxis);
+  const painted = lineRects.map((r) => bandInsetRect(r, computed) || r);
+  const banded = painted.some((p, i) => p !== lineRects[i]);
+  if (lineRects.length <= 1 && !banded) return null;
+  return painted.map((r) => ({
+    left: r.left - parentRect.left,
+    top: r.top - parentRect.top,
+    width: r.width,
+    height: r.height,
+  }));
+}
+
+// `emitInlineBoxFragments` turns the per-line rects into one absolutely-
+// positioned, visuals-only <div> per line fragment; the caller emits them behind
+// a transparent positioning wrapper that still anchors the inner text/children.
+// Returns null (single-box path) when `inlineBoxLineRects` declines.
+function emitInlineBoxFragments(el, parentRect, computed) {
+  const rects = inlineBoxLineRects(el, parentRect, computed);
+  if (!rects) return null;
+  const out = [];
+  for (const r of rects) {
+    const style = buildStyle(r.left, r.top, r.width, r.height, computed, { box: true });
+    const overlays = borderOverlayHTML(computed, r.width, r.height).join('');
+    out.push(`<div style="${style}">${overlays}</div>`);
+  }
+  return out.join('');
+}
+
 // Emit `el` as a single text-leaf wrapper containing inline runs.
 // See `isInlineTextLeafCandidate` for the eligibility rationale.
 function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
@@ -2810,6 +3023,16 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
     : [];
+  // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
+  // visuals once per line fragment behind a transparent positioning wrapper so
+  // the highlight hugs each line instead of filling the union bounding box. The
+  // text spans are unchanged — they already anchor to the union rect's padding
+  // box origin, so only the background moves off the wrapper.
+  const fragments = emitInlineBoxFragments(el, parentRect, computed);
+  if (fragments) {
+    const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {});
+    return `${fragments}<div style="${wrapperStyle}">${lineSpans.join('')}</div>`;
+  }
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
 }
 
@@ -2960,6 +3183,15 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed);
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  // Wrapped inline box with element children (e.g. a `<mark>` containing nested
+  // styling that spans multiple lines): paint the box visuals per line fragment
+  // behind a transparent positioning wrapper, matching how the browser paints a
+  // wrapped inline box. See emitInlineBoxFragments.
+  const fragments = emitInlineBoxFragments(el, parentRect, computed);
+  if (fragments) {
+    const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
+    return `${fragments}<div style="${wrapperStyle}">${childHTML}</div>`;
+  }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
     box: true, ...opts,
   });
@@ -3363,6 +3595,8 @@ ${parts.join('')}
 const PAYLOAD_CONSTANTS_SRC = `
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
+const BOUNDARY_SPACE = '\\u00a0';
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -3522,6 +3756,8 @@ const HELPER_FNS = [
   freezeSvg,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
+  isInlineLevelSibling,
+  boundarySpacePreservation,
   emitTextSpans,
   emitVerticalTextSpans,
   hasBoxVisualsForInline,
@@ -3532,6 +3768,12 @@ const HELPER_FNS = [
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
+  backgroundBandDescriptor,
+  resolveBandSizeAxis,
+  resolveBandPosAxis,
+  bandInsetRect,
+  inlineBoxLineRects,
+  emitInlineBoxFragments,
   renderInlineTextLeaf,
   flexMainGapPx,
   collectFlexProps,
@@ -4059,6 +4301,10 @@ export {
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  mergeRectsOnSameLine,
+  bandInsetRect,
+  inlineBoxLineRects,
+  emitInlineBoxFragments,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

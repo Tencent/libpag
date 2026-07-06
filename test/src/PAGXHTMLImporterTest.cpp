@@ -1197,6 +1197,68 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunC
   EXPECT_TRUE(ColorNear(solid1->color, HexColor(0x111111, 0.7f)));
 }
 
+// A non-wrapping inline text leaf (<span>/<a>) shrinks to fit its own shaped glyphs instead
+// of freezing the browser-measured px width the html-snapshot pipeline bakes onto every text
+// span. Freezing it would peg the box to the browser's font metrics, so a render host that
+// substitutes a different face (the norm for CJK / web fonts) would mis-centre or clip the
+// glyphs inside a box that no longer matches them. The inline-axis size is dropped; the cross
+// axis and the absolute position are preserved.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafShrinksToFitWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_TRUE(std::isnan(leaf->width));
+  EXPECT_FLOAT_EQ(leaf->height, 80.0f);
+  EXPECT_FLOAT_EQ(leaf->left, 0.0f);
+}
+
+// Block-level text leaves (<p>, <h1..6>) keep their authored width: a block box is as wide as
+// its declared dimension in CSS, not shrink-to-fit, so the measured width is meaningful.
+PAG_TEST(PAGXHTMLImporterTest, BlockNoWrapTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <p style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap">Title</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
+// An inline text leaf that can wrap keeps its width: there the width is the wrap boundary, not
+// redundant slack, so dropping it would change line breaking.
+PAG_TEST(PAGXHTMLImporterTest, InlineWrappingTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:20px">wrapping paragraph text</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
+// An inline text leaf whose box paints a background keeps its width: the painted Rectangle
+// fills the box, so the box size must stay fixed rather than shrinking to the glyphs.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafWithBackgroundKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap;background-color:#000">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -6124,6 +6186,31 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversRowLayoutWhenEnable
   }
 }
 
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceCentersMainAxisInsteadOfSymmetricPadding) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  // Two children (50px + 50px + 10px gap = 110px) centred inside a 210px-wide body leaves a
+  // symmetric 50px inset on each side. That should surface as justify-content:center, not
+  // padding.
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:210px;height:50px">
+               <div style="position:absolute;left:50px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:110px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: row"));
+  EXPECT_TRUE(StyleContains(body, "gap: 10px"));
+  EXPECT_TRUE(StyleContains(body, "justify-content: center"));
+  // The symmetric leading/trailing insets are absorbed by centering, so no left/right padding is
+  // baked in.
+  EXPECT_FALSE(StyleContains(body, "padding"));
+}
+
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversColumnLayoutWithCenter) {
   pagx::HTMLSubsetTransformer::Options opts = {};
   opts.inferFlexFromAbsolute = true;
@@ -6316,14 +6403,18 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderS
   EXPECT_TRUE(StyleContains(body, "align-items: stretch"));
 
   // First child: header row whose direct children stop 14px from both edges. After the fix
-  // its inner inference uses the original 320px width and recovers padding-left/right = 14.
+  // its inner inference uses the original 320px width and recovers the 14px inset (rather than
+  // collapsing it to 0). Because the leading/trailing insets are equal, the row is expressed as
+  // `justify-content: center` instead of symmetric left/right padding — the two are visually
+  // identical for a packed group, and centering stays correct if the content resizes.
   auto topBar = body->firstChild;
   ASSERT_NE(topBar, nullptr);
   ASSERT_EQ(topBar->type, pagx::DOMNodeType::Element);
   EXPECT_TRUE(StyleContains(topBar, "display: flex"));
   EXPECT_TRUE(StyleContains(topBar, "flex-direction: row"));
-  // Asymmetric main-axis padding (14 left, 14 right) emitted as the 2-token shorthand.
-  EXPECT_TRUE(StyleContains(topBar, "padding: 0px 14px"));
+  EXPECT_TRUE(StyleContains(topBar, "justify-content: center"));
+  // The symmetric inset is absorbed by centering, so no left/right padding is baked in.
+  EXPECT_FALSE(StyleContains(topBar, "padding"));
   // Because the parent stretches its cross axis, the top bar's width is erased.
   EXPECT_FALSE(StyleContains(topBar, "width:"));
 

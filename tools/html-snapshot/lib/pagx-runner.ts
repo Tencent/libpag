@@ -79,6 +79,10 @@ function spawnPagxImport(
       '--format', 'html',
       '--input', htmlPath,
       '--output', outPath,
+      // `pagx import` resolves import directives by default; the server returns the raw imported
+      // PAGX and leaves resolution to the caller (see the response comment in server.js), so opt
+      // out here to preserve that contract and avoid work the caller may not want.
+      '--no-resolve',
     ];
     // Flex inference is always on inside the importer now, so there is no flag
     // to pass. We feed it the already-rendered subset HTML, so disable the
