@@ -1617,6 +1617,44 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   return out;
 }
 
+// True when `node` is an element that shares its line box with adjacent text —
+// i.e. any inline-level display (`inline`, `inline-block`, `inline-flex`, …).
+// A block-level sibling starts a new line, so the whitespace at the seam
+// collapses to nothing; an inline-level one keeps it as a single visible space.
+function isInlineLevelSibling(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+  const cs = getComputedStyle(node);
+  if (!isVisible(cs)) return false;
+  return String(cs.display || '').startsWith('inline');
+}
+
+// CSS keeps the whitespace at the seam between a text run and an adjacent
+// INLINE-LEVEL sibling as one collapsed space — it is only dropped at the
+// start/end of a line or against a block boundary. The container path emits
+// each direct text node as its own absolutely-positioned span, so `cleanLine`
+// (which `.trim()`s every line) would erase that seam space, gluing the run
+// against its sibling (`人与自然 · <span>关键知识点</span>` → `人与自然 ·关键知识点`,
+// or a `<mark>…</mark> 构成…` body run losing the gap after the highlight).
+// Report whether a leading / trailing space must be re-materialised so the
+// caller can inject it back. Skipped in `pre*` modes, where `cleanLine` already
+// keeps the source spaces verbatim.
+function boundarySpacePreservation(textNode, computed) {
+  const ws = String(computed.getPropertyValue('white-space') || '').trim().toLowerCase();
+  if (ws.startsWith('pre')) return { leading: false, trailing: false };
+  const raw = textNode.nodeValue || '';
+  return {
+    leading: /^\s/.test(raw) && isInlineLevelSibling(textNode.previousSibling),
+    trailing: /\s$/.test(raw) && isInlineLevelSibling(textNode.nextSibling),
+  };
+}
+
+// The seam space is emitted as U+00A0 (NBSP) rather than an ASCII space so it
+// survives every downstream whitespace fold: this file's own `cleanLine`/`trim`
+// and the C++ importer's fragment collapsing + leading/trailing trim (both of
+// which only treat ASCII space/tab/newline as whitespace). It therefore rides
+// through shrink-to-fit and flex inference as a real glyph, reproducing the gap.
+const BOUNDARY_SPACE = '\u00a0';
+
 // Emit one absolutely-positioned, nowrap <span> per line of `textNode`,
 // positioned relative to `parentRect`. Chromium's `Range.getClientRects()`
 // reports glyph INK bounds, not line-box bounds — and the two diverge in
@@ -1652,15 +1690,17 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed) {
+  const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
-    return emitVerticalTextSpans(textNode, parentRect, computed, wm);
+    return emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve);
   }
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     let lt = line.rect.top;
     let lh = line.rect.height;
     if (lineHeightPx > lh + 0.1) {
@@ -1678,7 +1718,11 @@ function emitTextSpans(textNode, parentRect, computed) {
       box: false, text: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
-    const transformed = applyTextTransform(line.text, computed);
+    let transformed = applyTextTransform(line.text, computed);
+    // Re-materialise the seam whitespace the browser rendered against an
+    // inline sibling: leading on the first line, trailing on the last.
+    if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
+    if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -1701,13 +1745,15 @@ function emitTextSpans(textNode, parentRect, computed) {
 // narrower; expand each column to the line-height width and re-centre it around
 // the measured mid-X so consecutive columns tile on the line-height stride —
 // the direct analogue of the horizontal line-height re-centring above.
-function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
+function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
+  const seam = preserve || { leading: false, trailing: false };
   const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
   const columns = splitTextNodeIntoLines(textNode, ws, axis);
   const lineHeightPx = readNum(computed, 'line-height');
   const out = [];
-  for (const col of columns) {
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
     let cl = col.rect.left;
     let cw = col.rect.width;
     if (lineHeightPx > cw + 0.1) {
@@ -1724,7 +1770,9 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm) {
     const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
       box: false, text: true,
     });
-    const transformed = applyTextTransform(col.text, computed);
+    let transformed = applyTextTransform(col.text, computed);
+    if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
+    if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -3345,6 +3393,8 @@ ${parts.join('')}
 const PAYLOAD_CONSTANTS_SRC = `
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
+const BOUNDARY_SPACE = '\\u00a0';
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -3499,6 +3549,8 @@ const HELPER_FNS = [
   freezeSvg,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
+  isInlineLevelSibling,
+  boundarySpacePreservation,
   emitTextSpans,
   emitVerticalTextSpans,
   hasBoxVisualsForInline,
