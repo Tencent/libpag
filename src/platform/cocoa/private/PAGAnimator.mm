@@ -111,9 +111,6 @@ class AnimatorListener : public pag::PAGAnimator::Listener {
     [updater release];
   }
 
-  void onAnimationWillUpdate(PAGAnimator*) override {
-  };
-
   void onAnimationUpdate(pag::PAGAnimator* animator) override {
     @autoreleasepool {
       auto updater = (id<PAGAnimatorUpdater>)[updaterTable.anyObject retain];
