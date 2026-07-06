@@ -313,8 +313,29 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
                       !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
                       isVertical || fragmentHasExplicitLineHeight;
 
+  // CSS shrink-to-fit for inline text. The html-snapshot pipeline bakes the *browser's*
+  // measured px width/height onto every text `<span>` (it flattens each run into an
+  // absolutely-positioned `white-space:nowrap` box). Freezing that size would peg the box to
+  // the browser's font metrics, so a render host that substitutes a different face — the norm
+  // for CJK and web fonts — would mis-centre or clip the glyphs inside a box that no longer
+  // matches them. Dropping the inline-axis size lets PAGX's own text layout drive the box, so
+  // it always tracks the glyphs it actually renders (and the TextBox's percentWidth/Height 100%
+  // then resolves against that content-sized box). Restricted to the cases where the authored
+  // size is provably redundant:
+  //   - inline element (`<span>`/`<a>`): CSS shrink-to-fit. Block `<p>`/`<hN>` keep their width.
+  //   - non-wrapping (`nowrap`/`pre`): the size is not a wrap boundary.
+  //   - no background visuals: nothing painted depends on the box size.
+  //   - not anchored against the far edge: the inline-axis size does not drive the box position.
+  //   - not a flex-grow child: the flex engine is not distributing free space through it.
+  bool inlineTag = element->name == "span" || element->name == "a";
+  bool notFlexGrow = !box.flexGrowSet || box.flexGrow == 0.0f;
+  bool shrinkToFit = inlineTag && hasNoWrap && !hasBgVisuals && notFlexGrow;
+  bool shrinkWidth = shrinkToFit && !isVertical && std::isnan(box.rightPx);
+  bool shrinkHeight = shrinkToFit && isVertical && std::isnan(box.bottomPx);
+
   Layer* textHost = nullptr;
-  Layer* wrapper = buildTextHostLayers(element, box, hasBgVisuals, textHost);
+  Layer* wrapper =
+      buildTextHostLayers(element, box, hasBgVisuals, shrinkWidth, shrinkHeight, textHost);
   populateTextHostContents(textHost, fragments, inherited, box, needsTextBox, isVertical,
                            hasNoWrap);
   emitTextDecorations(textHost, fragments, inherited);
@@ -379,9 +400,14 @@ void HTMLTextFragmentBuilder::collapseFragmentWhitespace(std::vector<TextFragmen
 
 Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNode>& element,
                                                     const HTMLBoxAttributes& box, bool hasBgVisuals,
+                                                    bool shrinkWidth, bool shrinkHeight,
                                                     Layer*& outTextHost) {
   auto outer = _document->makeNode<Layer>();
   _layerBuilder.applySizeAndPosition(outer, box);
+  // Shrink-to-fit inline text: clear the authored inline-axis size so the box tracks its own
+  // shaped glyphs instead of the browser-measured px (see the rationale in `convertTextLeaf`).
+  if (shrinkWidth) outer->width = NAN;
+  if (shrinkHeight) outer->height = NAN;
   _layerBuilder.applyLayerAttributes(outer, element, box);
   _layerBuilder.applyBoxTransform(outer, box, element);
 

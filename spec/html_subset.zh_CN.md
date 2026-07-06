@@ -209,6 +209,14 @@
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
 `unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写、web fonts (`@font-face`)。
 
+**行内文本自适应宽度。** 不换行的行内文本叶子（`<span>` / `<a>`，且 `white-space: nowrap`
+或 `pre`）会丢弃其内联轴上的显式尺寸，改由排版后的文本撑起盒子，对应 CSS 的 shrink-to-fit。
+这样盒子始终与 PAGX 实际渲染的字形一致，而不是冻结 `tools/html-snapshot` 烘焙进来的浏览器测量
+像素宽度（该宽度绑定的是浏览器的字体度量，一旦渲染端替换了字体——中文/网络字体很常见——就会导致
+文本居中偏移或被裁剪）。在以下情况下尺寸会被保留而非丢弃，因为此时它是有意义的：块级叶子
+（`<p>` / `<h1>`…`<h6>`）、可换行叶子（宽度即换行边界）、盒子绘制了背景/边框/阴影的叶子、以远边
+锚定（`right` / `bottom`）的叶子，或带 flex 伸展的子项。
+
 ### 4.6 自定义数据
 
 `data-*` 前缀的属性按 PAGX `data-*` 约定（见 `spec/pagx_spec.zh_CN.md` §2.3）原样保留

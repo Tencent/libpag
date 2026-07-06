@@ -1065,6 +1065,68 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunC
   EXPECT_TRUE(ColorNear(solid1->color, HexColor(0x111111, 0.7f)));
 }
 
+// A non-wrapping inline text leaf (<span>/<a>) shrinks to fit its own shaped glyphs instead
+// of freezing the browser-measured px width the html-snapshot pipeline bakes onto every text
+// span. Freezing it would peg the box to the browser's font metrics, so a render host that
+// substitutes a different face (the norm for CJK / web fonts) would mis-centre or clip the
+// glyphs inside a box that no longer matches them. The inline-axis size is dropped; the cross
+// axis and the absolute position are preserved.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafShrinksToFitWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_TRUE(std::isnan(leaf->width));
+  EXPECT_FLOAT_EQ(leaf->height, 80.0f);
+  EXPECT_FLOAT_EQ(leaf->left, 0.0f);
+}
+
+// Block-level text leaves (<p>, <h1..6>) keep their authored width: a block box is as wide as
+// its declared dimension in CSS, not shrink-to-fit, so the measured width is meaningful.
+PAG_TEST(PAGXHTMLImporterTest, BlockNoWrapTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <p style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap">Title</p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
+// An inline text leaf that can wrap keeps its width: there the width is the wrap boundary, not
+// redundant slack, so dropping it would change line breaking.
+PAG_TEST(PAGXHTMLImporterTest, InlineWrappingTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:20px">wrapping paragraph text</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
+// An inline text leaf whose box paints a background keeps its width: the painted Rectangle
+// fills the box, so the box size must stay fixed rather than shrinking to the glyphs.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafWithBackgroundKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px">
+      <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap;background-color:#000">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

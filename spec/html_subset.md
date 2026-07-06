@@ -222,6 +222,17 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
 `unicode-bidi`, `font-variant`, `font-stretch`, `font` shorthand, web fonts (`@font-face`).
 
+**Inline text shrink-to-fit.** A non-wrapping inline text leaf (`<span>` / `<a>` with
+`white-space: nowrap` or `pre`) drops its authored inline-axis size and lets the shaped text
+drive the box, matching CSS shrink-to-fit. This keeps the box consistent with the glyphs PAGX
+actually renders instead of freezing the browser-measured px width baked in by
+`tools/html-snapshot` (which pegs the box to the browser's font metrics and mis-centres or
+clips text once a render host substitutes a different face — common for CJK / web fonts). The
+size is kept — not dropped — when any of these hold, since it is then load-bearing: a
+block-level leaf (`<p>` / `<h1>`…`<h6>`), a wrapping leaf (the width is the wrap boundary), a
+leaf whose box paints a background/border/shadow, a leaf anchored against its far edge
+(`right` / `bottom`), or a flex-grow child.
+
 ### 4.6 Custom Data
 
 Attributes prefixed `data-*` are preserved on the produced PAGX node as `data-*` custom
