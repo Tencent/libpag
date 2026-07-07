@@ -555,20 +555,24 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     protected void onAttachedToWindow() {
-        isAttachedToWindow = true;
+        synchronized (PAGView.this) {
+            isAttachedToWindow = true;
+        }
         super.onAttachedToWindow();
         checkVisible();
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        isAttachedToWindow = false;
+        synchronized (PAGView.this) {
+            isAttachedToWindow = false;
+        }
+        checkVisible();
         super.onDetachedFromWindow();
         if (pagSurface != null) {
             pagSurface.release();
             pagSurface = null;
         }
-        checkVisible();
     }
 
 
@@ -588,12 +592,18 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private boolean isVisible = false;
 
     private void checkVisible() {
-        boolean visible = isAttachedToWindow && isShown();
-        if (isVisible == visible) {
-            return;
+        boolean attached = false;
+        synchronized (PAGView.this) {
+            attached = isAttachedToWindow;
         }
-        isVisible = visible;
-        if (isVisible) {
+        boolean visible = attached && isShown();
+        synchronized (PAGView.this) {
+            if (isVisible == visible) {
+                return;
+            }
+            isVisible = visible;
+        }
+        if (visible) {
             animator.setDuration(pagPlayer.duration());
             animator.update();
         } else {
@@ -661,16 +671,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     public void onAnimationUpdate(PAGAnimator animator) {
-        pagPlayer.setProgress(animator.progress());
+        boolean changed = false;
         synchronized (PAGView.this) {
             if (!isAttachedToWindow) {
                 return;
             }
+            pagPlayer.setProgress(animator.progress());
+            if (isVisible) {
+                animator.setDuration(pagPlayer.duration());
+            }
+            changed = flush();
         }
-        if (isVisible) {
-            animator.setDuration(pagPlayer.duration());
-        }
-        boolean changed = flush();
         if (changed) {
             updateTextureView();
         }

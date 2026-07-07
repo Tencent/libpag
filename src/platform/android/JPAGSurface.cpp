@@ -30,17 +30,29 @@
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
+static std::mutex PAGSurface_contextLocker = {};
 }  // namespace pag
 
 using namespace pag;
 
 std::shared_ptr<PAGSurface> getPAGSurface(JNIEnv* env, jobject thiz) {
+  std::lock_guard<std::mutex> autoLock(PAGSurface_contextLocker);
   auto pagSurface =
       reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
   if (pagSurface == nullptr) {
     return nullptr;
   }
   return pagSurface->get();
+}
+
+void clearPAGSurface(JNIEnv* env, jobject thiz) {
+  JPAGSurface* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGSurface_contextLocker);
+    old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
+    env->SetLongField(thiz, PAGSurface_nativeSurface, 0);
+  }
+  delete old;
 }
 
 extern "C" {
@@ -50,17 +62,17 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
-  auto jPAGSurface =
-      reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
-  if (jPAGSurface != nullptr) {
-    jPAGSurface->clear();
-  }
+  clearPAGSurface(env, thiz);
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
-  auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
+  JPAGSurface* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGSurface_contextLocker);
+    old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
+    env->SetLongField(thiz, PAGSurface_nativeSurface, 0);
+  }
   delete old;
-  env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)thiz);
 }
 
 PAG_API jint Java_org_libpag_PAGSurface_width(JNIEnv* env, jobject thiz) {
