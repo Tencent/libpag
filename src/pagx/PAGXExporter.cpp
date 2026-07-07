@@ -486,6 +486,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
+      if (!rect->id.empty()) xml.addAttribute("id", rect->id);
       if (!ShouldSkipPosition(rect->position, Default<Rectangle>().position, rect->left, rect->top,
                               rect->right, rect->bottom, rect->centerX, rect->centerY)) {
         xml.addAttribute("position", PointToString(rect->position));
@@ -510,6 +511,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
+      if (!ellipse->id.empty()) xml.addAttribute("id", ellipse->id);
       if (!ShouldSkipPosition(ellipse->position, Default<Ellipse>().position, ellipse->left,
                               ellipse->top, ellipse->right, ellipse->bottom, ellipse->centerX,
                               ellipse->centerY)) {
@@ -534,6 +536,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
+      if (!polystar->id.empty()) xml.addAttribute("id", polystar->id);
       if (!ShouldSkipPosition(polystar->position, Default<Polystar>().position, polystar->left,
                               polystar->top, polystar->right, polystar->bottom, polystar->centerX,
                               polystar->centerY)) {
@@ -564,6 +567,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
+      // A shape element normally carries no id, but an animated CSS clip-path targets this Path by
+      // id from an AnimationObject, so the id must survive export.
+      if (!path->id.empty()) xml.addAttribute("id", path->id);
       if (path->data != nullptr && !path->data->id.empty()) {
         // Use the reference to PathData resource.
         xml.addAttribute("data", "@" + path->data->id);

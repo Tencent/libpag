@@ -10192,6 +10192,112 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
 }
 
 /**
+ * Test case: an animated contour-mask Path driven by per-point float channels (the runtime lowering
+ * for an animated CSS `clip-path`). The mask starts as a full 100x100 rectangle and its two
+ * right-edge points sweep their x coordinate from 100 to 0, collapsing the rectangle to a zero-area
+ * sliver. The masked content must therefore be fully visible at t=0 and almost entirely clipped at
+ * the end — verifying that PathRuntimeTarget rebuilds the tgfx path geometry from the point
+ * channels each frame.
+ */
+PAGX_TEST(PAGXTest, AnimatedClipPathPointChannelsMorphContourMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto* content = doc->makeNode<pagx::Layer>("content");
+  content->width = 100;
+  content->height = 100;
+  {
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->size.width = 100;
+    rect->size.height = 100;
+    auto* fill = doc->makeNode<pagx::Fill>();
+    auto* color = doc->makeNode<pagx::SolidColor>();
+    color->color = {1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+    fill->color = color;
+    content->contents.push_back(rect);
+    content->contents.push_back(fill);
+  }
+
+  // Contour mask: a full-box rectangle path whose right edge animates inward.
+  auto* maskLayer = doc->makeNode<pagx::Layer>("mask");
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(100, 0);
+  pathData->lineTo(100, 100);
+  pathData->lineTo(0, 100);
+  pathData->close();
+  auto* maskPath = doc->makeNode<pagx::Path>("clipPath");
+  maskPath->data = pathData;
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskColor = doc->makeNode<pagx::SolidColor>();
+  maskColor->color = {1.0f, 1.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  maskFill->color = maskColor;
+  maskLayer->contents.push_back(maskPath);
+  maskLayer->contents.push_back(maskFill);
+  content->mask = maskLayer;
+  content->maskType = pagx::MaskType::Contour;
+  content->children.push_back(maskLayer);
+  doc->layers.push_back(content);
+
+  auto* anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "clipPath";
+  for (const char* name : {"point1.x", "point2.x"}) {
+    auto* ch = doc->makeNode<pagx::TypedChannel<float>>();
+    ch->name = name;
+    ch->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+    ch->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+    object->channels.push_back(ch);
+  }
+  anim->objects.push_back(object);
+  doc->animations.push_back(anim);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  const size_t rowBytes = 100 * 4;
+  std::vector<uint8_t> pixels(rowBytes * 100);
+  auto countVisible = [&]() -> int {
+    int n = 0;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+      if (pixels[i + 3] > 0) n++;
+    }
+    return n;
+  };
+
+  auto driveTo = [&](int64_t timeUs) {
+    for (const auto& id : scene->getTimelineIds()) {
+      auto timeline = scene->getTimeline(id);
+      if (timeline != nullptr) {
+        timeline->setCurrentTime(timeUs);
+        timeline->apply(1.0f);
+      }
+    }
+  };
+
+  driveTo(0);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), rowBytes));
+  int visibleStart = countVisible();
+
+  driveTo(1'000'000);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), rowBytes));
+  int visibleEnd = countVisible();
+
+  // Full rectangle at t=0 covers essentially the whole 100x100 box; the collapsed sliver at the end
+  // clips nearly all of it away.
+  EXPECT_GT(visibleStart, 9000);
+  EXPECT_LT(visibleEnd, visibleStart / 4);
+}
+
+/**
  * Test case: external composition loaded under a plain container, then editing a child document
  * node and notifying the child document syncs the edit to the parent scene through the container
  * nesting. Verifies that PAGLayer children (introduced for plain-container nesting) don't break

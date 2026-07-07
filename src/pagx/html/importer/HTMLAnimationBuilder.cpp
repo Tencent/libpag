@@ -37,8 +37,11 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
+#include "pagx/svg/SVGPathParser.h"
 
 namespace pagx {
 
@@ -798,6 +801,94 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
   return inner;
 }
 
+// Extracts the quoted `d` payload from an animated `clip-path: path("...")` keyframe value. The
+// capture pipeline normalizes every clip-path shape (inset/circle/ellipse/polygon/path) to this
+// single canonical `path("<d>")` form in border-box pixels, so the importer only has to recognize
+// `path(...)` here. An optional fill-rule prefix (`path(evenodd, "...")`) is skipped. Returns an
+// empty string for any other form.
+std::string ExtractClipPathD(const std::string& value) {
+  std::string v = Trim(value);
+  auto lp = v.find('(');
+  if (lp == std::string::npos) return std::string();
+  std::string fn = ToLower(Trim(v.substr(0, lp)));
+  if (fn != "path") return std::string();
+  auto rp = v.rfind(')');
+  if (rp == std::string::npos || rp <= lp) return std::string();
+  std::string inner = v.substr(lp + 1, rp - lp - 1);
+  // Find the first quote (skips an optional `evenodd,` / `nonzero,` fill-rule prefix).
+  auto q = inner.find_first_of("'\"");
+  if (q == std::string::npos) return std::string();
+  char quote = inner[q];
+  auto end = inner.find(quote, q + 1);
+  if (end == std::string::npos) return std::string();
+  return Trim(inner.substr(q + 1, end - q - 1));
+}
+
+// Builds (or rebuilds) a contour mask on `clipTarget` whose geometry is a single filled Path with
+// the given verb / point structure, and returns that Path so the caller can attach per-point
+// animation channels to it. Reuses an existing mask layer (e.g. one synthesized for the element's
+// settled-state clip) by replacing its contents, so an animated element ends up with exactly one
+// mask whose Path point order matches the channel indices. A fresh white Fill makes the shape draw
+// into the contour mask coverage.
+Path* BuildContourMaskPath(Layer* clipTarget, const std::vector<PathVerb>& verbs,
+                           const std::vector<Point>& points, PAGXDocument* document,
+                           HTMLIdAllocator& idAllocator) {
+  if (clipTarget == nullptr || document == nullptr || verbs.empty()) return nullptr;
+
+  auto* pathData = document->makeNode<PathData>();
+  size_t idx = 0;
+  for (auto verb : verbs) {
+    switch (verb) {
+      case PathVerb::Move:
+        if (idx < points.size()) pathData->moveTo(points[idx].x, points[idx].y);
+        idx += 1;
+        break;
+      case PathVerb::Line:
+        if (idx < points.size()) pathData->lineTo(points[idx].x, points[idx].y);
+        idx += 1;
+        break;
+      case PathVerb::Quad:
+        if (idx + 1 < points.size()) {
+          pathData->quadTo(points[idx].x, points[idx].y, points[idx + 1].x, points[idx + 1].y);
+        }
+        idx += 2;
+        break;
+      case PathVerb::Cubic:
+        if (idx + 2 < points.size()) {
+          pathData->cubicTo(points[idx].x, points[idx].y, points[idx + 1].x, points[idx + 1].y,
+                            points[idx + 2].x, points[idx + 2].y);
+        }
+        idx += 3;
+        break;
+      case PathVerb::Close:
+        pathData->close();
+        break;
+    }
+  }
+
+  auto* path = document->makeNode<Path>();
+  path->data = pathData;
+  auto* fill = document->makeNode<Fill>();
+  auto* solid = document->makeNode<SolidColor>();
+  solid->color = {1.0f, 1.0f, 1.0f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+
+  Layer* maskLayer = clipTarget->mask;
+  if (maskLayer == nullptr) {
+    maskLayer = document->makeNode<Layer>();
+    maskLayer->visible = false;
+    maskLayer->includeInLayout = false;
+    maskLayer->id = idAllocator.generateUnique("mask");
+    clipTarget->children.push_back(maskLayer);
+    clipTarget->mask = maskLayer;
+  }
+  clipTarget->maskType = MaskType::Contour;
+  maskLayer->contents.clear();
+  maskLayer->contents.push_back(path);
+  maskLayer->contents.push_back(fill);
+  return path;
+}
+
 }  // namespace
 
 HTMLAnimationBuilder::HTMLAnimationBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
@@ -947,6 +1038,21 @@ bool HTMLAnimationBuilder::buildForElement(
   };
   std::vector<FilterStop> filterStops;
 
+  // Per-keyframe clip-path geometry (animated contour mask). The capture pipeline normalizes every
+  // clip-path shape to a canonical `path("d")` in border-box pixels; each stop stores that path's
+  // flattened point list. All stops of one animation share the same verb / point structure (CSS
+  // only interpolates matching shapes), so per-point float channels (`point{i}.x/.y`) line up
+  // one-to-one across the timeline. `clipVerbs` captures the structure of the first stop for the
+  // consistency check below.
+  struct ClipStop {
+    Frame time = 0;
+    std::vector<Point> points;
+  };
+  std::vector<ClipStop> clipStops;
+  std::vector<PathVerb> clipVerbs;
+  size_t clipPointCount = 0;
+  bool clipStructureConsistent = true;
+
   for (const auto& stop : stops) {
     Frame time = static_cast<Frame>(
         delayFrames + std::llround(stop.percent / 100.0f * static_cast<float>(durationFrames)));
@@ -1007,6 +1113,23 @@ bool HTMLAnimationBuilder::buildForElement(
           }
         }
         filterStops.push_back(fs);
+      } else if (prop == "clip-path") {
+        std::string d = ExtractClipPathD(val);
+        if (d.empty()) {
+          clipStructureConsistent = false;
+        } else {
+          PathData pd = PathDataFromSVGString(d);
+          ClipStop cs;
+          cs.time = time;
+          cs.points.assign(pd.points().begin(), pd.points().end());
+          if (clipStops.empty()) {
+            clipVerbs.assign(pd.verbs().begin(), pd.verbs().end());
+            clipPointCount = cs.points.size();
+          } else if (cs.points.size() != clipPointCount) {
+            clipStructureConsistent = false;
+          }
+          clipStops.push_back(std::move(cs));
+        }
       } else {
         _diagnostics.warn("html: animated property '" + prop +
                           "' is not supported; dropped [subset:animation-unsupported-property]");
@@ -1075,8 +1198,19 @@ bool HTMLAnimationBuilder::buildForElement(
     if (fs.hasBlur) filterHasBlur = true;
   }
 
+  // An animated clip-path is usable only when every stop resolved to a compatible geometry (same
+  // shape function → same verb / point structure). CSS itself refuses to interpolate mismatched
+  // shapes, so a mismatch here means the author animated between incompatible forms; drop the clip
+  // channel with a diagnostic rather than emit a corrupt morph.
+  bool clipUsable = clipStructureConsistent && clipStops.size() >= 2 && clipPointCount > 0;
+  if (!clipUsable && !clipStops.empty()) {
+    _diagnostics.warn(
+        "html: animated clip-path keyframes do not share a compatible shape; dropped "
+        "[subset:animation-unsupported-property]");
+  }
+
   if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() &&
-      colorKeys.empty() && !filterHasShadow && !filterHasBlur) {
+      colorKeys.empty() && !filterHasShadow && !filterHasBlur && !clipUsable) {
     return false;
   }
 
@@ -1405,6 +1539,67 @@ bool HTMLAnimationBuilder::buildForElement(
       chY->keyframes = std::move(bfBlurY);
       object->channels.push_back(chY);
       animation->objects.push_back(object);
+    }
+  }
+
+  // Animated clip-path (contour mask morph). The mask geometry is driven by per-point float
+  // channels on a Path node: the renderer's PathRuntimeTarget interprets "point{i}.x/.y" and
+  // rebuilds the tgfx path each frame. A mask must therefore be a single Path whose PathData point
+  // order matches the channel indices, so we (re)build the contour mask here from the base (first)
+  // keyframe, replacing whatever static geometry the settled-state clip synthesis produced. This
+  // runs after the transform split so the mask lands on the layer that actually holds the content.
+  if (clipUsable) {
+    Layer* clipTarget = (xyTarget != nullptr) ? xyTarget : layer;
+
+    // Base geometry = first stop; the mask's static Path shows this when no animation is active.
+    Path* maskPath =
+        BuildContourMaskPath(clipTarget, clipVerbs, clipStops.front().points, _document,
+                             _idAllocator);
+    if (maskPath != nullptr) {
+      if (maskPath->id.empty()) {
+        maskPath->id = _idAllocator.generateUnique("clip");
+      }
+      auto* object = _document->makeNode<AnimationObject>();
+      object->target = maskPath->id;
+      for (size_t i = 0; i < clipPointCount; i++) {
+        const Point& base = clipStops.front().points[i];
+        std::vector<Keyframe<float>> xKeysPt;
+        std::vector<Keyframe<float>> yKeysPt;
+        bool xVary = false;
+        bool yVary = false;
+        for (const auto& cs : clipStops) {
+          if (i >= cs.points.size()) continue;
+          float x = cs.points[i].x;
+          float y = cs.points[i].y;
+          xKeysPt.push_back({cs.time, x, interp, {}, {}});
+          yKeysPt.push_back({cs.time, y, interp, {}, {}});
+          if (std::abs(x - base.x) > 1e-3f) xVary = true;
+          if (std::abs(y - base.y) > 1e-3f) yVary = true;
+        }
+        ApplyBezierHandles(xKeysPt, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        ApplyBezierHandles(yKeysPt, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        if (easing.kind == ResolvedEasing::Kind::Steps) {
+          ExpandSteps(xKeysPt, easing.stepCount, easing.stepJump);
+          ExpandSteps(yKeysPt, easing.stepCount, easing.stepJump);
+        }
+        ApplyFillMode(xKeysPt, spec.fillMode, base.x, loopOnce, activeEnd);
+        ApplyFillMode(yKeysPt, spec.fillMode, base.y, loopOnce, activeEnd);
+        if (xVary) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "point" + std::to_string(i) + ".x";
+          ch->keyframes = std::move(xKeysPt);
+          object->channels.push_back(ch);
+        }
+        if (yVary) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "point" + std::to_string(i) + ".y";
+          ch->keyframes = std::move(yKeysPt);
+          object->channels.push_back(ch);
+        }
+      }
+      if (!object->channels.empty()) {
+        animation->objects.push_back(object);
+      }
     }
   }
 

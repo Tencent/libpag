@@ -526,8 +526,279 @@ export function pagxParseTimeMs(v: string): number {
 
 // Given N computed-style samples for one element, return the subset properties
 // whose value changes across the timeline (so static properties are dropped).
+// Convert a computed CSS `clip-path` value into a canonical SVG path `d` string in the element's
+// border-box pixel space. Used for animated clip-path capture: the importer parses each keyframe's
+// `path("d")` back into a point list and drives a contour mask's geometry through per-point float
+// channels (`point{i}.x/.y`). Because CSS only interpolates clip-paths that share the same shape
+// function, every sample of one animation yields a `d` with the same verb/point structure, so the
+// per-point channels line up across the timeline. Returns '' for `none`, a `url(#id)` reference
+// (handled by the static path), or any shape that cannot be resolved. `inset()` rounding is
+// ignored (a reveal wipe morphs the rectangle, not its corner radius). This is intentionally
+// self-contained so it survives `.toString()` bundling into the capture IIFE.
+export function pagxClipNormalizeD(raw: string, el: Element): string {
+  const v = (raw || '').trim();
+  if (!v || v.toLowerCase() === 'none' || /^url\(/i.test(v)) return '';
+  const rect = el.getBoundingClientRect();
+  const bw = rect.width;
+  const bh = rect.height;
+  if (!(bw > 0) || !(bh > 0)) return '';
+  const cs = getComputedStyle(el);
+  const px = (s: string): number => {
+    const f = parseFloat(s);
+    return isNaN(f) ? 0 : f;
+  };
+  const bl = px(cs.borderLeftWidth);
+  const bt = px(cs.borderTopWidth);
+  const brr = px(cs.borderRightWidth);
+  const bbb = px(cs.borderBottomWidth);
+  const pl = px(cs.paddingLeft);
+  const pt = px(cs.paddingTop);
+  const pr = px(cs.paddingRight);
+  const pb = px(cs.paddingBottom);
+  const ml = px(cs.marginLeft);
+  const mt = px(cs.marginTop);
+  const mr = px(cs.marginRight);
+  const mb = px(cs.marginBottom);
+  // Split off a trailing geometry-box keyword and resolve the reference rect (origin + size) in
+  // border-box coordinates. Everything below is computed in that local box then offset by the box
+  // origin so the emitted `d` is always in border-box pixels (matching how the importer frames the
+  // contour mask to the element's border box).
+  let body = v;
+  let ox = 0;
+  let oy = 0;
+  let w = bw;
+  let h = bh;
+  const boxMatch = body.match(/\b(border-box|padding-box|content-box|margin-box|fill-box|stroke-box|view-box)\s*$/i);
+  if (boxMatch) {
+    const box = boxMatch[1].toLowerCase();
+    body = body.slice(0, boxMatch.index).trim();
+    if (box === 'padding-box') {
+      ox = bl; oy = bt; w = bw - bl - brr; h = bh - bt - bbb;
+    } else if (box === 'content-box') {
+      ox = bl + pl; oy = bt + pt; w = bw - bl - brr - pl - pr; h = bh - bt - bbb - pt - pb;
+    } else if (box === 'margin-box') {
+      ox = -ml; oy = -mt; w = bw + ml + mr; h = bh + mt + mb;
+    }
+  }
+  if (!(w > 0) || !(h > 0)) return '';
+  // Paren-aware split of a shape's argument list on top-level spaces.
+  const splitSpace = (s: string): string[] => {
+    const out: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth = Math.max(0, depth - 1);
+      else if ((c === ' ' || c === '\t' || c === '\n') && depth === 0) {
+        if (i > start) out.push(s.slice(start, i));
+        start = i + 1;
+      }
+    }
+    if (s.length > start) out.push(s.slice(start));
+    return out.filter((t) => t.length > 0);
+  };
+  // Evaluate a <length-percentage> / calc() token to pixels against `basis`. Handles px, %, bare
+  // numbers, and simple calc() with + - * / (left-to-right with * / precedence).
+  const evalLen = (tokenRaw: string, basis: number): number => {
+    let token = (tokenRaw || '').trim();
+    if (!token) return 0;
+    const cm = token.match(/^calc\((.*)\)$/i);
+    if (cm) token = cm[1];
+    // Tokenize into numbers (with optional unit) and operators.
+    const toks: string[] = [];
+    let i = 0;
+    while (i < token.length) {
+      const c = token[i];
+      if (c === ' ' || c === '\t' || c === '\n') { i++; continue; }
+      if (c === '+' || c === '-' || c === '*' || c === '/' || c === '(' || c === ')') {
+        toks.push(c); i++; continue;
+      }
+      let j = i;
+      while (j < token.length && !'+-*/() \t\n'.includes(token[j])) j++;
+      toks.push(token.slice(i, j)); i = j;
+    }
+    const val = (t: string): number => {
+      if (t.endsWith('%')) return (parseFloat(t) / 100) * basis;
+      if (t.endsWith('px')) return parseFloat(t);
+      const f = parseFloat(t);
+      return isNaN(f) ? 0 : f;
+    };
+    // Shunting-ish: two-pass, handle * / first then + -. No parentheses expected in resolved
+    // computed values, but tolerate them by flattening (ignored).
+    const nums: number[] = [];
+    const ops: string[] = [];
+    for (const t of toks) {
+      if (t === '(' || t === ')') continue;
+      if (t === '+' || t === '-' || t === '*' || t === '/') ops.push(t);
+      else nums.push(val(t));
+    }
+    if (nums.length === 0) return 0;
+    // Fold * and / first.
+    const n2: number[] = [nums[0]];
+    const o2: string[] = [];
+    let k = 0;
+    for (let m = 0; m < ops.length; m++) {
+      const op = ops[m];
+      const rhs = nums[m + 1] != null ? nums[m + 1] : 0;
+      if (op === '*') n2[n2.length - 1] *= rhs;
+      else if (op === '/') n2[n2.length - 1] /= rhs;
+      else { o2.push(op); n2.push(rhs); }
+      k = m;
+    }
+    void k;
+    let acc = n2[0];
+    for (let m = 0; m < o2.length; m++) {
+      acc = o2[m] === '-' ? acc - n2[m + 1] : acc + n2[m + 1];
+    }
+    return acc;
+  };
+  const num = (x: number): string => String(Math.round(x * 1000) / 1000);
+  const P = (x: number, y: number): string => num(ox + x) + ' ' + num(oy + y);
+  const inner = (name: string): string | null => {
+    const idx = body.toLowerCase().indexOf(name + '(');
+    if (idx < 0) return null;
+    const open = body.indexOf('(', idx);
+    let depth = 0;
+    for (let i = open; i < body.length; i++) {
+      if (body[i] === '(') depth++;
+      else if (body[i] === ')') { depth--; if (depth === 0) return body.slice(open + 1, i); }
+    }
+    return null;
+  };
+  const kappa = 0.5522847498307936;
+  const ellipseD = (cx: number, cy: number, rx: number, ry: number): string => {
+    return 'M ' + P(cx + rx, cy) +
+      ' C ' + P(cx + rx, cy + ry * kappa) + ', ' + P(cx + rx * kappa, cy + ry) + ', ' + P(cx, cy + ry) +
+      ' C ' + P(cx - rx * kappa, cy + ry) + ', ' + P(cx - rx, cy + ry * kappa) + ', ' + P(cx - rx, cy) +
+      ' C ' + P(cx - rx, cy - ry * kappa) + ', ' + P(cx - rx * kappa, cy - ry) + ', ' + P(cx, cy - ry) +
+      ' C ' + P(cx + rx * kappa, cy - ry) + ', ' + P(cx + rx, cy - ry * kappa) + ', ' + P(cx + rx, cy) +
+      ' Z';
+  };
+  // Resolve a CSS <position> (1-2 tokens after `at`) to [cx, cy] in local box coords.
+  const resolvePos = (tokens: string[]): [number, number] => {
+    let cx = w / 2;
+    let cy = h / 2;
+    const xk: Record<string, number> = { left: 0, center: w / 2, right: w };
+    const yk: Record<string, number> = { top: 0, center: h / 2, bottom: h };
+    if (tokens.length >= 1) {
+      const t = tokens[0].toLowerCase();
+      cx = t in xk ? xk[t] : evalLen(tokens[0], w);
+    }
+    if (tokens.length >= 2) {
+      const t = tokens[1].toLowerCase();
+      cy = t in yk ? yk[t] : evalLen(tokens[1], h);
+    }
+    return [cx, cy];
+  };
+  // polygon()
+  const poly = inner('polygon');
+  if (poly != null) {
+    let pts = poly.trim();
+    // optional fill-rule prefix
+    const fr = pts.match(/^(nonzero|evenodd)\s*,\s*/i);
+    if (fr) pts = pts.slice(fr[0].length);
+    const verts = pagxSplitTopLevelCommas(pts).filter((s) => s.trim().length > 0);
+    if (verts.length < 3) return '';
+    const parts: string[] = [];
+    for (let i = 0; i < verts.length; i++) {
+      const xy = splitSpace(verts[i].trim());
+      const x = evalLen(xy[0] || '0', w);
+      const y = evalLen(xy[1] || '0', h);
+      parts.push((i === 0 ? 'M ' : 'L ') + P(x, y));
+    }
+    return parts.join(' ') + ' Z';
+  }
+  // inset()
+  const ins = inner('inset');
+  if (ins != null) {
+    let s = ins.trim();
+    const ri = s.toLowerCase().indexOf(' round ');
+    if (ri >= 0) s = s.slice(0, ri);
+    const t = splitSpace(s);
+    const top = evalLen(t[0] || '0', h);
+    const right = t.length > 1 ? evalLen(t[1], w) : top;
+    const bottom = t.length > 2 ? evalLen(t[2], h) : top;
+    const left = t.length > 3 ? evalLen(t[3], w) : right;
+    const x1 = left;
+    const y1 = top;
+    const x2 = Math.max(x1, w - right);
+    const y2 = Math.max(y1, h - bottom);
+    return 'M ' + P(x1, y1) + ' L ' + P(x2, y1) + ' L ' + P(x2, y2) + ' L ' + P(x1, y2) + ' Z';
+  }
+  // circle()
+  const cir = inner('circle');
+  if (cir != null) {
+    const t = splitSpace(cir.trim());
+    let radTok = '';
+    let posTokens: string[] = [];
+    const atIdx = t.findIndex((x) => x.toLowerCase() === 'at');
+    if (atIdx >= 0) {
+      radTok = t.slice(0, atIdx).join(' ').trim();
+      posTokens = t.slice(atIdx + 1);
+    } else {
+      radTok = t.join(' ').trim();
+    }
+    const [cx, cy] = resolvePos(posTokens);
+    const diag = Math.sqrt(w * w + h * h) / Math.SQRT2;
+    let r: number;
+    const rk = radTok.toLowerCase();
+    if (!radTok || rk === 'closest-side') {
+      r = Math.min(cx, w - cx, cy, h - cy);
+    } else if (rk === 'farthest-side') {
+      r = Math.max(cx, w - cx, cy, h - cy);
+    } else if (rk === 'closest-corner') {
+      const dx = Math.min(cx, w - cx);
+      const dy = Math.min(cy, h - cy);
+      r = Math.sqrt(dx * dx + dy * dy);
+    } else if (rk === 'farthest-corner') {
+      const dx = Math.max(cx, w - cx);
+      const dy = Math.max(cy, h - cy);
+      r = Math.sqrt(dx * dx + dy * dy);
+    } else {
+      r = evalLen(radTok, diag);
+    }
+    if (!(r >= 0)) r = 0;
+    return ellipseD(cx, cy, r, r);
+  }
+  // ellipse()
+  const ell = inner('ellipse');
+  if (ell != null) {
+    const t = splitSpace(ell.trim());
+    let posTokens: string[] = [];
+    let radToks: string[] = [];
+    const atIdx = t.findIndex((x) => x.toLowerCase() === 'at');
+    if (atIdx >= 0) {
+      radToks = t.slice(0, atIdx);
+      posTokens = t.slice(atIdx + 1);
+    } else {
+      radToks = t;
+    }
+    const [cx, cy] = resolvePos(posTokens);
+    const sideRx = (kw: string): number =>
+      kw === 'farthest-side' ? Math.max(cx, w - cx) : Math.min(cx, w - cx);
+    const sideRy = (kw: string): number =>
+      kw === 'farthest-side' ? Math.max(cy, h - cy) : Math.min(cy, h - cy);
+    const rxTok = (radToks[0] || '').toLowerCase();
+    const ryTok = (radToks[1] || '').toLowerCase();
+    const rx = !radToks[0] || rxTok === 'closest-side' || rxTok === 'farthest-side'
+      ? sideRx(rxTok || 'closest-side') : evalLen(radToks[0], w);
+    const ry = !radToks[1] || ryTok === 'closest-side' || ryTok === 'farthest-side'
+      ? sideRy(ryTok || 'closest-side') : evalLen(radToks[1], h);
+    return ellipseD(cx, cy, Math.max(0, rx), Math.max(0, ry));
+  }
+  // path()
+  const pth = inner('path');
+  if (pth != null) {
+    const m = pth.match(/(['"])((?:\\.|(?!\1).)*)\1/);
+    if (m && m[2]) return m[2].trim();
+    return '';
+  }
+  return '';
+}
+
 export function pagxWhichVary(samples: Array<Record<string, string | null>>): string[] {
-  const props = ['opacity', 'transform', 'color', 'background-color', 'filter'];
+  const props = ['opacity', 'transform', 'color', 'background-color', 'filter', 'clip-path'];
   const out: string[] = [];
   for (const p of props) {
     let varies = false;
@@ -721,6 +992,22 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
       put('fdbl', i, f.fdbl);
       put('fda', i, f.fda);
       put('fblur', i, f.fblur);
+    }
+    // clip-path is emitted as `path("<d>")`; expose each coordinate number as its own scalar
+    // channel (cp0, cp1, ...) so RDP keeps the frames where the mask geometry actually moves. All
+    // stops of one animation share the same shape structure, so coordinate index k is comparable
+    // across stops.
+    if (p['clip-path'] != null && p['clip-path']) {
+      const dm = p['clip-path'].match(/path\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/i);
+      if (dm && dm[2]) {
+        const nums = dm[2].match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi);
+        if (nums) {
+          for (let k = 0; k < nums.length; k++) {
+            const val = parseFloat(nums[k]);
+            if (!isNaN(val)) put('cp' + k, i, val);
+          }
+        }
+      }
     }
   }
   return series;
@@ -978,6 +1265,9 @@ export function pagxBuildCanonicalAnimation(
       decls.push('background-color: ' + s.props['background-color']);
     }
     if (s.props['filter'] != null) decls.push('filter: ' + s.props['filter']);
+    if (s.props['clip-path'] != null && s.props['clip-path']) {
+      decls.push('clip-path: ' + s.props['clip-path']);
+    }
     if (decls.length === 0) continue;
     lines.push((Math.round(s.offset * 1000) / 10) + '% { ' + decls.join('; ') + '; }');
   }
@@ -1361,12 +1651,21 @@ export function pagxSampleTimeline(
           ? filterVal + ' ' + shadowFilter
           : shadowFilter;
       }
+      // Animated `clip-path` (contour mask): normalize any shape form to a canonical SVG path `d`
+      // in border-box pixels so the importer can morph a mask Path's points over time. Only pay the
+      // getBoundingClientRect / shape-parse cost when the element actually carries a geometric
+      // clip-path (skip `none` and `url(#id)` references, which the static path already handles).
+      const rawClip = cs.clipPath;
+      const clipD = rawClip && rawClip !== 'none' && !/^url\(/i.test(rawClip)
+        ? pagxClipNormalizeD(rawClip, el)
+        : '';
       const snap: Record<string, string | null> = {
         opacity: cs.opacity,
         transform: pagxExtractTransform(cs.transform),
         color: cs.color,
         'background-color': cs.backgroundColor,
         filter: filterVal,
+        'clip-path': clipD ? 'path("' + clipD + '")' : '',
       };
       let arr = series.get(el);
       if (!arr) {
@@ -2404,6 +2703,7 @@ const PAGX_ANIM_FNS = [
   pagxParseColorChannels,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
+  pagxClipNormalizeD,
   pagxStopScalarSeries,
   pagxRdpKeep,
   pagxDecimateStops,

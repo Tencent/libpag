@@ -49,6 +49,7 @@
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
@@ -221,6 +222,118 @@ struct LayerRuntimeTarget : RuntimeTarget {
       result = tgfx::Matrix::MakeTrans(animX, animY) * animMatrix;
     }
     layer->setMatrix(result);
+  }
+};
+
+// Drives a tgfx::ShapePath's geometry from per-point float channels named "point{i}.x" /
+// "point{i}.y". Used for an animated CSS `clip-path` contour mask: the HTML importer emits one
+// x / y channel per path point and this target mixes each coordinate then rebuilds the whole
+// tgfx::Path from the mutable point array. CSS only interpolates clip-paths that share structure
+// (same shape function, same vertex count), so the verb list and point count stay fixed across the
+// animation and channel index {i} maps one-to-one onto PathData point {i}. Points are held in the
+// node's PathData (unscaled) space; `scale` (the Path's renderScale) is applied on rebuild so the
+// keyframe values stay in the same coordinate space the importer authored them in.
+struct PathRuntimeTarget : RuntimeTarget {
+  std::shared_ptr<tgfx::ShapePath> shapePath = nullptr;
+  std::vector<PathVerb> verbs = {};
+  std::vector<tgfx::Point> points = {};
+  float scale = 1.0f;
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    size_t index = 0;
+    bool isX = false;
+    if (ParsePointChannel(channel, index, isX)) {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr || index >= points.size()) {
+        return true;
+      }
+      if (isX) {
+        points[index].x = MixFloat(points[index].x, *v, mix);
+      } else {
+        points[index].y = MixFloat(points[index].y, *v, mix);
+      }
+      rebuild();
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    size_t index = 0;
+    bool isX = false;
+    if (ParsePointChannel(channel, index, isX)) {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+
+ private:
+  // Parses a "point{N}.x" / "point{N}.y" channel name into a point index and axis. Returns false
+  // for any other channel so the base writer table handles it.
+  static bool ParsePointChannel(const std::string& channel, size_t& index, bool& isX) {
+    if (channel.rfind("point", 0) != 0) {
+      return false;
+    }
+    auto dot = channel.rfind('.');
+    if (dot == std::string::npos || dot + 2 != channel.size()) {
+      return false;
+    }
+    char axis = channel[dot + 1];
+    if (axis != 'x' && axis != 'y') {
+      return false;
+    }
+    if (dot <= 5) {
+      return false;
+    }
+    size_t value = 0;
+    for (size_t i = 5; i < dot; i++) {
+      char c = channel[i];
+      if (c < '0' || c > '9') {
+        return false;
+      }
+      value = value * 10 + static_cast<size_t>(c - '0');
+    }
+    index = value;
+    isX = (axis == 'x');
+    return true;
+  }
+
+  void rebuild() {
+    tgfx::Path path = {};
+    size_t idx = 0;
+    for (auto verb : verbs) {
+      switch (verb) {
+        case PathVerb::Move:
+          if (idx < points.size()) path.moveTo(points[idx].x * scale, points[idx].y * scale);
+          idx += 1;
+          break;
+        case PathVerb::Line:
+          if (idx < points.size()) path.lineTo(points[idx].x * scale, points[idx].y * scale);
+          idx += 1;
+          break;
+        case PathVerb::Quad:
+          if (idx + 1 < points.size()) {
+            path.quadTo(points[idx].x * scale, points[idx].y * scale, points[idx + 1].x * scale,
+                        points[idx + 1].y * scale);
+          }
+          idx += 2;
+          break;
+        case PathVerb::Cubic:
+          if (idx + 2 < points.size()) {
+            path.cubicTo(points[idx].x * scale, points[idx].y * scale, points[idx + 1].x * scale,
+                         points[idx + 1].y * scale, points[idx + 2].x * scale,
+                         points[idx + 2].y * scale);
+          }
+          idx += 3;
+          break;
+        case PathVerb::Close:
+          path.close();
+          break;
+      }
+    }
+    if (shapePath != nullptr) {
+      shapePath->setPath(std::move(path));
+    }
   }
 };
 
@@ -1290,10 +1403,26 @@ class LayerBuilderContext {
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = tgfx::ShapePath::Make();
     shapePath->setPosition(ToTGFX(node->renderPosition()));
+    float scale = node->renderScale();
     if (node->data) {
-      shapePath->setPath(getScaledPath(node->data, node->renderScale()));
+      shapePath->setPath(getScaledPath(node->data, scale));
     }
     shapePath->setReversed(node->reversed);
+    // Install a point-channel target so an animated CSS clip-path (contour mask) can morph this
+    // path's geometry via "point{i}.x/.y" float channels. Seeded from the authored PathData; the
+    // target rebuilds the tgfx::Path in place each time a coordinate channel is applied.
+    if (node->data != nullptr && !node->data->isEmpty()) {
+      auto target = std::unique_ptr<PathRuntimeTarget>(new PathRuntimeTarget());
+      target->shapePath = shapePath;
+      target->verbs = node->data->verbs();
+      const auto& pts = node->data->points();
+      target->points.reserve(pts.size());
+      for (const auto& p : pts) {
+        target->points.push_back(tgfx::Point::Make(p.x, p.y));
+      }
+      target->scale = scale;
+      _result.binding.setTarget(node, std::move(target));
+    }
     return shapePath;
   }
 

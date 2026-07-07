@@ -4563,6 +4563,57 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
   EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
 }
 
+// An animated `clip-path` (emitted by the capture pipeline as a canonical `path("d")` per keyframe)
+// lowers onto a contour mask whose Path geometry morphs through per-point float channels. The
+// reveal below wipes a rectangle open on the x axis, so the two right-edge points animate their x
+// coordinate from 0 to 50 while the y coordinates (and the two left-edge points) stay constant and
+// emit no channel. The masked layer gains a Contour mask whose Path is the animation target.
+PAG_TEST(PAGXHTMLImporterTest, AnimationClipPathProducesPointChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes reveal {
+        0%   { clip-path: path("M 0 0 L 0 0 L 0 50 L 0 50 Z"); }
+        100% { clip-path: path("M 0 0 L 50 0 L 50 50 L 0 50 Z"); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:reveal 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+  EXPECT_EQ(anim->duration, 60);
+
+  // point1.x and point2.x sweep 0 -> 50; the other coordinates are constant and are not emitted.
+  auto* p1x = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "point1.x"));
+  auto* p2x = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "point2.x"));
+  ASSERT_NE(p1x, nullptr);
+  ASSERT_NE(p2x, nullptr);
+  EXPECT_FLOAT_EQ(p1x->keyframes.front().value, 0.0f);
+  EXPECT_FLOAT_EQ(p1x->keyframes.back().value, 50.0f);
+  EXPECT_FLOAT_EQ(p2x->keyframes.back().value, 50.0f);
+  EXPECT_EQ(FindChannel(anim, "point0.x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "point1.y"), nullptr);
+
+  // The masked layer carries a Contour mask whose Path geometry is the point channels' target.
+  auto* card = doc->layers.front()->children.front();
+  ASSERT_NE(card->mask, nullptr);
+  EXPECT_EQ(card->maskType, pagx::MaskType::Contour);
+  EXPECT_FALSE(card->mask->visible);
+  EXPECT_FALSE(card->mask->includeInLayout);
+  auto* maskPath = FindElementOfType<pagx::Path>(card->mask);
+  ASSERT_NE(maskPath, nullptr);
+  ASSERT_NE(maskPath->data, nullptr);
+  EXPECT_EQ(maskPath->data->countPoints(), 4u);
+  auto* obj = FindObjectByTarget(anim, maskPath->id);
+  ASSERT_NE(obj, nullptr);
+}
+
 // A `filter: drop-shadow(...)` glow authored in @keyframes (with `none` at rest) lowers onto the
 // runtime's animatable DropShadowFilter channels: blurX/blurY ramp with the glow radius and the
 // color channel ramps its alpha in/out. The filter node is minted on the layer (no static filter)
