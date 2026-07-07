@@ -31,6 +31,10 @@
   background-size: 30px 30px;
 }
 
+.container {
+  overflow-y: scroll;
+}
+
 .btn-box {
   width: 720rpx;
   display: flex;
