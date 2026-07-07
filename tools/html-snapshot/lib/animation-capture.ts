@@ -485,18 +485,11 @@ export function pagxNormalizeProps(
   // it rides the same channel (the runtime has no box-shadow animation channel).
   const flt = pagxPickProp(raw, 'filter', 'filter');
   const shadowFilter = pagxBoxShadowToFilter(pagxPickProp(raw, 'box-shadow', 'boxShadow'));
-  // A `text-shadow` glow shares `box-shadow`'s subset syntax (color + offX/offY/
-  // blur, no inset/spread) and, on a text element, is visually equivalent to
-  // `filter: drop-shadow(...)`. Fold it onto the filter channel too so an
-  // animated text glow (e.g. a pulsing label toggled by JS) keeps its curve —
-  // the runtime has no text-shadow channel, mirroring the box-shadow fold above.
-  const textShadowFilter = pagxBoxShadowToFilter(pagxPickProp(raw, 'text-shadow', 'textShadow'));
   let filterVal = flt;
-  for (const extra of [shadowFilter, textShadowFilter]) {
-    if (!extra) continue;
+  if (shadowFilter) {
     filterVal = filterVal != null && filterVal !== 'none'
-      ? filterVal + ' ' + extra
-      : extra;
+      ? filterVal + ' ' + shadowFilter
+      : shadowFilter;
   }
   if (filterVal != null) out['filter'] = filterVal;
   return out;
@@ -1025,7 +1018,7 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
 // channel's total motion (a 2px wiggle and a 200px slide are simplified to the
 // same relative tolerance). Returns a per-index keep mask. A flat channel
 // (zero travel) keeps only its endpoints.
-export function pagxRdpKeep(offsets: number[], values: number[], eps: number): boolean[] {
+export function pagxRdpKeep(offsets: number[], values: number[], eps: number, absEps = 0): boolean[] {
   const n = values.length;
   const keep = new Array(n).fill(false);
   if (n === 0) return keep;
@@ -1040,6 +1033,18 @@ export function pagxRdpKeep(offsets: number[], values: number[], eps: number): b
   }
   const range = hi - lo;
   if (!(range > 0)) return keep; // flat channel — endpoints only
+  // Because distances are measured on the value axis normalised to this
+  // channel's own [0,1] travel, `eps` is a fraction of the *total* motion — so
+  // a small-but-visible move loses to a larger one sharing the channel. A ±2px
+  // "shake" on an element that also slides 260px elsewhere on the timeline is
+  // only ~0.8% of the travel and falls under a 1% `eps`, erasing the shake.
+  // `absEps` (in the channel's own value units, e.g. px for translation) sets a
+  // floor in absolute terms: on a wide-range channel it tightens the effective
+  // tolerance to `absEps / range` so motion above the floor is kept regardless
+  // of how far the channel travels elsewhere. Zero (the default) preserves the
+  // pure relative behaviour for channels where an absolute unit is meaningless
+  // (opacity, colour, matrix scale/rotation).
+  const effEps = absEps > 0 ? Math.min(eps, absEps / range) : eps;
   const norm = values.map((v) => (v - lo) / range);
   const stack: number[][] = [[0, n - 1]];
   while (stack.length) {
@@ -1061,7 +1066,7 @@ export function pagxRdpKeep(offsets: number[], values: number[], eps: number): b
         idx = i;
       }
     }
-    if (maxD > eps && idx > a && idx < b) {
+    if (maxD > effEps && idx > a && idx < b) {
       keep[idx] = true;
       stack.push([a, idx]);
       stack.push([idx, b]);
@@ -1077,8 +1082,20 @@ export function pagxRdpKeep(offsets: number[], values: number[], eps: number): b
 // collapsing constant-velocity runs to their endpoints. The literal default
 // travels with the function source when it is serialised into the page. No-op
 // for <= 2 stops.
+//
+// Pixel-valued channels additionally get an absolute sub-pixel floor
+// (`ABS_FLOOR_PX`): a small motion (e.g. a ±2px "shake" retriggered while an
+// element also slides hundreds of px elsewhere on the timeline) is otherwise
+// erased by the relative `eps` because it is a tiny fraction of the channel's
+// full travel. Sub-pixel motion is imperceptible, so the floor keeps anything
+// above it. Dimensionless channels (opacity, matrix scale/rotation m0-m3,
+// colour) pass 0 and keep the pure relative tolerance.
 export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimStop[] {
   if (stops.length <= 2) return stops;
+  // Sub-pixel motion is imperceptible; keep anything above this on pixel-valued
+  // channels even when a larger move on the same channel would mask it under
+  // the relative eps. Inlined literal so it survives function-source bundling.
+  const ABS_FLOOR_PX = 0.5;
   const offsets = stops.map((s) => s.offset);
   const series = pagxStopScalarSeries(stops);
   const keep = new Array(stops.length).fill(false);
@@ -1086,6 +1103,15 @@ export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimSt
   keep[stops.length - 1] = true;
   for (const key of Object.keys(series)) {
     const vals = series[key];
+    // Translation (matrix e/f = m4/m5), drop-shadow offset/blur, and clip-path
+    // coordinates (cp0, cp1, …) are all measured in CSS pixels, so they get the
+    // absolute floor; every other channel keeps the pure relative tolerance.
+    const absEps =
+      key === 'm4' || key === 'm5' ||
+      key === 'fdx' || key === 'fdy' || key === 'fdb' || key === 'fblur' ||
+      (key[0] === 'c' && key[1] === 'p')
+        ? ABS_FLOOR_PX
+        : 0;
     // Defensive NaN fill (dense sampling is normally hole-free): carry the last
     // seen value forward, then backfill any leading gap, so RDP sees a complete
     // series.
@@ -1099,7 +1125,7 @@ export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimSt
       if (isNaN(vals[i])) vals[i] = next;
       else next = vals[i];
     }
-    const k = pagxRdpKeep(offsets, vals, eps);
+    const k = pagxRdpKeep(offsets, vals, eps, absEps);
     for (let i = 0; i < k.length; i++) {
       if (k[i]) keep[i] = true;
     }

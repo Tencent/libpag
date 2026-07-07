@@ -134,28 +134,6 @@ describe('pagxNormalizeProps', () => {
     });
     expect(out.filter).toBe('blur(2px) drop-shadow(1px 2px 3px rgb(0, 0, 0))');
   });
-
-  test('folds a text-shadow glow into the filter channel as drop-shadow', () => {
-    const out = pagxNormalizeProps({
-      opacity: '1',
-      textShadow: 'rgb(40, 224, 208) 0px 0px 12px, rgba(80, 160, 255, 0.55) 0px 0px 28px',
-    });
-    expect(out).toEqual({
-      opacity: '1',
-      filter: 'drop-shadow(0px 0px 12px rgb(40, 224, 208)) drop-shadow(0px 0px 28px rgba(80, 160, 255, 0.55))',
-    });
-  });
-
-  test('folds both box-shadow and text-shadow after an existing filter', () => {
-    const out = pagxNormalizeProps({
-      filter: 'blur(1px)',
-      boxShadow: 'rgb(0, 0, 0) 1px 2px 3px 0px',
-      textShadow: 'rgb(9, 9, 9) 0px 0px 4px',
-    });
-    expect(out.filter).toBe(
-      'blur(1px) drop-shadow(1px 2px 3px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgb(9, 9, 9))',
-    );
-  });
 });
 
 describe('pagxBoxShadowToFilter', () => {
@@ -379,6 +357,17 @@ describe('pagxRdpKeep', () => {
     const values = [7, 7, 7];
     expect(pagxRdpKeep(offsets, values, 0.02)).toEqual([true, false, true]);
   });
+
+  test('absEps keeps a small spike that relative eps alone drops on a wide-range channel', () => {
+    // A 2px spike at index 2 shares a channel that also travels 260px: the
+    // spike is only ~0.8% of the range, below a 2% relative eps.
+    const offsets = [0, 0.25, 0.5, 0.75, 1];
+    const values = [0, 0, 2, 0, 260];
+    const relOnly = pagxRdpKeep(offsets, values, 0.02, 0);
+    const withFloor = pagxRdpKeep(offsets, values, 0.02, 0.5);
+    expect(relOnly[2]).toBe(false);
+    expect(withFloor[2]).toBe(true);
+  });
 });
 
 describe('pagxDecimateStops', () => {
@@ -422,6 +411,32 @@ describe('pagxDecimateStops', () => {
       { offset: 1, props: { opacity: '1' } },
     ];
     expect(pagxDecimateStops(stops)).toHaveLength(2);
+  });
+
+  test('keeps a small translate shake sharing the channel with a large slide', () => {
+    // Baseline at x=0, a brief ±2px shake in the middle, then a 260px slide —
+    // the pattern an energy bar shows: each increment shakes the bar while it
+    // later slides off-screen. The pixel floor keeps the shake extrema that the
+    // relative eps alone would erase against the 260px travel.
+    const stops = [];
+    for (let i = 0; i < 5; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(0px, 0px)' } });
+    }
+    stops.push({ offset: 5 / 20, props: { transform: 'translate(2px, 0px)' } });
+    stops.push({ offset: 6 / 20, props: { transform: 'translate(-2px, 0px)' } });
+    stops.push({ offset: 7 / 20, props: { transform: 'translate(0px, 0px)' } });
+    for (let i = 8; i < 15; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(0px, 0px)' } });
+    }
+    for (let i = 15; i <= 20; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(260px, 0px)' } });
+    }
+    const out = pagxDecimateStops(stops);
+    const xs = out.map((s) => parseFloat(s.props.transform.match(/-?[\d.]+/)[0]));
+    expect(xs).toContain(2);
+    expect(xs).toContain(-2);
+    // …and the big slide endpoint is still present.
+    expect(xs).toContain(260);
   });
 });
 
