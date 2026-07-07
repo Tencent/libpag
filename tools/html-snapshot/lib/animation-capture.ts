@@ -2538,38 +2538,39 @@ export function pagxEmitCaptured(
     if (!built) continue;
     index++;
     css += built.keyframesCss + '\n';
-    // Pin a translate-only base transform onto the element's inline slot before
-    // installing the canonical pagxAnim* shorthand. The canonical keyframes only
-    // carry a translate channel (pagxExtractTranslate drops scale/rotate/skew —
-    // the runtime cannot play those), so any author-declared scale/rotate/skew
-    // base (e.g. `.loader-bar { transform: scaleX(0) }` paired with a
-    // `scaleX(0) -> scaleX(1)` keyframe animation, a common scanline / reveal
-    // idiom) must be neutralised on the element too. Otherwise, after the
-    // shorthand swap the element keeps its author scaleX(0) for the entire
-    // playback (the keyframe channel for transform is now pure translate, so
-    // the runtime never overrides the base) and the layer collapses to zero
-    // width / wrong rotation in the subset HTML and in `pagx render`. Reading
-    // the base under `animation: none !important` blocks both the original CSS
-    // animation and the just-installed inline pagxAnim* from contributing, so
-    // the resolved transform reflects only the static base. Inline-author
-    // transforms (set via `el.style.transform` directly) win over class rules,
-    // so this override doesn't lose any user intent the runtime could play.
+    // Pin the element's static base transform onto its inline slot before
+    // installing the canonical pagxAnim* shorthand. The runtime CAN play a full
+    // 2D affine base (scale/rotate/skew/translate) via the importer's
+    // `Layer.matrix` channel, so `pagxExtractTransform` preserves the whole
+    // matrix (collapsing to `translate(…)` only when the linear part is
+    // identity). This matters for two idioms that would otherwise regress:
+    //   - `.loader-bar { transform: scaleX(0) }` paired with a
+    //     `scaleX(0) -> scaleX(1)` keyframe animation — the keyframes drive
+    //     `transform`, so we pin `none` (see the exception below) and the
+    //     scaleX(0) base is neutralised.
+    //   - `.wslot { transform: skewX(-12deg) }` paired with an opacity/clip-path
+    //     reveal animation — the keyframes do NOT drive `transform`, so the
+    //     static skew must survive; pinning the full affine keeps the box a
+    //     parallelogram (and its reverse-skewed children upright) instead of
+    //     flattening to an axis-aligned rectangle. A translate-only pin
+    //     (the previous behaviour) silently dropped the skew/scale/rotate here.
+    // Reading the base under `animation: none !important` blocks both the
+    // original CSS animation and the just-installed inline pagxAnim* from
+    // contributing, so the resolved transform reflects only the static base.
+    // Inline-author transforms (set via `el.style.transform` directly) win over
+    // class rules, so this override doesn't lose any user intent.
     //
     // Critical exception: when the captured keyframes *themselves* drive a
     // `transform` channel, that channel is sampled from computed style, which
-    // already folds the element's static base translate into every stop (e.g. a
+    // already folds the element's static base transform into every stop (e.g. a
     // `.namebar { transform: translate(-88px,-50px) }` whose exit animation
     // toggles to `translateX(-560px)` samples as `translate(-88,-50)` at rest).
-    // Pinning that same base translate inline would then double-apply it: the
-    // PAGX importer writes the inline base into `Layer.matrix` AND plays the
-    // keyframe translate on top, so the element lands an extra (base) offset
-    // away from where the browser paints it. In that case pin `none` and let
-    // the keyframes be the single source of translation. Any non-translatable
-    // base (scale/rotate/skew) is unplayable by the runtime and is dropped by
-    // `pagxExtractTranslate` regardless, so `none` loses nothing the
-    // transform-driven path could have reproduced. The base translate is only
-    // pinned when the keyframes carry no transform channel (e.g. an opacity-only
-    // fade on a statically-translated element, which must keep its offset).
+    // Pinning that same base inline would then double-apply it: the PAGX
+    // importer writes the inline base into `Layer.matrix` AND plays the keyframe
+    // transform on top, so the element lands an extra (base) offset / scale away
+    // from where the browser paints it. In that case pin `none` and let the
+    // keyframes be the single source of the transform channel. The full base
+    // transform is only pinned when the keyframes carry no transform channel.
     const keyframesDriveTransform = cap.keyframes.some(
       (s) => s.props && s.props['transform'] != null,
     );
@@ -2580,7 +2581,7 @@ export function pagxEmitCaptured(
     const blockerParent = document.head || document.documentElement;
     if (blockerParent) blockerParent.appendChild(blocker);
     void document.body.offsetHeight;
-    const baseT = pagxExtractTranslate(getComputedStyle(cap.el).transform || '', elBox);
+    const baseT = pagxExtractTransform(getComputedStyle(cap.el).transform || '', elBox);
     if (blocker.parentNode) blocker.parentNode.removeChild(blocker);
     cap.el.style.transform = keyframesDriveTransform ? 'none' : (baseT || 'none');
     cap.el.style.animation = built.animationShorthand;
