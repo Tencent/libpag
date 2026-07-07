@@ -142,13 +142,380 @@ function normalizeMaskImage(value) {
 }
 
 // PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
-// which the importer turns into a contour mask layer. Chromium reports the
-// reference verbatim as `url("#id")`. Geometric forms (`inset()`, `circle()`,
-// `ellipse()`, `polygon()`, `path()`) and `none` are out of subset and collapse
-// to '' so STYLE_SCHEMA's `defaults` filter drops the property entirely.
+// which the importer turns into a contour mask layer. Chromium reports a `url()`
+// reference verbatim as `url("#id")`; this filter keeps those untouched. The
+// geometric forms (`inset()`, `circle()`, `ellipse()`, `polygon()`, `path()`)
+// are NOT handled here — they are converted into a synthesized `<clipPath>` def
+// (and rewritten to `url(#id)`) by `appendGeometricClipPath`, which needs the
+// element's box dimensions to resolve `%` / `calc()` into pixels. `none` and any
+// non-url value collapse to '' so STYLE_SCHEMA's `defaults` filter drops the
+// blind copy; the geometric synthesis then runs separately in `buildStyle`.
 function normalizeClipPath(value) {
   if (!value) return '';
   return /^url\(/i.test(value.trim()) ? value.trim() : '';
+}
+
+// Format a number for SVG geometry: round to sub-pixel precision and drop a
+// trailing `.0` so `10` stays `10` (not `10px` — SVG coordinates are unitless
+// user units) and `12.5` stays `12.5`.
+function pagxClipNum(n) {
+  if (!isFinite(n)) return '0';
+  const r = Math.round(n * 1000) / 1000;
+  return String(r);
+}
+
+// Split `str` on top-level occurrences of `sep` (a single char), ignoring any
+// separators nested inside parentheses (so `calc(100% - 10px)` and function
+// arguments survive intact). Used to break a `polygon()` vertex list on commas
+// and an argument on whitespace.
+function pagxClipSplitTop(str, sep) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (sep === ' ' ? /\s/.test(c) : c === sep)) {
+      if (cur.trim() !== '') out.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim() !== '') out.push(cur.trim());
+  return out;
+}
+
+// Evaluate a CSS <length-percentage> (optionally wrapped in `calc()`, possibly
+// nested, with `+ - * /`) to pixels. `%` resolves against `basis`; unitless and
+// `px` values pass through. Unknown units / functions (min/max/clamp/var) yield
+// 0 for the offending term rather than throwing, so a partially-understood value
+// degrades instead of dropping the whole clip. This is a small recursive-descent
+// evaluator (expr → term → factor) matching CSS calc precedence.
+function pagxEvalLengthPx(token, basis) {
+  const s = String(token == null ? '' : token).trim();
+  if (s === '') return 0;
+  let i = 0;
+  function skip() { while (i < s.length && /\s/.test(s[i])) i++; }
+  function parseFactor() {
+    skip();
+    if (s[i] === '(') {
+      i++;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    if (s.slice(i, i + 5).toLowerCase() === 'calc(') {
+      i += 5;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(px|%)?/i.exec(s.slice(i));
+    if (!m) { i = s.length; return 0; }
+    i += m[0].length;
+    let val = parseFloat(m[1]);
+    if (m[2] === '%') val = basis * val / 100;
+    return val;
+  }
+  function parseTerm() {
+    let v = parseFactor();
+    skip();
+    while (s[i] === '*' || s[i] === '/') {
+      const op = s[i++];
+      const r = parseFactor();
+      v = op === '*' ? v * r : (r !== 0 ? v / r : 0);
+      skip();
+    }
+    return v;
+  }
+  function parseExpr() {
+    let v = parseTerm();
+    skip();
+    while (s[i] === '+' || s[i] === '-') {
+      const op = s[i++];
+      const r = parseTerm();
+      v = op === '+' ? v + r : v - r;
+      skip();
+    }
+    return v;
+  }
+  return parseExpr();
+}
+
+// Parse a `clip-path` value into `{ shape, args, box }` where `shape` is one of
+// inset/circle/ellipse/polygon/path, `args` is the raw text inside the shape
+// function, and `box` is the resolved <geometry-box> keyword (defaults to
+// `border-box`, CSS's default reference box for HTML). Returns null for `none`,
+// `url(...)` (handled by the normalizer), and unrecognised values.
+function pagxParseClipShape(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '' || s.toLowerCase() === 'none') return null;
+  if (/^url\(/i.test(s)) return null;
+  const m = /(inset|circle|ellipse|polygon|path)\s*\(/i.exec(s);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let depth = 1;
+  let j = start;
+  for (; j < s.length; j++) {
+    if (s[j] === '(') depth++;
+    else if (s[j] === ')') { depth--; if (depth === 0) break; }
+  }
+  const args = s.slice(start, j);
+  const outside = (s.slice(0, m.index) + ' ' + s.slice(j + 1)).toLowerCase();
+  const boxKeywords = [
+    'border-box', 'padding-box', 'content-box', 'margin-box',
+    'fill-box', 'stroke-box', 'view-box',
+  ];
+  let box = 'border-box';
+  for (const kw of boxKeywords) {
+    if (new RegExp('(^|\\s)' + kw + '(\\s|$)').test(outside)) { box = kw; break; }
+  }
+  return { shape: m[1].toLowerCase(), args, box };
+}
+
+// Resolve the clip-path reference box to a pixel rect `{ x, y, w, h }` in the
+// element's own border-box coordinate space (origin at the border-box top-left,
+// matching the `width`/`height` the snapshot emits and the `viewBox` the C++
+// importer frames the mask in). `fill-box` / `stroke-box` / `view-box` (SVG-only)
+// fall back to border-box for HTML boxes.
+function pagxClipRefRect(box, width, height, computed) {
+  const bt = borderWidthOf(computed, 'top');
+  const br = borderWidthOf(computed, 'right');
+  const bb = borderWidthOf(computed, 'bottom');
+  const bl = borderWidthOf(computed, 'left');
+  if (box === 'padding-box') {
+    return { x: bl, y: bt, w: width - bl - br, h: height - bt - bb };
+  }
+  if (box === 'content-box') {
+    const p = readPadding(computed);
+    return {
+      x: bl + p.left, y: bt + p.top,
+      w: width - bl - br - p.left - p.right,
+      h: height - bt - bb - p.top - p.bottom,
+    };
+  }
+  if (box === 'margin-box') {
+    const mgn = readMargin(computed);
+    return {
+      x: -mgn.left, y: -mgn.top,
+      w: width + mgn.left + mgn.right,
+      h: height + mgn.top + mgn.bottom,
+    };
+  }
+  return { x: 0, y: 0, w: width, h: height };
+}
+
+// Resolve an `at <position>` list (CSS <position>, 1-2 tokens handled) into an
+// absolute center point inside `rect`. Keywords map to edges/center; percentages
+// resolve against the rect axis; lengths are px offsets from the top-left.
+function pagxClipPosition(tokens, rect) {
+  function axis(tok, base, origin, isX) {
+    const t = String(tok || '').toLowerCase();
+    if (t === 'center' || t === '') return origin + base / 2;
+    if (isX && t === 'left') return origin;
+    if (isX && t === 'right') return origin + base;
+    if (!isX && t === 'top') return origin;
+    if (!isX && t === 'bottom') return origin + base;
+    return origin + pagxEvalLengthPx(tok, base);
+  }
+  let xTok = 'center';
+  let yTok = 'center';
+  if (tokens.length === 1) {
+    const t = tokens[0].toLowerCase();
+    if (t === 'top' || t === 'bottom') { yTok = t; } else { xTok = tokens[0]; }
+  } else if (tokens.length >= 2) {
+    // Vertical keyword may lead (e.g. `top right`); otherwise first token is X.
+    const a = tokens[0].toLowerCase();
+    const b = tokens[1].toLowerCase();
+    if (a === 'top' || a === 'bottom' || b === 'left' || b === 'right') {
+      yTok = tokens[0]; xTok = tokens[1];
+    } else {
+      xTok = tokens[0]; yTok = tokens[1];
+    }
+  }
+  return {
+    cx: axis(xTok, rect.w, rect.x, true),
+    cy: axis(yTok, rect.h, rect.y, false),
+  };
+}
+
+// Resolve a circle/ellipse shape radius token against a per-axis basis, honouring
+// the `closest-side` / `farthest-side` keywords (measured from the center `c`
+// within `[origin, origin+base]`). `null` basisDiagonal signals the ellipse
+// per-axis case; circle passes the diagonal basis for `%`.
+function pagxClipRadius(tok, base, origin, c, basisForPercent) {
+  const t = String(tok || '').toLowerCase().trim();
+  if (t === '' || t === 'closest-side') return Math.max(0, Math.min(c - origin, origin + base - c));
+  if (t === 'farthest-side') return Math.max(c - origin, origin + base - c);
+  return pagxEvalLengthPx(tok, basisForPercent == null ? base : basisForPercent);
+}
+
+// Convert a parsed clip-path shape to the INNER markup of a `<clipPath>` (the
+// child shape element(s)), with all coordinates resolved into `rect`'s pixel
+// space. Returns '' for shapes that cannot be represented. The C++ importer
+// serializes exactly these children into a white-filled `<svg>` and reads their
+// coverage as a contour mask, so no fill/stroke needs to be set here.
+function pagxClipShapeToInner(parsed, rect) {
+  const shape = parsed.shape;
+  const args = parsed.args;
+  if (shape === 'polygon') {
+    let segs = pagxClipSplitTop(args, ',');
+    if (segs.length && /^(nonzero|evenodd)$/i.test(segs[0])) {
+      const rule = segs.shift().toLowerCase();
+      const pts = segs.map((seg) => {
+        const xy = pagxClipSplitTop(seg, ' ');
+        return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+               pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+      });
+      if (pts.length < 3) return '';
+      return '<polygon points="' + pts.join(' ') + '" clip-rule="' + rule +
+             '" fill-rule="' + rule + '"/>';
+    }
+    const pts = segs.map((seg) => {
+      const xy = pagxClipSplitTop(seg, ' ');
+      return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+             pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+    });
+    if (pts.length < 3) return '';
+    return '<polygon points="' + pts.join(' ') + '"/>';
+  }
+  if (shape === 'inset') {
+    const tokens = pagxClipSplitTop(args, ' ');
+    const insets = [];
+    let radius = null;
+    for (let k = 0; k < tokens.length; k++) {
+      if (tokens[k].toLowerCase() === 'round') {
+        // Remaining tokens are border-radius; take the first horizontal radius
+        // (optionally before a `/`) as a uniform rx/ry approximation.
+        const rest = tokens.slice(k + 1).join(' ');
+        const firstH = pagxClipSplitTop(rest.split('/')[0], ' ')[0];
+        if (firstH != null) radius = firstH;
+        break;
+      }
+      insets.push(tokens[k]);
+    }
+    let t; let r; let b; let l;
+    if (insets.length === 1) { t = b = insets[0]; r = l = insets[0]; }
+    else if (insets.length === 2) { t = b = insets[0]; r = l = insets[1]; }
+    else if (insets.length === 3) { t = insets[0]; r = l = insets[1]; b = insets[2]; }
+    else if (insets.length >= 4) { t = insets[0]; r = insets[1]; b = insets[2]; l = insets[3]; }
+    else { t = r = b = l = '0'; }
+    const top = pagxEvalLengthPx(t, rect.h);
+    const right = pagxEvalLengthPx(r, rect.w);
+    const bottom = pagxEvalLengthPx(b, rect.h);
+    const left = pagxEvalLengthPx(l, rect.w);
+    const w = Math.max(0, rect.w - left - right);
+    const h = Math.max(0, rect.h - top - bottom);
+    if (w <= 0 || h <= 0) return '';
+    let attrs = 'x="' + pagxClipNum(rect.x + left) + '" y="' + pagxClipNum(rect.y + top) +
+                '" width="' + pagxClipNum(w) + '" height="' + pagxClipNum(h) + '"';
+    if (radius != null) {
+      const rad = pagxEvalLengthPx(radius, Math.min(rect.w, rect.h));
+      if (rad > 0) attrs += ' rx="' + pagxClipNum(rad) + '" ry="' + pagxClipNum(rad) + '"';
+    }
+    return '<rect ' + attrs + '/>';
+  }
+  if (shape === 'circle' || shape === 'ellipse') {
+    const parts = pagxClipSplitTop(args, ' ');
+    const atIdx = parts.findIndex((p) => p.toLowerCase() === 'at');
+    const radiusTokens = atIdx >= 0 ? parts.slice(0, atIdx) : parts.slice();
+    const posTokens = atIdx >= 0 ? parts.slice(atIdx + 1) : [];
+    const center = pagxClipPosition(posTokens, rect);
+    if (shape === 'circle') {
+      const diag = Math.sqrt(rect.w * rect.w + rect.h * rect.h) / Math.SQRT2;
+      const rTok = radiusTokens.length ? radiusTokens[0] : 'closest-side';
+      // For `closest-side`/`farthest-side` on a circle, use the min/max over all
+      // four side distances (not a single axis).
+      let r;
+      const lc = String(rTok).toLowerCase();
+      if (lc === 'closest-side' || lc === '') {
+        r = Math.min(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else if (lc === 'farthest-side') {
+        r = Math.max(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else {
+        r = pagxEvalLengthPx(rTok, diag);
+      }
+      r = Math.max(0, r);
+      if (r <= 0) return '';
+      return '<circle cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+             '" r="' + pagxClipNum(r) + '"/>';
+    }
+    const rxTok = radiusTokens.length >= 1 ? radiusTokens[0] : 'closest-side';
+    const ryTok = radiusTokens.length >= 2 ? radiusTokens[1] : rxTok;
+    const rx = Math.max(0, pagxClipRadius(rxTok, rect.w, rect.x, center.cx, rect.w));
+    const ry = Math.max(0, pagxClipRadius(ryTok, rect.h, rect.y, center.cy, rect.h));
+    if (rx <= 0 || ry <= 0) return '';
+    return '<ellipse cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+           '" rx="' + pagxClipNum(rx) + '" ry="' + pagxClipNum(ry) + '"/>';
+  }
+  if (shape === 'path') {
+    // path( [<fill-rule>,]? "<path data>" ). The data is in the reference box's
+    // pixel space, so only a translate onto the box origin is needed.
+    let rule = '';
+    let data = args.trim();
+    const ruleMatch = /^(nonzero|evenodd)\s*,/i.exec(data);
+    if (ruleMatch) {
+      rule = ruleMatch[1].toLowerCase();
+      data = data.slice(ruleMatch[0].length).trim();
+    }
+    const q = /^(['"])([\s\S]*)\1$/.exec(data);
+    if (!q) return '';
+    const d = q[2];
+    const ruleAttr = rule ? ' clip-rule="' + rule + '" fill-rule="' + rule + '"' : '';
+    const inner = '<path d="' + d.replace(/"/g, "'") + '"' + ruleAttr + '/>';
+    if (rect.x !== 0 || rect.y !== 0) {
+      return '<g transform="translate(' + pagxClipNum(rect.x) + ',' + pagxClipNum(rect.y) +
+             ')">' + inner + '</g>';
+    }
+    return inner;
+  }
+  return '';
+}
+
+// Convert a geometric `clip-path` value into the INNER markup of a `<clipPath>`
+// def, resolved into the element's border-box pixel space. Returns '' for `none`,
+// `url(...)`, and shapes that cannot be represented. Pure (no DOM side effects)
+// so it is unit-testable with a mock `computed`; the registration + id lives in
+// `appendGeometricClipPath`.
+function pagxClipPathInnerMarkup(raw, width, height, computed) {
+  const parsed = pagxParseClipShape(raw);
+  if (!parsed) return '';
+  const rect = pagxClipRefRect(parsed.box, width, height, computed);
+  if (!(rect.w > 0) || !(rect.h > 0)) return '';
+  return pagxClipShapeToInner(parsed, rect);
+}
+
+// Emit a geometric `clip-path` (inset/circle/ellipse/polygon/path) as a rewritten
+// `clip-path: url(#pagxClipN)` declaration, registering the synthesized
+// `<clipPath clipPathUnits="userSpaceOnUse">` in `window.__pagxClipDefs` for
+// `snapshotMain` to flush into a single hidden `<svg>` in the output body. The
+// importer's `collectSharedDefs` then indexes it and rebuilds a contour mask —
+// the same path a hand-authored `url(#id)` clip-path already takes. `url(...)`
+// values are handled by the STYLE_SCHEMA copy (via `normalizeClipPath`) and are
+// left untouched here; identical geometry is de-duplicated across elements.
+function appendGeometricClipPath(parts, computed, width, height) {
+  const raw = (computed.getPropertyValue('clip-path') || '').trim();
+  if (!raw || /^url\(/i.test(raw)) return;
+  const inner = pagxClipPathInnerMarkup(raw, width, height, computed);
+  if (!inner) return;
+  if (typeof window === 'undefined') return;
+  if (!window.__pagxClipDefs) window.__pagxClipDefs = [];
+  if (!window.__pagxClipDefMap) window.__pagxClipDefMap = {};
+  let id = window.__pagxClipDefMap[inner];
+  if (!id) {
+    id = 'pagxClip' + window.__pagxClipDefs.length;
+    window.__pagxClipDefMap[inner] = id;
+    window.__pagxClipDefs.push(
+      '<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse">' + inner + '</clipPath>',
+    );
+  }
+  parts.push('clip-path: url(#' + id + ')');
 }
 
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
@@ -864,6 +1231,11 @@ function buildStyle(left, top, width, height, computed, opts) {
     for (const entry of STYLE_SCHEMA_BOX) {
       appendStyleProp(parts, computed, entry);
     }
+    // Geometric clip-path (inset/circle/ellipse/polygon/path) is not a plain
+    // property copy — it needs the element's box size to resolve %/calc, so it
+    // is synthesized into a `<clipPath>` def and rewritten to `url(#id)` here.
+    // (The STYLE_SCHEMA loop above already forwarded any `url(...)` clip-path.)
+    appendGeometricClipPath(parts, computed, width, height);
     // Border / shadow are emitted between the box-scope and text-scope blocks
     // so the resulting declaration order matches the historical hand-written
     // layout. See appendBorder / appendBoxShadow for the per-helper
@@ -3400,6 +3772,12 @@ function render(el, parentRect, opts, precomputed) {
 
 function snapshotMain(opts) {
   const body = document.body;
+  // Reset the geometric clip-path def registry so a re-run (this function is the
+  // registered `takeSnapshot` and may be evaluated more than once per page) does
+  // not accumulate defs from a previous pass. `appendGeometricClipPath` fills it
+  // during the tree walk; it is flushed into a hidden `<svg>` in the output below.
+  window.__pagxClipDefs = [];
+  window.__pagxClipDefMap = {};
   body.style.margin = '0';
   body.style.padding = '0';
   // Make <body> a containing block before any measurement runs. The output
@@ -3565,6 +3943,20 @@ function snapshotMain(opts) {
     styleBlock += animKeyframes.textContent.trim();
   }
 
+  // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
+  // hidden `<svg>` at the top of <body>. `display:none` keeps it out of the
+  // browser preview render, but the pagx importer's `collectSharedDefs` still
+  // indexes every id under a `<defs>` from the parsed DOM, so the `url(#pagxClipN)`
+  // rewrites resolve into contour masks. Coordinates are in userSpaceOnUse
+  // border-box pixels, which is also how a browser applies the url() clip.
+  const clipDefs = (window.__pagxClipDefs && window.__pagxClipDefs.length)
+    ? window.__pagxClipDefs : [];
+  const clipDefsSvg = clipDefs.length
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" ' +
+      'style="display:none" aria-hidden="true"><defs>' + clipDefs.join('') +
+      '</defs></svg>\n'
+    : '';
+
   return {
     html:
 `<!DOCTYPE html>
@@ -3574,7 +3966,7 @@ function snapshotMain(opts) {
     <style>${styleBlock}</style>
   </head>
   <body style="${bodyStyle.join('; ')}">
-${parts.join('')}
+${clipDefsSvg}${parts.join('')}
   </body>
 </html>
 `,
@@ -3698,6 +4090,16 @@ const HELPER_FNS = [
   normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
+  pagxClipNum,
+  pagxClipSplitTop,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipRefRect,
+  pagxClipPosition,
+  pagxClipRadius,
+  pagxClipShapeToInner,
+  pagxClipPathInnerMarkup,
+  appendGeometricClipPath,
   normalizeWritingMode,
   roundPx,
   px,
@@ -4367,6 +4769,9 @@ export {
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipPathInnerMarkup,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
