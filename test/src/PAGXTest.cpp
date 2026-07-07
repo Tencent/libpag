@@ -13655,4 +13655,205 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   EXPECT_TRUE(Baseline::Compare(surface3, "PAGXStateMachine/ButtonPressed"));
 }
 
+// =============================================================================
+// Health bar scenario: VM-driven SM with rendering output.
+// A health bar rectangle changes width (scaleX) and color based on role state.
+// VM holds hp; SM reads it via bindInput and switches animations.
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
+  auto doc = pagx::PAGXDocument::Make(200, 30);
+
+  auto layer = doc->makeNode<pagx::Layer>("bar");
+  layer->width = 200;
+  layer->height = 30;
+  // Background bar (dim)
+  auto bgRect = doc->makeNode<pagx::Rectangle>();
+  bgRect->width = 200;
+  bgRect->height = 30;
+  layer->contents.push_back(bgRect);
+  auto bgFill = doc->makeNode<pagx::Fill>();
+  auto bgColor = doc->makeNode<pagx::SolidColor>();
+  bgColor->color = {0.15f, 0.15f, 0.15f, 1.0f};
+  bgFill->color = bgColor;
+  layer->contents.push_back(bgFill);
+  // Foreground health bar (animated)
+  auto fgRect = doc->makeNode<pagx::Rectangle>();
+  fgRect->width = 200;
+  fgRect->height = 30;
+  layer->contents.push_back(fgRect);
+  auto fgFill = doc->makeNode<pagx::Fill>();
+  auto fgColor = doc->makeNode<pagx::SolidColor>();
+  fgColor->id = "hpColor";
+  fgColor->color = {0.0f, 0.8f, 0.2f, 1.0f};
+  fgFill->color = fgColor;
+  layer->contents.push_back(fgFill);
+  doc->layers.push_back(layer);
+
+  // VM: hp number, drives SM.
+  auto vm = doc->makeNode<pagx::ViewModel>("hpVM");
+  auto hpProp = doc->makeNode<pagx::ViewModelProperty>();
+  hpProp->name = "hp";
+  hpProp->propertyType = pagx::ViewModelPropertyType::Number;
+  hpProp->defaultNumber = 100;
+  vm->properties.push_back(hpProp);
+  doc->viewModel = vm;
+
+  // Animations for each health level.
+  // alive: scaleX=1.0, green.
+  auto animAlive = doc->makeNode<pagx::Animation>("animAlive");
+  animAlive->duration = 30;
+  animAlive->frameRate = 60.0f;
+  animAlive->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animAlive);
+  auto objA = doc->makeNode<pagx::AnimationObject>();
+  objA->target = "bar";
+  animAlive->objects.push_back(objA);
+  auto chAS = doc->makeNode<pagx::TypedChannel<float>>();
+  chAS->name = "scaleX";
+  chAS->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chAS->keyframes.push_back({30, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objA->channels.push_back(chAS);
+
+  // hurt: scaleX=0.4, orange.
+  auto animHurt = doc->makeNode<pagx::Animation>("animHurt");
+  animHurt->duration = 30;
+  animHurt->frameRate = 60.0f;
+  animHurt->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animHurt);
+  auto objH = doc->makeNode<pagx::AnimationObject>();
+  objH->target = "bar";
+  animHurt->objects.push_back(objH);
+  auto chHS = doc->makeNode<pagx::TypedChannel<float>>();
+  chHS->name = "scaleX";
+  chHS->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHS->keyframes.push_back({30, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objH->channels.push_back(chHS);
+  auto chHC = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  chHC->name = "color";
+  chHC->keyframes.push_back(
+      {0, {1.0f, 0.6f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHC->keyframes.push_back(
+      {30, {1.0f, 0.6f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto objHC = doc->makeNode<pagx::AnimationObject>();
+  objHC->target = "hpColor";
+  objHC->channels.push_back(chHC);
+  animHurt->objects.push_back(objHC);
+
+  // dead: scaleX=0.05, red.
+  auto animDead = doc->makeNode<pagx::Animation>("animDead");
+  animDead->duration = 30;
+  animDead->frameRate = 60.0f;
+  animDead->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animDead);
+  auto objD = doc->makeNode<pagx::AnimationObject>();
+  objD->target = "bar";
+  animDead->objects.push_back(objD);
+  auto chDS = doc->makeNode<pagx::TypedChannel<float>>();
+  chDS->name = "scaleX";
+  chDS->keyframes.push_back({0, 0.05f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chDS->keyframes.push_back({30, 0.05f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objD->channels.push_back(chDS);
+  auto chDC = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  chDC->name = "color";
+  auto objDC = doc->makeNode<pagx::AnimationObject>();
+  objDC->target = "hpColor";
+  animDead->objects.push_back(objDC);
+  chDC->keyframes.push_back(
+      {0, {0.9f, 0.2f, 0.1f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chDC->keyframes.push_back(
+      {30, {0.9f, 0.2f, 0.1f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objDC->channels.push_back(chDC);
+
+  // StateMachine.
+  auto sm = doc->makeNode<pagx::StateMachine>("hpSM");
+  auto inHP = doc->makeNode<pagx::StateMachineInput>();
+  inHP->name = "hp";
+  inHP->type = pagx::StateMachineInputType::Number;
+  inHP->defaultNumber = 100;
+  sm->inputs.push_back(inHP);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "alive";
+  auto sAlive = doc->makeNode<pagx::AnimationState>();
+  sAlive->name = "alive";
+  sAlive->animationId = "animAlive";
+  region->states.push_back(sAlive);
+  auto sHurt = doc->makeNode<pagx::AnimationState>();
+  sHurt->name = "hurt";
+  sHurt->animationId = "animHurt";
+  region->states.push_back(sHurt);
+  auto sDead = doc->makeNode<pagx::AnimationState>();
+  sDead->name = "dead";
+  sDead->animationId = "animDead";
+  region->states.push_back(sDead);
+
+  auto tHurt = doc->makeNode<pagx::StateTransition>();
+  tHurt->from = "alive";
+  tHurt->to = "hurt";
+  tHurt->duration = 5;
+  auto cHurt = doc->makeNode<pagx::TransitionCondition>();
+  cHurt->inputName = "hp";
+  cHurt->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cHurt->valueNumber = 30;
+  tHurt->conditions.push_back(cHurt);
+  region->transitions.push_back(tHurt);
+
+  auto tDead = doc->makeNode<pagx::StateTransition>();
+  tDead->from = "alive";
+  tDead->to = "dead";
+  tDead->duration = 5;
+  auto cDead = doc->makeNode<pagx::TransitionCondition>();
+  cDead->inputName = "hp";
+  cDead->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cDead->valueNumber = 0;
+  tDead->conditions.push_back(cDead);
+  region->transitions.push_back(tDead);
+
+  auto tHurtDead = doc->makeNode<pagx::StateTransition>();
+  tHurtDead->from = "hurt";
+  tHurtDead->to = "dead";
+  tHurtDead->duration = 5;
+  auto cHD = doc->makeNode<pagx::TransitionCondition>();
+  cHD->inputName = "hp";
+  cHD->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cHD->valueNumber = 0;
+  tHurtDead->conditions.push_back(cHD);
+  region->transitions.push_back(tHurtDead);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmHP = scene->viewModel()->propertyNumber("hp");
+  ASSERT_TRUE(vmHP != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("hpSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("hp", vmHP));
+
+  // Baseline 1: alive (hp=100, full green bar).
+  smTimeline->advanceAndApply(10 * 16667);
+  auto surface1 = pagx::PAGSurface::MakeOffscreen(200, 30);
+  ASSERT_TRUE(surface1 != nullptr);
+  ASSERT_TRUE(scene->draw(surface1));
+  EXPECT_TRUE(Baseline::Compare(surface1, "PAGXStateMachine/HealthBarAlive"));
+
+  // Baseline 2: hurt (hp=20, short orange bar).
+  vmHP->value(20);
+  smTimeline->advanceAndApply(10 * 16667);
+  auto surface2 = pagx::PAGSurface::MakeOffscreen(200, 30);
+  ASSERT_TRUE(surface2 != nullptr);
+  ASSERT_TRUE(scene->draw(surface2));
+  EXPECT_TRUE(Baseline::Compare(surface2, "PAGXStateMachine/HealthBarHurt"));
+
+  // Baseline 3: dead (hp=0, near-empty red bar).
+  vmHP->value(0);
+  smTimeline->advanceAndApply(10 * 16667);
+  auto surface3 = pagx::PAGSurface::MakeOffscreen(200, 30);
+  ASSERT_TRUE(surface3 != nullptr);
+  ASSERT_TRUE(scene->draw(surface3));
+  EXPECT_TRUE(Baseline::Compare(surface3, "PAGXStateMachine/HealthBarDead"));
+}
+
 }  // namespace pag
