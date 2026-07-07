@@ -485,11 +485,18 @@ export function pagxNormalizeProps(
   // it rides the same channel (the runtime has no box-shadow animation channel).
   const flt = pagxPickProp(raw, 'filter', 'filter');
   const shadowFilter = pagxBoxShadowToFilter(pagxPickProp(raw, 'box-shadow', 'boxShadow'));
+  // A `text-shadow` glow shares `box-shadow`'s subset syntax (color + offX/offY/
+  // blur, no inset/spread) and, on a text element, is visually equivalent to
+  // `filter: drop-shadow(...)`. Fold it onto the filter channel too so an
+  // animated text glow (e.g. a pulsing label toggled by JS) keeps its curve —
+  // the runtime has no text-shadow channel, mirroring the box-shadow fold above.
+  const textShadowFilter = pagxBoxShadowToFilter(pagxPickProp(raw, 'text-shadow', 'textShadow'));
   let filterVal = flt;
-  if (shadowFilter) {
+  for (const extra of [shadowFilter, textShadowFilter]) {
+    if (!extra) continue;
     filterVal = filterVal != null && filterVal !== 'none'
-      ? filterVal + ' ' + shadowFilter
-      : shadowFilter;
+      ? filterVal + ' ' + extra
+      : extra;
   }
   if (filterVal != null) out['filter'] = filterVal;
   return out;

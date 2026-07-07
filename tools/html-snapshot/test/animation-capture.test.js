@@ -134,6 +134,28 @@ describe('pagxNormalizeProps', () => {
     });
     expect(out.filter).toBe('blur(2px) drop-shadow(1px 2px 3px rgb(0, 0, 0))');
   });
+
+  test('folds a text-shadow glow into the filter channel as drop-shadow', () => {
+    const out = pagxNormalizeProps({
+      opacity: '1',
+      textShadow: 'rgb(40, 224, 208) 0px 0px 12px, rgba(80, 160, 255, 0.55) 0px 0px 28px',
+    });
+    expect(out).toEqual({
+      opacity: '1',
+      filter: 'drop-shadow(0px 0px 12px rgb(40, 224, 208)) drop-shadow(0px 0px 28px rgba(80, 160, 255, 0.55))',
+    });
+  });
+
+  test('folds both box-shadow and text-shadow after an existing filter', () => {
+    const out = pagxNormalizeProps({
+      filter: 'blur(1px)',
+      boxShadow: 'rgb(0, 0, 0) 1px 2px 3px 0px',
+      textShadow: 'rgb(9, 9, 9) 0px 0px 4px',
+    });
+    expect(out.filter).toBe(
+      'blur(1px) drop-shadow(1px 2px 3px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgb(9, 9, 9))',
+    );
+  });
 });
 
 describe('pagxBoxShadowToFilter', () => {

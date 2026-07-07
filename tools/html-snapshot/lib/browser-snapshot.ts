@@ -1078,6 +1078,83 @@ function appendTextStroke(parts, computed) {
   if (value) parts.push(`-webkit-text-stroke: ${value}`);
 }
 
+// Translate CSS `text-shadow` (a text glow like `0 0 12px rgba(...)`) into an
+// equivalent `filter: drop-shadow(...)` chain so it survives into PAGX. The
+// importer has no `text-shadow` property, but it lowers `filter: drop-shadow()`
+// onto a DropShadowFilter (HTMLLayerBuilder / HTMLAnimationBuilder). For an
+// element that paints no box, `filter: drop-shadow` glows only the rendered
+// glyphs — visually identical to `text-shadow`. The caller (buildStyle) gates
+// this on `!hasBoxVisualsForInline(computed)` so a solid panel is never haloed,
+// and only invokes it inside the `opts.text` branch (elements that render text
+// directly), which avoids double-glowing when the inherited `text-shadow`
+// re-appears on both a container and its text leaves.
+//
+// Computed `text-shadow` is `<color> <offX> <offY> [<blur>]` per shadow, comma
+// separated (no `inset`, no spread). Each maps to `drop-shadow(offX offY blur
+// color)`; a missing blur defaults to `0px`. The chain is merged into any
+// `filter` already emitted (a second inline `filter:` would clobber the first).
+function appendTextShadow(parts, computed) {
+  const raw = computed.getPropertyValue('text-shadow').trim();
+  if (!raw || raw === 'none') return;
+  // Top-level comma split that keeps `rgb(...)` / `hsl(...)` colour commas
+  // intact (they nest inside parens).
+  const items = [];
+  let depth = 0;
+  let seg = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      items.push(seg);
+      seg = '';
+    } else {
+      seg += ch;
+    }
+  }
+  if (seg) items.push(seg);
+  const chain = [];
+  for (const item of items) {
+    const spec = item.trim();
+    if (!spec) continue;
+    // Whitespace tokeniser that keeps function args (`rgb(...)`) intact.
+    const tokens = [];
+    let d = 0;
+    let cur = '';
+    for (let i = 0; i < spec.length; i++) {
+      const c = spec[i];
+      if (c === '(') d++;
+      else if (c === ')') d = Math.max(0, d - 1);
+      if (d === 0 && /\s/.test(c)) {
+        if (cur) {
+          tokens.push(cur);
+          cur = '';
+        }
+      } else {
+        cur += c;
+      }
+    }
+    if (cur) tokens.push(cur);
+    const lengths = [];
+    const colors = [];
+    for (const t of tokens) {
+      if (/^-?[\d.]+(px)?$/.test(t)) lengths.push(t);
+      else colors.push(t);
+    }
+    if (lengths.length < 2) continue; // need at least offX / offY
+    const offX = lengths[0];
+    const offY = lengths[1];
+    const blur = lengths.length >= 3 ? lengths[2] : '0px';
+    const color = colors.length ? colors.join(' ') : 'rgb(0, 0, 0)';
+    chain.push(`drop-shadow(${offX} ${offY} ${blur} ${color})`);
+  }
+  if (!chain.length) return;
+  const glow = chain.join(' ');
+  const idx = parts.findIndex((p) => p.indexOf('filter:') === 0);
+  if (idx >= 0) parts[idx] = `${parts[idx]} ${glow}`;
+  else parts.push(`filter: ${glow}`);
+}
+
 // Forward `background-size` / `background-repeat` / `background-position` when the element
 // carries a `url(...)` background image. The importer recovers them into the ImagePattern's
 // scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
@@ -1253,6 +1330,18 @@ function buildStyle(left, top, width, height, computed, opts) {
       appendStyleProp(parts, computed, entry, ctx);
     }
     appendTextStroke(parts, computed);
+    // Text glow: forward `text-shadow` as a `filter: drop-shadow(...)` chain so
+    // the glow survives import (the importer lowers a drop-shadow filter onto a
+    // DropShadowFilter but has no `text-shadow`). `filter` glows the element's
+    // whole painted content, so only skip when THIS style call also paints a
+    // box (`opts.box` with a background/border/shadow) — a whole-element glow
+    // would then halo the box. A text-only span (`opts.box` false, the common
+    // case: a text leaf inside a separately-painted wrapper) always glows just
+    // its glyphs, matching CSS text-shadow, even when the inherited `computed`
+    // carries the wrapper's background.
+    if (!(opts.box && hasBoxVisualsForInline(computed))) {
+      appendTextShadow(parts, computed);
+    }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -4139,6 +4228,7 @@ const HELPER_FNS = [
   appendAnimation,
   resolveTextStroke,
   appendTextStroke,
+  appendTextShadow,
   appendBackgroundImageFitting,
   appendMaskFitting,
   buildStyle,
