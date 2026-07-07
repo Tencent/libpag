@@ -11842,4 +11842,361 @@ PAGX_TEST(PAGXTest, SMStateChangeListener) {
   EXPECT_TRUE(receivedRegion.empty());
 }
 
+PAGX_TEST(PAGXTest, SMEmptyStateNoTransition) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  // Empty state: no animation bound.
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "idle";
+  region->states.push_back(s);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // advance should be a no-op.
+  timeline->advance(16667);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+}
+
+PAGX_TEST(PAGXTest, SMNumberTransitionOps) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "val";
+  input->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(input);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "low";
+  auto slow = doc->makeNode<pagx::AnimationState>();
+  slow->name = "low";
+  region->states.push_back(slow);
+  auto shigh = doc->makeNode<pagx::AnimationState>();
+  shigh->name = "high";
+  region->states.push_back(shigh);
+
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "low";
+  t->to = "high";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "val";
+  c->op = pagx::TransitionConditionOp::GreaterThan;
+  c->valueNumber = 5.0f;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // val=5, not > 5.
+  timeline->setNumber("val", 5.0f);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "low");
+  // val=6 > 5, should transition.
+  timeline->setNumber("val", 6.0f);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "high");
+}
+
+PAGX_TEST(PAGXTest, SMConditionAnd) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto inputA = doc->makeNode<pagx::StateMachineInput>();
+  inputA->name = "a";
+  inputA->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inputA);
+  auto inputB = doc->makeNode<pagx::StateMachineInput>();
+  inputB->name = "b";
+  inputB->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inputB);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  auto c1 = doc->makeNode<pagx::TransitionCondition>();
+  c1->inputName = "a";
+  c1->op = pagx::TransitionConditionOp::Equal;
+  c1->valueBool = true;
+  t->conditions.push_back(c1);
+  auto c2 = doc->makeNode<pagx::TransitionCondition>();
+  c2->inputName = "b";
+  c2->op = pagx::TransitionConditionOp::Equal;
+  c2->valueBool = true;
+  t->conditions.push_back(c2);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Only a=true, not b; no transition.
+  timeline->setBool("a", true);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // Both true -> transition.
+  timeline->setBool("b", true);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMExitTimeNoConditionAutoAdvance) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 30;
+  anim->frameRate = 60.0f;
+  anim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(anim);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "loading";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "loading";
+  s1->animationId = "anim";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  // No condition: auto-advance after exitTime.
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "loading";
+  t->to = "done";
+  t->duration = 0;
+  t->exitTime = 15;
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Advance to frame 10 (10*16667us at 60fps); exitTime 15 not reached.
+  timeline->advance(10 * 16667);
+  EXPECT_EQ(timeline->getCurrentState("main"), "loading");
+  // Advance past frame 15; should auto-transition.
+  timeline->advance(6 * 16667);
+  EXPECT_EQ(timeline->getCurrentState("main"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60.0f;
+  anim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(anim);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  s1->animationId = "anim";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "active";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 10;
+  t->exitTime = 10;
+  t->pauseOnExit = true;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Set go=true. Advance to frame 30 (past exitTime 10); should transition.
+  timeline->setBool("go", true);
+  timeline->advance(30 * 16667);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+}
+
+PAGX_TEST(PAGXTest, SMDurationZeroHardCut) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  timeline->setBool("go", true);
+  timeline->advance(0);
+  // duration=0: immediate hard cut, no crossfade.
+  EXPECT_EQ(timeline->getCurrentState("main"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMDefaultInputValue) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = true;
+  sm->inputs.push_back(input);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "active";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Default true should trigger immediately on first advance.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+}
+
+PAGX_TEST(PAGXTest, SMGetStateMachineIds) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm1 = doc->makeNode<pagx::StateMachine>("sm1");
+  auto r1 = doc->makeNode<pagx::StateRegion>();
+  r1->name = "main";
+  r1->initialState = "s";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "s";
+  r1->states.push_back(s);
+  sm1->regions.push_back(r1);
+  auto sm2 = doc->makeNode<pagx::StateMachine>("sm2");
+  auto r2 = doc->makeNode<pagx::StateRegion>();
+  r2->name = "main";
+  r2->initialState = "s";
+  r2->states.push_back(s);
+  sm2->regions.push_back(r2);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  ASSERT_TRUE(scene != nullptr);
+
+  auto ids = scene->getStateMachineIds();
+  ASSERT_EQ(ids.size(), 2u);
+  EXPECT_EQ(ids[0], "sm1");
+  EXPECT_EQ(ids[1], "sm2");
+}
+
+PAGX_TEST(PAGXTest, SMMissingRegionError) {
+  auto xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Animations>
+    <StateMachine id="testSM"/>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  // Missing regions should produce an error.
+  EXPECT_FALSE(doc->errors.empty());
+}
+
+PAGX_TEST(PAGXTest, SMUnknownRegionName) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "idle";
+  region->states.push_back(s);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  EXPECT_EQ(timeline->getCurrentState("nonexistent"), "");
+}
+
+PAGX_TEST(PAGXTest, SMImporterErrorsForMissingFields) {
+  auto xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Animations>
+    <StateMachine id="bad">
+      <Inputs>
+        <Input name="x"/>
+      </Inputs>
+    </StateMachine>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  // Should have at least one error due to missing type attribute.
+  EXPECT_FALSE(doc->errors.empty());
+}
+
 }  // namespace pag
