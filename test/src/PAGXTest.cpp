@@ -13057,6 +13057,127 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/StableState"));
 }
 
+// =============================================================================
+// Nested SM (scene-driven via <Timelines><StateMachine ref>) screenshot test.
+// The SM is attached to a slot layer that references a Composition. The SM uses
+// the composition's binding (not root), so it can drive the composition's internal
+// child layer. The SM is auto-driven by scene->advanceAndApply.
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  // Child layer inside a Composition resource.
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 50; child->height = 50;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50; rect->size.height = 50;
+  child->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  child->contents.push_back(fill);
+
+  auto comp = doc->makeNode<pagx::Composition>("card");
+  comp->width = 50; comp->height = 50;
+  comp->layers.push_back(child);
+
+  // Two animations for two states: visible (alpha=1) and dim (alpha=0.3).
+  auto animVisible = doc->makeNode<pagx::Animation>("animVisible");
+  animVisible->duration = 10; animVisible->frameRate = 60;
+  comp->animations.push_back(animVisible);
+  auto objV = doc->makeNode<pagx::AnimationObject>();
+  objV->target = "child";
+  animVisible->objects.push_back(objV);
+  auto chV = doc->makeNode<pagx::TypedChannel<float>>();
+  chV->name = "alpha";
+  chV->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chV->keyframes.push_back({10, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objV->channels.push_back(chV);
+
+  auto animDim = doc->makeNode<pagx::Animation>("animDim");
+  animDim->duration = 10; animDim->frameRate = 60;
+  comp->animations.push_back(animDim);
+  auto objD = doc->makeNode<pagx::AnimationObject>();
+  objD->target = "child";
+  animDim->objects.push_back(objD);
+  auto chD = doc->makeNode<pagx::TypedChannel<float>>();
+  chD->name = "alpha";
+  chD->keyframes.push_back({0, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chD->keyframes.push_back({10, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objD->channels.push_back(chD);
+
+  // StateMachine: visible → dim on "dim" bool input.
+  auto sm = doc->makeNode<pagx::StateMachine>("cardSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "dim"; input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main"; region->initialState = "visible";
+  auto sVis = doc->makeNode<pagx::AnimationState>();
+  sVis->name = "visible"; sVis->animationId = "animVisible";
+  region->states.push_back(sVis);
+  auto sDim = doc->makeNode<pagx::AnimationState>();
+  sDim->name = "dim"; sDim->animationId = "animDim";
+  region->states.push_back(sDim);
+  auto tVisDim = doc->makeNode<pagx::StateTransition>();
+  tVisDim->from = "visible"; tVisDim->to = "dim"; tVisDim->duration = 5;
+  auto cVisDim = doc->makeNode<pagx::TransitionCondition>();
+  cVisDim->inputName = "dim"; cVisDim->op = pagx::TransitionConditionOp::Equal;
+  cVisDim->valueBool = true;
+  tVisDim->conditions.push_back(cVisDim);
+  region->transitions.push_back(tVisDim);
+  auto tDimVis = doc->makeNode<pagx::StateTransition>();
+  tDimVis->from = "dim"; tDimVis->to = "visible"; tDimVis->duration = 5;
+  auto cDimVis = doc->makeNode<pagx::TransitionCondition>();
+  cDimVis->inputName = "dim"; cDimVis->op = pagx::TransitionConditionOp::NotEqual;
+  cDimVis->valueBool = true;
+  tDimVis->conditions.push_back(cDimVis);
+  region->transitions.push_back(tDimVis);
+  sm->regions.push_back(region);
+
+  // Slot layer referencing the Composition, with SM attached via Timelines.
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  slot->width = 100; slot->height = 100;
+  auto smDriver = std::make_unique<pagx::StateMachineTimeline>();
+  smDriver->stateMachineId = "cardSM";
+  slot->timelines.push_back(std::move(smDriver));
+  doc->layers.push_back(slot);
+  doc->applyLayout();
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Baseline 1: visible state (alpha=1.0, full red). Scene auto-drives the nested SM.
+  scene->advanceAndApply(5 * 16667);
+  auto surface1 = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface1 != nullptr);
+  ASSERT_TRUE(scene->draw(surface1));
+  EXPECT_TRUE(Baseline::Compare(surface1, "PAGXStateMachine/NestedVisible"));
+
+  // Baseline 2: dim state. Need to set input on the nested SM.
+  // The nested SM is in the slot's composition's stateMachineTimelines.
+  // Access it through rootComposition → children → composition.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_FALSE(rootChildren.empty());
+  auto slotComp = rootChildren[0];
+  ASSERT_TRUE(slotComp != nullptr);
+  ASSERT_EQ(slotComp->layerType(), pagx::LayerType::Composition);
+  auto* slotComposition = static_cast<pagx::PAGComposition*>(slotComp.get());
+  ASSERT_FALSE(slotComposition->stateMachineTimelines.empty());
+  auto nestedSM = slotComposition->stateMachineTimelines[0];
+  ASSERT_TRUE(nestedSM != nullptr);
+  nestedSM->setBool("dim", true);
+  scene->advanceAndApply(10 * 16667);
+  auto surface2 = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface2 != nullptr);
+  ASSERT_TRUE(scene->draw(surface2));
+  EXPECT_TRUE(Baseline::Compare(surface2, "PAGXStateMachine/NestedDim"));
+}
+
 PAGX_TEST(PAGXTest, SMVMBoolBinding) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
@@ -13632,6 +13753,7 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   rColor->transitions.push_back(tcPN);
   sm->regions.push_back(rColor);
   doc->applyLayout();
+  printf("=== Button SM XML ===\n%s\n", pagx::PAGXExporter::ToXML(*doc).c_str());
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto smTimeline = scene->getStateMachineTimeline("btnSM");
