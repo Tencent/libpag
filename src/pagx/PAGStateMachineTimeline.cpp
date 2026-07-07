@@ -479,6 +479,21 @@ void PAGStateMachineTimeline::advanceRegion(int64_t deltaUs) {
         break;
       }
     }
+    // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
+    // delta so the first apply sees a non-zero mix (prevents a one-frame blank output).
+    if (ri.transition != nullptr && ri.mix < 1.0f) {
+      int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
+      if (mixDurationUs <= 0) {
+        ri.mix = 1.0f;
+      } else {
+        ri.mix =
+            std::min(1.0f, std::max(0.0f, ri.mix + static_cast<float>(deltaUs) / mixDurationUs));
+      }
+      if (ri.mix >= 1.0f) {
+        ri.fadingOut.clear();
+        ri.transition = nullptr;
+      }
+    }
   }
 }
 

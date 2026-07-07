@@ -12929,18 +12929,24 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto layer = doc->makeNode<pagx::Layer>("target");
-  layer->width = 100;
-  layer->height = 100;
+  layer->width = 50;
+  layer->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->width = 100;
-  rect->height = 100;
+  rect->size.width = 50; rect->size.height = 50;
   layer->contents.push_back(rect);
   auto sf = doc->makeNode<pagx::Fill>();
   auto sc = doc->makeNode<pagx::SolidColor>();
   sc->color = {1.0f, 0.0f, 0.0f, 1.0f};
   sf->color = sc;
   layer->contents.push_back(sf);
-  doc->layers.push_back(layer);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 50; comp->height = 50;
+  comp->layers.push_back(layer);
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  slot->width = 100; slot->height = 100;
+  doc->layers.push_back(slot);
 
   // animA: alpha = 1.0
   auto animA = doc->makeNode<pagx::Animation>("animA");
@@ -12987,7 +12993,7 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto smTimeline = scene->getStateMachineTimeline("crossSM");
@@ -13004,23 +13010,27 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
 
 PAGX_TEST(PAGXTest, SMStableStateOutput) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto layer = doc->makeNode<pagx::Layer>("target");
-  layer->width = 100; layer->height = 100;
+
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 50; child->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->width = 100; rect->height = 100;
-  layer->contents.push_back(rect);
-  auto sf = doc->makeNode<pagx::Fill>();
-  auto sc = doc->makeNode<pagx::SolidColor>();
-  sc->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  sf->color = sc;
-  layer->contents.push_back(sf);
-  doc->layers.push_back(layer);
+  rect->size.width = 50; rect->size.height = 50;
+  child->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  child->contents.push_back(fill);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 50; comp->height = 50;
+  comp->layers.push_back(child);
 
   auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 60; anim->frameRate = 60.0f; anim->loop = pagx::LoopMode::Loop;
-  doc->animations.push_back(anim);
+  anim->duration = 60; anim->frameRate = 60;
+  comp->animations.push_back(anim);
   auto obj = doc->makeNode<pagx::AnimationObject>();
-  obj->target = "target";
+  obj->target = "child";
   anim->objects.push_back(obj);
   auto ch = doc->makeNode<pagx::TypedChannel<float>>();
   ch->name = "alpha";
@@ -13035,6 +13045,11 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   s->name = "fade"; s->animationId = "anim";
   region->states.push_back(s);
   sm->regions.push_back(region);
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  slot->width = 100; slot->height = 100;
+  doc->layers.push_back(slot);
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -13085,7 +13100,7 @@ PAGX_TEST(PAGXTest, SMVMBoolBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13140,7 +13155,7 @@ PAGX_TEST(PAGXTest, SMVMNumberBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13195,7 +13210,7 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13305,7 +13320,7 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
   tDie->conditions.push_back(cDie);
   region->transitions.push_back(tDie);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13442,15 +13457,13 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
 
   // Layer: a colored button rectangle.
   auto layer = doc->makeNode<pagx::Layer>("btn");
-  layer->width = 100;
-  layer->height = 40;
+  layer->width = 50;
+  layer->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->width = 100;
-  rect->height = 40;
+  rect->size.width = 50; rect->size.height = 50;
   layer->contents.push_back(rect);
   auto sf = doc->makeNode<pagx::Fill>();
   auto sc = doc->makeNode<pagx::SolidColor>();
-  sc->id = "btnColor";
   sc->color = {0.2f, 0.4f, 1.0f, 1.0f};
   sf->color = sc;
   layer->contents.push_back(sf);
@@ -13466,7 +13479,7 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   objN->target = "btn";
   animNormal->objects.push_back(objN);
   auto chNX = doc->makeNode<pagx::TypedChannel<float>>();
-  chNX->name = "scaleX";
+  chNX->name = "alpha";
   chNX->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   chNX->keyframes.push_back({30, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objN->channels.push_back(chNX);
@@ -13480,9 +13493,9 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   objH->target = "btn";
   animHover->objects.push_back(objH);
   auto chHX = doc->makeNode<pagx::TypedChannel<float>>();
-  chHX->name = "scaleX";
-  chHX->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  chHX->keyframes.push_back({15, 1.15f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHX->name = "alpha";
+  chHX->keyframes.push_back({0, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHX->keyframes.push_back({15, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objH->channels.push_back(chHX);
 
   auto animPressed = doc->makeNode<pagx::Animation>("animPressed");
@@ -13494,9 +13507,9 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   objP->target = "btn";
   animPressed->objects.push_back(objP);
   auto chPX = doc->makeNode<pagx::TypedChannel<float>>();
-  chPX->name = "scaleX";
-  chPX->keyframes.push_back({0, 0.95f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  chPX->keyframes.push_back({10, 0.95f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chPX->name = "alpha";
+  chPX->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chPX->keyframes.push_back({10, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objP->channels.push_back(chPX);
 
   // Color changes for states.
@@ -13625,7 +13638,7 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   tcPN->conditions.push_back(ccPN);
   rColor->transitions.push_back(tcPN);
   sm->regions.push_back(rColor);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto smTimeline = scene->getStateMachineTimeline("btnSM");
@@ -13641,6 +13654,7 @@ PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
   // Baseline 2: hover state.
   smTimeline->setBool("isHover", true);
   smTimeline->advanceAndApply(10 * 16667);
+  ASSERT_EQ(smTimeline->getCurrentState("scale"), "hover");
   auto surface2 = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface2 != nullptr);
   ASSERT_TRUE(scene->draw(surface2));
@@ -13669,8 +13683,7 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   layer->height = 30;
   // Background bar (dim)
   auto bgRect = doc->makeNode<pagx::Rectangle>();
-  bgRect->width = 200;
-  bgRect->height = 30;
+  bgRect->size.width = 200; bgRect->size.height = 30;
   layer->contents.push_back(bgRect);
   auto bgFill = doc->makeNode<pagx::Fill>();
   auto bgColor = doc->makeNode<pagx::SolidColor>();
@@ -13679,8 +13692,7 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   layer->contents.push_back(bgFill);
   // Foreground health bar (animated)
   auto fgRect = doc->makeNode<pagx::Rectangle>();
-  fgRect->width = 200;
-  fgRect->height = 30;
+  fgRect->size.width = 200; fgRect->size.height = 30;
   layer->contents.push_back(fgRect);
   auto fgFill = doc->makeNode<pagx::Fill>();
   auto fgColor = doc->makeNode<pagx::SolidColor>();
@@ -13688,7 +13700,14 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   fgColor->color = {0.0f, 0.8f, 0.2f, 1.0f};
   fgFill->color = fgColor;
   layer->contents.push_back(fgFill);
-  doc->layers.push_back(layer);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 200; comp->height = 30;
+  comp->layers.push_back(layer);
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  slot->width = 200; slot->height = 30;
+  doc->layers.push_back(slot);
 
   // VM: hp number, drives SM.
   auto vm = doc->makeNode<pagx::ViewModel>("hpVM");
@@ -13710,7 +13729,7 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   objA->target = "bar";
   animAlive->objects.push_back(objA);
   auto chAS = doc->makeNode<pagx::TypedChannel<float>>();
-  chAS->name = "scaleX";
+  chAS->name = "alpha";
   chAS->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   chAS->keyframes.push_back({30, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objA->channels.push_back(chAS);
@@ -13725,9 +13744,9 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   objH->target = "bar";
   animHurt->objects.push_back(objH);
   auto chHS = doc->makeNode<pagx::TypedChannel<float>>();
-  chHS->name = "scaleX";
-  chHS->keyframes.push_back({0, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  chHS->keyframes.push_back({30, 0.4f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHS->name = "alpha";
+  chHS->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHS->keyframes.push_back({30, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objH->channels.push_back(chHS);
   auto chHC = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   chHC->name = "color";
@@ -13750,9 +13769,9 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   objD->target = "bar";
   animDead->objects.push_back(objD);
   auto chDS = doc->makeNode<pagx::TypedChannel<float>>();
-  chDS->name = "scaleX";
-  chDS->keyframes.push_back({0, 0.05f, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  chDS->keyframes.push_back({30, 0.05f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chDS->name = "alpha";
+  chDS->keyframes.push_back({0, 0.2f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chDS->keyframes.push_back({30, 0.2f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   objD->channels.push_back(chDS);
   auto chDC = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
   chDC->name = "color";
@@ -13822,7 +13841,7 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   tHurtDead->conditions.push_back(cHD);
   region->transitions.push_back(tHurtDead);
   sm->regions.push_back(region);
-
+  doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13854,6 +13873,57 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   ASSERT_TRUE(surface3 != nullptr);
   ASSERT_TRUE(scene->draw(surface3));
   EXPECT_TRUE(Baseline::Compare(surface3, "PAGXStateMachine/HealthBarDead"));
+}
+
+// Canonical scene render test: Composition-wrapped layer with animation via scene.
+PAGX_TEST(PAGXTest, SMDebugSceneAnimation) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto child = doc->makeNode<pagx::Layer>("child");
+  child->width = 50; child->height = 50;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 50; rect->size.height = 50;
+  child->contents.push_back(rect);
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  child->contents.push_back(fill);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 50; comp->height = 50;
+  comp->layers.push_back(child);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60; anim->frameRate = 60;
+  comp->animations.push_back(anim);
+  auto obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "child";
+  anim->objects.push_back(obj);
+  auto ch = doc->makeNode<pagx::TypedChannel<float>>();
+  ch->name = "alpha";
+  ch->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  ch->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  obj->channels.push_back(ch);
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  slot->width = 100; slot->height = 100;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "anim";
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  scene->advanceAndApply(10 * 16667);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/DebugSceneAnim"));
 }
 
 }  // namespace pag
