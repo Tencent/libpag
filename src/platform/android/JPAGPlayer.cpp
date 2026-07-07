@@ -29,7 +29,7 @@
 namespace pag {
 static jfieldID PAGPlayer_nativeContext;
 static std::mutex PAGPlayer_contextLocker = {};
-}
+}  // namespace pag
 
 using namespace pag;
 
