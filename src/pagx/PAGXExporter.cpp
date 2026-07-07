@@ -30,6 +30,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -59,6 +61,8 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
@@ -97,6 +101,41 @@ static std::string FloatListToString(const float* values, size_t count) {
 
 static std::string FloatListToString(const std::vector<float>& values) {
   return FloatListToString(values.data(), values.size());
+}
+static std::string ViewModelPropertyTypeToString(ViewModelPropertyType t) {
+  switch (t) {
+    case ViewModelPropertyType::Number:
+      return "Number";
+    case ViewModelPropertyType::String:
+      return "String";
+    case ViewModelPropertyType::Boolean:
+      return "Boolean";
+    case ViewModelPropertyType::Color:
+      return "Color";
+    case ViewModelPropertyType::Image:
+      return "Image";
+    case ViewModelPropertyType::ViewModel:
+      return "ViewModel";
+    case ViewModelPropertyType::Enum:
+      return "Enum";
+    case ViewModelPropertyType::Trigger:
+      return "Trigger";
+  }
+  return "Number";
+}
+
+static std::string DataBindDirectionToString(DataBindDirection f) {
+  switch (f) {
+    case DataBindDirection::ToTarget:
+      return "ToTarget";
+    case DataBindDirection::ToSource:
+      return "ToSource";
+    case DataBindDirection::TwoWay:
+      return "TwoWay";
+    case DataBindDirection::Once:
+      return "Once";
+  }
+  return "ToTarget";
 }
 
 static std::string PointListToString(const std::vector<Point>& points) {
@@ -252,6 +291,10 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       break;
     case ChannelValueType::Matrix:
       WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
+      break;
+    case ChannelValueType::PAGImage:
+      // PAGImage channels carry a runtime-only decoded bitmap with no serializable form, so they
+      // are intentionally not written; there is no matching import path in ParseChannel.
       break;
   }
 }
@@ -1110,10 +1153,26 @@ static bool IsExportableResource(const Node* node) {
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern:
+    case NodeType::ViewModel:
+    case NodeType::DataConverter:
       return true;
     default:
       return false;
   }
+}
+
+// Escapes backslash and comma in an enum option value so the comma-joined "options" attribute can
+// be split unambiguously on import. Backslash becomes "\\" and comma becomes "\,".
+static std::string EscapeEnumOption(const std::string& option) {
+  std::string escaped;
+  escaped.reserve(option.size());
+  for (char c : option) {
+    if (c == '\\' || c == ',') {
+      escaped += '\\';
+    }
+    escaped += c;
+  }
+  return escaped;
 }
 
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
@@ -1147,8 +1206,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("id", comp->id);
       xml.addRequiredAttribute("width", comp->width);
       xml.addRequiredAttribute("height", comp->height);
+      if (comp->viewModel != nullptr) xml.addAttribute("viewModel", "@" + comp->viewModel->id);
       WriteCustomData(xml, node);
-      if (comp->layers.empty() && comp->animations.empty()) {
+      if (comp->layers.empty() && comp->animations.empty() && comp->dataBinds.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
@@ -1156,6 +1216,9 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           WriteLayer(xml, layer, options);
         }
         WriteAnimations(xml, comp->animations);
+        for (const auto& bind : comp->dataBinds) {
+          WriteResource(xml, bind, options);
+        }
         xml.closeElement();
       }
       break;
@@ -1211,6 +1274,102 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern: {
       WriteColorSource(xml, static_cast<const ColorSource*>(node));
+      break;
+    }
+    case NodeType::ViewModel: {
+      auto vm = static_cast<const ViewModel*>(node);
+      xml.openElement("ViewModel");
+      xml.addAttribute("id", vm->id);
+      WriteCustomData(xml, node);
+      if (vm->properties.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& prop : vm->properties) {
+          xml.openElement("Property");
+          xml.addAttribute("id", prop->id);
+          xml.addAttribute("name", prop->name);
+          xml.addAttribute("type", ViewModelPropertyTypeToString(prop->propertyType));
+          switch (prop->propertyType) {
+            case ViewModelPropertyType::Number:
+              xml.addAttribute("default", prop->defaultNumber);
+              break;
+            case ViewModelPropertyType::String:
+              xml.addAttribute("default", prop->defaultString);
+              break;
+            case ViewModelPropertyType::Boolean:
+              xml.addAttribute("default", prop->defaultBoolean);
+              break;
+            case ViewModelPropertyType::Color:
+              xml.addAttribute(
+                  "default", ColorToHexString(prop->defaultColor, prop->defaultColor.alpha < 1.0f));
+              break;
+            case ViewModelPropertyType::Image:
+              if (prop->defaultImage) {
+                xml.addAttribute("default", "@" + prop->defaultImage->id);
+              }
+              break;
+            case ViewModelPropertyType::ViewModel:
+              if (prop->viewModelRef)
+                xml.addAttribute("viewModelRef", "@" + prop->viewModelRef->id);
+              break;
+            case ViewModelPropertyType::Enum:
+              xml.addAttribute("default", prop->defaultEnum);
+              break;
+            case ViewModelPropertyType::Trigger:
+              break;
+          }
+          if (prop->propertyType == ViewModelPropertyType::Number) {
+            if (prop->minValue.has_value()) xml.addRequiredAttribute("min", *prop->minValue);
+            if (prop->maxValue.has_value()) xml.addRequiredAttribute("max", *prop->maxValue);
+          }
+          if (!prop->enumOptions.empty()) {
+            std::string opts;
+            for (size_t i = 0; i < prop->enumOptions.size(); i++) {
+              if (i > 0) opts += ",";
+              opts += EscapeEnumOption(prop->enumOptions[i]);
+            }
+            xml.addAttribute("options", opts);
+          }
+          if (prop->dataConverter) xml.addAttribute("dataConverter", "@" + prop->dataConverter->id);
+          WriteCustomData(xml, prop);
+          xml.closeElementSelfClosing();
+        }
+        xml.closeElement();
+      }
+      break;
+    }
+    case NodeType::DataBind: {
+      auto bind = static_cast<const DataBind*>(node);
+      xml.openElement("DataBind");
+      xml.addAttribute("source", bind->source);
+      xml.addAttribute("target", bind->target);
+      xml.addAttribute("channel", bind->channel);
+      if (bind->direction != DataBindDirection::ToTarget) {
+        xml.addAttribute("direction", DataBindDirectionToString(bind->direction));
+      }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::DataConverter: {
+      auto conv = static_cast<const DataConverter*>(node);
+      xml.openElement("DataConverter");
+      xml.addAttribute("id", conv->id);
+      xml.addAttribute("type", conv->converterType);
+      WriteCustomData(xml, node);
+      if (conv->params.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& [k, v] : conv->params) {
+          xml.openElement("Param");
+          xml.addAttribute("name", k);
+          xml.addAttribute("value", v);
+          xml.closeElementSelfClosing();
+        }
+        xml.closeElement();
+      }
       break;
     }
     default:
@@ -1286,6 +1445,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   } else if (!node->compositionFilePath.empty()) {
     xml.addAttribute("composition", node->compositionFilePath);
   }
+  xml.addAttribute("vmContext", node->vmContext);
 
   // Build directive attributes.
   xml.addAttribute("import", node->importDirective.source);
@@ -1368,6 +1528,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   xml.openElement("pagx");
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
+  if (doc.viewModel != nullptr) xml.addAttribute("viewModel", "@" + doc.viewModel->id);
   WriteCustomData(xml, &doc);
   xml.closeElementStart();
 
@@ -1376,6 +1537,9 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     WriteLayer(xml, layer, options);
   }
   WriteAnimations(xml, doc.animations);
+  for (const auto& bind : doc.dataBinds) {
+    WriteResource(xml, bind, options);
+  }
 
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;

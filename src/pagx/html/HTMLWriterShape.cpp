@@ -1578,8 +1578,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
             float bgW = sx * static_cast<float>(imgSize.first);
             float bgH = sy * static_cast<float>(imgSize.second);
             if (bgW > 0 && bgH > 0) {
-              style += ";background-size:" + CssFloatToString(bgW) + "px " +
-                       CssFloatToString(bgH) + "px";
+              style += ";background-size:" + CssFloatToString(bgW) + "px " + CssFloatToString(bgH) +
+                       "px";
             }
           }
           // For scaleMode=none the pattern is anchored to the parent Layer's origin (0,0),

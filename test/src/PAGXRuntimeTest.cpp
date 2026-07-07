@@ -27,6 +27,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/runtime/KeyframeEvaluator.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -405,6 +406,27 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   context = device->lockContext();
   glDeleteFramebuffers(1, &fbo);
   glDeleteTextures(1, &textureInfo.id);
+}
+
+/**
+ * Test case: EvaluateKeyframeSequence treats KeyframeInterpolationType::None identically to Hold,
+ * holding the left keyframe value across the segment instead of interpolating linearly toward the
+ * right keyframe. This locks the None == Hold semantics so it cannot silently drift back to linear.
+ */
+PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
+  std::vector<pagx::Keyframe<float>> keyframes;
+  keyframes.push_back({0, 10.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+  keyframes.push_back({60, 20.0f, pagx::KeyframeInterpolationType::None, {}, {}});
+
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 0.0), 10.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 30.0), 10.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 59.0), 10.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 60.0), 20.0f);
+
+  std::vector<pagx::Keyframe<float>> linear;
+  linear.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  linear.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(linear, 30.0), 15.0f);
 }
 
 }  // namespace pag

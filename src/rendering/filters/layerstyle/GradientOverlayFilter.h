@@ -40,6 +40,5 @@ class GradientOverlayFilter : public LayerStyleFilter {
   bool reverse = false;
   float scale = 1.0;
   Point offset = Point::Zero();
-  tgfx::Point _filterScale = tgfx::Point::Make(1.0f, 1.0f);
 };
 }  // namespace pag

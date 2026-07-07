@@ -39,7 +39,8 @@
         ],
         "arguments": [
           "-DBUILD_STATIC=TRUE",
-          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "includes": [
           "${SOURCE_DIR}/src/rttr",

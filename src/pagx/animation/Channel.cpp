@@ -70,7 +70,8 @@ ChannelValueType TypedChannel<Matrix>::valueType() const {
   return ChannelValueType::Matrix;
 }
 
-// Explicit instantiations: must cover every alternative of KeyValue.
+// Explicit instantiations for every keyframe-animatable alternative of KeyValue (PAGImage is
+// excluded — it is not interpolated).
 template class TypedChannel<float>;
 template class TypedChannel<bool>;
 template class TypedChannel<int>;

@@ -362,6 +362,8 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
     if (session->videoHasAlpha != hasAlpha) {
       session->videoHasAlpha = hasAlpha;
+      pagEncodeThread->close();
+      pagEncodeThread.reset();
       delete sequence;
       continue;
     }

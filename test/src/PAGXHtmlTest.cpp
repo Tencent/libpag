@@ -362,8 +362,8 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
 }
 
 CLI_TEST(PAGXHtmlTest, MergePathAvoidsDuplicateFillRuleAttributes) {
-  auto html =
-      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/unit/merge_path_fill_rule.pagx"));
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/merge_path_fill_rule.pagx"));
   ASSERT_FALSE(html.empty());
 
   auto standaloneTag = FindTagContaining(html, "fill=\"#EC4899\"");

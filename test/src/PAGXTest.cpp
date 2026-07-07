@@ -29,6 +29,7 @@
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGFont.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -157,29 +158,13 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static std::vector<std::shared_ptr<Typeface>> CreateFallbackTypefaces() {
-  std::vector<std::shared_ptr<Typeface>> result = {};
-  auto regularTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  if (regularTypeface) {
-    result.push_back(regularTypeface);
-  }
-  auto emojiTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-  if (emojiTypeface) {
-    result.push_back(emojiTypeface);
-  }
-  auto hebrewTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"));
-  if (hebrewTypeface) {
-    result.push_back(hebrewTypeface);
-  }
-  return result;
-}
-
-static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
-  static auto typefaces = CreateFallbackTypefaces();
-  return typefaces;
+static const std::vector<std::string>& GetFallbackFontPaths() {
+  static const std::vector<std::string> paths = {
+      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
+      ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"),
+      ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"),
+  };
+  return paths;
 }
 
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
@@ -252,7 +237,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 
   // Create FontConfig for text layout
   pagx::FontConfig svgFontConfig;
-  svgFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    svgFontConfig.addFallbackFont(fontPath, 0);
+  }
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -582,7 +569,9 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   doc->layers.push_back(layer);
 
   pagx::FontConfig embedFontConfig;
-  embedFontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    embedFontConfig.addFallbackFont(fontPath, 0);
+  }
   doc->applyLayout(&embedFontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -601,6 +590,53 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
+}
+
+/**
+ * Test case: editing a Text node's font size and calling notifyChange(layoutChanged=true) re-runs
+ * layout and refreshes the runtime tree so the cached TextBlob is rebuilt from the new layout runs
+ * (a stale blob would otherwise be returned by the render-time cache and ignore the edit).
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRebuildsTextBlobOnFontEdit) {
+  auto doc = pagx::PAGXDocument::Make(240, 140);
+  auto* textLayer = MakeTextLayer(doc.get(), "Hello", 20, {0, 0, 0, 1});
+  doc->layers.push_back(textLayer);
+
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
+  // Locate the Text node inside the layer's Group content.
+  pagx::Text* text = nullptr;
+  for (auto* element : textLayer->contents) {
+    if (element->nodeType() == pagx::NodeType::Group) {
+      for (auto* child : static_cast<pagx::Group*>(element)->elements) {
+        if (child->nodeType() == pagx::NodeType::Text) {
+          text = static_cast<pagx::Text*>(child);
+        }
+      }
+    }
+  }
+  ASSERT_NE(text, nullptr);
+
+  // Building the scene shapes the text and populates the cached TextBlob.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  auto oldBlob = text->glyphData->textBlob;
+  float oldHeight = text->textBounds.height;
+
+  // Edit the font size and notify with layoutChanged=true: this re-runs layout (clearing the cached
+  // blob) and refreshes the runtime tree in place, re-shaping from the new layout runs.
+  text->fontSize = 40;
+  doc->notifyChange({text}, true);
+
+  // The runtime tree now holds a freshly shaped blob (not the original) reflecting the larger font.
+  ASSERT_NE(text->glyphData->textBlob, nullptr);
+  EXPECT_NE(text->glyphData->textBlob, oldBlob);
+  EXPECT_GT(text->textBounds.height, oldHeight);
 }
 
 /**
@@ -766,7 +802,9 @@ static void TestMarkdownPatterns(tgfx::Context* context, const std::string& mark
                              std::filesystem::copy_options::overwrite_existing);
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
 
   for (const auto& [name, xmlContent] : patterns) {
     auto key = prefix + name;
@@ -829,7 +867,9 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
   std::sort(files.begin(), files.end());
 
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
 
   for (const auto& filePath : files) {
     auto key = prefix + std::filesystem::path(filePath).stem().string();
@@ -2343,7 +2383,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -2389,7 +2430,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
 
   // Compute original text bounds (horizontal: advance width, vertical: tight pixel bounds).
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
@@ -4793,7 +4835,8 @@ PAGX_TEST(PAGXTest, LayoutTextIndependentConstraint) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
 
   doc->applyLayout(&fontConfig);
 
@@ -4893,7 +4936,8 @@ PAGX_TEST(PAGXTest, LayoutTextScaledPositionAnchor) {
   layer->contents.push_back(text);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   // Target width = 400 - 50 - 50 = 300.
@@ -4968,7 +5012,8 @@ PAGX_TEST(PAGXTest, TextLayoutGlyphRunIntegrity) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5013,7 +5058,8 @@ PAGX_TEST(PAGXTest, TextBoxLayoutGlyphRunIntegrity) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5051,7 +5097,8 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   pagx::FontEmbedder().embed(doc.get());
 
@@ -5102,7 +5149,8 @@ PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   layer->contents = {textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto& layoutRuns = text->glyphData->layoutRuns;
@@ -5156,7 +5204,8 @@ PAGX_TEST(PAGXTest, TextBoundsDirectValidation) {
   layer->contents = {standalone, fill1, textBox};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   // Standalone Text: textBounds should have positive width and height.
@@ -5287,7 +5336,8 @@ PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   EXPECT_TRUE(doc->embed());
@@ -5318,7 +5368,8 @@ PAGX_TEST(PAGXTest, DocumentClearEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5353,7 +5404,8 @@ PAGX_TEST(PAGXTest, DocumentReEmbed) {
   layer->contents = {text, fill};
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
   doc->embed();
 
@@ -5935,7 +5987,8 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
   object->channels.push_back(yProp);
 
   pagx::FontConfig fontConfig;
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   doc->applyLayout(&fontConfig);
 
   auto file = pagx::PAGScene::Make(doc);
@@ -7569,7 +7622,8 @@ PAGX_TEST(PAGXTest, HitTestNestedComposition) {
 
 /**
  * Test case: hit test resolves a leaf layer nested under a container layer that has no composition
- * reference. The container itself is not returned; only the leaf is.
+ * reference. The leaf is the top-most hit, with its ancestor container and the root composition
+ * following in the result.
  */
 PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -7855,12 +7909,15 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
   constexpr int canvasH = 470;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
   pagx::FontConfig fontConfig;
-  fontConfig.addFallbackTypefaces(GetFallbackTypefaces());
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(typeface != nullptr);
-  fontConfig.registerTypeface(typeface);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
   auto fontFamily = typeface->fontFamily();
   auto fontStyle = typeface->fontStyle();
 
@@ -10137,10 +10194,11 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   EXPECT_EQ(hits[1]->name(), "Middle");
   EXPECT_EQ(hits[2]->name(), "Root");
+  EXPECT_EQ(hits[3], scene->rootComposition());
 
   // Add a grandchild under middle and notify.
   auto grandchild = doc->makeNode<pagx::Layer>("Grandchild");
@@ -10158,10 +10216,10 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   hits = scene->getLayersUnderPoint(120, 120);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Grandchild");
 
   // Remove the grandchild and notify; it is no longer hit.
@@ -10169,7 +10227,7 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   doc->notifyChange({middle}, /*layoutChanged=*/true);
 
   hits = scene->getLayersUnderPoint(70, 70);
-  ASSERT_EQ(hits.size(), 3u);
+  ASSERT_EQ(hits.size(), 4u);
   EXPECT_EQ(hits[0]->name(), "Leaf");
   // No content covers (120,120) after removing grandchild: Middle has no direct content.
   hits = scene->getLayersUnderPoint(120, 120);
@@ -10183,6 +10241,37 @@ PAGX_TEST(PAGXTest, NotifyChangeDeeplyNestedChildHitTest) {
   ASSERT_EQ(hits.size(), 0u);
   hits = scene->getLayersUnderPoint(120, 120);
   ASSERT_EQ(hits.size(), 0u);
+}
+
+/**
+ * Test case: hit testing returns authored PAGComposition nodes, not only plain layers. A Layer slot
+ * referencing a composition is hit, and the composition instance itself appears in the result chain
+ * because a composition is a PAGLayer.
+ */
+PAGX_TEST(PAGXTest, HitTestReturnsCompositionNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto slot = doc->makeNode<pagx::Layer>("Slot");
+  slot->name = "Slot";
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  scene->advanceAndApply(500'000);
+
+  auto hits = scene->getLayersUnderPoint(25, 25);
+  ASSERT_FALSE(hits.empty());
+  bool hasComposition = false;
+  for (const auto& hit : hits) {
+    if (hit->layerType() == pagx::LayerType::Composition) {
+      hasComposition = true;
+    }
+  }
+  EXPECT_TRUE(hasComposition);
 }
 
 /**
@@ -10818,6 +10907,155 @@ PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
   ASSERT_TRUE(surface != nullptr);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_after"));
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFonts) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  // No fonts yet.
+  EXPECT_TRUE(doc->getRequiredFonts().empty());
+
+  // Add a Text node directly.
+  auto* text1 = doc->makeNode<pagx::Text>("text1");
+  text1->fontFamily = "Arial";
+  text1->fontStyle = "Bold";
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts[0].fontFamily, "Arial");
+  EXPECT_EQ(fonts[0].fontStyle, "Bold");
+
+  // Same font, different node — deduplicated.
+  auto* text2 = doc->makeNode<pagx::Text>("text2");
+  text2->fontFamily = "Arial";
+  text2->fontStyle = "Bold";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 1u);
+
+  // Different font style.
+  auto* text3 = doc->makeNode<pagx::Text>("text3");
+  text3->fontFamily = "Arial";
+  text3->fontStyle = "Italic";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 2u);
+
+  // Different font family.
+  auto* text4 = doc->makeNode<pagx::Text>("text4");
+  text4->fontFamily = "Times New Roman";
+  text4->fontStyle = "Regular";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 3u);
+
+  // Empty fontFamily is skipped.
+  auto* text5 = doc->makeNode<pagx::Text>("text5");
+  text5->fontFamily = "";
+  text5->fontStyle = "Whatever";
+  EXPECT_EQ(doc->getRequiredFonts().size(), 3u);
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsNestedInGroupAndTextBox) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // Text inside Group inside Layer.
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* textInGroup = doc->makeNode<pagx::Text>();
+  textInGroup->fontFamily = "Helvetica";
+  textInGroup->fontStyle = "Regular";
+  group->elements = {textInGroup};
+
+  // Text inside TextBox inside same Layer.
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  auto* textInTextBox = doc->makeNode<pagx::Text>();
+  textInTextBox->fontFamily = "Courier";
+  textInTextBox->fontStyle = "Bold";
+  textBox->elements = {textInTextBox};
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {group, textBox};
+  doc->layers = {layer};
+
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 2u);
+  EXPECT_EQ(fonts[0].fontFamily, "Courier");
+  EXPECT_EQ(fonts[1].fontFamily, "Helvetica");
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsFromComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto* comp = doc->makeNode<pagx::Composition>("comp");
+  comp->width = 200;
+  comp->height = 200;
+  auto* compLayer = doc->makeNode<pagx::Layer>();
+  compLayer->contents = {};
+  comp->layers = {compLayer};
+
+  auto* textInComp = doc->makeNode<pagx::Text>();
+  textInComp->fontFamily = "System";
+  textInComp->fontStyle = "Regular";
+  compLayer->contents = {textInComp};
+
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts[0].fontFamily, "System");
+}
+
+PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto typeface =
+      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+  auto rootFamily = typeface->fontFamily();
+  auto rootStyle = typeface->fontStyle();
+
+  // Root document text using real typeface.
+  auto* rootText = doc->makeNode<pagx::Text>();
+  rootText->text = "Hello";
+  rootText->fontFamily = rootFamily;
+  rootText->fontStyle = rootStyle;
+  rootText->fontSize = 24;
+  rootText->position = {10, 50};
+  auto fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(fill->color)->color = {0.2f, 0.2f, 0.8f, 1.0f};
+  auto* rootLayer = doc->makeNode<pagx::Layer>();
+  rootLayer->contents = {rootText, fill};
+  doc->layers = {rootLayer};
+
+  // External document with a different string font.
+  auto* slotLayer = doc->makeNode<pagx::Layer>();
+  slotLayer->compositionFilePath = "external.pagx";
+  doc->layers.push_back(slotLayer);
+
+  std::string externalXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"extLayer\">\n"
+      "    <Text text=\"World\" fontFamily=\"Helvetica\" fontStyle=\"Regular\""
+      " fontSize=\"24\" position=\"10,50\"/>\n"
+      "    <Fill>\n"
+      "      <SolidColor color=\"#CC3333\"/>\n"
+      "    </Fill>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+
+  EXPECT_TRUE(doc->loadFileData("external.pagx", MakePAGXData(externalXML)));
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  // After loading, both fonts appear.
+  auto fonts = doc->getRequiredFonts();
+  ASSERT_EQ(fonts.size(), 2u);
+
+  // Register typeface and run full pipeline.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
+  doc->applyLayout(&fontConfig);
+  EXPECT_TRUE(doc->embed());
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Render and verify text is correctly shaped with the registered font.
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/GetRequiredFontsCrossDocument"));
 }
 
 }  // namespace pag

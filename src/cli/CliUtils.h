@@ -67,30 +67,6 @@ static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::s
 }
 
 /**
- * Resolves a fallback font specifier to a Typeface. Accepts either a font file path (containing
- * '/' or ending with a known font extension) or a font name in "family[,style]" format.
- */
-inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string& specifier) {
-  // Treat as file path if it contains '/' or ends with a known font extension.
-  bool isFilePath = specifier.find('/') != std::string::npos;
-  if (!isFilePath) {
-    auto dot = specifier.rfind('.');
-    if (dot != std::string::npos) {
-      auto ext = specifier.substr(dot);
-      isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
-                   ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
-    }
-  }
-  if (isFilePath) {
-    return tgfx::Typeface::MakeFromPath(specifier);
-  }
-  auto commaPos = specifier.find(',');
-  auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
-  auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
-  return ResolveSystemTypeface(family, style);
-}
-
-/**
  * Extracts the file extension from a path (without the dot) in lowercase, or returns an empty
  * string if none.
  */
