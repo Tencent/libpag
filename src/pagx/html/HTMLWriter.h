@@ -500,6 +500,9 @@ class HTMLWriter {
   // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
                                       const Stroke* stroke, float alpha);
+  // Emits native text spans at GlyphRun positions when generated font data is unavailable.
+  bool writePositionedGlyphTextFallback(HTMLBuilder& out, const Text* text, const Fill* fill,
+                                        const Stroke* stroke, float alpha);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups

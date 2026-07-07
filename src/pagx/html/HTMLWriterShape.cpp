@@ -1566,18 +1566,20 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
           } else {
             style += ";background-repeat:" + repeatX + " " + repeatY;
           }
-          // When any axis tiles, the tile unit on screen must equal (sx*imgW, sy*imgH) CSS
-          // pixels to mirror tgfx's pattern->setMatrix() inverse texture-coordinate transform.
-          bool anyRepeat = (p->tileModeX == TileMode::Repeat) || (p->tileModeY == TileMode::Repeat);
-          if (anyRepeat) {
-            auto size = GetImageNativeSize(p->image);
-            if (size.first > 0 && size.second > 0) {
-              float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
-              float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
-              float tileW = sx * static_cast<float>(size.first);
-              float tileH = sy * static_cast<float>(size.second);
-              style += ";background-size:" + CssFloatToString(tileW) + "px " +
-                       CssFloatToString(tileH) + "px";
+          // scaleMode=none places the transformed image in the parent Layer's coordinate
+          // space. CSS background-position is relative to the element's own top-left, so the
+          // image must be scaled to (sx*imgW, sy*imgH) CSS pixels via background-size before
+          // the same matrix translation is applied. Without background-size, browsers render
+          // the image at its native pixel size and the matrix translation no longer aligns.
+          auto imgSize = GetImageNativeSize(p->image);
+          if (imgSize.first > 0 && imgSize.second > 0) {
+            float sx = std::sqrt(p->matrix.a * p->matrix.a + p->matrix.b * p->matrix.b);
+            float sy = std::sqrt(p->matrix.c * p->matrix.c + p->matrix.d * p->matrix.d);
+            float bgW = sx * static_cast<float>(imgSize.first);
+            float bgH = sy * static_cast<float>(imgSize.second);
+            if (bgW > 0 && bgH > 0) {
+              style += ";background-size:" + CssFloatToString(bgW) + "px " +
+                       CssFloatToString(bgH) + "px";
             }
           }
           // For scaleMode=none the pattern is anchored to the parent Layer's origin (0,0),

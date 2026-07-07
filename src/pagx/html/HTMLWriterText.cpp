@@ -22,6 +22,7 @@
 #include <functional>
 #include <random>
 #include <string>
+#include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/FontSignature.h"
@@ -2131,6 +2132,169 @@ static void AppendUTF8(std::string& out, uint32_t cp) {
     out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
     out += static_cast<char>(0x80 | (cp & 0x3F));
   }
+}
+
+static bool IsGlyphTextClusterContinuation(int32_t ch) {
+  if ((ch >= 0xFE00 && ch <= 0xFE0F) || (ch >= 0xE0100 && ch <= 0xE01EF)) {
+    return true;
+  }
+  if (ch >= 0x1F3FB && ch <= 0x1F3FF) {
+    return true;
+  }
+  return ch == 0x20E3;
+}
+
+static std::vector<std::string> SplitGlyphTextClusters(const std::string& text) {
+  std::vector<std::string> clusters = {};
+  const char* ptr = text.c_str();
+  const char* end = ptr + text.size();
+  while (ptr < end) {
+    const char* start = ptr;
+    int32_t ch = 0;
+    size_t len = SVGDecodeUTF8Char(ptr, static_cast<size_t>(end - ptr), &ch);
+    if (len == 0) {
+      break;
+    }
+    ptr += len;
+    if (ch == 0x200D && !clusters.empty()) {
+      clusters.back().append(start, len);
+      if (ptr < end) {
+        const char* nextStart = ptr;
+        int32_t nextCh = 0;
+        size_t nextLen = SVGDecodeUTF8Char(ptr, static_cast<size_t>(end - ptr), &nextCh);
+        if (nextLen > 0) {
+          clusters.back().append(nextStart, nextLen);
+          ptr += nextLen;
+        }
+      }
+      continue;
+    }
+    if (IsGlyphTextClusterContinuation(ch) && !clusters.empty()) {
+      clusters.back().append(start, len);
+      continue;
+    }
+    clusters.emplace_back(start, len);
+  }
+  return clusters;
+}
+
+bool HTMLWriter::writePositionedGlyphTextFallback(HTMLBuilder& out, const Text* text,
+                                                  const Fill* fill, const Stroke* stroke,
+                                                  float alpha) {
+  if (text == nullptr || text->glyphRuns.empty() || text->text.empty()) {
+    return false;
+  }
+  auto clusters = SplitGlyphTextClusters(text->text);
+  if (clusters.empty()) {
+    return false;
+  }
+
+  HTMLBuilder local(out.level(), 1024);
+  auto renderPos = text->renderPosition();
+  std::string containerStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
+                               "px;top:" + CssFloatToString(renderPos.y) + "px";
+  if (alpha < 1.0f) {
+    containerStyle += ";opacity:" + CssFloatToString(alpha);
+  }
+  local.openTag("div");
+  local.addAttr("style", containerStyle);
+  local.closeTagStart();
+
+  bool emittedGlyph = false;
+  size_t clusterIndex = 0;
+  for (auto* run : text->glyphRuns) {
+    if (run == nullptr) {
+      continue;
+    }
+    float fontSize = run->fontSize > 0.0f ? run->fontSize : text->renderFontSize();
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      if (clusterIndex >= clusters.size()) {
+        break;
+      }
+      uint16_t glyphID = run->glyphs[i];
+      std::string cluster = clusters[clusterIndex++];
+      if (glyphID == 0 || cluster.empty()) {
+        continue;
+      }
+
+      float posX = run->x;
+      float posY = run->y;
+      if (i < run->xOffsets.size()) {
+        posX += run->xOffsets[i];
+      }
+      if (i < run->positions.size()) {
+        posX += run->positions[i].x;
+        posY += run->positions[i].y;
+      }
+
+      std::string style = "position:absolute;left:" + CssFloatToString(posX) +
+                          "px;top:" + CssFloatToString(posY - fontSize) +
+                          "px;line-height:1;white-space:pre";
+      if (!text->fontFamily.empty()) {
+        style += ";font-family:'" + EscapeCssFontFamily(text->fontFamily) + "'";
+      }
+      style += ";font-size:" + CssFloatToString(fontSize) + "px";
+      if (!text->fontStyle.empty()) {
+        auto fontProps = ParseFontStyleToCSS(text->fontStyle);
+        if (fontProps.weight != 400) {
+          style += ";font-weight:" + fontProps.weightString();
+        }
+        if (fontProps.italic) {
+          style += ";font-style:italic";
+        } else if (fontProps.oblique) {
+          style += ";font-style:oblique";
+        }
+      }
+      if (text->fauxBold) {
+        style += ";font-weight:bold";
+      }
+      if (text->fauxItalic) {
+        style += ";font-style:italic";
+      }
+      if (fill && fill->color) {
+        auto ct = fill->color->nodeType();
+        if (ct == NodeType::SolidColor) {
+          auto sc = static_cast<const SolidColor*>(fill->color);
+          style += ";color:" + ColorToRGBA(sc->color, fill->alpha);
+        } else {
+          float fillAlpha = 1.0f;
+          auto css = colorToCSS(fill->color, &fillAlpha);
+          if (!css.empty()) {
+            style += ";background:" + css;
+            style += ";-webkit-background-clip:text;background-clip:text";
+            style += ";-webkit-text-fill-color:transparent";
+          }
+        }
+      }
+      if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+        auto sc = static_cast<const SolidColor*>(stroke->color);
+        bool hasFill = fill && fill->color;
+        auto strokeCss = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
+        if (strokeCss.width > 0.0f) {
+          style += ";-webkit-text-stroke:" + CssFloatToString(strokeCss.width) + "px " +
+                   ColorToRGBA(sc->color, stroke->alpha);
+          if (strokeCss.paintOrderStrokeFill) {
+            style += ";paint-order:stroke fill";
+          }
+        }
+        if (!hasFill) {
+          style += ";-webkit-text-fill-color:transparent";
+        }
+      }
+
+      local.openTag("span");
+      local.addAttr("style", style);
+      local.closeTagWithText(cluster);
+      emittedGlyph = true;
+    }
+  }
+  local.closeTag();
+
+  if (!emittedGlyph) {
+    return false;
+  }
+  out.emitRaw(local.release());
+  return true;
 }
 
 void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text,

@@ -1130,6 +1130,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         isFirstSpan = false;
         continue;
       }
+      if (writePositionedGlyphTextFallback(out, span.text, span.fill, span.stroke, 1.0f)) {
+        prevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+        prevFontSize = spanFontSize;
+        isFirstSpan = false;
+        continue;
+      }
       // Detect single-span horizontal justify-with-\n upfront — when true, we emit
       // a <div> per \n-segment instead of a single <span>...<br>... so each segment
       // becomes its own justify paragraph. CSS treats every <br> as a paragraph
@@ -1297,6 +1303,11 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     }
     if (CanWriteEmbeddedGlyphText(span.text, _ctx)) {
       writeEmbeddedShapeGlyphs(out, span.text, span.fill, span.stroke, 1.0f);
+      rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
+      rtPrevFontSize = rtSpanFontSize;
+      continue;
+    }
+    if (writePositionedGlyphTextFallback(out, span.text, span.fill, span.stroke, 1.0f)) {
       rtPrevTrailingBreaks = HTMLBuilder::CountTrailingBreaks(span.text->text);
       rtPrevFontSize = rtSpanFontSize;
       continue;

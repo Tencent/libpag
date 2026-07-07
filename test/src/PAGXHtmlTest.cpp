@@ -48,11 +48,6 @@ static std::string LoadAndConvert(const std::string& pagxPath,
   return ConvertToHTML(pagx::PAGXImporter::FromFile(pagxPath), options);
 }
 
-static std::string LoadXMLAndConvert(const std::string& xml,
-                                     const pagx::HTMLExportOptions& options = {}) {
-  return ConvertToHTML(pagx::PAGXImporter::FromXML(xml), options);
-}
-
 static std::string FindTagContaining(const std::string& html, const std::string& marker) {
   auto markerPos = html.find(marker);
   if (markerPos == std::string::npos) {
@@ -367,31 +362,8 @@ CLI_TEST(PAGXHtmlTest, GeometryPath) {
 }
 
 CLI_TEST(PAGXHtmlTest, MergePathAvoidsDuplicateFillRuleAttributes) {
-  auto html = LoadXMLAndConvert(R"(
-<pagx width="120" height="120">
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Path data="M10,10 L50,10 L50,50 L10,50 Z M20,20 L40,20 L40,40 L20,40 Z"/>
-    <Fill color="#EC4899" fillRule="evenOdd"/>
-  </Layer>
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="30,80" size="40,40"/>
-    <Ellipse position="50,80" size="40,40"/>
-    <MergePath mode="append"/>
-    <Fill color="#8B5CF6" fillRule="evenOdd"/>
-  </Layer>
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="80,30" size="40,40"/>
-    <Ellipse position="100,30" size="40,40"/>
-    <MergePath mode="intersect"/>
-    <Fill color="#F59E0B" fillRule="evenOdd"/>
-  </Layer>
-  <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="80,80" size="40,40"/>
-    <Ellipse position="100,80" size="40,40"/>
-    <MergePath mode="xor"/>
-    <Fill color="#10B981" fillRule="evenOdd"/>
-  </Layer>
-</pagx>)");
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/unit/merge_path_fill_rule.pagx"));
   ASSERT_FALSE(html.empty());
 
   auto standaloneTag = FindTagContaining(html, "fill=\"#EC4899\"");
@@ -471,6 +443,14 @@ CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_image_pattern.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("background-image"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, ImagePatternScaleNoneEmitsBackgroundSize) {
+  auto html = LoadAndConvert(ProjectPath::Absolute(
+      "resources/pagx_to_html/unit/image_pattern_scale_none_background_size.pagx"));
+  ASSERT_FALSE(html.empty());
+  // 16x16 native image * 0.5 scale = 8px 8px background-size.
+  EXPECT_NE(html.find("background-size:8px 8px"), std::string::npos);
 }
 
 // =============================================================================
@@ -680,6 +660,22 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
   EXPECT_NE(html.find("top:2px"), std::string::npos);
   EXPECT_NE(html.find("line-height:1"), std::string::npos);
   EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, TextBoxGlyphRunEmojiFallbackKeepsPosition) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/text_box_glyph_run_emoji_fallback.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto emojiTag = FindTagContaining(html, "🔗");
+  ASSERT_FALSE(emojiTag.empty());
+  EXPECT_NE(emojiTag.find("position:absolute"), std::string::npos);
+  EXPECT_NE(emojiTag.find("left:30px"), std::string::npos);
+  EXPECT_NE(emojiTag.find("top:4px"), std::string::npos);
+  EXPECT_NE(emojiTag.find("font-size:20px"), std::string::npos);
+  EXPECT_NE(emojiTag.find("color:#176DE6"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, RichTextNewlineGroupEmitsSingleBreak) {
