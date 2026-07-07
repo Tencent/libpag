@@ -22,6 +22,7 @@
 #include "pagx/DataContext.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
+#include "pagx/PAGStateMachineTimeline.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
@@ -31,6 +32,7 @@
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/runtime/Drawable.h"
@@ -105,6 +107,7 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   timelinesByAnimation.clear();
+  stateMachineTimelines.clear();
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
@@ -423,6 +426,45 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
     return nullptr;
   }
   return getTimeline(first->id);
+}
+
+std::vector<std::string> PAGScene::getStateMachineIds() const {
+  std::vector<std::string> ids;
+  if (document == nullptr) {
+    return ids;
+  }
+  for (const auto& node : document->nodes) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      ids.push_back(node->id);
+    }
+  }
+  return ids;
+}
+
+std::shared_ptr<PAGStateMachineTimeline> PAGScene::getStateMachineTimeline(const std::string& id) {
+  if (document == nullptr) {
+    return nullptr;
+  }
+  auto it = stateMachineTimelines.find(id);
+  if (it != stateMachineTimelines.end()) {
+    return it->second;
+  }
+  StateMachine* matched = nullptr;
+  for (const auto& node : document->nodes) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine && node->id == id) {
+      matched = static_cast<StateMachine*>(node.get());
+      break;
+    }
+  }
+  if (matched == nullptr) {
+    return nullptr;
+  }
+  // Construct with a null binding so the timeline resolves the scene's current root binding lazily
+  // at apply time, same as PAGTimeline.
+  auto timeline = std::shared_ptr<PAGStateMachineTimeline>(
+      new PAGStateMachineTimeline(matched, nullptr, document.get(), shared_from_this()));
+  stateMachineTimelines.emplace(id, timeline);
+  return timeline;
 }
 
 std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {

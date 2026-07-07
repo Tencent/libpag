@@ -1,0 +1,160 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
+
+namespace pagx {
+
+struct RuntimeBinding;
+class PAGScene;
+class PAGXDocument;
+class State;
+class StateTransition;
+
+/**
+ * PAGStateMachineTimeline drives a single StateMachine. It holds the runtime input values and a per-
+ * region execution instance (RegionInstance, hidden in the .cpp) that tracks the current state,
+ * crossfade progress, and per-region trigger consumption.
+ *
+ * PAGStateMachineTimeline must not be constructed directly; obtain instances through
+ * PAGScene::getStateMachineTimeline(). Multiple lookups for the same state machine id return the
+ * same PAGStateMachineTimeline instance.
+ *
+ * Lifetime: references content owned by the PAGScene that vended it. Callers may keep the returned
+ * shared_ptr alive past the PAGScene, but once that scene is destroyed the timeline detaches:
+ * advance() and apply() become no-ops.
+ *
+ * Thread safety: PAGStateMachineTimeline is not thread-safe. Callers must serialize access.
+ */
+class PAGStateMachineTimeline {
+ public:
+  ~PAGStateMachineTimeline();
+
+  /**
+   * Returns the state machine id. Returns an empty string once the owning PAGScene is destroyed.
+   */
+  const std::string& getId() const;
+
+  /**
+   * Returns the region names in declaration order.
+   */
+  std::vector<std::string> getRegionIds() const;
+
+  /**
+   * Returns the name of the current state in the given region. Returns an empty string if the
+   * region name is not found or the owning scene has been destroyed.
+   */
+  std::string getCurrentState(const std::string& regionName) const;
+
+  /**
+   * Sets a bool input. The state machine will evaluate conditions referencing this input on the
+   * next advance().
+   */
+  bool setBool(const std::string& name, bool value);
+
+  /**
+   * Sets a number input.
+   */
+  bool setNumber(const std::string& name, float value);
+
+  /**
+   * Fires a trigger input. Sets the fired flag; the state machine will evaluate trigger conditions
+   * on the next advance(). Fire is idempotent: firing the same trigger multiple times before the
+   * next advance() has the same effect as firing it once.
+   */
+  bool fireTrigger(const std::string& name);
+
+  /**
+   * Advances all regions by deltaMicroseconds: advances elapsed time for active animations,
+   * advances crossfade progress, and evaluates state transitions (including chained transitions
+   * within the same frame, capped at 100 iterations).
+   * @param deltaMicroseconds the elapsed time in microseconds.
+   * @return true if any state changed or any crossfade is in progress.
+   */
+  bool advance(int64_t deltaMicroseconds);
+
+  /**
+   * Evaluates the current state's animation output for every region and applies the results to the
+   * content via the runtime binding. During a crossfade, both the outgoing and incoming states are
+   * applied with their respective mix weights.
+   * @param mix blend weight, defaults to 1.0 (full overwrite).
+   */
+  void apply(float mix = 1.0f);
+
+  /**
+   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(mix). Returns
+   * the result of advance(deltaMicroseconds).
+   */
+  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
+
+  /**
+   * Registers a state-change listener. The callback receives the region name and the new state
+   * name whenever a region transitions. Returns an opaque listener id; pass it to
+   * removeStateChangeListener() to unregister.
+   */
+  int addStateChangeListener(
+      std::function<void(const std::string& regionName, const std::string& newState)> callback);
+
+  /**
+   * Removes a previously registered state-change listener. Safe to call with an unknown id.
+   */
+  void removeStateChangeListener(int listenerId);
+
+  struct InputValue {
+    StateMachineInputType type = StateMachineInputType::Bool;
+    bool boolValue = false;
+    float numberValue = 0.0f;
+    bool fired = false;
+  };
+
+ private:
+  explicit PAGStateMachineTimeline(StateMachine* stateMachine, RuntimeBinding* binding,
+                                   PAGXDocument* contextDoc,
+                                   std::weak_ptr<PAGScene> owner);
+
+  std::weak_ptr<PAGScene> owner;
+  StateMachine* stateMachine = nullptr;
+  RuntimeBinding* binding = nullptr;
+  PAGXDocument* contextDoc = nullptr;
+
+  struct RegionInstance;
+  std::vector<RegionInstance> regions;
+  std::vector<InputValue> inputValues;
+
+  int nextListenerId = 1;
+  std::vector<std::pair<int, std::function<void(const std::string&, const std::string&)>>>
+      stateChangeListeners;
+
+  // Region advance helpers.
+  void advanceRegion(int64_t deltaUs);
+  bool tryChangeState(RegionInstance& ri);
+  void changeState(RegionInstance& ri, const StateTransition* t);
+  RegionInstance* findRegion(const std::string& regionName);
+
+  friend class PAGScene;
+  friend class PAGComposition;
+};
+
+}  // namespace pagx

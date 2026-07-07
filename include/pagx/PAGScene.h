@@ -99,6 +99,20 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
   /**
+   * Returns the ids of all top-level state machines in the source document, preserving declaration
+   * order.
+   */
+  std::vector<std::string> getStateMachineIds() const;
+
+  /**
+   * Returns the PAGStateMachineTimeline driving the named top-level state machine. Repeated calls
+   * with the same id return the same instance.
+   * @param id a state machine id from getStateMachineIds(). Returns nullptr if no top-level
+   *           StateMachine matches the given id.
+   */
+  std::shared_ptr<PAGStateMachineTimeline> getStateMachineTimeline(const std::string& id);
+
+  /**
    * Returns the root PAGComposition of this scene.
    */
   std::shared_ptr<PAGComposition> rootComposition() const;
@@ -214,6 +228,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
   std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
+  std::unordered_map<std::string, std::shared_ptr<PAGStateMachineTimeline>>
+      stateMachineTimelines = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
 
@@ -227,6 +243,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   friend class PAGXDocument;
   friend class PAGTimeline;
+  friend class PAGStateMachineTimeline;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

@@ -65,6 +65,7 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -689,11 +690,21 @@ static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument*
       driver->animationId = refAttr.substr(1);
       driver->playing = GetBoolAttribute(current.get(), "playing", true, doc);
       layer->timelines.push_back(std::move(driver));
+    } else if (current->name == "StateMachine") {
+      auto refAttr = GetAttribute(current.get(), "ref");
+      if (refAttr.empty() || refAttr[0] != '@') {
+        ReportError(doc, current.get(),
+                    "Timelines/StateMachine requires 'ref' attribute starting with '@'.");
+        continue;
+      }
+      auto driver = std::make_unique<StateMachineTimeline>();
+      driver->stateMachineId = refAttr.substr(1);
+      layer->timelines.push_back(std::move(driver));
     } else {
       ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'Timelines'."
-                      " Expected: Animation.");
+                      " Expected: Animation or StateMachine.");
     }
   }
 }

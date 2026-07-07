@@ -55,6 +55,7 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -1528,6 +1529,13 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
           xml.openElement("Animation");
           xml.addRequiredAttribute("ref", "@" + anim->animationId);
           xml.addAttribute("playing", anim->playing, true);
+          xml.closeElementSelfClosing();
+          break;
+        }
+        case TimelineType::StateMachine: {
+          auto* sm = static_cast<const StateMachineTimeline*>(timeline.get());
+          xml.openElement("StateMachine");
+          xml.addRequiredAttribute("ref", "@" + sm->stateMachineId);
           xml.closeElementSelfClosing();
           break;
         }

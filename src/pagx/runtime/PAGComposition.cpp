@@ -22,6 +22,7 @@
 #include "pagx/DataBindRuntime.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachineTimeline.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
@@ -30,6 +31,8 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 
@@ -54,12 +57,18 @@ void PAGComposition::advance(int64_t deltaMicroseconds) {
   for (auto& timeline : timelines) {
     timeline->advance(deltaMicroseconds);
   }
+  for (auto& sm : stateMachineTimelines) {
+    if (sm) sm->advance(deltaMicroseconds);
+  }
   PAGLayer::advance(deltaMicroseconds);
 }
 
 void PAGComposition::apply(float mix) {
   for (auto& timeline : timelines) {
     timeline->apply(mix);
+  }
+  for (auto& sm : stateMachineTimelines) {
+    if (sm) sm->apply(mix);
   }
   PAGLayer::apply(mix);
 }
@@ -111,25 +120,39 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
 
 void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
   timelines.clear();
+  stateMachineTimelines.clear();
   if (node == nullptr) {
     return;
   }
   for (const auto& driver : node->timelines) {
-    if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
+    if (driver == nullptr) {
       continue;
     }
-    auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-    auto* animation =
-        document != nullptr ? document->findNode<Animation>(animationDriver->animationId) : nullptr;
-    if (animation == nullptr) {
-      continue;
+    if (driver->timelineType() == TimelineType::Animation) {
+      auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
+      auto* animation = document != nullptr
+                            ? document->findNode<Animation>(animationDriver->animationId)
+                            : nullptr;
+      if (animation == nullptr) {
+        continue;
+      }
+      auto timeline =
+          std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding.get(), document, scene));
+      if (!animationDriver->playing) {
+        timeline->pause();
+      }
+      timelines.push_back(std::move(timeline));
+    } else if (driver->timelineType() == TimelineType::StateMachine) {
+      auto* smDriver = static_cast<const StateMachineTimeline*>(driver.get());
+      auto* sm = document != nullptr ? document->findNode<StateMachine>(smDriver->stateMachineId)
+                                     : nullptr;
+      if (sm == nullptr) {
+        continue;
+      }
+      auto smTimeline = std::shared_ptr<PAGStateMachineTimeline>(
+          new PAGStateMachineTimeline(sm, binding.get(), document, scene));
+      stateMachineTimelines.push_back(std::move(smTimeline));
     }
-    auto timeline =
-        std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding.get(), document, scene));
-    if (!animationDriver->playing) {
-      timeline->pause();
-    }
-    timelines.push_back(std::move(timeline));
   }
 }
 
