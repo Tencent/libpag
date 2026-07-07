@@ -20,8 +20,12 @@
 
 #include <memory>
 #include <string>
-#include "pag/gpu.h"
 #include "pagx/types/Data.h"
+
+namespace pag {
+class BackendTexture;
+enum class ImageOrigin;
+}
 
 namespace tgfx {
 class Image;

@@ -57,7 +57,15 @@ class Drawable {
     return tgfx::GLDevice::Current();
   }
 
-  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* /*context*/) {
+  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {
+    // A surface created from a specific context cannot be used with a different one. Without this
+    // guard, a PAGSurface built via pagx::MakeFrom(tgfx::Surface) would silently hand its surface
+    // to whichever context PAGScene::draw() happens to lock, even if that context belongs to a
+    // different device. Callers that need cross-device rendering should use pagx::Record() with
+    // the matching context instead.
+    if (surface && context != nullptr && surface->getContext() != context) {
+      return nullptr;
+    }
     return surface;
   }
 
