@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGStateMachineTimeline.h"
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include "pagx/PAGScene.h"
@@ -511,6 +512,20 @@ void PAGStateMachineTimeline::apply(float smMix) {
   if (stateMachine == nullptr || owner.expired()) {
     return;
   }
+  auto clamped = std::clamp(smMix, 0.0f, 1.0f);
+  if (clamped <= 0.0f) {
+    return;
+  }
+  // Resolve effective binding: null binding is a top-level timeline that resolves the scene's
+  // current root binding lazily at apply time, same as PAGTimeline.
+  RuntimeBinding* effectiveBinding = binding;
+  if (effectiveBinding == nullptr) {
+    auto scene = owner.lock();
+    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
+  }
+  if (effectiveBinding == nullptr) {
+    return;
+  }
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
       float weight = smMix * CurveMix(ri.transition, f.mixFrom);
@@ -540,7 +555,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
           continue;
         }
         auto* targetNode = contextDoc->findNode(object->target);
-        if (targetNode == nullptr || binding == nullptr) {
+        if (targetNode == nullptr || effectiveBinding == nullptr) {
           continue;
         }
         for (const auto* channel : object->channels) {
@@ -548,7 +563,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
             continue;
           }
           auto value = channel->evaluateAt(sampleUs, anim->frameRate);
-          binding->apply(targetNode, channel->name, value, weight);
+          effectiveBinding->apply(targetNode, channel->name, value, weight);
         }
       }
     }
