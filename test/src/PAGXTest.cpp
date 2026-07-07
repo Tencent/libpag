@@ -13212,4 +13212,447 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
   EXPECT_EQ(smTimeline->getCurrentState("main"), "done");
 }
 
+// =============================================================================
+// VM as data hub — VM values drive SM transitions via bindInput.
+// The VM is the single source of truth; SM never reads external data directly.
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
+  // Game scenario: a character has health (number) and alive/dead state.
+  // VM holds the health value. SM transitions based on thresholds.
+  // When health drops below thresholds, SM moves through hurt→dead states.
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto vm = doc->makeNode<pagx::ViewModel>("charVM");
+  auto hpProp = doc->makeNode<pagx::ViewModelProperty>();
+  hpProp->name = "hp";
+  hpProp->propertyType = pagx::ViewModelPropertyType::Number;
+  hpProp->defaultNumber = 100;
+  vm->properties.push_back(hpProp);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("charSM");
+
+  // Input: hp (number, bound to VM) and deathTrigger (trigger, manual).
+  auto inHP = doc->makeNode<pagx::StateMachineInput>();
+  inHP->name = "hp";
+  inHP->type = pagx::StateMachineInputType::Number;
+  inHP->defaultNumber = 100;
+  sm->inputs.push_back(inHP);
+  auto inDie = doc->makeNode<pagx::StateMachineInput>();
+  inDie->name = "die";
+  inDie->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(inDie);
+
+  // States: alive, hurt, dead. hurt→dead has earlyExit to interrupt immediately.
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "health";
+  region->initialState = "alive";
+  auto sAlive = doc->makeNode<pagx::AnimationState>();
+  sAlive->name = "alive";
+  region->states.push_back(sAlive);
+  auto sHurt = doc->makeNode<pagx::AnimationState>();
+  sHurt->name = "hurt";
+  region->states.push_back(sHurt);
+  auto sDead = doc->makeNode<pagx::AnimationState>();
+  sDead->name = "dead";
+  region->states.push_back(sDead);
+
+  // alive → hurt when hp <= 30
+  auto tHurt = doc->makeNode<pagx::StateTransition>();
+  tHurt->from = "alive";
+  tHurt->to = "hurt";
+  tHurt->duration = 0;
+  auto cHurt = doc->makeNode<pagx::TransitionCondition>();
+  cHurt->inputName = "hp";
+  cHurt->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cHurt->valueNumber = 30;
+  tHurt->conditions.push_back(cHurt);
+  region->transitions.push_back(tHurt);
+
+  // alive → dead when hp <= 0 (override hurt)
+  auto tDead = doc->makeNode<pagx::StateTransition>();
+  tDead->from = "alive";
+  tDead->to = "dead";
+  tDead->duration = 0;
+  auto cDead = doc->makeNode<pagx::TransitionCondition>();
+  cDead->inputName = "hp";
+  cDead->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cDead->valueNumber = 0;
+  tDead->conditions.push_back(cDead);
+  region->transitions.push_back(tDead);
+
+  // hurt → dead when hp <= 0
+  auto tHurtDead = doc->makeNode<pagx::StateTransition>();
+  tHurtDead->from = "hurt";
+  tHurtDead->to = "dead";
+  tHurtDead->duration = 0;
+  auto cHurtDead = doc->makeNode<pagx::TransitionCondition>();
+  cHurtDead->inputName = "hp";
+  cHurtDead->op = pagx::TransitionConditionOp::LessThanOrEqual;
+  cHurtDead->valueNumber = 0;
+  tHurtDead->conditions.push_back(cHurtDead);
+  region->transitions.push_back(tHurtDead);
+
+  // any → dead on die trigger
+  auto tDie = doc->makeNode<pagx::StateTransition>();
+  tDie->from = pagx::AnyStateName;
+  tDie->to = "dead";
+  tDie->duration = 0;
+  auto cDie = doc->makeNode<pagx::TransitionCondition>();
+  cDie->inputName = "die";
+  cDie->op = pagx::TransitionConditionOp::Trigger;
+  tDie->conditions.push_back(cDie);
+  region->transitions.push_back(tDie);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmHP = scene->viewModel()->propertyNumber("hp");
+  ASSERT_TRUE(vmHP != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("charSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  // Bind VM hp to SM hp input. VM is the data hub.
+  ASSERT_TRUE(smTimeline->bindInput("hp", vmHP));
+
+  // Initial state: alive (hp=100)
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("health"), "alive");
+
+  // Health drops to 50, still alive.
+  vmHP->value(50);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("health"), "alive");
+
+  // Health drops to 30, should enter hurt.
+  vmHP->value(30);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("health"), "hurt");
+
+  // Health drops to 0, should enter dead directly from alive (alive→dead priority over alive→hurt).
+  vmHP->value(0);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("health"), "dead");
+}
+
+// Scenario: two independent VM properties feed two SM inputs simultaneously via
+// bindInput. This models a real-world case where a UI receives data from
+// multiple sources that all flow through the VM hub into a single SM.
+PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto vm = doc->makeNode<pagx::ViewModel>("uiVM");
+  auto visibleProp = doc->makeNode<pagx::ViewModelProperty>();
+  visibleProp->name = "visible";
+  visibleProp->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(visibleProp);
+  auto styleProp = doc->makeNode<pagx::ViewModelProperty>();
+  styleProp->name = "styleIndex";
+  styleProp->propertyType = pagx::ViewModelPropertyType::Number;
+  vm->properties.push_back(styleProp);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("uiSM");
+  auto inVis = doc->makeNode<pagx::StateMachineInput>();
+  inVis->name = "visible";
+  inVis->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inVis);
+  auto inStyle = doc->makeNode<pagx::StateMachineInput>();
+  inStyle->name = "styleIndex";
+  inStyle->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(inStyle);
+
+  auto regionV = doc->makeNode<pagx::StateRegion>();
+  regionV->name = "visibility";
+  regionV->initialState = "hidden";
+  auto sHidden = doc->makeNode<pagx::AnimationState>();
+  sHidden->name = "hidden";
+  regionV->states.push_back(sHidden);
+  auto sShown = doc->makeNode<pagx::AnimationState>();
+  sShown->name = "shown";
+  regionV->states.push_back(sShown);
+  auto tShow = doc->makeNode<pagx::StateTransition>();
+  tShow->from = "hidden";
+  tShow->to = "shown";
+  tShow->duration = 0;
+  auto cShow = doc->makeNode<pagx::TransitionCondition>();
+  cShow->inputName = "visible";
+  cShow->op = pagx::TransitionConditionOp::Equal;
+  cShow->valueBool = true;
+  tShow->conditions.push_back(cShow);
+  regionV->transitions.push_back(tShow);
+  sm->regions.push_back(regionV);
+
+  auto regionS = doc->makeNode<pagx::StateRegion>();
+  regionS->name = "style";
+  regionS->initialState = "default";
+  auto sDef = doc->makeNode<pagx::AnimationState>();
+  sDef->name = "default";
+  regionS->states.push_back(sDef);
+  auto sDark = doc->makeNode<pagx::AnimationState>();
+  sDark->name = "dark";
+  regionS->states.push_back(sDark);
+  auto tDark = doc->makeNode<pagx::StateTransition>();
+  tDark->from = "default";
+  tDark->to = "dark";
+  tDark->duration = 0;
+  auto cDark = doc->makeNode<pagx::TransitionCondition>();
+  cDark->inputName = "styleIndex";
+  cDark->op = pagx::TransitionConditionOp::Equal;
+  cDark->valueNumber = 1;
+  tDark->conditions.push_back(cDark);
+  regionS->transitions.push_back(tDark);
+  sm->regions.push_back(regionS);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmVis = scene->viewModel()->propertyBoolean("visible");
+  auto vmStyle = scene->viewModel()->propertyNumber("styleIndex");
+  ASSERT_TRUE(vmVis != nullptr);
+  ASSERT_TRUE(vmStyle != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("uiSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("visible", vmVis));
+  ASSERT_TRUE(smTimeline->bindInput("styleIndex", vmStyle));
+
+  // Initially hidden/default.
+  EXPECT_EQ(smTimeline->getCurrentState("visibility"), "hidden");
+  EXPECT_EQ(smTimeline->getCurrentState("style"), "default");
+
+  // Server pushes data → VM updates → SM responds.
+  vmVis->value(true);
+  vmStyle->value(1);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("visibility"), "shown");
+  EXPECT_EQ(smTimeline->getCurrentState("style"), "dark");
+}
+
+// =============================================================================
+// StateMachine end-to-end animation with baseline output.
+// A button with normal/hover/pressed visual states driven by SM via VM inputs.
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMButtonAnimationBaseline) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  // Layer: a colored button rectangle.
+  auto layer = doc->makeNode<pagx::Layer>("btn");
+  layer->width = 100;
+  layer->height = 40;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->width = 100;
+  rect->height = 40;
+  layer->contents.push_back(rect);
+  auto sf = doc->makeNode<pagx::Fill>();
+  auto sc = doc->makeNode<pagx::SolidColor>();
+  sc->id = "btnColor";
+  sc->color = {0.2f, 0.4f, 1.0f, 1.0f};
+  sf->color = sc;
+  layer->contents.push_back(sf);
+  doc->layers.push_back(layer);
+
+  // Animations for each state: scaleX changes.
+  auto animNormal = doc->makeNode<pagx::Animation>("animNormal");
+  animNormal->duration = 30;
+  animNormal->frameRate = 60.0f;
+  animNormal->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animNormal);
+  auto objN = doc->makeNode<pagx::AnimationObject>();
+  objN->target = "btn";
+  animNormal->objects.push_back(objN);
+  auto chNX = doc->makeNode<pagx::TypedChannel<float>>();
+  chNX->name = "scaleX";
+  chNX->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chNX->keyframes.push_back({30, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objN->channels.push_back(chNX);
+
+  auto animHover = doc->makeNode<pagx::Animation>("animHover");
+  animHover->duration = 15;
+  animHover->frameRate = 60.0f;
+  animHover->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animHover);
+  auto objH = doc->makeNode<pagx::AnimationObject>();
+  objH->target = "btn";
+  animHover->objects.push_back(objH);
+  auto chHX = doc->makeNode<pagx::TypedChannel<float>>();
+  chHX->name = "scaleX";
+  chHX->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chHX->keyframes.push_back({15, 1.15f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objH->channels.push_back(chHX);
+
+  auto animPressed = doc->makeNode<pagx::Animation>("animPressed");
+  animPressed->duration = 10;
+  animPressed->frameRate = 60.0f;
+  animPressed->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animPressed);
+  auto objP = doc->makeNode<pagx::AnimationObject>();
+  objP->target = "btn";
+  animPressed->objects.push_back(objP);
+  auto chPX = doc->makeNode<pagx::TypedChannel<float>>();
+  chPX->name = "scaleX";
+  chPX->keyframes.push_back({0, 0.95f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chPX->keyframes.push_back({10, 0.95f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objP->channels.push_back(chPX);
+
+  // Color changes for states.
+  auto animColorHover = doc->makeNode<pagx::Animation>("animColorHover");
+  animColorHover->duration = 15;
+  animColorHover->frameRate = 60.0f;
+  animColorHover->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animColorHover);
+  auto objCH = doc->makeNode<pagx::AnimationObject>();
+  objCH->target = "btnColor";
+  animColorHover->objects.push_back(objCH);
+  auto chColH = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  chColH->name = "color";
+  chColH->keyframes.push_back(
+      {0, {0.2f, 0.6f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chColH->keyframes.push_back(
+      {15, {0.2f, 0.6f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objCH->channels.push_back(chColH);
+
+  auto animColorPressed = doc->makeNode<pagx::Animation>("animColorPressed");
+  animColorPressed->duration = 10;
+  animColorPressed->frameRate = 60.0f;
+  animColorPressed->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animColorPressed);
+  auto objCP = doc->makeNode<pagx::AnimationObject>();
+  objCP->target = "btnColor";
+  animColorPressed->objects.push_back(objCP);
+  auto chColP = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  chColP->name = "color";
+  chColP->keyframes.push_back(
+      {0, {0.5f, 0.3f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chColP->keyframes.push_back(
+      {10, {0.5f, 0.3f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objCP->channels.push_back(chColP);
+
+  // StateMachine with two regions: visual + color
+  auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  auto inHover = doc->makeNode<pagx::StateMachineInput>();
+  inHover->name = "isHover";
+  inHover->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inHover);
+  auto inPress = doc->makeNode<pagx::StateMachineInput>();
+  inPress->name = "isPressed";
+  inPress->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inPress);
+
+  // Region 1: scale
+  auto rScale = doc->makeNode<pagx::StateRegion>();
+  rScale->name = "scale";
+  rScale->initialState = "normal";
+  auto sN = doc->makeNode<pagx::AnimationState>();
+  sN->name = "normal"; sN->animationId = "animNormal";
+  rScale->states.push_back(sN);
+  auto sH = doc->makeNode<pagx::AnimationState>();
+  sH->name = "hover"; sH->animationId = "animHover";
+  rScale->states.push_back(sH);
+  auto sP = doc->makeNode<pagx::AnimationState>();
+  sP->name = "pressed"; sP->animationId = "animPressed";
+  rScale->states.push_back(sP);
+  auto tNH = doc->makeNode<pagx::StateTransition>();
+  tNH->from = "normal"; tNH->to = "hover"; tNH->duration = 8;
+  auto cNH = doc->makeNode<pagx::TransitionCondition>();
+  cNH->inputName = "isHover"; cNH->op = pagx::TransitionConditionOp::Equal; cNH->valueBool = true;
+  tNH->conditions.push_back(cNH);
+  rScale->transitions.push_back(tNH);
+  auto tHN = doc->makeNode<pagx::StateTransition>();
+  tHN->from = "hover"; tHN->to = "normal"; tHN->duration = 8;
+  auto cHN = doc->makeNode<pagx::TransitionCondition>();
+  cHN->inputName = "isHover"; cHN->op = pagx::TransitionConditionOp::NotEqual; cHN->valueBool = true;
+  tHN->conditions.push_back(cHN);
+  rScale->transitions.push_back(tHN);
+  auto tHP = doc->makeNode<pagx::StateTransition>();
+  tHP->from = "hover"; tHP->to = "pressed"; tHP->duration = 4;
+  auto cHP = doc->makeNode<pagx::TransitionCondition>();
+  cHP->inputName = "isPressed"; cHP->op = pagx::TransitionConditionOp::Equal;
+  cHP->valueBool = true;
+  tHP->conditions.push_back(cHP);
+  rScale->transitions.push_back(tHP);
+  auto tPN = doc->makeNode<pagx::StateTransition>();
+  tPN->from = "pressed"; tPN->to = "normal"; tPN->duration = 6;
+  auto cPN = doc->makeNode<pagx::TransitionCondition>();
+  cPN->inputName = "isPressed"; cPN->op = pagx::TransitionConditionOp::NotEqual;
+  cPN->valueBool = true;
+  tPN->conditions.push_back(cPN);
+  rScale->transitions.push_back(tPN);
+  sm->regions.push_back(rScale);
+
+  // Region 2: color
+  auto rColor = doc->makeNode<pagx::StateRegion>();
+  rColor->name = "color";
+  rColor->initialState = "normal";
+  auto sCN = doc->makeNode<pagx::AnimationState>();
+  sCN->name = "normal";
+  rColor->states.push_back(sCN);
+  auto sCH = doc->makeNode<pagx::AnimationState>();
+  sCH->name = "hover"; sCH->animationId = "animColorHover";
+  rColor->states.push_back(sCH);
+  auto sCP = doc->makeNode<pagx::AnimationState>();
+  sCP->name = "pressed"; sCP->animationId = "animColorPressed";
+  rColor->states.push_back(sCP);
+  auto tcNH = doc->makeNode<pagx::StateTransition>();
+  tcNH->from = "normal"; tcNH->to = "hover"; tcNH->duration = 8;
+  auto ccNH = doc->makeNode<pagx::TransitionCondition>();
+  ccNH->inputName = "isHover"; ccNH->op = pagx::TransitionConditionOp::Equal; ccNH->valueBool = true;
+  tcNH->conditions.push_back(ccNH);
+  rColor->transitions.push_back(tcNH);
+  auto tcHN = doc->makeNode<pagx::StateTransition>();
+  tcHN->from = "hover"; tcHN->to = "normal"; tcHN->duration = 8;
+  auto ccHN = doc->makeNode<pagx::TransitionCondition>();
+  ccHN->inputName = "isHover"; ccHN->op = pagx::TransitionConditionOp::NotEqual;
+  ccHN->valueBool = true;
+  tcHN->conditions.push_back(ccHN);
+  rColor->transitions.push_back(tcHN);
+  auto tcHP = doc->makeNode<pagx::StateTransition>();
+  tcHP->from = "hover"; tcHP->to = "pressed"; tcHP->duration = 4;
+  auto ccHP = doc->makeNode<pagx::TransitionCondition>();
+  ccHP->inputName = "isPressed"; ccHP->op = pagx::TransitionConditionOp::Equal;
+  ccHP->valueBool = true;
+  tcHP->conditions.push_back(ccHP);
+  rColor->transitions.push_back(tcHP);
+  auto tcPN = doc->makeNode<pagx::StateTransition>();
+  tcPN->from = "pressed"; tcPN->to = "normal"; tcPN->duration = 6;
+  auto ccPN = doc->makeNode<pagx::TransitionCondition>();
+  ccPN->inputName = "isPressed"; ccPN->op = pagx::TransitionConditionOp::NotEqual;
+  ccPN->valueBool = true;
+  tcPN->conditions.push_back(ccPN);
+  rColor->transitions.push_back(tcPN);
+  sm->regions.push_back(rColor);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("btnSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  // Baseline 1: normal state (default at start).
+  smTimeline->advanceAndApply(5 * 16667);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/ButtonNormal"));
+
+  // Baseline 2: hover state.
+  smTimeline->setBool("isHover", true);
+  smTimeline->advanceAndApply(10 * 16667);
+  auto surface2 = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface2 != nullptr);
+  ASSERT_TRUE(scene->draw(surface2));
+  EXPECT_TRUE(Baseline::Compare(surface2, "PAGXStateMachine/ButtonHover"));
+
+  // Baseline 3: pressed state.
+  smTimeline->setBool("isPressed", true);
+  smTimeline->advanceAndApply(10 * 16667);
+  auto surface3 = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface3 != nullptr);
+  ASSERT_TRUE(scene->draw(surface3));
+  EXPECT_TRUE(Baseline::Compare(surface3, "PAGXStateMachine/ButtonPressed"));
+}
+
 }  // namespace pag
