@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/Woff2FontGenerator.h"
-#ifdef PAG_USE_WOFF2
 #include <woff2/encode.h>
-#endif
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -1323,7 +1321,6 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
   }
   result.unitsPerEm = writtenUnitsPerEm;
 
-#ifdef PAG_USE_WOFF2
   // Compress to WOFF2. Disable transforms for bitmap fonts because the glyf table transform
   // eliminates empty glyph outlines, producing a zero-length table that OTS rejects.
   woff2::WOFF2Params params;
@@ -1339,7 +1336,6 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId) 
   woff2Buf.resize(woff2Size);
 
   result.woff2Data = std::move(woff2Buf);
-#endif
   result.familyName = familyName;
   return result;
 }
