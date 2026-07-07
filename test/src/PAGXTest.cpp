@@ -12939,14 +12939,7 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   sc->color = {1.0f, 0.0f, 0.0f, 1.0f};
   sf->color = sc;
   layer->contents.push_back(sf);
-
-  auto comp = doc->makeNode<pagx::Composition>("comp");
-  comp->width = 50; comp->height = 50;
-  comp->layers.push_back(layer);
-  auto slot = doc->makeNode<pagx::Layer>("slot");
-  slot->composition = comp;
-  slot->width = 100; slot->height = 100;
-  doc->layers.push_back(slot);
+  doc->layers.push_back(layer);
 
   // animA: alpha = 1.0
   auto animA = doc->makeNode<pagx::Animation>("animA");
@@ -13700,14 +13693,7 @@ PAGX_TEST(PAGXTest, SMHealthBarBaseline) {
   fgColor->color = {0.0f, 0.8f, 0.2f, 1.0f};
   fgFill->color = fgColor;
   layer->contents.push_back(fgFill);
-
-  auto comp = doc->makeNode<pagx::Composition>("comp");
-  comp->width = 200; comp->height = 30;
-  comp->layers.push_back(layer);
-  auto slot = doc->makeNode<pagx::Layer>("slot");
-  slot->composition = comp;
-  slot->width = 200; slot->height = 30;
-  doc->layers.push_back(slot);
+  doc->layers.push_back(layer);
 
   // VM: hp number, drives SM.
   auto vm = doc->makeNode<pagx::ViewModel>("hpVM");
