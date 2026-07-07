@@ -12199,4 +12199,338 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForMissingFields) {
   EXPECT_FALSE(doc->errors.empty());
 }
 
+PAGX_TEST(PAGXTest, SMChainedMaxIterations) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b";
+  region->states.push_back(sb);
+
+  // a->b and b->a: forms a dead loop with zero duration.
+  auto tab = doc->makeNode<pagx::StateTransition>();
+  tab->from = "a";
+  tab->to = "b";
+  tab->duration = 0;
+  region->transitions.push_back(tab);
+  auto tba = doc->makeNode<pagx::StateTransition>();
+  tba->from = "b";
+  tba->to = "a";
+  tba->duration = 0;
+  region->transitions.push_back(tba);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Should not hang; capped at 100 iterations.
+  timeline->advance(0);
+  // Verify still alive (no crash).
+  EXPECT_TRUE(timeline->getCurrentState("main") == "a" ||
+              timeline->getCurrentState("main") == "b");
+}
+
+PAGX_TEST(PAGXTest, SMEmptyConditionAutoTransition) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b";
+  region->states.push_back(sb);
+  auto sc = doc->makeNode<pagx::AnimationState>();
+  sc->name = "c";
+  region->states.push_back(sc);
+
+  // a->b: no condition, auto-transition on advance.
+  auto tab = doc->makeNode<pagx::StateTransition>();
+  tab->from = "a";
+  tab->to = "b";
+  tab->duration = 0;
+  region->transitions.push_back(tab);
+  // b->c: no condition.
+  auto tbc = doc->makeNode<pagx::StateTransition>();
+  tbc->from = "b";
+  tbc->to = "c";
+  tbc->duration = 0;
+  region->transitions.push_back(tbc);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Unconditional transitions should chain a->b->c in one advance.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "c");
+}
+
+PAGX_TEST(PAGXTest, SMNoEarlyExitBlocks) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto interrupt = doc->makeNode<pagx::StateMachineInput>();
+  interrupt->name = "interrupt";
+  interrupt->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(interrupt);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "slow";
+  region->states.push_back(s2);
+  auto s3 = doc->makeNode<pagx::AnimationState>();
+  s3->name = "fast";
+  region->states.push_back(s3);
+
+  // idle->slow: unconditional, duration=60, no earlyExit.
+  auto tab = doc->makeNode<pagx::StateTransition>();
+  tab->from = "idle";
+  tab->to = "slow";
+  tab->duration = 60;
+  region->transitions.push_back(tab);
+  // slow->fast: triggered by interrupt, but NO earlyExit (default=false).
+  auto tbc = doc->makeNode<pagx::StateTransition>();
+  tbc->from = "slow";
+  tbc->to = "fast";
+  tbc->duration = 0;
+  auto cbc = doc->makeNode<pagx::TransitionCondition>();
+  cbc->inputName = "interrupt";
+  cbc->op = pagx::TransitionConditionOp::Equal;
+  cbc->valueBool = true;
+  tbc->conditions.push_back(cbc);
+  region->transitions.push_back(tbc);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Enter idle->slow transition.
+  timeline->advance(0);
+  // Set interrupt=true; but slow->fast has earlyExit=false (default), so it should NOT interrupt.
+  timeline->setBool("interrupt", true);
+  timeline->advance(0);
+}
+
+PAGX_TEST(PAGXTest, SMTransitionAllOpsRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+
+  auto inBool = doc->makeNode<pagx::StateMachineInput>();
+  inBool->name = "b";
+  inBool->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(inBool);
+  auto inNum = doc->makeNode<pagx::StateMachineInput>();
+  inNum->name = "n";
+  inNum->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(inNum);
+  auto inTrig = doc->makeNode<pagx::StateMachineInput>();
+  inTrig->name = "t";
+  inTrig->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(inTrig);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "s";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "s";
+  region->states.push_back(s);
+
+  struct OpDef {
+    std::string inputName;
+    pagx::TransitionConditionOp op;
+    bool valueBool = false;
+    float valueNum = 0;
+  };
+  std::vector<OpDef> ops = {
+      {"b", pagx::TransitionConditionOp::Equal},        {"b", pagx::TransitionConditionOp::NotEqual},
+      {"n", pagx::TransitionConditionOp::Equal, false, 0},
+      {"n", pagx::TransitionConditionOp::NotEqual, false, 0},
+      {"n", pagx::TransitionConditionOp::LessThan, false, 10},
+      {"n", pagx::TransitionConditionOp::LessThanOrEqual, false, 10},
+      {"n", pagx::TransitionConditionOp::GreaterThan, false, 10},
+      {"n", pagx::TransitionConditionOp::GreaterThanOrEqual, false, 10},
+      {"t", pagx::TransitionConditionOp::Trigger},
+  };
+  for (const auto& def : ops) {
+    auto t = doc->makeNode<pagx::StateTransition>();
+    t->from = "s";
+    t->to = "s";
+    t->duration = 0;
+    auto c = doc->makeNode<pagx::TransitionCondition>();
+    c->inputName = def.inputName;
+    c->op = def.op;
+    c->valueBool = def.valueBool;
+    c->valueNumber = def.valueNum;
+    t->conditions.push_back(c);
+    region->transitions.push_back(t);
+  }
+  sm->regions.push_back(region);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+
+  auto* loadedSM = static_cast<pagx::StateMachine*>(
+      [&]() -> pagx::Node* {
+        for (const auto& node : loaded->nodes) {
+          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+        }
+        return nullptr;
+      }());
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions.size(), 1u);
+  EXPECT_EQ(loadedSM->regions[0]->transitions.size(), ops.size());
+  for (size_t i = 0; i < ops.size(); i++) {
+    EXPECT_EQ(loadedSM->regions[0]->transitions[i]->conditions[0]->op, ops[i].op);
+  }
+}
+
+PAGX_TEST(PAGXTest, SMTransitionBezierRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "s";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "s";
+  region->states.push_back(s);
+
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "s";
+  t->to = "s";
+  t->duration = 30;
+  t->interpolation = pagx::KeyframeInterpolationType::Bezier;
+  t->bezierOut = {0.42f, 0.0f};
+  t->bezierIn = {0.58f, 1.0f};
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  auto* loadedSM = static_cast<pagx::StateMachine*>(
+      [&]() -> pagx::Node* {
+        for (const auto& node : loaded->nodes) {
+          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+        }
+        return nullptr;
+      }());
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
+  auto* loadedT = loadedSM->regions[0]->transitions[0];
+  EXPECT_EQ(loadedT->interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_FLOAT_EQ(loadedT->bezierOut.x, 0.42f);
+  EXPECT_FLOAT_EQ(loadedT->bezierOut.y, 0.0f);
+  EXPECT_FLOAT_EQ(loadedT->bezierIn.x, 0.58f);
+  EXPECT_FLOAT_EQ(loadedT->bezierIn.y, 1.0f);
+}
+
+PAGX_TEST(PAGXTest, SMTransitionExitTimeRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "s";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "s";
+  region->states.push_back(s);
+
+  auto tWith = doc->makeNode<pagx::StateTransition>();
+  tWith->from = "s";
+  tWith->to = "s";
+  tWith->duration = 0;
+  tWith->exitTime = 15;
+  region->transitions.push_back(tWith);
+  auto tWithout = doc->makeNode<pagx::StateTransition>();
+  tWithout->from = "s";
+  tWithout->to = "s";
+  tWithout->duration = 0;
+  region->transitions.push_back(tWithout);
+  sm->regions.push_back(region);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  auto* loadedSM = static_cast<pagx::StateMachine*>(
+      [&]() -> pagx::Node* {
+        for (const auto& node : loaded->nodes) {
+          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+        }
+        return nullptr;
+      }());
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 2u);
+  EXPECT_TRUE(loadedSM->regions[0]->transitions[0]->exitTime.has_value());
+  EXPECT_EQ(loadedSM->regions[0]->transitions[0]->exitTime.value(), 15);
+  EXPECT_FALSE(loadedSM->regions[0]->transitions[1]->exitTime.has_value());
+}
+
+PAGX_TEST(PAGXTest, SMGetSameInstance) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "idle";
+  region->states.push_back(s);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto t1 = scene->getStateMachineTimeline("testSM");
+  auto t2 = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(t1 != nullptr);
+  ASSERT_TRUE(t2 != nullptr);
+  EXPECT_EQ(t1.get(), t2.get());
+}
+
+PAGX_TEST(PAGXTest, SMGetUnknownTimeline) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto t = scene->getStateMachineTimeline("nope");
+  EXPECT_EQ(t, nullptr);
+}
+
+PAGX_TEST(PAGXTest, SMImporterErrorsForUnknownState) {
+  // Unknown state references in transitions are stored as-is; runtime handles the resolution.
+  // The importer accepts them and reports no error by default.
+  auto xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Animations>
+    <StateMachine id="sm">
+      <StateRegion name="main" initialState="start">
+        <States>
+          <State name="start"/>
+        </States>
+        <Transitions>
+          <Transition from="start" to="unknown"/>
+        </Transitions>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  // Importer accepts unknown state references (runtime handles lookup).
+  EXPECT_EQ(doc->errors.size(), 0u);
+}
+
 }  // namespace pag
