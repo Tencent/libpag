@@ -11435,4 +11435,411 @@ PAGX_TEST(PAGXTest, SMMultiRegion) {
   EXPECT_EQ(timeline->getCurrentState("B"), "done");
 }
 
+PAGX_TEST(PAGXTest, SMTriggerConsumedOnce) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "fire";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateA = doc->makeNode<pagx::AnimationState>();
+  stateA->name = "idle";
+  region->states.push_back(stateA);
+  auto stateB = doc->makeNode<pagx::AnimationState>();
+  stateB->name = "active";
+  region->states.push_back(stateB);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "fire";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Fire trigger and advance; should transition once.
+  ASSERT_TRUE(timeline->fireTrigger("fire"));
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+}
+
+PAGX_TEST(PAGXTest, SMTriggerClearedAfterAdvance) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "fire";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "idle";
+  region->states.push_back(s);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "idle";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "fire";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  timeline->fireTrigger("fire");
+  timeline->advanceAndApply(0);
+  // Trigger should be consumed and cleared after advanceAndApply.
+  // Fire again — idempotent (already true before advance).
+  timeline->fireTrigger("fire");
+  timeline->advance(0);
+  // Should trigger again since first was cleared.
+}
+
+PAGX_TEST(PAGXTest, SMTriggerPerRegion) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+
+  auto regionA = doc->makeNode<pagx::StateRegion>();
+  regionA->name = "A";
+  regionA->initialState = "idle";
+  auto a1 = doc->makeNode<pagx::AnimationState>();
+  a1->name = "idle";
+  regionA->states.push_back(a1);
+  auto a2 = doc->makeNode<pagx::AnimationState>();
+  a2->name = "done";
+  regionA->states.push_back(a2);
+  auto tA = doc->makeNode<pagx::StateTransition>();
+  tA->from = "idle";
+  tA->to = "done";
+  tA->duration = 0;
+  auto cA = doc->makeNode<pagx::TransitionCondition>();
+  cA->inputName = "go";
+  cA->op = pagx::TransitionConditionOp::Trigger;
+  tA->conditions.push_back(cA);
+  regionA->transitions.push_back(tA);
+  sm->regions.push_back(regionA);
+
+  auto regionB = doc->makeNode<pagx::StateRegion>();
+  regionB->name = "B";
+  regionB->initialState = "idle";
+  auto b1 = doc->makeNode<pagx::AnimationState>();
+  b1->name = "idle";
+  regionB->states.push_back(b1);
+  auto b2 = doc->makeNode<pagx::AnimationState>();
+  b2->name = "done";
+  regionB->states.push_back(b2);
+  auto tB = doc->makeNode<pagx::StateTransition>();
+  tB->from = "idle";
+  tB->to = "done";
+  tB->duration = 0;
+  auto cB = doc->makeNode<pagx::TransitionCondition>();
+  cB->inputName = "go";
+  cB->op = pagx::TransitionConditionOp::Trigger;
+  tB->conditions.push_back(cB);
+  regionB->transitions.push_back(tB);
+  sm->regions.push_back(regionB);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  timeline->fireTrigger("go");
+  timeline->advance(0);
+  // Both regions should have consumed the trigger independently.
+  EXPECT_EQ(timeline->getCurrentState("A"), "done");
+  EXPECT_EQ(timeline->getCurrentState("B"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMTriggerFireWithoutAdvanceKeeps) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Fire without advancing; trigger should be retained.
+  timeline->fireTrigger("go");
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // Advance now; trigger should be consumed.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMExitTimeGate) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60.0f;
+  anim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(anim);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  s1->animationId = "anim";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  t->exitTime = 30;  // 30-frame gate
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Advance to frame 15 (833334us at 60fps); exitTime not reached.
+  timeline->advance(833334 / 2);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // Advance past frame 30; should transition.
+  timeline->advance(833334 / 2);
+  EXPECT_EQ(timeline->getCurrentState("main"), "done");
+}
+
+PAGX_TEST(PAGXTest, SMEarlyExitInterrupts) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto interrupt = doc->makeNode<pagx::StateMachineInput>();
+  interrupt->name = "interrupt";
+  interrupt->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(interrupt);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "idle";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "slow";
+  region->states.push_back(sb);
+  auto sc = doc->makeNode<pagx::AnimationState>();
+  sc->name = "fast";
+  region->states.push_back(sc);
+
+  // idle -> slow: unconditional, long transition (60 frames), no early exit.
+  auto tab = doc->makeNode<pagx::StateTransition>();
+  tab->from = "idle";
+  tab->to = "slow";
+  tab->duration = 60;
+  region->transitions.push_back(tab);
+
+  // slow -> fast: triggered by interrupt, zero duration, earlyExit=true.
+  auto tbc = doc->makeNode<pagx::StateTransition>();
+  tbc->from = "slow";
+  tbc->to = "fast";
+  tbc->duration = 0;
+  tbc->enableEarlyExit = true;
+  auto cbc = doc->makeNode<pagx::TransitionCondition>();
+  cbc->inputName = "interrupt";
+  cbc->op = pagx::TransitionConditionOp::Equal;
+  cbc->valueBool = true;
+  tbc->conditions.push_back(cbc);
+  region->transitions.push_back(tbc);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Advance: idle->slow starts (duration=60). currentState becomes "slow" with mix<1.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "slow");
+
+  // Without interrupt set, slow stays even though transition is in progress.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "slow");
+
+  // Set interrupt=true, advance: slow->fast with earlyExit interrupts idle->slow transition.
+  ASSERT_TRUE(timeline->setBool("interrupt", true));
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "fast");
+}
+
+PAGX_TEST(PAGXTest, SMChainedTransition) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b";
+  region->states.push_back(sb);
+  auto sc = doc->makeNode<pagx::AnimationState>();
+  sc->name = "c";
+  region->states.push_back(sc);
+
+  // a -> b: unconditional, duration zero
+  auto tab = doc->makeNode<pagx::StateTransition>();
+  tab->from = "a";
+  tab->to = "b";
+  tab->duration = 0;
+  region->transitions.push_back(tab);
+  // b -> c: unconditional, duration zero
+  auto tbc = doc->makeNode<pagx::StateTransition>();
+  tbc->from = "b";
+  tbc->to = "c";
+  tbc->duration = 0;
+  region->transitions.push_back(tbc);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // Single advance should chain a -> b -> c.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "c");
+}
+
+PAGX_TEST(PAGXTest, SMAnyStateTransition) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "reset";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b";
+  region->states.push_back(sb);
+
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = pagx::AnyStateName;
+  t->to = "a";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "reset";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  // First move to b via setState (simulate being in b).
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "a");
+  // Now fire reset trigger; from="any" should match and go back to a.
+  timeline->fireTrigger("reset");
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "a");
+}
+
+PAGX_TEST(PAGXTest, SMStateChangeListener) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "active";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  auto timeline = scene->getStateMachineTimeline("testSM");
+
+  std::string receivedRegion;
+  std::string receivedState;
+  int lid = timeline->addStateChangeListener(
+      [&](const std::string& rn, const std::string& sn) {
+        receivedRegion = rn;
+        receivedState = sn;
+      });
+
+  timeline->setBool("go", true);
+  timeline->advance(0);
+  EXPECT_EQ(receivedRegion, "main");
+  EXPECT_EQ(receivedState, "active");
+
+  timeline->removeStateChangeListener(lid);
+  receivedRegion.clear();
+  timeline->setBool("go", false);
+  // No more transitions after removal.
+  timeline->advance(0);
+  EXPECT_TRUE(receivedRegion.empty());
+}
+
 }  // namespace pag
