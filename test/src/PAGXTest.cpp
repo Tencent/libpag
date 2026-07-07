@@ -13138,6 +13138,14 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   region->transitions.push_back(tDimVis);
   sm->regions.push_back(region);
 
+  // ViewModel: "dim" bool property drives the SM input.
+  auto vm = doc->makeNode<pagx::ViewModel>("cardVM");
+  auto dimProp = doc->makeNode<pagx::ViewModelProperty>();
+  dimProp->name = "dim";
+  dimProp->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(dimProp);
+  doc->viewModel = vm;
+
   // Slot layer referencing the Composition, with SM attached via Timelines.
   auto slot = doc->makeNode<pagx::Layer>("slot");
   slot->composition = comp;
@@ -13151,26 +13159,28 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
-  // Baseline 1: visible state (alpha=1.0, full red). Scene auto-drives the nested SM.
+  // Get the nested SM instance and bind VM "dim" property to SM "dim" input.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_FALSE(rootChildren.empty());
+  ASSERT_EQ(rootChildren[0]->layerType(), pagx::LayerType::Composition);
+  auto* slotComp = static_cast<pagx::PAGComposition*>(rootChildren[0].get());
+  ASSERT_FALSE(slotComp->stateMachineTimelines.empty());
+  auto nestedSM = slotComp->stateMachineTimelines[0];
+  ASSERT_TRUE(nestedSM != nullptr);
+
+  auto vmDim = scene->viewModel()->propertyBoolean("dim");
+  ASSERT_TRUE(vmDim != nullptr);
+  ASSERT_TRUE(nestedSM->bindInput("dim", vmDim));
+
+  // Baseline 1: visible state (alpha=1.0, full red). VM dim=false.
   scene->advanceAndApply(5 * 16667);
   auto surface1 = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface1 != nullptr);
   ASSERT_TRUE(scene->draw(surface1));
   EXPECT_TRUE(Baseline::Compare(surface1, "PAGXStateMachine/NestedVisible"));
 
-  // Baseline 2: dim state. Need to set input on the nested SM.
-  // The nested SM is in the slot's composition's stateMachineTimelines.
-  // Access it through rootComposition → children → composition.
-  auto& rootChildren = scene->rootComposition()->children;
-  ASSERT_FALSE(rootChildren.empty());
-  auto slotComp = rootChildren[0];
-  ASSERT_TRUE(slotComp != nullptr);
-  ASSERT_EQ(slotComp->layerType(), pagx::LayerType::Composition);
-  auto* slotComposition = static_cast<pagx::PAGComposition*>(slotComp.get());
-  ASSERT_FALSE(slotComposition->stateMachineTimelines.empty());
-  auto nestedSM = slotComposition->stateMachineTimelines[0];
-  ASSERT_TRUE(nestedSM != nullptr);
-  nestedSM->setBool("dim", true);
+  // Baseline 2: dim state. Set VM dim=true → SM input auto-syncs → transition.
+  vmDim->value(true);
   scene->advanceAndApply(10 * 16667);
   auto surface2 = pagx::PAGSurface::MakeOffscreen(100, 100);
   ASSERT_TRUE(surface2 != nullptr);
