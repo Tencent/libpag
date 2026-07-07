@@ -12913,6 +12913,136 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForMissingRefAt) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_FALSE(doc->errors.empty());
+  // Importer accepts unknown state references (runtime handles lookup).
+  EXPECT_EQ(doc->errors.size(), 0u);
+}
+
+// =============================================================================
+// StateMachine screenshot (baseline) tests
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMCrossfade) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto layer = doc->makeNode<pagx::Layer>("target");
+  layer->width = 100;
+  layer->height = 100;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->width = 100;
+  rect->height = 100;
+  layer->contents.push_back(rect);
+  auto sf = doc->makeNode<pagx::Fill>();
+  auto sc = doc->makeNode<pagx::SolidColor>();
+  sc->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  sf->color = sc;
+  layer->contents.push_back(sf);
+  doc->layers.push_back(layer);
+
+  // animA: alpha = 1.0
+  auto animA = doc->makeNode<pagx::Animation>("animA");
+  animA->duration = 30; animA->frameRate = 60.0f; animA->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animA);
+  auto objA = doc->makeNode<pagx::AnimationObject>();
+  objA->target = "target";
+  animA->objects.push_back(objA);
+  auto chA = doc->makeNode<pagx::TypedChannel<float>>();
+  chA->name = "alpha";
+  chA->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chA->keyframes.push_back({30, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objA->channels.push_back(chA);
+
+  // animB: alpha = 0.2
+  auto animB = doc->makeNode<pagx::Animation>("animB");
+  animB->duration = 30; animB->frameRate = 60.0f; animB->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animB);
+  auto objB = doc->makeNode<pagx::AnimationObject>();
+  objB->target = "target";
+  animB->objects.push_back(objB);
+  auto chB = doc->makeNode<pagx::TypedChannel<float>>();
+  chB->name = "alpha";
+  chB->keyframes.push_back({0, 0.2f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chB->keyframes.push_back({30, 0.2f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objB->channels.push_back(chB);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
+  auto in = doc->makeNode<pagx::StateMachineInput>();
+  in->name = "go"; in->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(in);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main"; region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a"; sa->animationId = "animA";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b"; sb->animationId = "animB";
+  region->states.push_back(sb);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "a"; t->to = "b"; t->duration = 10;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go"; c->op = pagx::TransitionConditionOp::Equal; c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("crossSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  smTimeline->setBool("go", true);
+  smTimeline->advanceAndApply(5 * 16667);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/Crossfade"));
+}
+
+PAGX_TEST(PAGXTest, SMStableStateOutput) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("target");
+  layer->width = 100; layer->height = 100;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->width = 100; rect->height = 100;
+  layer->contents.push_back(rect);
+  auto sf = doc->makeNode<pagx::Fill>();
+  auto sc = doc->makeNode<pagx::SolidColor>();
+  sc->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  sf->color = sc;
+  layer->contents.push_back(sf);
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60; anim->frameRate = 60.0f; anim->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(anim);
+  auto obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "target";
+  anim->objects.push_back(obj);
+  auto ch = doc->makeNode<pagx::TypedChannel<float>>();
+  ch->name = "alpha";
+  ch->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  ch->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  obj->channels.push_back(ch);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("stableSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main"; region->initialState = "fade";
+  auto s = doc->makeNode<pagx::AnimationState>();
+  s->name = "fade"; s->animationId = "anim";
+  region->states.push_back(s);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("stableSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  smTimeline->advanceAndApply(30 * 16667);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/StableState"));
 }
 
 }  // namespace pag
