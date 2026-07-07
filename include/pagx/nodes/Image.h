@@ -25,7 +25,6 @@
 
 namespace pagx {
 
-class LayerBuilder;
 class PAGImage;
 
 /**

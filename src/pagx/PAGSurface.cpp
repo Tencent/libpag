@@ -58,10 +58,6 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget&
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
 }
 
-PAGSurface::PAGSurface(std::shared_ptr<tgfx::Surface> surface)
-    : drawable(Drawable::MakeFrom(std::move(surface))) {
-}
-
 PAGSurface::~PAGSurface() = default;
 
 int PAGSurface::width() const {
@@ -98,10 +94,7 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
 }
 
 std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>& surface) {
-  if (surface == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(surface));
+  return PAGSurface::MakeFrom(Drawable::MakeFrom(surface));
 }
 
 }  // namespace pagx

@@ -23,6 +23,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 namespace pagx {
