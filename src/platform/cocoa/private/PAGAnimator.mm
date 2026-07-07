@@ -111,16 +111,9 @@ class AnimatorListener : public pag::PAGAnimator::Listener {
     [updater release];
   }
 
-  void onAnimationWillUpdate(PAGAnimator*) override {
-    // [updaterTable.anyObject retain] is non-atomic and may lead to a wild pointer issue
-    // if the object is released after obtaining anyObject.
-    // Therefore, it is necessary to increment the reference count in the main thread before using.
-    [updaterTable.anyObject retain];
-  };
-
   void onAnimationUpdate(pag::PAGAnimator* animator) override {
     @autoreleasepool {
-      auto updater = (id<PAGAnimatorUpdater>)updaterTable.anyObject;
+      auto updater = (id<PAGAnimatorUpdater>)[updaterTable.anyObject retain];
       if (updater == nil) {
         return;
       }
@@ -133,9 +126,7 @@ class AnimatorListener : public pag::PAGAnimator::Listener {
         }
       }
       [copiedListeners release];
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [updaterTable.anyObject release];
-      });
+      [updater release];
     }
   };
 
