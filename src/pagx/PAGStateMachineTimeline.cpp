@@ -28,6 +28,9 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
+#include "pagx/PAGViewModelValue.h"
+#include "pagx/PAGViewModelValueBoolean.h"
+#include "pagx/PAGViewModelValueNumber.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
@@ -625,6 +628,62 @@ void PAGStateMachineTimeline::removeStateChangeListener(int listenerId) {
       break;
     }
   }
+}
+
+bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
+                                        const std::shared_ptr<PAGViewModelValue>& vmValue) {
+  if (!vmValue || !stateMachine) {
+    return false;
+  }
+  int idx = -1;
+  for (size_t i = 0; i < stateMachine->inputs.size(); i++) {
+    if (stateMachine->inputs[i] && stateMachine->inputs[i]->name == inputName) {
+      idx = static_cast<int>(i);
+      break;
+    }
+  }
+  if (idx < 0) {
+    return false;
+  }
+  auto rawThis = this;
+  auto inputType = inputValues[idx].type;
+
+  if (inputType == StateMachineInputType::Bool) {
+    auto boolVal = std::dynamic_pointer_cast<PAGViewModelValueBoolean>(vmValue);
+    if (!boolVal) {
+      return false;
+    }
+    auto handle = boolVal->addObserver([rawThis, inputName, boolVal]() {
+      rawThis->setBool(inputName, boolVal->value());
+    });
+    inputBindings.push_back(std::move(handle));
+    return true;
+  }
+  if (inputType == StateMachineInputType::Number) {
+    auto numVal = std::dynamic_pointer_cast<PAGViewModelValueNumber>(vmValue);
+    if (!numVal) {
+      return false;
+    }
+    auto handle = numVal->addObserver([rawThis, inputName, numVal]() {
+      rawThis->setNumber(inputName, numVal->value());
+    });
+    inputBindings.push_back(std::move(handle));
+    return true;
+  }
+  if (inputType == StateMachineInputType::Trigger) {
+    auto boolVal = std::dynamic_pointer_cast<PAGViewModelValueBoolean>(vmValue);
+    if (!boolVal) {
+      return false;
+    }
+    auto handle = boolVal->addObserver([rawThis, inputName, boolVal]() {
+      if (boolVal->value()) {
+        rawThis->fireTrigger(inputName);
+      }
+    });
+    inputBindings.push_back(std::move(handle));
+    return true;
+  }
+  return false;
 }
 
 }  // namespace pagx

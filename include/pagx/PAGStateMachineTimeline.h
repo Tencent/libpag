@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/ObserverHandle.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateMachineInput.h"
 
@@ -30,6 +31,7 @@ namespace pagx {
 struct RuntimeBinding;
 class PAGScene;
 class PAGXDocument;
+class PAGViewModelValue;
 class State;
 class StateTransition;
 
@@ -122,6 +124,19 @@ class PAGStateMachineTimeline {
    */
   void removeStateChangeListener(int listenerId);
 
+  /**
+   * Binds a ViewModel property to a StateMachine input, so that changes to the VM value are
+   * automatically synchronized to the SM input. The VM property type must be compatible with the
+   * SM input type: Boolean for Bool inputs, Number for Number inputs, Boolean for Trigger inputs
+   * (where a true transition fires the trigger).
+   * @param inputName the name of the SM input declared in <Inputs>.
+   * @param vmValue the ViewModel property value to bind. The binding holds a weak reference; the
+   *        caller must keep the VM alive.
+   * @return true if the binding was established successfully.
+   */
+  bool bindInput(const std::string& inputName,
+                 const std::shared_ptr<PAGViewModelValue>& vmValue);
+
   struct InputValue {
     StateMachineInputType type = StateMachineInputType::Bool;
     bool boolValue = false;
@@ -146,6 +161,9 @@ class PAGStateMachineTimeline {
   int nextListenerId = 1;
   std::vector<std::pair<int, std::function<void(const std::string&, const std::string&)>>>
       stateChangeListeners;
+
+  // VM→SM input bindings. Each entry holds an ObserverHandle that detaches on destruction.
+  std::vector<ObserverHandle> inputBindings;
 
   // Region advance helpers.
   void advanceRegion(int64_t deltaUs);

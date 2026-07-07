@@ -110,6 +110,12 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
+#include "pagx/PAGViewModel.h"
+#include "pagx/PAGViewModelValue.h"
+#include "pagx/PAGViewModelValueBoolean.h"
+#include "pagx/PAGViewModelValueNumber.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -12913,8 +12919,6 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForMissingRefAt) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_FALSE(doc->errors.empty());
-  // Importer accepts unknown state references (runtime handles lookup).
-  EXPECT_EQ(doc->errors.size(), 0u);
 }
 
 // =============================================================================
@@ -13043,6 +13047,169 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   ASSERT_TRUE(surface != nullptr);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/StableState"));
+}
+
+PAGX_TEST(PAGXTest, SMVMBoolBinding) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  // Create a VM schema with a bool property.
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "go";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "active";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmInstance = scene->viewModel();
+  ASSERT_TRUE(vmInstance != nullptr);
+  auto vmBool = vmInstance->propertyBoolean("go");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("go", vmBool));
+
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "idle");
+  // Setting VM value to true should automatically set the SM input.
+  vmBool->value(true);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "active");
+}
+
+PAGX_TEST(PAGXTest, SMVMNumberBinding) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "score";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "score";
+  input->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "low";
+  auto slow = doc->makeNode<pagx::AnimationState>();
+  slow->name = "low";
+  region->states.push_back(slow);
+  auto shigh = doc->makeNode<pagx::AnimationState>();
+  shigh->name = "high";
+  region->states.push_back(shigh);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "low";
+  t->to = "high";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "score";
+  c->op = pagx::TransitionConditionOp::GreaterThan;
+  c->valueNumber = 50;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmNum = scene->viewModel()->propertyNumber("score");
+  ASSERT_TRUE(vmNum != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("score", vmNum));
+
+  // VM number <= 50: no transition.
+  vmNum->value(30);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
+  // VM number > 50: transition.
+  vmNum->value(60);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "high");
+}
+
+PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "fire";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "fire";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "fire";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto vmBool = scene->viewModel()->propertyBoolean("fire");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("fire", vmBool));
+
+  // VM bool → true acts as trigger.
+  vmBool->value(true);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "done");
 }
 
 }  // namespace pag
