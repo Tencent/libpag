@@ -1,7 +1,7 @@
 <!-- index.wxml -->
 <view class="container">
   <view>
-    <canvas class="zebra" type="webgl" id="pag" style="width: 300px; height:300px;"></canvas>
+    <canvas class="zebra" type="webgl" id="pag" style="width: 690rpx; height:900rpx;"></canvas>
   </view>
   <view hidden="{{pagLoaded}}">
     <button class="btn-load" size="default" type="default" bindtap="load">加载测试PAG</button>
