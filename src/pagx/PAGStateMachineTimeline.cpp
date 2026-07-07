@@ -594,7 +594,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
         continue;
       }
       auto* targetNode = contextDoc->findNode(object->target);
-      if (targetNode == nullptr || binding == nullptr) {
+      if (targetNode == nullptr || effectiveBinding == nullptr) {
         continue;
       }
       for (const auto* channel : object->channels) {
@@ -602,7 +602,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
           continue;
         }
         auto value = channel->evaluateAt(sampleUs, anim->frameRate);
-        binding->apply(targetNode, channel->name, value, weight);
+        effectiveBinding->apply(targetNode, channel->name, value, weight);
       }
     }
   }
