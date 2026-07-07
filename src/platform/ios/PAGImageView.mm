@@ -237,8 +237,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     if (pagComposition) {
       pagDecoder = pag::PAGDecoder::MakeFrom(pagComposition, self.maxFrameRate, scaleFactor);
     } else if (filePath) {
-      auto file = pag::PAGFile::Load([filePath UTF8String]);
-      pagDecoder = pag::PAGDecoder::MakeFrom(file, self.maxFrameRate, scaleFactor);
+      PAGFile* pagFile = [PAGFile Load:filePath];
+      if (pagFile != nil) {
+        auto layer = [[pagFile impl] pagLayer];
+        auto composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+        pagDecoder = pag::PAGDecoder::MakeFrom(composition, self.maxFrameRate, scaleFactor);
+      }
     }
     if (pagDecoder) {
       width = pagDecoder->width();
@@ -594,9 +598,14 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     filePath = nil;
   }
   filePath = [path retain];
-  auto file = pag::PAGFile::Load([path UTF8String]);
-  [self setCompositionInternal:file maxFrameRate:maxFrameRate];
-  return file != nullptr;
+  PAGFile* pagFile = [PAGFile Load:path];
+  std::shared_ptr<pag::PAGComposition> composition = nullptr;
+  if (pagFile != nil) {
+    auto layer = [[pagFile impl] pagLayer];
+    composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+  }
+  [self setCompositionInternal:composition maxFrameRate:maxFrameRate];
+  return composition != nullptr;
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
