@@ -174,7 +174,6 @@ class PAGStateMachineTimeline {
   void advanceRegion(int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
-  RegionInstance* findRegion(const std::string& regionName);
   void applyAnimationState(const State* state, int64_t elapsedUs, float weight,
                            RuntimeBinding* effectiveBinding);
 

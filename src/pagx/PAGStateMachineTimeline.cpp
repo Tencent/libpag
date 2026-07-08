@@ -183,16 +183,6 @@ std::string PAGStateMachineTimeline::getCurrentState(const std::string& regionNa
   return {};
 }
 
-PAGStateMachineTimeline::RegionInstance* PAGStateMachineTimeline::findRegion(
-    const std::string& regionName) {
-  for (auto& ri : regions) {
-    if (ri.region != nullptr && ri.region->name == regionName) {
-      return &ri;
-    }
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // Input setters
 // =============================================================================
