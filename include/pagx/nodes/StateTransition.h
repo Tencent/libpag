@@ -77,7 +77,8 @@ class StateTransition : public Node {
   /**
    * Optional exit-time gate, in frames. When set, the transition is only allowed after the source
    * state's animation has advanced past this frame, even if all conditions already hold. nullopt
-   * means no exit-time gate.
+   * means no exit-time gate. For non-Once (looping) animations, the exit frame is aligned modulo
+   * the animation duration so that it falls within the current loop iteration.
    */
   std::optional<Frame> exitTime = std::nullopt;
 
