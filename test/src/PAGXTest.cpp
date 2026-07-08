@@ -13259,7 +13259,7 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("health"), "hurt");
 
-  // Health drops to 0, should enter dead directly from alive (alive→dead priority over alive→hurt).
+  // Health drops to 0, transitions from hurt to dead.
   vmHP->value(0);
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("health"), "dead");
