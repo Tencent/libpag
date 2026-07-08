@@ -13171,7 +13171,7 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
   inDie->type = pagx::StateMachineInputType::Trigger;
   sm->inputs.push_back(inDie);
 
-  // States: alive, hurt, dead. hurt→dead has earlyExit to interrupt immediately.
+  // States: alive, hurt, dead.
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "health";
   region->initialState = "alive";
