@@ -284,6 +284,28 @@ export interface PagxTextDynamic {
   segments: PagxTextSegment[];
 }
 
+// One distinct glyph/sprite a dynamic SVG `<use>` / `<image>` referenced during
+// the timeline. A JS-driven "scramble" swaps a slot's `href` between several
+// symbols over time; since neither CSS nor the PAGX SVG importer can animate a
+// `href`, each distinct reference is materialised as its own overlay `<use>`
+// layer whose opacity window shows it only on the frames it was selected. This
+// is the discrete analogue of `PagxTextSegment` for content-selecting hrefs.
+export interface PagxUseSegment {
+  // The `href` / `xlink:href` value (typically `#symbolId`) this overlay shows.
+  href: string;
+  // Opacity keyframes over the *whole* global window (offsets 0..1): 1 on the
+  // samples this href was selected, 0 everywhere else. Exactly one overlay is
+  // visible at any sample, so the glyphs hard-switch instead of cross-fading.
+  stops: PagxAnimStop[];
+}
+
+// An SVG `<use>` / `<image>` whose `href` was swapped across the sampled
+// timeline, with one segment per distinct referenced glyph.
+export interface PagxUseDynamic {
+  el: HTMLElement;
+  segments: PagxUseSegment[];
+}
+
 // ===== Pure helpers (module scope, exported, unit-tested) =====
 
 // transform → translate-only normalisation. The runtime can only play
@@ -1712,6 +1734,7 @@ export function pagxSampleTimeline(
   direction: string,
   delayMs: number,
   textDynamics?: PagxTextDynamic[],
+  useDynamics?: PagxUseDynamic[],
 ): void {
   const candidates = pagxCandidateElements(maxElements);
   const series = new Map<HTMLElement, Array<Record<string, string | null>>>();
@@ -1723,6 +1746,13 @@ export function pagxSampleTimeline(
   const wantText = Array.isArray(textDynamics);
   const textLeaf = wantText
     ? new Map<HTMLElement, { texts: string[]; fontSizes: string[]; colors: string[]; fills: string[]; opacities: number[] }>()
+    : null;
+  // Parallel per-sample record of the `href` each SVG `<use>` / `<image>`
+  // referenced, so a timeline that swaps which symbol a slot points at (a glyph
+  // scramble / sprite swap) can be rebuilt as alternating overlay layers.
+  const wantUse = Array.isArray(useDynamics);
+  const useLeaf = wantUse
+    ? new Map<HTMLElement, { hrefs: string[]; opacities: number[] }>()
     : null;
   // Guard sampleCount === 1 so the offset math (i / (sampleCount - 1)) does not divide by zero.
   // Callers normally pass >= 2, but the function is exported and unit-tested as a pure helper.
@@ -1804,6 +1834,32 @@ export function pagxSampleTimeline(
         rec.fills.push((cs as unknown as { fill?: string }).fill || '');
         rec.opacities.push(parseFloat(cs.opacity) || 0);
       }
+      // SVG `<use>` / `<image>` content selector: record the referenced glyph so
+      // a scripted `href` swap can be reconstructed as overlay layers below.
+      // Only these two SVG elements carry a content-selecting href; every other
+      // element (and the href on `<a>`, `<link>`, …) is left untouched.
+      if (useLeaf && el.namespaceURI === 'http://www.w3.org/2000/svg') {
+        const tag = (el.tagName || '').toLowerCase();
+        if (tag === 'use' || tag === 'image') {
+          let href = '';
+          try {
+            href = el.getAttribute('href')
+              || el.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+              || '';
+          } catch (_) {
+            href = '';
+          }
+          let hrec = useLeaf.get(el);
+          if (!hrec) {
+            hrec = { hrefs: [], opacities: [] };
+            useLeaf.set(el, hrec);
+          }
+          hrec.hrefs.push(href);
+          // Keep the element's own opacity per sample so a slot that also
+          // flickers / fades (not just swaps glyph) keeps that envelope below.
+          hrec.opacities.push(parseFloat(cs.opacity) || 0);
+        }
+      }
     }
   }
   if (textLeaf && textDynamics) {
@@ -1859,8 +1915,62 @@ export function pagxSampleTimeline(
       if (segments.length > 0) textDynamics.push({ el, segments });
     }
   }
+  // An SVG `<use>` / `<image>` is "dynamic href" when the timeline swapped which
+  // glyph it references (a scramble / sprite animation). Each distinct glyph
+  // becomes an overlay layer (pagxBuildUseOverlays) with an opacity window that
+  // shows it only on its frames; the base element is bounded out of the plain
+  // channel capture below so it does not also emit a single frozen (and, after
+  // static serialisation, effectively random) glyph that merely blinks.
+  const dynamicUse = new Set<HTMLElement>();
+  if (useLeaf && useDynamics) {
+    for (const [el, rec] of useLeaf) {
+      const hrefs = rec.hrefs;
+      const base = hrefs[0];
+      let varies = false;
+      for (let i = 1; i < hrefs.length; i++) {
+        if (hrefs[i] && hrefs[i] !== base) {
+          varies = true;
+          break;
+        }
+      }
+      if (!varies) continue;
+      // Distinct non-empty references, in first-seen order.
+      const distinct: string[] = [];
+      for (const h of hrefs) {
+        if (h && distinct.indexOf(h) === -1) distinct.push(h);
+      }
+      // Need at least two glyphs to be a swap; cap the fan-out so a pathological
+      // sequence cannot explode the layer / animation count.
+      if (distinct.length < 2 || distinct.length > 12) continue;
+      const n = hrefs.length;
+      const segments: PagxUseSegment[] = [];
+      for (const h of distinct) {
+        let stops: PagxAnimStop[] = [];
+        for (let i = 0; i < n; i++) {
+          // The element's own sampled opacity on the frames this glyph is the
+          // selected reference, 0 on the frames another glyph is shown. Using
+          // the real opacity (not a flat 1) preserves any flicker / self fade
+          // the slot also carried.
+          const op = hrefs[i] === h ? rec.opacities[i] : 0;
+          stops.push({ offset: n > 1 ? i / (n - 1) : 0, props: { opacity: String(op) } });
+        }
+        stops = pagxDecimateStops(stops);
+        segments.push({ href: h, stops });
+      }
+      if (segments.length > 0) {
+        useDynamics.push({ el, segments });
+        dynamicUse.add(el);
+      }
+    }
+  }
   for (const [el, samples] of series) {
     if (seen.has(el)) continue;
+    // Dynamic-href <use>/<image> are rebuilt as overlay layers; skip the plain
+    // channel path so they are not double-captured as a frozen glyph.
+    if (dynamicUse.has(el)) {
+      seen.add(el);
+      continue;
+    }
     const varying = pagxWhichVary(samples);
     if (varying.length === 0) continue;
     let norm: PagxAnimStop[] = [];
@@ -2182,6 +2292,7 @@ export function pagxCollectGlobalSampled(
   sampleCount: number,
   maxElements: number,
   textDynamics?: PagxTextDynamic[],
+  useDynamics?: PagxUseDynamic[],
 ): void {
   let globalMs = 0;
   try {
@@ -2229,7 +2340,7 @@ export function pagxCollectGlobalSampled(
   const effectiveSamples = pagxGlobalSampleCount(globalMs, sampleCount);
   pagxSampleTimeline(
     captured, seen, globalMs, (p) => pagxSeekAllToTime(p * globalMs),
-    1, effectiveSamples, maxElements, 'normal', 0, textDynamics,
+    1, effectiveSamples, maxElements, 'normal', 0, textDynamics, useDynamics,
   );
   try {
     if (txBlocker && txBlocker.parentNode) txBlocker.parentNode.removeChild(txBlocker);
@@ -2311,6 +2422,88 @@ export function pagxBuildTextOverlays(
         direction: 'normal',
         timing: 'linear',
       });
+    }
+  }
+}
+
+// Materialise the dynamic-href SVG `<use>` / `<image>` elements the global
+// sampler found into alternating overlay layers. Runs *after* pagxDomRestore
+// (so the appended clones survive into the snapshot) and *before*
+// pagxEmitCaptured (so the shared emit path installs each overlay's opacity
+// `@keyframes` + inline `animation` shorthand uniformly).
+//
+// Since neither CSS nor the PAGX SVG importer can animate a `<use>`'s `href`,
+// each distinct glyph a slot referenced becomes its own `<use>` layer stacked at
+// the same position, with an opacity window that is 1 only on the frames that
+// glyph was selected. The base element is reused for the first glyph and shallow
+// clones (id dropped to avoid duplicate ids) carry the rest. The importer's
+// inline-SVG shape-animation path (collectInlineSvgShapeAnimations ->
+// buildForInlineSvgShape) then drives each layer's `alpha`, so the imported PAGX
+// reproduces the glyph "scramble" that a single static `<use>` never could.
+//
+// This is the SVG-interior analogue of pagxBuildTextOverlays. It works here —
+// where the older SVG `<text>` overlay attempt did not — because the overlays
+// are real SVG `<use>` siblings inside the same import directive, each mapped to
+// its own animatable SVG sub-layer, rather than stacked HTML clones that the
+// importer would flatten into one static unit.
+export function pagxBuildUseOverlays(
+  useDynamics: PagxUseDynamic[],
+  captured: Array<{ el: HTMLElement } & PagxAnimDescriptor>,
+  globalMs: number,
+): void {
+  if (!Array.isArray(useDynamics) || useDynamics.length === 0) return;
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  for (const dyn of useDynamics) {
+    const el = dyn.el;
+    if (!el || (el as { isConnected?: boolean }).isConnected === false) continue;
+    if (!el.parentNode || dyn.segments.length === 0) continue;
+    let anchor: Node = el;
+    for (let s = 0; s < dyn.segments.length; s++) {
+      const seg = dyn.segments[s];
+      let target: HTMLElement;
+      if (s === 0) {
+        // Reuse the base <use> for the first glyph — keeps its position/class and
+        // avoids leaving an invisible original behind.
+        target = el;
+      } else {
+        try {
+          target = el.cloneNode(false) as HTMLElement;
+        } catch (_) {
+          continue;
+        }
+        try {
+          target.removeAttribute('id');
+          el.parentNode.insertBefore(target, anchor.nextSibling);
+        } catch (_) {
+          continue;
+        }
+      }
+      // Point this layer at its glyph. Set `href`; also update `xlink:href` when
+      // the source used the legacy form so the reference resolves either way.
+      try {
+        target.setAttribute('href', seg.href);
+        if (target.getAttributeNS && target.getAttributeNS(XLINK, 'href') != null) {
+          target.setAttributeNS(XLINK, 'href', seg.href);
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      // Clear any static inline opacity so the emitted animation owns `alpha`.
+      try {
+        target.style.removeProperty('opacity');
+      } catch (_) {
+        /* ignore */
+      }
+      captured.push({
+        el: target,
+        keyframes: seg.stops,
+        durationMs: globalMs,
+        delayMs: 0,
+        iterations: 1,
+        direction: 'normal',
+        timing: 'linear',
+      });
+      anchor = target;
     }
   }
 }
@@ -2755,7 +2948,11 @@ export function pagxAnimMain(opts: {
   // glyph survives into the snapshot (a single static text node cannot show
   // `+1` then `+4` then `+20` at different times).
   const textDynamics: PagxTextDynamic[] = [];
-  pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements, textDynamics);
+  // SVG `<use>`/`<image>` elements whose `href` the timeline swaps (a glyph
+  // scramble / sprite swap). Rebuilt as alternating overlay layers after the DOM
+  // is restored, mirroring the scripted-text path.
+  const useDynamics: PagxUseDynamic[] = [];
+  pagxCollectGlobalSampled(captured, seen, sampleCount, maxElements, textDynamics, useDynamics);
   try {
     pagxDomRestore(checkpoint);
   } catch (_) {
@@ -2765,7 +2962,7 @@ export function pagxAnimMain(opts: {
   // its initial scene (so the clones we append are not stripped by the restore
   // above). Recompute the global window — deterministic after the seek-to-0 the
   // sampler ends on — to time each overlay's fade against the same clock.
-  if (textDynamics.length > 0) {
+  if (textDynamics.length > 0 || useDynamics.length > 0) {
     let overlayMs = 0;
     try {
       overlayMs = pagxMeasureGlobalDurationMs();
@@ -2773,10 +2970,22 @@ export function pagxAnimMain(opts: {
       overlayMs = 0;
     }
     if (overlayMs > 0 && isFinite(overlayMs)) {
-      try {
-        pagxBuildTextOverlays(textDynamics, captured, overlayMs);
-      } catch (_) {
-        /* ignore */
+      if (textDynamics.length > 0) {
+        try {
+          pagxBuildTextOverlays(textDynamics, captured, overlayMs);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      // SVG glyph-swap slots → alternating overlay `<use>` layers, timed against
+      // the same global clock so each glyph's opacity window lines up with the
+      // frames the baseline shows it.
+      if (useDynamics.length > 0) {
+        try {
+          pagxBuildUseOverlays(useDynamics, captured, overlayMs);
+        } catch (_) {
+          /* ignore */
+        }
       }
     }
   }
@@ -2822,6 +3031,7 @@ const PAGX_ANIM_FNS = [
   pagxTransitionDescriptorFromBags,
   pagxTextSegments,
   pagxBuildTextOverlays,
+  pagxBuildUseOverlays,
   pagxCandidateElements,
   pagxDomCheckpoint,
   pagxDomRestore,
