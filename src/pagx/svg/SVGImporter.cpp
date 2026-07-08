@@ -1559,7 +1559,15 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         convertChildren(child, subLayer->contents, inheritedStyle);
         maskLayer->children.push_back(subLayer);
       } else {
-        convertChildren(child, maskLayer->contents, inheritedStyle);
+        // Each SVG shape carries its own paint, so wrap it in a Group to isolate the fill/stroke.
+        // Otherwise multiple shapes sharing the mask layer's flat contents list would let a later
+        // shape's Fill paint all preceding geometry (e.g. a white rect followed by black holes
+        // would collapse into an all-black mask, blanking a luminance mask).
+        auto group = _document->makeNode<Group>();
+        convertChildren(child, group->elements, inheritedStyle);
+        if (!group->elements.empty()) {
+          maskLayer->contents.push_back(group);
+        }
       }
     } else if (child->name == "g") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
