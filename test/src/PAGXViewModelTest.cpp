@@ -2476,4 +2476,101 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncPreservesColorSpaceOnReadback) {
   EXPECT_EQ(bg->value().colorSpace, pagx::ColorSpace::DisplayP3);
 }
 
+// A ViewModel property declared with viewModelRef but not bound to any Composition must still
+// instantiate its nested VM, so referenceViewModel() returns it and $vm.child.leaf DataBind paths
+// resolve. This covers pure data nesting (e.g. a "face" VM grouping an "eyes" sub-VM) where no
+// Composition slot exists; previously the nested VM was only created when a Layer bound a
+// Composition via vmContext.
+PAGX_TEST(PAGXViewModelTest, NestedViewModelInstantiatedWithoutComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // EyesVM: color(Color), size(Number).
+  auto* eyesVM = doc->makeNode<pagx::ViewModel>("EyesVM");
+  auto* eyesColorProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesColorProp->name = "color";
+  eyesColorProp->propertyType = pagx::ViewModelPropertyType::Color;
+  eyesColorProp->defaultColor = pagx::Color{32.0f / 255.0f, 32.0f / 255.0f, 32.0f / 255.0f, 1.0f};
+  eyesVM->properties.push_back(eyesColorProp);
+  auto* eyesSizeProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesSizeProp->name = "size";
+  eyesSizeProp->propertyType = pagx::ViewModelPropertyType::Number;
+  eyesSizeProp->defaultNumber = 1.0f;
+  eyesVM->properties.push_back(eyesSizeProp);
+
+  // FaceVM: faceColor(Color), eyes(@EyesVM). No Composition — pure data nesting.
+  auto* faceVM = doc->makeNode<pagx::ViewModel>("FaceVM");
+  auto* faceColorProp = doc->makeNode<pagx::ViewModelProperty>();
+  faceColorProp->name = "faceColor";
+  faceColorProp->propertyType = pagx::ViewModelPropertyType::Color;
+  faceColorProp->defaultColor = pagx::Color{1.0f, 199.0f / 255.0f, 82.0f / 255.0f, 1.0f};
+  faceVM->properties.push_back(faceColorProp);
+  auto* eyesSlotProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesSlotProp->name = "eyes";
+  eyesSlotProp->propertyType = pagx::ViewModelPropertyType::ViewModel;
+  eyesSlotProp->viewModelRef = eyesVM;
+  faceVM->properties.push_back(eyesSlotProp);
+  doc->viewModel = faceVM;
+
+  // A layer whose fill color is bound to $vm.eyes.color — a nested path that requires
+  // referenceInstance to descend into the EyesVM.
+  auto layer = doc->makeNode<pagx::Layer>("face");
+  layer->width = 200;
+  layer->height = 200;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>("eyesFill");
+  color->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  fill->color = color;
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.eyes.color";
+  db->target = "@eyesFill";
+  db->channel = "color";
+  doc->dataBinds.push_back(db);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+
+  // The nested EyesVM is reachable through the VM API without any Composition binding.
+  auto rootVM = scene->viewModel();
+  ASSERT_NE(rootVM, nullptr);
+  EXPECT_EQ(rootVM->id(), "FaceVM");
+  auto eyesProp = rootVM->propertyViewModel("eyes");
+  ASSERT_NE(eyesProp, nullptr);
+  auto eyesVMRuntime = eyesProp->referenceViewModel();
+  ASSERT_NE(eyesVMRuntime, nullptr);
+  EXPECT_EQ(eyesVMRuntime->id(), "EyesVM");
+
+  // Nested property defaults are populated.
+  auto eyesColor = eyesVMRuntime->propertyColor("color");
+  ASSERT_NE(eyesColor, nullptr);
+  EXPECT_FLOAT_EQ(eyesColor->value().red, 32.0f / 255.0f);
+  EXPECT_FLOAT_EQ(eyesColor->value().green, 32.0f / 255.0f);
+  EXPECT_FLOAT_EQ(eyesColor->value().blue, 32.0f / 255.0f);
+  auto eyesSize = eyesVMRuntime->propertyNumber("size");
+  ASSERT_NE(eyesSize, nullptr);
+  EXPECT_FLOAT_EQ(eyesSize->value(), 1.0f);
+
+  // The $vm.eyes.color DataBind path resolves through referenceInstance: writing the nested color
+  // propagates to the bound fill after a draw.
+  eyesColor->value(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f});
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+  std::array<uint8_t, 200 * 200 * 4> pixels = {};
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 200 * 4));
+  auto& px = *reinterpret_cast<uint32_t*>(pixels.data() + (100 * 200 + 100) * 4);
+  EXPECT_EQ(px & 0xFF, 0u);           // R
+  EXPECT_EQ((px >> 8) & 0xFF, 255u);  // G
+  EXPECT_EQ((px >> 16) & 0xFF, 0u);   // B
+}
+
 }  // namespace pag
