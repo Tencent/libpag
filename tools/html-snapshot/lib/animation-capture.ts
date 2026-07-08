@@ -856,6 +856,79 @@ export function pagxClipNormalizeD(raw: string, el: Element): string {
   return '';
 }
 
+// The canonical "unclipped" geometry for a `clip-path: none` keyframe: the element's full border
+// box emitted as the same 4-point rectangle `path("d")` that `pagxClipNormalizeD` produces for a
+// border-box `inset()` (`M 0 0 L w 0 L w h L 0 h Z`, same corner order TL→TR→BR→BL). Used by
+// `pagxResolveClipNoneSamples` so a reveal wipe that animates between `inset(...)` and `none`
+// morphs the contour mask *open* at the `none` stops instead of dropping them (which freezes the
+// mask at its last clipped rectangle). Measures the UNTRANSFORMED border box (offsetWidth/Height,
+// immune to ancestor transforms) exactly like `pagxClipNormalizeD`, so the synthesized rect frames
+// the same space as the inset stops. Returns '' when the box cannot be measured.
+export function pagxClipFullBoxD(el: Element): string {
+  const hostEl = el as HTMLElement;
+  let bw = typeof hostEl.offsetWidth === 'number' ? hostEl.offsetWidth : 0;
+  let bh = typeof hostEl.offsetHeight === 'number' ? hostEl.offsetHeight : 0;
+  if (!(bw > 0) || !(bh > 0)) {
+    const csBox = getComputedStyle(el);
+    const cw = parseFloat(csBox.width);
+    const ch = parseFloat(csBox.height);
+    if (cw > 0 && ch > 0) {
+      bw = cw;
+      bh = ch;
+    } else {
+      const rect = el.getBoundingClientRect();
+      bw = rect.width;
+      bh = rect.height;
+    }
+  }
+  if (!(bw > 0) || !(bh > 0)) return '';
+  const num = (x: number): string => String(Math.round(x * 1000) / 1000);
+  const w = num(bw);
+  const h = num(bh);
+  return 'M 0 0 L ' + w + ' 0 L ' + w + ' ' + h + ' L 0 ' + h + ' Z';
+}
+
+// In-place fix-up of one element's per-sample `clip-path` column (produced by the timeline
+// sampler). A `clip-path: none` sample is recorded as '' (no geometry). If the element animates a
+// rectangular reveal — `inset(...)` to and from `none` — those '' stops carry no clip declaration
+// and are dropped at keyframe emission, so the importer's contour mask *holds* its last clipped
+// rectangle through every `none` region instead of reopening to fully-visible (the visible symptom:
+// a figure stays cropped to a band during the calm, un-clipped phases of a glitch loop). Rewrite
+// each `none` sample to the full border-box rectangle — the correct "unclipped" geometry — so the
+// mask morphs back open. Only applied when every geometric sample is itself a 4-point rectangle
+// (8 coordinates), so the synthesized full box lines up point-for-point with the inset stops; the
+// importer refuses to morph clip shapes whose point structure differs, so circle / ellipse /
+// polygon reveals are left untouched (avoids turning a partial glitch into a fully dropped clip).
+export function pagxResolveClipNoneSamples(
+  el: Element,
+  samples: Array<Record<string, string | null>>,
+): void {
+  let hasNone = false;
+  let hasRect = false;
+  for (const s of samples) {
+    const cp = s['clip-path'];
+    if (cp == null) continue;
+    if (cp === '') {
+      hasNone = true;
+      continue;
+    }
+    const dm = cp.match(/path\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/i);
+    const nums = dm && dm[2] ? dm[2].match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) : null;
+    if (nums && nums.length === 8) {
+      hasRect = true;
+    } else {
+      return; // a non-rect (or unparseable) geometric stop — leave the column untouched
+    }
+  }
+  if (!hasNone || !hasRect) return;
+  const full = pagxClipFullBoxD(el);
+  if (!full) return;
+  const fullPath = 'path("' + full + '")';
+  for (const s of samples) {
+    if (s['clip-path'] === '') s['clip-path'] = fullPath;
+  }
+}
+
 export function pagxWhichVary(samples: Array<Record<string, string | null>>): string[] {
   const props = ['opacity', 'transform', 'color', 'background-color', 'filter', 'clip-path', 'fill',
     'stroke', 'stroke-dashoffset'];
@@ -888,6 +961,37 @@ export function pagxReduceKeyframes(norm: PagxAnimStop[]): PagxAnimStop[] {
   }
   out.push(norm[norm.length - 1]);
   return out;
+}
+
+// Detect whether an element's CSS animation is driven purely by a step timing
+// function (`steps()` / `step-start` / `step-end`) across every animation listed
+// on the element. The global timeline sampler reads the *computed* value at each
+// sample, so a `steps()` animation is captured as its correct piecewise-constant
+// staircase — but the default `linear` interpolation then ramps across each step
+// boundary, smearing a hard glitch cut into a visible cross-fade (a doubled /
+// ghosted figure lingering through the calm phase between glitches). Such
+// elements must instead be emitted with hold interpolation so the staircase is
+// reproduced. Returns false for mixed easing (some step, some not) or non-step
+// easing, where holding every channel would be wrong.
+export function pagxElementUsesStepTiming(el: Element): boolean {
+  let name = '';
+  let tf = '';
+  try {
+    const cs = getComputedStyle(el);
+    name = (cs.animationName || '').trim();
+    tf = cs.animationTimingFunction || '';
+  } catch (_) {
+    return false;
+  }
+  if (!name || name === 'none') return false;
+  const fns = pagxSplitTopLevelCommas(tf)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+  if (fns.length === 0) return false;
+  for (const f of fns) {
+    if (f !== 'step-start' && f !== 'step-end' && f.indexOf('steps(') !== 0) return false;
+  }
+  return true;
 }
 
 // ===== Keyframe decimation (Ramer–Douglas–Peucker) =====
@@ -1971,6 +2075,10 @@ export function pagxSampleTimeline(
       seen.add(el);
       continue;
     }
+    // Reopen `clip-path: none` stops (captured as '') to the full border box before deciding which
+    // channels vary, so a rectangular reveal wipe returns to fully-visible instead of freezing the
+    // mask at its last clipped rectangle through the un-clipped phases.
+    pagxResolveClipNoneSamples(el, samples);
     const varying = pagxWhichVary(samples);
     if (varying.length === 0) continue;
     let norm: PagxAnimStop[] = [];
@@ -1997,10 +2105,17 @@ export function pagxSampleTimeline(
       if (Object.keys(props).length > 0) norm.push({ offset, props });
     }
     if (norm.length < 2) continue;
-    // Dense linear samples → minimal keyframe set via per-channel RDP. Replaces
-    // the old flat-run-only reducer: RDP additionally collapses collinear
-    // (constant-velocity) runs, so a denser sample grid does not bloat the file.
-    norm = pagxDecimateStops(norm);
+    // A `steps()` CSS animation is sampled as its exact piecewise-constant
+    // staircase. Emit it with hold interpolation (`step-end`) and a hold-safe
+    // flat-run reduction, so the linear default does not ramp across the step
+    // boundaries (which smears a hard glitch cut into a ghosted cross-fade
+    // through the calm phase). `step-end` == `steps(1, jump-end)`, which the
+    // importer expands to a plain hold of every sampled keyframe — it must NOT
+    // re-expand the original `steps(N)`, since the sampled values already bake
+    // the N sub-steps in. Non-step animations keep the dense-sample → per-channel
+    // RDP path (collapses collinear runs so a fine sample grid stays compact).
+    const stepped = pagxElementUsesStepTiming(el);
+    norm = stepped ? pagxReduceKeyframes(norm) : pagxDecimateStops(norm);
     captured.push({
       el,
       keyframes: norm,
@@ -2008,7 +2123,7 @@ export function pagxSampleTimeline(
       delayMs,
       iterations,
       direction: direction || 'normal',
-      timing: 'linear',
+      timing: stepped ? 'step-end' : 'linear',
     });
     seen.add(el);
   }
@@ -3016,10 +3131,13 @@ const PAGX_ANIM_FNS = [
   pagxParseTimeMs,
   pagxWhichVary,
   pagxReduceKeyframes,
+  pagxElementUsesStepTiming,
   pagxParseColorChannels,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxClipNormalizeD,
+  pagxClipFullBoxD,
+  pagxResolveClipNoneSamples,
   pagxStopScalarSeries,
   pagxRdpKeep,
   pagxDecimateStops,

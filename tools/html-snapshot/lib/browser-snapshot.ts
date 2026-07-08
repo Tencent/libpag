@@ -1053,6 +1053,22 @@ function appendAnimation(parts, computed) {
     const v = (computed.getPropertyValue(prop) || '').trim();
     if (v) parts.push(`${prop}: ${v}`);
   }
+  // Forward `transform-origin` for animated elements. The importer pivots an
+  // animated `transform` channel around this origin (`T(o)·M·T(-o)`), and the
+  // captured keyframe matrices are the origin-independent CSS values, so the
+  // origin must survive into the subset. The generic transform emission above
+  // only writes `transform-origin` alongside a non-`none` static `transform`
+  // (readBoxTransform returns null for `none`); an element whose *keyframes*
+  // drive the transform has its static transform pinned to `none` by the
+  // capture pass, which would otherwise drop the origin and force the importer
+  // to fall back to the box centre — visibly shifting any scaled / rotated
+  // keyframe whose CSS origin is off-centre. Skipped when a transform-origin
+  // was already emitted (static-transform path) to avoid a duplicate property.
+  const hasOrigin = parts.some((p) => p.indexOf('transform-origin:') === 0);
+  if (!hasOrigin) {
+    const origin = (computed.getPropertyValue('transform-origin') || '').trim();
+    if (origin) parts.push(`transform-origin: ${origin}`);
+  }
 }
 
 // Coalesce the two `-webkit-text-stroke` longhands Chromium's computed style
