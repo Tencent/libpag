@@ -288,7 +288,10 @@ static bool IsTransitionAllowed(const StateTransition* transition, int64_t curre
   }
   // Exit-time gate.
   if (transition->exitTime.has_value()) {
-    auto* animState = dynamic_cast<const AnimationState*>(currentState);
+    const AnimationState* animState = nullptr;
+    if (currentState != nullptr && currentState->stateType() == StateType::Animation) {
+      animState = static_cast<const AnimationState*>(currentState);
+    }
     if (animState != nullptr && !animState->animationId.empty() && contextDoc != nullptr) {
       auto* anim = contextDoc->findNode<Animation>(animState->animationId);
       if (anim != nullptr) {
@@ -534,7 +537,10 @@ void PAGStateMachineTimeline::apply(float smMix) {
       if (weight <= 0.0f || f.state == nullptr) {
         continue;
       }
-      auto* animState = dynamic_cast<const AnimationState*>(f.state);
+      const AnimationState* animState = nullptr;
+      if (f.state != nullptr && f.state->stateType() == StateType::Animation) {
+        animState = static_cast<const AnimationState*>(f.state);
+      }
       if (animState == nullptr || animState->animationId.empty() || contextDoc == nullptr) {
         continue;
       }
@@ -573,7 +579,10 @@ void PAGStateMachineTimeline::apply(float smMix) {
     if (weight <= 0.0f || ri.currentState == nullptr) {
       continue;
     }
-    auto* animState = dynamic_cast<const AnimationState*>(ri.currentState);
+    const AnimationState* animState = nullptr;
+    if (ri.currentState->stateType() == StateType::Animation) {
+      animState = static_cast<const AnimationState*>(ri.currentState);
+    }
     if (animState == nullptr || animState->animationId.empty() || contextDoc == nullptr) {
       continue;
     }
@@ -647,6 +656,75 @@ void PAGStateMachineTimeline::removeStateChangeListener(int listenerId) {
   }
 }
 
+// =============================================================================
+// ViewModel→StateMachine input binding functors
+// =============================================================================
+namespace {
+
+class BoolInputObserver {
+ public:
+  BoolInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+                    std::weak_ptr<PAGViewModelValueBoolean> vmValue)
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+
+  void operator()() const {
+    auto locked = vmValue.lock();
+    if (locked == nullptr) {
+      return;
+    }
+    timeline->setBool(inputName, locked->value());
+  }
+
+ private:
+  PAGStateMachineTimeline* timeline = nullptr;
+  std::string inputName;
+  std::weak_ptr<PAGViewModelValueBoolean> vmValue;
+};
+
+class NumberInputObserver {
+ public:
+  NumberInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+                      std::weak_ptr<PAGViewModelValueNumber> vmValue)
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+
+  void operator()() const {
+    auto locked = vmValue.lock();
+    if (locked == nullptr) {
+      return;
+    }
+    timeline->setNumber(inputName, locked->value());
+  }
+
+ private:
+  PAGStateMachineTimeline* timeline = nullptr;
+  std::string inputName;
+  std::weak_ptr<PAGViewModelValueNumber> vmValue;
+};
+
+class TriggerInputObserver {
+ public:
+  TriggerInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+                       std::weak_ptr<PAGViewModelValueBoolean> vmValue)
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+
+  void operator()() const {
+    auto locked = vmValue.lock();
+    if (locked == nullptr) {
+      return;
+    }
+    if (locked->value()) {
+      timeline->fireTrigger(inputName);
+    }
+  }
+
+ private:
+  PAGStateMachineTimeline* timeline = nullptr;
+  std::string inputName;
+  std::weak_ptr<PAGViewModelValueBoolean> vmValue;
+};
+
+}  // namespace
+
 bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
                                         const std::shared_ptr<PAGViewModelValue>& vmValue) {
   if (!vmValue || !stateMachine) {
@@ -662,41 +740,35 @@ bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
   if (idx < 0) {
     return false;
   }
-  auto rawThis = this;
   auto inputType = inputValues[idx].type;
 
   if (inputType == StateMachineInputType::Bool) {
-    auto boolVal = std::dynamic_pointer_cast<PAGViewModelValueBoolean>(vmValue);
-    if (!boolVal) {
+    if (vmValue->valueType() != ViewModelPropertyType::Boolean) {
       return false;
     }
-    auto handle = boolVal->addObserver([rawThis, inputName, boolVal]() {
-      rawThis->setBool(inputName, boolVal->value());
-    });
+    auto boolVal = std::static_pointer_cast<PAGViewModelValueBoolean>(vmValue);
+    auto handle = boolVal->addObserver(
+        BoolInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueBoolean>(boolVal)));
     inputBindings.push_back(std::move(handle));
     return true;
   }
   if (inputType == StateMachineInputType::Number) {
-    auto numVal = std::dynamic_pointer_cast<PAGViewModelValueNumber>(vmValue);
-    if (!numVal) {
+    if (vmValue->valueType() != ViewModelPropertyType::Number) {
       return false;
     }
-    auto handle = numVal->addObserver([rawThis, inputName, numVal]() {
-      rawThis->setNumber(inputName, numVal->value());
-    });
+    auto numVal = std::static_pointer_cast<PAGViewModelValueNumber>(vmValue);
+    auto handle = numVal->addObserver(
+        NumberInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueNumber>(numVal)));
     inputBindings.push_back(std::move(handle));
     return true;
   }
   if (inputType == StateMachineInputType::Trigger) {
-    auto boolVal = std::dynamic_pointer_cast<PAGViewModelValueBoolean>(vmValue);
-    if (!boolVal) {
+    if (vmValue->valueType() != ViewModelPropertyType::Boolean) {
       return false;
     }
-    auto handle = boolVal->addObserver([rawThis, inputName, boolVal]() {
-      if (boolVal->value()) {
-        rawThis->fireTrigger(inputName);
-      }
-    });
+    auto boolVal = std::static_pointer_cast<PAGViewModelValueBoolean>(vmValue);
+    auto handle = boolVal->addObserver(
+        TriggerInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueBoolean>(boolVal)));
     inputBindings.push_back(std::move(handle));
     return true;
   }
