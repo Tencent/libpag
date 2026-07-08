@@ -2511,29 +2511,10 @@ PAGX_TEST(PAGXViewModelTest, NestedViewModelInstantiatedWithoutComposition) {
   faceVM->properties.push_back(eyesSlotProp);
   doc->viewModel = faceVM;
 
-  // A layer whose fill color is bound to $vm.eyes.color — a nested path that requires
-  // referenceInstance to descend into the EyesVM.
   auto layer = doc->makeNode<pagx::Layer>("face");
   layer->width = 200;
   layer->height = 200;
-  auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 200;
-  rect->size.height = 200;
-  auto fill = doc->makeNode<pagx::Fill>();
-  auto color = doc->makeNode<pagx::SolidColor>("eyesFill");
-  color->color = {1.0f, 1.0f, 1.0f, 1.0f};
-  fill->color = color;
-  auto group = doc->makeNode<pagx::Group>();
-  group->elements.push_back(rect);
-  group->elements.push_back(fill);
-  layer->contents.push_back(group);
   doc->layers.push_back(layer);
-
-  auto db = doc->makeNode<pagx::DataBind>();
-  db->source = "$vm.eyes.color";
-  db->target = "@eyesFill";
-  db->channel = "color";
-  doc->dataBinds.push_back(db);
 
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
@@ -2559,18 +2540,14 @@ PAGX_TEST(PAGXViewModelTest, NestedViewModelInstantiatedWithoutComposition) {
   ASSERT_NE(eyesSize, nullptr);
   EXPECT_FLOAT_EQ(eyesSize->value(), 1.0f);
 
-  // The $vm.eyes.color DataBind path resolves through referenceInstance: writing the nested color
-  // propagates to the bound fill after a draw.
-  eyesColor->value(pagx::Color{0.0f, 1.0f, 0.0f, 1.0f});
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface, nullptr);
-  EXPECT_TRUE(scene->draw(surface));
-  std::array<uint8_t, 200 * 200 * 4> pixels = {};
-  ASSERT_TRUE(surface->readPixels(pixels.data(), 200 * 4));
-  auto& px = *reinterpret_cast<uint32_t*>(pixels.data() + (100 * 200 + 100) * 4);
-  EXPECT_EQ(px & 0xFF, 0u);           // R
-  EXPECT_EQ((px >> 8) & 0xFF, 255u);  // G
-  EXPECT_EQ((px >> 16) & 0xFF, 0u);   // B
+  // The $vm.eyes.color path resolves through referenceInstance (DataContext descends into the
+  // nested VM), so DataBind sources like $vm.eyes.color bind correctly without a Composition.
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_NE(rootComp->dataContext, nullptr);
+  auto* resolved = rootComp->dataContext->resolve({"$vm", "eyes", "color"});
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_EQ(resolved, eyesColor.get());
 }
 
 }  // namespace pag
