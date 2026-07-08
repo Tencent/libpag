@@ -64,6 +64,22 @@ class HTMLAnimationBuilder {
   bool buildForElement(const std::unordered_map<std::string, std::string>& resolvedStyle,
                        Layer* layer);
 
+  /**
+   * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that
+   * declares one or more CSS animations. Unlike `buildForElement`, the shape has no Layer of its
+   * own: its painters (`Fill` / `Stroke`) are synthesised later by the SVG importer during resolve,
+   * so the emitted `AnimationObject`s target the painter ids the importer derives from the shape's
+   * DOM `id` (`<id>__fill` for the fill, `<id>__stroke` for the stroke). Supports the SVG-specific
+   * animatable properties `fill`, `fill-opacity`, `stroke`, `stroke-opacity` and
+   * `stroke-dashoffset`, and honours the full comma-separated `animation` list (each entry becomes
+   * its own `Animation`). `dashScale` (real path length / author `pathLength`) rescales
+   * `stroke-dashoffset` keyframes into user units, mirroring the static dash scaling the SVG
+   * importer applies. Returns true when at least one channel was emitted.
+   */
+  bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
+                              const std::string& fillTargetId, const std::string& strokeTargetId,
+                              float dashScale);
+
  private:
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;

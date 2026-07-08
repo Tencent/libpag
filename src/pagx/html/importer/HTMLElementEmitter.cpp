@@ -22,7 +22,9 @@
 // handled by `HTMLTextFragmentBuilder` and reached through `_textFragmentBuilder`.
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <unordered_map>
 #include "base/utils/MathUtil.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -33,11 +35,15 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLDOM.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
 
@@ -359,10 +365,85 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
     _svgEmitter->stripRootOpacity(element);
   }
 
+  // Record animated shape descendants before serialisation so any minted `id` is baked into the
+  // import directive and the SVG importer can derive matching Fill / Stroke painter ids.
+  collectInlineSvgShapeAnimations(element);
+
   layer->importDirective.content = _svgEmitter->serialize(element);
   layer->importDirective.format = "svg";
   assignElementId(layer, element);
   return layer;
+}
+
+void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node) {
+  if (node == nullptr) {
+    return;
+  }
+  for (auto child = node->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type != DOMNodeType::Element) {
+      continue;
+    }
+    const std::string* styleAttr = child->findAttribute("style");
+    if (styleAttr != nullptr) {
+      std::unordered_map<std::string, std::string> style;
+      ParseStyleString(*styleAttr, style);
+      if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+        // A stable id must survive serialisation so the SVG importer can key the derived painter
+        // ids off it. Reuse an authored id; otherwise mint a fresh non-colliding one.
+        std::string id;
+        const std::string* idAttr = child->findAttribute("id");
+        if (idAttr != nullptr && !idAttr->empty()) {
+          id = *idAttr;
+        } else {
+          id = _idAllocator->generateUnique("svgshape");
+          bool replaced = false;
+          for (auto& attr : child->attributes) {
+            if (attr.name == "id") {
+              attr.value = id;
+              replaced = true;
+              break;
+            }
+          }
+          if (!replaced) {
+            child->attributes.push_back(DOMAttribute{std::string("id"), id});
+          }
+        }
+
+        // `stroke-dashoffset` keyframes are captured in author space (normalised by `pathLength`);
+        // resolve the real-to-author length ratio here where the geometry `d` is available, matching
+        // the static dash scaling the SVG importer applies (SVGParserContext::computePathTotalLength).
+        float dashScale = 1.0f;
+        const std::string* pathLen = child->findAttribute("pathLength");
+        const std::string* dAttr = child->findAttribute("d");
+        if (pathLen != nullptr && dAttr != nullptr && child->name == "path") {
+          float authorLength = std::strtof(pathLen->c_str(), nullptr);
+          if (authorLength > 0.0f) {
+            tgfx::Path path = ToTGFX(PathDataFromSVGString(*dAttr));
+            if (!path.isEmpty()) {
+              auto measure = tgfx::PathMeasure::MakeFrom(path);
+              if (measure != nullptr) {
+                float total = 0.0f;
+                do {
+                  total += measure->getLength();
+                } while (measure->nextContour());
+                if (total > 0.0f) {
+                  dashScale = total / authorLength;
+                }
+              }
+            }
+          }
+        }
+
+        PendingSvgShapeAnimation pending;
+        pending.style = std::move(style);
+        pending.fillTargetId = id + "__fill";
+        pending.strokeTargetId = id + "__stroke";
+        pending.dashScale = dashScale;
+        _pendingSvgShapeAnimations.push_back(std::move(pending));
+      }
+    }
+    collectInlineSvgShapeAnimations(child);
+  }
 }
 
 std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {

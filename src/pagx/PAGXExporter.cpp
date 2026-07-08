@@ -702,6 +702,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
+      // A Fill normally carries no id, but an animated inline-SVG `fill` targets this Fill by id
+      // from an AnimationObject, so the id must survive export.
+      if (!fill->id.empty()) xml.addAttribute("id", fill->id);
       bool needsInlineColorSource = WriteColorAttribute(xml, fill->color);
       xml.addAttribute("alpha", fill->alpha, Default<Fill>().alpha);
       if (fill->blendMode != Default<Fill>().blendMode) {
@@ -726,6 +729,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
+      // A Stroke normally carries no id, but an animated inline-SVG `stroke` / `stroke-dashoffset`
+      // targets this Stroke by id from an AnimationObject, so the id must survive export.
+      if (!stroke->id.empty()) xml.addAttribute("id", stroke->id);
       bool needsInlineColorSource = WriteColorAttribute(xml, stroke->color);
       xml.addAttribute("width", stroke->width, Default<Stroke>().width);
       xml.addAttribute("alpha", stroke->alpha, Default<Stroke>().alpha);

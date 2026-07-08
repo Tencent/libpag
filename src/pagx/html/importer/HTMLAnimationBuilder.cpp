@@ -297,6 +297,13 @@ void ParseAnimationShorthand(const std::string& value, AnimationSpec& spec, bool
       spec.fillMode = lc;
       continue;
     }
+    // `animation-play-state` (running / paused) is not part of the animation shorthand grammar, but
+    // getComputedStyle serialises the `animation` property with it appended (e.g.
+    // `1s linear … both running pagxAnim0`). Inline-SVG shapes are frozen from computed style, so
+    // skip it here — otherwise `running` would be mistaken for the (name-last) keyframes name.
+    if (lc == "running" || lc == "paused") {
+      continue;
+    }
     // A bare number is the iteration-count. Numeric values override any earlier `infinite`
     // keyword in the same shorthand declaration (CSS shorthand parsing is order-dependent and
     // the numeric token assigns iteration-count, which is mutually exclusive with infinite).
@@ -1608,6 +1615,239 @@ bool HTMLAnimationBuilder::buildForElement(
   }
   _document->animations.push_back(animation);
   return true;
+}
+
+bool HTMLAnimationBuilder::buildForInlineSvgShape(
+    const std::unordered_map<std::string, std::string>& style, const std::string& fillTargetId,
+    const std::string& strokeTargetId, float dashScale) {
+  if (_document == nullptr || _keyframes == nullptr) return false;
+  auto shorthandIt = style.find("animation");
+  bool hasShorthand = shorthandIt != style.end() && !Trim(shorthandIt->second).empty();
+  bool hasLonghand = style.count("animation-name") > 0;
+  if (!hasShorthand && !hasLonghand) return false;
+
+  // Each comma-separated entry in the `animation` shorthand is an independent animation with its
+  // own duration / delay / timing (the line-draw + fill-in idiom lists two: `hbDraw …, hbFill …`).
+  // Build one `Animation` per entry. Longhands only apply to a single-animation declaration.
+  std::vector<std::string> entries;
+  if (hasShorthand) {
+    entries = SplitTopLevelCommas(shorthandIt->second);
+  }
+  if (entries.empty()) {
+    entries.push_back(std::string());  // longhand-only declaration
+  }
+
+  auto parseFloatVal = [](const std::string& v, float& out) -> bool {
+    std::string t = Trim(v);
+    char* end = nullptr;
+    float f = std::strtof(t.c_str(), &end);
+    if (end == t.c_str()) return false;
+    out = f;
+    return true;
+  };
+
+  bool builtAny = false;
+  for (const auto& entry : entries) {
+    AnimationSpec spec = {};
+    bool dummyMultiple = false;
+    if (!Trim(entry).empty()) {
+      ParseAnimationShorthand(entry, spec, dummyMultiple);
+    }
+    if (entries.size() == 1) {
+      ApplyAnimationLonghands(style, spec);
+    }
+    if (spec.name.empty() || spec.durationSeconds <= 0.0f) continue;
+
+    auto kfIt = _keyframes->find(spec.name);
+    if (kfIt == _keyframes->end()) {
+      _diagnostics.warn("html: inline-svg animation references unknown @keyframes '" + spec.name +
+                        "'; dropped [subset:animation-unknown-keyframes]");
+      continue;
+    }
+
+    std::vector<CssKeyframeStop> stops = kfIt->second.stops;
+    bool reversed = (spec.direction == "reverse" || spec.direction == "alternate-reverse");
+    if (reversed) {
+      for (auto& s : stops) s.percent = 100.0f - s.percent;
+    }
+    std::stable_sort(stops.begin(), stops.end(), KeyframeStopLess);
+
+    ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
+    if (reversed) ReverseEasing(easing);
+    KeyframeInterpolationType interp = KeyframeInterpolationType::Linear;
+    if (easing.kind == ResolvedEasing::Kind::Steps) {
+      interp = KeyframeInterpolationType::Hold;
+    } else if (easing.kind == ResolvedEasing::Kind::Bezier) {
+      interp = KeyframeInterpolationType::Bezier;
+    }
+
+    long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
+    long long delayFrames =
+        spec.delaySeconds > 0.0f ? std::llround(spec.delaySeconds * kFrameRate) : 0;
+
+    std::vector<Keyframe<Color>> fillColorKeys;
+    std::vector<Keyframe<float>> fillAlphaKeys;
+    std::vector<Keyframe<Color>> strokeColorKeys;
+    std::vector<Keyframe<float>> strokeAlphaKeys;
+    std::vector<Keyframe<float>> dashKeys;
+
+    for (const auto& stop : stops) {
+      Frame time = static_cast<Frame>(
+          delayFrames + std::llround(stop.percent / 100.0f * static_cast<float>(durationFrames)));
+      std::unordered_map<std::string, std::string> decls;
+      ParseStyleString(stop.declarations, decls);
+      for (const auto& kv : decls) {
+        const std::string& prop = kv.first;
+        const std::string& val = kv.second;
+        if (prop == "fill") {
+          fillColorKeys.push_back({time, _valueParser.parseColor(val), interp, {}, {}});
+        } else if (prop == "fill-opacity") {
+          float f = 0.0f;
+          if (parseFloatVal(val, f)) {
+            fillAlphaKeys.push_back({time, std::max(0.0f, std::min(1.0f, f)), interp, {}, {}});
+          }
+        } else if (prop == "stroke") {
+          strokeColorKeys.push_back({time, _valueParser.parseColor(val), interp, {}, {}});
+        } else if (prop == "stroke-opacity") {
+          float f = 0.0f;
+          if (parseFloatVal(val, f)) {
+            strokeAlphaKeys.push_back({time, std::max(0.0f, std::min(1.0f, f)), interp, {}, {}});
+          }
+        } else if (prop == "stroke-dashoffset") {
+          // Author-space value (normalised by `pathLength`); rescale into user units exactly like
+          // the static dash import (SVGImporter multiplies by realLength / authorLength).
+          float f = 0.0f;
+          if (parseFloatVal(val, f)) {
+            dashKeys.push_back({time, f * dashScale, interp, {}, {}});
+          }
+        }
+        // opacity / transform have no per-shape painter target and are ignored here.
+      }
+    }
+
+    if (fillColorKeys.empty() && fillAlphaKeys.empty() && strokeColorKeys.empty() &&
+        strokeAlphaKeys.empty() && dashKeys.empty()) {
+      continue;
+    }
+
+    ApplyBezierHandles(fillColorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(fillAlphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(strokeColorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(strokeAlphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(dashKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    if (easing.kind == ResolvedEasing::Kind::Steps) {
+      ExpandSteps(fillColorKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(fillAlphaKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(strokeColorKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(strokeAlphaKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(dashKeys, easing.stepCount, easing.stepJump);
+    }
+
+    LoopMode loopMode = LoopMode::Once;
+    bool isAlternate = (spec.direction == "alternate" || spec.direction == "alternate-reverse");
+    if (isAlternate && spec.iterationInfinite) {
+      loopMode = LoopMode::PingPong;
+    } else if (spec.iterationInfinite) {
+      loopMode = LoopMode::Loop;
+    }
+    bool loopOnce = (loopMode == LoopMode::Once);
+    Frame activeEnd = static_cast<Frame>(delayFrames + durationFrames);
+
+    // The shape's static painter value shows outside the active window. The capture bakes an
+    // explicit 0% stop carrying the resting value, so the first keyframe is a faithful per-channel
+    // baseline for `animation-fill-mode` forwards / backwards.
+    if (!fillColorKeys.empty()) {
+      ApplyFillMode(fillColorKeys, spec.fillMode, fillColorKeys.front().value, loopOnce, activeEnd);
+    }
+    if (!fillAlphaKeys.empty()) {
+      ApplyFillMode(fillAlphaKeys, spec.fillMode, fillAlphaKeys.front().value, loopOnce, activeEnd);
+    }
+    if (!strokeColorKeys.empty()) {
+      ApplyFillMode(strokeColorKeys, spec.fillMode, strokeColorKeys.front().value, loopOnce,
+                    activeEnd);
+    }
+    if (!strokeAlphaKeys.empty()) {
+      ApplyFillMode(strokeAlphaKeys, spec.fillMode, strokeAlphaKeys.front().value, loopOnce,
+                    activeEnd);
+    }
+    if (!dashKeys.empty()) {
+      ApplyFillMode(dashKeys, spec.fillMode, dashKeys.front().value, loopOnce, activeEnd);
+    }
+
+    bool needsTrailingBaseline =
+        loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
+
+    std::string animId = (strokeTargetId.empty() ? fillTargetId : strokeTargetId) + "_" +
+                         spec.name + "_anim";
+    auto* animation = _document->makeNode<Animation>(animId);
+    animation->frameRate = kFrameRate;
+    if (loopOnce) {
+      animation->duration =
+          static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
+    } else {
+      animation->duration = static_cast<Frame>(durationFrames);
+    }
+    animation->loop = loopMode;
+
+    // Group channels by their target painter node (fill vs stroke).
+    if (!fillColorKeys.empty() || !fillAlphaKeys.empty()) {
+      if (fillTargetId.empty()) {
+        _diagnostics.warn(
+            "html: inline-svg 'fill' animation has no fill painter to target; dropped "
+            "[subset:animation-unsupported-property]");
+      } else {
+        auto* object = _document->makeNode<AnimationObject>();
+        object->target = fillTargetId;
+        if (!fillColorKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<Color>>();
+          ch->name = "color";
+          ch->keyframes = std::move(fillColorKeys);
+          object->channels.push_back(ch);
+        }
+        if (!fillAlphaKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "alpha";
+          ch->keyframes = std::move(fillAlphaKeys);
+          object->channels.push_back(ch);
+        }
+        animation->objects.push_back(object);
+      }
+    }
+    if (!strokeColorKeys.empty() || !strokeAlphaKeys.empty() || !dashKeys.empty()) {
+      if (strokeTargetId.empty()) {
+        _diagnostics.warn(
+            "html: inline-svg 'stroke' animation has no stroke painter to target; dropped "
+            "[subset:animation-unsupported-property]");
+      } else {
+        auto* object = _document->makeNode<AnimationObject>();
+        object->target = strokeTargetId;
+        if (!strokeColorKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<Color>>();
+          ch->name = "color";
+          ch->keyframes = std::move(strokeColorKeys);
+          object->channels.push_back(ch);
+        }
+        if (!strokeAlphaKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "alpha";
+          ch->keyframes = std::move(strokeAlphaKeys);
+          object->channels.push_back(ch);
+        }
+        if (!dashKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "dashOffset";
+          ch->keyframes = std::move(dashKeys);
+          object->channels.push_back(ch);
+        }
+        animation->objects.push_back(object);
+      }
+    }
+
+    if (animation->objects.empty()) continue;
+    _document->animations.push_back(animation);
+    builtAny = true;
+  }
+  return builtAny;
 }
 
 }  // namespace pagx

@@ -119,6 +119,14 @@ class HTMLParserContext {
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
 
+  // Walks an inline `<svg>` subtree (before it is serialised into the layer's import directive) and
+  // records every shape descendant carrying an inline `style="animation:…"`. Each such shape is
+  // given a stable DOM `id` (minted when absent) so the SVG importer can derive its Fill / Stroke
+  // painter ids from it, and a `PendingSvgShapeAnimation` is queued targeting those derived ids.
+  // `stroke-dashoffset` scaling (real path length / author `pathLength`) is resolved here where the
+  // geometry `d` is available, mirroring the static dash scaling in the SVG importer.
+  void collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node);
+
   // Reserves the element's `id` on the allocator, then records the element when it carries an
   // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
   // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
@@ -216,6 +224,20 @@ class HTMLParserContext {
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).
   std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+
+  // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
+  // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the
+  // layer tree is built, so these shapes have no PAGX painter node yet. `convertInlineSvg` assigns
+  // each such shape a stable DOM `id`; the SVG importer later derives its Fill / Stroke ids from it
+  // (`<id>__fill` / `<id>__stroke`). The animation is built after the tree exists, targeting those
+  // derived painter ids by string (the nodes materialise during resolve, before export).
+  struct PendingSvgShapeAnimation {
+    std::unordered_map<std::string, std::string> style = {};
+    std::string fillTargetId = {};
+    std::string strokeTargetId = {};
+    float dashScale = 1.0f;
+  };
+  std::vector<PendingSvgShapeAnimation> _pendingSvgShapeAnimations = {};
 
   // Builds and mutates `Layer` instances from `HTMLBoxAttributes`. Borrows `_diagnostics`,
   // `_valueParser` and `_idAllocator`; document handle is bound after `PAGXDocument::Make`.

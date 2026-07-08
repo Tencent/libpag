@@ -1855,6 +1855,13 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
   FillRule effectiveFillRule = (fillRule == "evenodd") ? FillRule::EvenOdd : FillRule::Winding;
 
+  // A shape carrying a DOM `id` (assigned by the HTML importer for animated inline-SVG shapes) gets
+  // deterministic painter ids so the pre-resolve animation objects can target its Fill / Stroke by
+  // string. Empty when the shape has no id (the common static case), which leaves the node id blank.
+  std::string elementId = getAttribute(element, "id");
+  std::string fillId = elementId.empty() ? std::string() : elementId + "__fill";
+  std::string strokeId = elementId.empty() ? std::string() : elementId + "__stroke";
+
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
@@ -1862,6 +1869,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
@@ -1869,6 +1877,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       contents.push_back(fillNode);
     } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
@@ -1888,6 +1897,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       contents.push_back(fillNode);
     } else {
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
 
       // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
@@ -1932,6 +1942,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     }
 
     auto strokeNode = _document->makeNode<Stroke>();
+    strokeNode->id = strokeId;
 
     // Determine effective stroke-opacity. Applies to both url() and solid color strokes.
     std::string strokeOpacity = getAttribute(element, "stroke-opacity");

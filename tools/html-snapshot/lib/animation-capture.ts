@@ -492,6 +492,18 @@ export function pagxNormalizeProps(
       : shadowFilter;
   }
   if (filterVal != null) out['filter'] = filterVal;
+  // SVG paint channels. `fill` / `stroke` are colours (a `<path>` line-draw fills in from
+  // `transparent`), `stroke-dashoffset` is a scalar used for the path-trace line-draw idiom
+  // (`stroke-dasharray:1; stroke-dashoffset:1 -> 0` with `pathLength="1"`). The importer maps these
+  // onto the per-shape Fill / Stroke painter channels; `stroke-dashoffset` is rescaled there by the
+  // real path length. Only inline-SVG shapes ever carry a varying value here; HTML elements report
+  // a constant default and are dropped by `pagxWhichVary`.
+  const fill = pagxPickProp(raw, 'fill', 'fill');
+  if (fill != null) out['fill'] = fill;
+  const stroke = pagxPickProp(raw, 'stroke', 'stroke');
+  if (stroke != null) out['stroke'] = stroke;
+  const dashOffset = pagxPickProp(raw, 'stroke-dashoffset', 'strokeDashoffset');
+  if (dashOffset != null) out['stroke-dashoffset'] = dashOffset;
   return out;
 }
 
@@ -810,7 +822,8 @@ export function pagxClipNormalizeD(raw: string, el: Element): string {
 }
 
 export function pagxWhichVary(samples: Array<Record<string, string | null>>): string[] {
-  const props = ['opacity', 'transform', 'color', 'background-color', 'filter', 'clip-path'];
+  const props = ['opacity', 'transform', 'color', 'background-color', 'filter', 'clip-path', 'fill',
+    'stroke', 'stroke-dashoffset'];
   const out: string[] = [];
   for (const p of props) {
     let varies = false;
@@ -993,6 +1006,28 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
         put('bb', i, c[2]);
         put('ba', i, c[3]);
       }
+    }
+    if (p['fill'] != null) {
+      const c = pagxParseColorChannels(p['fill']);
+      if (c) {
+        put('flr', i, c[0]);
+        put('flg', i, c[1]);
+        put('flb', i, c[2]);
+        put('fla', i, c[3]);
+      }
+    }
+    if (p['stroke'] != null) {
+      const c = pagxParseColorChannels(p['stroke']);
+      if (c) {
+        put('skr', i, c[0]);
+        put('skg', i, c[1]);
+        put('skb', i, c[2]);
+        put('ska', i, c[3]);
+      }
+    }
+    if (p['stroke-dashoffset'] != null) {
+      const v = parseFloat(p['stroke-dashoffset']);
+      if (!isNaN(v)) put('sdo', i, v);
     }
     if (p['filter'] != null) {
       const f = pagxParseFilterChannels(p['filter']);
@@ -1313,6 +1348,11 @@ export function pagxBuildCanonicalAnimation(
     if (s.props['clip-path'] != null && s.props['clip-path']) {
       decls.push('clip-path: ' + s.props['clip-path']);
     }
+    if (s.props['fill'] != null) decls.push('fill: ' + s.props['fill']);
+    if (s.props['stroke'] != null) decls.push('stroke: ' + s.props['stroke']);
+    if (s.props['stroke-dashoffset'] != null) {
+      decls.push('stroke-dashoffset: ' + s.props['stroke-dashoffset']);
+    }
     if (decls.length === 0) continue;
     lines.push((Math.round(s.offset * 1000) / 10) + '% { ' + decls.join('; ') + '; }');
   }
@@ -1595,6 +1635,9 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
         color: kf.style.color,
         backgroundColor: kf.style.backgroundColor,
         filter: kf.style.filter,
+        fill: kf.style.fill,
+        stroke: kf.style.stroke,
+        strokeDashoffset: kf.style.strokeDashoffset,
       }, elBox);
       if (Object.keys(props).length === 0) continue;
       for (const o of offsets) {
@@ -1704,6 +1747,7 @@ export function pagxSampleTimeline(
       const clipD = rawClip && rawClip !== 'none' && !/^url\(/i.test(rawClip)
         ? pagxClipNormalizeD(rawClip, el)
         : '';
+      const svgCs = cs as unknown as { fill?: string; stroke?: string; strokeDashoffset?: string };
       const snap: Record<string, string | null> = {
         opacity: cs.opacity,
         transform: pagxExtractTransform(cs.transform),
@@ -1711,6 +1755,10 @@ export function pagxSampleTimeline(
         'background-color': cs.backgroundColor,
         filter: filterVal,
         'clip-path': clipD ? 'path("' + clipD + '")' : '',
+        // SVG paint channels (constant/absent for HTML nodes; dropped by pagxWhichVary there).
+        fill: svgCs.fill != null ? svgCs.fill : null,
+        stroke: svgCs.stroke != null ? svgCs.stroke : null,
+        'stroke-dashoffset': svgCs.strokeDashoffset != null ? svgCs.strokeDashoffset : null,
       };
       let arr = series.get(el);
       if (!arr) {

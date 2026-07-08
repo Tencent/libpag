@@ -107,8 +107,14 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     return false;  // Nothing to resolve.
   }
 
-  // Check for conflicting contents or children.
-  if (!layer->contents.empty() || !layer->children.empty()) {
+  // Check for conflicting contents or children. An attached mask (e.g. a contour mask synthesised
+  // from an animated CSS clip-path, or an alpha/luminance mask-image) lives as an invisible,
+  // layout-excluded child in `layer->children` alongside `layer->mask`; that does not conflict with
+  // expanding the inline <svg> into `layer->contents`, so permit resolve when the layer's only
+  // "extra" content is its own mask layer (the masked inline SVG then resolves normally).
+  bool onlyMaskChild = layer->contents.empty() && layer->mask != nullptr &&
+                       layer->children.size() == 1 && layer->children.front() == layer->mask;
+  if ((!layer->contents.empty() || !layer->children.empty()) && !onlyMaskChild) {
     std::string desc =
         hasImportSource ? ("import=\"" + layer->importDirective.source + "\"") : "inline <svg>";
     std::cerr << "pagx resolve: warning: Layer";
