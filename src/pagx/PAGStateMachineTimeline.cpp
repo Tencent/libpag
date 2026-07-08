@@ -32,6 +32,7 @@
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueNumber.h"
+#include "pagx/runtime/BezierEasing.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
@@ -84,25 +85,6 @@ const State* FindStateByName(const StateRegion* region, const std::string& name)
   return nullptr;
 }
 
-float EvalBezier(Point bezierOut, Point bezierIn, float t) {
-  if (t <= 0.0f) return 0.0f;
-  if (t >= 1.0f) return 1.0f;
-  float x0 = 0.0f, x1 = bezierOut.x, x2 = bezierIn.x, x3 = 1.0f;
-  for (int i = 0; i < 10; i++) {
-    float tMid = (x0 + x3) * 0.5f;
-    float oneMinusMid = 1.0f - tMid;
-    float x = oneMinusMid * oneMinusMid * oneMinusMid * x0 +
-              3.0f * oneMinusMid * oneMinusMid * tMid * x1 + 3.0f * oneMinusMid * tMid * tMid * x2 +
-              tMid * tMid * tMid * x3;
-    if (x < t) {
-      x0 = tMid;
-    } else {
-      x3 = tMid;
-    }
-  }
-  return (x0 + x3) * 0.5f;
-}
-
 float CurveMix(const StateTransition* transition, float t) {
   if (transition == nullptr) {
     return t;
@@ -112,7 +94,9 @@ float CurveMix(const StateTransition* transition, float t) {
     case KeyframeInterpolationType::Hold:
       return t >= 1.0f ? 1.0f : 0.0f;
     case KeyframeInterpolationType::Bezier:
-      return EvalBezier(transition->bezierOut, transition->bezierIn, t);
+      return static_cast<float>(SolveBezierEasing(transition->bezierOut.x, transition->bezierOut.y,
+                                                   transition->bezierIn.x, transition->bezierIn.y,
+                                                   t));
     case KeyframeInterpolationType::Linear:
     default:
       return t;
