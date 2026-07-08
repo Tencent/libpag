@@ -66,19 +66,22 @@ class HTMLAnimationBuilder {
 
   /**
    * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that
-   * declares one or more CSS animations. Unlike `buildForElement`, the shape has no Layer of its
-   * own: its painters (`Fill` / `Stroke`) are synthesised later by the SVG importer during resolve,
-   * so the emitted `AnimationObject`s target the painter ids the importer derives from the shape's
-   * DOM `id` (`<id>__fill` for the fill, `<id>__stroke` for the stroke). Supports the SVG-specific
-   * animatable properties `fill`, `fill-opacity`, `stroke`, `stroke-opacity` and
-   * `stroke-dashoffset`, and honours the full comma-separated `animation` list (each entry becomes
-   * its own `Animation`). `dashScale` (real path length / author `pathLength`) rescales
-   * `stroke-dashoffset` keyframes into user units, mirroring the static dash scaling the SVG
-   * importer applies. Returns true when at least one channel was emitted.
+   * declares one or more CSS animations. The SVG importer materialises the shape as its own `Layer`
+   * (keyed by the shape's DOM `id`, passed here as `shapeTargetId`) whose `Fill` / `Stroke` painters
+   * get the derived ids `<id>__fill` / `<id>__stroke`. Painter-space properties (`fill`,
+   * `fill-opacity`, `stroke`, `stroke-opacity`, `stroke-dashoffset`) target those painter ids;
+   * layer-space properties (`opacity` -> `alpha`, and a pure-translate `transform` -> `x` / `y`)
+   * target the shape's `Layer` directly. The shape layer sits at layout origin in the SVG user
+   * (view-box) space, so translate keyframes — captured in that same space via `transform-box:
+   * view-box` — map onto `x` / `y` verbatim. Non-translate transforms (scale / rotate / skew) have
+   * no Layer channel and are dropped with a diagnostic. Honours the full comma-separated `animation`
+   * list (each entry becomes its own `Animation`). `dashScale` (real path length / author
+   * `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the static dash
+   * scaling the SVG importer applies. Returns true when at least one channel was emitted.
    */
   bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
-                              const std::string& fillTargetId, const std::string& strokeTargetId,
-                              float dashScale);
+                              const std::string& shapeTargetId, const std::string& fillTargetId,
+                              const std::string& strokeTargetId, float dashScale);
 
  private:
   HTMLDiagnosticSink& _diagnostics;

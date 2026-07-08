@@ -1618,8 +1618,8 @@ bool HTMLAnimationBuilder::buildForElement(
 }
 
 bool HTMLAnimationBuilder::buildForInlineSvgShape(
-    const std::unordered_map<std::string, std::string>& style, const std::string& fillTargetId,
-    const std::string& strokeTargetId, float dashScale) {
+    const std::unordered_map<std::string, std::string>& style, const std::string& shapeTargetId,
+    const std::string& fillTargetId, const std::string& strokeTargetId, float dashScale) {
   if (_document == nullptr || _keyframes == nullptr) return false;
   auto shorthandIt = style.find("animation");
   bool hasShorthand = shorthandIt != style.end() && !Trim(shorthandIt->second).empty();
@@ -1690,6 +1690,13 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     std::vector<Keyframe<Color>> strokeColorKeys;
     std::vector<Keyframe<float>> strokeAlphaKeys;
     std::vector<Keyframe<float>> dashKeys;
+    // Layer-space channels: `opacity` -> the shape Layer's `alpha`, a pure-translate `transform` ->
+    // its `x` / `y`. The shape Layer sits at layout origin in SVG user (view-box) space, so the
+    // captured translate values (emitted in that space via `transform-box: view-box`) map verbatim.
+    std::vector<Keyframe<float>> alphaKeys;
+    std::vector<Keyframe<float>> xKeys;
+    std::vector<Keyframe<float>> yKeys;
+    bool transformDropped = false;
 
     for (const auto& stop : stops) {
       Frame time = static_cast<Frame>(
@@ -1699,7 +1706,21 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       for (const auto& kv : decls) {
         const std::string& prop = kv.first;
         const std::string& val = kv.second;
-        if (prop == "fill") {
+        if (prop == "opacity") {
+          float f = 0.0f;
+          if (parseFloatVal(val, f)) {
+            alphaKeys.push_back({time, std::max(0.0f, std::min(1.0f, f)), interp, {}, {}});
+          }
+        } else if (prop == "transform") {
+          Matrix m = Matrix::Identity();
+          bool pureTranslate = false;
+          if (ParseTransformMatrix(val, _valueParser, m, pureTranslate) && pureTranslate) {
+            xKeys.push_back({time, m.tx, interp, {}, {}});
+            yKeys.push_back({time, m.ty, interp, {}, {}});
+          } else {
+            transformDropped = true;
+          }
+        } else if (prop == "fill") {
           fillColorKeys.push_back({time, _valueParser.parseColor(val), interp, {}, {}});
         } else if (prop == "fill-opacity") {
           float f = 0.0f;
@@ -1721,12 +1742,22 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
             dashKeys.push_back({time, f * dashScale, interp, {}, {}});
           }
         }
-        // opacity / transform have no per-shape painter target and are ignored here.
       }
     }
 
+    // A pure-translate track that got interrupted by an unrepresentable function (scale / rotate /
+    // matrix-with-linear-part) can't be faithfully split across `x` / `y`, so drop the whole track.
+    if (transformDropped) {
+      xKeys.clear();
+      yKeys.clear();
+      _diagnostics.warn(
+          "html: inline-svg shape 'transform' animation is not a pure translate; transform channel "
+          "dropped [subset:animation-unsupported-property]");
+    }
+
     if (fillColorKeys.empty() && fillAlphaKeys.empty() && strokeColorKeys.empty() &&
-        strokeAlphaKeys.empty() && dashKeys.empty()) {
+        strokeAlphaKeys.empty() && dashKeys.empty() && alphaKeys.empty() && xKeys.empty() &&
+        yKeys.empty()) {
       continue;
     }
 
@@ -1735,12 +1766,18 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     ApplyBezierHandles(strokeColorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(strokeAlphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(dashKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     if (easing.kind == ResolvedEasing::Kind::Steps) {
       ExpandSteps(fillColorKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(fillAlphaKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(strokeColorKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(strokeAlphaKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(dashKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(alphaKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
     }
 
     LoopMode loopMode = LoopMode::Once;
@@ -1773,6 +1810,19 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     if (!dashKeys.empty()) {
       ApplyFillMode(dashKeys, spec.fillMode, dashKeys.front().value, loopOnce, activeEnd);
     }
+    if (!alphaKeys.empty()) {
+      ApplyFillMode(alphaKeys, spec.fillMode, alphaKeys.front().value, loopOnce, activeEnd);
+    }
+    // The shape Layer sits at layout origin, so its static (pre-animation) translate is (0, 0) —
+    // the same baseline `buildForElement` uses for translate-animated layers. The captured keyframe
+    // values stack on top of that origin, so `fill-mode: none` / `backwards` must revert to 0, not
+    // to the first keyframe (which is the off-screen start of the slide).
+    if (!xKeys.empty()) {
+      ApplyFillMode(xKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
+    }
+    if (!yKeys.empty()) {
+      ApplyFillMode(yKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
+    }
 
     bool needsTrailingBaseline =
         loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
@@ -1788,6 +1838,37 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       animation->duration = static_cast<Frame>(durationFrames);
     }
     animation->loop = loopMode;
+
+    // Layer-space channels (opacity / translate) target the shape's own `Layer`.
+    if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty()) {
+      if (shapeTargetId.empty()) {
+        _diagnostics.warn(
+            "html: inline-svg 'opacity' / 'transform' animation has no shape layer to target; "
+            "dropped [subset:animation-unsupported-property]");
+      } else {
+        auto* object = _document->makeNode<AnimationObject>();
+        object->target = shapeTargetId;
+        if (!alphaKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "alpha";
+          ch->keyframes = std::move(alphaKeys);
+          object->channels.push_back(ch);
+        }
+        if (!xKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "x";
+          ch->keyframes = std::move(xKeys);
+          object->channels.push_back(ch);
+        }
+        if (!yKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = "y";
+          ch->keyframes = std::move(yKeys);
+          object->channels.push_back(ch);
+        }
+        animation->objects.push_back(object);
+      }
+    }
 
     // Group channels by their target painter node (fill vs stroke).
     if (!fillColorKeys.empty() || !fillAlphaKeys.empty()) {

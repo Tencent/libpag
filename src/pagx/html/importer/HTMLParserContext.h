@@ -233,6 +233,7 @@ class HTMLParserContext {
   // derived painter ids by string (the nodes materialise during resolve, before export).
   struct PendingSvgShapeAnimation {
     std::unordered_map<std::string, std::string> style = {};
+    std::string shapeTargetId = {};
     std::string fillTargetId = {};
     std::string strokeTargetId = {};
     float dashScale = 1.0f;

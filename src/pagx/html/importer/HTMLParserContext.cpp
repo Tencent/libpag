@@ -268,8 +268,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
   // the derived painter ids by string; the nodes materialise (with those ids) before export.
   for (auto& shape : _pendingSvgShapeAnimations) {
-    _animationBuilder->buildForInlineSvgShape(shape.style, shape.fillTargetId, shape.strokeTargetId,
-                                              shape.dashScale);
+    _animationBuilder->buildForInlineSvgShape(shape.style, shape.shapeTargetId, shape.fillTargetId,
+                                              shape.strokeTargetId, shape.dashScale);
   }
   suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();

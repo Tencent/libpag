@@ -436,6 +436,7 @@ void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DO
 
         PendingSvgShapeAnimation pending;
         pending.style = std::move(style);
+        pending.shapeTargetId = id;
         pending.fillTargetId = id + "__fill";
         pending.strokeTargetId = id + "__stroke";
         pending.dashScale = dashScale;
