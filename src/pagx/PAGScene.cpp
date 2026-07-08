@@ -462,7 +462,7 @@ std::shared_ptr<PAGStateMachineTimeline> PAGScene::getStateMachineTimeline(const
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
   // at apply time, same as PAGTimeline.
   auto timeline = std::shared_ptr<PAGStateMachineTimeline>(
-      new PAGStateMachineTimeline(matched, nullptr, document.get(), shared_from_this()));
+      new PAGStateMachineTimeline(matched, nullptr, document.get(), weak_from_this()));
   stateMachineTimelines.emplace(id, timeline);
   return timeline;
 }
