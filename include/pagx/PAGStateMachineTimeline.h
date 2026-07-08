@@ -94,7 +94,7 @@ class PAGStateMachineTimeline {
    * advances crossfade progress, and evaluates state transitions (including chained transitions
    * within the same frame, capped at 100 iterations).
    * @param deltaMicroseconds the elapsed time in microseconds.
-   * @return true if any state changed or any crossfade is in progress.
+   * @return true if any crossfade transition is in progress.
    */
   bool advance(int64_t deltaMicroseconds);
 
