@@ -4433,6 +4433,58 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientWithExplicitPxOffsetPerStop) {
   ASSERT_EQ(lg->colorStops.size(), 2u);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientPxStopOffsetsNormalisedAgainstRadius) {
+  // A px stop offset is an absolute distance along the gradient ray, so it must be divided by the
+  // gradient's px radius to land in PAGX's [0,1] color-stop space. On a large box the `1.4px` /
+  // `1.6px` halftone dots would otherwise store 1.4 / 1.6 (both past the 1.0 edge) and flood the
+  // whole box with the first color instead of painting a tiny dot.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:1920px;height:1080px">
+      <div style="width:1920px;height:1080px;
+                  background-image:radial-gradient(rgba(255,138,0,0.16) 1.4px, rgba(0,0,0,0) 1.6px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  ASSERT_EQ(rg->colorStops.size(), 2u);
+  // radius = 0.5 (default) * 1920 box width = 960px, so 1.4px -> 0.001458, 1.6px -> 0.001667.
+  EXPECT_TRUE(NearlyEqual(rg->colorStops[0]->offset, 1.4f / 960.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(rg->colorStops[1]->offset, 1.6f / 960.0f, 1e-4f));
+  EXPECT_LT(rg->colorStops.back()->offset, 1.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientPxStopsNormalisedAndReset) {
+  // A repeating-*-gradient downgraded to a single gradient must still normalise its px stops into
+  // [0,1] (against the known box) and reset to the first color past the pattern, so a subtle 10px
+  // stripe overlay renders as one period at true scale instead of flooding the box with the last
+  // color.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;
+                  background-image:repeating-linear-gradient(90deg, #F00 0px, #00F 10px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_GE(lg->colorStops.size(), 3u);
+  // Every stop stays within [0,1] (no raw 10px offset leaking through).
+  for (const auto* stop : lg->colorStops) {
+    EXPECT_GE(stop->offset, 0.0f);
+    EXPECT_LE(stop->offset, 1.0f);
+  }
+  // The declared period ends at 10px / 100px line = 0.1, then the tile resets to the first color and
+  // the last stop holds that first color out to the 1.0 edge.
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.1f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(lg->colorStops.back()->offset, 1.0f, 0.01f));
+  EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, lg->colorStops.front()->color));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, DuplicateHeadIsMergedBySubsetTransformer) {
   // The transformer must merge multiple <head> elements into one. Both <title>s should survive
   // (the importer uses the first one for data-title).

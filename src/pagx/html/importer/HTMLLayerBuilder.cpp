@@ -187,10 +187,12 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
     return color;
   };
   if (lower.compare(0, 26, "repeating-linear-gradient(") == 0) {
-    return warnDowngrade(_valueParser.parseLinearGradient(trimmed.substr(kRepeatingPrefixLen)));
+    return warnDowngrade(_valueParser.parseLinearGradient(trimmed.substr(kRepeatingPrefixLen),
+                                                          boxWidth, boxHeight, /*repeating=*/true));
   }
   if (lower.compare(0, 26, "repeating-radial-gradient(") == 0) {
-    return warnDowngrade(_valueParser.parseRadialGradient(trimmed.substr(kRepeatingPrefixLen)));
+    return warnDowngrade(_valueParser.parseRadialGradient(trimmed.substr(kRepeatingPrefixLen),
+                                                          boxWidth, boxHeight, /*repeating=*/true));
   }
   if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
     return warnDowngrade(_valueParser.parseConicGradient(trimmed.substr(kRepeatingPrefixLen)));
