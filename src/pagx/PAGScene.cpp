@@ -118,8 +118,14 @@ void PAGScene::buildRuntimeTree() {
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
-    ViewModel* schema, const std::shared_ptr<PAGScene>& scene) {
+    ViewModel* schema, const std::shared_ptr<PAGScene>& scene,
+    std::unordered_set<const ViewModel*>& visited) {
   if (schema == nullptr) return nullptr;
+  // Guard against cyclic viewModelRef chains (A -> B -> A) which would recurse forever; the
+  // importer does not reject such cycles, so stop at a schema already on the current path. The
+  // schema is erased on return so two sibling properties referencing the same schema each get
+  // their own instance rather than being mistaken for a cycle.
+  if (!visited.insert(schema).second) return nullptr;
   auto vm = std::shared_ptr<PAGViewModel>(new PAGViewModel());
   vm->_id = schema->id;
   for (auto* prop : schema->properties) {
@@ -168,6 +174,14 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       case ViewModelPropertyType::ViewModel: {
         auto v = std::make_shared<PAGViewModelValueViewModel>();
         v->type = ViewModelPropertyType::ViewModel;
+        // Instantiate the nested VM from the referenced schema now, so a property declared as
+        // ViewModel carries its child instance regardless of whether a Composition later binds
+        // it. DataBind source paths ($vm.child.leaf) and referenceViewModel() both rely on this
+        // link being present; without it, a pure data-nesting declaration (no Composition) could
+        // neither be read through the VM API nor resolved by DataContext.
+        if (prop->viewModelRef != nullptr) {
+          v->referenceInstance = CreateViewModelFromSchema(prop->viewModelRef, scene, visited);
+        }
         value = std::move(v);
         break;
       }
@@ -254,6 +268,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
       vm->propertyList.push_back(value);
     }
   }
+  visited.erase(schema);
   return vm;
 }
 
@@ -267,14 +282,28 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
     const auto* compSchema = sourceLayer->composition;
     std::shared_ptr<PAGViewModel> childVM = nullptr;
     if (compSchema->viewModel != nullptr) {
-      childVM = PAGScene::CreateViewModelFromSchema(compSchema->viewModel, shared_from_this());
-      childComp->compositionViewModel = childVM;
+      // Reuse the nested VM the parent already declared for this slot (instantiated from the
+      // property's viewModelRef during the parent VM creation) when present, so the Composition
+      // shares the parent's instance rather than building a divergent one. An open slot (property
+      // declared without viewModelRef) is back-filled here from the Composition's own schema.
+      std::shared_ptr<PAGViewModelValueViewModel> parentSlot;
       if (parentComp->compositionViewModel != nullptr && !sourceLayer->vmContext.empty()) {
         auto propName = sourceLayer->vmContext;
         if (propName.find("$vm.") == 0) propName = propName.substr(4);
-        auto prop = parentComp->compositionViewModel->propertyViewModel(propName);
-        if (prop) prop->referenceInstance = childVM;
+        parentSlot = parentComp->compositionViewModel->propertyViewModel(propName);
+        if (parentSlot != nullptr) {
+          childVM = parentSlot->referenceInstance;
+        }
       }
+      if (childVM == nullptr) {
+        std::unordered_set<const ViewModel*> nestedVisited = {};
+        childVM = PAGScene::CreateViewModelFromSchema(compSchema->viewModel, shared_from_this(),
+                                                      nestedVisited);
+        if (parentSlot != nullptr) {
+          parentSlot->referenceInstance = childVM;
+        }
+      }
+      childComp->compositionViewModel = childVM;
     }
     // A nested Composition may carry DataBinds that reference a parent ViewModel property even when
     // it has no ViewModel of its own. Build a DataContext (with null VM when absent) chained to the
@@ -294,7 +323,8 @@ void PAGScene::buildNestedViewModels(PAGComposition* parentComp) {
 
 void PAGScene::buildViewModels() {
   auto self = shared_from_this();
-  rootViewModel = PAGScene::CreateViewModelFromSchema(document->viewModel, self);
+  std::unordered_set<const ViewModel*> visited = {};
+  rootViewModel = PAGScene::CreateViewModelFromSchema(document->viewModel, self, visited);
   if (rootViewModel != nullptr && _rootComposition != nullptr) {
     _rootComposition->compositionViewModel = rootViewModel;
     _rootComposition->dataBindRuntime = std::make_unique<DataBindRuntime>();

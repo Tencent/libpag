@@ -185,7 +185,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void buildViewModels();
   void buildNestedViewModels(PAGComposition* parentComp);
   static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(
-      ViewModel* schema, const std::shared_ptr<PAGScene>& scene);
+      ViewModel* schema, const std::shared_ptr<PAGScene>& scene,
+      std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
