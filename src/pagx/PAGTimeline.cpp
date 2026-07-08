@@ -126,6 +126,35 @@ int64_t PAGTimeline::currentTime() const {
   return currentTimeUs;
 }
 
+// Maps an absolute time to a valid playback position according to the loop mode. Once clamps to
+// [0, duration]; Loop wraps modulo duration; PingPong mirrors over a period of 2 * duration. Pure:
+// has no side effect on playback state.
+static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
+  if (duration <= 0) {
+    return time;
+  }
+  switch (loop) {
+    case LoopMode::Once:
+      return std::clamp<int64_t>(time, 0, duration);
+    case LoopMode::Loop: {
+      auto pos = time % duration;
+      if (pos < 0) {
+        pos += duration;
+      }
+      return pos;
+    }
+    case LoopMode::PingPong: {
+      auto period = duration * 2;
+      auto pos = time % period;
+      if (pos < 0) {
+        pos += period;
+      }
+      return pos < duration ? pos : period - pos;
+    }
+  }
+  return time;
+}
+
 bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
@@ -144,35 +173,19 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   } else {
     next = currentTimeUs + deltaMicroseconds;
   }
-  switch (animation->loop) {
-    case LoopMode::Once:
-      if (next >= duration) {
-        next = duration;
-        playing = false;
-      } else if (next < 0) {
-        next = 0;
-        playing = false;
-      }
-      break;
-    case LoopMode::Loop: {
-      next = next % duration;
-      if (next < 0) {
-        next += duration;
-      }
-      break;
-    }
-    case LoopMode::PingPong: {
-      auto period = duration * 2;
-      auto pos = next % period;
-      if (pos < 0) {
-        pos += period;
-      }
-      next = pos < duration ? pos : period - pos;
-      break;
-    }
+  // Once mode stops playback when the clip reaches either end; other modes keep looping.
+  if (animation->loop == LoopMode::Once && (next >= duration || next < 0)) {
+    playing = false;
   }
-  currentTimeUs = next;
+  currentTimeUs = WrapTime(next, duration, animation->loop);
   return currentTimeUs != previous;
+}
+
+void PAGTimeline::setElapsedTime(int64_t elapsedMicroseconds) {
+  if (animation == nullptr) {
+    return;
+  }
+  currentTimeUs = WrapTime(elapsedMicroseconds, DurationMicros(animation), animation->loop);
 }
 
 void PAGTimeline::apply(float mix) {

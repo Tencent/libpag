@@ -20,7 +20,9 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueNumber.h"
@@ -521,59 +523,43 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
   return hadActive || hasActive;
 }
 
-void PAGStateMachineTimeline::applyAnimationState(const State* state, int64_t elapsedUs,
-                                                  float weight, RuntimeBinding* effectiveBinding) {
-  if (state == nullptr || state->stateType() != StateType::Animation || contextDoc == nullptr) {
+PAGTimeline* PAGStateMachineTimeline::getOrCreateTimeline(const std::string& animationId) {
+  if (contextDoc == nullptr) {
+    return nullptr;
+  }
+  auto it = timelineCache.find(animationId);
+  if (it != timelineCache.end()) {
+    return it->second.get();
+  }
+  auto* anim = contextDoc->findNode<Animation>(animationId);
+  // A state referencing a missing animation is a malformed document (import only validates the
+  // "@id" syntax, not existence). Surface it loudly in debug builds; in release fall back to an
+  // empty state that drives no channels.
+  DEBUG_ASSERT(anim != nullptr);
+  if (anim == nullptr) {
+    return nullptr;
+  }
+  auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(anim, binding, contextDoc, owner));
+  auto* raw = timeline.get();
+  timelineCache.emplace(animationId, std::move(timeline));
+  return raw;
+}
+
+void PAGStateMachineTimeline::applyStateViaTimeline(const State* state, int64_t elapsedUs,
+                                                    float weight) {
+  if (state == nullptr || state->stateType() != StateType::Animation) {
     return;
   }
   auto* animState = static_cast<const AnimationState*>(state);
   if (animState->animationId.empty()) {
     return;
   }
-  auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-  if (anim == nullptr) {
+  auto* timeline = getOrCreateTimeline(animState->animationId);
+  if (timeline == nullptr) {
     return;
   }
-  int64_t sampleUs = elapsedUs;
-  int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
-  if (durationUs > 0) {
-    switch (anim->loop) {
-      case LoopMode::Loop:
-        sampleUs = sampleUs % durationUs;
-        if (sampleUs < 0) {
-          sampleUs += durationUs;
-        }
-        break;
-      case LoopMode::Once:
-        sampleUs = std::min(sampleUs, durationUs);
-        break;
-      case LoopMode::PingPong: {
-        auto period = durationUs * 2;
-        auto pos = sampleUs % period;
-        if (pos < 0) {
-          pos += period;
-        }
-        sampleUs = pos < durationUs ? pos : period - pos;
-        break;
-      }
-    }
-  }
-  for (const auto* object : anim->objects) {
-    if (object == nullptr) {
-      continue;
-    }
-    auto* targetNode = contextDoc->findNode(object->target);
-    if (targetNode == nullptr) {
-      continue;
-    }
-    for (const auto* channel : object->channels) {
-      if (channel == nullptr) {
-        continue;
-      }
-      auto value = channel->evaluateAt(sampleUs, anim->frameRate);
-      effectiveBinding->apply(targetNode, channel->name, value, weight);
-    }
-  }
+  timeline->setElapsedTime(elapsedUs);
+  timeline->apply(weight);
 }
 
 void PAGStateMachineTimeline::apply(float smMix) {
@@ -584,29 +570,21 @@ void PAGStateMachineTimeline::apply(float smMix) {
   if (clamped <= 0.0f) {
     return;
   }
-  // Resolve effective binding: null binding is a top-level timeline that resolves the scene's
-  // current root binding lazily at apply time, same as PAGTimeline.
-  RuntimeBinding* effectiveBinding = binding;
-  if (effectiveBinding == nullptr) {
-    auto scene = owner.lock();
-    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
-  }
-  if (effectiveBinding == nullptr) {
-    return;
-  }
+  // Binding resolution (including the null-binding lazy path for top-level timelines) is delegated
+  // to each state's PAGTimeline in applyStateViaTimeline.
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
       float weight = smMix * CurveMix(ri.transition, f.mixFrom);
       if (weight <= 0.0f) {
         continue;
       }
-      applyAnimationState(f.state, f.elapsedUs, weight, effectiveBinding);
+      applyStateViaTimeline(f.state, f.elapsedUs, weight);
     }
     float weight = smMix * CurveMix(ri.transition, ri.mix);
     if (weight <= 0.0f) {
       continue;
     }
-    applyAnimationState(ri.currentState, ri.currentElapsedUs, weight, effectiveBinding);
+    applyStateViaTimeline(ri.currentState, ri.currentElapsedUs, weight);
   }
 }
 

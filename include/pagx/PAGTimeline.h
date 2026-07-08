@@ -135,6 +135,12 @@ class PAGTimeline {
   PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
               std::weak_ptr<PAGScene> owner);
 
+  // Sets the current time from an elapsed duration since the state started, wrapping it into the
+  // valid playback range according to the animation's loop mode (Once clamps, Loop wraps, PingPong
+  // mirrors). Used by PAGStateMachineTimeline, which tracks elapsed time per state rather than
+  // driving advance() directly. Unlike advance() this never mutates the playing flag.
+  void setElapsedTime(int64_t elapsedMicroseconds);
+
   // Resolves each animation object's target node against contextDoc once and caches the
   // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup. Built lazily on
   // the first apply(). Stale caches are replaced by rebuilding the PAGTimeline (driven by
@@ -164,6 +170,7 @@ class PAGTimeline {
 
   friend class PAGScene;
   friend class PAGComposition;
+  friend class PAGStateMachineTimeline;
 };
 
 }  // namespace pagx
