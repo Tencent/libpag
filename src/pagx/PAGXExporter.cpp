@@ -336,7 +336,7 @@ static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition
         condition->op == TransitionConditionOp::NotEqual) {
       xml.addAttribute("value", condition->valueBool ? "true" : "false");
     } else {
-      xml.addAttribute("value", std::to_string(condition->valueNumber));
+      xml.addAttribute("value", FloatToString(condition->valueNumber));
     }
   }
   xml.closeElementSelfClosing();
@@ -431,7 +431,7 @@ static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
         case StateMachineInputType::Number:
           typeStr = "number";
           if (input->defaultNumber != 0.0f)
-            xml.addAttribute("default", std::to_string(input->defaultNumber));
+            xml.addAttribute("default", FloatToString(input->defaultNumber));
           break;
         case StateMachineInputType::Trigger:
           typeStr = "trigger";
