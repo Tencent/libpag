@@ -58,7 +58,7 @@ void PAGComposition::advance(int64_t deltaMicroseconds) {
     timeline->advance(deltaMicroseconds);
   }
   for (auto& sm : stateMachineTimelines) {
-    if (sm) sm->advance(deltaMicroseconds);
+    sm->advance(deltaMicroseconds);
   }
   PAGLayer::advance(deltaMicroseconds);
 }
@@ -68,7 +68,7 @@ void PAGComposition::apply(float mix) {
     timeline->apply(mix);
   }
   for (auto& sm : stateMachineTimelines) {
-    if (sm) sm->apply(mix);
+    sm->apply(mix);
   }
   PAGLayer::apply(mix);
 }
