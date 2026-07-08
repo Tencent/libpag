@@ -12617,8 +12617,9 @@ PAGX_TEST(PAGXTest, SMEmptyStateRoundTrip) {
       }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->states.size(), 1u);
-  EXPECT_TRUE(dynamic_cast<const pagx::AnimationState*>(loadedSM->regions[0]->states[0])
-                  ->animationId.empty());
+  auto* loadedState = loadedSM->regions[0]->states[0].get();
+  ASSERT_TRUE(loadedState->stateType() == pagx::StateType::Animation);
+  EXPECT_TRUE(static_cast<const pagx::AnimationState*>(loadedState)->animationId.empty());
 }
 
 PAGX_TEST(PAGXTest, SMDefaultsOmittedInExport) {
