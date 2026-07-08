@@ -21,6 +21,7 @@
 #include <memory>
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Device.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -39,47 +40,48 @@ class Drawable {
  public:
   virtual ~Drawable() = default;
 
-  virtual int width() const = 0;
-  virtual int height() const = 0;
-
   /**
-   * Returns the GPU device backing this drawable. May be lazily constructed; the returned device
-   * remains valid for the lifetime of the drawable. Returns nullptr if the drawable is not yet
-   * ready (e.g. zero-sized canvas) or the platform backend is unavailable.
+   * Creates a Drawable that takes ownership of the given tgfx::Surface. The surface is returned
+   * from getSurface() and kept alive for the lifetime of the Drawable.
    */
-  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface);
 
-  /**
-   * Acquires a tgfx::Surface to render into. The context must be the one obtained from
-   * getDevice()->lockContext() on the calling thread. Implementations may cache the surface
-   * across calls and re-create it after updateSize(). Returns nullptr if the drawable cannot
-   * provide a renderable surface.
-   */
-  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) = 0;
+  virtual int width() const {
+    return surface ? surface->width() : 0;
+  }
+  virtual int height() const {
+    return surface ? surface->height() : 0;
+  }
 
-  /**
-   * Releases any cached surface. Called when the drawable size changes or the caller wants to
-   * reduce memory pressure.
-   */
+  virtual std::shared_ptr<tgfx::Device> getDevice() {
+    return tgfx::GLDevice::Current();
+  }
+
+  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {
+    // A surface created from a specific context cannot be used with a different one. Without this
+    // guard, a PAGSurface built via pagx::MakeFrom(tgfx::Surface) would silently hand its surface
+    // to whichever context PAGScene::draw() happens to lock, even if that context belongs to a
+    // different device. Callers that need cross-device rendering should use pagx::Record() with
+    // the matching context instead.
+    if (surface && context != nullptr && surface->getContext() != context) {
+      return nullptr;
+    }
+    return surface;
+  }
+
   virtual void freeSurface() {
     surface = nullptr;
   }
-
-  /**
-   * Presents the rendered content to the platform's display target. Default implementation is a
-   * no-op; on-screen drawables (canvas, swap-chain) override to swap buffers.
-   */
   virtual void present(tgfx::Context* /*context*/) {
   }
-
-  /**
-   * Synchronizes the drawable's logical size with the underlying platform target. Called by
-   * PAGSurface when the canvas may have been resized externally.
-   */
   virtual void updateSize() {
   }
 
  protected:
+  Drawable() = default;
+  explicit Drawable(std::shared_ptr<tgfx::Surface> surface) : surface(std::move(surface)) {
+  }
+
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 };
 

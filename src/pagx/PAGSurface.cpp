@@ -22,6 +22,7 @@
 #include "pagx/runtime/OffscreenDrawable.h"
 #include "pagx/runtime/RenderTargetDrawable.h"
 #include "pagx/runtime/TextureDrawable.h"
+#include "pagx/tgfx.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -90,6 +91,10 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);
   device->unlock();
   return ok;
+}
+
+std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>& surface) {
+  return PAGSurface::MakeFrom(Drawable::MakeFrom(surface));
 }
 
 }  // namespace pagx

@@ -54,8 +54,7 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceProvider* provider,
-                                    std::vector<std::string>* paths,
+static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths,
                                     std::unordered_set<const PAGXDocument*>& visited) {
   if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
     return;
@@ -69,16 +68,13 @@ static void AppendExternalFilePaths(const PAGXDocument* document, ImageResourceP
       if (!IsExternalFilePath(image->filePath)) {
         continue;
       }
-      if (provider && provider->hasImage(image->filePath)) {
-        continue;
-      }
       paths->push_back(image->filePath);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), provider, paths, visited);
+        AppendExternalFilePaths(layer->externalDoc.get(), paths, visited);
       }
     }
   }
@@ -300,7 +296,7 @@ bool PAGXDocument::hasUnresolvedImports() const {
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   std::unordered_set<const PAGXDocument*> visited = {};
-  AppendExternalFilePaths(this, _imageResourceProvider.get(), &paths, visited);
+  AppendExternalFilePaths(this, &paths, visited);
   return paths;
 }
 
@@ -320,6 +316,48 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     }
   }
   return found;
+}
+
+// Sets runtimeImage on every Image node matching filePath in this document and its resolved
+// external documents, collecting the touched Image nodes per owning document for notifyChange.
+void PAGXDocument::LoadImageInChain(
+    PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* imageNode = static_cast<Image*>(node.get());
+      if (imageNode->filePath == filePath) {
+        imageNode->runtimeImage = image;  // filePath is kept as the serialization anchor.
+        docDirtyImages[document].push_back(imageNode);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        LoadImageInChain(layer->externalDoc.get(), filePath, image, docDirtyImages, visited);
+      }
+    }
+  }
+}
+
+bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image) {
+  if (filePath.empty()) {
+    return false;
+  }
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyImages = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  LoadImageInChain(this, filePath, image, docDirtyImages, visited);
+  if (docDirtyImages.empty()) {
+    return false;
+  }
+  // A decoded image swap does not change geometry, so layout is not re-run (layoutChanged = false).
+  for (auto& entry : docDirtyImages) {
+    entry.first->notifyChange(entry.second, false);
+  }
+  return true;
 }
 
 bool PAGXDocument::embed() {
@@ -628,10 +666,6 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
       ++it;
     }
   }
-}
-
-void PAGXDocument::setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider) {
-  _imageResourceProvider = std::move(provider);
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into

@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGImage.h"
+#include "base/utils/TGFXCast.h"
+#include "pagx/tgfx.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -59,11 +62,36 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
   return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
 }
 
+std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
+                                                    pag::ImageOrigin origin) {
+  auto device = tgfx::GLDevice::Current();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto* context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto image = tgfx::Image::MakeFrom(context, pag::ToTGFX(texture), pag::ToTGFX(origin));
+  device->unlock();
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
+}
+
 const std::string& PAGImage::source() const {
   return _source;
 }
 PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
     : _tgfxImage(std::move(image)), _source(std::move(source)) {
+}
+
+std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>& image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
 }
 
 }  // namespace pagx
