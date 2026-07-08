@@ -142,13 +142,6 @@ class PAGStateMachineTimeline {
   bool bindInput(const std::string& inputName,
                  const std::shared_ptr<PAGViewModelValue>& vmValue);
 
-  struct InputValue {
-    StateMachineInputType type = StateMachineInputType::Bool;
-    bool boolValue = false;
-    float numberValue = 0.0f;
-    bool fired = false;
-  };
-
  private:
   explicit PAGStateMachineTimeline(StateMachine* stateMachine, RuntimeBinding* binding,
                                    PAGXDocument* contextDoc,
@@ -160,6 +153,12 @@ class PAGStateMachineTimeline {
   PAGXDocument* contextDoc = nullptr;
 
   struct RegionInstance;
+  struct InputValue {
+    StateMachineInputType type = StateMachineInputType::Bool;
+    bool boolValue = false;
+    float numberValue = 0.0f;
+    bool fired = false;
+  };
   std::vector<RegionInstance> regions;
   std::vector<InputValue> inputValues;
 
