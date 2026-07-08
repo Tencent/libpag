@@ -150,16 +150,16 @@ PAGStateMachineTimeline::PAGStateMachineTimeline(StateMachine* sm, RuntimeBindin
 // =============================================================================
 
 const std::string& PAGStateMachineTimeline::getId() const {
-  if (stateMachine != nullptr) {
-    return stateMachine->id;
+  if (stateMachine == nullptr || owner.expired()) {
+    static const std::string empty;
+    return empty;
   }
-  static const std::string empty;
-  return empty;
+  return stateMachine->id;
 }
 
 std::vector<std::string> PAGStateMachineTimeline::getRegionIds() const {
   std::vector<std::string> ids;
-  if (stateMachine == nullptr) {
+  if (stateMachine == nullptr || owner.expired()) {
     return ids;
   }
   ids.reserve(regions.size());
@@ -172,6 +172,9 @@ std::vector<std::string> PAGStateMachineTimeline::getRegionIds() const {
 }
 
 std::string PAGStateMachineTimeline::getCurrentState(const std::string& regionName) const {
+  if (stateMachine == nullptr || owner.expired()) {
+    return {};
+  }
   for (const auto& ri : regions) {
     if (ri.region != nullptr && ri.region->name == regionName && ri.currentState != nullptr) {
       return ri.currentState->name;

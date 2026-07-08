@@ -60,7 +60,8 @@ class PAGStateMachineTimeline {
   const std::string& getId() const;
 
   /**
-   * Returns the region names in declaration order.
+   * Returns the region names in declaration order. Returns an empty vector once the owning
+   * PAGScene is destroyed.
    */
   std::vector<std::string> getRegionIds() const;
 
