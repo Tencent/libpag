@@ -11607,7 +11607,7 @@ PAGX_TEST(PAGXTest, SMExitTimeGate) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Advance to frame 15 (833334us at 60fps); exitTime not reached.
+  // Advance to frame 25 (416667us at 60fps); exitTime not reached.
   timeline->advance(833334 / 2);
   EXPECT_EQ(timeline->getCurrentState("main"), "idle");
   // Advance past frame 30; should transition.
