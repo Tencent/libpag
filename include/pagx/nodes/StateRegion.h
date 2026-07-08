@@ -41,8 +41,8 @@ class StateRegion : public Node {
   std::string name = {};
 
   /**
-   * The name of the state this region enters when the state machine starts. Must match one of the
-   * State names in this region.
+   * The name of the state this region enters when the state machine starts. If no matching State
+   * is found, the first State in the region is used as the default.
    */
   std::string initialState = {};
 
