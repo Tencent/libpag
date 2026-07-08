@@ -538,9 +538,21 @@ export function pagxParseTimeMs(v: string): number {
 export function pagxClipNormalizeD(raw: string, el: Element): string {
   const v = (raw || '').trim();
   if (!v || v.toLowerCase() === 'none' || /^url\(/i.test(v)) return '';
-  const rect = el.getBoundingClientRect();
-  const bw = rect.width;
-  const bh = rect.height;
+  // Measure the element's UNTRANSFORMED layout border box — not getBoundingClientRect(), which
+  // reports the box after ancestor CSS transforms. A scaled wrapper (e.g. `.poster{ transform:
+  // scale(s) }`) would otherwise make this emit clip geometry in screen pixels while the importer
+  // frames the contour mask in the element's unscaled layout box, so the wipe would reveal the
+  // wrong region (shifted / cropped by the scale factor). `offsetWidth/offsetHeight` are the
+  // border-box size in layout pixels and are immune to transforms. Fall back to the rendered rect
+  // for elements without an offset box (e.g. SVG nodes).
+  const hostEl = el as HTMLElement;
+  let bw = typeof hostEl.offsetWidth === 'number' ? hostEl.offsetWidth : 0;
+  let bh = typeof hostEl.offsetHeight === 'number' ? hostEl.offsetHeight : 0;
+  if (!(bw > 0) || !(bh > 0)) {
+    const rect = el.getBoundingClientRect();
+    bw = rect.width;
+    bh = rect.height;
+  }
   if (!(bw > 0) || !(bh > 0)) return '';
   const cs = getComputedStyle(el);
   const px = (s: string): number => {

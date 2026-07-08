@@ -24,6 +24,7 @@ const {
   pagxTransitionDescriptorFromBags,
   pagxTextSegments,
   pagxGlobalSampleCount,
+  pagxClipNormalizeD,
   buildAnimationCapturePayload,
   capturePagxAnimationsOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
@@ -687,6 +688,54 @@ describe('pagxGlobalSampleCount', () => {
     expect(pagxGlobalSampleCount(0, 24)).toBe(24);
     expect(pagxGlobalSampleCount(-5, 24)).toBe(24);
     expect(pagxGlobalSampleCount(Infinity, 24)).toBe(24);
+  });
+});
+
+describe('pagxClipNormalizeD', () => {
+  // The function reads border/padding/margin off getComputedStyle; default them all to 0px so the
+  // reference box is the plain border-box.
+  const origGetComputedStyle = global.getComputedStyle;
+  beforeAll(() => {
+    global.getComputedStyle = () => ({
+      borderLeftWidth: '0px', borderTopWidth: '0px', borderRightWidth: '0px', borderBottomWidth: '0px',
+      paddingLeft: '0px', paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px',
+      marginLeft: '0px', marginTop: '0px', marginRight: '0px', marginBottom: '0px',
+    });
+  });
+  afterAll(() => { global.getComputedStyle = origGetComputedStyle; });
+
+  // Emulate an element under a `transform: scale(s)` ancestor (e.g. the poster wrapper): the layout
+  // border box (offsetWidth/offsetHeight) stays in CSS pixels while getBoundingClientRect() reports
+  // the scaled, rendered box.
+  const scaledEl = (layoutW, layoutH, scale) => ({
+    offsetWidth: layoutW,
+    offsetHeight: layoutH,
+    getBoundingClientRect: () => ({ width: layoutW * scale, height: layoutH * scale, left: 0, top: 0 }),
+  });
+
+  test('emits geometry in the untransformed layout box, not the scaled rect', () => {
+    const el = scaledEl(1920, 383, 0.5);
+    // Fully-open inset → the full-size layout border box (1920×383), NOT the halved rect (960×191.5).
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 0px)', el))
+      .toBe('M 0 0 L 1920 0 L 1920 383 L 0 383 Z');
+    // wipe start: right inset 100% collapses width to 0 at the left edge, in layout pixels.
+    expect(pagxClipNormalizeD('inset(0px 100% 0px 0px)', el))
+      .toBe('M 0 0 L 0 0 L 0 383 L 0 383 Z');
+    // wipe start from the right: left inset 100% collapses width to 0 at the right (x = 1920).
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 100%)', el))
+      .toBe('M 1920 0 L 1920 0 L 1920 383 L 1920 383 Z');
+  });
+
+  test('falls back to getBoundingClientRect for elements without an offset box (e.g. SVG)', () => {
+    const el = { getBoundingClientRect: () => ({ width: 200, height: 100, left: 0, top: 0 }) };
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 0px)', el))
+      .toBe('M 0 0 L 200 0 L 200 100 L 0 100 Z');
+  });
+
+  test('returns empty for none / url() references', () => {
+    const el = scaledEl(100, 100, 0.5);
+    expect(pagxClipNormalizeD('none', el)).toBe('');
+    expect(pagxClipNormalizeD('url(#clip)', el)).toBe('');
   });
 });
 
