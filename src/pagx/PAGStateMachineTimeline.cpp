@@ -47,15 +47,14 @@ static constexpr int MAX_TRANSITIONS_PER_FRAME = 100;
 
 struct PAGStateMachineTimeline::RegionInstance {
   struct FadingState {
-    const State* state = nullptr;
-    int64_t elapsedUs = 0;
+    std::shared_ptr<PAGTimeline> timeline;
     float mixFrom = 1.0f;
     bool frozen = false;
   };
 
   const StateRegion* region = nullptr;
   const State* currentState = nullptr;
-  int64_t currentElapsedUs = 0;
+  std::shared_ptr<PAGTimeline> currentTimeline;
   float mix = 1.0f;
   const StateTransition* transition = nullptr;
   std::vector<FadingState> fadingOut;
@@ -143,6 +142,7 @@ PAGStateMachineTimeline::PAGStateMachineTimeline(StateMachine* sm, RuntimeBindin
     if (ri.currentState == nullptr && !region->states.empty()) {
       ri.currentState = region->states[0];
     }
+    ri.currentTimeline = createTimelineForState(ri.currentState);
     regions.push_back(std::move(ri));
   }
 }
@@ -269,8 +269,9 @@ static bool EvaluateCondition(const TransitionCondition* condition,
 // Transition lookup (member helpers)
 // =============================================================================
 
-static bool IsTransitionAllowed(const StateTransition* transition, int64_t currentElapsedUs,
-                                const PAGXDocument* contextDoc, const State* currentState,
+static bool IsTransitionAllowed(const StateTransition* transition,
+                                const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc,
+                                const State* currentState,
                                 const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
                                 const StateMachine* stateMachine,
                                 const std::set<std::string>& consumedTriggers) {
@@ -283,18 +284,24 @@ static bool IsTransitionAllowed(const StateTransition* transition, int64_t curre
     if (currentState != nullptr && currentState->stateType() == StateType::Animation) {
       animState = static_cast<const AnimationState*>(currentState);
     }
-    if (animState != nullptr && !animState->animationId.empty() && contextDoc != nullptr) {
+    if (animState != nullptr && !animState->animationId.empty() && contextDoc != nullptr &&
+        currentTimeline != nullptr) {
       auto* anim = contextDoc->findNode<Animation>(animState->animationId);
       if (anim != nullptr) {
         int64_t exitUs = FramesToUs(transition->exitTime.value(), anim->frameRate);
         int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
+        // Time comes from the state's own timeline: totalTime is the monotonic elapsed time (loop
+        // count included), lastTotalTime is where the previous frame ended. A sub-loop exit time is
+        // aligned to the loop the previous frame was in so it can fire on every cycle.
+        int64_t totalUs = currentTimeline->totalTime();
+        int64_t lastTotalUs = currentTimeline->lastTotalTime();
         int64_t alignedExitUs = exitUs;
         if (exitUs <= durationUs && anim->loop != LoopMode::Once && durationUs > 0) {
           alignedExitUs +=
-              static_cast<int64_t>(std::floor(static_cast<double>(currentElapsedUs) / durationUs)) *
+              static_cast<int64_t>(std::floor(static_cast<double>(lastTotalUs) / durationUs)) *
               durationUs;
         }
-        if (currentElapsedUs < alignedExitUs) {
+        if (totalUs < alignedExitUs) {
           return false;
         }
       }
@@ -343,7 +350,7 @@ static bool IsTransitionAllowed(const StateTransition* transition, int64_t curre
 
 static const StateTransition* FindAllowedTransition(
     const StateRegion* region, const std::string& fromName, bool inTransition,
-    int64_t currentElapsedUs, const PAGXDocument* contextDoc, const State* currentState,
+    const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc, const State* currentState,
     const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
     const StateMachine* stateMachine, const std::set<std::string>& consumedTriggers) {
   if (region == nullptr) {
@@ -356,8 +363,8 @@ static const StateTransition* FindAllowedTransition(
     if (inTransition && !t->enableEarlyExit) {
       continue;
     }
-    if (IsTransitionAllowed(t, currentElapsedUs, contextDoc, currentState, inputValues,
-                            stateMachine, consumedTriggers)) {
+    if (IsTransitionAllowed(t, currentTimeline, contextDoc, currentState, inputValues, stateMachine,
+                            consumedTriggers)) {
       return t;
     }
   }
@@ -368,34 +375,47 @@ static const StateTransition* FindAllowedTransition(
 // Region state transition (member)
 // =============================================================================
 
+std::shared_ptr<PAGTimeline> PAGStateMachineTimeline::createTimelineForState(const State* state) {
+  if (state == nullptr || state->stateType() != StateType::Animation || contextDoc == nullptr) {
+    return nullptr;
+  }
+  auto* animState = static_cast<const AnimationState*>(state);
+  if (animState->animationId.empty()) {
+    return nullptr;
+  }
+  auto* anim = contextDoc->findNode<Animation>(animState->animationId);
+  // A state referencing a missing animation is a malformed document (import only validates the
+  // "@id" syntax, not existence). Surface it loudly in debug builds; in release fall back to an
+  // empty state that drives no channels.
+  DEBUG_ASSERT(anim != nullptr);
+  if (anim == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGTimeline>(new PAGTimeline(anim, binding, contextDoc, owner));
+}
+
 void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransition* t) {
   if (t == nullptr) {
     return;
   }
   RegionInstance::FadingState fading;
-  fading.state = ri.currentState;
-  fading.elapsedUs = ri.currentElapsedUs;
+  fading.timeline = ri.currentTimeline;
   fading.mixFrom = ri.mix;
   fading.frozen = false;
-  if (t->pauseOnExit && t->exitTime.has_value()) {
-    // Use the outgoing animation's frame rate to convert exitTime (in frames) to microseconds.
-    auto frameRate = 60.0f;
-    if (ri.currentState != nullptr && ri.currentState->stateType() == StateType::Animation &&
-        contextDoc != nullptr) {
-      auto* animState = static_cast<const AnimationState*>(ri.currentState);
-      if (!animState->animationId.empty()) {
-        auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-        if (anim != nullptr) {
-          frameRate = anim->frameRate;
-        }
-      }
-    }
-    fading.elapsedUs = FramesToUs(t->exitTime.value(), frameRate);
+  // Time that spilled past the outgoing animation's boundary this frame; forwarded to the incoming
+  // state so playback carries over seamlessly instead of restarting from zero.
+  int64_t spilledUs = ri.currentTimeline != nullptr ? ri.currentTimeline->spilledTime() : 0;
+  if (t->pauseOnExit && t->exitTime.has_value() && fading.timeline != nullptr) {
+    // Freeze the outgoing animation at its current pose (the exit frame it just reached) so it
+    // keeps contributing that pose while it mixes out, matching Rive's hold-at-exit behavior.
     fading.frozen = true;
   }
-  ri.fadingOut.push_back(fading);
+  ri.fadingOut.push_back(std::move(fading));
   ri.currentState = FindStateByName(ri.region, t->to);
-  ri.currentElapsedUs = 0;
+  ri.currentTimeline = createTimelineForState(ri.currentState);
+  if (ri.currentTimeline != nullptr && spilledUs > 0) {
+    ri.currentTimeline->advance(spilledUs);
+  }
   ri.transition = t;
   ri.mix = (t->duration <= 0) ? 1.0f : 0.0f;
   if (ri.mix >= 1.0f) {
@@ -421,13 +441,13 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
 
 bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
   bool inTransition = (ri.transition != nullptr && ri.mix < 1.0f);
-  const StateTransition* t =
-      FindAllowedTransition(ri.region, AnyStateName, inTransition, ri.currentElapsedUs, contextDoc,
-                            ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
+  const StateTransition* t = FindAllowedTransition(
+      ri.region, AnyStateName, inTransition, ri.currentTimeline.get(), contextDoc, ri.currentState,
+      inputValues, stateMachine, ri.consumedTriggers);
   if (t == nullptr) {
     t = FindAllowedTransition(ri.region,
                               ri.currentState != nullptr ? ri.currentState->name : std::string{},
-                              inTransition, ri.currentElapsedUs, contextDoc, ri.currentState,
+                              inTransition, ri.currentTimeline.get(), contextDoc, ri.currentState,
                               inputValues, stateMachine, ri.consumedTriggers);
   }
   if (t == nullptr) {
@@ -445,10 +465,12 @@ void PAGStateMachineTimeline::advanceRegion(int64_t deltaUs) {
     auto frameRate = contextDoc != nullptr && !contextDoc->animations.empty()
                          ? contextDoc->animations[0]->frameRate
                          : 60.0f;
-    ri.currentElapsedUs += deltaUs;
+    if (ri.currentTimeline != nullptr) {
+      ri.currentTimeline->advance(deltaUs);
+    }
     for (auto& f : ri.fadingOut) {
-      if (!f.frozen) {
-        f.elapsedUs += deltaUs;
+      if (!f.frozen && f.timeline != nullptr) {
+        f.timeline->advance(deltaUs);
       }
     }
     if (ri.transition != nullptr) {
@@ -523,45 +545,6 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
   return hadActive || hasActive;
 }
 
-PAGTimeline* PAGStateMachineTimeline::getOrCreateTimeline(const std::string& animationId) {
-  if (contextDoc == nullptr) {
-    return nullptr;
-  }
-  auto it = timelineCache.find(animationId);
-  if (it != timelineCache.end()) {
-    return it->second.get();
-  }
-  auto* anim = contextDoc->findNode<Animation>(animationId);
-  // A state referencing a missing animation is a malformed document (import only validates the
-  // "@id" syntax, not existence). Surface it loudly in debug builds; in release fall back to an
-  // empty state that drives no channels.
-  DEBUG_ASSERT(anim != nullptr);
-  if (anim == nullptr) {
-    return nullptr;
-  }
-  auto timeline = std::shared_ptr<PAGTimeline>(new PAGTimeline(anim, binding, contextDoc, owner));
-  auto* raw = timeline.get();
-  timelineCache.emplace(animationId, std::move(timeline));
-  return raw;
-}
-
-void PAGStateMachineTimeline::applyStateViaTimeline(const State* state, int64_t elapsedUs,
-                                                    float weight) {
-  if (state == nullptr || state->stateType() != StateType::Animation) {
-    return;
-  }
-  auto* animState = static_cast<const AnimationState*>(state);
-  if (animState->animationId.empty()) {
-    return;
-  }
-  auto* timeline = getOrCreateTimeline(animState->animationId);
-  if (timeline == nullptr) {
-    return;
-  }
-  timeline->setElapsedTime(elapsedUs);
-  timeline->apply(weight);
-}
-
 void PAGStateMachineTimeline::apply(float smMix) {
   if (stateMachine == nullptr || owner.expired()) {
     return;
@@ -570,21 +553,21 @@ void PAGStateMachineTimeline::apply(float smMix) {
   if (clamped <= 0.0f) {
     return;
   }
-  // Binding resolution (including the null-binding lazy path for top-level timelines) is delegated
-  // to each state's PAGTimeline in applyStateViaTimeline.
+  // Each playback slot owns its PAGTimeline, which holds the playback time and resolves the binding
+  // (including the null-binding lazy path for top-level timelines) internally.
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
       float weight = smMix * CurveMix(ri.transition, f.mixFrom);
-      if (weight <= 0.0f) {
+      if (weight <= 0.0f || f.timeline == nullptr) {
         continue;
       }
-      applyStateViaTimeline(f.state, f.elapsedUs, weight);
+      f.timeline->apply(weight);
     }
     float weight = smMix * CurveMix(ri.transition, ri.mix);
-    if (weight <= 0.0f) {
+    if (weight <= 0.0f || ri.currentTimeline == nullptr) {
       continue;
     }
-    applyStateViaTimeline(ri.currentState, ri.currentElapsedUs, weight);
+    ri.currentTimeline->apply(weight);
   }
 }
 

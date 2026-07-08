@@ -21,7 +21,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "pagx/ObserverHandle.h"
 #include "pagx/nodes/StateMachine.h"
@@ -181,25 +180,15 @@ class PAGStateMachineTimeline {
   // VM→SM input bindings. Each entry holds an ObserverHandle that detaches on destruction.
   std::vector<ObserverHandle> inputBindings;
 
-  // Per-animation PAGTimeline instances, keyed by animation id. Each state that references an
-  // animation plays it through the shared PAGTimeline for that id: the state machine only sets the
-  // current time and applies with a blend weight, delegating loop handling, channel evaluation and
-  // binding writes to PAGTimeline. Keyed by id (not per region/state) because apply() resets the
-  // current time before every apply, so the transient time never leaks across regions or crossfade
-  // slots; the only persistent state (resolved targets) is intrinsic to the animation and shared.
-  // These are private to the state machine and never share instances with PAGScene::getTimeline(),
-  // whose instances expose shared playback state to external API callers.
-  std::unordered_map<std::string, std::shared_ptr<PAGTimeline>> timelineCache;
-
   // Region advance helpers.
   void advanceRegion(int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
-  // Plays the animation of the given state through its PAGTimeline at elapsedUs, blended by weight.
-  void applyStateViaTimeline(const State* state, int64_t elapsedUs, float weight);
-  // Returns the PAGTimeline for animationId, creating and caching it on first use. Returns nullptr
-  // if the id resolves to no Animation (asserts in debug builds to surface dangling references).
-  PAGTimeline* getOrCreateTimeline(const std::string& animationId);
+  // Constructs a fresh PAGTimeline that plays the given state's animation. Each playback slot
+  // (current or fading) owns its own instance so their playback times stay independent. Returns
+  // nullptr for an empty state or a missing animation (asserts in debug builds to surface a
+  // dangling reference).
+  std::shared_ptr<PAGTimeline> createTimelineForState(const State* state);
 
   friend class PAGScene;
   friend class PAGComposition;

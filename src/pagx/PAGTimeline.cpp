@@ -156,6 +156,7 @@ static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
 }
 
 bool PAGTimeline::advance(int64_t deltaMicroseconds) {
+  spilledTimeUs = 0;
   if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
@@ -164,6 +165,11 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
     return false;
   }
   auto previous = currentTimeUs;
+  lastTotalTimeUs = totalTimeUs;
+  // Monotonic total time ignores loop folding so the state machine can recover the loop count for
+  // exit-time gates. Uses the absolute delta; per-state speed scaling will fold in here later.
+  int64_t absDelta = deltaMicroseconds < 0 ? -deltaMicroseconds : deltaMicroseconds;
+  totalTimeUs = totalTimeUs > INT64_MAX - absDelta ? INT64_MAX : totalTimeUs + absDelta;
   // Use saturating add to prevent signed overflow UB when deltaMicroseconds is extreme.
   int64_t next = 0;
   if (deltaMicroseconds > 0 && currentTimeUs > INT64_MAX - deltaMicroseconds) {
@@ -173,6 +179,14 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   } else {
     next = currentTimeUs + deltaMicroseconds;
   }
+  // Time of this frame's delta that spilled past a boundary: forwarded to the incoming state on a
+  // transition so playback carries over without a one-frame reset. For Loop it is the phase into
+  // the new cycle; for Once/PingPong it is the overshoot past the end (or before the start).
+  if (next > duration) {
+    spilledTimeUs = animation->loop == LoopMode::Loop ? next % duration : next - duration;
+  } else if (next < 0) {
+    spilledTimeUs = -next;
+  }
   // Once mode stops playback when the clip reaches either end; other modes keep looping.
   if (animation->loop == LoopMode::Once && (next >= duration || next < 0)) {
     playing = false;
@@ -181,11 +195,16 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   return currentTimeUs != previous;
 }
 
-void PAGTimeline::setElapsedTime(int64_t elapsedMicroseconds) {
-  if (animation == nullptr) {
-    return;
-  }
-  currentTimeUs = WrapTime(elapsedMicroseconds, DurationMicros(animation), animation->loop);
+int64_t PAGTimeline::totalTime() const {
+  return totalTimeUs;
+}
+
+int64_t PAGTimeline::lastTotalTime() const {
+  return lastTotalTimeUs;
+}
+
+int64_t PAGTimeline::spilledTime() const {
+  return spilledTimeUs;
 }
 
 void PAGTimeline::apply(float mix) {

@@ -100,6 +100,25 @@ class PAGTimeline {
   int64_t currentTime() const;
 
   /**
+   * Returns the monotonic total elapsed time in microseconds, accumulated by advance() regardless
+   * of loop folding. Reflects how long playback has run (loop count included), as opposed to
+   * currentTime() which is folded into the animation's duration by the loop mode.
+   */
+  int64_t totalTime() const;
+
+  /**
+   * Returns the value of totalTime() before the most recent advance().
+   */
+  int64_t lastTotalTime() const;
+
+  /**
+   * Returns the microseconds of the last advance() delta that spilled past the animation boundary
+   * (the overshoot past the end of a completed once/loop/pingPong cycle). Zero when the last
+   * advance() stayed within bounds.
+   */
+  int64_t spilledTime() const;
+
+  /**
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
    * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
@@ -135,12 +154,6 @@ class PAGTimeline {
   PAGTimeline(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
               std::weak_ptr<PAGScene> owner);
 
-  // Sets the current time from an elapsed duration since the state started, wrapping it into the
-  // valid playback range according to the animation's loop mode (Once clamps, Loop wraps, PingPong
-  // mirrors). Used by PAGStateMachineTimeline, which tracks elapsed time per state rather than
-  // driving advance() directly. Unlike advance() this never mutates the playing flag.
-  void setElapsedTime(int64_t elapsedMicroseconds);
-
   // Resolves each animation object's target node against contextDoc once and caches the
   // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup. Built lazily on
   // the first apply(). Stale caches are replaced by rebuilding the PAGTimeline (driven by
@@ -166,6 +179,12 @@ class PAGTimeline {
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;
+  // Monotonic elapsed time, folded into currentTimeUs by the loop mode. Kept separately so the
+  // state machine can reason about loop count (exit-time). When per-state speed is added this will
+  // accumulate scaled local time, so no state-machine change is needed for speed support.
+  int64_t totalTimeUs = 0;
+  int64_t lastTotalTimeUs = 0;
+  int64_t spilledTimeUs = 0;
   bool playing = true;
 
   friend class PAGScene;
