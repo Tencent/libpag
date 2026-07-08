@@ -74,11 +74,18 @@ class PAGStateMachineTimeline {
   /**
    * Sets a bool input. The state machine will evaluate conditions referencing this input on the
    * next advance().
+   * @param name the name of the SM input declared in <Inputs>.
+   * @param value the bool value to set.
+   * @return false if name is not found or the input type is not Bool; true otherwise.
    */
   bool setBool(const std::string& name, bool value);
 
   /**
-   * Sets a number input.
+   * Sets a number input. The state machine will evaluate conditions referencing this input on the
+   * next advance().
+   * @param name the name of the SM input declared in <Inputs>.
+   * @param value the number value to set.
+   * @return false if name is not found or the input type is not Number; true otherwise.
    */
   bool setNumber(const std::string& name, float value);
 
@@ -86,6 +93,8 @@ class PAGStateMachineTimeline {
    * Fires a trigger input. Sets the fired flag; the state machine will evaluate trigger conditions
    * on the next advance(). Fire is idempotent: firing the same trigger multiple times before the
    * next advance() has the same effect as firing it once.
+   * @param name the name of the SM input declared in <Inputs>.
+   * @return false if name is not found or the input type is not Trigger; true otherwise.
    */
   bool fireTrigger(const std::string& name);
 
