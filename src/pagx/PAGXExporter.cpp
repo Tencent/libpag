@@ -327,14 +327,29 @@ static std::string TransitionConditionOpToString(TransitionConditionOp op) {
   return "equal";
 }
 
-static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition) {
+static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition,
+                           const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("Condition");
   xml.addRequiredAttribute("input", condition->inputName);
   xml.addRequiredAttribute("op", TransitionConditionOpToString(condition->op));
   if (condition->op != TransitionConditionOp::Trigger) {
     if (condition->op == TransitionConditionOp::Equal ||
         condition->op == TransitionConditionOp::NotEqual) {
-      xml.addAttribute("value", condition->valueBool ? "true" : "false");
+      // Equal/NotEqual apply to both Bool and Number inputs. Look up the referenced input's type
+      // so the matching value field is serialized; fall back to valueBool when the input is
+      // missing, preserving the legacy behavior for forward references to unresolved inputs.
+      auto inputType = StateMachineInputType::Bool;
+      for (const auto* input : inputs) {
+        if (input != nullptr && input->name == condition->inputName) {
+          inputType = input->type;
+          break;
+        }
+      }
+      if (inputType == StateMachineInputType::Number) {
+        xml.addAttribute("value", FloatToString(condition->valueNumber));
+      } else {
+        xml.addAttribute("value", condition->valueBool ? "true" : "false");
+      }
     } else {
       xml.addAttribute("value", FloatToString(condition->valueNumber));
     }
@@ -342,7 +357,8 @@ static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition
   xml.closeElementSelfClosing();
 }
 
-static void WriteTransition(XMLBuilder& xml, const StateTransition* transition) {
+static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
+                            const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("Transition");
   xml.addRequiredAttribute("from", transition->from);
   xml.addRequiredAttribute("to", transition->to);
@@ -370,13 +386,14 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition) 
   xml.closeElementStart();
   for (const auto* condition : transition->conditions) {
     if (condition != nullptr) {
-      WriteCondition(xml, condition);
+      WriteCondition(xml, condition, inputs);
     }
   }
   xml.closeElement();
 }
 
-static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region) {
+static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
+                             const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("StateRegion");
   xml.addRequiredAttribute("name", region->name);
   xml.addRequiredAttribute("initialState", region->initialState);
@@ -402,7 +419,7 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region) {
   xml.closeElementStart();
   for (const auto* transition : region->transitions) {
     if (transition != nullptr) {
-      WriteTransition(xml, transition);
+      WriteTransition(xml, transition, inputs);
     }
   }
   xml.closeElement();
@@ -445,7 +462,7 @@ static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
 
   for (const auto* region : sm->regions) {
     if (region != nullptr) {
-      WriteStateRegion(xml, region);
+      WriteStateRegion(xml, region, sm->inputs);
     }
   }
 
