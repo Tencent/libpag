@@ -278,8 +278,7 @@ static bool EvaluateCondition(const TransitionCondition* condition,
 // =============================================================================
 
 static bool IsTransitionAllowed(const StateTransition* transition, int64_t currentElapsedUs,
-                                float frameRate, const PAGXDocument* contextDoc,
-                                const State* currentState,
+                                const PAGXDocument* contextDoc, const State* currentState,
                                 const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
                                 const StateMachine* stateMachine,
                                 const std::set<std::string>& consumedTriggers) {
@@ -295,8 +294,8 @@ static bool IsTransitionAllowed(const StateTransition* transition, int64_t curre
     if (animState != nullptr && !animState->animationId.empty() && contextDoc != nullptr) {
       auto* anim = contextDoc->findNode<Animation>(animState->animationId);
       if (anim != nullptr) {
-        int64_t exitUs = FramesToUs(transition->exitTime.value(), frameRate);
-        int64_t durationUs = FramesToUs(anim->duration, frameRate);
+        int64_t exitUs = FramesToUs(transition->exitTime.value(), anim->frameRate);
+        int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
         int64_t alignedExitUs = exitUs;
         if (exitUs <= durationUs && anim->loop != LoopMode::Once && durationUs > 0) {
           alignedExitUs +=
@@ -352,8 +351,8 @@ static bool IsTransitionAllowed(const StateTransition* transition, int64_t curre
 
 static const StateTransition* FindAllowedTransition(
     const StateRegion* region, const std::string& fromName, bool inTransition,
-    int64_t currentElapsedUs, float frameRate, const PAGXDocument* contextDoc,
-    const State* currentState, const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
+    int64_t currentElapsedUs, const PAGXDocument* contextDoc, const State* currentState,
+    const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
     const StateMachine* stateMachine, const std::set<std::string>& consumedTriggers) {
   if (region == nullptr) {
     return nullptr;
@@ -365,7 +364,7 @@ static const StateTransition* FindAllowedTransition(
     if (inTransition && !t->enableEarlyExit) {
       continue;
     }
-    if (IsTransitionAllowed(t, currentElapsedUs, frameRate, contextDoc, currentState, inputValues,
+    if (IsTransitionAllowed(t, currentElapsedUs, contextDoc, currentState, inputValues,
                             stateMachine, consumedTriggers)) {
       return t;
     }
@@ -381,15 +380,24 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
   if (t == nullptr) {
     return;
   }
-  auto frameRate = contextDoc != nullptr && !contextDoc->animations.empty()
-                       ? contextDoc->animations[0]->frameRate
-                       : 60.0f;
   RegionInstance::FadingState fading;
   fading.state = ri.currentState;
   fading.elapsedUs = ri.currentElapsedUs;
   fading.mixFrom = ri.mix;
   fading.frozen = false;
   if (t->pauseOnExit && t->exitTime.has_value()) {
+    // Use the outgoing animation's frame rate to convert exitTime (in frames) to microseconds.
+    auto frameRate = 60.0f;
+    if (ri.currentState != nullptr && ri.currentState->stateType() == StateType::Animation &&
+        contextDoc != nullptr) {
+      auto* animState = static_cast<const AnimationState*>(ri.currentState);
+      if (!animState->animationId.empty()) {
+        auto* anim = contextDoc->findNode<Animation>(animState->animationId);
+        if (anim != nullptr) {
+          frameRate = anim->frameRate;
+        }
+      }
+    }
     fading.elapsedUs = FramesToUs(t->exitTime.value(), frameRate);
     fading.frozen = true;
   }
@@ -420,17 +428,14 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
 }
 
 bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
-  auto frameRate = contextDoc != nullptr && !contextDoc->animations.empty()
-                       ? contextDoc->animations[0]->frameRate
-                       : 60.0f;
   bool inTransition = (ri.transition != nullptr && ri.mix < 1.0f);
   const StateTransition* t = FindAllowedTransition(
-      ri.region, AnyStateName, inTransition, ri.currentElapsedUs, frameRate, contextDoc,
+      ri.region, AnyStateName, inTransition, ri.currentElapsedUs, contextDoc,
       ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
   if (t == nullptr) {
     t = FindAllowedTransition(ri.region,
                               ri.currentState != nullptr ? ri.currentState->name : std::string{},
-                              inTransition, ri.currentElapsedUs, frameRate, contextDoc,
+                              inTransition, ri.currentElapsedUs, contextDoc,
                               ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
   }
   if (t == nullptr) {
