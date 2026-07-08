@@ -165,11 +165,12 @@ static bool LoadFileDataInChain(
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  applyLayout(config, visited);
+  applyLayout(config, visited, nullptr);
 }
 
 void PAGXDocument::applyLayout(const FontConfig* config,
-                               std::unordered_set<const PAGXDocument*>& visited) {
+                               std::unordered_set<const PAGXDocument*>& visited,
+                               std::vector<Layer*>* changedOut) {
   if (!visited.insert(this).second) {
     errors.push_back("Cyclic external composition reference detected during layout.");
     return;
@@ -180,12 +181,20 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
+  // When changedOut is requested, snapshot each Layer's layoutBounds here (before resetLayout()
+  // clears them to NAN) so the post-layout pass can detect which Layers auto layout repositioned.
+  std::unordered_map<Layer*, Rect> beforeBounds = {};
   if (layoutApplied) {
     for (auto& node : nodes) {
       switch (node->nodeType()) {
-        case NodeType::Layer:
-          static_cast<Layer*>(node.get())->resetLayout();
+        case NodeType::Layer: {
+          auto* layer = static_cast<Layer*>(node.get());
+          if (changedOut != nullptr) {
+            beforeBounds.emplace(layer, layer->layoutBounds());
+          }
+          layer->resetLayout();
           break;
+        }
         case NodeType::Rectangle:
         case NodeType::Ellipse:
         case NodeType::Path:
@@ -222,7 +231,9 @@ void PAGXDocument::applyLayout(const FontConfig* config,
         // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
         // so external compositions are measured and rendered with the host's fonts, keeping text
         // consistent across the embedded boundary rather than using the external doc's own config.
-        layer->externalDoc->applyLayout(&fontConfig, visited);
+        // changedOut is intentionally not forwarded: an external document has its own notifyChange
+        // chain, and runtime layers inside it are rebuilt by that document's scenes.
+        layer->externalDoc->applyLayout(&fontConfig, visited, nullptr);
       }
     }
   }
@@ -230,6 +241,16 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // leave the document flagged as laid out even when a downstream cycle aborts the recursion,
   // letting PAGScene::Make build from an inconsistent tree.
   layoutApplied = true;
+  if (changedOut != nullptr) {
+    // Layout is deterministic, so a Layer that auto layout did not move produces an identical
+    // layoutBounds; only those whose bounds actually changed are appended, so notifyChange can
+    // refresh the repositioned siblings the caller did not list.
+    for (auto& [layer, oldBounds] : beforeBounds) {
+      if (layer->layoutBounds() != oldBounds) {
+        changedOut->push_back(layer);
+      }
+    }
+  }
   visited.erase(this);
 }
 
@@ -617,8 +638,22 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // list changes require a full re-layout, since layout is resolved top-down and a single node
   // cannot be re-measured in isolation. applyLayout() discards the cached layout outputs first when
   // the document is already laid out (see its reset branch). Pure render edits skip this entirely.
+  // Auto layout can reposition siblings the caller did not list (e.g. a flex container pushing
+  // other children when one child is resized); applyLayout collects every Layer whose layoutBounds
+  // changed, and those are merged into ownedDirty below so refreshNodes re-syncs their runtime
+  // transform too.
   if (layoutChanged) {
-    applyLayout();
+    std::unordered_set<const PAGXDocument*> visited = {};
+    std::vector<Layer*> layoutRepositioned = {};
+    applyLayout(nullptr, visited, &layoutRepositioned);
+    if (!layoutRepositioned.empty()) {
+      ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
+      for (auto* layer : layoutRepositioned) {
+        ownedDirty.push_back(layer);
+      }
+      std::sort(ownedDirty.begin(), ownedDirty.end());
+      ownedDirty.erase(std::unique(ownedDirty.begin(), ownedDirty.end()), ownedDirty.end());
+    }
   }
   for (auto& weakScene : liveScenes) {
     auto scene = weakScene.lock();
