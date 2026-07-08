@@ -103,6 +103,10 @@
 #include <OpenGL/gl3.h>
 #endif
 #include "pagx/PAGStateMachineTimeline.h"
+#include "pagx/PAGViewModel.h"
+#include "pagx/PAGViewModelValue.h"
+#include "pagx/PAGViewModelValueBoolean.h"
+#include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateMachineInput.h"
@@ -110,10 +114,6 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
-#include "pagx/PAGViewModel.h"
-#include "pagx/PAGViewModelValue.h"
-#include "pagx/PAGViewModelValueBoolean.h"
-#include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "tgfx/core/Data.h"
@@ -11792,11 +11792,10 @@ PAGX_TEST(PAGXTest, SMStateChangeListener) {
 
   std::string receivedRegion;
   std::string receivedState;
-  int lid = timeline->addStateChangeListener(
-      [&](const std::string& rn, const std::string& sn) {
-        receivedRegion = rn;
-        receivedState = sn;
-      });
+  int lid = timeline->addStateChangeListener([&](const std::string& rn, const std::string& sn) {
+    receivedRegion = rn;
+    receivedState = sn;
+  });
 
   timeline->setBool("go", true);
   timeline->advance(0);
@@ -12110,8 +12109,7 @@ PAGX_TEST(PAGXTest, SMChainedMaxIterations) {
   // Should not hang; capped at 100 iterations.
   timeline->advance(0);
   // Verify still alive (no crash).
-  EXPECT_TRUE(timeline->getCurrentState("main") == "a" ||
-              timeline->getCurrentState("main") == "b");
+  EXPECT_TRUE(timeline->getCurrentState("main") == "a" || timeline->getCurrentState("main") == "b");
 }
 
 PAGX_TEST(PAGXTest, SMEmptyConditionAutoTransition) {
@@ -12184,7 +12182,8 @@ PAGX_TEST(PAGXTest, SMTransitionAllOpsRoundTrip) {
     float valueNum = 0;
   };
   std::vector<OpDef> ops = {
-      {"b", pagx::TransitionConditionOp::Equal},        {"b", pagx::TransitionConditionOp::NotEqual},
+      {"b", pagx::TransitionConditionOp::Equal},
+      {"b", pagx::TransitionConditionOp::NotEqual},
       {"n", pagx::TransitionConditionOp::Equal, false, 0},
       {"n", pagx::TransitionConditionOp::NotEqual, false, 0},
       {"n", pagx::TransitionConditionOp::LessThan, false, 10},
@@ -12213,13 +12212,12 @@ PAGX_TEST(PAGXTest, SMTransitionAllOpsRoundTrip) {
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
 
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions.size(), 1u);
   EXPECT_EQ(loadedSM->regions[0]->transitions.size(), ops.size());
@@ -12252,13 +12250,12 @@ PAGX_TEST(PAGXTest, SMTransitionBezierRoundTrip) {
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
   auto* loadedT = loadedSM->regions[0]->transitions[0];
@@ -12296,13 +12293,12 @@ PAGX_TEST(PAGXTest, SMTransitionExitTimeRoundTrip) {
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 2u);
   EXPECT_TRUE(loadedSM->regions[0]->transitions[0]->exitTime.has_value());
@@ -12581,13 +12577,12 @@ PAGX_TEST(PAGXTest, SMMultiConditionRoundTrip) {
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
   EXPECT_EQ(loadedSM->regions[0]->transitions[0]->conditions.size(), 2u);
@@ -12608,16 +12603,15 @@ PAGX_TEST(PAGXTest, SMEmptyStateRoundTrip) {
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->states.size(), 1u);
-  auto* loadedState = loadedSM->regions[0]->states[0].get();
+  auto* loadedState = loadedSM->regions[0]->states[0];
   ASSERT_TRUE(loadedState->stateType() == pagx::StateType::Animation);
   EXPECT_TRUE(static_cast<const pagx::AnimationState*>(loadedState)->animationId.empty());
 }
@@ -12642,13 +12636,12 @@ PAGX_TEST(PAGXTest, SMDefaultsOmittedInExport) {
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
   ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>(
-      [&]() -> pagx::Node* {
-        for (const auto& node : loaded->nodes) {
-          if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-        }
-        return nullptr;
-      }());
+  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
+    for (const auto& node : loaded->nodes) {
+      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
+    }
+    return nullptr;
+  }());
   ASSERT_TRUE(loadedSM != nullptr);
   ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
   auto* loadedT = loadedSM->regions[0]->transitions[0];
@@ -12720,7 +12713,8 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   layer->width = 50;
   layer->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 50; rect->size.height = 50;
+  rect->size.width = 50;
+  rect->size.height = 50;
   layer->contents.push_back(rect);
   auto sf = doc->makeNode<pagx::Fill>();
   auto sc = doc->makeNode<pagx::SolidColor>();
@@ -12731,7 +12725,9 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
 
   // animA: alpha = 1.0
   auto animA = doc->makeNode<pagx::Animation>("animA");
-  animA->duration = 30; animA->frameRate = 60.0f; animA->loop = pagx::LoopMode::Loop;
+  animA->duration = 30;
+  animA->frameRate = 60.0f;
+  animA->loop = pagx::LoopMode::Loop;
   doc->animations.push_back(animA);
   auto objA = doc->makeNode<pagx::AnimationObject>();
   objA->target = "target";
@@ -12744,7 +12740,9 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
 
   // animB: alpha = 0.2
   auto animB = doc->makeNode<pagx::Animation>("animB");
-  animB->duration = 30; animB->frameRate = 60.0f; animB->loop = pagx::LoopMode::Loop;
+  animB->duration = 30;
+  animB->frameRate = 60.0f;
+  animB->loop = pagx::LoopMode::Loop;
   doc->animations.push_back(animB);
   auto objB = doc->makeNode<pagx::AnimationObject>();
   objB->target = "target";
@@ -12757,20 +12755,28 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
 
   auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
   auto in = doc->makeNode<pagx::StateMachineInput>();
-  in->name = "go"; in->type = pagx::StateMachineInputType::Bool;
+  in->name = "go";
+  in->type = pagx::StateMachineInputType::Bool;
   sm->inputs.push_back(in);
   auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main"; region->initialState = "a";
+  region->name = "main";
+  region->initialState = "a";
   auto sa = doc->makeNode<pagx::AnimationState>();
-  sa->name = "a"; sa->animationId = "animA";
+  sa->name = "a";
+  sa->animationId = "animA";
   region->states.push_back(sa);
   auto sb = doc->makeNode<pagx::AnimationState>();
-  sb->name = "b"; sb->animationId = "animB";
+  sb->name = "b";
+  sb->animationId = "animB";
   region->states.push_back(sb);
   auto t = doc->makeNode<pagx::StateTransition>();
-  t->from = "a"; t->to = "b"; t->duration = 10;
+  t->from = "a";
+  t->to = "b";
+  t->duration = 10;
   auto c = doc->makeNode<pagx::TransitionCondition>();
-  c->inputName = "go"; c->op = pagx::TransitionConditionOp::Equal; c->valueBool = true;
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
@@ -12793,9 +12799,11 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto child = doc->makeNode<pagx::Layer>("child");
-  child->width = 50; child->height = 50;
+  child->width = 50;
+  child->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 50; rect->size.height = 50;
+  rect->size.width = 50;
+  rect->size.height = 50;
   child->contents.push_back(rect);
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -12804,11 +12812,13 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   child->contents.push_back(fill);
 
   auto comp = doc->makeNode<pagx::Composition>("comp");
-  comp->width = 50; comp->height = 50;
+  comp->width = 50;
+  comp->height = 50;
   comp->layers.push_back(child);
 
   auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 60; anim->frameRate = 60;
+  anim->duration = 60;
+  anim->frameRate = 60;
   comp->animations.push_back(anim);
   auto obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = "child";
@@ -12821,15 +12831,18 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
 
   auto sm = doc->makeNode<pagx::StateMachine>("stableSM");
   auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main"; region->initialState = "fade";
+  region->name = "main";
+  region->initialState = "fade";
   auto s = doc->makeNode<pagx::AnimationState>();
-  s->name = "fade"; s->animationId = "anim";
+  s->name = "fade";
+  s->animationId = "anim";
   region->states.push_back(s);
   sm->regions.push_back(region);
 
   auto slot = doc->makeNode<pagx::Layer>("slot");
   slot->composition = comp;
-  slot->width = 100; slot->height = 100;
+  slot->width = 100;
+  slot->height = 100;
   doc->layers.push_back(slot);
 
   auto scene = pagx::PAGScene::Make(doc);
@@ -12857,9 +12870,11 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
 
   // Child layer inside a Composition resource.
   auto child = doc->makeNode<pagx::Layer>("child");
-  child->width = 50; child->height = 50;
+  child->width = 50;
+  child->height = 50;
   auto rect = doc->makeNode<pagx::Rectangle>();
-  rect->size.width = 50; rect->size.height = 50;
+  rect->size.width = 50;
+  rect->size.height = 50;
   child->contents.push_back(rect);
   auto fill = doc->makeNode<pagx::Fill>();
   auto solid = doc->makeNode<pagx::SolidColor>();
@@ -12868,12 +12883,14 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   child->contents.push_back(fill);
 
   auto comp = doc->makeNode<pagx::Composition>("card");
-  comp->width = 50; comp->height = 50;
+  comp->width = 50;
+  comp->height = 50;
   comp->layers.push_back(child);
 
   // Two animations for two states: visible (alpha=1) and dim (alpha=0.3).
   auto animVisible = doc->makeNode<pagx::Animation>("animVisible");
-  animVisible->duration = 10; animVisible->frameRate = 60;
+  animVisible->duration = 10;
+  animVisible->frameRate = 60;
   comp->animations.push_back(animVisible);
   auto objV = doc->makeNode<pagx::AnimationObject>();
   objV->target = "child";
@@ -12885,7 +12902,8 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   objV->channels.push_back(chV);
 
   auto animDim = doc->makeNode<pagx::Animation>("animDim");
-  animDim->duration = 10; animDim->frameRate = 60;
+  animDim->duration = 10;
+  animDim->frameRate = 60;
   comp->animations.push_back(animDim);
   auto objD = doc->makeNode<pagx::AnimationObject>();
   objD->target = "child";
@@ -12899,28 +12917,38 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   // StateMachine: visible → dim on "dim" bool input.
   auto sm = doc->makeNode<pagx::StateMachine>("cardSM");
   auto input = doc->makeNode<pagx::StateMachineInput>();
-  input->name = "dim"; input->type = pagx::StateMachineInputType::Bool;
+  input->name = "dim";
+  input->type = pagx::StateMachineInputType::Bool;
   input->defaultBool = false;
   sm->inputs.push_back(input);
   auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main"; region->initialState = "visible";
+  region->name = "main";
+  region->initialState = "visible";
   auto sVis = doc->makeNode<pagx::AnimationState>();
-  sVis->name = "visible"; sVis->animationId = "animVisible";
+  sVis->name = "visible";
+  sVis->animationId = "animVisible";
   region->states.push_back(sVis);
   auto sDim = doc->makeNode<pagx::AnimationState>();
-  sDim->name = "dim"; sDim->animationId = "animDim";
+  sDim->name = "dim";
+  sDim->animationId = "animDim";
   region->states.push_back(sDim);
   auto tVisDim = doc->makeNode<pagx::StateTransition>();
-  tVisDim->from = "visible"; tVisDim->to = "dim"; tVisDim->duration = 5;
+  tVisDim->from = "visible";
+  tVisDim->to = "dim";
+  tVisDim->duration = 5;
   auto cVisDim = doc->makeNode<pagx::TransitionCondition>();
-  cVisDim->inputName = "dim"; cVisDim->op = pagx::TransitionConditionOp::Equal;
+  cVisDim->inputName = "dim";
+  cVisDim->op = pagx::TransitionConditionOp::Equal;
   cVisDim->valueBool = true;
   tVisDim->conditions.push_back(cVisDim);
   region->transitions.push_back(tVisDim);
   auto tDimVis = doc->makeNode<pagx::StateTransition>();
-  tDimVis->from = "dim"; tDimVis->to = "visible"; tDimVis->duration = 5;
+  tDimVis->from = "dim";
+  tDimVis->to = "visible";
+  tDimVis->duration = 5;
   auto cDimVis = doc->makeNode<pagx::TransitionCondition>();
-  cDimVis->inputName = "dim"; cDimVis->op = pagx::TransitionConditionOp::NotEqual;
+  cDimVis->inputName = "dim";
+  cDimVis->op = pagx::TransitionConditionOp::NotEqual;
   cDimVis->valueBool = true;
   tDimVis->conditions.push_back(cDimVis);
   region->transitions.push_back(tDimVis);
@@ -12937,7 +12965,8 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   // Slot layer referencing the Composition, with SM attached via Timelines.
   auto slot = doc->makeNode<pagx::Layer>("slot");
   slot->composition = comp;
-  slot->width = 100; slot->height = 100;
+  slot->width = 100;
+  slot->height = 100;
   auto smDriver = std::make_unique<pagx::StateMachineTimeline>();
   smDriver->stateMachineId = "cardSM";
   slot->timelines.push_back(std::move(smDriver));
