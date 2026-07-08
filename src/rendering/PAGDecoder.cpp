@@ -30,6 +30,8 @@
 
 namespace pag {
 
+static std::mutex renderLocker = {};
+
 static std::string DefaultCacheKeyGeneratorFunc(PAGDecoder* decoder,
                                                 std::shared_ptr<PAGComposition> composition) {
   if (!composition->isPAGFile() || pag::ContentVersion::Get(composition) > 0) {
@@ -196,6 +198,7 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
   }
   auto success = sequenceFile->readFrame(index, bitmap);
   if (!success) {
+    std::lock_guard<std::mutex> autoLock(renderLocker);
     success = renderFrame(composition, index, bitmap);
     if (success) {
       success = sequenceFile->writeFrame(index, bitmap);
