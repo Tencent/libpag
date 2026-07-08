@@ -408,7 +408,10 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
     }
   }
   if (ri.currentState != nullptr) {
-    for (auto& [listenerId, cb] : stateChangeListeners) {
+    // Snapshot listeners so a reentrant add/remove during dispatch does not invalidate the
+    // vector being iterated.
+    auto listenersSnapshot = stateChangeListeners;
+    for (auto& [listenerId, cb] : listenersSnapshot) {
       if (cb) {
         cb(ri.region->name, ri.currentState->name);
       }

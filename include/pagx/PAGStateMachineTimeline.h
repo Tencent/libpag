@@ -115,7 +115,10 @@ class PAGStateMachineTimeline {
   /**
    * Registers a state-change listener. The callback receives the region name and the new state
    * name whenever a region transitions. Returns an opaque listener id; pass it to
-   * removeStateChangeListener() to unregister.
+   * removeStateChangeListener() to unregister. Returns -1 if callback is null.
+   *
+   * Reentrant add/remove is safe: listeners are snapshotted before dispatch, so a callback that
+   * adds or removes listeners during dispatch does not invalidate the ongoing iteration.
    */
   int addStateChangeListener(
       std::function<void(const std::string& regionName, const std::string& newState)> callback);
@@ -131,8 +134,9 @@ class PAGStateMachineTimeline {
    * SM input type: Boolean for Bool inputs, Number for Number inputs, Boolean for Trigger inputs
    * (where a true transition fires the trigger).
    * @param inputName the name of the SM input declared in <Inputs>.
-   * @param vmValue the ViewModel property value to bind. The binding holds a weak reference; the
-   *        caller must keep the VM alive.
+   * @param vmValue the ViewModel property value to bind. The binding holds a weak reference to
+   *        vmValue; if vmValue is destroyed, the binding becomes inactive and future notifications
+   *        are dropped silently.
    * @return true if the binding was established successfully.
    */
   bool bindInput(const std::string& inputName,
