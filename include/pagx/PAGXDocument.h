@@ -222,13 +222,11 @@ class PAGXDocument : public Node {
    * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
    * supported — edit the Text node with layoutChanged = true instead.
    *
-   * When layoutChanged is true, layout is re-run and any Layer whose layoutBounds changed as a
-   * side effect of the re-layout (for example, a sibling pushed by a flex container when one child
-   * is resized) is auto-refreshed as well — callers do not need to list such repositioned siblings.
-   * Only list nodes directly edited or whose own authored fields / child lists changed: the whole
-   * chain for an "@id" reference change, or the container Layer for a structural child-list edit.
-   * For external compositions, notify the document that owns the nodes; foreign nodes are skipped
-   * (see ownsNode()).
+   * When layoutChanged is true, only list nodes directly edited or whose child list changed: the
+   * whole chain for an "@id" reference change, or the container Layer for a structural child-list
+   * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,
+   * so callers do not need to list such siblings. For external compositions, notify the document
+   * that owns the nodes; foreign nodes are skipped (see ownsNode()).
    *
    * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
    * null and foreign entries are skipped; an empty list is a no-op.
