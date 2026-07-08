@@ -561,9 +561,22 @@ export function pagxClipNormalizeD(raw: string, el: Element): string {
   let bw = typeof hostEl.offsetWidth === 'number' ? hostEl.offsetWidth : 0;
   let bh = typeof hostEl.offsetHeight === 'number' ? hostEl.offsetHeight : 0;
   if (!(bw > 0) || !(bh > 0)) {
-    const rect = el.getBoundingClientRect();
-    bw = rect.width;
-    bh = rect.height;
+    // SVG nodes have no offset box. Prefer the computed used width/height, which is the layout
+    // size in CSS pixels and — unlike getBoundingClientRect() — is immune to ancestor transforms
+    // (rotate/scale). Falling straight to getBoundingClientRect() here would frame the clip in
+    // screen pixels of a rotated/scaled element (e.g. a 1080x99 bar under `rotate(90deg) scale(s)`
+    // reports a ~117x1286 rect), so the wipe would reveal the wrong, cropped region.
+    const csBox = getComputedStyle(el);
+    const cw = parseFloat(csBox.width);
+    const ch = parseFloat(csBox.height);
+    if (cw > 0 && ch > 0) {
+      bw = cw;
+      bh = ch;
+    } else {
+      const rect = el.getBoundingClientRect();
+      bw = rect.width;
+      bh = rect.height;
+    }
   }
   if (!(bw > 0) || !(bh > 0)) return '';
   const cs = getComputedStyle(el);

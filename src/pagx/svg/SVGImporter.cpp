@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
@@ -550,6 +551,26 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     if (tag == "g" && layer->children.empty() && layer->contents.empty() &&
         layer->mask == nullptr && layer->filters.empty() && layer->styles.empty()) {
       return nullptr;
+    }
+  } else if (tag == "use") {
+    // A <use> may reference a container (<symbol>/<g>/<svg>) or a leaf (<image>/shape). Container
+    // references must be instantiated as child layers: convertElement (used by the leaf path below)
+    // only handles leaf shapes and returns null for containers, which would drop the referenced
+    // sub-tree entirely (e.g. glyph <symbol>s referenced by digit slots).
+    std::string refId = resolveUrl(getHrefAttribute(element));
+    auto refIt = refId.empty() ? _defs.end() : _defs.find(refId);
+    bool handledAsContainer = false;
+    if (_options.expandUseReferences && refIt != _defs.end() && _useStack.count(refId) == 0 &&
+        (refIt->second->name == "symbol" || refIt->second->name == "g" ||
+         refIt->second->name == "svg")) {
+      auto* useGroup = convertUseContainer(element, refIt->second, inheritedStyle, depth);
+      if (useGroup) {
+        layer->children.push_back(useGroup);
+      }
+      handledAsContainer = true;
+    }
+    if (!handledAsContainer) {
+      convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
     }
   } else {
     // Shape element: convert to vector contents.
@@ -1277,6 +1298,101 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   // group->name (removed) = "_useRef:" + refId;
   return group;
 }
+// Maps a viewBox (minX minY width height) into a viewport of size (vpW × vpH) honouring the SVG
+// preserveAspectRatio rules ("[defer] <align> [meet|slice]", default "xMidYMid meet"). The returned
+// matrix converts points from viewBox coordinates into the viewport's local space.
+static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW, float vpH,
+                                   const std::string& preserveAspectRatio) {
+  float vbX = viewBox[0];
+  float vbY = viewBox[1];
+  float vbW = viewBox[2];
+  float vbH = viewBox[3];
+
+  std::string align = "xMidYMid";
+  std::string meetOrSlice = "meet";
+  {
+    std::istringstream iss(preserveAspectRatio);
+    std::vector<std::string> tokens;
+    std::string token;
+    while (iss >> token) {
+      tokens.push_back(token);
+    }
+    size_t i = 0;
+    if (i < tokens.size() && tokens[i] == "defer") {
+      i++;
+    }
+    if (i < tokens.size()) {
+      align = tokens[i++];
+    }
+    if (i < tokens.size()) {
+      meetOrSlice = tokens[i++];
+    }
+  }
+
+  float scaleX = vpW / vbW;
+  float scaleY = vpH / vbH;
+  if (align != "none") {
+    float uniform = (meetOrSlice == "slice") ? std::max(scaleX, scaleY) : std::min(scaleX, scaleY);
+    scaleX = uniform;
+    scaleY = uniform;
+  }
+
+  float tx = -vbX * scaleX;
+  float ty = -vbY * scaleY;
+  if (align.find("xMid") != std::string::npos) {
+    tx += (vpW - vbW * scaleX) / 2.0f;
+  } else if (align.find("xMax") != std::string::npos) {
+    tx += vpW - vbW * scaleX;
+  }
+  if (align.find("YMid") != std::string::npos) {
+    ty += (vpH - vbH * scaleY) / 2.0f;
+  } else if (align.find("YMax") != std::string::npos) {
+    ty += vpH - vbH * scaleY;
+  }
+  return Matrix::Translate(tx, ty) * Matrix::Scale(scaleX, scaleY);
+}
+Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
+                                             const std::shared_ptr<DOMNode>& refElement,
+                                             const InheritedStyle& inheritedStyle, int depth) {
+  std::string refId = resolveUrl(getHrefAttribute(useElement));
+  float x = parseLength(getAttribute(useElement, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(useElement, "y"), _viewBoxHeight);
+
+  // The use's x/y establishes the referenced content's origin. For <symbol>/<svg> the use's
+  // width/height define a viewport that the referenced viewBox is fitted into (per
+  // preserveAspectRatio); a plain <g> has no viewport of its own.
+  Matrix contentMatrix = Matrix::Translate(x, y);
+  if (refElement->name == "symbol" || refElement->name == "svg") {
+    auto viewBox = parseViewBox(getAttribute(refElement, "viewBox"));
+    float useWidth = parseLength(getAttribute(useElement, "width"), _viewBoxWidth);
+    float useHeight = parseLength(getAttribute(useElement, "height"), _viewBoxHeight);
+    if (viewBox.size() >= 4 && viewBox[2] > 0 && viewBox[3] > 0 && useWidth > 0 && useHeight > 0) {
+      contentMatrix = contentMatrix * ComputeViewBoxMatrix(viewBox, useWidth, useHeight,
+                                                           getAttribute(refElement,
+                                                                        "preserveAspectRatio"));
+    }
+  }
+
+  auto group = _document->makeNode<Layer>();
+  group->matrix = contentMatrix;
+
+  InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
+  _useStack.insert(refId);
+  auto child = refElement->getFirstChild();
+  while (child) {
+    auto childLayer = convertToLayer(child, refStyle, depth + 1);
+    if (childLayer) {
+      group->children.push_back(childLayer);
+    }
+    child = child->getNextSibling();
+  }
+  _useStack.erase(refId);
+
+  if (group->children.empty()) {
+    return nullptr;
+  }
+  return group;
+}
 // Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
 // direct <image> element and <use> references to an image. The box (x, y, width, height) is in the
 // element's own coordinate space; any transform on the host element is applied by the parent Layer.
@@ -1545,7 +1661,7 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
   while (child) {
     if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
         child->name == "path" || child->name == "polygon" || child->name == "polyline" ||
-        child->name == "use") {
+        child->name == "use" || child->name == "image") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
       std::string transformStr = getAttribute(child, "transform");
       Matrix combinedMatrix = parentMatrix;
