@@ -531,6 +531,61 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
   return hadActive || hasActive;
 }
 
+void PAGStateMachineTimeline::applyAnimationState(const State* state, int64_t elapsedUs,
+                                                   float weight, RuntimeBinding* effectiveBinding) {
+  if (state == nullptr || state->stateType() != StateType::Animation || contextDoc == nullptr) {
+    return;
+  }
+  auto* animState = static_cast<const AnimationState*>(state);
+  if (animState->animationId.empty()) {
+    return;
+  }
+  auto* anim = contextDoc->findNode<Animation>(animState->animationId);
+  if (anim == nullptr) {
+    return;
+  }
+  int64_t sampleUs = elapsedUs;
+  int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
+  if (durationUs > 0) {
+    switch (anim->loop) {
+      case LoopMode::Loop:
+        sampleUs = sampleUs % durationUs;
+        if (sampleUs < 0) {
+          sampleUs += durationUs;
+        }
+        break;
+      case LoopMode::Once:
+        sampleUs = std::min(sampleUs, durationUs);
+        break;
+      case LoopMode::PingPong: {
+        auto period = durationUs * 2;
+        auto pos = sampleUs % period;
+        if (pos < 0) {
+          pos += period;
+        }
+        sampleUs = pos < durationUs ? pos : period - pos;
+        break;
+      }
+    }
+  }
+  for (const auto* object : anim->objects) {
+    if (object == nullptr) {
+      continue;
+    }
+    auto* targetNode = contextDoc->findNode(object->target);
+    if (targetNode == nullptr) {
+      continue;
+    }
+    for (const auto* channel : object->channels) {
+      if (channel == nullptr) {
+        continue;
+      }
+      auto value = channel->evaluateAt(sampleUs, anim->frameRate);
+      effectiveBinding->apply(targetNode, channel->name, value, weight);
+    }
+  }
+}
+
 void PAGStateMachineTimeline::apply(float smMix) {
   if (stateMachine == nullptr || owner.expired()) {
     return;
@@ -552,88 +607,16 @@ void PAGStateMachineTimeline::apply(float smMix) {
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
       float weight = smMix * CurveMix(ri.transition, f.mixFrom);
-      if (weight <= 0.0f || f.state == nullptr) {
+      if (weight <= 0.0f) {
         continue;
       }
-      const AnimationState* animState = nullptr;
-      if (f.state != nullptr && f.state->stateType() == StateType::Animation) {
-        animState = static_cast<const AnimationState*>(f.state);
-      }
-      if (animState == nullptr || animState->animationId.empty() || contextDoc == nullptr) {
-        continue;
-      }
-      auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-      if (anim == nullptr) {
-        continue;
-      }
-      int64_t sampleUs = f.elapsedUs;
-      int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
-      if (durationUs > 0) {
-        if (anim->loop == LoopMode::Loop) {
-          sampleUs = sampleUs % durationUs;
-          if (sampleUs < 0) sampleUs += durationUs;
-        } else if (anim->loop == LoopMode::Once) {
-          sampleUs = std::min(sampleUs, durationUs);
-        }
-      }
-      for (const auto* object : anim->objects) {
-        if (object == nullptr) {
-          continue;
-        }
-        auto* targetNode = contextDoc->findNode(object->target);
-        if (targetNode == nullptr || effectiveBinding == nullptr) {
-          continue;
-        }
-        for (const auto* channel : object->channels) {
-          if (channel == nullptr) {
-            continue;
-          }
-          auto value = channel->evaluateAt(sampleUs, anim->frameRate);
-          effectiveBinding->apply(targetNode, channel->name, value, weight);
-        }
-      }
+      applyAnimationState(f.state, f.elapsedUs, weight, effectiveBinding);
     }
     float weight = smMix * CurveMix(ri.transition, ri.mix);
-    if (weight <= 0.0f || ri.currentState == nullptr) {
+    if (weight <= 0.0f) {
       continue;
     }
-    const AnimationState* animState = nullptr;
-    if (ri.currentState->stateType() == StateType::Animation) {
-      animState = static_cast<const AnimationState*>(ri.currentState);
-    }
-    if (animState == nullptr || animState->animationId.empty() || contextDoc == nullptr) {
-      continue;
-    }
-    auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-    if (anim == nullptr) {
-      continue;
-    }
-    int64_t sampleUs = ri.currentElapsedUs;
-    int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
-    if (durationUs > 0) {
-      if (anim->loop == LoopMode::Loop) {
-        sampleUs = sampleUs % durationUs;
-        if (sampleUs < 0) sampleUs += durationUs;
-      } else if (anim->loop == LoopMode::Once) {
-        sampleUs = std::min(sampleUs, durationUs);
-      }
-    }
-    for (const auto* object : anim->objects) {
-      if (object == nullptr) {
-        continue;
-      }
-      auto* targetNode = contextDoc->findNode(object->target);
-      if (targetNode == nullptr || effectiveBinding == nullptr) {
-        continue;
-      }
-      for (const auto* channel : object->channels) {
-        if (channel == nullptr) {
-          continue;
-        }
-        auto value = channel->evaluateAt(sampleUs, anim->frameRate);
-        effectiveBinding->apply(targetNode, channel->name, value, weight);
-      }
-    }
+    applyAnimationState(ri.currentState, ri.currentElapsedUs, weight, effectiveBinding);
   }
 }
 

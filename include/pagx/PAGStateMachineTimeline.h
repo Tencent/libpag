@@ -175,6 +175,8 @@ class PAGStateMachineTimeline {
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
   RegionInstance* findRegion(const std::string& regionName);
+  void applyAnimationState(const State* state, int64_t elapsedUs, float weight,
+                           RuntimeBinding* effectiveBinding);
 
   friend class PAGScene;
   friend class PAGComposition;
