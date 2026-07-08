@@ -1930,16 +1930,10 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
   }
   transition->duration = GetInt64Attribute(node, "duration", 0, doc);
   auto interp = GetAttribute(node, "interpolation", "linear");
-  if (interp == "linear") {
-    transition->interpolation = KeyframeInterpolationType::Linear;
-  } else if (interp == "none") {
-    transition->interpolation = KeyframeInterpolationType::None;
-  } else if (interp == "bezier") {
-    transition->interpolation = KeyframeInterpolationType::Bezier;
+  transition->interpolation = ParseKeyframeInterpolation(interp, doc, node);
+  if (transition->interpolation == KeyframeInterpolationType::Bezier) {
     transition->bezierOut = GetPointAttribute(node, "bezier-out", {0.0f, 0.0f}, doc);
     transition->bezierIn = GetPointAttribute(node, "bezier-in", {0.0f, 0.0f}, doc);
-  } else if (interp == "hold") {
-    transition->interpolation = KeyframeInterpolationType::Hold;
   }
   auto exitAttr = GetAttribute(node, "exitTime");
   if (!exitAttr.empty()) {
