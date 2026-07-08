@@ -388,9 +388,11 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region) {
     if (state == nullptr) continue;
     xml.openElement("State");
     xml.addRequiredAttribute("name", state->name);
-    auto* animState = dynamic_cast<const AnimationState*>(state);
-    if (animState != nullptr && !animState->animationId.empty()) {
-      xml.addAttribute("animation", "@" + animState->animationId);
+    if (state->stateType() == StateType::Animation) {
+      auto* animState = static_cast<const AnimationState*>(state);
+      if (!animState->animationId.empty()) {
+        xml.addAttribute("animation", "@" + animState->animationId);
+      }
     }
     xml.closeElementSelfClosing();
   }
