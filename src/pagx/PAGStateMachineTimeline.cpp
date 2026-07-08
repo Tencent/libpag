@@ -21,6 +21,9 @@
 #include <cmath>
 #include <set>
 #include "pagx/PAGScene.h"
+#include "pagx/PAGViewModelValue.h"
+#include "pagx/PAGViewModelValueBoolean.h"
+#include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -29,9 +32,6 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
-#include "pagx/PAGViewModelValue.h"
-#include "pagx/PAGViewModelValueBoolean.h"
-#include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "renderer/LayerBuilder.h"
 
@@ -95,8 +95,8 @@ float CurveMix(const StateTransition* transition, float t) {
       return t >= 1.0f ? 1.0f : 0.0f;
     case KeyframeInterpolationType::Bezier:
       return static_cast<float>(SolveBezierEasing(transition->bezierOut.x, transition->bezierOut.y,
-                                                   transition->bezierIn.x, transition->bezierIn.y,
-                                                   t));
+                                                  transition->bezierIn.x, transition->bezierIn.y,
+                                                  t));
     case KeyframeInterpolationType::Linear:
     default:
       return t;
@@ -419,14 +419,14 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
 
 bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
   bool inTransition = (ri.transition != nullptr && ri.mix < 1.0f);
-  const StateTransition* t = FindAllowedTransition(
-      ri.region, AnyStateName, inTransition, ri.currentElapsedUs, contextDoc,
-      ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
+  const StateTransition* t =
+      FindAllowedTransition(ri.region, AnyStateName, inTransition, ri.currentElapsedUs, contextDoc,
+                            ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
   if (t == nullptr) {
     t = FindAllowedTransition(ri.region,
                               ri.currentState != nullptr ? ri.currentState->name : std::string{},
-                              inTransition, ri.currentElapsedUs, contextDoc,
-                              ri.currentState, inputValues, stateMachine, ri.consumedTriggers);
+                              inTransition, ri.currentElapsedUs, contextDoc, ri.currentState,
+                              inputValues, stateMachine, ri.consumedTriggers);
   }
   if (t == nullptr) {
     return false;
@@ -522,7 +522,7 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
 }
 
 void PAGStateMachineTimeline::applyAnimationState(const State* state, int64_t elapsedUs,
-                                                   float weight, RuntimeBinding* effectiveBinding) {
+                                                  float weight, RuntimeBinding* effectiveBinding) {
   if (state == nullptr || state->stateType() != StateType::Animation || contextDoc == nullptr) {
     return;
   }
@@ -648,7 +648,8 @@ class BoolInputObserver {
  public:
   BoolInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
                     std::weak_ptr<PAGViewModelValueBoolean> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
+  }
 
   void operator()() const {
     auto locked = vmValue.lock();
@@ -668,7 +669,8 @@ class NumberInputObserver {
  public:
   NumberInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
                       std::weak_ptr<PAGViewModelValueNumber> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
+  }
 
   void operator()() const {
     auto locked = vmValue.lock();
@@ -688,7 +690,8 @@ class TriggerInputObserver {
  public:
   TriggerInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
                        std::weak_ptr<PAGViewModelValueBoolean> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {}
+      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
+  }
 
   void operator()() const {
     auto locked = vmValue.lock();
