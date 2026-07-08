@@ -37,7 +37,7 @@
 
 namespace pagx {
 
-static constexpr int kMaxTransitionsPerFrame = 100;
+static constexpr int MAX_TRANSITIONS_PER_FRAME = 100;
 
 // =============================================================================
 // RegionInstance (hidden in .cpp)
@@ -462,7 +462,7 @@ void PAGStateMachineTimeline::advanceRegion(int64_t deltaUs) {
         ri.transition = nullptr;
       }
     }
-    for (int i = 0; i < kMaxTransitionsPerFrame; i++) {
+    for (int i = 0; i < MAX_TRANSITIONS_PER_FRAME; i++) {
       if (!tryChangeState(ri)) {
         break;
       }
