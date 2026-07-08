@@ -1028,10 +1028,11 @@ bool HTMLAnimationBuilder::buildForElement(
   // Per-keyframe `filter` decomposition. A glow / shadow authored as
   // `filter: drop-shadow(...)` (and `none` at rest) is lowered onto the runtime's
   // animatable DropShadowFilter channels; a `blur(...)` onto BlurFilter. Each stop
-  // folds the chain onto ONE representative drop-shadow (largest blur*alpha — the
-  // dominant glow) plus one blur radius, mirroring the capture-side decomposition.
-  // A stop with no drop-shadow (`none`) records `hasShadow=false` so the channel
-  // ramps its alpha / blur from zero rather than snapping.
+  // folds the chain onto ONE representative drop-shadow (largest `alpha*(blur+1)` —
+  // the most visually prominent shadow) plus one blur radius, mirroring the
+  // capture-side decomposition. A stop with no drop-shadow (`none`) records
+  // `hasShadow=false` so the channel ramps its alpha / blur from zero rather than
+  // snapping.
   struct FilterStop {
     Frame time = 0;
     bool sawFilter = false;
@@ -1101,11 +1102,22 @@ bool HTMLAnimationBuilder::buildForElement(
         std::string trimmed = Trim(val);
         if (ToLower(trimmed) != "none" && !trimmed.empty()) {
           auto steps = _valueParser.parseFilterChain(val);
+          // Collapse a multi-`drop-shadow()` chain to the single most visually
+          // prominent shadow (the runtime animates one DropShadowFilter). Score by
+          // `alpha * (blur + 1)`: a soft glow (large blur) still wins over a faint
+          // one, but crucially the `+1` keeps opacity meaningful when every shadow
+          // is blur-0 — the offset-only "chromatic aberration" idiom common in
+          // glitch effects (e.g. `drop-shadow(rgba(240,160,0,.55) 42px 0 0)
+          // drop-shadow(rgba(255,0,90,.4) -26px 0 0)`). The old `blur * alpha`
+          // scored every blur-0 shadow at 0, so the `>=` tie-break kept the LAST
+          // one — dropping the more opaque, author-first aberration (here the
+          // orange ghost) in favour of the fainter trailing one. Use strict `>` so
+          // ties keep the earliest (author-primary) shadow.
           float bestScore = -1.0f;
           for (const auto& st : steps) {
             if (st.kind == HTMLValueParser::FilterStep::Kind::DropShadow) {
-              float score = st.shadow.blur * st.shadow.color.alpha;
-              if (score >= bestScore) {
+              float score = st.shadow.color.alpha * (st.shadow.blur + 1.0f);
+              if (score > bestScore) {
                 bestScore = score;
                 fs.hasShadow = true;
                 fs.sx = st.shadow.offsetX;

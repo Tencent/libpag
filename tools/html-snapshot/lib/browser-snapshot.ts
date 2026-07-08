@@ -1893,6 +1893,24 @@ function freezeSvg(svgEl, rect) {
     // opacity here; the walk below also skips freezing it back as an attribute. Only the
     // root is affected — CSS `opacity` does not inherit, so descendants keep theirs.
     clone.style.removeProperty('opacity');
+    // `animation` is wrapper-owned for the same reason: `renderSvg`'s wrapper `<div>`
+    // already carries the SVG's `pagxAnim*` animation and its `transform-origin`
+    // (buildStyle → appendAnimation), and that is the box the importer pivots the
+    // animated transform around. Leaving the identical `animation` on the root `<svg>`
+    // makes the runtime play it a SECOND time on the inner layer — doubling every
+    // scale/translate/opacity/filter step (e.g. a glitch glyph's `scale(2)` becomes
+    // ~4× and floods the frame as a solid block, with the drop-shadow copies smeared
+    // into offset colour bars). Strip the root's own animation so the transform lives
+    // on exactly one element. Descendant shape animations (buildForInlineSvgShape)
+    // target inner nodes, not the root, so they are untouched.
+    clone.style.removeProperty('animation');
+    clone.style.removeProperty('animation-name');
+    clone.style.removeProperty('animation-duration');
+    clone.style.removeProperty('animation-timing-function');
+    clone.style.removeProperty('animation-iteration-count');
+    clone.style.removeProperty('animation-direction');
+    clone.style.removeProperty('animation-delay');
+    clone.style.removeProperty('animation-fill-mode');
   }
   // A directly-authored `opacity` attribute on the root <svg> is the same wrapper-owned
   // value in attribute form; drop it so the walk's freeze pass treats the root as having

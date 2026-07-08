@@ -1028,9 +1028,13 @@ export function pagxParseColorChannels(value: string): number[] | null {
 // of being flattened. `getComputedStyle().filter` is either `none` or a chain of
 // space-separated functions (`drop-shadow(rgb(...) 0px 0px 16px) blur(4px) …`).
 // We fold every drop-shadow onto ONE representative shadow — the one with the
-// largest `blur * alpha` (the dominant glow) — and every `blur()` onto a single
-// radius, matching how the importer lowers the chain onto a single animatable
-// DropShadowFilter / BlurFilter. `none` (or no recognised function) yields all
+// largest `alpha * (blur + 1)` (the most visually prominent shadow) — and every
+// `blur()` onto a single radius, matching how the importer lowers the chain onto a
+// single animatable DropShadowFilter / BlurFilter. The `+ 1` keeps opacity
+// meaningful when every shadow is blur-0 (the offset-only "chromatic aberration"
+// glitch idiom), so the tracked shadow stays the one the importer will select
+// instead of whichever happened to be authored last. `none` (or no recognised
+// function) yields all
 // zeros so a none <-> shadow transition reads as an alpha / blur ramp from 0.
 // Unrecognised functions (brightness, contrast, …) are ignored (dropped, as the
 // runtime has no channel for them).
@@ -1069,8 +1073,8 @@ export function pagxParseFilterChannels(value: string): {
       const ox = nums[0] || 0;
       const oy = nums[1] || 0;
       const blur = nums[2] || 0;
-      const score = blur * (color[3] != null ? color[3] : 1);
-      if (score >= bestScore) {
+      const score = (color[3] != null ? color[3] : 1) * (blur + 1);
+      if (score > bestScore) {
         bestScore = score;
         out.fdx = ox; out.fdy = oy; out.fdb = blur;
         out.fdr = color[0]; out.fdg = color[1]; out.fdbl = color[2];

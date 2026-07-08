@@ -283,13 +283,25 @@ describe('pagxParseFilterChannels', () => {
     expect([f.fdr, f.fdg, f.fdbl]).toEqual([40, 224, 208]);
     expect(f.fda).toBe(1);
   });
-  test('folds multiple drop-shadows onto the strongest (blur*alpha) glow', () => {
+  test('folds multiple drop-shadows onto the most prominent (alpha*(blur+1)) glow', () => {
     const f = pagxParseFilterChannels(
       'drop-shadow(rgb(40, 224, 208) 0px 0px 16px) ' +
       'drop-shadow(rgba(40, 224, 208, 0.85) 0px 0px 28px) brightness(1.3)');
-    // 28 * 0.85 = 23.8 beats 16 * 1 = 16, so the second shadow wins.
+    // 0.85 * (28 + 1) = 24.65 beats 1 * (16 + 1) = 17, so the second shadow wins.
     expect(f.fdb).toBe(28);
     expect(f.fda).toBeCloseTo(0.85, 5);
+  });
+  test('folds blur-0 chromatic-aberration shadows onto the most opaque, not the last', () => {
+    // Offset-only glitch idiom: every shadow has blur 0, so a `blur * alpha` score
+    // would tie at 0 and keep whichever was authored last. `alpha * (blur + 1)`
+    // keeps the more opaque, author-first shadow (orange, alpha .55) instead of the
+    // fainter trailing one (magenta, alpha .4).
+    const f = pagxParseFilterChannels(
+      'drop-shadow(rgba(240, 160, 0, 0.55) 42px 0px 0px) ' +
+      'drop-shadow(rgba(255, 0, 90, 0.4) -26px 0px 0px)');
+    expect(f.fdx).toBe(42);
+    expect(f.fda).toBeCloseTo(0.55, 5);
+    expect([f.fdr, f.fdg, f.fdbl]).toEqual([240, 160, 0]);
   });
   test('captures a blur() radius and ignores unsupported functions', () => {
     const f = pagxParseFilterChannels('blur(5px) brightness(1.2)');
