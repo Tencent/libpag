@@ -107,8 +107,8 @@ class PAGStateMachineTimeline {
   void apply(float mix = 1.0f);
 
   /**
-   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(mix). Returns
-   * the result of advance(deltaMicroseconds).
+   * Convenience method exactly equivalent to advance(deltaMicroseconds) followed by apply(mix).
+   * Returns the result of advance(deltaMicroseconds).
    */
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 

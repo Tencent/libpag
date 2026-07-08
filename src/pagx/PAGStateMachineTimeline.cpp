@@ -518,6 +518,16 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
       break;
     }
   }
+  // Clear consumed triggers and fired flags at the end of advance so that nested state machines
+  // driven via separate advance() + apply() calls also clear correctly.
+  for (auto& iv : inputValues) {
+    if (iv.type == StateMachineInputType::Trigger) {
+      iv.fired = false;
+    }
+  }
+  for (auto& ri : regions) {
+    ri.consumedTriggers.clear();
+  }
   return hadActive || hasActive;
 }
 
@@ -630,14 +640,6 @@ void PAGStateMachineTimeline::apply(float smMix) {
 bool PAGStateMachineTimeline::advanceAndApply(int64_t deltaMicroseconds, float smMix) {
   bool result = advance(deltaMicroseconds);
   apply(smMix);
-  for (auto& iv : inputValues) {
-    if (iv.type == StateMachineInputType::Trigger) {
-      iv.fired = false;
-    }
-  }
-  for (auto& ri : regions) {
-    ri.consumedTriggers.clear();
-  }
   return result;
 }
 
