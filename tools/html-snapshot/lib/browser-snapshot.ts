@@ -1277,6 +1277,17 @@ function buildStyle(left, top, width, height, computed, opts) {
         parts.push(`width: ${px(width)}`);
       }
       parts.push(`flex: ${formatFlexGrow(grow)}`);
+    } else if (opts.flexContentSized) {
+      // A block / padded text-leaf flex item whose box size is purely glyph-
+      // derived (the browser measured it, the author never declared a width —
+      // see the `contentSized` gate in `renderTextLeaf`). Omit both axes so
+      // PAGX's own text layout sizes the box (plus any padding) instead of
+      // freezing Chromium's measured px, which pins the box to Chromium's font
+      // metrics and clips / gaps the text once a different face is
+      // substituted. `flex-shrink: 0` keeps the flex parent from compressing
+      // it below that natural content size — the same intent as the pinned
+      // branch below, without pinning the dimensions.
+      parts.push(`flex-shrink: 0`);
     } else {
       parts.push(`width: ${px(width)}`);
       parts.push(`height: ${px(height)}`);
@@ -3426,7 +3437,28 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     // wrappers we still want the source padding so the inline span starts
     // inside the padding box.
     const innerLayout = textLeafInnerLayout(computed);
-    const wrapperStyle = joinStyles(boxStyle, innerLayout);
+    // A non-inline (block) or padded text leaf that is a flex item still
+    // derives its box size from its glyph content — the browser measured it,
+    // the author never declared a width. Baking Chromium's measured px pins
+    // the box to Chromium's font metrics, so a render host that substitutes a
+    // different face (the norm for CJK / web fonts) over- or under-fills it,
+    // clipping the text or opening a gap to the next flex sibling. Emit the
+    // wrapper unsized — keeping its padding and inner flex — so PAGX's text
+    // layout drives the box and the flex parent positions it, exactly like the
+    // pure-inline <span> branch above. Two carve-outs keep the measured size:
+    //   - an author-reserved gutter (`hasAuthorDefinedFlexSize`), e.g. an
+    //     explicit `width` / `min-width` or a stretched cross axis, must
+    //     survive so the reserved space is not lost;
+    //   - a box-painted leaf (background / border / shadow) needs a concrete
+    //     box to paint into, and its importer host nests a `100% x 100%` inner
+    //     layer that has nothing to resolve against once the outer is unsized.
+    const contentSized =
+      !hasAuthorDefinedFlexSize(el) && !hasBoxVisualsForInline(computed);
+    const wrapperBox = contentSized
+      ? buildStyle(left, top, rect.width, rect.height, computed,
+                   { box: true, ...opts, flexContentSized: true })
+      : boxStyle;
+    const wrapperStyle = joinStyles(wrapperBox, innerLayout);
     return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
 
