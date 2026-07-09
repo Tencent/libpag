@@ -52,7 +52,8 @@ const USAGE = `Usage: node run.js [options]
   --scale <float>     pagx render scale (default: 1.0)
   --no-infer-flex     Disable the C++ AbsoluteToFlexInferencePass during import
   --skip-existing     Reuse existing baseline / render frames if present
-  --only <substr>     Only run cases whose relative path contains <substr>
+  --only <substr>     Only run cases whose relative path contains <substr>.
+                      Repeat the flag or pass a comma-separated list to match any of them.
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus
   --concurrency, -j N Process N cases in parallel (default: 1)
@@ -67,7 +68,7 @@ function parseArgs(argv) {
     scale: 1,
     inferFlex: true,
     skipExisting: false,
-    only: '',
+    only: [],
     label: 'current',
     recursive: false,
     concurrency: 1,
@@ -88,7 +89,13 @@ function parseArgs(argv) {
       opts.scale = v;
     } else if (a === '--no-infer-flex') opts.inferFlex = false;
     else if (a === '--skip-existing') opts.skipExisting = true;
-    else if (a === '--only') opts.only = argv[++i];
+    else if (a === '--only') {
+      const parts = String(argv[++i])
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      opts.only.push(...parts);
+    }
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--browser-engine') opts.browserEngine = argv[++i];
@@ -140,7 +147,7 @@ function findCorpusFiles(corpusDir, only, recursive) {
       if (!name.toLowerCase().endsWith('.html')) continue;
       if (name.includes('.subset.')) continue;
       const rel = relPrefix ? `${relPrefix}/${name}` : name;
-      if (only && !rel.includes(only)) continue;
+      if (only.length && !only.some((s) => rel.includes(s))) continue;
       const base = name.slice(0, -'.html'.length);
       const caseName = relPrefix
         ? `${relPrefix.replace(/[\\/]/g, '__')}__${base}`
