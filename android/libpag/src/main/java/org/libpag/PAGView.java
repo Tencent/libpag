@@ -37,7 +37,7 @@ import java.util.ArrayList;
 public class PAGView extends TextureView implements TextureView.SurfaceTextureListener,
         LifecycleListener, PAGAnimator.Listener {
 
-    public interface PAGViewListener {
+    private static final String TAG = "LifecycleTest";    public interface PAGViewListener {
         /**
          * Notifies the start of the animation. It can be called from either the UI thread or the
          * thread that calls the play() method.
@@ -599,6 +599,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
+        android.util.Log.i(TAG, "[View] onVisibilityAggregated(" + isVisible + ")");
         checkVisible();
     }
 
@@ -620,6 +621,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public void onResume() {
+        android.util.Log.i(TAG, "[OLD Fragment] onResume() triggered, isVisible=" + isVisible);
         // When the device is locked and then unlocked, the PAGView's content may disappear,
         // use the following way to make the content appear.
         if (isVisible) {
