@@ -435,10 +435,10 @@ class PAGXView {
   float userOffsetY = 0.0f;
   std::shared_ptr<PAGXDocument> document = nullptr;
 
-  // Gesture-freeze pipeline (currently inactive). The snapshot fast path was removed from draw()
-  // in the PAGScene migration; these members are retained for the public setGestureActive/
-  // setSnapshotEnabled API and to support a future performance pass. fitSnapshot stays null, so
-  // setGestureActive naturally no-ops. Cleared on parsePAGX/updateSize.
+  // Gesture-freeze pipeline. draw() captures fitSnapshot after each full render (captureFitSnapshot)
+  // and blits it during active gestures and the steady-state zoom ~= 1 path, keeping pan/zoom smooth
+  // without a full Record(). setGestureActive takes effect once a snapshot exists. Cleared on
+  // parsePAGX/updateSize.
   bool gestureActive = false;
   std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
   // Supersampling factor of the fit snapshot: 1 = same resolution; >1 = N× pixel density, used to
@@ -447,9 +447,9 @@ class PAGXView {
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
   // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
   bool zoomedOutFrameSettled = false;
-  // Master switch for the fitSnapshot fast path (currently inactive; see the gesture-freeze note
-  // above). draw() always performs a full render regardless of this flag. Toggled via
-  // setSnapshotEnabled().
+  // Master switch for the fitSnapshot fast path (gesture-freeze blit, steady-state blit, and the
+  // idle short-circuit). When false, draw() always performs a full render and no snapshot is used.
+  // Toggled via setSnapshotEnabled().
   bool snapshotEnabled = true;
   // Timestamp (emscripten_get_now ms) of the most recent gesture end. Used to defer the refresh of
   // fitSnapshot until the user truly stops: during dense gestures it reuses the last stable captured
