@@ -28,12 +28,12 @@
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGFont.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXChannelTable.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
@@ -102,7 +102,7 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
-#include "pagx/PAGStateMachineTimeline.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
@@ -5566,7 +5566,7 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
   ASSERT_TRUE(loaded->errors.empty()) << "errors: " << loaded->errors.size();
   ASSERT_EQ(loaded->animations.size(), 1u);
 
-  auto* anim2 = loaded->animations[0];
+  auto* anim2 = static_cast<pagx::Animation*>(loaded->animations[0]);
   EXPECT_EQ(anim2->id, "main");
   EXPECT_EQ(anim2->duration, 120);
   EXPECT_FLOAT_EQ(anim2->frameRate, 60.0f);
@@ -5640,10 +5640,9 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   ASSERT_TRUE(loaded->errors.empty());
   ASSERT_EQ(loaded->animations.size(), 1u);
 
-  ASSERT_EQ(loaded->animations[0]->objects[0]->channels[0]->valueType(),
-            pagx::ChannelValueType::Float);
-  auto* prop2 =
-      static_cast<pagx::TypedChannel<float>*>(loaded->animations[0]->objects[0]->channels[0]);
+  auto* loadedAnim = static_cast<pagx::Animation*>(loaded->animations[0]);
+  ASSERT_EQ(loadedAnim->objects[0]->channels[0]->valueType(), pagx::ChannelValueType::Float);
+  auto* prop2 = static_cast<pagx::TypedChannel<float>*>(loadedAnim->objects[0]->channels[0]);
   ASSERT_EQ(prop2->keyframes.size(), 3u);
 
   EXPECT_EQ(prop2->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
@@ -5930,7 +5929,7 @@ PAGX_TEST(PAGXTest, ChannelLayerAlpha) {
   ASSERT_TRUE(tgfxLayer != nullptr);
   tgfxLayer->setAlpha(1.0f);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
 
   // mix=1: alpha overwritten to keyframe value 0.25.
@@ -5974,7 +5973,7 @@ PAGX_TEST(PAGXTest, ChannelLayerVisibleDiscrete) {
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setVisible(true);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
 
   // mix=0.3 still overwrites because discrete.
   timeline->apply(0.3f);
@@ -6013,7 +6012,7 @@ PAGX_TEST(PAGXTest, ChannelLayerX) {
 
   // The layer transform is held as decomposed state on the runtime target, seeded from the node's
   // authored x (0 here). apply(0.5) mixes that baseline toward the keyframe value 100.
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(0.5f);
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);  // 0 + (100-0)*0.5
 }
@@ -6068,7 +6067,7 @@ PAGX_TEST(PAGXTest, ChannelTextPosition) {
 
   tgfxText->setPosition(tgfx::Point::Make(20, 40));
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(0.5f);
   // x: 20 + (100-20)*0.5 = 60; y: 40 + (80-40)*0.5 = 60.
@@ -6110,7 +6109,7 @@ PAGX_TEST(PAGXTest, ChannelSolidColor) {
   auto tgfxSolid = tree.get<tgfx::SolidColor>(solid);
   ASSERT_TRUE(tgfxSolid != nullptr);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxSolid->color().red, 0.0f);
   EXPECT_FLOAT_EQ(tgfxSolid->color().blue, 1.0f);
@@ -6178,7 +6177,7 @@ PAGX_TEST(PAGXTest, ChannelColorStop) {
   EXPECT_EQ(stopBinding->gradient.get(), tgfxGrad.get());
   EXPECT_EQ(stopBinding->index, 1u);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxGrad->colors()[1].blue, 1.0f);
   EXPECT_FLOAT_EQ(tgfxGrad->positions()[1], 0.4f);
@@ -6220,7 +6219,7 @@ PAGX_TEST(PAGXTest, ChannelBlurFilter) {
   auto tgfxBlur = tree.get<tgfx::BlurFilter>(blur);
   ASSERT_TRUE(tgfxBlur != nullptr);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(0.5f);
   EXPECT_FLOAT_EQ(tgfxBlur->blurrinessX(), 6.0f);  // 2 + (10-2)*0.5
   EXPECT_FLOAT_EQ(tgfxBlur->blurrinessY(), 4.0f);  // 2 + (6-2)*0.5
@@ -6285,7 +6284,7 @@ PAGX_TEST(PAGXTest, ChannelDropShadow) {
   auto tgfxStyle = tree.get<tgfx::DropShadowStyle>(dsStyle);
   ASSERT_TRUE(tgfxStyle != nullptr);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(1.0f);
 
   EXPECT_FLOAT_EQ(tgfxFilter->offsetX(), 8.0f);
@@ -6329,7 +6328,7 @@ PAGX_TEST(PAGXTest, ChannelBlendFilter) {
   auto tgfxBlend = tree.get<tgfx::BlendFilter>(blend);
   ASSERT_TRUE(tgfxBlend != nullptr);
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxBlend->color().red, 0.0f);
   EXPECT_FLOAT_EQ(tgfxBlend->color().green, 1.0f);
@@ -7000,7 +6999,7 @@ PAGX_TEST(PAGXTest, TopLevelTimelineSurvivesExternalChildRebuild) {
   // Cache the top-level timeline handle BEFORE the rebuild, like a caller that keeps it per frame.
   // Drive to a mid value (0.5) distinct from the layer's default alpha (1.0) so the assertion proves
   // the timeline actually wrote through the binding, not that the value happened to match.
-  auto cachedTimeline = scene->getDefaultTimeline();
+  auto cachedTimeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(cachedTimeline != nullptr);
   cachedTimeline->setCurrentTime(500'000);  // frame 30 of a 60-frame, 60fps animation
   cachedTimeline->apply(1.0f);
@@ -8394,7 +8393,7 @@ PAGX_TEST(PAGXTest, ChannelNoiseFilter) {
   EXPECT_FALSE(tree.apply(multiFilter, "secondColor",
                           pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
 
   // Apply at mix=1.0: values fully overwritten by keyframe targets.
@@ -8543,7 +8542,7 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
   EXPECT_FALSE(tree.apply(multiStyle, "secondColor",
                           pagx::KeyValue(pagx::Color{1.0f, 1.0f, 1.0f, 1.0f}), 1.0f));
 
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
 
   // Apply at mix=1.0
@@ -8959,7 +8958,7 @@ PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineWhenNoTimelineNodeDirty) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(1.0f);
   EXPECT_TRUE(timeline->resolved);
@@ -9010,7 +9009,7 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
   doc->notifyChange({alphaChannel}, true);
 
   // A freshly rebuilt timeline applies the new value.
-  auto rebuilt = scene->getDefaultTimeline();
+  auto rebuilt = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(rebuilt != nullptr);
   tgfxLayer->setAlpha(1.0f);
   rebuilt->apply(1.0f);
@@ -9707,7 +9706,7 @@ PAGX_TEST(PAGXTest, ChannelRectangleSize) {
   ASSERT_TRUE(tgfxRect != nullptr);
   EXPECT_FLOAT_EQ(tgfxRect->size().width, 40.0f);
 
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   // mix=0.5 from 40 toward 100 = 70; height untouched.
   timeline->apply(0.5f);
@@ -9745,7 +9744,7 @@ PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
   auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   // mix=1: matrix becomes 2x scale, composed with the authored x translation (10).
   timeline->apply(1.0f);
@@ -9789,7 +9788,7 @@ PAGX_TEST(PAGXTest, ChannelLayerMatrixRotationShortestArc) {
   auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
 
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   // Sweep at 25%, 50%, 75% of the segment. The shortest-arc rotation should rise monotonically from
   // 170 -> 175 -> 180 -> 185 -> 190 deg; sin and cos act as a sufficient continuity check.

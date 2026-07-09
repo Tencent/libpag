@@ -107,9 +107,7 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   wrapper->width = externalDoc->width;
   wrapper->height = externalDoc->height;
   wrapper->layers = externalDoc->layers;
-  for (auto* animation : externalDoc->animations) {
-    wrapper->animations.push_back(animation);
-  }
+  wrapper->animations = externalDoc->animations;
   layer->composition = wrapper;
   layer->externalDoc = externalDoc;
   // compositionFilePath is retained as the origin path of this externalDoc: it identifies the

@@ -20,9 +20,10 @@
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
-#include "pagx/PAGStateMachineTimeline.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
@@ -380,24 +381,26 @@ std::vector<std::string> PAGScene::getTimelineIds() const {
   if (document == nullptr) {
     return ids;
   }
-  ids.reserve(document->animations.size());
-  for (auto* animation : document->animations) {
-    if (animation != nullptr) {
-      ids.push_back(animation->id);
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      ids.push_back(static_cast<Animation*>(node)->id);
     }
   }
   return ids;
 }
 
-std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
+std::shared_ptr<PAGAnimation> PAGScene::getTimeline(const std::string& id) {
   if (document == nullptr) {
     return nullptr;
   }
   Animation* matched = nullptr;
-  for (auto* animation : document->animations) {
-    if (animation != nullptr && animation->id == id) {
-      matched = animation;
-      break;
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      auto* animation = static_cast<Animation*>(node);
+      if (animation->id == id) {
+        matched = animation;
+        break;
+      }
     }
   }
   if (matched == nullptr) {
@@ -410,8 +413,8 @@ std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
   // at apply time. A user-cached handle then survives a runtime-tree rebuild (foreign external-doc
   // edit) that replaces _rootComposition and frees the old binding, instead of dangling.
-  auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, nullptr, document.get(), weak_from_this()));
+  auto timeline = std::shared_ptr<PAGAnimation>(
+      new PAGAnimation(matched, nullptr, document.get(), weak_from_this()));
   timelinesByAnimation.emplace(matched, timeline);
   return timeline;
 }
@@ -420,11 +423,18 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
   if (document == nullptr || document->animations.empty()) {
     return nullptr;
   }
-  auto* first = document->animations.front();
-  if (first == nullptr) {
-    return nullptr;
+  for (auto* node : document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == NodeType::Animation) {
+      return getTimeline(static_cast<Animation*>(node)->id);
+    }
+    if (node->nodeType() == NodeType::StateMachine) {
+      return getStateMachineTimeline(static_cast<StateMachine*>(node)->id);
+    }
   }
-  return getTimeline(first->id);
+  return nullptr;
 }
 
 std::vector<std::string> PAGScene::getStateMachineIds() const {
@@ -440,7 +450,7 @@ std::vector<std::string> PAGScene::getStateMachineIds() const {
   return ids;
 }
 
-std::shared_ptr<PAGStateMachineTimeline> PAGScene::getStateMachineTimeline(const std::string& id) {
+std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::string& id) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -459,9 +469,9 @@ std::shared_ptr<PAGStateMachineTimeline> PAGScene::getStateMachineTimeline(const
     return nullptr;
   }
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
-  // at apply time, same as PAGTimeline.
-  auto timeline = std::shared_ptr<PAGStateMachineTimeline>(
-      new PAGStateMachineTimeline(matched, nullptr, document.get(), weak_from_this()));
+  // at apply time, same as PAGAnimation.
+  auto timeline = std::shared_ptr<PAGStateMachine>(
+      new PAGStateMachine(matched, nullptr, document.get(), weak_from_this()));
   stateMachineTimelines.emplace(id, timeline);
   return timeline;
 }

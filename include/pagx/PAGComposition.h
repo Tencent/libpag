@@ -26,8 +26,8 @@
 
 namespace pagx {
 
-class PAGTimeline;
-class PAGStateMachineTimeline;
+class PAGAnimation;
+class PAGStateMachine;
 class PAGScene;
 class PAGViewModel;
 class PAGXDocument;
@@ -154,8 +154,8 @@ class PAGComposition : public PAGLayer {
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
-  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-  std::vector<std::shared_ptr<PAGStateMachineTimeline>> stateMachineTimelines = {};
+  std::vector<std::shared_ptr<PAGAnimation>> timelines = {};
+  std::vector<std::shared_ptr<PAGStateMachine>> stateMachineTimelines = {};
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
   std::unique_ptr<DataBindRuntime> dataBindRuntime;
   std::shared_ptr<DataContext> dataContext = nullptr;

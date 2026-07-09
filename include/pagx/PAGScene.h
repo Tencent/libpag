@@ -23,8 +23,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
 
 namespace tgfx {
@@ -57,7 +59,8 @@ struct RuntimeBinding;
  * PAGScene keeps the source PAGXDocument alive internally, so callers may release their own
  * document handle once the PAGScene is created.
  *
- * Thread safety: PAGScene and the PAGTimeline instances it vends are not thread-safe. Their
+ * Thread safety: PAGScene and the PAGAnimation / PAGStateMachine instances it vends are not
+ * thread-safe. Their
  * playback and render state carry no internal locking, so all calls on a single PAGScene (and its
  * timelines) must be serialized by the caller. Distinct PAGScene instances built from the same
  * PAGXDocument hold independent runtime state and may be driven from different threads, provided
@@ -84,17 +87,18 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::vector<std::string> getTimelineIds() const;
 
   /**
-   * Returns the PAGTimeline driving the named top-level animation. Repeated calls with the same
+   * Returns the PAGAnimation driving the named top-level animation. Repeated calls with the same
    * id return the same instance, so playback state is shared across all callers driving that
    * animation.
    * @param id an animation id from getTimelineIds(). Returns nullptr if no top-level
    *           Animation matches the given id.
    */
-  std::shared_ptr<PAGTimeline> getTimeline(const std::string& id);
+  std::shared_ptr<PAGAnimation> getTimeline(const std::string& id);
 
   /**
-   * Returns the PAGTimeline for the first top-level animation in the document, or nullptr if the
-   * document has no top-level animations.
+   * Returns the first top-level playback driver (animation or state machine) in declaration order,
+   * or nullptr if the document has none. The returned shared_ptr points to a PAGAnimation or
+   * PAGStateMachine; use getTimeline() / getStateMachineTimeline() for typed access.
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
@@ -105,12 +109,12 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::vector<std::string> getStateMachineIds() const;
 
   /**
-   * Returns the PAGStateMachineTimeline driving the named top-level state machine. Repeated calls
+   * Returns the PAGStateMachine driving the named top-level state machine. Repeated calls
    * with the same id return the same instance.
    * @param id a state machine id from getStateMachineIds(). Returns nullptr if no top-level
    *           StateMachine matches the given id.
    */
-  std::shared_ptr<PAGStateMachineTimeline> getStateMachineTimeline(const std::string& id);
+  std::shared_ptr<PAGStateMachine> getStateMachineTimeline(const std::string& id);
 
   /**
    * Returns the root PAGComposition of this scene.
@@ -227,8 +231,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
-  std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
-  std::unordered_map<std::string, std::shared_ptr<PAGStateMachineTimeline>>
+  std::unordered_map<Animation*, std::shared_ptr<PAGAnimation>> timelinesByAnimation = {};
+  std::unordered_map<std::string, std::shared_ptr<PAGStateMachine>>
       stateMachineTimelines = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
@@ -242,8 +246,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
-  friend class PAGTimeline;
-  friend class PAGStateMachineTimeline;
+  friend class PAGAnimation;
+  friend class PAGStateMachine;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/ObserverHandle.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateMachineInput.h"
 
@@ -32,33 +33,33 @@ struct RuntimeBinding;
 class PAGScene;
 class PAGXDocument;
 class PAGViewModelValue;
-class PAGTimeline;
+class PAGAnimation;
 class State;
 class StateTransition;
 
 /**
- * PAGStateMachineTimeline drives a single StateMachine. It holds the runtime input values and a per-
- * region execution instance (RegionInstance, hidden in the .cpp) that tracks the current state,
- * crossfade progress, and per-region trigger consumption.
+ * PAGStateMachine drives a single StateMachine. It holds the runtime input values and a per-region
+ * execution instance (RegionInstance, hidden in the .cpp) that tracks the current state, crossfade
+ * progress, and per-region trigger consumption.
  *
- * PAGStateMachineTimeline must not be constructed directly; obtain instances through
+ * PAGStateMachine must not be constructed directly; obtain instances through
  * PAGScene::getStateMachineTimeline(). Multiple lookups for the same state machine id return the
- * same PAGStateMachineTimeline instance.
+ * same PAGStateMachine instance.
  *
  * Lifetime: references content owned by the PAGScene that vended it. Callers may keep the returned
  * shared_ptr alive past the PAGScene, but once that scene is destroyed the timeline detaches:
  * advance() and apply() become no-ops.
  *
- * Thread safety: PAGStateMachineTimeline is not thread-safe. Callers must serialize access.
+ * Thread safety: PAGStateMachine is not thread-safe. Callers must serialize access.
  */
-class PAGStateMachineTimeline {
+class PAGStateMachine : public PAGTimeline {
  public:
-  ~PAGStateMachineTimeline();
+  ~PAGStateMachine();
 
   /**
    * Returns the state machine id. Returns an empty string once the owning PAGScene is destroyed.
    */
-  const std::string& getId() const;
+  const std::string& getId() const override;
 
   /**
    * Returns the region names in declaration order. Returns an empty vector once the owning
@@ -106,7 +107,7 @@ class PAGStateMachineTimeline {
    * @param deltaMicroseconds the elapsed time in microseconds.
    * @return true if any crossfade transition is in progress.
    */
-  bool advance(int64_t deltaMicroseconds);
+  bool advance(int64_t deltaMicroseconds) override;
 
   /**
    * Evaluates the current state's animation output for every region and applies the results to the
@@ -114,13 +115,13 @@ class PAGStateMachineTimeline {
    * applied with their respective mix weights.
    * @param mix blend weight, defaults to 1.0 (full overwrite).
    */
-  void apply(float mix = 1.0f);
+  void apply(float mix = 1.0f) override;
 
   /**
    * Convenience method exactly equivalent to advance(deltaMicroseconds) followed by apply(mix).
    * Returns the result of advance(deltaMicroseconds).
    */
-  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
+  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f) override;
 
   /**
    * Registers a state-change listener. The callback receives the region name and the new state
@@ -149,8 +150,7 @@ class PAGStateMachineTimeline {
    *        are dropped silently.
    * @return true if the binding was established successfully.
    */
-  bool bindInput(const std::string& inputName,
-                 const std::shared_ptr<PAGViewModelValue>& vmValue);
+  bool bindInput(const std::string& inputName, const std::shared_ptr<PAGViewModelValue>& vmValue);
 
   struct InputValue {
     StateMachineInputType type = StateMachineInputType::Bool;
@@ -160,9 +160,8 @@ class PAGStateMachineTimeline {
   };
 
  private:
-  explicit PAGStateMachineTimeline(StateMachine* stateMachine, RuntimeBinding* binding,
-                                   PAGXDocument* contextDoc,
-                                   std::weak_ptr<PAGScene> owner);
+  explicit PAGStateMachine(StateMachine* stateMachine, RuntimeBinding* binding,
+                           PAGXDocument* contextDoc, std::weak_ptr<PAGScene> owner);
 
   std::weak_ptr<PAGScene> owner;
   StateMachine* stateMachine = nullptr;
@@ -184,11 +183,11 @@ class PAGStateMachineTimeline {
   void advanceRegion(int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
-  // Constructs a fresh PAGTimeline that plays the given state's animation. Each playback slot
+  // Constructs a fresh PAGAnimation that plays the given state's animation. Each playback slot
   // (current or fading) owns its own instance so their playback times stay independent. Returns
   // nullptr for an empty state or a missing animation (asserts in debug builds to surface a
   // dangling reference).
-  std::shared_ptr<PAGTimeline> createTimelineForState(const State* state);
+  std::shared_ptr<PAGAnimation> createTimelineForState(const State* state);
 
   friend class PAGScene;
   friend class PAGComposition;

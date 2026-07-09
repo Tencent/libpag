@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGStateMachineTimeline.h"
+#include "pagx/PAGStateMachine.h"
 #include <algorithm>
 #include <set>
 #include "base/utils/Log.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueNumber.h"
@@ -45,16 +45,16 @@ static constexpr int MAX_TRANSITIONS_PER_FRAME = 100;
 // RegionInstance (hidden in .cpp)
 // =============================================================================
 
-struct PAGStateMachineTimeline::RegionInstance {
+struct PAGStateMachine::RegionInstance {
   struct FadingState {
-    std::shared_ptr<PAGTimeline> timeline;
+    std::shared_ptr<PAGAnimation> timeline;
     float mixFrom = 1.0f;
     bool frozen = false;
   };
 
   const StateRegion* region = nullptr;
   const State* currentState = nullptr;
-  std::shared_ptr<PAGTimeline> currentTimeline;
+  std::shared_ptr<PAGAnimation> currentTimeline;
   float mix = 1.0f;
   const StateTransition* transition = nullptr;
   std::vector<FadingState> fadingOut;
@@ -110,10 +110,10 @@ float CurveMix(const StateTransition* transition, float t) {
 // Constructor / Destructor
 // =============================================================================
 
-PAGStateMachineTimeline::~PAGStateMachineTimeline() = default;
+PAGStateMachine::~PAGStateMachine() = default;
 
-PAGStateMachineTimeline::PAGStateMachineTimeline(StateMachine* sm, RuntimeBinding* b,
-                                                 PAGXDocument* ctx, std::weak_ptr<PAGScene> owner)
+PAGStateMachine::PAGStateMachine(StateMachine* sm, RuntimeBinding* b, PAGXDocument* ctx,
+                                 std::weak_ptr<PAGScene> owner)
     : owner(std::move(owner)), stateMachine(sm), binding(b), contextDoc(ctx) {
   if (stateMachine == nullptr) {
     return;
@@ -151,7 +151,7 @@ PAGStateMachineTimeline::PAGStateMachineTimeline(StateMachine* sm, RuntimeBindin
 // Identity / queries
 // =============================================================================
 
-const std::string& PAGStateMachineTimeline::getId() const {
+const std::string& PAGStateMachine::getId() const {
   if (stateMachine == nullptr || owner.expired()) {
     static const std::string empty;
     return empty;
@@ -159,7 +159,7 @@ const std::string& PAGStateMachineTimeline::getId() const {
   return stateMachine->id;
 }
 
-std::vector<std::string> PAGStateMachineTimeline::getRegionIds() const {
+std::vector<std::string> PAGStateMachine::getRegionIds() const {
   std::vector<std::string> ids;
   if (stateMachine == nullptr || owner.expired()) {
     return ids;
@@ -173,7 +173,7 @@ std::vector<std::string> PAGStateMachineTimeline::getRegionIds() const {
   return ids;
 }
 
-std::string PAGStateMachineTimeline::getCurrentState(const std::string& regionName) const {
+std::string PAGStateMachine::getCurrentState(const std::string& regionName) const {
   if (stateMachine == nullptr || owner.expired()) {
     return {};
   }
@@ -198,7 +198,7 @@ static int findInputIdx(const StateMachine* sm, const std::string& name) {
   return -1;
 }
 
-bool PAGStateMachineTimeline::setBool(const std::string& name, bool value) {
+bool PAGStateMachine::setBool(const std::string& name, bool value) {
   int idx = findInputIdx(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Bool) {
     return false;
@@ -207,7 +207,7 @@ bool PAGStateMachineTimeline::setBool(const std::string& name, bool value) {
   return true;
 }
 
-bool PAGStateMachineTimeline::setNumber(const std::string& name, float value) {
+bool PAGStateMachine::setNumber(const std::string& name, float value) {
   int idx = findInputIdx(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Number) {
     return false;
@@ -216,7 +216,7 @@ bool PAGStateMachineTimeline::setNumber(const std::string& name, float value) {
   return true;
 }
 
-bool PAGStateMachineTimeline::fireTrigger(const std::string& name) {
+bool PAGStateMachine::fireTrigger(const std::string& name) {
   int idx = findInputIdx(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Trigger) {
     return false;
@@ -233,7 +233,7 @@ bool PAGStateMachineTimeline::fireTrigger(const std::string& name) {
 // =============================================================================
 
 static bool EvaluateCondition(const TransitionCondition* condition,
-                              const PAGStateMachineTimeline::InputValue& input) {
+                              const PAGStateMachine::InputValue& input) {
   if (condition == nullptr) {
     return true;
   }
@@ -270,7 +270,7 @@ static bool EvaluateCondition(const TransitionCondition* condition,
 // =============================================================================
 
 static bool IsTransitionAllowed(const StateTransition* transition,
-                                const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
+                                const std::vector<PAGStateMachine::InputValue>& inputValues,
                                 const StateMachine* stateMachine,
                                 const std::set<std::string>& consumedTriggers) {
   if (transition == nullptr) {
@@ -319,8 +319,8 @@ static bool IsTransitionAllowed(const StateTransition* transition,
 
 static const StateTransition* FindAllowedTransition(
     const StateRegion* region, const std::string& fromName, bool inTransition,
-    const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
-    const StateMachine* stateMachine, const std::set<std::string>& consumedTriggers) {
+    const std::vector<PAGStateMachine::InputValue>& inputValues, const StateMachine* stateMachine,
+    const std::set<std::string>& consumedTriggers) {
   if (region == nullptr) {
     return nullptr;
   }
@@ -342,7 +342,7 @@ static const StateTransition* FindAllowedTransition(
 // Region state transition (member)
 // =============================================================================
 
-std::shared_ptr<PAGTimeline> PAGStateMachineTimeline::createTimelineForState(const State* state) {
+std::shared_ptr<PAGAnimation> PAGStateMachine::createTimelineForState(const State* state) {
   if (state == nullptr || state->stateType() != StateType::Animation || contextDoc == nullptr) {
     return nullptr;
   }
@@ -358,10 +358,10 @@ std::shared_ptr<PAGTimeline> PAGStateMachineTimeline::createTimelineForState(con
   if (anim == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGTimeline>(new PAGTimeline(anim, binding, contextDoc, owner));
+  return std::shared_ptr<PAGAnimation>(new PAGAnimation(anim, binding, contextDoc, owner));
 }
 
-void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransition* t) {
+void PAGStateMachine::changeState(RegionInstance& ri, const StateTransition* t) {
   if (t == nullptr) {
     return;
   }
@@ -400,7 +400,7 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
   }
 }
 
-bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
+bool PAGStateMachine::tryChangeState(RegionInstance& ri) {
   bool inTransition = (ri.transition != nullptr && ri.mix < 1.0f);
   const StateTransition* t = FindAllowedTransition(ri.region, AnyStateName, inTransition,
                                                    inputValues, stateMachine, ri.consumedTriggers);
@@ -416,14 +416,20 @@ bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
   return true;
 }
 
-void PAGStateMachineTimeline::advanceRegion(int64_t deltaUs) {
+void PAGStateMachine::advanceRegion(int64_t deltaUs) {
   for (auto& ri : regions) {
     if (ri.region == nullptr || ri.currentState == nullptr) {
       continue;
     }
-    auto frameRate = contextDoc != nullptr && !contextDoc->animations.empty()
-                         ? contextDoc->animations[0]->frameRate
-                         : 60.0f;
+    float frameRate = 60.0f;
+    if (contextDoc != nullptr) {
+      for (auto* node : contextDoc->animations) {
+        if (node != nullptr && node->nodeType() == NodeType::Animation) {
+          frameRate = static_cast<Animation*>(node)->frameRate;
+          break;
+        }
+      }
+    }
     if (ri.currentTimeline != nullptr) {
       ri.currentTimeline->advance(deltaUs);
     }
@@ -472,7 +478,7 @@ void PAGStateMachineTimeline::advanceRegion(int64_t deltaUs) {
 // advance / apply
 // =============================================================================
 
-bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
+bool PAGStateMachine::advance(int64_t deltaMicroseconds) {
   if (stateMachine == nullptr || owner.expired()) {
     return false;
   }
@@ -504,7 +510,7 @@ bool PAGStateMachineTimeline::advance(int64_t deltaMicroseconds) {
   return hadActive || hasActive;
 }
 
-void PAGStateMachineTimeline::apply(float smMix) {
+void PAGStateMachine::apply(float smMix) {
   if (stateMachine == nullptr || owner.expired()) {
     return;
   }
@@ -512,7 +518,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
   if (clamped <= 0.0f) {
     return;
   }
-  // Each playback slot owns its PAGTimeline, which holds the playback time and resolves the binding
+  // Each playback slot owns its PAGAnimation, which holds the playback time and resolves the binding
   // (including the null-binding lazy path for top-level timelines) internally.
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
@@ -530,7 +536,7 @@ void PAGStateMachineTimeline::apply(float smMix) {
   }
 }
 
-bool PAGStateMachineTimeline::advanceAndApply(int64_t deltaMicroseconds, float smMix) {
+bool PAGStateMachine::advanceAndApply(int64_t deltaMicroseconds, float smMix) {
   bool result = advance(deltaMicroseconds);
   apply(smMix);
   return result;
@@ -540,7 +546,7 @@ bool PAGStateMachineTimeline::advanceAndApply(int64_t deltaMicroseconds, float s
 // State change listeners
 // =============================================================================
 
-int PAGStateMachineTimeline::addStateChangeListener(
+int PAGStateMachine::addStateChangeListener(
     std::function<void(const std::string&, const std::string&)> callback) {
   if (!callback) {
     return -1;
@@ -550,7 +556,7 @@ int PAGStateMachineTimeline::addStateChangeListener(
   return id;
 }
 
-void PAGStateMachineTimeline::removeStateChangeListener(int listenerId) {
+void PAGStateMachine::removeStateChangeListener(int listenerId) {
   for (auto it = stateChangeListeners.begin(); it != stateChangeListeners.end(); ++it) {
     if (it->first == listenerId) {
       stateChangeListeners.erase(it);
@@ -566,7 +572,7 @@ namespace {
 
 class BoolInputObserver {
  public:
-  BoolInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+  BoolInputObserver(PAGStateMachine* timeline, std::string inputName,
                     std::weak_ptr<PAGViewModelValueBoolean> vmValue)
       : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
   }
@@ -580,14 +586,14 @@ class BoolInputObserver {
   }
 
  private:
-  PAGStateMachineTimeline* timeline = nullptr;
+  PAGStateMachine* timeline = nullptr;
   std::string inputName;
   std::weak_ptr<PAGViewModelValueBoolean> vmValue;
 };
 
 class NumberInputObserver {
  public:
-  NumberInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+  NumberInputObserver(PAGStateMachine* timeline, std::string inputName,
                       std::weak_ptr<PAGViewModelValueNumber> vmValue)
       : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
   }
@@ -601,14 +607,14 @@ class NumberInputObserver {
   }
 
  private:
-  PAGStateMachineTimeline* timeline = nullptr;
+  PAGStateMachine* timeline = nullptr;
   std::string inputName;
   std::weak_ptr<PAGViewModelValueNumber> vmValue;
 };
 
 class TriggerInputObserver {
  public:
-  TriggerInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
+  TriggerInputObserver(PAGStateMachine* timeline, std::string inputName,
                        std::weak_ptr<PAGViewModelValueTrigger> vmValue)
       : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
   }
@@ -620,15 +626,15 @@ class TriggerInputObserver {
   }
 
  private:
-  PAGStateMachineTimeline* timeline = nullptr;
+  PAGStateMachine* timeline = nullptr;
   std::string inputName;
   std::weak_ptr<PAGViewModelValueTrigger> vmValue;
 };
 
 }  // namespace
 
-bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
-                                        const std::shared_ptr<PAGViewModelValue>& vmValue) {
+bool PAGStateMachine::bindInput(const std::string& inputName,
+                                const std::shared_ptr<PAGViewModelValue>& vmValue) {
   if (!vmValue || !stateMachine) {
     return false;
   }

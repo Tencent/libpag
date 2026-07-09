@@ -2937,13 +2937,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
           doc->layers.push_back(layer);
         }
       } else if (child->name == "Animations") {
-        std::vector<Node*> animChildren;
-        ParseAnimations(child.get(), &animChildren, doc);
-        for (auto* node : animChildren) {
-          if (node != nullptr && node->nodeType() == NodeType::Animation) {
-            doc->animations.push_back(static_cast<Animation*>(node));
-          }
-        }
+        ParseAnimations(child.get(), &doc->animations, doc);
       } else if (child->name == "DataBind") {
         auto bind = ParseDataBind(child.get(), doc);
         if (bind) doc->dataBinds.push_back(bind);

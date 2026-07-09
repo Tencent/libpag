@@ -20,10 +20,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "pagx/DataBindRuntime.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
-#include "pagx/PAGStateMachineTimeline.h"
-#include "pagx/PAGTimeline.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -136,8 +136,8 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       if (animation == nullptr) {
         continue;
       }
-      auto timeline =
-          std::shared_ptr<PAGTimeline>(new PAGTimeline(animation, binding.get(), document, scene));
+      auto timeline = std::shared_ptr<PAGAnimation>(
+          new PAGAnimation(animation, binding.get(), document, scene));
       if (!animationDriver->playing) {
         timeline->pause();
       }
@@ -149,8 +149,8 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       if (sm == nullptr) {
         continue;
       }
-      auto smTimeline = std::shared_ptr<PAGStateMachineTimeline>(
-          new PAGStateMachineTimeline(sm, binding.get(), document, scene));
+      auto smTimeline =
+          std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
       stateMachineTimelines.push_back(std::move(smTimeline));
     }
   }

@@ -181,7 +181,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -488,13 +488,6 @@ static void WriteAnimation(XMLBuilder& xml, const Animation* animation) {
     xml.closeElement();
   }
   xml.closeElement();
-}
-
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
-  // Note: caller is responsible for opening and closing the <Animations> container.
-  for (const auto* animation : animations) {
-    WriteAnimation(xml, animation);
-  }
 }
 
 //==============================================================================
@@ -1753,25 +1746,19 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
-  // Collect state machines already written inside a Composition's <Animations> so they are not
-  // duplicated at the document level.
-  std::set<const Node*> compOwned;
-  for (const auto& node : doc.nodes) {
-    if (node != nullptr && node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<const Composition*>(node.get());
-      for (const auto* animChild : comp->animations) {
-        if (animChild != nullptr && animChild->nodeType() == NodeType::StateMachine) {
-          compOwned.insert(animChild);
-        }
-      }
-    }
+  // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
+  // definitions parsed from the document's <Animations> block (in declaration order). StateMachine
+  // nodes created programmatically may only live in doc.nodes, so also scan doc.nodes for any SM
+  // not already in doc.animations.
+  std::set<const Node*> written;
+  for (const auto* node : doc.animations) {
+    written.insert(node);
   }
-  // Check if there's any Animation or StateMachine to write at the document level.
   bool hasAnimOrSM = !doc.animations.empty();
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
       if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
-          compOwned.find(node.get()) == compOwned.end()) {
+          written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
       }
@@ -1780,10 +1767,19 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   if (hasAnimOrSM) {
     xml.openElement("Animations");
     xml.closeElementStart();
-    WriteAnimations(xml, doc.animations);
+    for (const auto* node : doc.animations) {
+      if (node == nullptr) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node));
+      } else if (node->nodeType() == NodeType::StateMachine) {
+        WriteStateMachine(xml, static_cast<const StateMachine*>(node));
+      }
+    }
     for (const auto& node : doc.nodes) {
       if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
-          compOwned.find(node.get()) == compOwned.end()) {
+          written.find(node.get()) == written.end()) {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }
     }

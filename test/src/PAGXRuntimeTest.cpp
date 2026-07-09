@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -102,7 +102,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneTimelineLookup) {
 
   EXPECT_EQ(file->getTimeline("missing"), nullptr);
 
-  auto def = file->getDefaultTimeline();
+  auto def = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   EXPECT_EQ(def.get(), t1.get());
 }
 
@@ -179,7 +179,7 @@ PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
 
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
-  auto timeline = file->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->play();
 
@@ -247,7 +247,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(1.0f);
 
@@ -324,7 +324,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(1.0f);
 
@@ -396,7 +396,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
   timeline->apply(1.0f);
 
