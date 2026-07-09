@@ -1935,10 +1935,6 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
     transition->bezierOut = GetPointAttribute(node, "bezier-out", {0.0f, 0.0f}, doc);
     transition->bezierIn = GetPointAttribute(node, "bezier-in", {0.0f, 0.0f}, doc);
   }
-  auto exitAttr = GetAttribute(node, "exitTime");
-  if (!exitAttr.empty()) {
-    transition->exitTime = GetInt64Attribute(node, "exitTime", 0, doc);
-  }
   transition->enableEarlyExit = GetBoolAttribute(node, "earlyExit", false, doc);
   transition->pauseOnExit = GetBoolAttribute(node, "pauseOnExit", false, doc);
   auto child = node->firstChild;

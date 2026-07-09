@@ -374,9 +374,6 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
       }
     }
   }
-  if (transition->exitTime.has_value()) {
-    xml.addAttribute("exitTime", std::to_string(transition->exitTime.value()));
-  }
   if (transition->enableEarlyExit) {
     xml.addAttribute("earlyExit", "true");
   }

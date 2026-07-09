@@ -18,7 +18,6 @@
 
 #include "pagx/PAGStateMachineTimeline.h"
 #include <algorithm>
-#include <cmath>
 #include <set>
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
@@ -269,50 +268,11 @@ static bool EvaluateCondition(const TransitionCondition* condition,
 // Transition lookup (member helpers)
 // =============================================================================
 
-// Returns how far the current timeline has run past the transition's exit-time point, in
-// microseconds. A negative result means the exit time has not been reached yet. Returns 0 when the
-// transition has no exit time or the current state has no resolvable animation (no gate, no
-// overshoot). A sub-loop exit time is aligned to the loop the previous frame ended in so it fires
-// on every cycle. The state machine uses the sign as the exit gate and, on a transition, the
-// positive part as the time to carry over to the incoming state.
-static int64_t ExitTimeOvershoot(const StateTransition* transition,
-                                 const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc,
-                                 const State* currentState) {
-  if (transition == nullptr || !transition->exitTime.has_value() || currentTimeline == nullptr ||
-      contextDoc == nullptr || currentState == nullptr ||
-      currentState->stateType() != StateType::Animation) {
-    return 0;
-  }
-  auto* animState = static_cast<const AnimationState*>(currentState);
-  if (animState->animationId.empty()) {
-    return 0;
-  }
-  auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-  if (anim == nullptr) {
-    return 0;
-  }
-  int64_t exitUs = FramesToUs(transition->exitTime.value(), anim->frameRate);
-  int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
-  int64_t alignedExitUs = exitUs;
-  if (exitUs <= durationUs && anim->loop != LoopMode::Once && durationUs > 0) {
-    alignedExitUs += static_cast<int64_t>(std::floor(
-                         static_cast<double>(currentTimeline->lastTotalTime()) / durationUs)) *
-                     durationUs;
-  }
-  return currentTimeline->totalTime() - alignedExitUs;
-}
-
 static bool IsTransitionAllowed(const StateTransition* transition,
-                                const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc,
-                                const State* currentState,
                                 const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
                                 const StateMachine* stateMachine,
                                 const std::set<std::string>& consumedTriggers) {
   if (transition == nullptr) {
-    return false;
-  }
-  // Exit-time gate: not yet reached when the current state has run less than the exit time.
-  if (ExitTimeOvershoot(transition, currentTimeline, contextDoc, currentState) < 0) {
     return false;
   }
   // All conditions must hold (AND).
@@ -358,7 +318,6 @@ static bool IsTransitionAllowed(const StateTransition* transition,
 
 static const StateTransition* FindAllowedTransition(
     const StateRegion* region, const std::string& fromName, bool inTransition,
-    const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc, const State* currentState,
     const std::vector<PAGStateMachineTimeline::InputValue>& inputValues,
     const StateMachine* stateMachine, const std::set<std::string>& consumedTriggers) {
   if (region == nullptr) {
@@ -371,8 +330,7 @@ static const StateTransition* FindAllowedTransition(
     if (inTransition && !t->enableEarlyExit) {
       continue;
     }
-    if (IsTransitionAllowed(t, currentTimeline, contextDoc, currentState, inputValues, stateMachine,
-                            consumedTriggers)) {
+    if (IsTransitionAllowed(t, inputValues, stateMachine, consumedTriggers)) {
       return t;
     }
   }
@@ -410,22 +368,14 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
   fading.timeline = ri.currentTimeline;
   fading.mixFrom = ri.mix;
   fading.frozen = false;
-  // Time the current state ran past the transition's exit-time point this frame; forwarded to the
-  // incoming state so playback carries over seamlessly instead of restarting from zero. Only
-  // exit-time transitions overshoot; input-triggered ones return 0 and start the new state at zero.
-  int64_t overshootUs = ExitTimeOvershoot(t, ri.currentTimeline.get(), contextDoc, ri.currentState);
-  int64_t spilledUs = overshootUs > 0 ? overshootUs : 0;
-  if (t->pauseOnExit && t->exitTime.has_value() && fading.timeline != nullptr) {
-    // Freeze the outgoing animation at its current pose (the exit frame it just reached) so it
-    // keeps contributing that pose while it mixes out, matching Rive's hold-at-exit behavior.
+  if (t->pauseOnExit && fading.timeline != nullptr) {
+    // Freeze the outgoing animation at its current frame so it holds that pose while it mixes out,
+    // instead of continuing to advance during the crossfade.
     fading.frozen = true;
   }
   ri.fadingOut.push_back(std::move(fading));
   ri.currentState = FindStateByName(ri.region, t->to);
   ri.currentTimeline = createTimelineForState(ri.currentState);
-  if (ri.currentTimeline != nullptr && spilledUs > 0) {
-    ri.currentTimeline->advance(spilledUs);
-  }
   ri.transition = t;
   ri.mix = (t->duration <= 0) ? 1.0f : 0.0f;
   if (ri.mix >= 1.0f) {
@@ -451,14 +401,12 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
 
 bool PAGStateMachineTimeline::tryChangeState(RegionInstance& ri) {
   bool inTransition = (ri.transition != nullptr && ri.mix < 1.0f);
-  const StateTransition* t = FindAllowedTransition(
-      ri.region, AnyStateName, inTransition, ri.currentTimeline.get(), contextDoc, ri.currentState,
-      inputValues, stateMachine, ri.consumedTriggers);
+  const StateTransition* t = FindAllowedTransition(ri.region, AnyStateName, inTransition,
+                                                   inputValues, stateMachine, ri.consumedTriggers);
   if (t == nullptr) {
     t = FindAllowedTransition(ri.region,
                               ri.currentState != nullptr ? ri.currentState->name : std::string{},
-                              inTransition, ri.currentTimeline.get(), contextDoc, ri.currentState,
-                              inputValues, stateMachine, ri.consumedTriggers);
+                              inTransition, inputValues, stateMachine, ri.consumedTriggers);
   }
   if (t == nullptr) {
     return false;

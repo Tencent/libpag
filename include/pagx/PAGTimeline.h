@@ -100,18 +100,6 @@ class PAGTimeline {
   int64_t currentTime() const;
 
   /**
-   * Returns the monotonic total elapsed time in microseconds, accumulated by advance() regardless
-   * of loop folding. Reflects how long playback has run (loop count included), as opposed to
-   * currentTime() which is folded into the animation's duration by the loop mode.
-   */
-  int64_t totalTime() const;
-
-  /**
-   * Returns the value of totalTime() before the most recent advance().
-   */
-  int64_t lastTotalTime() const;
-
-  /**
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
    * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
@@ -172,11 +160,6 @@ class PAGTimeline {
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;
-  // Monotonic elapsed time, folded into currentTimeUs by the loop mode. Kept separately so the
-  // state machine can reason about loop count (exit-time). When per-state speed is added this will
-  // accumulate scaled local time, so no state-machine change is needed for speed support.
-  int64_t totalTimeUs = 0;
-  int64_t lastTotalTimeUs = 0;
   bool playing = true;
 
   friend class PAGScene;

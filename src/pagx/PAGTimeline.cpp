@@ -164,11 +164,6 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
     return false;
   }
   auto previous = currentTimeUs;
-  lastTotalTimeUs = totalTimeUs;
-  // Monotonic total time ignores loop folding so the state machine can recover the loop count for
-  // exit-time gates. Uses the absolute delta; per-state speed scaling will fold in here later.
-  int64_t absDelta = deltaMicroseconds < 0 ? -deltaMicroseconds : deltaMicroseconds;
-  totalTimeUs = totalTimeUs > INT64_MAX - absDelta ? INT64_MAX : totalTimeUs + absDelta;
   // Use saturating add to prevent signed overflow UB when deltaMicroseconds is extreme.
   int64_t next = 0;
   if (deltaMicroseconds > 0 && currentTimeUs > INT64_MAX - deltaMicroseconds) {
@@ -184,14 +179,6 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   }
   currentTimeUs = WrapTime(next, duration, animation->loop);
   return currentTimeUs != previous;
-}
-
-int64_t PAGTimeline::totalTime() const {
-  return totalTimeUs;
-}
-
-int64_t PAGTimeline::lastTotalTime() const {
-  return lastTotalTimeUs;
 }
 
 void PAGTimeline::apply(float mix) {

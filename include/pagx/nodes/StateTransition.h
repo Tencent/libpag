@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <optional>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
@@ -75,14 +74,6 @@ class StateTransition : public Node {
   Point bezierIn = {};
 
   /**
-   * Optional exit-time gate, in frames. When set, the transition is only allowed after the source
-   * state's animation has advanced past this frame, even if all conditions already hold. nullopt
-   * means no exit-time gate. For non-Once (looping) animations, the exit frame is aligned modulo
-   * the animation duration so that it falls within the current loop iteration.
-   */
-  std::optional<Frame> exitTime = std::nullopt;
-
-  /**
    * Whether this transition may interrupt an in-progress crossfade. When false (default), the
    * transition is only evaluated once the region has no active crossfade; when true, it can be
    * taken mid-crossfade, and the current outgoing state keeps fading out while the new target
@@ -91,16 +82,15 @@ class StateTransition : public Node {
   bool enableEarlyExit = false;
 
   /**
-   * Whether the source state's animation is held (frozen) at its exitTime frame during the
-   * crossfade, instead of continuing to play. Only takes effect together with exitTime (a frozen
-   * frame is only meaningful when there is an exit frame to hold). Default false: the source keeps
+   * Whether the source state's animation is held (frozen) at its current frame when the transition
+   * begins, instead of continuing to play during the crossfade. Default false: the source keeps
    * advancing while fading out.
    */
   bool pauseOnExit = false;
 
   /**
    * The conditions gating this transition. All must evaluate true (AND). An empty list means the
-   * transition is always allowed (subject to exitTime).
+   * transition is always allowed.
    */
   std::vector<TransitionCondition*> conditions = {};
 

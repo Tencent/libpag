@@ -11576,45 +11576,6 @@ PAGX_TEST(PAGXTest, SMTriggerFireWithoutAdvanceKeeps) {
   EXPECT_EQ(timeline->getCurrentState("main"), "done");
 }
 
-PAGX_TEST(PAGXTest, SMExitTimeGate) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 60;
-  anim->frameRate = 60.0f;
-  anim->loop = pagx::LoopMode::Once;
-  doc->animations.push_back(anim);
-
-  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
-  auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main";
-  region->initialState = "idle";
-  auto s1 = doc->makeNode<pagx::AnimationState>();
-  s1->name = "idle";
-  s1->animationId = "anim";
-  region->states.push_back(s1);
-  auto s2 = doc->makeNode<pagx::AnimationState>();
-  s2->name = "done";
-  region->states.push_back(s2);
-  auto t = doc->makeNode<pagx::StateTransition>();
-  t->from = "idle";
-  t->to = "done";
-  t->duration = 0;
-  t->exitTime = 30;  // 30-frame gate
-  region->transitions.push_back(t);
-  sm->regions.push_back(region);
-
-  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
-  auto timeline = scene->getStateMachineTimeline("testSM");
-  ASSERT_TRUE(timeline != nullptr);
-
-  // Advance to frame 25 (416667us at 60fps); exitTime not reached.
-  timeline->advance(833334 / 2);
-  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
-  // Advance past frame 30; should transition.
-  timeline->advance(833334 / 2);
-  EXPECT_EQ(timeline->getCurrentState("main"), "done");
-}
-
 PAGX_TEST(PAGXTest, SMEarlyExitInterrupts) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
@@ -11906,46 +11867,6 @@ PAGX_TEST(PAGXTest, SMConditionAnd) {
   EXPECT_EQ(timeline->getCurrentState("main"), "done");
 }
 
-PAGX_TEST(PAGXTest, SMExitTimeNoConditionAutoAdvance) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 30;
-  anim->frameRate = 60.0f;
-  anim->loop = pagx::LoopMode::Once;
-  doc->animations.push_back(anim);
-
-  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
-  auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main";
-  region->initialState = "loading";
-  auto s1 = doc->makeNode<pagx::AnimationState>();
-  s1->name = "loading";
-  s1->animationId = "anim";
-  region->states.push_back(s1);
-  auto s2 = doc->makeNode<pagx::AnimationState>();
-  s2->name = "done";
-  region->states.push_back(s2);
-  // No condition: auto-advance after exitTime.
-  auto t = doc->makeNode<pagx::StateTransition>();
-  t->from = "loading";
-  t->to = "done";
-  t->duration = 0;
-  t->exitTime = 15;
-  region->transitions.push_back(t);
-  sm->regions.push_back(region);
-
-  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
-  auto timeline = scene->getStateMachineTimeline("testSM");
-  ASSERT_TRUE(timeline != nullptr);
-
-  // Advance to frame 10 (10*16667us at 60fps); exitTime 15 not reached.
-  timeline->advance(10 * 16667);
-  EXPECT_EQ(timeline->getCurrentState("main"), "loading");
-  // Advance past frame 15; should auto-transition.
-  timeline->advance(6 * 16667);
-  EXPECT_EQ(timeline->getCurrentState("main"), "done");
-}
-
 PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto anim = doc->makeNode<pagx::Animation>("anim");
@@ -11974,7 +11895,6 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   t->from = "idle";
   t->to = "active";
   t->duration = 10;
-  t->exitTime = 10;
   t->pauseOnExit = true;
   auto c = doc->makeNode<pagx::TransitionCondition>();
   c->inputName = "go";
@@ -11988,7 +11908,8 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Set go=true. Advance to frame 30 (past exitTime 10); should transition.
+  // Set go=true and advance; the condition fires immediately and pauseOnExit freezes the outgoing
+  // state's timeline at its current frame for the duration of the crossfade.
   timeline->setBool("go", true);
   timeline->advance(30 * 16667);
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
@@ -12266,46 +12187,6 @@ PAGX_TEST(PAGXTest, SMTransitionBezierRoundTrip) {
   EXPECT_FLOAT_EQ(loadedT->bezierIn.y, 1.0f);
 }
 
-PAGX_TEST(PAGXTest, SMTransitionExitTimeRoundTrip) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
-  auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main";
-  region->initialState = "s";
-  auto s = doc->makeNode<pagx::AnimationState>();
-  s->name = "s";
-  region->states.push_back(s);
-
-  auto tWith = doc->makeNode<pagx::StateTransition>();
-  tWith->from = "s";
-  tWith->to = "s";
-  tWith->duration = 0;
-  tWith->exitTime = 15;
-  region->transitions.push_back(tWith);
-  auto tWithout = doc->makeNode<pagx::StateTransition>();
-  tWithout->from = "s";
-  tWithout->to = "s";
-  tWithout->duration = 0;
-  region->transitions.push_back(tWithout);
-  sm->regions.push_back(region);
-
-  auto xml = pagx::PAGXExporter::ToXML(*doc);
-  auto loaded = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_TRUE(loaded != nullptr);
-  ASSERT_TRUE(loaded->errors.empty());
-  auto* loadedSM = static_cast<pagx::StateMachine*>([&]() -> pagx::Node* {
-    for (const auto& node : loaded->nodes) {
-      if (node->nodeType() == pagx::NodeType::StateMachine) return node.get();
-    }
-    return nullptr;
-  }());
-  ASSERT_TRUE(loadedSM != nullptr);
-  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 2u);
-  EXPECT_TRUE(loadedSM->regions[0]->transitions[0]->exitTime.has_value());
-  EXPECT_EQ(loadedSM->regions[0]->transitions[0]->exitTime.value(), 15);
-  EXPECT_FALSE(loadedSM->regions[0]->transitions[1]->exitTime.has_value());
-}
-
 PAGX_TEST(PAGXTest, SMGetSameInstance) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
@@ -12347,44 +12228,6 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForUnknownState) {
   ASSERT_TRUE(doc != nullptr);
   // Importer accepts unknown state references (runtime handles lookup).
   EXPECT_EQ(doc->errors.size(), 0u);
-}
-
-PAGX_TEST(PAGXTest, SMExitTimeWithLoop) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 30;
-  anim->frameRate = 60.0f;
-  anim->loop = pagx::LoopMode::Loop;
-  doc->animations.push_back(anim);
-
-  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
-  auto region = doc->makeNode<pagx::StateRegion>();
-  region->name = "main";
-  region->initialState = "keep";
-  auto s1 = doc->makeNode<pagx::AnimationState>();
-  s1->name = "keep";
-  s1->animationId = "anim";
-  region->states.push_back(s1);
-  auto s2 = doc->makeNode<pagx::AnimationState>();
-  s2->name = "done";
-  region->states.push_back(s2);
-
-  auto t = doc->makeNode<pagx::StateTransition>();
-  t->from = "keep";
-  t->to = "done";
-  t->duration = 0;
-  t->exitTime = 10;
-  region->transitions.push_back(t);
-  sm->regions.push_back(region);
-
-  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
-  auto timeline = scene->getStateMachineTimeline("testSM");
-  ASSERT_TRUE(timeline != nullptr);
-
-  timeline->advance(5 * 16667);
-  EXPECT_EQ(timeline->getCurrentState("main"), "keep");
-  timeline->advance(10 * 16667);
-  EXPECT_EQ(timeline->getCurrentState("main"), "done");
 }
 
 PAGX_TEST(PAGXTest, SMZeroDeltaAdvance) {
