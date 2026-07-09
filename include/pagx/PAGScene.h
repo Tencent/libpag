@@ -136,6 +136,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   PAGDisplayOptions* getDisplayOptions() const;
 
   /**
+   * Returns true if the scene's content has changed since the last render, i.e. a redraw would
+   * produce different pixels. Hosts driving their own render loop can consult this to skip
+   * redundant full renders on idle frames. Reflects only the runtime layer tree state captured
+   * by the last renderTo()/Record(); pending ViewModel data binds flushed at the next Record()
+   * are not accounted for here.
+   */
+  bool hasContentChanged() const;
+
+  /**
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
    * apply() drive the animations that play automatically in this scene (including nested
    * compositions). Top-level animations are not driven here; play them explicitly via

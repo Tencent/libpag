@@ -327,11 +327,9 @@ class PAGXView {
   /**
    * Enables/disables gesture-freeze rendering.
    *
-   * NOTE: The gesture-freeze fast path was removed from draw() in the PAGScene migration, which
-   * now performs a full render every frame. This method is retained for API compatibility with
-   * the JS gesture layer and binding.cpp, but is effectively a no-op because fitSnapshot is never
-   * captured (stays null). The snapshot fast path is expected to be reintroduced as a later
-   * performance pass.
+   * While active, draw() skips the full Record() pass and blits the cached fitSnapshot with an
+   * incremental translate/scale, keeping pan/zoom smooth. Takes effect only once a fitSnapshot has
+   * been captured (after the first full render); calling it before then leaves gestureActive false.
    *
    * The caller (JavaScript gesture layer) is responsible for calling setGestureActive(true)
    * on zoomStart/panStart and setGestureActive(false) on zoomEnd/panEnd.
@@ -339,13 +337,9 @@ class PAGXView {
   void setGestureActive(bool active);
 
   /**
-   * Toggles the fitSnapshot fast path.
-   *
-   * NOTE: The fitSnapshot fast path was removed from draw() in the PAGScene migration, which now
-   * always runs a full render and never captures a fit snapshot. This method is retained for API
-   * compatibility (binding.cpp/JS) and only flips the stored flag. The setting persists across
-   * parsePAGX/buildLayers. The fast path is expected to be reintroduced as a later performance
-   * pass.
+   * Toggles the fitSnapshot fast path (gesture-freeze blit, steady-state blit at zoom ~= 1, and
+   * the idle short-circuit). When disabled, draw() always performs a full render and the captured
+   * snapshot is dropped. The setting persists across parsePAGX/buildLayers.
    */
   void setSnapshotEnabled(bool enabled);
 
@@ -391,6 +385,16 @@ class PAGXView {
   // scene->advanceAndApply) and the scene's auto-playing / nested-composition animations. No-op
   // until the scene exists and on the first frame (delta seeded from lastAnimationTimeMs).
   void advanceTimelines(double frameStartMs);
+
+  // Captures the current fit view (userZoom = 1) into fitSnapshot for the gesture-freeze / steady
+  // blit fast paths. Renders the scene into an offscreen tgfx::Surface at pixelScale supersampling
+  // (2x for very small fit scales, 1x otherwise, subject to the full-quality byte budget), then
+  // grabs an image snapshot. Temporarily overrides the scene's PAGDisplayOptions zoom/offset to
+  // the fit transform scaled by pixelScale and restores the user view via applyMergedTransform()
+  // afterwards. No-op unless snapshotEnabled is set, fitSnapshot is still null, and both scene and
+  // surface exist. Must run inside an active lockContext window (called from draw() after the main
+  // submit and before unlock).
+  void captureFitSnapshot(tgfx::Context* context);
 
   void applyDocumentCustomData();
 

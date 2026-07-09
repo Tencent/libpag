@@ -24,6 +24,7 @@
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include <tgfx/gpu/opengl/GLTypes.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include "base/utils/Log.h"
@@ -34,10 +35,12 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
 #include "utils/ImagePatternMatrixCalculator.h"
@@ -1425,11 +1428,79 @@ bool PAGXView::draw() {
   double frameStartMs = emscripten_get_now();
 
   // Advance animations before rendering so Record() below captures the new frame. Mutates only
-  // CPU-side content (no GL state), so it runs before lockContext.
+  // CPU-side content (no GL state), so it runs before lockContext. Advancing here also refreshes
+  // the scene's content-changed flag, which the idle short-circuit and dirty gate below rely on.
   advanceTimelines(frameStartMs);
+
+  // Idle short-circuit: a previous draw() finished the steady-state blit and nothing has moved or
+  // changed since. The pixels already on the surface match the current view, so skip the frame at
+  // zero GPU cost. Guarded by hasContentChanged() (a progressive image upgrade or a late
+  // attachNativeImage flips it back to true) and pendingUploads (a queued upload marks neither the
+  // scene dirty nor clears zoomedOutFrameSettled, yet must reach flushPendingUploads).
+  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && userZoom <= ZOOM_DRIFT_MARGIN &&
+      !scene->hasContentChanged() && pendingUploads.empty()) {
+    return true;
+  }
+
+  // Composite-blit fast path. Skips the full Record() pass in two cases:
+  //   1. Active gesture: user is panning/zooming; a full render would cost 200-800ms/frame.
+  //   2. Steady state at zoom ~= 1: fitSnapshot already holds every pixel a render would produce
+  //      at this zoom, so blitting it is equivalent to (but far cheaper than) re-rendering.
+  // The non-gesture branch additionally requires the scene not to be dirty and no queued uploads,
+  // so a content change (progressive upgrade, deferred attach) or a pending texture upload always
+  // takes the full-render path. Blit coordinates use the fit/user decomposition, NOT the effective
+  // zoom on PAGDisplayOptions: the snapshot was rendered at zoomScale = fitScale*pixelScale with
+  // offset = centerOffset*pixelScale (userZoom = 1), so mapping it to screen = doc*effectiveZoom +
+  // effectiveOffset reduces to scale = userZoom/pixelScale, translate = userOffset.
+  bool fitOnly = snapshotEnabled && !gestureActive && fitSnapshot != nullptr &&
+                 userZoom <= ZOOM_DRIFT_MARGIN && !scene->hasContentChanged() &&
+                 pendingUploads.empty();
+  if (snapshotEnabled && (gestureActive || fitOnly) && surface != nullptr &&
+      fitSnapshot != nullptr) {
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return false;
+    }
+    auto* canvas = surface->getCanvas();
+    // Paint the same solid background the full-render path gets from the display list, so blit
+    // regions the snapshot does not cover (edges exposed by pan/zoom) match the rendered look.
+    canvas->clear(backgroundTGFXColor);
+    float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : DEFAULT_PIXEL_SCALE;
+    float blitScale = userZoom / pixelScale;
+    canvas->save();
+    canvas->translate(userOffsetX, userOffsetY);
+    canvas->scale(blitScale, blitScale);
+    canvas->drawImage(fitSnapshot);
+    canvas->restore();
+    auto recording = context->flush();
+    if (recording) {
+      context->submit(std::move(recording));
+    }
+    // Free GL textures retired earlier (e.g. a parsePAGX document swap while the gesture-freeze
+    // path was active). Safe after submit: any in-flight command that sampled the texture has
+    // already been recorded.
+    drainPendingTextureDeletes();
+    device->unlock();
+    hasRenderedFirstFrame = true;
+    // Mark idle so future frames can short-circuit until the view moves. Only for the non-gesture
+    // path -- gestures expect to re-composite every frame.
+    if (fitOnly) {
+      zoomedOutFrameSettled = true;
+    }
+    return true;
+  }
 
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
+
+  // Dirty gate: only run the full render pass when the scene content changed, an upload is queued,
+  // or the first frame has not been drawn yet. Otherwise the current surface pixels are still
+  // valid and the frame is skipped. Kept separate from the idle short-circuit above so it also
+  // covers the snapshotEnabled == false configuration (no blit / no idle token) and the window
+  // before the first fitSnapshot has been captured.
+  if (!(scene->hasContentChanged() || !pendingUploads.empty() || !hasRenderedFirstFrame)) {
+    return true;
+  }
 
   // Per-stage timings in milliseconds. All capture sites are gated on DRAW_LOG_ENABLED so the
   // emscripten_get_now() probes are fully stripped from shipped builds, where the only consumers
@@ -1443,10 +1514,10 @@ bool PAGXView::draw() {
   [[maybe_unused]] double submitStartMs = 0.0;
   [[maybe_unused]] double unlockStartMs = 0.0;
 
-  // Full render every frame: the fitSnapshot blit and idle short-circuit fast paths were dropped
-  // in the PAGScene migration (to be reintroduced as a later performance pass). The locked context
-  // is still needed each frame so flushPendingUploads can commit queued attachNativeImage()
-  // textures.
+  // Full render path (dirty content, queued upload, or first frame). The gesture / steady-state
+  // blit and idle short-circuit above handle the cheap cases; reaching here means the scene must
+  // be re-recorded. The locked context is also needed so flushPendingUploads can commit queued
+  // attachNativeImage() textures and captureFitSnapshot can render the offscreen snapshot.
   auto context = device->lockContext();
   if (context == nullptr) {
     return false;
@@ -1536,6 +1607,12 @@ bool PAGXView::draw() {
     // return at the top of draw().
     hasRenderedFirstFrame = true;
   }
+
+  // Capture the fit-view snapshot once (fitSnapshot == null) so the gesture / steady-state blit
+  // fast paths have a source. Runs inside the still-locked context, after the main submit so the
+  // on-screen frame is already published and the offscreen render is pure overhead paid a single
+  // time per document (or after resetForFreshCapture / snapshot invalidation).
+  captureFitSnapshot(context);
 
   // Free GL textures retired during this draw (eviction in enforceFullBudget, replacement upload
   // in flushPendingUploads, or document swap in parsePAGX). Must happen after flush+submit so the
@@ -1747,6 +1824,65 @@ void PAGXView::advanceTimelines(double frameStartMs) {
     defaultTimeline->advanceAndApply(deltaUs);
   }
   scene->advanceAndApply(deltaUs);
+}
+
+void PAGXView::captureFitSnapshot(tgfx::Context* context) {
+  if (!snapshotEnabled || fitSnapshot != nullptr || scene == nullptr || surface == nullptr ||
+      context == nullptr) {
+    return;
+  }
+  float fitScale = computeFitScale();
+  if (fitScale <= 0.0f) {
+    return;
+  }
+  // Supersample ultra-small fit views (very large documents shrunk to fit) so a subsequent zoom-in
+  // blit stays sharp. Everything else captures at 1x.
+  float pixelScale =
+      (fitScale < HIGH_RES_FIT_SCALE_THRESHOLD) ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
+  int offW = std::max(1, static_cast<int>(std::lround(canvasWidth * pixelScale)));
+  int offH = std::max(1, static_cast<int>(std::lround(canvasHeight * pixelScale)));
+  // Budget guard: a 2x snapshot is 4x the canvas byte cost. If adding it would push the combined
+  // texture footprint past fullBudget, fall back to 1x rather than risk an OOM kill.
+  if (pixelScale > DEFAULT_PIXEL_SCALE) {
+    uint64_t snapshotBytes =
+        static_cast<uint64_t>(offW) * static_cast<uint64_t>(offH) * RGBA_BYTES_PER_PIXEL;
+    if (externalTexturesTotalBytes + thumbnailTexturesTotalBytes + snapshotBytes > fullBudget) {
+      pixelScale = DEFAULT_PIXEL_SCALE;
+      offW = std::max(1, static_cast<int>(std::lround(canvasWidth * pixelScale)));
+      offH = std::max(1, static_cast<int>(std::lround(canvasHeight * pixelScale)));
+    }
+  }
+  auto offscreen = tgfx::Surface::Make(context, offW, offH);
+  if (offscreen == nullptr) {
+    return;
+  }
+  auto offPagSurface = pagx::MakeFrom(offscreen);
+  if (offPagSurface == nullptr) {
+    return;
+  }
+  // Render the fit view (userZoom = 1) supersampled by pixelScale: offscreen_px = doc*fitScale*
+  // pixelScale + centerOffset*pixelScale. Override the merged transform temporarily; the display
+  // list paints its own background under the tree with autoClear = true, so the snapshot is
+  // self-contained.
+  float centerOffsetX = (static_cast<float>(canvasWidth) - pagxWidth * fitScale) * 0.5f;
+  float centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(fitScale * pixelScale);
+  options->setContentOffset(centerOffsetX * pixelScale, centerOffsetY * pixelScale);
+  auto recording = Record(context, scene, offPagSurface, true);
+  if (recording) {
+    context->submit(std::move(recording));
+  }
+  fitSnapshot = offscreen->makeImageSnapshot();
+  fitSnapshotPixelScale = pixelScale;
+  // makeImageSnapshot may attach a deferred copy task; flush immediately so it completes while the
+  // offscreen surface is still clean, before the surface is dropped at function exit.
+  auto copyRecording = context->flush();
+  if (copyRecording) {
+    context->submit(std::move(copyRecording));
+  }
+  // Restore the user's effective zoom/offset for subsequent frames.
+  applyMergedTransform();
 }
 
 }  // namespace pagx
