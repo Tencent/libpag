@@ -690,10 +690,12 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     std::unordered_set<const Composition*> visited = {};
     _rootComposition->refreshNodes(dirtyNodes, dirtySet, visited);
   }
-  // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
-  // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather
-  // than patched in place; a removed animation node then simply produces no timeline. Edits that do
-  // not touch a timeline node leave playback untouched.
+  // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
+  // state machines that play them) can share targets and cross-reference, so the whole timeline
+  // tree is rebuilt rather than patched in place; a removed animation or state machine then simply
+  // produces no timeline, and structural edits to a state machine (added/removed states,
+  // transitions, inputs) drop the stale instance instead of running off dangling pointers. Edits
+  // that do not touch a timeline node leave playback untouched.
   bool timelineDirty = false;
   for (auto* node : dirtyNodes) {
     if (node == nullptr) {
@@ -701,7 +703,10 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     }
     auto type = node->nodeType();
     if (type == NodeType::Animation || type == NodeType::AnimationObject ||
-        type == NodeType::Channel) {
+        type == NodeType::Channel || type == NodeType::StateMachine ||
+        type == NodeType::StateRegion || type == NodeType::State ||
+        type == NodeType::StateTransition || type == NodeType::TransitionCondition ||
+        type == NodeType::StateMachineInput) {
       timelineDirty = true;
       break;
     }
@@ -711,6 +716,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       _rootComposition->resetTimelines();
     }
     timelinesByAnimation.clear();
+    stateMachineTimelines.clear();
   }
 }
 
