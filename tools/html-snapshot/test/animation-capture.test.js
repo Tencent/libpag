@@ -11,6 +11,7 @@ const {
   pagxParseTimeMs,
   pagxWhichVary,
   pagxReduceKeyframes,
+  pagxBisectStepBoundary,
   pagxParseColorChannels,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
@@ -252,6 +253,31 @@ describe('pagxReduceKeyframes', () => {
     expect(out.length).toBeLessThan(4);
     expect(out[0].offset).toBe(0);
     expect(out[out.length - 1].offset).toBe(1);
+  });
+});
+
+describe('pagxBisectStepBoundary', () => {
+  // A synthetic piecewise-constant value that jumps from "old" to "new" at 0.4.
+  const probeIsNew = (frac) => frac >= 0.4;
+
+  test('locates a mid-interval step boundary to sub-sample precision', () => {
+    // Coarse grid straddles the true 0.4 jump (old @0.3, new @0.5); the plain
+    // step-end path would place the jump at 0.5 and lag a render at 0.42.
+    const b = pagxBisectStepBoundary(0.3, 0.5, probeIsNew, 12);
+    expect(b).toBeGreaterThanOrEqual(0.4);
+    expect(b).toBeLessThan(0.41);
+  });
+
+  test('returns a value strictly inside the bracket', () => {
+    const b = pagxBisectStepBoundary(0.3, 0.5, probeIsNew);
+    expect(b).toBeGreaterThan(0.3);
+    expect(b).toBeLessThanOrEqual(0.5);
+  });
+
+  test('boundary at the high edge stays at the high edge', () => {
+    // Value only turns new at the very end: bisection converges to hi.
+    const b = pagxBisectStepBoundary(0.3, 0.5, (f) => f >= 0.5, 10);
+    expect(b).toBeCloseTo(0.5, 2);
   });
 });
 

@@ -1888,6 +1888,83 @@ export function pagxTextSegments(
   return out;
 }
 
+// Read the animatable channels of one element from an already-computed style.
+// Factored out of the sampling loop so the step-boundary refinement pass below
+// (pagxRefineStepOffsets) can re-read the same channels at an arbitrary seek
+// time and detect exactly when a hard `steps()` jump happens, using the very
+// same normalisation the coarse grid captured with.
+function pagxReadAnimChannels(
+  el: Element,
+  cs: CSSStyleDeclaration,
+): Record<string, string | null> {
+  // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
+  // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the computed
+  // string; the importer maps a varying drop-shadow / blur onto the runtime's
+  // animatable DropShadowFilter / BlurFilter channels. An animated `box-shadow`
+  // glow (e.g. a `.on` class toggled by JS) has no channel of its own, so it is
+  // folded into the filter channel here as an equivalent drop-shadow (constant
+  // shadows stay flat and get dropped by pagxWhichVary — see pagxBoxShadowToFilter).
+  const shadowFilter = pagxBoxShadowToFilter(cs.boxShadow);
+  let filterVal = cs.filter;
+  if (shadowFilter) {
+    filterVal = filterVal && filterVal !== 'none'
+      ? filterVal + ' ' + shadowFilter
+      : shadowFilter;
+  }
+  // Animated `clip-path` (contour mask): normalize any shape form to a canonical SVG path `d`
+  // in border-box pixels so the importer can morph a mask Path's points over time. Only pay the
+  // getBoundingClientRect / shape-parse cost when the element actually carries a geometric
+  // clip-path (skip `none` and `url(#id)` references, which the static path already handles).
+  const rawClip = cs.clipPath;
+  const clipD = rawClip && rawClip !== 'none' && !/^url\(/i.test(rawClip)
+    ? pagxClipNormalizeD(rawClip, el)
+    : '';
+  const svgCs = cs as unknown as { fill?: string; stroke?: string; strokeDashoffset?: string };
+  return {
+    opacity: cs.opacity,
+    transform: pagxExtractTransform(cs.transform),
+    color: cs.color,
+    'background-color': cs.backgroundColor,
+    filter: filterVal,
+    'clip-path': clipD ? 'path("' + clipD + '")' : '',
+    // SVG paint channels (constant/absent for HTML nodes; dropped by pagxWhichVary there).
+    fill: svgCs.fill != null ? svgCs.fill : null,
+    stroke: svgCs.stroke != null ? svgCs.stroke : null,
+    'stroke-dashoffset': svgCs.strokeDashoffset != null ? svgCs.strokeDashoffset : null,
+  };
+}
+
+// Bisect the sub-sample interval [loFrac, hiFrac] to locate the fraction at
+// which a purely piecewise-constant (`steps()`) value flips from its old to its
+// new state, assuming a single jump inside the interval. `probeIsNew(frac)`
+// reports whether the value at `frac` already equals the *new* state. Returns
+// the smallest fraction (to `iterations` bits of precision) that reads as the
+// new state — i.e. an estimate of the true CSS keyframe boundary time.
+//
+// The coarse global grid records a hard step one sample late: it can only see
+// the jump at the first sample *after* the boundary, so with `step-end` hold
+// interpolation any render time that falls between the true boundary and that
+// sample plays the *previous* keyframe (a glitch figure shown one step behind).
+// Snapping the emitted stop onto the refined boundary makes the imported
+// staircase land on the exact times the browser jumps, so a per-time render
+// lines up with the baseline instead of lagging by up to one grid step. Pure so
+// it can be unit-tested with a synthetic threshold probe.
+export function pagxBisectStepBoundary(
+  loFrac: number,
+  hiFrac: number,
+  probeIsNew: (frac: number) => boolean,
+  iterations = 8,
+): number {
+  let lo = loFrac;
+  let hi = hiFrac;
+  for (let k = 0; k < iterations; k++) {
+    const mid = (lo + hi) / 2;
+    if (probeIsNew(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
 export function pagxSampleTimeline(
   captured: unknown[],
   seen: Set<Element>,
@@ -1922,6 +1999,20 @@ export function pagxSampleTimeline(
   // Guard sampleCount === 1 so the offset math (i / (sampleCount - 1)) does not divide by zero.
   // Callers normally pass >= 2, but the function is exported and unit-tested as a pure helper.
   if (sampleCount < 2) sampleCount = 2;
+  // Step-timed elements (`steps()` / `step-start` / `step-end`) render as a hard
+  // piecewise-constant staircase. The coarse grid can only see a jump at the
+  // first sample *after* the real keyframe boundary, so with the `step-end` hold
+  // below any render time between the boundary and that sample would replay the
+  // previous keyframe (a glitch figure shown one step behind — e.g. the
+  // fnt_poster hero close-up at a frame whose sample time sits just past a jump).
+  // Whenever such an element changes value between two grid samples we bisect the
+  // interval *right here in the forward sweep* to pin the true boundary time, and
+  // move that stop onto it in the emit loop. It must be done during the sweep:
+  // the virtual clock is forward-only, so a backward seek from the end of the
+  // timeline reads a frozen fill state, but a small backward seek inside the
+  // interval just crossed still repositions declarative animations correctly.
+  const steppedCache = new Map<Element, boolean>();
+  const refinedOffsets = new Map<HTMLElement, Map<number, number>>();
   for (let i = 0; i < sampleCount; i++) {
     const p = i / (sampleCount - 1);
     try {
@@ -1932,42 +2023,7 @@ export function pagxSampleTimeline(
     void document.body.offsetHeight; // force reflow
     for (const el of candidates) {
       const cs = getComputedStyle(el);
-      // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
-      // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the
-      // computed string; the importer maps a varying drop-shadow / blur onto
-      // the runtime's animatable DropShadowFilter / BlurFilter channels. An
-      // animated `box-shadow` glow (e.g. a `.on` class toggled by JS) has no
-      // channel of its own, so it is folded into the filter channel here as an
-      // equivalent drop-shadow (constant shadows stay flat and get dropped by
-      // pagxWhichVary — see pagxBoxShadowToFilter).
-      const shadowFilter = pagxBoxShadowToFilter(cs.boxShadow);
-      let filterVal = cs.filter;
-      if (shadowFilter) {
-        filterVal = filterVal && filterVal !== 'none'
-          ? filterVal + ' ' + shadowFilter
-          : shadowFilter;
-      }
-      // Animated `clip-path` (contour mask): normalize any shape form to a canonical SVG path `d`
-      // in border-box pixels so the importer can morph a mask Path's points over time. Only pay the
-      // getBoundingClientRect / shape-parse cost when the element actually carries a geometric
-      // clip-path (skip `none` and `url(#id)` references, which the static path already handles).
-      const rawClip = cs.clipPath;
-      const clipD = rawClip && rawClip !== 'none' && !/^url\(/i.test(rawClip)
-        ? pagxClipNormalizeD(rawClip, el)
-        : '';
-      const svgCs = cs as unknown as { fill?: string; stroke?: string; strokeDashoffset?: string };
-      const snap: Record<string, string | null> = {
-        opacity: cs.opacity,
-        transform: pagxExtractTransform(cs.transform),
-        color: cs.color,
-        'background-color': cs.backgroundColor,
-        filter: filterVal,
-        'clip-path': clipD ? 'path("' + clipD + '")' : '',
-        // SVG paint channels (constant/absent for HTML nodes; dropped by pagxWhichVary there).
-        fill: svgCs.fill != null ? svgCs.fill : null,
-        stroke: svgCs.stroke != null ? svgCs.stroke : null,
-        'stroke-dashoffset': svgCs.strokeDashoffset != null ? svgCs.strokeDashoffset : null,
-      };
+      const snap = pagxReadAnimChannels(el, cs);
       let arr = series.get(el);
       if (!arr) {
         arr = [];
@@ -2024,6 +2080,41 @@ export function pagxSampleTimeline(
           // flickers / fades (not just swaps glyph) keeps that envelope below.
           hrec.opacities.push(parseFloat(cs.opacity) || 0);
         }
+      }
+    }
+    // Refine step boundaries for the interval just crossed (see the comment on
+    // `steppedCache` above). Runs after all elements were read at `p`, so the
+    // extra in-interval seeks here do not disturb this sample's readings; the
+    // next iteration's forward seek re-establishes the clock.
+    if (i >= 1 && durationMs > 0) {
+      const loFrac = (i - 1) / (sampleCount - 1);
+      const hiFrac = i / (sampleCount - 1);
+      for (const el of candidates) {
+        let isStep = steppedCache.get(el);
+        if (isStep === undefined) {
+          isStep = pagxElementUsesStepTiming(el);
+          steppedCache.set(el, isStep);
+        }
+        if (!isStep) continue;
+        const arr = series.get(el);
+        if (!arr || arr.length <= i) continue;
+        const sigLo = JSON.stringify(arr[i - 1]);
+        if (JSON.stringify(arr[i]) === sigLo) continue; // no hard jump at this sample
+        const boundary = pagxBisectStepBoundary(loFrac, hiFrac, (f) => {
+          try {
+            seekFn(f);
+          } catch (_) {
+            /* ignore seek failure */
+          }
+          void document.body.offsetHeight;
+          return JSON.stringify(pagxReadAnimChannels(el, getComputedStyle(el))) !== sigLo;
+        });
+        let m = refinedOffsets.get(el);
+        if (!m) {
+          m = new Map();
+          refinedOffsets.set(el, m);
+        }
+        m.set(i, Math.min(hiFrac, Math.max(loFrac, boundary)));
       }
     }
   }
@@ -2148,9 +2239,12 @@ export function pagxSampleTimeline(
     pagxResolveClipNoneSamples(el, samples);
     const varying = pagxWhichVary(samples);
     if (varying.length === 0) continue;
+    const elRefined = refinedOffsets.get(el);
     let norm: PagxAnimStop[] = [];
     for (let i = 0; i < sampleCount; i++) {
-      const offset = i / (sampleCount - 1);
+      const offset = elRefined && elRefined.has(i)
+        ? (elRefined.get(i) as number)
+        : i / (sampleCount - 1);
       const props: Record<string, string> = {};
       for (const pr of varying) {
         const v = samples[i][pr];
@@ -3225,6 +3319,8 @@ const PAGX_ANIM_FNS = [
   pagxCollectWAAPI,
   pagxCollectCSS,
   pagxCollectTransitions,
+  pagxReadAnimChannels,
+  pagxBisectStepBoundary,
   pagxSampleTimeline,
   pagxGsapWindow,
   pagxCollectGsap,
