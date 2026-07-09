@@ -682,6 +682,21 @@ function readNum(computed, prop) {
   return parseFloat(computed.getPropertyValue(prop)) || 0;
 }
 
+// True when a flex-item text leaf carries its own `pagxAnim*` reveal whose
+// starting phase hides the glyph (base `opacity` < 1) — the per-character
+// decode/typewriter shape where each char fades in on its own keyframes.
+// Such a leaf must NOT take renderTextLeaf's bare pure-inline `<span>` flex
+// path: that path forwards only text-scope declarations and drops the
+// box-scope `opacity`, so the importer folds the reveal into a static colour
+// alpha and freezes the glyph fully visible from t=0 (loose value text in a
+// `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>` flex row popped in
+// immediately while the `<b>` label, emitted as an absolute char box,
+// correctly stayed hidden until typed). When this fires, renderTextLeaf emits
+// a sized flex-item box that keeps the opacity reveal on the outer Layer.
+function flexCharCarriesReveal(computed) {
+  return hasPagxAnimation(computed) && readNum(computed, 'opacity') < 1;
+}
+
 // Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
 // a `{ top, right, bottom, left }` object. Tolerates missing / non-numeric
 // values by coercing to 0 — `getComputedStyle` always returns a string but
@@ -3030,6 +3045,17 @@ function isInlineRunChild(el) {
   if (!INLINE_RUN_TAGS.has(tag)) return false;
   const cs = getComputedStyle(el);
   if (!isVisible(cs, el)) return false;
+  // An inline run carrying its own `pagxAnim*` animation (e.g. a per-character
+  // decode-typewriter where each `<span class="ch">` fades/decodes in on its own
+  // opacity/color keyframes) must NOT be collapsed into a static text leaf: the
+  // inline-run emit path forwards only text-scope declarations and folds the
+  // child's `opacity` into its `color` alpha at the static base value, silently
+  // dropping the animation (a t=0 `opacity:0` char is frozen fully transparent
+  // and never reveals). Bail so the element takes the absolute-positioned
+  // container path instead, which preserves each animated child as its own
+  // Layer that plays the reveal — matching how a multi-line / overlay-bearing
+  // sibling run is already handled.
+  if (hasPagxAnimation(cs)) return false;
   const display = cs.display;
   if (display !== 'inline' && display !== 'inline-block') return false;
   if (cs.position !== 'static') return false;
@@ -3412,6 +3438,27 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // metrics differ from Chromium's by a sub-pixel — the measured wrapper
   // rect already matches Chromium's natural line width.
   if (opts.flexItem) {
+    // A flex-item text leaf that carries its own `pagxAnim*` reveal AND whose
+    // base opacity is < 1 (a per-character decode/typewriter where each glyph
+    // fades in on its own opacity keyframes) must be emitted as a sized
+    // flex-item BOX that keeps that box-level `opacity` + animation — NOT the
+    // bare pure-inline `<span>` below. The pure-inline path forwards only
+    // text-scope declarations (color/font/letter-spacing/…) and drops the
+    // box-scope `opacity`, so the importer folds the reveal into a static
+    // colour alpha and freezes the glyph at its resting (fully-visible) state:
+    // the loose value text in a `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>`
+    // flex row then pops in from t=0 while the `<b>` label (which takes the
+    // absolute-positioned char-box path) correctly stays hidden until typed.
+    // The box mirrors that char-box path — `opacity`/animation on the outer
+    // Layer, colour flash on the inner text span — so the reveal plays and the
+    // flex row still measures the item's width for layout.
+    if (flexCharCarriesReveal(computed)) {
+      const textNode = firstTextNodeChild(el);
+      const revealSpans = textNode
+        ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+        : [];
+      return `<div style="${boxStyle}">${revealSpans.join('')}${overlays}</div>`;
+    }
     const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
       box: false, text: true, positioned: false,
     });
@@ -4323,6 +4370,7 @@ const HELPER_FNS = [
   resolveInlineTextValue,
   isInlineRunChild,
   isInlineTextLeafCandidate,
+  flexCharCarriesReveal,
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
@@ -4925,6 +4973,7 @@ export {
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  flexCharCarriesReveal,
   pagxEvalLengthPx,
   pagxParseClipShape,
   pagxClipPathInnerMarkup,

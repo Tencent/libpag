@@ -1821,6 +1821,48 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
   }
 }
 
+// True when materialising `el` as dynamic-text overlays would corrupt the
+// surrounding layout, so it must fall back to the plain opacity/colour reveal
+// on the base element instead. `pagxBuildTextOverlays` clears the base's own
+// text and inserts sibling clones in DOM order; because those clones are
+// appended *before* the snapshot measures each element's box, they are only
+// layout-safe when `el` owns its box: it is out of normal flow (absolute /
+// fixed — clones pin to the same offset and overlap), or it is the sole in-flow
+// child of its parent (no sibling whose position the clones could shift).
+//
+// The canonical unsafe case is one `<span class="ch">` of a per-character
+// decode-typewriter whose text the sampler catches mid-scramble: it shares its
+// parent's formatting context with the other characters, so clearing its base
+// glyph and inserting sibling clones shifts every following character's measured
+// position (an inline run wraps onto extra lines; a flex/grid row — where the
+// per-character span is blockified to `display:block` — gains stray tracks). A
+// standalone scripted counter / countdown (a dedicated element that is out of
+// flow or the only child of its container) is unaffected and keeps the overlay
+// path. Dropping the transient scramble is a far smaller error than corrupting
+// the whole run's geometry, and the base still reveals via its own captured
+// opacity / colour keyframes.
+export function pagxOverlayDisturbsFlow(el: Element): boolean {
+  try {
+    const cs = getComputedStyle(el);
+    const pos = cs.position;
+    if (pos === 'absolute' || pos === 'fixed') return false;
+    const parent = el.parentElement;
+    if (!parent) return false;
+    // In-flow element: unsafe when any other node shares its parent's flow.
+    for (const sib of Array.prototype.slice.call(parent.childNodes)) {
+      if (sib === el) continue;
+      if (sib.nodeType === 3) {
+        if ((sib.nodeValue || '').trim()) return true;
+      } else if (sib.nodeType === 1) {
+        return true;
+      }
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Group a per-sample text series into contiguous runs of the same *non-empty*
 // value. Each run becomes one `{ text, startIdx, endIdx }` segment (inclusive
 // sample indices); empty samples are gaps and start no segment. A value that
@@ -2001,6 +2043,12 @@ export function pagxSampleTimeline(
         }
       }
       if (!dynamic) continue;
+      // An in-flow inline character (a per-character decode-typewriter span the
+      // sampler happened to catch mid-scramble) must not be fanned out into
+      // sibling overlays: that clears its base glyph and inserts inline clones,
+      // corrupting the measured position of every following character. Leave it
+      // to the plain opacity/colour reveal captured on the base below.
+      if (pagxOverlayDisturbsFlow(el)) continue;
       const ranges = pagxTextSegments(rec.texts);
       if (ranges.length === 0) continue;
       const n = rec.texts.length;
@@ -3166,6 +3214,7 @@ const PAGX_ANIM_FNS = [
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
+  pagxOverlayDisturbsFlow,
   pagxTextSegments,
   pagxBuildTextOverlays,
   pagxBuildUseOverlays,

@@ -22,6 +22,7 @@ const {
   pagxResolveWaapiEasing,
   pagxBuildCanonicalAnimation,
   pagxTransitionDescriptorFromBags,
+  pagxOverlayDisturbsFlow,
   pagxTextSegments,
   pagxGlobalSampleCount,
   pagxClipNormalizeD,
@@ -463,6 +464,52 @@ describe('pagxNormalizeTiming', () => {
   test('defaults empty to linear, passes others through', () => {
     expect(pagxNormalizeTiming('')).toBe('linear');
     expect(pagxNormalizeTiming('ease-in-out')).toBe('ease-in-out');
+  });
+});
+
+describe('pagxOverlayDisturbsFlow', () => {
+  const originalGetComputedStyle = global.getComputedStyle;
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  // Build a mock element that is `el` with the given computed `position`, sitting
+  // among `siblings` (raw childNode objects) inside a parent. getComputedStyle is
+  // stubbed to report the element's position; the helper only reads `position`.
+  function withEl(position, siblings) {
+    const el = { nodeType: 1 };
+    el.parentElement = { childNodes: [el, ...siblings] };
+    global.getComputedStyle = (node) => (node === el ? { position } : { position: 'static' });
+    return el;
+  }
+  const elementSibling = () => ({ nodeType: 1 });
+  const textSibling = (v) => ({ nodeType: 3, nodeValue: v });
+
+  test('in-flow element with an element sibling is unsafe (typewriter char)', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [elementSibling()]))).toBe(true);
+  });
+
+  test('blockified flex-item char with siblings is still unsafe', () => {
+    // A per-character span that is a flex item computes display:block, but it
+    // still shares its parent's formatting context — clones would add tracks.
+    expect(pagxOverlayDisturbsFlow(withEl('relative', [elementSibling(), textSibling(' ')]))).toBe(true);
+  });
+
+  test('in-flow element with a non-whitespace text sibling is unsafe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [textSibling('COMBO ')]))).toBe(true);
+  });
+
+  test('in-flow element with only whitespace text siblings is safe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [textSibling('\n  ')]))).toBe(false);
+  });
+
+  test('sole in-flow child (standalone counter) is safe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', []))).toBe(false);
+  });
+
+  test('out-of-flow element keeps the overlay path even with siblings', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('absolute', [elementSibling()]))).toBe(false);
+    expect(pagxOverlayDisturbsFlow(withEl('fixed', [elementSibling()]))).toBe(false);
   });
 });
 
