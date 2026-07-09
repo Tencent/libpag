@@ -1441,12 +1441,10 @@ bool PAGXView::draw() {
   // emscripten_get_now() probes are fully stripped from shipped builds, where the only consumers
   // (the slow-frame / first-frame breakdowns below) are compiled out.
   [[maybe_unused]] double surfaceMs = 0.0;
-  [[maybe_unused]] double bgMs = 0.0;
   [[maybe_unused]] double renderMs = 0.0;
   [[maybe_unused]] double submitMs = 0.0;
   [[maybe_unused]] double unlockMs = 0.0;
   [[maybe_unused]] double surfaceStartMs = 0.0;
-  [[maybe_unused]] double bgStartMs = 0.0;
   [[maybe_unused]] double renderStartMs = 0.0;
   [[maybe_unused]] double submitStartMs = 0.0;
   [[maybe_unused]] double unlockStartMs = 0.0;
@@ -1489,28 +1487,19 @@ bool PAGXView::draw() {
     surfaceMs = emscripten_get_now() - surfaceStartMs;
   }
 
-  if constexpr (DRAW_LOG_ENABLED) {
-    bgStartMs = emscripten_get_now();
-  }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  if constexpr (DRAW_LOG_ENABLED) {
-    bgMs = emscripten_get_now() - bgStartMs;
-  }
-
-  // Record the scene, which paints its own background color under the layer tree. autoClear=false
-  // keeps the freshly cleared surface; Record() flushes internally (the clear queued on the same
-  // surface is captured in that same flush) and returns a Recording we submit here. Record covers
-  // the flush cost, so a separate flush timing is no longer tracked.
+  // Record the scene with autoClear=true: the display list clears the surface (Src blend) and
+  // paints its own background color across the whole surface under the layer tree, so no manual
+  // clear pass is needed. Record() flushes internally and returns a Recording we submit here.
   if constexpr (DRAW_LOG_ENABLED) {
     renderStartMs = emscripten_get_now();
   }
   std::unique_ptr<tgfx::Recording> recording;
   if (scene != nullptr && pagSurface != nullptr) {
-    recording = Record(context, scene, pagSurface, false);
+    recording = Record(context, scene, pagSurface, true);
   } else {
-    // No scene yet (parsePAGX succeeded but buildLayers has not run): still flush the clear so the
-    // canvas shows a clean surface instead of stale pixels.
+    // No scene yet (parsePAGX succeeded but buildLayers has not run): clear to a clean surface and
+    // flush so we present a clean frame instead of the undefined on-screen framebuffer contents.
+    surface->getCanvas()->clear();
     recording = context->flush();
   }
   if constexpr (DRAW_LOG_ENABLED) {
@@ -1600,11 +1589,11 @@ bool PAGXView::draw() {
       float drawWidthPx = pagxWidth * effectiveScale;
       float drawHeightPx = pagxHeight * effectiveScale;
       LOGI(
-          "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+          "[PAGXView] slow frame: total=%.2fms surface=%.2fms render=%.2fms "
           "submit=%.2fms unlock=%.2fms zoom=%.4f "
           "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
           "drawPx=(%.0fx%.0f)",
-          frameDurationMs, surfaceMs, bgMs, renderMs, submitMs, unlockMs,
+          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs,
           userZoom, offsetX, offsetY, fitScale, effectiveScale, canvasWidth,
           canvasHeight, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
     }
@@ -1614,9 +1603,9 @@ bool PAGXView::draw() {
   if constexpr (DRAW_LOG_ENABLED) {
     if (wasFirstFrame && hasRenderedFirstFrame) {
       LOGI(
-          "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
+          "[PAGXView] first frame: total=%.2fms surface=%.2fms render=%.2fms "
           "submit=%.2fms unlock=%.2fms",
-          frameDurationMs, surfaceMs, bgMs, renderMs, submitMs, unlockMs);
+          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs);
     }
   }
 
