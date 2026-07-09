@@ -267,46 +267,38 @@ describe('pagxParseColorChannels', () => {
 });
 
 describe('pagxParseFilterChannels', () => {
-  test('none / empty yields all-zero channels', () => {
-    expect(pagxParseFilterChannels('none')).toEqual({
-      fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0,
-    });
-    expect(pagxParseFilterChannels('')).toEqual({
-      fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0,
-    });
+  test('none / empty yields no shadows', () => {
+    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0 });
+    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0 });
   });
   test('parses a color-first drop-shadow (computed serialization)', () => {
     const f = pagxParseFilterChannels('drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
-    expect(f.fdx).toBe(0);
-    expect(f.fdy).toBe(0);
-    expect(f.fdb).toBe(16);
-    expect([f.fdr, f.fdg, f.fdbl]).toEqual([40, 224, 208]);
-    expect(f.fda).toBe(1);
+    expect(f.shadows).toHaveLength(1);
+    const sh = f.shadows[0];
+    expect(sh.fdx).toBe(0);
+    expect(sh.fdy).toBe(0);
+    expect(sh.fdb).toBe(16);
+    expect([sh.fdr, sh.fdg, sh.fdbl]).toEqual([40, 224, 208]);
+    expect(sh.fda).toBe(1);
   });
-  test('folds multiple drop-shadows onto the most prominent (alpha*(blur+1)) glow', () => {
-    const f = pagxParseFilterChannels(
-      'drop-shadow(rgb(40, 224, 208) 0px 0px 16px) ' +
-      'drop-shadow(rgba(40, 224, 208, 0.85) 0px 0px 28px) brightness(1.3)');
-    // 0.85 * (28 + 1) = 24.65 beats 1 * (16 + 1) = 17, so the second shadow wins.
-    expect(f.fdb).toBe(28);
-    expect(f.fda).toBeCloseTo(0.85, 5);
-  });
-  test('folds blur-0 chromatic-aberration shadows onto the most opaque, not the last', () => {
-    // Offset-only glitch idiom: every shadow has blur 0, so a `blur * alpha` score
-    // would tie at 0 and keep whichever was authored last. `alpha * (blur + 1)`
-    // keeps the more opaque, author-first shadow (orange, alpha .55) instead of the
-    // fainter trailing one (magenta, alpha .4).
+  test('keeps every drop-shadow in author order (chromatic aberration stack)', () => {
+    // Offset-only glitch idiom: two blur-0 ghosts, orange right + magenta left. The
+    // importer lowers each onto its own DropShadowFilter slot, so both are kept.
     const f = pagxParseFilterChannels(
       'drop-shadow(rgba(240, 160, 0, 0.55) 42px 0px 0px) ' +
-      'drop-shadow(rgba(255, 0, 90, 0.4) -26px 0px 0px)');
-    expect(f.fdx).toBe(42);
-    expect(f.fda).toBeCloseTo(0.55, 5);
-    expect([f.fdr, f.fdg, f.fdbl]).toEqual([240, 160, 0]);
+      'drop-shadow(rgba(255, 0, 90, 0.4) -26px 0px 0px) brightness(1.3)');
+    expect(f.shadows).toHaveLength(2);
+    expect(f.shadows[0].fdx).toBe(42);
+    expect(f.shadows[0].fda).toBeCloseTo(0.55, 5);
+    expect([f.shadows[0].fdr, f.shadows[0].fdg, f.shadows[0].fdbl]).toEqual([240, 160, 0]);
+    expect(f.shadows[1].fdx).toBe(-26);
+    expect(f.shadows[1].fda).toBeCloseTo(0.4, 5);
+    expect([f.shadows[1].fdr, f.shadows[1].fdg, f.shadows[1].fdbl]).toEqual([255, 0, 90]);
   });
   test('captures a blur() radius and ignores unsupported functions', () => {
     const f = pagxParseFilterChannels('blur(5px) brightness(1.2)');
     expect(f.fblur).toBe(5);
-    expect(f.fdb).toBe(0);
+    expect(f.shadows).toEqual([]);
   });
 });
 
@@ -336,16 +328,30 @@ describe('pagxStopScalarSeries', () => {
     expect(series.m4).toEqual([0, 40]);
     expect(series.m5).toEqual([0, 10]);
   });
-  test('decomposes a filter drop-shadow into scalar glow channels', () => {
+  test('decomposes a filter drop-shadow into per-slot scalar glow channels', () => {
     const stops = [
       { offset: 0, props: { filter: 'none' } },
       { offset: 0.5, props: { filter: 'drop-shadow(rgb(40, 224, 208) 0px 0px 16px)' } },
       { offset: 1, props: { filter: 'none' } },
     ];
     const series = pagxStopScalarSeries(stops);
-    expect(series.fdb).toEqual([0, 16, 0]);
-    expect(series.fda).toEqual([0, 1, 0]);
-    expect(series.fdg).toEqual([0, 224, 0]);
+    // Slot 0 channels; absent (`none`) stops read a transparent 0 so the ramp is seen.
+    expect(series.fd0b).toEqual([0, 16, 0]);
+    expect(series.fd0a).toEqual([0, 1, 0]);
+    expect(series.fd0g).toEqual([0, 224, 0]);
+  });
+  test('tracks a second drop-shadow slot so a secondary ghost keeps its frames', () => {
+    // Only the SECOND shadow moves (24px -> 40px); the first is constant. A single
+    // collapsed signature could miss frame 1, dropping the slot-1 keyframe.
+    const stops = [
+      { offset: 0, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px) drop-shadow(rgb(0,0,255) 24px 0px 0px)' } },
+      { offset: 0.5, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px) drop-shadow(rgb(0,0,255) 40px 0px 0px)' } },
+      { offset: 1, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px)' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.fd0b).toEqual([8, 8, 8]);
+    expect(series.fd1x).toEqual([24, 40, 0]);
+    expect(series.fd1a).toEqual([1, 1, 0]);
   });
 });
 

@@ -4729,6 +4729,79 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationFilterDropShadowGlowMapsToDropShadowChan
   ASSERT_NE(obj, nullptr);
 }
 
+// A `filter` chain with several drop-shadows (a glitch "chromatic aberration" stack)
+// lowers onto ONE animated DropShadowFilter per shadow slot, so every ghost survives
+// instead of collapsing to a single representative. Slot k tracks the k-th drop-shadow
+// of each keyframe (author order); a keyframe with fewer shadows leaves the extra slot
+// transparent (alpha ramps to 0) so its ghost fades out rather than snapping.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterMultipleDropShadowsMapToSeparateSlots) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes ca {
+        0%   { filter: none; }
+        50%  { filter: drop-shadow(rgba(240,160,0,0.55) 42px 0px 0px)
+                       drop-shadow(rgba(255,0,90,0.4) -26px 0px 0px); }
+        100% { filter: drop-shadow(rgba(240,160,0,0.55) -40px 0px 0px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="g" style="width:50px;height:50px;background-color:#000;
+                         animation:ca 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = doc->animations.front();
+
+  // Two DropShadowFilter nodes minted on the layer, one per concurrent shadow.
+  auto* div = doc->layers.front()->children.front();
+  std::vector<pagx::DropShadowFilter*> drops;
+  for (auto* f : div->filters) {
+    if (auto* d = As<pagx::DropShadowFilter>(f)) drops.push_back(d);
+  }
+  ASSERT_EQ(drops.size(), 2u);
+
+  // offsetX travel + minimum color alpha for a given slot's AnimationObject.
+  auto slotStats = [&](pagx::DropShadowFilter* d, float& oxMin, float& oxMax, float& aMin) {
+    oxMin = 1e9f;
+    oxMax = -1e9f;
+    aMin = 1.0f;
+    auto* obj = FindObjectByTarget(anim, d->id);
+    EXPECT_NE(obj, nullptr);
+    if (!obj) return;
+    for (auto* ch : obj->channels) {
+      if (ch->name == "offsetX") {
+        auto* fc = dynamic_cast<pagx::TypedChannel<float>*>(ch);
+        for (const auto& k : fc->keyframes) {
+          if (k.value < oxMin) oxMin = k.value;
+          if (k.value > oxMax) oxMax = k.value;
+        }
+      } else if (ch->name == "color") {
+        auto* cc = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(ch);
+        for (const auto& k : cc->keyframes) {
+          if (k.value.alpha < aMin) aMin = k.value.alpha;
+        }
+      }
+    }
+  };
+
+  // Slot 0 (author-first orange): reaches +42 at 50% and -40 at 100%.
+  float ox0Min, ox0Max, a0Min;
+  slotStats(drops[0], ox0Min, ox0Max, a0Min);
+  EXPECT_NEAR(ox0Max, 42.0f, 0.5f);
+  EXPECT_NEAR(ox0Min, -40.0f, 0.5f);
+
+  // Slot 1 (magenta): reaches -26 at 50%, and is transparent (alpha 0) on the 0% /
+  // 100% keyframes that have fewer than two shadows.
+  float ox1Min, ox1Max, a1Min;
+  slotStats(drops[1], ox1Min, ox1Max, a1Min);
+  EXPECT_NEAR(ox1Min, -26.0f, 0.5f);
+  EXPECT_NEAR(a1Min, 0.0f, 0.01f);
+}
+
 // A `filter: blur(...)` animation lowers onto a BlurFilter's blurX/blurY channels.
 PAG_TEST(PAGXHTMLImporterTest, AnimationFilterBlurMapsToBlurChannels) {
   pagx::HTMLImporter::Options opts;

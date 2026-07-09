@@ -1027,27 +1027,25 @@ export function pagxParseColorChannels(value: string): number[] | null {
 // decimator tracks, so a glow / shadow / blur animation keeps its curve instead
 // of being flattened. `getComputedStyle().filter` is either `none` or a chain of
 // space-separated functions (`drop-shadow(rgb(...) 0px 0px 16px) blur(4px) …`).
-// We fold every drop-shadow onto ONE representative shadow — the one with the
-// largest `alpha * (blur + 1)` (the most visually prominent shadow) — and every
-// `blur()` onto a single radius, matching how the importer lowers the chain onto a
-// single animatable DropShadowFilter / BlurFilter. The `+ 1` keeps opacity
-// meaningful when every shadow is blur-0 (the offset-only "chromatic aberration"
-// glitch idiom), so the tracked shadow stays the one the importer will select
-// instead of whichever happened to be authored last. `none` (or no recognised
-// function) yields all
-// zeros so a none <-> shadow transition reads as an alpha / blur ramp from 0.
-// Unrecognised functions (brightness, contrast, …) are ignored (dropped, as the
-// runtime has no channel for them).
-export function pagxParseFilterChannels(value: string): {
+// EVERY drop-shadow is kept in author order (a glitch "chromatic aberration"
+// stacks several offset-only shadows), because the importer lowers each onto its
+// own animated DropShadowFilter slot — so the decimator must watch every shadow or
+// it could drop a frame where only a secondary ghost moves. Every `blur()` still
+// folds onto a single radius. `none` (or no recognised function) yields an empty
+// shadow list so a none <-> shadow transition reads as an alpha / blur ramp from
+// zero. Unrecognised functions (brightness, contrast, …) are ignored (dropped, as
+// the runtime has no channel for them).
+export interface PagxShadowChannels {
   fdx: number; fdy: number; fdb: number;
   fdr: number; fdg: number; fdbl: number; fda: number;
+}
+export function pagxParseFilterChannels(value: string): {
+  shadows: PagxShadowChannels[];
   fblur: number;
 } {
-  const zero = { fdx: 0, fdy: 0, fdb: 0, fdr: 0, fdg: 0, fdbl: 0, fda: 0, fblur: 0 };
   const s = (value || '').trim();
-  if (!s || s.toLowerCase() === 'none') return zero;
-  const out = { ...zero };
-  let bestScore = -1;
+  if (!s || s.toLowerCase() === 'none') return { shadows: [], fblur: 0 };
+  const shadows: PagxShadowChannels[] = [];
   let fblur = 0;
   // Paren-aware walk of `name( args )` functions (drop-shadow args themselves
   // contain `rgb(...)`, so a naive regex would mis-split them).
@@ -1070,24 +1068,22 @@ export function pagxParseFilterChannels(value: string): {
       // offsetX offsetY [blur].
       const rest = args.replace(/rgba?\([^)]*\)/i, ' ');
       const nums = (rest.match(/-?[\d.]+/g) || []).map((n) => parseFloat(n));
-      const ox = nums[0] || 0;
-      const oy = nums[1] || 0;
-      const blur = nums[2] || 0;
-      const score = (color[3] != null ? color[3] : 1) * (blur + 1);
-      if (score > bestScore) {
-        bestScore = score;
-        out.fdx = ox; out.fdy = oy; out.fdb = blur;
-        out.fdr = color[0]; out.fdg = color[1]; out.fdbl = color[2];
-        out.fda = color[3] != null ? color[3] : 1;
-      }
+      shadows.push({
+        fdx: nums[0] || 0,
+        fdy: nums[1] || 0,
+        fdb: nums[2] || 0,
+        fdr: color[0],
+        fdg: color[1],
+        fdbl: color[2],
+        fda: color[3] != null ? color[3] : 1,
+      });
     } else if (name === 'blur') {
       const m = args.match(/-?[\d.]+/);
       if (m) fblur = Math.max(fblur, parseFloat(m[0]));
     }
     i = j;
   }
-  out.fblur = fblur;
-  return out;
+  return { shadows, fblur };
 }
 
 // Parse the x/y pixels of a normalised `translate(xpx, ypx)` string (the shape
@@ -1110,6 +1106,18 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
     if (!series[key]) series[key] = new Array(stops.length).fill(NaN);
     series[key][i] = v;
   };
+  // Pre-parse each stop's filter chain so absent shadow slots read as a transparent
+  // 0 rather than "missing": the importer animates one DropShadowFilter per slot, so
+  // a ghost that vanishes on some frames must register as a change (value -> 0) for
+  // the RDP decimator to keep that frame.
+  const filterByStop = stops.map((st) => {
+    const fv = (st.props || {})['filter'];
+    return fv != null ? pagxParseFilterChannels(fv) : null;
+  });
+  let maxShadowSlots = 0;
+  for (const f of filterByStop) {
+    if (f) maxShadowSlots = Math.max(maxShadowSlots, f.shadows.length);
+  }
   for (let i = 0; i < stops.length; i++) {
     const p = stops[i].props || {};
     if (p['opacity'] != null) {
@@ -1172,15 +1180,19 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
       const v = parseFloat(p['stroke-dashoffset']);
       if (!isNaN(v)) put('sdo', i, v);
     }
-    if (p['filter'] != null) {
-      const f = pagxParseFilterChannels(p['filter']);
-      put('fdx', i, f.fdx);
-      put('fdy', i, f.fdy);
-      put('fdb', i, f.fdb);
-      put('fdr', i, f.fdr);
-      put('fdg', i, f.fdg);
-      put('fdbl', i, f.fdbl);
-      put('fda', i, f.fda);
+    const f = filterByStop[i];
+    if (f) {
+      // One channel group per shadow slot (fd{k}x/y/b + rgba); absent slots read 0.
+      for (let k = 0; k < maxShadowSlots; k++) {
+        const sh = f.shadows[k];
+        put('fd' + k + 'x', i, sh ? sh.fdx : 0);
+        put('fd' + k + 'y', i, sh ? sh.fdy : 0);
+        put('fd' + k + 'b', i, sh ? sh.fdb : 0);
+        put('fd' + k + 'r', i, sh ? sh.fdr : 0);
+        put('fd' + k + 'g', i, sh ? sh.fdg : 0);
+        put('fd' + k + 'bl', i, sh ? sh.fdbl : 0);
+        put('fd' + k + 'a', i, sh ? sh.fda : 0);
+      }
       put('fblur', i, f.fblur);
     }
     // clip-path is emitted as `path("<d>")`; expose each coordinate number as its own scalar
@@ -1293,12 +1305,15 @@ export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimSt
   keep[stops.length - 1] = true;
   for (const key of Object.keys(series)) {
     const vals = series[key];
-    // Translation (matrix e/f = m4/m5), drop-shadow offset/blur, and clip-path
-    // coordinates (cp0, cp1, …) are all measured in CSS pixels, so they get the
-    // absolute floor; every other channel keeps the pure relative tolerance.
+    // Translation (matrix e/f = m4/m5), per-slot drop-shadow offset/blur
+    // (fd{k}x / fd{k}y / fd{k}b, and fblur), and clip-path coordinates (cp0, cp1,
+    // …) are all measured in CSS pixels, so they get the absolute floor; every
+    // other channel (colour, alpha, matrix scale/rotation) keeps the pure relative
+    // tolerance. `/^fd\d+[xyb]$/` matches the offset/blur slots without catching
+    // the colour channels fd{k}r / fd{k}g / fd{k}bl / fd{k}a.
     const absEps =
       key === 'm4' || key === 'm5' ||
-      key === 'fdx' || key === 'fdy' || key === 'fdb' || key === 'fblur' ||
+      /^fd\d+[xyb]$/.test(key) || key === 'fblur' ||
       (key[0] === 'c' && key[1] === 'p')
         ? ABS_FLOOR_PX
         : 0;

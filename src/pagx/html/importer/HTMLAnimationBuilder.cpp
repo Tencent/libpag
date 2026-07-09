@@ -1027,20 +1027,24 @@ bool HTMLAnimationBuilder::buildForElement(
 
   // Per-keyframe `filter` decomposition. A glow / shadow authored as
   // `filter: drop-shadow(...)` (and `none` at rest) is lowered onto the runtime's
-  // animatable DropShadowFilter channels; a `blur(...)` onto BlurFilter. Each stop
-  // folds the chain onto ONE representative drop-shadow (largest `alpha*(blur+1)` —
-  // the most visually prominent shadow) plus one blur radius, mirroring the
-  // capture-side decomposition. A stop with no drop-shadow (`none`) records
-  // `hasShadow=false` so the channel ramps its alpha / blur from zero rather than
-  // snapping.
-  struct FilterStop {
-    Frame time = 0;
-    bool sawFilter = false;
-    bool hasShadow = false;
+  // animatable DropShadowFilter channels; a `blur(...)` onto BlurFilter. Every
+  // drop-shadow in the chain is kept in author order — a glitch "chromatic
+  // aberration" stacks several offset-only shadows (e.g. an orange ghost to the
+  // right + a magenta ghost to the left), and each lowers onto its own animated
+  // DropShadowFilter *slot* below so the runtime composites the whole stack instead
+  // of a single representative. `blur(...)` still folds onto one radius. A stop with
+  // no drop-shadow (`none`, or fewer shadows than the max) leaves that slot empty so
+  // its channel ramps alpha / blur from zero rather than snapping.
+  struct ShadowStop {
     float sx = 0.0f;
     float sy = 0.0f;
     float sblur = 0.0f;
     Color scolor = {};
+  };
+  struct FilterStop {
+    Frame time = 0;
+    bool sawFilter = false;
+    std::vector<ShadowStop> shadows;  // author (chain) order; empty == no shadow
     bool hasBlur = false;
     float blur = 0.0f;
   };
@@ -1102,29 +1106,19 @@ bool HTMLAnimationBuilder::buildForElement(
         std::string trimmed = Trim(val);
         if (ToLower(trimmed) != "none" && !trimmed.empty()) {
           auto steps = _valueParser.parseFilterChain(val);
-          // Collapse a multi-`drop-shadow()` chain to the single most visually
-          // prominent shadow (the runtime animates one DropShadowFilter). Score by
-          // `alpha * (blur + 1)`: a soft glow (large blur) still wins over a faint
-          // one, but crucially the `+1` keeps opacity meaningful when every shadow
-          // is blur-0 — the offset-only "chromatic aberration" idiom common in
-          // glitch effects (e.g. `drop-shadow(rgba(240,160,0,.55) 42px 0 0)
-          // drop-shadow(rgba(255,0,90,.4) -26px 0 0)`). The old `blur * alpha`
-          // scored every blur-0 shadow at 0, so the `>=` tie-break kept the LAST
-          // one — dropping the more opaque, author-first aberration (here the
-          // orange ghost) in favour of the fainter trailing one. Use strict `>` so
-          // ties keep the earliest (author-primary) shadow.
-          float bestScore = -1.0f;
+          // Keep every drop-shadow in the chain (author order) so the whole stack —
+          // e.g. an offset-only "chromatic aberration" pair `drop-shadow(orange 42px
+          // 0 0) drop-shadow(magenta -26px 0 0)` — survives as one animated
+          // DropShadowFilter slot each below, instead of being collapsed to a single
+          // representative. `blur(...)` still folds onto one radius.
           for (const auto& st : steps) {
             if (st.kind == HTMLValueParser::FilterStep::Kind::DropShadow) {
-              float score = st.shadow.color.alpha * (st.shadow.blur + 1.0f);
-              if (score > bestScore) {
-                bestScore = score;
-                fs.hasShadow = true;
-                fs.sx = st.shadow.offsetX;
-                fs.sy = st.shadow.offsetY;
-                fs.sblur = st.shadow.blur;
-                fs.scolor = st.shadow.color;
-              }
+              ShadowStop sh;
+              sh.sx = st.shadow.offsetX;
+              sh.sy = st.shadow.offsetY;
+              sh.sblur = st.shadow.blur;
+              sh.scolor = st.shadow.color;
+              fs.shadows.push_back(sh);
             } else if (st.kind == HTMLValueParser::FilterStep::Kind::Blur) {
               fs.hasBlur = true;
               fs.blur = std::max(fs.blur, st.blurX);
@@ -1212,8 +1206,10 @@ bool HTMLAnimationBuilder::buildForElement(
   // guard here too so an all-`none` filter never mints an empty filter node).
   bool filterHasShadow = false;
   bool filterHasBlur = false;
+  size_t maxShadows = 0;
   for (const auto& fs : filterStops) {
-    if (fs.hasShadow) filterHasShadow = true;
+    if (!fs.shadows.empty()) filterHasShadow = true;
+    maxShadows = std::max(maxShadows, fs.shadows.size());
     if (fs.hasBlur) filterHasBlur = true;
   }
 
@@ -1427,90 +1423,103 @@ bool HTMLAnimationBuilder::buildForElement(
     Layer* fxLayer = xyTarget != nullptr ? xyTarget : layer;
 
     if (filterHasShadow) {
-      // Representative RGB for `none` stops: the most opaque authored shadow, so a
-      // none <-> glow transition ramps alpha on a stable hue instead of lerping toward black.
-      Color repColor = {};
-      float bestAlpha = -1.0f;
-      for (const auto& fs : filterStops) {
-        if (fs.hasShadow && fs.scolor.alpha > bestAlpha) {
-          bestAlpha = fs.scolor.alpha;
-          repColor = fs.scolor;
-        }
-      }
-
-      DropShadowFilter* ds = nullptr;
+      // One DropShadowFilter per concurrent authored shadow ("slot"). Slot k tracks
+      // the k-th drop-shadow of each stop (author order); a stop with fewer shadows
+      // leaves slot k transparent so its ghost fades out rather than snapping. At
+      // every keyframe the union of the slots is exactly the authored shadow stack,
+      // so a chromatic-aberration pair renders both ghosts instead of one.
+      //
+      // Existing static drop-shadow nodes (from the element's base `filter`) are
+      // reused as slots in order; any extra slots are minted. Freshly minted slots
+      // are appended in author order, matching the static filter path.
+      std::vector<DropShadowFilter*> slots;
       for (auto* f : fxLayer->filters) {
         if (f != nullptr && f->nodeType() == NodeType::DropShadowFilter) {
-          ds = static_cast<DropShadowFilter*>(f);
-          break;
+          slots.push_back(static_cast<DropShadowFilter*>(f));
         }
       }
-      if (ds == nullptr) {
-        ds = _document->makeNode<DropShadowFilter>();
-        ds->offsetX = 0.0f;
-        ds->offsetY = 0.0f;
-        ds->blurX = 0.0f;
-        ds->blurY = 0.0f;
-        ds->color = {repColor.red, repColor.green, repColor.blue, 0.0f, repColor.colorSpace};
-        fxLayer->filters.push_back(ds);
-      }
-      if (ds->id.empty()) {
-        ds->id = _idAllocator.generateUnique("anim");
-      }
 
-      std::vector<Keyframe<float>> dsOffsetX;
-      std::vector<Keyframe<float>> dsOffsetY;
-      std::vector<Keyframe<float>> dsBlurX;
-      std::vector<Keyframe<float>> dsBlurY;
-      std::vector<Keyframe<Color>> dsColor;
-      for (const auto& fs : filterStops) {
-        float ox = fs.hasShadow ? fs.sx : 0.0f;
-        float oy = fs.hasShadow ? fs.sy : 0.0f;
-        float bl = fs.hasShadow ? fs.sblur : 0.0f;
-        Color c = fs.hasShadow
-                      ? fs.scolor
-                      : Color{repColor.red, repColor.green, repColor.blue, 0.0f, repColor.colorSpace};
-        dsOffsetX.push_back({fs.time, ox, interp, {}, {}});
-        dsOffsetY.push_back({fs.time, oy, interp, {}, {}});
-        dsBlurX.push_back({fs.time, bl, interp, {}, {}});
-        dsBlurY.push_back({fs.time, bl, interp, {}, {}});
-        dsColor.push_back({fs.time, c, interp, {}, {}});
-      }
-      ApplyBezierHandles(dsOffsetX, interp, easing.x1, easing.y1, easing.x2, easing.y2);
-      ApplyBezierHandles(dsOffsetY, interp, easing.x1, easing.y1, easing.x2, easing.y2);
-      ApplyBezierHandles(dsBlurX, interp, easing.x1, easing.y1, easing.x2, easing.y2);
-      ApplyBezierHandles(dsBlurY, interp, easing.x1, easing.y1, easing.x2, easing.y2);
-      ApplyBezierHandles(dsColor, interp, easing.x1, easing.y1, easing.x2, easing.y2);
-      if (easing.kind == ResolvedEasing::Kind::Steps) {
-        ExpandSteps(dsOffsetX, easing.stepCount, easing.stepJump);
-        ExpandSteps(dsOffsetY, easing.stepCount, easing.stepJump);
-        ExpandSteps(dsBlurX, easing.stepCount, easing.stepJump);
-        ExpandSteps(dsBlurY, easing.stepCount, easing.stepJump);
-        ExpandSteps(dsColor, easing.stepCount, easing.stepJump);
-      }
-      ApplyFillMode(dsOffsetX, spec.fillMode, ds->offsetX, loopOnce, activeEnd);
-      ApplyFillMode(dsOffsetY, spec.fillMode, ds->offsetY, loopOnce, activeEnd);
-      ApplyFillMode(dsBlurX, spec.fillMode, ds->blurX, loopOnce, activeEnd);
-      ApplyFillMode(dsBlurY, spec.fillMode, ds->blurY, loopOnce, activeEnd);
-      ApplyFillMode(dsColor, spec.fillMode, ds->color, loopOnce, activeEnd);
+      for (size_t k = 0; k < maxShadows; ++k) {
+        // Representative RGB for stops missing this slot: the most opaque k-th
+        // shadow, so an absent <-> present transition ramps alpha on a stable hue.
+        Color repColor = {};
+        float bestAlpha = -1.0f;
+        for (const auto& fs : filterStops) {
+          if (k < fs.shadows.size() && fs.shadows[k].scolor.alpha > bestAlpha) {
+            bestAlpha = fs.shadows[k].scolor.alpha;
+            repColor = fs.shadows[k].scolor;
+          }
+        }
 
-      auto* object = _document->makeNode<AnimationObject>();
-      object->target = ds->id;
-      auto addFloat = [&](const char* name, std::vector<Keyframe<float>>& keys) {
-        auto* ch = _document->makeNode<TypedChannel<float>>();
-        ch->name = name;
-        ch->keyframes = std::move(keys);
-        object->channels.push_back(ch);
-      };
-      addFloat("offsetX", dsOffsetX);
-      addFloat("offsetY", dsOffsetY);
-      addFloat("blurX", dsBlurX);
-      addFloat("blurY", dsBlurY);
-      auto* colorCh = _document->makeNode<TypedChannel<Color>>();
-      colorCh->name = "color";
-      colorCh->keyframes = std::move(dsColor);
-      object->channels.push_back(colorCh);
-      animation->objects.push_back(object);
+        DropShadowFilter* ds = k < slots.size() ? slots[k] : nullptr;
+        if (ds == nullptr) {
+          ds = _document->makeNode<DropShadowFilter>();
+          ds->offsetX = 0.0f;
+          ds->offsetY = 0.0f;
+          ds->blurX = 0.0f;
+          ds->blurY = 0.0f;
+          ds->color = {repColor.red, repColor.green, repColor.blue, 0.0f, repColor.colorSpace};
+          fxLayer->filters.push_back(ds);
+        }
+        if (ds->id.empty()) {
+          ds->id = _idAllocator.generateUnique("anim");
+        }
+
+        std::vector<Keyframe<float>> dsOffsetX;
+        std::vector<Keyframe<float>> dsOffsetY;
+        std::vector<Keyframe<float>> dsBlurX;
+        std::vector<Keyframe<float>> dsBlurY;
+        std::vector<Keyframe<Color>> dsColor;
+        for (const auto& fs : filterStops) {
+          bool has = k < fs.shadows.size();
+          float ox = has ? fs.shadows[k].sx : 0.0f;
+          float oy = has ? fs.shadows[k].sy : 0.0f;
+          float bl = has ? fs.shadows[k].sblur : 0.0f;
+          Color c = has ? fs.shadows[k].scolor
+                        : Color{repColor.red, repColor.green, repColor.blue, 0.0f,
+                                repColor.colorSpace};
+          dsOffsetX.push_back({fs.time, ox, interp, {}, {}});
+          dsOffsetY.push_back({fs.time, oy, interp, {}, {}});
+          dsBlurX.push_back({fs.time, bl, interp, {}, {}});
+          dsBlurY.push_back({fs.time, bl, interp, {}, {}});
+          dsColor.push_back({fs.time, c, interp, {}, {}});
+        }
+        ApplyBezierHandles(dsOffsetX, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        ApplyBezierHandles(dsOffsetY, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        ApplyBezierHandles(dsBlurX, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        ApplyBezierHandles(dsBlurY, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        ApplyBezierHandles(dsColor, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+        if (easing.kind == ResolvedEasing::Kind::Steps) {
+          ExpandSteps(dsOffsetX, easing.stepCount, easing.stepJump);
+          ExpandSteps(dsOffsetY, easing.stepCount, easing.stepJump);
+          ExpandSteps(dsBlurX, easing.stepCount, easing.stepJump);
+          ExpandSteps(dsBlurY, easing.stepCount, easing.stepJump);
+          ExpandSteps(dsColor, easing.stepCount, easing.stepJump);
+        }
+        ApplyFillMode(dsOffsetX, spec.fillMode, ds->offsetX, loopOnce, activeEnd);
+        ApplyFillMode(dsOffsetY, spec.fillMode, ds->offsetY, loopOnce, activeEnd);
+        ApplyFillMode(dsBlurX, spec.fillMode, ds->blurX, loopOnce, activeEnd);
+        ApplyFillMode(dsBlurY, spec.fillMode, ds->blurY, loopOnce, activeEnd);
+        ApplyFillMode(dsColor, spec.fillMode, ds->color, loopOnce, activeEnd);
+
+        auto* object = _document->makeNode<AnimationObject>();
+        object->target = ds->id;
+        auto addFloat = [&](const char* name, std::vector<Keyframe<float>>& keys) {
+          auto* ch = _document->makeNode<TypedChannel<float>>();
+          ch->name = name;
+          ch->keyframes = std::move(keys);
+          object->channels.push_back(ch);
+        };
+        addFloat("offsetX", dsOffsetX);
+        addFloat("offsetY", dsOffsetY);
+        addFloat("blurX", dsBlurX);
+        addFloat("blurY", dsBlurY);
+        auto* colorCh = _document->makeNode<TypedChannel<Color>>();
+        colorCh->name = "color";
+        colorCh->keyframes = std::move(dsColor);
+        object->channels.push_back(colorCh);
+        animation->objects.push_back(object);
+      }
     }
 
     if (filterHasBlur) {
