@@ -22,6 +22,7 @@ import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.hardware.HardwareBuffer;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 class PAGImageViewHelper {
@@ -99,6 +100,12 @@ class PAGImageViewHelper {
         volatile long duration;
         private PAGDecoder _pagDecoder;
         private final ReentrantLock locker = new ReentrantLock();
+        // resetToken is bumped by every reset(); decoderToken records the resetToken value captured
+        // when the current decoder was built. isValid() treats the decoder as invalid once a reset()
+        // has happened since it was built, so a lock-free reset() that races an in-flight initDecoder()
+        // always wins without having to block on the lock.
+        private final AtomicInteger resetToken = new AtomicInteger(0);
+        private volatile int decoderToken = 0;
 
         void lock() {
             locker.lock();
@@ -111,7 +118,7 @@ class PAGImageViewHelper {
         boolean isValid() {
             locker.lock();
             try {
-                return _width > 0 && _height > 0;
+                return _width > 0 && _height > 0 && decoderToken == resetToken.get();
             } finally {
                 locker.unlock();
             }
@@ -166,6 +173,10 @@ class PAGImageViewHelper {
                 // resources when the DecoderInfo is reused, for example on a detach-then-reattach in
                 // a RecyclerView, or when reset() skipped the release on a busy lock.
                 releaseDecoder();
+                // Capture the reset token before the slow Make() call. If a reset() bumps the token
+                // while we build, decoderToken will no longer match and isValid() reports this decoder
+                // as stale, so the racing reset() wins instead of being silently overwritten.
+                int token = resetToken.get();
                 float scaleFactor;
                 if (composition.width() >= composition.height()) {
                     scaleFactor = width * 1.0f / composition.width();
@@ -176,6 +187,7 @@ class PAGImageViewHelper {
                 _width = _pagDecoder.width();
                 _height = _pagDecoder.height();
                 duration = composition.duration();
+                decoderToken = token;
                 return true;
             } finally {
                 locker.unlock();
@@ -196,10 +208,12 @@ class PAGImageViewHelper {
 
         void reset() {
             // tryLock avoids an ANR: a blocking reset() on the main thread would stall if the worker
-            // thread is stuck in readFrame() (e.g. the hardware decoder hangs). On a failed lock, skip
-            // the native release but still clear the volatile size fields so isValid() turns false and
-            // the render path re-initializes; the stale decoder is reclaimed by initDecoder() on reuse
-            // or PAGDecoder.finalize() on GC.
+            // thread is stuck in readFrame() (e.g. the hardware decoder hangs). Bump the reset token
+            // first so that any initDecoder() building concurrently on the worker thread is marked
+            // stale by isValid(); this wins the race even though the field writes below are lock-free.
+            // On a failed lock, skip the native release but still clear the size fields; the stale
+            // decoder is reclaimed by initDecoder() on reuse or PAGDecoder.finalize() on GC.
+            resetToken.incrementAndGet();
             if (!locker.tryLock()) {
                 _width = 0;
                 _height = 0;
