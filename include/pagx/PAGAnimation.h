@@ -66,27 +66,6 @@ class PAGAnimation : public PAGTimeline {
   float frameRate() const;
 
   /**
-   * Starts or resumes playback. Subsequent advance() calls will advance the current time.
-   */
-  void play();
-
-  /**
-   * Pauses playback. The current time is preserved; subsequent advance() calls become no-ops
-   * until play() is called again.
-   */
-  void pause();
-
-  /**
-   * Stops playback and resets the current time to zero.
-   */
-  void stop();
-
-  /**
-   * Returns true if the timeline is currently playing.
-   */
-  bool isPlaying() const;
-
-  /**
    * Sets the current playback time in microseconds. Only updates the time; call apply() to reflect
    * it in the content.
    */
@@ -158,7 +137,6 @@ class PAGAnimation : public PAGTimeline {
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
   bool resolved = false;
   int64_t currentTimeUs = 0;
-  bool playing = true;
 
   friend class PAGScene;
   friend class PAGComposition;

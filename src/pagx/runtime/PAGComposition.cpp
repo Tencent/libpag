@@ -138,9 +138,6 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
-      if (!animationDriver->playing) {
-        timeline->pause();
-      }
       timelines.push_back(std::move(timeline));
     } else if (driver->timelineType() == TimelineType::StateMachine) {
       auto* smDriver = static_cast<const StateMachineTimeline*>(driver.get());

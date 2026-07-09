@@ -5748,7 +5748,6 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
   EXPECT_EQ(timeline->duration(), 1'000'000);
 
-  EXPECT_TRUE(timeline->isPlaying());
   EXPECT_EQ(timeline->currentTime(), 0);
 
   EXPECT_TRUE(timeline->advance(500'000));
@@ -5757,16 +5756,12 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   EXPECT_TRUE(timeline->advance(600'000));
   EXPECT_EQ(timeline->currentTime(), 100'000);
 
-  timeline->pause();
-  EXPECT_FALSE(timeline->isPlaying());
-  EXPECT_FALSE(timeline->advance(200'000));
-  EXPECT_EQ(timeline->currentTime(), 100'000);
-
+  // PAGAnimation is a pure advance/apply engine — no internal play/pause state. The caller
+  // controls playback by choosing whether to call advance().
   timeline->setCurrentTime(400'000);
   EXPECT_EQ(timeline->currentTime(), 400'000);
 
-  timeline->stop();
-  EXPECT_FALSE(timeline->isPlaying());
+  timeline->setCurrentTime(0);
   EXPECT_EQ(timeline->currentTime(), 0);
 
   auto onceAnim = doc->makeNode<pagx::Animation>("once");
@@ -5778,7 +5773,9 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   auto onceTimeline = file->getTimeline("once");
   EXPECT_TRUE(onceTimeline->advance(2'000'000));
   EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
-  EXPECT_FALSE(onceTimeline->isPlaying());
+  // Once clamps at the end; further advances produce no change.
+  EXPECT_FALSE(onceTimeline->advance(100'000));
+  EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
 }
 
 /**
@@ -5806,8 +5803,7 @@ PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
   EXPECT_EQ(timeline->currentTime(), 400'000);
 
   // Reset and test negative delta before start (pos < 0, pos += period).
-  timeline->stop();
-  timeline->play();
+  timeline->setCurrentTime(0);
   EXPECT_TRUE(timeline->advance(-500'000));
   EXPECT_EQ(timeline->currentTime(), 500'000);
 
@@ -5844,12 +5840,13 @@ PAGX_TEST(PAGXTest, PAGTimelineNegativeDelta) {
   EXPECT_TRUE(loopTl->advance(-500'000));
   EXPECT_EQ(loopTl->currentTime(), 700'000);
 
-  // Once: negative delta stops at 0 and pauses.
+  // Once: negative delta clamps at 0.
   auto onceTl = file->getTimeline("once");
   onceTl->setCurrentTime(300'000);
   EXPECT_TRUE(onceTl->advance(-500'000));
   EXPECT_EQ(onceTl->currentTime(), 0);
-  EXPECT_FALSE(onceTl->isPlaying());
+  // Further negative advance produces no change (clamped at 0).
+  EXPECT_FALSE(onceTl->advance(-100'000));
 }
 
 /**
@@ -6818,9 +6815,8 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   ASSERT_TRUE(mainTimeline != nullptr);
   ASSERT_TRUE(hintTimeline != nullptr);
 
-  // PAGScene::advance drives only composition-spawned timelines; top-level animations are not
-  // touched, regardless of their playing state.
-  mainTimeline->play();
+  // PAGScene::advance drives only composition-spawned timelines; top-level animations obtained
+  // via getTimeline() are separate instances and are not touched by the composition's advance loop.
   file->rootComposition()->advance(500'000);
   EXPECT_EQ(mainTimeline->currentTime(), 0);
   EXPECT_EQ(hintTimeline->currentTime(), 0);

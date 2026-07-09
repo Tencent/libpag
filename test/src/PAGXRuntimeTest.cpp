@@ -181,7 +181,6 @@ PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
   ASSERT_TRUE(file != nullptr);
   auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
-  timeline->play();
 
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_TRUE(surface != nullptr);

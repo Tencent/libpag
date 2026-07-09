@@ -101,23 +101,6 @@ float PAGAnimation::frameRate() const {
   return (!owner.expired() && animation != nullptr) ? animation->frameRate : 0.0f;
 }
 
-void PAGAnimation::play() {
-  playing = true;
-}
-
-void PAGAnimation::pause() {
-  playing = false;
-}
-
-void PAGAnimation::stop() {
-  playing = false;
-  currentTimeUs = 0;
-}
-
-bool PAGAnimation::isPlaying() const {
-  return playing;
-}
-
 void PAGAnimation::setCurrentTime(int64_t microseconds) {
   currentTimeUs = std::max<int64_t>(0, microseconds);
 }
@@ -156,7 +139,7 @@ static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
 }
 
 bool PAGAnimation::advance(int64_t deltaMicroseconds) {
-  if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
+  if (owner.expired() || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
   auto duration = DurationMicros(animation);
@@ -172,10 +155,6 @@ bool PAGAnimation::advance(int64_t deltaMicroseconds) {
     next = INT64_MIN;
   } else {
     next = currentTimeUs + deltaMicroseconds;
-  }
-  // Once mode stops playback when the clip reaches either end; other modes keep looping.
-  if (animation->loop == LoopMode::Once && (next >= duration || next < 0)) {
-    playing = false;
   }
   currentTimeUs = WrapTime(next, duration, animation->loop);
   return currentTimeUs != previous;
