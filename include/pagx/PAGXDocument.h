@@ -24,7 +24,6 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
-#include "pagx/ImageResourceProvider.h"
 #include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
@@ -34,6 +33,7 @@
 namespace pagx {
 
 class DataBind;
+class PAGImage;
 class LayoutContext;
 class PAGScene;
 class ViewModel;
@@ -142,9 +142,8 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
-   * for which the current ImageResourceProvider already holds a decoded counterpart are also
-   * excluded so the same resource is not fetched twice.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. The caller is
+   * responsible for skipping paths it has already supplied (e.g. via PAGXDocument::loadFileData).
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -175,15 +174,21 @@ class PAGXDocument : public Node {
   }
 
   /**
-   * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
-   * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
-   * decoded counterpart. The renderer queries the provider during layer building via
-   * resolveImage().
+   * Supplies a host-decoded image for the given external file path. Image nodes whose filePath
+   * matches (in this document and its resolved external documents) render with this image instead
+   * of decoding from their own data or file path; passing an empty shared_ptr clears a previous
+   * one. The image is runtime-only state and is not serialized. Use this for resources the host
+   * loads itself (e.g. asynchronously, or from a GPU texture via PAGImage::MakeFromTexture).
+   * Existing scenes refresh the affected layers in place.
    *
-   * Passing nullptr removes the provider; the renderer will use only embedded data / file paths.
-   * @param provider the platform-specific image resource provider, or nullptr to remove.
+   * Note: this affects ImagePattern rendering only. ViewModel image-valued properties resolve
+   * images through their own decode chain (data → dataURI → filePath) and do not consult the
+   * runtime image set here.
+   * @param filePath the external file path as declared in the document's Image nodes
+   * @param image the decoded image to use, or an empty shared_ptr to clear it
+   * @return true if a matching Image node was found
    */
-  void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
+  bool loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
@@ -235,10 +240,11 @@ class PAGXDocument : public Node {
    * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
    * supported — edit the Text node with layoutChanged = true instead.
    *
-   * Only the listed nodes are refreshed, so include every node an edit affects: the whole chain for
-   * an "@id" reference change, and every Layer a layoutChanged re-layout repositions (or pass the
-   * container Layer). For external compositions, notify the document that owns the nodes; foreign
-   * nodes are skipped (see ownsNode()).
+   * When layoutChanged is true, only list nodes directly edited or whose child list changed: the
+   * whole chain for an "@id" reference change, or the container Layer for a structural child-list
+   * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,
+   * so callers do not need to list such siblings. For external compositions, notify the document
+   * that owns the nodes; foreign nodes are skipped (see ownsNode()).
    *
    * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
    * null and foreign entries are skipped; an empty list is a no-op.
@@ -272,10 +278,21 @@ class PAGXDocument : public Node {
 
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
 
+  // Sets runtimeImage on every Image node matching filePath in this document and its resolved
+  // external documents, collecting the touched Image nodes per owning document.
+  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
+                               const std::shared_ptr<PAGImage>& image,
+                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+                               std::unordered_set<const PAGXDocument*>& visited);
+
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
-  // is detected and stops the recursion instead of overflowing the stack.
-  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
+  // is detected and stops the recursion instead of overflowing the stack. When changedOut is not
+  // null and the document was already laid out, every Layer whose layoutBounds differ from before
+  // the re-layout is appended to it, so notifyChange can auto-refresh siblings that auto layout
+  // repositioned without the caller having to list them.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited,
+                   std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
@@ -285,7 +302,6 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
-  std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
   FontConfig _fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};

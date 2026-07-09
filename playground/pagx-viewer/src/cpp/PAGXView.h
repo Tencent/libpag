@@ -27,6 +27,7 @@
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Color.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
@@ -91,6 +92,7 @@ class PAGXView {
 
   std::string canvasID = {};
   std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
