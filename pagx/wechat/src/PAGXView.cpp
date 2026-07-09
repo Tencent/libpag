@@ -17,16 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXView.h"
-#include <emscripten/html5.h>
 #include <GLES3/gl31.h>
+#include <emscripten/html5.h>
+#include <tgfx/gpu/Backend.h>
+#include <tgfx/gpu/Context.h>
+#include <tgfx/gpu/opengl/GLDevice.h>
+#include <tgfx/gpu/opengl/GLTypes.h>
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
-#include <tgfx/gpu/Context.h>
-#include <tgfx/gpu/Backend.h>
-#include <tgfx/gpu/opengl/GLDevice.h>
-#include <tgfx/gpu/opengl/GLTypes.h>
-#include "utils/StringParser.h"
+#include "base/utils/Log.h"
+#include "pagx/PAGImage.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/tgfx.h"
+#include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
@@ -34,14 +40,8 @@
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
-#include "pagx/PAGImage.h"
-#include "pagx/tgfx.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/PAGXImporter.h"
-#include "pagx/types/Data.h"
 #include "utils/ImagePatternMatrixCalculator.h"
-#include "base/utils/Log.h"
+#include "utils/StringParser.h"
 
 using namespace emscripten;
 
@@ -127,8 +127,6 @@ constexpr int SCALE_MODE_TILE = 3;
 // GPU probe log interval in frames.
 constexpr int GPU_PROBE_INTERVAL = 60;
 
-
-
 // Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Each wasm page is 64 KiB.
 // Returns -1 on non-wasm platforms so the same probe can stay in cross-platform code.
 static int64_t SampleWasmHeap() {
@@ -141,8 +139,7 @@ static int64_t SampleWasmHeap() {
 
 // One-shot wasm heap log. Format kept simple so it can be grepped from the miniprogram console.
 static void LogMemProbe(const char* tag) {
-  LOGI("[MemProbe] tag=%s wasmHeap=%lld", tag,
-                 static_cast<long long>(SampleWasmHeap()));
+  LOGI("[MemProbe] tag=%s wasmHeap=%lld", tag, static_cast<long long>(SampleWasmHeap()));
 }
 
 // Bucket index for an image's pixel area. Boundaries align with the [Img] log analysis: tiny
@@ -217,7 +214,7 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 }
 
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
-: device(device), canvasWidth(width), canvasHeight(height) {
+    : device(device), canvasWidth(width), canvasHeight(height) {
   // Display-list configuration (render mode, tile budgets, subtree cache) now lives on the
   // scene's PAGDisplayOptions and is applied in buildLayers() once the scene exists. The
   // constructor only records the device and canvas dimensions.
@@ -261,12 +258,13 @@ void PAGXView::loadPAGX(const val& pagxData) {
 void PAGXView::parsePAGX(const val& pagxData) {
   LogMemProbe("parsePAGX.enter");
   // Release old resources early to reduce peak memory usage when switching pages. Dropping the
-  // scene detaches the entire runtime layer tree and ViewModel binding; the timeline and the
-  // surface wrapper go with it. document resets last so the scene's teardown still sees it.
+  // scene detaches the entire runtime layer tree and ViewModel binding; the timeline goes with it.
+  // document resets last so the scene's teardown still sees it. `surface`/`pagSurface` are left
+  // intact: the on-screen render target is reused across the reload (same canvas size), and the
+  // wrapper must stay coupled to it so the next draw() after buildLayers() can Record() into it.
   scene = nullptr;
   defaultTimeline = nullptr;
   lastAnimationTimeMs = -1.0;
-  pagSurface = nullptr;
   document = nullptr;
   // Drop snapshots so the new document doesn't blit pixels from the old one.
   fitSnapshot = nullptr;
@@ -342,9 +340,8 @@ void PAGXView::parsePAGX(const val& pagxData) {
     pagxHeight = document->height;
     applyDocumentCustomData();
     auto paths = document->getExternalFilePaths();
-    LOGI(
-        "[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
-        static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
+    LOGI("[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
+         static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
   } else {
     LogMemProbe("parsePAGX.exit.failed");
   }
@@ -369,10 +366,7 @@ bool PAGXView::loadFileData(const val& filePathVal, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
-
-
-bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
-                                 int qualityRaw) {
+bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage, int qualityRaw) {
   if (!document || !nativeImage.as<bool>()) {
     return false;
   }
@@ -400,9 +394,9 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
   if (width < 1 || height < 1) {
     return false;
   }
-  uint64_t bytes =
-      static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * static_cast<uint64_t>(RGBA_BYTES_PER_PIXEL)
-      * MIPMAP_FACTOR_NUM / MIPMAP_FACTOR_DEN;
+  uint64_t bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) *
+                   static_cast<uint64_t>(RGBA_BYTES_PER_PIXEL) * MIPMAP_FACTOR_NUM /
+                   MIPMAP_FACTOR_DEN;
 
   // Thumbnail budget enforcement: estimate the upload's GPU footprint up front so we can run a
   // silent LRU eviction before queuing. The estimate must match flushPendingUploads' bytes
@@ -437,12 +431,11 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
       if (existing != thumbnailTextures.end()) {
         replacingBytes = existing->second.sizeBytes;
       }
-      projected =
-          thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
+      projected = thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
     }
     if (projected > thumbnailBudget) {
-      LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d",
-                     filePath.c_str(), width, height);
+      LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d", filePath.c_str(), width,
+           height);
       return false;
     }
   } else {
@@ -465,8 +458,7 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
     if (existing != externalTextures.end()) {
       replacingBytes = existing->second.sizeBytes;
     }
-    uint64_t projected =
-        externalTexturesTotalBytes + pendingFullBytes + bytes - replacingBytes;
+    uint64_t projected = externalTexturesTotalBytes + pendingFullBytes + bytes - replacingBytes;
     if (projected > fullBudget) {
       // enforceFullBudget evicts off-viewport paths until totalBytes <= fullBudget. Running
       // it before push_back means the upcoming upload sees an already-trimmed cache, so the
@@ -559,8 +551,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     int textureId = val::module_property("tgfx").call<int>(
         "createBackendTexture", val::module_property("GL"), p.nativeImage);
     if (textureId <= 0) {
-      LOGI("[PAGX] attachNativeImage: createBackendTexture failed path=%s",
-                     p.filePath.c_str());
+      LOGI("[PAGX] attachNativeImage: createBackendTexture failed path=%s", p.filePath.c_str());
       continue;
     }
 
@@ -713,10 +704,9 @@ void PAGXView::enforceFullBudget() {
   if (externalTexturesTotalBytes > fullBudget &&
       currentFrameIndex - lastFullBudgetOverflowWarnFrame >= GPU_PROBE_INTERVAL) {
     lastFullBudgetOverflowWarnFrame = currentFrameIndex;
-    LOGI(
-        "[PAGX] fullBudget exceeded by %lluMB; %zu visible paths protected from eviction",
-        static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / BYTES_PER_MB),
-        visibleCount);
+    LOGI("[PAGX] fullBudget exceeded by %lluMB; %zu visible paths protected from eviction",
+         static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / BYTES_PER_MB),
+         visibleCount);
   }
   // Notify the host once per draw with the full batch so JS only takes a single trip across
   // the boundary regardless of how many paths were dropped.
@@ -751,8 +741,7 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   constexpr float kViewportExpansion = 1.2f;
   float expandX = width * (kViewportExpansion - 1.0f) * 0.5f;
   float expandY = height * (kViewportExpansion - 1.0f) * 0.5f;
-  return tgfx::Rect::MakeLTRB(left, top, left + width, top + height)
-      .makeOutset(expandX, expandY);
+  return tgfx::Rect::MakeLTRB(left, top, left + width, top + height).makeOutset(expandX, expandY);
 }
 
 std::unordered_map<std::string, tgfx::Rect> PAGXView::computeFullPathBounds() const {
@@ -1120,15 +1109,14 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  LOGI(
-      "[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
-      static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-      static_cast<unsigned long long>(imageDecodedPixelTotal),
-      static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
-  LOGI(
-      "[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
-      imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
-      imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
+  LOGI("[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
+       static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+       static_cast<unsigned long long>(imageDecodedPixelTotal),
+       static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL /
+                                       BYTES_PER_MB));
+  LOGI("[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
+       imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2], imageSizeBuckets[3],
+       imageSizeBuckets[4], imageSizeBuckets[5]);
 
   // PAGX files exported by CoCraft reference images by hash, so actual pixel dimensions are
   // unavailable at export time. The exporter stores a normalized transform and scale parameters in
@@ -1427,6 +1415,12 @@ bool PAGXView::draw() {
   if (device == nullptr) {
     return false;
   }
+  // The render loop may spin up (autoRender) before buildLayers() creates the scene. Skip those
+  // frames entirely so the rest of draw() can assume the scene exists; the WebGL drawing buffer
+  // starts out transparent, so there is nothing to present until the scene is built.
+  if (scene == nullptr) {
+    return false;
+  }
 
   double frameStartMs = emscripten_get_now();
 
@@ -1482,6 +1476,12 @@ bool PAGXView::draw() {
     // Wrap the surface so pagx::Record() renders into the same GL framebuffer. Recreated in
     // lockstep with `surface` so the wrapper never points at a stale render target.
     pagSurface = pagx::MakeFrom(surface);
+  } else if (pagSurface == nullptr) {
+    // `surface` survived (same-size reload), so the surface-recreation branch above did not run,
+    // but the wrapper may have been dropped independently (e.g. by parsePAGX during a page switch).
+    // Re-wrap the still-valid surface: Record() requires a non-null PAGSurface, so without this the
+    // freshly built scene would never be submitted and the new document would never appear.
+    pagSurface = pagx::MakeFrom(surface);
   }
   if constexpr (DRAW_LOG_ENABLED) {
     surfaceMs = emscripten_get_now() - surfaceStartMs;
@@ -1490,18 +1490,12 @@ bool PAGXView::draw() {
   // Record the scene with autoClear=true: the display list clears the surface (Src blend) and
   // paints its own background color across the whole surface under the layer tree, so no manual
   // clear pass is needed. Record() flushes internally and returns a Recording we submit here.
+  // scene is guaranteed non-null by the early return above, and pagSurface is created in lockstep
+  // with surface right above, so both are valid here.
   if constexpr (DRAW_LOG_ENABLED) {
     renderStartMs = emscripten_get_now();
   }
-  std::unique_ptr<tgfx::Recording> recording;
-  if (scene != nullptr && pagSurface != nullptr) {
-    recording = Record(context, scene, pagSurface, true);
-  } else {
-    // No scene yet (parsePAGX succeeded but buildLayers has not run): clear to a clean surface and
-    // flush so we present a clean frame instead of the undefined on-screen framebuffer contents.
-    surface->getCanvas()->clear();
-    recording = context->flush();
-  }
+  std::unique_ptr<tgfx::Recording> recording = Record(context, scene, pagSurface, true);
   if constexpr (DRAW_LOG_ENABLED) {
     renderMs = emscripten_get_now() - renderStartMs;
   }
@@ -1521,15 +1515,12 @@ bool PAGXView::draw() {
         "thumb=%zu/%lluMB(budget=%lluMB) pendingUploads=%zu",
         static_cast<unsigned long long>(context->memoryUsage() / BYTES_PER_MB),
         static_cast<unsigned long long>(context->purgeableBytes() / BYTES_PER_MB),
-        static_cast<unsigned long long>(context->cacheLimit() / BYTES_PER_MB),
-        imageDecodedCount,
+        static_cast<unsigned long long>(context->cacheLimit() / BYTES_PER_MB), imageDecodedCount,
         externalTextures.size(),
         static_cast<unsigned long long>(externalTexturesTotalBytes / BYTES_PER_MB),
-        static_cast<unsigned long long>(fullBudget / BYTES_PER_MB),
-        thumbnailTextures.size(),
+        static_cast<unsigned long long>(fullBudget / BYTES_PER_MB), thumbnailTextures.size(),
         static_cast<unsigned long long>(thumbnailTexturesTotalBytes / BYTES_PER_MB),
-        static_cast<unsigned long long>(thumbnailBudget / BYTES_PER_MB),
-        pendingUploads.size());
+        static_cast<unsigned long long>(thumbnailBudget / BYTES_PER_MB), pendingUploads.size());
   }
 
   if (recording) {
@@ -1540,11 +1531,10 @@ bool PAGXView::draw() {
     if constexpr (DRAW_LOG_ENABLED) {
       submitMs = emscripten_get_now() - submitStartMs;
     }
-    // Only count a rendered scene as the first frame. A background-only flush before buildLayers
-    // must not satisfy the JS loading flow's firstFrameRendered() wait.
-    if (scene != nullptr && !hasRenderedFirstFrame) {
-      hasRenderedFirstFrame = true;
-    }
+    // Mark the first successfully submitted scene frame so the JS loading flow's
+    // firstFrameRendered() wait is satisfied. scene is guaranteed non-null here by the early
+    // return at the top of draw().
+    hasRenderedFirstFrame = true;
   }
 
   // Free GL textures retired during this draw (eviction in enforceFullBudget, replacement upload
@@ -1593,9 +1583,9 @@ bool PAGXView::draw() {
           "submit=%.2fms unlock=%.2fms zoom=%.4f "
           "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
           "drawPx=(%.0fx%.0f)",
-          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs,
-          userZoom, offsetX, offsetY, fitScale, effectiveScale, canvasWidth,
-          canvasHeight, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
+          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs, userZoom, offsetX, offsetY,
+          fitScale, effectiveScale, canvasWidth, canvasHeight, pagxWidth, pagxHeight, drawWidthPx,
+          drawHeightPx);
     }
   }
 

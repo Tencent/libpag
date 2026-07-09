@@ -18,24 +18,24 @@
 
 #pragma once
 
+#include <emscripten/val.h>
 #include <cstdint>
 #include <deque>
-#include <emscripten/val.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/FontConfig.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Device.h"
 #include "tgfx/gpu/Recording.h"
-#include "pagx/FontConfig.h"
-#include "pagx/PAGScene.h"
-#include "pagx/PAGSurface.h"
-#include "pagx/PAGXDocument.h"
 #include "utils/StringParser.h"
 
 namespace tgfx {
@@ -198,8 +198,6 @@ class PAGXView {
    */
   bool isFullBudgetSaturated() const;
 
-
-
   /**
    * Returns bounds mapped into canvas pixel space by the contain-mode fit transform (fitScale +
    * centerOffset, WITHOUT the user pan/zoom folded in) for every filePath in the input list. Each
@@ -256,7 +254,7 @@ class PAGXView {
    * @param width    Original image width in pixels (> 0).
    * @param height   Original image height in pixels (> 0).
    */
-  void setImageOriginalSize(const emscripten::val&  filePathVal, float width, float height);
+  void setImageOriginalSize(const emscripten::val& filePathVal, float width, float height);
 
   /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
@@ -420,8 +418,10 @@ class PAGXView {
   // draw() after a (re)build advances by zero and starts animating from the next frame.
   double lastAnimationTimeMs = -1.0;
   // Wraps `surface` so pagx::Record() can render the scene into the same GL framebuffer. Shares
-  // the surface lifecycle: recreated whenever `surface` is (re)created, dropped alongside it in
-  // updateSize() / parsePAGX().
+  // the surface lifecycle: recreated whenever `surface` is (re)created and dropped alongside it in
+  // updateSize(). parsePAGX() keeps both alive (the on-screen render target is reused across a
+  // same-size reload); draw() re-wraps defensively if the wrapper is ever missing while `surface`
+  // is valid.
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   // User-driven pan/zoom relative to the fit transform, supplied by updateZoomScaleAndOffset().
   // applyMergedTransform() combines these with the contain-mode fit (fitScale + centerOffset)
