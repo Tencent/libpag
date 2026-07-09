@@ -3731,6 +3731,17 @@ async function inlineExternalImages(cachedMap) {
   const imgs = Array.from(document.querySelectorAll('img'));
   const pending = [];
   for (const img of imgs) {
+    // A placeholder <img> whose `src`/`srcset` attributes are empty or missing
+    // is not a real image, but the IDL getters below (`currentSrc` / `img.src`)
+    // resolve an empty `src=""` against the document base URL — i.e. they hand
+    // back the *page's own URL* (e.g. `file://.../slide-3.html`). Left
+    // unchecked, that self-URL gets stamped onto `data-snapshot-src` and the
+    // downstream importer emits an `<Image source="....html">` pointing at the
+    // page itself. Guard on the raw attributes so these placeholders are
+    // skipped outright.
+    const rawSrc = (img.getAttribute('src') || '').trim();
+    const rawSrcset = (img.getAttribute('srcset') || '').trim();
+    if (!rawSrc && !rawSrcset) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
     if (src.startsWith('data:')) continue;
