@@ -519,7 +519,8 @@ int RunImport(int argc, char* argv[]) {
   {
     ImageStorageOptions imageOptions = {};
     imageOptions.mode = options.imageStorage;
-    std::string inputDir = IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
+    std::string inputDir =
+        IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
     imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : inputDir;
     // The importer anchors relative `<img>` paths at the input file's directory, so that is the
     // prefix to strip back off when recovering the authored `source`.

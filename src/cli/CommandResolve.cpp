@@ -50,26 +50,27 @@ struct ResolveOptions {
 };
 
 static void PrintResolveUsage() {
-  std::cout << "Usage: pagx resolve <file> [options]\n"
-            << "\n"
-            << "Resolve all import directives in a PAGX file into native PAGX nodes.\n"
-            << "Expands inline <svg> elements and external file references (import attribute)\n"
-            << "within Layers.\n"
-            << "\n"
-            << "Options:\n"
-            << "  -o, --output <file>         Output PAGX file (default: overwrite input)\n"
-            << "  --images <mode>             How image resources are stored: 'external' (default;\n"
-            << "                              write image files next to the output PAGX and keep the\n"
-            << "                              relative path) or 'embed' (inline as base64 data URIs)\n"
-            << "  --image-base-dir <dir>      Directory to resolve relative image paths against\n"
-            << "                              (default: the input file's directory)\n"
-            << "\n"
-            << "Format-specific options are shared with `pagx import`;\n"
-            << "see `pagx import --help` for details.\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx resolve design.pagx                # resolve in place\n"
-            << "  pagx resolve design.pagx -o out.pagx    # resolve to new file\n";
+  std::cout
+      << "Usage: pagx resolve <file> [options]\n"
+      << "\n"
+      << "Resolve all import directives in a PAGX file into native PAGX nodes.\n"
+      << "Expands inline <svg> elements and external file references (import attribute)\n"
+      << "within Layers.\n"
+      << "\n"
+      << "Options:\n"
+      << "  -o, --output <file>         Output PAGX file (default: overwrite input)\n"
+      << "  --images <mode>             How image resources are stored: 'external' (default;\n"
+      << "                              write image files next to the output PAGX and keep the\n"
+      << "                              relative path) or 'embed' (inline as base64 data URIs)\n"
+      << "  --image-base-dir <dir>      Directory to resolve relative image paths against\n"
+      << "                              (default: the input file's directory)\n"
+      << "\n"
+      << "Format-specific options are shared with `pagx import`;\n"
+      << "see `pagx import --help` for details.\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx resolve design.pagx                # resolve in place\n"
+      << "  pagx resolve design.pagx -o out.pagx    # resolve to new file\n";
 }
 
 static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) {
