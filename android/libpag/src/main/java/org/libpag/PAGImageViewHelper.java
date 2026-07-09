@@ -22,6 +22,8 @@ import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.hardware.HardwareBuffer;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 class PAGImageViewHelper {
 
     protected static Matrix ApplyScaleMode(int scaleMode, int sourceWidth, int sourceHeight,
@@ -96,63 +98,129 @@ class PAGImageViewHelper {
         int _height;
         long duration;
         private PAGDecoder _pagDecoder;
+        private final ReentrantLock locker = new ReentrantLock();
 
-        synchronized boolean isValid() {
-            return _width > 0 && _height > 0;
+        void lock() {
+            locker.lock();
         }
 
-        synchronized boolean hasPAGDecoder() {
-            return _pagDecoder != null;
+        void unlock() {
+            locker.unlock();
         }
 
-        synchronized boolean checkFrameChanged(int currentFrame) {
-            return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
-        }
-
-        synchronized boolean readFrame(int currentFrame, HardwareBuffer hardwareBuffer) {
-            return _pagDecoder != null && hardwareBuffer != null && _pagDecoder.readFrame(currentFrame,
-                    hardwareBuffer);
-        }
-
-        synchronized boolean copyFrameTo(Bitmap bitmap, int currentFrame) {
-            return _pagDecoder != null && bitmap != null && _pagDecoder.copyFrameTo(bitmap,
-                    currentFrame);
-        }
-
-        synchronized boolean initDecoder(PAGComposition composition, int width, int height,
-                                         float maxFrameRate) {
-            if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
-                return false;
-            }
-            float scaleFactor;
-            if (composition.width() >= composition.height()) {
-                scaleFactor = width * 1.0f / composition.width();
-            } else {
-                scaleFactor = height * 1.0f / composition.height();
-            }
-            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
-            _width = _pagDecoder.width();
-            _height = _pagDecoder.height();
-            duration = composition.duration();
-            return true;
-        }
-
-        synchronized void releaseDecoder() {
-            if (_pagDecoder != null) {
-                _pagDecoder.release();
-                _pagDecoder = null;
+        boolean isValid() {
+            locker.lock();
+            try {
+                return _width > 0 && _height > 0;
+            } finally {
+                locker.unlock();
             }
         }
 
-        synchronized void reset() {
-            releaseDecoder();
-            _width = 0;
-            _height = 0;
-            duration = 0;
+        boolean hasPAGDecoder() {
+            locker.lock();
+            try {
+                return _pagDecoder != null;
+            } finally {
+                locker.unlock();
+            }
         }
 
-        synchronized int numFrames() {
-            return _pagDecoder == null ? 0 : _pagDecoder.numFrames();
+        boolean checkFrameChanged(int currentFrame) {
+            locker.lock();
+            try {
+                return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        boolean readFrame(int currentFrame, HardwareBuffer hardwareBuffer) {
+            locker.lock();
+            try {
+                return _pagDecoder != null && hardwareBuffer != null && _pagDecoder.readFrame(
+                        currentFrame, hardwareBuffer);
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        boolean copyFrameTo(Bitmap bitmap, int currentFrame) {
+            locker.lock();
+            try {
+                return _pagDecoder != null && bitmap != null && _pagDecoder.copyFrameTo(bitmap,
+                        currentFrame);
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        boolean initDecoder(PAGComposition composition, int width, int height,
+                            float maxFrameRate) {
+            locker.lock();
+            try {
+                if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
+                    return false;
+                }
+                // Release the previous decoder before creating a new one to avoid leaking native
+                // resources when the DecoderInfo is reused, for example on a detach-then-reattach in
+                // a RecyclerView, or when reset() skipped the release on a busy lock.
+                releaseDecoder();
+                float scaleFactor;
+                if (composition.width() >= composition.height()) {
+                    scaleFactor = width * 1.0f / composition.width();
+                } else {
+                    scaleFactor = height * 1.0f / composition.height();
+                }
+                _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
+                _width = _pagDecoder.width();
+                _height = _pagDecoder.height();
+                duration = composition.duration();
+                return true;
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        void releaseDecoder() {
+            locker.lock();
+            try {
+                if (_pagDecoder != null) {
+                    _pagDecoder.release();
+                    _pagDecoder = null;
+                }
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        void reset() {
+            // Use tryLock instead of a blocking lock: when the worker thread is stuck inside
+            // readFrame() (for example when the hardware video decoder hangs in the system layer), a
+            // blocking reset() on the main thread would wait for the lock and trigger an ANR. If the
+            // lock cannot be acquired immediately, skip the synchronous release; the decoder will be
+            // released later by initDecoder() on reuse or by PAGDecoder.finalize() on garbage
+            // collection.
+            if (!locker.tryLock()) {
+                return;
+            }
+            try {
+                releaseDecoder();
+                _width = 0;
+                _height = 0;
+                duration = 0;
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        int numFrames() {
+            locker.lock();
+            try {
+                return _pagDecoder == null ? 0 : _pagDecoder.numFrames();
+            } finally {
+                locker.unlock();
+            }
         }
     }
 }
