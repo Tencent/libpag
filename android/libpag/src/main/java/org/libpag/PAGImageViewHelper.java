@@ -94,9 +94,9 @@ class PAGImageViewHelper {
     }
 
     static class DecoderInfo {
-        int _width;
-        int _height;
-        long duration;
+        volatile int _width;
+        volatile int _height;
+        volatile long duration;
         private PAGDecoder _pagDecoder;
         private final ReentrantLock locker = new ReentrantLock();
 
@@ -199,10 +199,10 @@ class PAGImageViewHelper {
             // readFrame() (for example when the hardware video decoder hangs in the system layer), a
             // blocking reset() on the main thread would wait for the lock and trigger an ANR. If the
             // lock cannot be acquired immediately, skip only the native decoder release (the blocking
-            // part) but still invalidate the size fields so isValid() turns false right away. This lets
-            // the render path re-enter initDecoderInfo() to clear freezeDraw, and reclaim the stale
-            // decoder via initDecoder()'s upfront releaseDecoder() on reuse (or PAGDecoder.finalize()
-            // on garbage collection).
+            // part) but still invalidate the volatile size fields without the lock as a best-effort
+            // signal so isValid() turns false and the render path re-enters initDecoderInfo() to clear
+            // freezeDraw. The stale decoder is reclaimed via initDecoder()'s upfront releaseDecoder() on
+            // reuse (or PAGDecoder.finalize() on garbage collection).
             if (!locker.tryLock()) {
                 _width = 0;
                 _height = 0;
