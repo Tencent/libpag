@@ -26,7 +26,6 @@
 #include <tgfx/gpu/Backend.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include <tgfx/gpu/opengl/GLTypes.h>
-#include "GridBackground.h"
 #include "utils/StringParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
@@ -326,7 +325,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // from the freshly parsed document right after FromXML.
   pagxWidth = 0.0f;
   pagxHeight = 0.0f;
-  backgroundVisible = false;
   backgroundTGFXColor = DefaultBackgroundColor();
 
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -1157,15 +1155,16 @@ void PAGXView::buildLayers() {
   // Mirror the display-list tuning that previously lived in the constructor onto the scene's
   // options. Subtree cache: caches static layers as textures to avoid per-layer shape
   // retriangulation, the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton
-  // shapes). Background is set to explicit transparent so the display list never paints over the
-  // manual checkerboard / solid background drawn on the surface before Record().
+  // shapes). The background color resolved from the document (or opaque white by default) is set
+  // on the scene so the display list paints it under the layer tree across the whole surface.
   auto* options = scene->getDisplayOptions();
   options->setRenderMode(PAGRenderMode::Tiled);
   options->setTileUpdateMode(PAGTileUpdateMode::Fast);
   options->setMaxTileCount(static_cast<int>(DEFAULT_MAX_TILE_COUNT));
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
   options->setSubtreeCacheMaxSize(static_cast<int>(DEFAULT_SUBTREE_CACHE_SIZE));
-  options->setBackgroundColor({0.0f, 0.0f, 0.0f, 0.0f});
+  options->setBackgroundColor({backgroundTGFXColor.red, backgroundTGFXColor.green,
+                               backgroundTGFXColor.blue, backgroundTGFXColor.alpha});
 
   hasRenderedFirstFrame = false;
   applyMergedTransform();
@@ -1173,25 +1172,18 @@ void PAGXView::buildLayers() {
 }
 
 void PAGXView::applyDocumentCustomData() {
-  backgroundVisible = false;
   backgroundTGFXColor = DefaultBackgroundColor();
   auto& customData = document->customData;
-  auto visibleIt = customData.find("bg-visible");
-  if (visibleIt != customData.end()) {
-    backgroundVisible = (visibleIt->second == "true");
+  auto colorIt = customData.find("bg-color");
+  if (colorIt != customData.end()) {
+    backgroundTGFXColor = ParseHexColor(colorIt->second);
   }
-  if (backgroundVisible) {
-    auto colorIt = customData.find("bg-color");
-    if (colorIt != customData.end()) {
-      backgroundTGFXColor = ParseHexColor(colorIt->second);
-    }
-    auto alphaIt = customData.find("bg-alpha");
-    if (alphaIt != customData.end()) {
-      char* end = nullptr;
-      float alpha = std::strtof(alphaIt->second.c_str(), &end);
-      if (end != alphaIt->second.c_str()) {
-        backgroundTGFXColor.alpha *= alpha;
-      }
+  auto alphaIt = customData.find("bg-alpha");
+  if (alphaIt != customData.end()) {
+    char* end = nullptr;
+    float alpha = std::strtof(alphaIt->second.c_str(), &end);
+    if (end != alphaIt->second.c_str()) {
+      backgroundTGFXColor.alpha *= alpha;
     }
   }
   if (!boundsOriginOverridden) {
@@ -1502,19 +1494,14 @@ bool PAGXView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  if (backgroundVisible) {
-    DrawSolidBackground(canvas, canvasWidth, canvasHeight, backgroundTGFXColor);
-  } else {
-    DrawBackground(canvas, canvasWidth, canvasHeight, 1.0f);
-  }
   if constexpr (DRAW_LOG_ENABLED) {
     bgMs = emscripten_get_now() - bgStartMs;
   }
 
-  // Record the scene on top of the manual background. autoClear=false preserves the background;
-  // Record() flushes internally (the background draws queued on the same surface are captured in
-  // that same flush) and returns a Recording we submit here. Record covers the flush cost, so a
-  // separate flush timing is no longer tracked.
+  // Record the scene, which paints its own background color under the layer tree. autoClear=false
+  // keeps the freshly cleared surface; Record() flushes internally (the clear queued on the same
+  // surface is captured in that same flush) and returns a Recording we submit here. Record covers
+  // the flush cost, so a separate flush timing is no longer tracked.
   if constexpr (DRAW_LOG_ENABLED) {
     renderStartMs = emscripten_get_now();
   }
@@ -1522,8 +1509,8 @@ bool PAGXView::draw() {
   if (scene != nullptr && pagSurface != nullptr) {
     recording = Record(context, scene, pagSurface, false);
   } else {
-    // No scene yet (parsePAGX succeeded but buildLayers has not run): still flush the background
-    // so the canvas shows the checkerboard instead of stale pixels.
+    // No scene yet (parsePAGX succeeded but buildLayers has not run): still flush the clear so the
+    // canvas shows a clean surface instead of stale pixels.
     recording = context->flush();
   }
   if constexpr (DRAW_LOG_ENABLED) {

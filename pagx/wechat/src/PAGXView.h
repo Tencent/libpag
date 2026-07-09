@@ -667,8 +667,8 @@ class PAGXView {
   int canvasHeight = 0;
   FontConfig fontConfig = {};
 
-  // Background state from the PAGX document
-  bool backgroundVisible = false;
+  // Background color resolved from the PAGX document (bg-color / bg-alpha), or opaque white by
+  // default. Routed to the scene via PAGDisplayOptions::setBackgroundColor() in buildLayers().
   tgfx::Color backgroundTGFXColor = DefaultBackgroundColor();
 
   // Performance monitoring
