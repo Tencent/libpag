@@ -53,12 +53,28 @@ std::shared_ptr<PAGViewModel> PAGComposition::viewModel() const {
   return compositionViewModel;
 }
 
+void PAGComposition::playTimeline(const std::string& id) {
+  pausedTimelineIds.erase(id);
+}
+
+void PAGComposition::pauseTimeline(const std::string& id) {
+  pausedTimelineIds.insert(id);
+}
+
+bool PAGComposition::isTimelinePlaying(const std::string& id) {
+  return pausedTimelineIds.find(id) == pausedTimelineIds.end();
+}
+
 void PAGComposition::advance(int64_t deltaMicroseconds) {
   for (auto& timeline : timelines) {
-    timeline->advance(deltaMicroseconds);
+    if (isTimelinePlaying(timeline->getId())) {
+      timeline->advance(deltaMicroseconds);
+    }
   }
   for (auto& sm : stateMachineTimelines) {
-    sm->advance(deltaMicroseconds);
+    if (isTimelinePlaying(sm->getId())) {
+      sm->advance(deltaMicroseconds);
+    }
   }
   PAGLayer::advance(deltaMicroseconds);
 }
@@ -136,15 +152,11 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       if (animation == nullptr) {
         continue;
       }
-      // An animation driver with playing=false is not added to the composition's auto-advance
-      // loop. The caller can still obtain a standalone instance via PAGScene::getTimeline() for
-      // manual advance/apply. This mirrors PAGPlayer where only active animations participate in
-      // the flush cycle.
-      if (!animationDriver->playing) {
-        continue;
-      }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
+      if (!animationDriver->playing) {
+        pausedTimelineIds.insert(animation->id);
+      }
       timelines.push_back(std::move(timeline));
     } else if (driver->timelineType() == TimelineType::StateMachine) {
       auto* smDriver = static_cast<const StateMachineTimeline*>(driver.get());
