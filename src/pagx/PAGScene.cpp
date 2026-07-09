@@ -590,6 +590,44 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   return FromTGFX(surfaceBounds);
 }
 
+std::vector<Rect> PAGScene::getImageBounds(const std::string& filePath) const {
+  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr ||
+      document == nullptr || filePath.empty()) {
+    return {};
+  }
+  const auto& layers = document->findLayersByImageFilePath(filePath);
+  if (layers.empty()) {
+    return {};
+  }
+  std::unordered_set<const Layer*> targetSet(layers.begin(), layers.end());
+  auto* rootLayer = _rootComposition->runtimeLayer.get();
+  std::vector<Rect> results = {};
+  // Iterative pre-order walk over the whole runtime tree. Plain PAGLayer containers can also carry
+  // children (not just PAGComposition), so every node is descended into rather than only
+  // compositions.
+  std::vector<PAGLayer*> stack = {_rootComposition.get()};
+  while (!stack.empty()) {
+    auto* layer = stack.back();
+    stack.pop_back();
+    for (const auto& child : layer->children) {
+      if (child == nullptr || child->runtimeLayer == nullptr) {
+        continue;
+      }
+      if (child->node != nullptr && targetSet.count(child->node) > 0) {
+        // getBounds against the root layer folds in every ancestor matrix up to (but not
+        // including) the display zoom/offset, matching the space getGlobalBounds uses before the
+        // rootToSurface step. tgfx caches the result after the first evaluation.
+        auto bounds = child->runtimeLayer->getBounds(rootLayer);
+        if (!bounds.isEmpty()) {
+          results.push_back(FromTGFX(bounds));
+        }
+      }
+      stack.push_back(child.get());
+    }
+  }
+  return results;
+}
+
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
     return false;
