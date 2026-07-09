@@ -71,6 +71,10 @@ function parseArgs(argv) {
     // files directly, so (unlike fonts) no per-case manifest or `--fallback`
     // wiring is needed.
     downloadImages: false,
+    // How images are stored in the exported .pagx: 'external' (default; write image files next to
+    // each case's .pagx, keeping their relative path) or 'embed' (base64 data URIs). Independent of
+    // --download-images (which controls snapshot-side handling).
+    pagxImages: 'external',
     // Headless browser driver — propagates to baseline.js / snapshot.js via
     // --browser-engine, plus to the flex-counter pages owned by this script.
     // Honours HTML_SNAPSHOT_BROWSER when no flag is passed.
@@ -88,6 +92,13 @@ function parseArgs(argv) {
     else if (a === '--download-fonts') opts.downloadFonts = true;
     else if (a === '--embed-fonts') { opts.embedFonts = true; opts.downloadFonts = true; }
     else if (a === '--download-images') opts.downloadImages = true;
+    else if (a === '--pagx-images') {
+      const mode = argv[++i];
+      if (mode !== 'embed' && mode !== 'external') {
+        fail(`--pagx-images expects 'embed' or 'external', got '${mode}'`);
+      }
+      opts.pagxImages = mode;
+    }
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -131,6 +142,11 @@ const USAGE = `Usage: node run.js [options]
                       addressed cache at out/<label>/images/ (identical images
                       stored once); pagx render reads the files directly, so no
                       per-case manifest is needed.
+  --pagx-images <m>   How images are stored in each .pagx: 'external' (default;
+                      write image files next to the case's .pagx, keeping their
+                      relative path, producing a portable per-case folder) or
+                      'embed' (base64 data URIs). Independent of
+                      --download-images.
   --concurrency, -j N Process N cases in parallel (default: 1). Each case
                       spawns its own baseline/snapshot Chromium plus the pagx
                       binary, so memory and CPU scale roughly linearly with N.
@@ -324,6 +340,11 @@ async function processCase(entry, outDir, opts, browser) {
     await runPagxResolve({
       pagxBin: opts.pagxBin,
       pagxFile: subsetPagx,
+      // Image resources (both <img> and inline-SVG <image>) only exist after resolve, so image
+      // storage is applied here. The subset lives in the case dir, but its relative on-disk images
+      // are addressed relative to the original HTML — point relocation there.
+      imageStorage: opts.pagxImages,
+      imageBaseDir: path.dirname(htmlPath),
       stderrPath: path.join(caseDir, 'resolve.stderr.txt'),
     });
     // Optionally embed the downloaded faces into the resolved .pagx so the

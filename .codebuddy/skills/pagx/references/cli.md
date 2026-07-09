@@ -343,7 +343,33 @@ pagx import --input page.html -v                  # print conversion warnings
 | `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
+| `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
+| `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
+
+### Image storage
+
+Controls how `<Image>` resources are stored in the output PAGX (`--images`, default `external`).
+The two modes are symmetric and **only ever touch local file references** — an image already
+carried as embedded bytes or a `data:` URI is left exactly as it is in either mode (inline content
+is never extracted to a file, and existing data URIs are never rewritten). Absolute paths and remote
+`http(s)://` URLs are also left untouched.
+
+- **`external` (default)** — images that reference a local file are copied next to the output
+  `.pagx` at their original relative path, and `source` keeps that relative name unchanged, so the
+  `.pagx` plus its sidecar image files form a portable folder. The authored relative path is
+  preserved even when writing to a different output directory (e.g. `assets/logo.png` stays
+  `assets/logo.png`).
+- **`embed`** — images that reference a local file are read and inlined as base64 `data:` URIs,
+  producing a single self-contained `.pagx`.
+
+`--image-base-dir` sets the directory that relative image paths are resolved against when locating
+the files on disk; it defaults to the input file's directory.
+
+```bash
+pagx import --input page.html --output card.pagx                 # external (default): sidecar images
+pagx import --input page.html --output card.pagx --images embed  # self-contained: base64 images
+```
 
 ### SVG options
 
@@ -406,11 +432,18 @@ PAGX files that reference external SVG or embed inline `<svg>`, or for PAGX prod
 ```bash
 pagx resolve design.pagx                          # resolve in place
 pagx resolve design.pagx -o out.pagx              # resolve to new file
+pagx resolve design.pagx --images embed           # also inline local images as base64
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--images <mode>` | How image resources are stored: `external` (default) or `embed`. Same behavior as [`pagx import`](#image-storage) — only local file references are affected; data URIs are left untouched |
+| `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+
+Image resources created while resolving inline `<svg>` (e.g. `<image href="…">`) are normalized to
+the requested storage mode in the same pass. Passing `--images`/`--image-base-dir` also forces the
+image pass (and file writes) even when there are no import directives to resolve.
 
 Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see above for details.
 
