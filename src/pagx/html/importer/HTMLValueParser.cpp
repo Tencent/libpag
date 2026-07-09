@@ -48,6 +48,142 @@ bool ExtractGradientParts(const std::string& value, std::vector<std::string>& ou
   return outParts.size() >= 2;
 }
 
+using ColorMatrix = std::array<float, 20>;
+
+// The 4x5 identity colour matrix (row-major R, G, B, A rows; last column bias). Each `*Matrix`
+// builder below starts from a copy and overwrites only the coefficients its function touches.
+constexpr ColorMatrix kIdentityColorMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                              0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+
+// Parses a CSS filter amount: a unitless number (`1.15`) or a percentage (`115%`). Returns
+// `defaultValue` for an empty argument (e.g. `grayscale()` == `grayscale(1)`) and NaN for a value
+// that is not a bare number/percentage, so the caller can fall back to an unsupported diagnostic.
+float ParseFilterAmount(const std::string& raw, float defaultValue) {
+  std::string s = Trim(raw);
+  if (s.empty()) return defaultValue;
+  float fraction = 0.0f;
+  if (ParseCssPercentage(s, fraction)) return fraction;
+  char* end = nullptr;
+  float v = std::strtof(s.c_str(), &end);
+  if (end == s.c_str()) return NAN;
+  // Reject anything with a trailing unit (`1px`, `2em`) so it is not silently read as a number.
+  if (!Trim(end).empty()) return NAN;
+  return v;
+}
+
+// brightness(b): scale every colour channel by `b`.
+ColorMatrix BrightnessMatrix(float b) {
+  ColorMatrix m = kIdentityColorMatrix;
+  m[0] = b;
+  m[6] = b;
+  m[12] = b;
+  return m;
+}
+
+// contrast(c): out = c * in + 0.5 * (1 - c) per channel.
+ColorMatrix ContrastMatrix(float c) {
+  float bias = 0.5f * (1.0f - c);
+  ColorMatrix m = kIdentityColorMatrix;
+  m[0] = c;
+  m[4] = bias;
+  m[6] = c;
+  m[9] = bias;
+  m[12] = c;
+  m[14] = bias;
+  return m;
+}
+
+// invert(a): out = (1 - 2a) * in + a per channel.
+ColorMatrix InvertMatrix(float a) {
+  float slope = 1.0f - 2.0f * a;
+  ColorMatrix m = kIdentityColorMatrix;
+  m[0] = slope;
+  m[4] = a;
+  m[6] = slope;
+  m[9] = a;
+  m[12] = slope;
+  m[14] = a;
+  return m;
+}
+
+// opacity(o): scale the alpha channel by `o`.
+ColorMatrix OpacityMatrix(float o) {
+  ColorMatrix m = kIdentityColorMatrix;
+  m[18] = o;
+  return m;
+}
+
+// saturate(s): the CSS Filter Effects saturation matrix (Rec. 601 luma weights).
+ColorMatrix SaturateMatrix(float s) {
+  return {0.213f + 0.787f * s, 0.715f - 0.715f * s, 0.072f - 0.072f * s, 0, 0,
+          0.213f - 0.213f * s, 0.715f + 0.285f * s, 0.072f - 0.072f * s, 0, 0,
+          0.213f - 0.213f * s, 0.715f - 0.715f * s, 0.072f + 0.928f * s, 0, 0,
+          0,                   0,                   0,                   1, 0};
+}
+
+// hue-rotate(deg): the CSS Filter Effects hue-rotation matrix.
+ColorMatrix HueRotateMatrix(float degrees) {
+  float radians = degrees * HtmlPi / 180.0f;
+  float c = std::cos(radians);
+  float s = std::sin(radians);
+  return {0.213f + c * 0.787f - s * 0.213f, 0.715f - c * 0.715f - s * 0.715f,
+          0.072f - c * 0.072f + s * 0.928f, 0, 0,
+          0.213f - c * 0.213f + s * 0.143f, 0.715f + c * 0.285f + s * 0.140f,
+          0.072f - c * 0.072f - s * 0.283f, 0, 0,
+          0.213f - c * 0.213f - s * 0.787f, 0.715f - c * 0.715f + s * 0.715f,
+          0.072f + c * 0.928f + s * 0.072f, 0, 0,
+          0,                                0,                                0, 1, 0};
+}
+
+// grayscale(a): interpolate towards luma-only output (Rec. 709 weights); `p = 1 - a`.
+ColorMatrix GrayscaleMatrix(float a) {
+  float p = 1.0f - a;
+  return {0.2126f + 0.7874f * p, 0.7152f - 0.7152f * p, 0.0722f - 0.0722f * p, 0, 0,
+          0.2126f - 0.2126f * p, 0.7152f + 0.2848f * p, 0.0722f - 0.0722f * p, 0, 0,
+          0.2126f - 0.2126f * p, 0.7152f - 0.7152f * p, 0.0722f + 0.9278f * p, 0, 0,
+          0,                     0,                     0,                     1, 0};
+}
+
+// sepia(a): interpolate towards the CSS Filter Effects sepia tint; `p = 1 - a`.
+ColorMatrix SepiaMatrix(float a) {
+  float p = 1.0f - a;
+  return {0.393f + 0.607f * p, 0.769f - 0.769f * p, 0.189f - 0.189f * p, 0, 0,
+          0.349f - 0.349f * p, 0.686f + 0.314f * p, 0.168f - 0.168f * p, 0, 0,
+          0.272f - 0.272f * p, 0.534f - 0.534f * p, 0.131f + 0.869f * p, 0, 0,
+          0,                   0,                   0,                   1, 0};
+}
+
+// Lowers a CSS colour filter function (`name(args)`) to its 4x5 colour matrix. Returns false when
+// `name` is not a colour filter function or its argument fails to parse, leaving the caller to
+// treat the step as unsupported.
+bool ColorFilterMatrix(const std::string& name, const std::string& args, ColorMatrix& out) {
+  auto clamp = [](float v, float lo, float hi) { return std::max(lo, std::min(hi, v)); };
+  if (name == "hue-rotate") {
+    out = HueRotateMatrix(ParseAngle(args));
+    return true;
+  }
+  float amount = ParseFilterAmount(args, 1.0f);
+  if (std::isnan(amount)) return false;
+  if (name == "brightness") {
+    out = BrightnessMatrix(std::max(0.0f, amount));
+  } else if (name == "contrast") {
+    out = ContrastMatrix(std::max(0.0f, amount));
+  } else if (name == "saturate") {
+    out = SaturateMatrix(std::max(0.0f, amount));
+  } else if (name == "grayscale") {
+    out = GrayscaleMatrix(clamp(amount, 0.0f, 1.0f));
+  } else if (name == "sepia") {
+    out = SepiaMatrix(clamp(amount, 0.0f, 1.0f));
+  } else if (name == "invert") {
+    out = InvertMatrix(clamp(amount, 0.0f, 1.0f));
+  } else if (name == "opacity") {
+    out = OpacityMatrix(clamp(amount, 0.0f, 1.0f));
+  } else {
+    return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 HTMLValueParser::HTMLValueParser(HTMLDiagnosticSink& sink, const float& canvasWidth,
@@ -353,6 +489,11 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       }
       step.kind = ref.empty() ? FilterStep::Kind::Unsupported : FilterStep::Kind::SvgRef;
       step.refId = ref;
+    } else if (ColorMatrix cm; ColorFilterMatrix(name, args, cm)) {
+      // CSS colour filter functions (hue-rotate / saturate / brightness / contrast / grayscale /
+      // sepia / invert / opacity) all lower to a 4x5 colour matrix driving a ColorMatrixFilter.
+      step.kind = FilterStep::Kind::ColorMatrix;
+      step.matrix = cm;
     } else {
       step.kind = FilterStep::Kind::Unsupported;
     }

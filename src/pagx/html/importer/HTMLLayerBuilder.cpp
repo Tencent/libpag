@@ -30,6 +30,7 @@
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -551,6 +552,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         for (auto* f : decoded) {
           layer->filters.push_back(f);
         }
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }
