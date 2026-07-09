@@ -112,13 +112,6 @@ class PAGTimeline {
   int64_t lastTotalTime() const;
 
   /**
-   * Returns the microseconds of the last advance() delta that spilled past the animation boundary
-   * (the overshoot past the end of a completed once/loop/pingPong cycle). Zero when the last
-   * advance() stayed within bounds.
-   */
-  int64_t spilledTime() const;
-
-  /**
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
    * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
@@ -184,7 +177,6 @@ class PAGTimeline {
   // accumulate scaled local time, so no state-machine change is needed for speed support.
   int64_t totalTimeUs = 0;
   int64_t lastTotalTimeUs = 0;
-  int64_t spilledTimeUs = 0;
   bool playing = true;
 
   friend class PAGScene;

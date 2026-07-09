@@ -156,7 +156,6 @@ static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
 }
 
 bool PAGTimeline::advance(int64_t deltaMicroseconds) {
-  spilledTimeUs = 0;
   if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
@@ -179,14 +178,6 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   } else {
     next = currentTimeUs + deltaMicroseconds;
   }
-  // Time of this frame's delta that spilled past a boundary: forwarded to the incoming state on a
-  // transition so playback carries over without a one-frame reset. For Loop it is the phase into
-  // the new cycle; for Once/PingPong it is the overshoot past the end (or before the start).
-  if (next > duration) {
-    spilledTimeUs = animation->loop == LoopMode::Loop ? next % duration : next - duration;
-  } else if (next < 0) {
-    spilledTimeUs = -next;
-  }
   // Once mode stops playback when the clip reaches either end; other modes keep looping.
   if (animation->loop == LoopMode::Once && (next >= duration || next < 0)) {
     playing = false;
@@ -201,10 +192,6 @@ int64_t PAGTimeline::totalTime() const {
 
 int64_t PAGTimeline::lastTotalTime() const {
   return lastTotalTimeUs;
-}
-
-int64_t PAGTimeline::spilledTime() const {
-  return spilledTimeUs;
 }
 
 void PAGTimeline::apply(float mix) {

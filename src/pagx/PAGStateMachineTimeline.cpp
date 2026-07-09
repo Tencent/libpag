@@ -269,6 +269,39 @@ static bool EvaluateCondition(const TransitionCondition* condition,
 // Transition lookup (member helpers)
 // =============================================================================
 
+// Returns how far the current timeline has run past the transition's exit-time point, in
+// microseconds. A negative result means the exit time has not been reached yet. Returns 0 when the
+// transition has no exit time or the current state has no resolvable animation (no gate, no
+// overshoot). A sub-loop exit time is aligned to the loop the previous frame ended in so it fires
+// on every cycle. The state machine uses the sign as the exit gate and, on a transition, the
+// positive part as the time to carry over to the incoming state.
+static int64_t ExitTimeOvershoot(const StateTransition* transition,
+                                 const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc,
+                                 const State* currentState) {
+  if (transition == nullptr || !transition->exitTime.has_value() || currentTimeline == nullptr ||
+      contextDoc == nullptr || currentState == nullptr ||
+      currentState->stateType() != StateType::Animation) {
+    return 0;
+  }
+  auto* animState = static_cast<const AnimationState*>(currentState);
+  if (animState->animationId.empty()) {
+    return 0;
+  }
+  auto* anim = contextDoc->findNode<Animation>(animState->animationId);
+  if (anim == nullptr) {
+    return 0;
+  }
+  int64_t exitUs = FramesToUs(transition->exitTime.value(), anim->frameRate);
+  int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
+  int64_t alignedExitUs = exitUs;
+  if (exitUs <= durationUs && anim->loop != LoopMode::Once && durationUs > 0) {
+    alignedExitUs += static_cast<int64_t>(std::floor(
+                         static_cast<double>(currentTimeline->lastTotalTime()) / durationUs)) *
+                     durationUs;
+  }
+  return currentTimeline->totalTime() - alignedExitUs;
+}
+
 static bool IsTransitionAllowed(const StateTransition* transition,
                                 const PAGTimeline* currentTimeline, const PAGXDocument* contextDoc,
                                 const State* currentState,
@@ -278,34 +311,9 @@ static bool IsTransitionAllowed(const StateTransition* transition,
   if (transition == nullptr) {
     return false;
   }
-  // Exit-time gate.
-  if (transition->exitTime.has_value()) {
-    const AnimationState* animState = nullptr;
-    if (currentState != nullptr && currentState->stateType() == StateType::Animation) {
-      animState = static_cast<const AnimationState*>(currentState);
-    }
-    if (animState != nullptr && !animState->animationId.empty() && contextDoc != nullptr &&
-        currentTimeline != nullptr) {
-      auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-      if (anim != nullptr) {
-        int64_t exitUs = FramesToUs(transition->exitTime.value(), anim->frameRate);
-        int64_t durationUs = FramesToUs(anim->duration, anim->frameRate);
-        // Time comes from the state's own timeline: totalTime is the monotonic elapsed time (loop
-        // count included), lastTotalTime is where the previous frame ended. A sub-loop exit time is
-        // aligned to the loop the previous frame was in so it can fire on every cycle.
-        int64_t totalUs = currentTimeline->totalTime();
-        int64_t lastTotalUs = currentTimeline->lastTotalTime();
-        int64_t alignedExitUs = exitUs;
-        if (exitUs <= durationUs && anim->loop != LoopMode::Once && durationUs > 0) {
-          alignedExitUs +=
-              static_cast<int64_t>(std::floor(static_cast<double>(lastTotalUs) / durationUs)) *
-              durationUs;
-        }
-        if (totalUs < alignedExitUs) {
-          return false;
-        }
-      }
-    }
+  // Exit-time gate: not yet reached when the current state has run less than the exit time.
+  if (ExitTimeOvershoot(transition, currentTimeline, contextDoc, currentState) < 0) {
+    return false;
   }
   // All conditions must hold (AND).
   for (const auto* condition : transition->conditions) {
@@ -402,9 +410,11 @@ void PAGStateMachineTimeline::changeState(RegionInstance& ri, const StateTransit
   fading.timeline = ri.currentTimeline;
   fading.mixFrom = ri.mix;
   fading.frozen = false;
-  // Time that spilled past the outgoing animation's boundary this frame; forwarded to the incoming
-  // state so playback carries over seamlessly instead of restarting from zero.
-  int64_t spilledUs = ri.currentTimeline != nullptr ? ri.currentTimeline->spilledTime() : 0;
+  // Time the current state ran past the transition's exit-time point this frame; forwarded to the
+  // incoming state so playback carries over seamlessly instead of restarting from zero. Only
+  // exit-time transitions overshoot; input-triggered ones return 0 and start the new state at zero.
+  int64_t overshootUs = ExitTimeOvershoot(t, ri.currentTimeline.get(), contextDoc, ri.currentState);
+  int64_t spilledUs = overshootUs > 0 ? overshootUs : 0;
   if (t->pauseOnExit && t->exitTime.has_value() && fading.timeline != nullptr) {
     // Freeze the outgoing animation at its current pose (the exit frame it just reached) so it
     // keeps contributing that pose while it mixes out, matching Rive's hold-at-exit behavior.
