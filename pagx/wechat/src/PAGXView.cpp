@@ -251,22 +251,14 @@ PAGXView::~PAGXView() {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.registerFont(fontData->bytes(), fontData->size(), 0);
   }
   auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(emojiFontData->bytes(), emojiFontData->size(), 0);
   }
-  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {

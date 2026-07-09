@@ -170,6 +170,8 @@ async function getSystemInfoNew(sdkVersion: string) {
     version: appBaseInfo.version || '',
     benchmarkLevel: benchInfo.benchmarkLevel,
     modelLevel: benchInfo.modelLevel,
+    brand: deviceInfo.brand || '',
+    model: deviceInfo.model || '',
   };
 }
 
@@ -191,6 +193,8 @@ async function getSystemInfoLegacy() {
     version: info.version || '',
     benchmarkLevel: benchInfo.benchmarkLevel,
     modelLevel: benchInfo.modelLevel,
+    brand: info.brand || '',
+    model: info.model || '',
   };
 }
 
