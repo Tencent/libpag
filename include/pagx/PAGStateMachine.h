@@ -59,7 +59,7 @@ class PAGStateMachine : public PAGTimeline {
   /**
    * Returns the concrete timeline kind.
    */
-  TimelineType timelineType() const override {
+  TimelineType type() const override {
     return TimelineType::StateMachine;
   }
 

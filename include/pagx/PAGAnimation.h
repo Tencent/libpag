@@ -52,7 +52,7 @@ class PAGAnimation : public PAGTimeline {
   /**
    * Returns the concrete timeline kind.
    */
-  TimelineType timelineType() const override {
+  TimelineType type() const override {
     return TimelineType::Animation;
   }
 
