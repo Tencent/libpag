@@ -266,6 +266,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // surface wrapper go with it. document resets last so the scene's teardown still sees it.
   scene = nullptr;
   defaultTimeline = nullptr;
+  lastAnimationTimeMs = -1.0;
   pagSurface = nullptr;
   document = nullptr;
   // Drop snapshots so the new document doesn't blit pixels from the old one.
@@ -1151,6 +1152,7 @@ void PAGXView::buildLayers() {
     return;
   }
   defaultTimeline = scene->getDefaultTimeline();
+  lastAnimationTimeMs = -1.0;
 
   // Mirror the display-list tuning that previously lived in the constructor onto the scene's
   // options. Subtree cache: caches static layers as textures to avoid per-layer shape
@@ -1435,6 +1437,10 @@ bool PAGXView::draw() {
   }
 
   double frameStartMs = emscripten_get_now();
+
+  // Advance animations before rendering so Record() below captures the new frame. Mutates only
+  // CPU-side content (no GL state), so it runs before lockContext.
+  advanceTimelines(frameStartMs);
 
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
@@ -1754,6 +1760,27 @@ void PAGXView::updateAdaptiveTileRefinement() {
       scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
     }
   }
+}
+
+void PAGXView::advanceTimelines(double frameStartMs) {
+  if (scene == nullptr) {
+    return;
+  }
+  int64_t deltaUs = 0;
+  if (lastAnimationTimeMs >= 0.0) {
+    deltaUs = static_cast<int64_t>(std::max(0.0, frameStartMs - lastAnimationTimeMs) * 1000.0);
+  }
+  lastAnimationTimeMs = frameStartMs;
+  if (deltaUs <= 0) {
+    return;
+  }
+  // Top-level animations are not driven by scene->advanceAndApply(), so advance the default
+  // timeline explicitly; then advance the scene for its auto-playing and nested-composition
+  // animations.
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->advanceAndApply(deltaUs);
+  }
+  scene->advanceAndApply(deltaUs);
 }
 
 }  // namespace pagx

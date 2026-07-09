@@ -388,6 +388,12 @@ class PAGXView {
   // the display list carried the user pan/zoom) now that the runtime tree is owned by PAGScene.
   void applyMergedTransform();
 
+  // Advances the scene's animations by the wall-clock delta since the previous draw() and applies
+  // them to the content. Drives both the top-level timeline (defaultTimeline, not advanced by
+  // scene->advanceAndApply) and the scene's auto-playing / nested-composition animations. No-op
+  // until the scene exists and on the first frame (delta seeded from lastAnimationTimeMs).
+  void advanceTimelines(double frameStartMs);
+
   void applyDocumentCustomData();
 
   // Shared contain-mode fit scale used by both the content matrix and the JS-facing content
@@ -409,6 +415,10 @@ class PAGXView {
   // First top-level timeline of the scene, or nullptr when the document declares none. Driven by
   // the JS animation-frame callback.
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
+  // Wall-clock timestamp (emscripten_get_now ms) of the previous timeline advance, used to derive
+  // the per-frame delta. -1 means "no previous frame" (set on parsePAGX/buildLayers) so the first
+  // draw() after a (re)build advances by zero and starts animating from the next frame.
+  double lastAnimationTimeMs = -1.0;
   // Wraps `surface` so pagx::Record() can render the scene into the same GL framebuffer. Shares
   // the surface lifecycle: recreated whenever `surface` is (re)created, dropped alongside it in
   // updateSize() / parsePAGX().

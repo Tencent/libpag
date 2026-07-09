@@ -102,12 +102,23 @@ cd /Users/billyjin/Desktop/project/libpag-main/pagx/wechat && npm run build:rele
 
 ---
 
-## Phase 2：动画支持（按需）
+## Phase 2：动画支持
 
-### 任务
-- 合适时机（如 raf 帧回调）调 `defaultTimeline->advanceAndApply(deltaMicroseconds)`；**调用前判空**（无 top-level 动画时 `getDefaultTimeline()` 返回 `nullptr`）。
+### 已完成改动
 
-**Phase 2 验证**：编译通过 + 动画帧驱动正常。通过后提交。
+- `PAGXView.h`：新增私有方法 `void advanceTimelines(double frameStartMs);` 与成员 `double lastAnimationTimeMs = -1.0;`（记录上一次 advance 的 wall-clock 时间，用于求每帧增量；-1 表示无上一帧）。
+- `PAGXView.cpp`：
+  - 实现 `advanceTimelines(frameStartMs)`（参照 `playground/pagx-viewer` 规范）——`scene` 为空直接 return；由 `lastAnimationTimeMs` 求 `deltaUs`（首帧 delta=0 跳过），再 `if (defaultTimeline) defaultTimeline->advanceAndApply(deltaUs)` + `scene->advanceAndApply(deltaUs)`。
+    > 关键：top-level 时间轴动画**不**由 `scene->advanceAndApply()` 驱动，须显式驱动 `defaultTimeline`；`scene->advanceAndApply()` 负责自动播放与嵌套合成动画。二者都调，覆盖全部动画类型。
+  - `draw()`：在算得 `frameStartMs` 后、渲染前调用 `advanceTimelines(frameStartMs)`（仅改 CPU 侧内容、无 GL 状态，故在 `lockContext` 之前调用，`Record()` 随后捕获新帧）。
+  - `parsePAGX()` / `buildLayers()`：重置 `lastAnimationTimeMs = -1.0`，避免跨文档/重建时用陈旧时间戳算出巨大 delta。
+
+**Phase 2 验证**：编译通过 + 带 top-level 时间轴与嵌套合成动画的 PAGX 能正常播放、循环。通过后提交。
+
+编译命令同 Phase 1：
+```bash
+cd /Users/billyjin/Desktop/project/libpag-main/pagx/wechat && npm run build:release
+```
 
 ---
 
