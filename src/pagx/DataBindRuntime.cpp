@@ -119,8 +119,8 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     // Drop out-of-scope targets. findNode does a flat document-wide lookup, so it can resolve a node
     // living inside a nested composition; that node is bound in the composition's own binding, not
     // here, so binding to it would cross the composition boundary (mirrors
-    // PAGTimeline::resolveTargets). The early return above guarantees binding is non-null here.
-    if (!binding->contains(targetNode)) {
+    // PAGTimeline::resolveTargets).
+    if (binding != nullptr && !binding->contains(targetNode)) {
       LOGE("DataBind skipped: target '%s' is outside this binding's scope.", db->target.c_str());
       continue;
     }
