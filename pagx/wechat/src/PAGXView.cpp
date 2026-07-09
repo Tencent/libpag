@@ -1221,7 +1221,7 @@ void PAGXView::updateSize(int width, int height) {
 }
 
 // Computes the contain-mode fit scale for the PAGX content against the canvas. Used by both
-// applyCenteringTransform() (content matrix) and getContentTransform() (comment-pin
+// applyMergedTransform() (content matrix) and getContentTransform() (comment-pin
 // coordinates) so the two stay in sync; any divergence here produces pins that drift relative
 // to the content.
 //
