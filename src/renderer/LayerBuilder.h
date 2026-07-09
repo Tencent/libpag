@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
@@ -261,6 +262,10 @@ struct RuntimeBinding {
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
     auto it = targets.find(node);
     if (it == targets.end()) {
+      // Callers (PAGTimeline::resolveTargets, DataBindRuntime::bind) already drop out-of-scope
+      // targets via contains(), so a miss here means that scope contract was broken upstream. The
+      // return false below keeps release builds graceful.
+      DEBUG_ASSERT(false);
       return false;
     }
     return it->second->apply(channel, value, mix);

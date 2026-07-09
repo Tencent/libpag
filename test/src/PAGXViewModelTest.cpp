@@ -2014,6 +2014,10 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeNullDataBindSafety) {
                                            : nullptr;
   std::vector<pagx::DataBind*> binds = {db};
   auto binding = std::make_unique<pagx::RuntimeBinding>();
+  // Register the target node in the binding. In the real runtime LayerBuilder populates targets
+  // before bind() runs; bind() now drops out-of-scope targets via binding->contains(), so this
+  // isolated test must mirror that precondition.
+  binding->set(layer, std::make_shared<int>(0));
   runtime->bind(binds, ctx.get(), doc.get(), binding.get());
   EXPECT_FALSE(runtime->entries.empty());
 

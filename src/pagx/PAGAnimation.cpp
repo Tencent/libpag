@@ -19,6 +19,7 @@
 #include "pagx/PAGAnimation.h"
 #include <algorithm>
 #include <cstdint>
+#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGXDocument.h"
@@ -60,9 +61,9 @@ PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocumen
     : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
-void PAGAnimation::resolveTargets() {
+void PAGAnimation::resolveTargets(const RuntimeBinding* binding) {
   resolved = true;
-  if (animation == nullptr || contextDoc == nullptr) {
+  if (animation == nullptr || contextDoc == nullptr || binding == nullptr) {
     return;
   }
   for (auto* object : animation->objects) {
@@ -71,6 +72,12 @@ void PAGAnimation::resolveTargets() {
     }
     auto* targetNode = contextDoc->findNode(object->target);
     if (targetNode == nullptr) {
+      continue;
+    }
+    // Drop targets outside this binding's scope. findNode does a flat document-wide lookup, so it
+    // can resolve a node living inside a nested composition; that node is bound in the composition's
+    // own binding, not here, so applying to it would cross the composition boundary.
+    if (!binding->contains(targetNode)) {
       continue;
     }
     std::vector<Channel*> channels = {};
@@ -177,7 +184,7 @@ void PAGAnimation::apply(float mix) {
     return;
   }
   if (!resolved) {
-    resolveTargets();
+    resolveTargets(effectiveBinding);
   }
   ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
 }
