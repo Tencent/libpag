@@ -27,6 +27,7 @@
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PropertyData.h"
 #include "pagx/SuppressDelegation.h"
 
@@ -190,6 +191,14 @@ void PAGViewModelValueImage::setValueInternal(std::shared_ptr<PAGImage> v, bool 
   }
   propertyValue = std::move(v);
   notifyChanged(fromVM);
+}
+
+void PAGViewModelValueTrigger::fire() {
+  // A trigger is a value-less pulse: every call is a distinct event, so there is no same-value
+  // short-circuit. The dirty flag is set so dependent data bindings are notified, though triggers
+  // are typically consumed by observers (e.g. StateMachine inputs) rather than data bindings.
+  dirty = true;
+  notifyChanged(true);
 }
 
 // ---- ObserverHandle ----------------------------------------------------------

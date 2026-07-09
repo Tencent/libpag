@@ -196,8 +196,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         break;
       }
       case ViewModelPropertyType::Trigger: {
-        auto v = std::make_shared<PAGViewModelValueBoolean>();
-        v->propertyValue = false;
+        auto v = std::make_shared<PAGViewModelValueTrigger>();
         v->type = ViewModelPropertyType::Trigger;
         value = std::move(v);
         break;

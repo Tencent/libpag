@@ -25,6 +25,7 @@
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueNumber.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -608,16 +609,12 @@ class NumberInputObserver {
 class TriggerInputObserver {
  public:
   TriggerInputObserver(PAGStateMachineTimeline* timeline, std::string inputName,
-                       std::weak_ptr<PAGViewModelValueBoolean> vmValue)
+                       std::weak_ptr<PAGViewModelValueTrigger> vmValue)
       : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
   }
 
   void operator()() const {
-    auto locked = vmValue.lock();
-    if (locked == nullptr) {
-      return;
-    }
-    if (locked->value()) {
+    if (vmValue.lock() != nullptr) {
       timeline->fireTrigger(inputName);
     }
   }
@@ -625,7 +622,7 @@ class TriggerInputObserver {
  private:
   PAGStateMachineTimeline* timeline = nullptr;
   std::string inputName;
-  std::weak_ptr<PAGViewModelValueBoolean> vmValue;
+  std::weak_ptr<PAGViewModelValueTrigger> vmValue;
 };
 
 }  // namespace
@@ -668,13 +665,12 @@ bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
     return true;
   }
   if (inputType == StateMachineInputType::Trigger) {
-    auto vmType = vmValue->valueType();
-    if (vmType != ViewModelPropertyType::Boolean && vmType != ViewModelPropertyType::Trigger) {
+    if (vmValue->valueType() != ViewModelPropertyType::Trigger) {
       return false;
     }
-    auto boolVal = std::static_pointer_cast<PAGViewModelValueBoolean>(vmValue);
-    auto handle = boolVal->addObserver(
-        TriggerInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueBoolean>(boolVal)));
+    auto triggerVal = std::static_pointer_cast<PAGViewModelValueTrigger>(vmValue);
+    auto handle = triggerVal->addObserver(
+        TriggerInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueTrigger>(triggerVal)));
     inputBindings.push_back(std::move(handle));
     return true;
   }

@@ -172,7 +172,9 @@ static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
     case ViewModelPropertyType::Enum:
       return KeyValue{static_cast<PAGViewModelValueEnum*>(value)->value()};
     case ViewModelPropertyType::Trigger:
-      return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
+      // A trigger is a value-less event and is not a data-binding source. Consumers (e.g. a bound
+      // StateMachine input) observe it directly via PAGViewModelValueTrigger::addObserver.
+      return KeyValue{0.0f};
     default:
       return KeyValue{0.0f};
   }
@@ -268,7 +270,6 @@ void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv)
       static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(KeyValueToFloat(kv), false);
       break;
     case ViewModelPropertyType::Boolean:
-    case ViewModelPropertyType::Trigger:
       static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(KeyValueToFloat(kv) != 0.0f,
                                                                       false);
       break;
