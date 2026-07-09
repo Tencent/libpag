@@ -668,7 +668,8 @@ bool PAGStateMachineTimeline::bindInput(const std::string& inputName,
     return true;
   }
   if (inputType == StateMachineInputType::Trigger) {
-    if (vmValue->valueType() != ViewModelPropertyType::Boolean) {
+    auto vmType = vmValue->valueType();
+    if (vmType != ViewModelPropertyType::Boolean && vmType != ViewModelPropertyType::Trigger) {
       return false;
     }
     auto boolVal = std::static_pointer_cast<PAGViewModelValueBoolean>(vmValue);

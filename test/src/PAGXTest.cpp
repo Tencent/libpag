@@ -13011,6 +13011,58 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
   EXPECT_EQ(smTimeline->getCurrentState("main"), "done");
 }
 
+PAGX_TEST(PAGXTest, SMVMTriggerBindingWithTriggerProperty) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "fire";
+  prop->propertyType = pagx::ViewModelPropertyType::Trigger;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "fire";
+  input->type = pagx::StateMachineInputType::Trigger;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto s1 = doc->makeNode<pagx::AnimationState>();
+  s1->name = "idle";
+  region->states.push_back(s1);
+  auto s2 = doc->makeNode<pagx::AnimationState>();
+  s2->name = "done";
+  region->states.push_back(s2);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "done";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "fire";
+  c->op = pagx::TransitionConditionOp::Trigger;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+  doc->applyLayout();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // A Trigger-typed VM property is vended as PAGViewModelValueBoolean.
+  auto vmBool = scene->viewModel()->propertyBoolean("fire");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  ASSERT_TRUE(smTimeline->bindInput("fire", vmBool));
+
+  // VM trigger → true fires the SM trigger.
+  vmBool->value(true);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "done");
+}
+
 // =============================================================================
 // VM as data hub — VM values drive SM transitions via bindInput.
 // The VM is the single source of truth; SM never reads external data directly.
