@@ -26,6 +26,7 @@ namespace pagx {
 class Animation;
 class DataBind;
 class Layer;
+class StateMachine;
 class ViewModel;
 
 /**
@@ -50,9 +51,11 @@ class Composition : public Node {
   std::vector<Layer*> layers = {};
 
   /**
-   * The animations contained in this composition.
+   * The animation and state-machine definitions declared inside this composition's
+   * &lt;Animations&gt; block, in declaration order. Each entry is either an Animation or a
+   * StateMachine; check nodeType() to dispatch.
    */
-  std::vector<Animation*> animations = {};
+  std::vector<Node*> animations = {};
   /**
    * The ViewModel schema bound to this composition.
    */

@@ -148,8 +148,7 @@ static EnumType GetEnumAttribute(const DOMNode* node, const char* name,
 // Forward declarations for parse functions
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc);
 static void ParseResources(const DOMNode* node, PAGXDocument* doc);
-static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
-                            PAGXDocument* doc);
+static void ParseAnimations(const DOMNode* node, std::vector<Node*>* animations, PAGXDocument* doc);
 static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
 static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
@@ -2082,7 +2081,7 @@ static StateMachine* ParseStateMachine(const DOMNode* node, PAGXDocument* doc) {
   return sm;
 }
 
-static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
+static void ParseAnimations(const DOMNode* node, std::vector<Node*>* animations,
                             PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
@@ -2093,7 +2092,10 @@ static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animat
           animations->push_back(animation);
         }
       } else if (child->name == "StateMachine") {
-        ParseStateMachine(child.get(), doc);
+        auto* sm = ParseStateMachine(child.get(), doc);
+        if (sm != nullptr) {
+          animations->push_back(sm);
+        }
       } else {
         ReportError(doc, child.get(),
                     "Element '" + child->name +
@@ -2935,7 +2937,13 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
           doc->layers.push_back(layer);
         }
       } else if (child->name == "Animations") {
-        ParseAnimations(child.get(), &doc->animations, doc);
+        std::vector<Node*> animChildren;
+        ParseAnimations(child.get(), &animChildren, doc);
+        for (auto* node : animChildren) {
+          if (node != nullptr && node->nodeType() == NodeType::Animation) {
+            doc->animations.push_back(static_cast<Animation*>(node));
+          }
+        }
       } else if (child->name == "DataBind") {
         auto bind = ParseDataBind(child.get(), doc);
         if (bind) doc->dataBinds.push_back(bind);

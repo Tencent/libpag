@@ -11295,6 +11295,61 @@ PAGX_TEST(PAGXTest, StateMachineTimelineRoundTrip) {
   EXPECT_EQ(smDriver->stateMachineId, "btnSM");
 }
 
+PAGX_TEST(PAGXTest, SMInCompositionRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  // Build a Composition that owns a StateMachine inside its <Animations> block.
+  auto comp = doc->makeNode<pagx::Composition>("childComp");
+  comp->width = 50;
+  comp->height = 50;
+  auto sm = doc->makeNode<pagx::StateMachine>("compSM");
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "idle";
+  region->states.push_back(state);
+  sm->regions.push_back(region);
+  // SM and Animation interleave in the same <Animations> block to verify declaration order is
+  // preserved across the round-trip.
+  auto anim = doc->makeNode<pagx::Animation>("compAnim");
+  anim->duration = 10;
+  anim->frameRate = 60.0f;
+  comp->animations.push_back(sm);
+  comp->animations.push_back(anim);
+
+  auto layer = doc->makeNode<pagx::Layer>("slot");
+  layer->composition = comp;
+  doc->layers.push_back(layer);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+
+  // Find the loaded Composition.
+  pagx::Composition* loadedComp = nullptr;
+  for (const auto& node : loaded->nodes) {
+    if (node != nullptr && node->nodeType() == pagx::NodeType::Composition) {
+      loadedComp = static_cast<pagx::Composition*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(loadedComp != nullptr);
+  ASSERT_EQ(loadedComp->animations.size(), 2u);
+  // Declaration order preserved: SM first, then Animation.
+  EXPECT_EQ(loadedComp->animations[0]->nodeType(), pagx::NodeType::StateMachine);
+  EXPECT_EQ(loadedComp->animations[1]->nodeType(), pagx::NodeType::Animation);
+
+  // The comp-owned SM must NOT be duplicated at the document level.
+  for (const auto& node : loaded->nodes) {
+    if (node != nullptr && node->nodeType() == pagx::NodeType::StateMachine &&
+        node.get() != loadedComp->animations[0]) {
+      FAIL() << "State machine was duplicated at document level instead of staying in the comp.";
+    }
+  }
+}
+
 PAGX_TEST(PAGXTest, SMRuntimeInitialState) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 

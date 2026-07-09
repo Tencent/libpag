@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
+#include <set>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -466,29 +467,33 @@ static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
   xml.closeElement();
 }
 
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
-  // Note: caller is responsible for opening and closing the <Animations> container.
-  if (animations.empty()) {
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation) {
+  if (animation == nullptr) {
     return;
   }
-  for (const auto* animation : animations) {
-    xml.openElement("Animation");
-    xml.addAttribute("id", animation->id);
-    xml.addRequiredAttribute("duration", animation->duration);
-    xml.addAttribute("frameRate", animation->frameRate, 60.0f);
-    xml.addAttribute("loop", LoopModeToString(animation->loop));
+  xml.openElement("Animation");
+  xml.addAttribute("id", animation->id);
+  xml.addRequiredAttribute("duration", animation->duration);
+  xml.addAttribute("frameRate", animation->frameRate, 60.0f);
+  xml.addAttribute("loop", LoopModeToString(animation->loop));
+  xml.closeElementStart();
+  for (const auto* object : animation->objects) {
+    xml.openElement("Object");
+    xml.addAttribute("id", object->id);
+    xml.addRequiredAttribute("target", object->target);
     xml.closeElementStart();
-    for (const auto* object : animation->objects) {
-      xml.openElement("Object");
-      xml.addAttribute("id", object->id);
-      xml.addRequiredAttribute("target", object->target);
-      xml.closeElementStart();
-      for (const auto* ch : object->channels) {
-        WriteChannel(xml, ch);
-      }
-      xml.closeElement();
+    for (const auto* ch : object->channels) {
+      WriteChannel(xml, ch);
     }
     xml.closeElement();
+  }
+  xml.closeElement();
+}
+
+static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
+  // Note: caller is responsible for opening and closing the <Animations> container.
+  for (const auto* animation : animations) {
+    WriteAnimation(xml, animation);
   }
 }
 
@@ -1410,7 +1415,16 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         if (!comp->animations.empty()) {
           xml.openElement("Animations");
           xml.closeElementStart();
-          WriteAnimations(xml, comp->animations);
+          for (const auto* animChild : comp->animations) {
+            if (animChild == nullptr) {
+              continue;
+            }
+            if (animChild->nodeType() == NodeType::Animation) {
+              WriteAnimation(xml, static_cast<const Animation*>(animChild));
+            } else if (animChild->nodeType() == NodeType::StateMachine) {
+              WriteStateMachine(xml, static_cast<const StateMachine*>(animChild));
+            }
+          }
           xml.closeElement();
         }
         for (const auto& bind : comp->dataBinds) {
@@ -1739,11 +1753,25 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
-  // Check if there's any Animation or StateMachine to write.
+  // Collect state machines already written inside a Composition's <Animations> so they are not
+  // duplicated at the document level.
+  std::set<const Node*> compOwned;
+  for (const auto& node : doc.nodes) {
+    if (node != nullptr && node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<const Composition*>(node.get());
+      for (const auto* animChild : comp->animations) {
+        if (animChild != nullptr && animChild->nodeType() == NodeType::StateMachine) {
+          compOwned.insert(animChild);
+        }
+      }
+    }
+  }
+  // Check if there's any Animation or StateMachine to write at the document level.
   bool hasAnimOrSM = !doc.animations.empty();
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
+          compOwned.find(node.get()) == compOwned.end()) {
         hasAnimOrSM = true;
         break;
       }
@@ -1754,7 +1782,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     xml.closeElementStart();
     WriteAnimations(xml, doc.animations);
     for (const auto& node : doc.nodes) {
-      if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
+          compOwned.find(node.get()) == compOwned.end()) {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }
     }
