@@ -209,6 +209,9 @@ public class PAGSurface {
     private native void nativeFinalize();
 
     protected void finalize() {
+        if (needsReleaseSurface && surface != null) {
+            surface.release();
+        }
         nativeFinalize();
     }
 
