@@ -136,6 +136,13 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       if (animation == nullptr) {
         continue;
       }
+      // An animation driver with playing=false is not added to the composition's auto-advance
+      // loop. The caller can still obtain a standalone instance via PAGScene::getTimeline() for
+      // manual advance/apply. This mirrors PAGPlayer where only active animations participate in
+      // the flush cycle.
+      if (!animationDriver->playing) {
+        continue;
+      }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
       timelines.push_back(std::move(timeline));
