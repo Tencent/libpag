@@ -195,14 +195,11 @@ class PAGImageViewHelper {
         }
 
         void reset() {
-            // Use tryLock instead of a blocking lock: when the worker thread is stuck inside
-            // readFrame() (for example when the hardware video decoder hangs in the system layer), a
-            // blocking reset() on the main thread would wait for the lock and trigger an ANR. If the
-            // lock cannot be acquired immediately, skip only the native decoder release (the blocking
-            // part) but still invalidate the volatile size fields without the lock as a best-effort
-            // signal so isValid() turns false and the render path re-enters initDecoderInfo() to clear
-            // freezeDraw. The stale decoder is reclaimed via initDecoder()'s upfront releaseDecoder() on
-            // reuse (or PAGDecoder.finalize() on garbage collection).
+            // tryLock avoids an ANR: a blocking reset() on the main thread would stall if the worker
+            // thread is stuck in readFrame() (e.g. the hardware decoder hangs). On a failed lock, skip
+            // the native release but still clear the volatile size fields so isValid() turns false and
+            // the render path re-initializes; the stale decoder is reclaimed by initDecoder() on reuse
+            // or PAGDecoder.finalize() on GC.
             if (!locker.tryLock()) {
                 _width = 0;
                 _height = 0;
