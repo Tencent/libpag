@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include "pagx/nodes/Timeline.h"
 
 namespace pagx {
 
@@ -39,6 +40,11 @@ namespace pagx {
 class PAGTimeline {
  public:
   virtual ~PAGTimeline() = default;
+
+  /**
+   * Returns the concrete timeline kind, for dispatch without dynamic_cast.
+   */
+  virtual TimelineType timelineType() const = 0;
 
   /**
    * Returns the playback identifier (the animation or state machine id). Returns an empty string

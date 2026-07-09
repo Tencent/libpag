@@ -50,6 +50,13 @@ class Channel;
 class PAGAnimation : public PAGTimeline {
  public:
   /**
+   * Returns the concrete timeline kind.
+   */
+  TimelineType timelineType() const override {
+    return TimelineType::Animation;
+  }
+
+  /**
    * Returns the animation id. Returns an empty string once the owning PAGScene is destroyed.
    */
   const std::string& getId() const override;
