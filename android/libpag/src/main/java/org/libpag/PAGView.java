@@ -35,7 +35,7 @@ import java.util.ArrayList;
 public class PAGView extends TextureView implements TextureView.SurfaceTextureListener,
         PAGAnimator.Listener {
 
-    public interface PAGViewListener {
+    private static final String TAG = "LifecycleTest";    public interface PAGViewListener {
         /**
          * Notifies the start of the animation. It can be called from either the UI thread or the
          * thread that calls the play() method.
@@ -596,6 +596,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
+        android.util.Log.i(TAG, "[View] onVisibilityAggregated(" + isVisible + ")");
         checkVisible();
     }
 
@@ -618,6 +619,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
+        android.util.Log.i(TAG, "[NEW View] onWindowVisibilityChanged("
+                + (visibility == View.VISIBLE ? "VISIBLE" : "GONE/INVISIBLE") + "), isVisible=" + isVisible);
         if (visibility == View.VISIBLE && isVisible) {
             setVisibility(View.INVISIBLE);
             setVisibility(View.VISIBLE);
