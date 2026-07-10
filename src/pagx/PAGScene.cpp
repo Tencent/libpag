@@ -442,7 +442,7 @@ std::vector<std::string> PAGScene::getStateMachineIds() const {
   if (document == nullptr) {
     return ids;
   }
-  for (auto* node : document->animations) {
+  for (const auto& node : document->nodes) {
     if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
       ids.push_back(node->id);
     }
@@ -459,9 +459,9 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
     return it->second;
   }
   StateMachine* matched = nullptr;
-  for (auto* node : document->animations) {
+  for (const auto& node : document->nodes) {
     if (node != nullptr && node->nodeType() == NodeType::StateMachine && node->id == id) {
-      matched = static_cast<StateMachine*>(node);
+      matched = static_cast<StateMachine*>(node.get());
       break;
     }
   }
