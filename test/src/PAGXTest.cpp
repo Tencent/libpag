@@ -12090,10 +12090,10 @@ PAGX_TEST(PAGXTest, SMChainedMaxIterations) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Should not hang; capped at 100 iterations.
+  // Should not hang; capped at MAX_TRANSITIONS_PER_FRAME (100) iterations. Starting at "a", an even
+  // number of a<->b toggles returns to "a".
   timeline->advance(0);
-  // Verify still alive (no crash).
-  EXPECT_TRUE(timeline->getCurrentState("main") == "a" || timeline->getCurrentState("main") == "b");
+  EXPECT_EQ(timeline->getCurrentState("main"), "a");
 }
 
 PAGX_TEST(PAGXTest, SMEmptyConditionAutoTransition) {
