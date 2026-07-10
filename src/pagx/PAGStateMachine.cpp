@@ -529,13 +529,13 @@ void PAGStateMachine::apply(float smMix) {
   // (including the null-binding lazy path for top-level timelines) internally.
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
-      float weight = smMix * CurveMix(ri.transition, f.mixFrom);
+      float weight = clamped * CurveMix(ri.transition, f.mixFrom);
       if (weight <= 0.0f || f.timeline == nullptr) {
         continue;
       }
       f.timeline->apply(weight);
     }
-    float weight = smMix * CurveMix(ri.transition, ri.mix);
+    float weight = clamped * CurveMix(ri.transition, ri.mix);
     if (weight <= 0.0f || ri.currentTimeline == nullptr) {
       continue;
     }
