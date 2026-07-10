@@ -87,8 +87,8 @@ class PAGAnimation : public PAGTimeline {
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
    * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
-   * @return true if the current time changed, false if the timeline is paused or
-   *         deltaMicroseconds is zero.
+   * @return true if the current time changed, false when the owning PAGScene is destroyed,
+   *         deltaMicroseconds is zero, the animation is missing, or its duration is zero.
    */
   bool advance(int64_t deltaMicroseconds) override;
 
