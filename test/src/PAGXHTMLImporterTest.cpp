@@ -554,14 +554,15 @@ PAG_TEST(PAGXHTMLImporterTest, MixBlendModeHyphenatedKeywords) {
     pagx::BlendMode mode;
   };
   const Case cases[] = {
-      {"color-dodge", pagx::BlendMode::ColorDodge}, {"color-burn", pagx::BlendMode::ColorBurn},
-      {"hard-light", pagx::BlendMode::HardLight},   {"soft-light", pagx::BlendMode::SoftLight},
+      {"color-dodge", pagx::BlendMode::ColorDodge},   {"color-burn", pagx::BlendMode::ColorBurn},
+      {"hard-light", pagx::BlendMode::HardLight},     {"soft-light", pagx::BlendMode::SoftLight},
       {"plus-lighter", pagx::BlendMode::PlusLighter}, {"plus-darker", pagx::BlendMode::PlusDarker},
   };
   for (const auto& c : cases) {
-    std::string html = "<html><body style=\"width:50px;height:50px\">"
-                       "<div style=\"width:50px;height:50px;background-color:#000;mix-blend-mode:" +
-                       std::string(c.css) + "\"></div></body></html>";
+    std::string html =
+        "<html><body style=\"width:50px;height:50px\">"
+        "<div style=\"width:50px;height:50px;background-color:#000;mix-blend-mode:" +
+        std::string(c.css) + "\"></div></body></html>";
     auto doc = ParseFromString(html);
     ASSERT_NE(doc, nullptr) << c.css;
     auto* div = doc->layers.front()->children.front();
