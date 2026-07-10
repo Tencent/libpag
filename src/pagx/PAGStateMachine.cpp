@@ -422,18 +422,18 @@ bool PAGStateMachine::tryChangeState(RegionInstance& ri) {
 }
 
 void PAGStateMachine::advanceRegion(int64_t deltaUs) {
+  float frameRate = 60.0f;
+  if (contextDoc != nullptr) {
+    for (auto* node : contextDoc->animations) {
+      if (node != nullptr && node->nodeType() == NodeType::Animation) {
+        frameRate = static_cast<Animation*>(node)->frameRate;
+        break;
+      }
+    }
+  }
   for (auto& ri : regions) {
     if (ri.region == nullptr || ri.currentState == nullptr) {
       continue;
-    }
-    float frameRate = 60.0f;
-    if (contextDoc != nullptr) {
-      for (auto* node : contextDoc->animations) {
-        if (node != nullptr && node->nodeType() == NodeType::Animation) {
-          frameRate = static_cast<Animation*>(node)->frameRate;
-          break;
-        }
-      }
     }
     if (ri.currentTimeline != nullptr) {
       ri.currentTimeline->advance(deltaUs);
