@@ -115,10 +115,26 @@ ColorMatrix OpacityMatrix(float o) {
 
 // saturate(s): the CSS Filter Effects saturation matrix (Rec. 601 luma weights).
 ColorMatrix SaturateMatrix(float s) {
-  return {0.213f + 0.787f * s, 0.715f - 0.715f * s, 0.072f - 0.072f * s, 0, 0,
-          0.213f - 0.213f * s, 0.715f + 0.285f * s, 0.072f - 0.072f * s, 0, 0,
-          0.213f - 0.213f * s, 0.715f - 0.715f * s, 0.072f + 0.928f * s, 0, 0,
-          0,                   0,                   0,                   1, 0};
+  return {0.213f + 0.787f * s,
+          0.715f - 0.715f * s,
+          0.072f - 0.072f * s,
+          0,
+          0,
+          0.213f - 0.213f * s,
+          0.715f + 0.285f * s,
+          0.072f - 0.072f * s,
+          0,
+          0,
+          0.213f - 0.213f * s,
+          0.715f - 0.715f * s,
+          0.072f + 0.928f * s,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0};
 }
 
 // hue-rotate(deg): the CSS Filter Effects hue-rotation matrix.
@@ -126,31 +142,76 @@ ColorMatrix HueRotateMatrix(float degrees) {
   float radians = degrees * HtmlPi / 180.0f;
   float c = std::cos(radians);
   float s = std::sin(radians);
-  return {0.213f + c * 0.787f - s * 0.213f, 0.715f - c * 0.715f - s * 0.715f,
-          0.072f - c * 0.072f + s * 0.928f, 0, 0,
-          0.213f - c * 0.213f + s * 0.143f, 0.715f + c * 0.285f + s * 0.140f,
-          0.072f - c * 0.072f - s * 0.283f, 0, 0,
-          0.213f - c * 0.213f - s * 0.787f, 0.715f - c * 0.715f + s * 0.715f,
-          0.072f + c * 0.928f + s * 0.072f, 0, 0,
-          0,                                0,                                0, 1, 0};
+  return {0.213f + c * 0.787f - s * 0.213f,
+          0.715f - c * 0.715f - s * 0.715f,
+          0.072f - c * 0.072f + s * 0.928f,
+          0,
+          0,
+          0.213f - c * 0.213f + s * 0.143f,
+          0.715f + c * 0.285f + s * 0.140f,
+          0.072f - c * 0.072f - s * 0.283f,
+          0,
+          0,
+          0.213f - c * 0.213f - s * 0.787f,
+          0.715f - c * 0.715f + s * 0.715f,
+          0.072f + c * 0.928f + s * 0.072f,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0};
 }
 
 // grayscale(a): interpolate towards luma-only output (Rec. 709 weights); `p = 1 - a`.
 ColorMatrix GrayscaleMatrix(float a) {
   float p = 1.0f - a;
-  return {0.2126f + 0.7874f * p, 0.7152f - 0.7152f * p, 0.0722f - 0.0722f * p, 0, 0,
-          0.2126f - 0.2126f * p, 0.7152f + 0.2848f * p, 0.0722f - 0.0722f * p, 0, 0,
-          0.2126f - 0.2126f * p, 0.7152f - 0.7152f * p, 0.0722f + 0.9278f * p, 0, 0,
-          0,                     0,                     0,                     1, 0};
+  return {0.2126f + 0.7874f * p,
+          0.7152f - 0.7152f * p,
+          0.0722f - 0.0722f * p,
+          0,
+          0,
+          0.2126f - 0.2126f * p,
+          0.7152f + 0.2848f * p,
+          0.0722f - 0.0722f * p,
+          0,
+          0,
+          0.2126f - 0.2126f * p,
+          0.7152f - 0.7152f * p,
+          0.0722f + 0.9278f * p,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0};
 }
 
 // sepia(a): interpolate towards the CSS Filter Effects sepia tint; `p = 1 - a`.
 ColorMatrix SepiaMatrix(float a) {
   float p = 1.0f - a;
-  return {0.393f + 0.607f * p, 0.769f - 0.769f * p, 0.189f - 0.189f * p, 0, 0,
-          0.349f - 0.349f * p, 0.686f + 0.314f * p, 0.168f - 0.168f * p, 0, 0,
-          0.272f - 0.272f * p, 0.534f - 0.534f * p, 0.131f + 0.869f * p, 0, 0,
-          0,                   0,                   0,                   1, 0};
+  return {0.393f + 0.607f * p,
+          0.769f - 0.769f * p,
+          0.189f - 0.189f * p,
+          0,
+          0,
+          0.349f - 0.349f * p,
+          0.686f + 0.314f * p,
+          0.168f - 0.168f * p,
+          0,
+          0,
+          0.272f - 0.272f * p,
+          0.534f - 0.534f * p,
+          0.131f + 0.869f * p,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0};
 }
 
 // Lowers a CSS colour filter function (`name(args)`) to its 4x5 colour matrix. Returns false when

@@ -1367,9 +1367,9 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
     float useWidth = parseLength(getAttribute(useElement, "width"), _viewBoxWidth);
     float useHeight = parseLength(getAttribute(useElement, "height"), _viewBoxHeight);
     if (viewBox.size() >= 4 && viewBox[2] > 0 && viewBox[3] > 0 && useWidth > 0 && useHeight > 0) {
-      contentMatrix = contentMatrix * ComputeViewBoxMatrix(viewBox, useWidth, useHeight,
-                                                           getAttribute(refElement,
-                                                                        "preserveAspectRatio"));
+      contentMatrix =
+          contentMatrix * ComputeViewBoxMatrix(viewBox, useWidth, useHeight,
+                                               getAttribute(refElement, "preserveAspectRatio"));
     }
   }
 

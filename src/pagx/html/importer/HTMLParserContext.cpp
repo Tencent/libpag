@@ -75,8 +75,7 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
   if (layer == nullptr) {
     return 0;
   }
-  const bool fades =
-      ancestorFades || (!layer->id.empty() && fadingIds.count(layer->id) > 0);
+  const bool fades = ancestorFades || (!layer->id.empty() && fadingIds.count(layer->id) > 0);
   size_t removed = 0;
   if (fades && !layer->styles.empty()) {
     auto& styles = layer->styles;

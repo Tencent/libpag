@@ -1606,9 +1606,8 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* comp = static_cast<Composition*>(node.get());
-      result.iterationsUsed +=
-          OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets, options,
-                            &result.converged);
+      result.iterationsUsed += OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets,
+                                                 options, &result.converged);
     }
   }
 

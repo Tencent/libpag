@@ -1475,9 +1475,9 @@ bool HTMLAnimationBuilder::buildForElement(
           float ox = has ? fs.shadows[k].sx : 0.0f;
           float oy = has ? fs.shadows[k].sy : 0.0f;
           float bl = has ? fs.shadows[k].sblur : 0.0f;
-          Color c = has ? fs.shadows[k].scolor
-                        : Color{repColor.red, repColor.green, repColor.blue, 0.0f,
-                                repColor.colorSpace};
+          Color c =
+              has ? fs.shadows[k].scolor
+                  : Color{repColor.red, repColor.green, repColor.blue, 0.0f, repColor.colorSpace};
           dsOffsetX.push_back({fs.time, ox, interp, {}, {}});
           dsOffsetY.push_back({fs.time, oy, interp, {}, {}});
           dsBlurX.push_back({fs.time, bl, interp, {}, {}});
@@ -1580,9 +1580,8 @@ bool HTMLAnimationBuilder::buildForElement(
     Layer* clipTarget = (xyTarget != nullptr) ? xyTarget : layer;
 
     // Base geometry = first stop; the mask's static Path shows this when no animation is active.
-    Path* maskPath =
-        BuildContourMaskPath(clipTarget, clipVerbs, clipStops.front().points, _document,
-                             _idAllocator);
+    Path* maskPath = BuildContourMaskPath(clipTarget, clipVerbs, clipStops.front().points,
+                                          _document, _idAllocator);
     if (maskPath != nullptr) {
       if (maskPath->id.empty()) {
         maskPath->id = _idAllocator.generateUnique("clip");
@@ -1848,8 +1847,8 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     bool needsTrailingBaseline =
         loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
 
-    std::string animId = (strokeTargetId.empty() ? fillTargetId : strokeTargetId) + "_" +
-                         spec.name + "_anim";
+    std::string animId =
+        (strokeTargetId.empty() ? fillTargetId : strokeTargetId) + "_" + spec.name + "_anim";
     auto* animation = _document->makeNode<Animation>(animId);
     animation->frameRate = kFrameRate;
     if (loopOnce) {
