@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include "pagx/nodes/Node.h"
 
