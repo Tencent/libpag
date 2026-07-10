@@ -32,10 +32,12 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
 #include "pagx/html/importer/HTMLTransformPassUtils.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
@@ -1921,6 +1923,288 @@ PAG_TEST(PAGXHTMLInlineSvgEmitterTest, FormatColorForAttributeEmitsAlphaHex) {
   translucent.colorSpace = pagx::ColorSpace::SRGB;
   // 0.5 * 255 rounds to 128 (0x80).
   EXPECT_EQ(pagx::HTMLInlineSvgEmitter::formatColorForAttribute(translucent), "#0000FF80");
+}
+
+//==================================================================================================
+// HTMLInlineSvgEmitter — reconstructForeignObjectPaints
+//
+// The HTML exporter has no plain-SVG spelling for a conic-gradient stroke, so it emits a
+// `<defs><mask>` holding white stroke shapes plus a sibling `<foreignObject mask="url(#…)">`
+// whose `<div>` carries the paint as a CSS `background`. The downstream SVG importer does not
+// understand `<foreignObject>`, so `reconstructForeignObjectPaints` rewrites that pattern back
+// into native stroked shapes recoloured to a concrete paint. These tests drive the emitter
+// directly to cover the reconstruction, the paint-sampling helpers, and the fallback branches.
+//==================================================================================================
+
+namespace {
+
+// Parses `svg` into a DOM tree and returns the root `<svg>` element (skipping any surrounding
+// wrapper), or nullptr when parsing fails or no `<svg>` is present.
+std::shared_ptr<pagx::DOMNode> ParseSvgRoot(const std::string& svg) {
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(svg.data()), svg.size());
+  if (!dom) return nullptr;
+  auto root = dom->getRootNode();
+  if (!root) return nullptr;
+  if (pagx::html::ToLower(root->name) == "svg") return root;
+  return root->getFirstChild("svg");
+}
+
+// Runs `collectSharedDefs` + `reconstructForeignObjectPaints` on `svg` and returns the serialised
+// result, so tests can assert on the rewritten SVG text.
+std::string ReconstructForeignObjects(const std::string& svg) {
+  auto svgRoot = ParseSvgRoot(svg);
+  if (!svgRoot) return {};
+  pagx::HTMLInlineSvgEmitter emitter;
+  emitter.collectSharedDefs(svgRoot);
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  pagx::HTMLDiagnosticSink sink(/*strict=*/false);
+  float canvasWidth = 100;
+  float canvasHeight = 100;
+  pagx::HTMLValueParser parser(sink, canvasWidth, canvasHeight);
+  parser.bindDocument(doc.get());
+  emitter.reconstructForeignObjectPaints(svgRoot, parser);
+  return emitter.serialize(svgRoot);
+}
+
+}  // namespace
+
+// A masked `<foreignObject>` whose `<div>` carries a solid colour background is rewritten into the
+// mask's single stroke shape, recoloured with that solid colour; the foreignObject and mask
+// indirection is dropped. A single shape without a transform is spliced in directly (no wrapping
+// `<g>`).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectSolidMaskBecomesStrokedShape) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask0" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask0)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#FF8800"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  // The foreignObject is gone; a native stroked circle carrying the sampled colour remains.
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#FF8800\""), std::string::npos);
+}
+
+// A masked `<foreignObject>` carrying a `transform` wraps the recoloured mask shapes in a `<g>`
+// that re-applies the transform, and multiple mask shapes are all recoloured.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectMaskWithTransformWrapsInGroup) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask1" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+          <rect x="4" y="4" width="10" height="10" fill="none" stroke="white" stroke-width="2"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" transform="rotate(30 20 20)" mask="url(#cmask1)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#123456"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<g"), std::string::npos);
+  EXPECT_NE(out.find("transform=\"rotate(30 20 20)\""), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  // Both shapes are recoloured to the sampled solid colour.
+  auto first = out.find("stroke=\"#123456\"");
+  ASSERT_NE(first, std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#123456\"", first + 1), std::string::npos);
+}
+
+// A masked `<foreignObject>` whose `<div>` background is a `conic-gradient(...)` samples the sweep
+// to a representative hue and recolours the mask stroke shape with it.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectConicGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask2" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <path d="M4 4 L36 4 L36 36 Z" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask2)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:conic-gradient(from 0deg at -100px -100px, #FF0000 0deg, #00FF00 360deg)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<path"), std::string::npos);
+  // A concrete hex colour (not the CSS gradient token) is now on the stroke.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("conic-gradient"), std::string::npos);
+}
+
+// A linear-gradient div background is sampled at its midpoint.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectLinearGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask3" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask3)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:linear-gradient(90deg, #000000, #FFFFFF)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  // Midpoint of black→white is a mid-grey; assert a concrete stroke colour was written.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("linear-gradient"), std::string::npos);
+}
+
+// A radial-gradient div background is sampled at its midpoint.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectRadialGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask4" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask4)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:radial-gradient(circle, #FF0000, #0000FF)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("radial-gradient"), std::string::npos);
+}
+
+// A `<foreignObject>` with no `mask` attribute represents a plain painted box; it is rewritten into
+// a solid-filled `<rect>` covering the same box (carrying x/y/width/height and the sampled fill).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectWithoutMaskBecomesFilledRect) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="5" y="6" width="20" height="30" transform="translate(1 2)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#00AA00"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  EXPECT_NE(out.find("fill=\"#00AA00\""), std::string::npos);
+  EXPECT_NE(out.find("x=\"5\""), std::string::npos);
+  EXPECT_NE(out.find("y=\"6\""), std::string::npos);
+  EXPECT_NE(out.find("width=\"20\""), std::string::npos);
+  EXPECT_NE(out.find("height=\"30\""), std::string::npos);
+  EXPECT_NE(out.find("transform=\"translate(1 2)\""), std::string::npos);
+}
+
+// A `<foreignObject>` whose `<div>` background is a `url(...)` image reference is left untouched:
+// the reconstruction returns nullptr and the node is preserved for the existing image path.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectImageBackgroundLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:url(tex.png)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  // The unrecognised image background leaves the foreignObject in place.
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A `<foreignObject>` whose child `<div>` carries no `style` (thus no background paint) is left
+// untouched — there is nothing to recover.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectNoBackgroundLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40">
+        <div xmlns="http://www.w3.org/1999/xhtml"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A `<foreignObject>` with no element child is left untouched (nothing to reconstruct).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectWithoutDivChildLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40"></foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A masked `<foreignObject>` whose referenced `<mask>` holds no element shapes yields no
+// reconstructable geometry, so the node is left untouched.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectEmptyMaskLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask5" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40"></mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask5)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#FF0000"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// The reconstruction descends into nested groups: a `<foreignObject>` buried under a `<g>` is
+// rewritten in place while its enclosing group survives.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectNestedUnderGroupReconstructed) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <g id="wrap">
+        <foreignObject x="2" y="2" width="20" height="20">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#010203"/>
+        </foreignObject>
+      </g>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("id=\"wrap\""), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  EXPECT_NE(out.find("fill=\"#010203\""), std::string::npos);
+}
+
+// A conic gradient whose centre coincides with the box centre (CSS default `at 50% 50%`, i.e. no
+// `at` clause) has an undefined sweep angle at the sample point, so the paint falls back to the
+// average of all stop colours rather than a single interpolated hue.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectConicCentredUsesAverageStops) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask6" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask6)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:conic-gradient(#000000 0deg, #FFFFFF 360deg)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  // Average of black and white is a mid-grey (#7F7F7F / #808080); assert a concrete hex was set.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("conic-gradient"), std::string::npos);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
