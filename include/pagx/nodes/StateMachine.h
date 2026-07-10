@@ -39,8 +39,9 @@ class StateRegion;
 class StateMachine : public Node {
  public:
   /**
-   * The input ports shared by all regions. Set by host code or synced from a ViewModel. Conditions
-   * in any region reference these inputs by name.
+   * The input port declarations shared by all regions. These describe the inputs (name and type)
+   * that region conditions reference by name; the live runtime values are held separately by the
+   * PAGStateMachine that drives this node.
    */
   std::vector<StateMachineInput*> inputs = {};
 

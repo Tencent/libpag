@@ -12738,10 +12738,6 @@ PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
   animA->duration = 30;
   animA->frameRate = 60.0f;
   doc->animations.push_back(animA);
-  auto animB = doc->makeNode<pagx::Animation>("animB");
-  animB->duration = 30;
-  animB->frameRate = 60.0f;
-  doc->animations.push_back(animB);
 
   auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
   auto in = doc->makeNode<pagx::StateMachineInput>();
@@ -12755,9 +12751,11 @@ PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
   sa->name = "a";
   sa->animationId = "animA";
   region->states.push_back(sa);
+  // Target state "b" is an empty state (no animation): once the crossfade completes the region has
+  // no current timeline and no active transition, so advance() returns false. That makes advance()
+  // returning false the exact signal that the crossfade has finished, which this test relies on.
   auto sb = doc->makeNode<pagx::AnimationState>();
   sb->name = "b";
-  sb->animationId = "animB";
   region->states.push_back(sb);
   auto t = doc->makeNode<pagx::StateTransition>();
   t->from = "a";
@@ -12779,7 +12777,8 @@ PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
 
   // duration=10 frames @60fps -> mixDuration ~166666us; each 16667us frame advances mix by ~0.1,
   // so a correctly single-advanced crossfade needs ~10 frames to reach mix=1.0 and finish.
-  // advance() returns true while a crossfade is in progress and false once it has completed.
+  // While the crossfade runs the outgoing animation and the mix keep changing, so advance() returns
+  // true; once it completes the empty target leaves nothing to advance, so advance() returns false.
   smTimeline->setBool("go", true);
   int frames = 0;
   while (smTimeline->advance(16667) && frames < 100) {

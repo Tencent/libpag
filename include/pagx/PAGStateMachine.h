@@ -112,7 +112,8 @@ class PAGStateMachine : public PAGTimeline {
    * advances crossfade progress, and evaluates state transitions (including chained transitions
    * within the same frame, capped at 100 iterations).
    * @param deltaMicroseconds the elapsed time in microseconds.
-   * @return true if any crossfade transition is in progress.
+   * @return true if any region's playback state changed this frame: an active or fading animation
+   *         advanced its time, a state transition occurred, or the crossfade mix moved.
    */
   bool advance(int64_t deltaMicroseconds) override;
 
@@ -187,11 +188,14 @@ class PAGStateMachine : public PAGTimeline {
   std::vector<ObserverHandle> inputBindings;
 
   // Region advance helpers.
-  void advanceRegion(int64_t deltaUs);
+  // Advances every region by deltaUs and returns true if any region's playback state changed this
+  // frame: an active or fading animation advanced its time, a state transition occurred, or the
+  // crossfade mix moved.
+  bool advanceRegion(int64_t deltaUs);
   // Advances the region's crossfade mix by one frame's worth of deltaUs, using the transition's
   // own frame rate to convert its duration (in frames) to time. Clears the transition and fading
-  // slots once mix reaches 1.0.
-  void advanceMix(RegionInstance& ri, int64_t deltaUs);
+  // slots once mix reaches 1.0. Returns true if the mix value changed.
+  bool advanceMix(RegionInstance& ri, int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
   // Constructs a fresh PAGAnimation that plays the given state's animation. Each playback slot

@@ -189,7 +189,7 @@ std::string PAGStateMachine::getCurrentState(const std::string& regionName) cons
 // Input setters
 // =============================================================================
 
-static int findInputIdx(const StateMachine* sm, const std::string& name) {
+static int FindInputIndex(const StateMachine* sm, const std::string& name) {
   for (size_t i = 0; i < sm->inputs.size(); i++) {
     if (sm->inputs[i] != nullptr && sm->inputs[i]->name == name) {
       return static_cast<int>(i);
@@ -199,7 +199,7 @@ static int findInputIdx(const StateMachine* sm, const std::string& name) {
 }
 
 bool PAGStateMachine::setBool(const std::string& name, bool value) {
-  int idx = findInputIdx(stateMachine, name);
+  int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Bool) {
     return false;
   }
@@ -208,7 +208,7 @@ bool PAGStateMachine::setBool(const std::string& name, bool value) {
 }
 
 bool PAGStateMachine::setNumber(const std::string& name, float value) {
-  int idx = findInputIdx(stateMachine, name);
+  int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Number) {
     return false;
   }
@@ -217,7 +217,7 @@ bool PAGStateMachine::setNumber(const std::string& name, float value) {
 }
 
 bool PAGStateMachine::fireTrigger(const std::string& name) {
-  int idx = findInputIdx(stateMachine, name);
+  int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Trigger) {
     return false;
   }
@@ -285,36 +285,15 @@ static bool IsTransitionAllowed(const StateTransition* transition,
       if (consumedTriggers.find(condition->inputName) != consumedTriggers.end()) {
         return false;
       }
-      // Find the trigger input and check fired.
-      bool found = false;
-      for (size_t i = 0; i < stateMachine->inputs.size(); i++) {
-        if (stateMachine->inputs[i] != nullptr &&
-            stateMachine->inputs[i]->name == condition->inputName &&
-            stateMachine->inputs[i]->type == StateMachineInputType::Trigger) {
-          if (!inputValues[i].fired) {
-            return false;
-          }
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
+      int idx = FindInputIndex(stateMachine, condition->inputName);
+      if (idx < 0 || stateMachine->inputs[idx]->type != StateMachineInputType::Trigger ||
+          !inputValues[idx].fired) {
         return false;
       }
     } else {
       // Non-trigger condition: find input and evaluate.
-      bool found = false;
-      for (size_t i = 0; i < stateMachine->inputs.size(); i++) {
-        if (stateMachine->inputs[i] != nullptr &&
-            stateMachine->inputs[i]->name == condition->inputName) {
-          if (!EvaluateCondition(condition, inputValues[i])) {
-            return false;
-          }
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
+      int idx = FindInputIndex(stateMachine, condition->inputName);
+      if (idx < 0 || !EvaluateCondition(condition, inputValues[idx])) {
         return false;
       }
     }
@@ -421,14 +400,15 @@ bool PAGStateMachine::tryChangeState(RegionInstance& ri) {
   return true;
 }
 
-void PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
+bool PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
   if (ri.transition == nullptr) {
-    return;
+    return false;
   }
   // The crossfade duration is authored in frames and converted using the transition's own frame
   // rate, so the crossfade speed does not depend on which state animations it connects.
   float frameRate = ri.transition->frameRate > 0.0f ? ri.transition->frameRate : 60.0f;
   int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
+  float previous = ri.mix;
   if (mixDurationUs <= 0) {
     ri.mix = 1.0f;
   } else {
@@ -438,35 +418,39 @@ void PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
     ri.fadingOut.clear();
     ri.transition = nullptr;
   }
+  return ri.mix != previous;
 }
 
-void PAGStateMachine::advanceRegion(int64_t deltaUs) {
+bool PAGStateMachine::advanceRegion(int64_t deltaUs) {
+  bool changed = false;
   for (auto& ri : regions) {
     if (ri.region == nullptr || ri.currentState == nullptr) {
       continue;
     }
-    if (ri.currentTimeline != nullptr) {
-      ri.currentTimeline->advance(deltaUs);
+    if (ri.currentTimeline != nullptr && ri.currentTimeline->advance(deltaUs)) {
+      changed = true;
     }
     for (auto& f : ri.fadingOut) {
-      if (!f.frozen && f.timeline != nullptr) {
-        f.timeline->advance(deltaUs);
+      if (!f.frozen && f.timeline != nullptr && f.timeline->advance(deltaUs)) {
+        changed = true;
       }
     }
-    advanceMix(ri, deltaUs);
+    changed |= advanceMix(ri, deltaUs);
     const StateTransition* alreadyAdvanced = ri.transition;
     for (int i = 0; i < MAX_TRANSITIONS_PER_FRAME; i++) {
       if (!tryChangeState(ri)) {
         break;
       }
+      changed = true;
     }
     // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
     // delta so the first apply sees a non-zero mix (prevents a one-frame blank output). Skip a
     // carried-over transition that was already advanced above this frame, to avoid 2x speed.
     if (ri.transition != alreadyAdvanced) {
-      advanceMix(ri, deltaUs);
+      changed |= advanceMix(ri, deltaUs);
     }
   }
+  return changed;
 }
 
 // =============================================================================
@@ -477,21 +461,7 @@ bool PAGStateMachine::advance(int64_t deltaMicroseconds) {
   if (stateMachine == nullptr || owner.expired()) {
     return false;
   }
-  bool hadActive = false;
-  for (const auto& ri : regions) {
-    if (ri.transition != nullptr && ri.mix < 1.0f) {
-      hadActive = true;
-      break;
-    }
-  }
-  advanceRegion(deltaMicroseconds);
-  bool hasActive = false;
-  for (const auto& ri : regions) {
-    if (ri.transition != nullptr && ri.mix < 1.0f) {
-      hasActive = true;
-      break;
-    }
-  }
+  bool changed = advanceRegion(deltaMicroseconds);
   // Clear consumed triggers and fired flags at the end of advance so that nested state machines
   // driven via separate advance() + apply() calls also clear correctly.
   for (auto& iv : inputValues) {
@@ -502,7 +472,7 @@ bool PAGStateMachine::advance(int64_t deltaMicroseconds) {
   for (auto& ri : regions) {
     ri.consumedTriggers.clear();
   }
-  return hadActive || hasActive;
+  return changed;
 }
 
 void PAGStateMachine::apply(float smMix) {
