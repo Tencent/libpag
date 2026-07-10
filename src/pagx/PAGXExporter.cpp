@@ -1754,6 +1754,19 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto* node : doc.animations) {
     written.insert(node);
   }
+  // Composition-owned StateMachines live in doc.nodes but are written nested inside their
+  // Composition (see WriteResource). Record them here so the orphan scan below does not emit them
+  // a second time at document root.
+  for (const auto& node : doc.nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Composition) {
+      continue;
+    }
+    for (const auto* animChild : static_cast<const Composition*>(node.get())->animations) {
+      if (animChild != nullptr && animChild->nodeType() == NodeType::StateMachine) {
+        written.insert(animChild);
+      }
+    }
+  }
   bool hasAnimOrSM = !doc.animations.empty();
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
