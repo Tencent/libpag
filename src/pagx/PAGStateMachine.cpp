@@ -286,6 +286,7 @@ static bool IsTransitionAllowed(const StateTransition* transition,
         return false;
       }
       // Find the trigger input and check fired.
+      bool found = false;
       for (size_t i = 0; i < stateMachine->inputs.size(); i++) {
         if (stateMachine->inputs[i] != nullptr &&
             stateMachine->inputs[i]->name == condition->inputName &&
@@ -293,8 +294,12 @@ static bool IsTransitionAllowed(const StateTransition* transition,
           if (!inputValues[i].fired) {
             return false;
           }
+          found = true;
           break;
         }
+      }
+      if (!found) {
+        return false;
       }
     } else {
       // Non-trigger condition: find input and evaluate.
