@@ -20,6 +20,7 @@
 
 #include <emscripten/bind.h>
 #include <deque>
+#include <vector>
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGScene.h"
@@ -95,7 +96,7 @@ class PAGXView {
   std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
-  std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
+  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   double lastAnimationTimeMs = -1.0;
   int lastSurfaceWidth = 0;

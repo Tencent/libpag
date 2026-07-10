@@ -111,7 +111,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
   scene = nullptr;
-  defaultTimeline = nullptr;
+  timelines.clear();
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -153,7 +153,17 @@ void PAGXView::buildLayers() {
   if (scene == nullptr) {
     return;
   }
-  defaultTimeline = scene->getDefaultTimeline();
+  // Drive every top-level animation, not just the first one. A PAGX document may declare several
+  // independent animations (e.g. one per animated element); the CLI renderer plays them all via
+  // getTimelineIds(), so the viewer must do the same or only the first animation would appear to
+  // play.
+  timelines.clear();
+  for (const auto& id : scene->getTimelineIds()) {
+    auto timeline = scene->getTimeline(id);
+    if (timeline != nullptr) {
+      timelines.push_back(std::move(timeline));
+    }
+  }
   lastAnimationTimeMs = -1.0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
@@ -171,8 +181,10 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->advanceAndApply(deltaUs);
+  for (const auto& timeline : timelines) {
+    if (timeline != nullptr) {
+      timeline->advanceAndApply(deltaUs);
+    }
   }
   if (scene != nullptr) {
     scene->advanceAndApply(deltaUs);
@@ -250,7 +262,7 @@ void PAGXView::applySceneDisplayOptions() {
     return;
   }
   auto options = scene->getDisplayOptions();
-  options->setRenderMode(PAGRenderMode::Tiled);
+  options->setRenderMode(PAGRenderMode::Partial);
   options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
   options->setMaxTileCount(512);
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
