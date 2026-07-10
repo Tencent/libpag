@@ -243,8 +243,8 @@ attributes (matches PAGX `data-*` convention in `spec/pagx_spec.md` §2.3). The 
 
 When a single HTML element has both painted background (color, gradient, border, shadow,
 border-radius) *and* children that require padding/layout, the importer emits the canonical
-PAGX "outer background + inner padded container" pattern (see PAGX guide §Container
-Layout):
+PAGX "outer background + inner padded container" pattern (see `spec/pagx_spec.md`
+§4.2 Container Layout → Background with Padding):
 
 ```xml
 <Layer width="100%" height="100%">
@@ -260,8 +260,7 @@ Elements with neither background nor padding emit a single Layer with no wrapper
 
 ## 6. Text Decoration
 
-Underline and strike-through are rendered as overlay rectangles inside the same `Layer`,
-following `references/patterns.md` §Text Decoration:
+Underline and strike-through are rendered as overlay rectangles inside the same `Layer`:
 
 - `text-decoration: underline` → 1px `<Rectangle>` at `bottom="0"`
 - `text-decoration: line-through` → 1px `<Rectangle>` at `centerY="0"`
@@ -334,7 +333,7 @@ through their own external-import directive path.
   `linear-gradient` and `conic-gradient`.
 - `linear-gradient` `to bottom right` style keywords are converted to numeric angles.
 
-## 9. Pitfalls (mirrors `references/guide.md` §Common Pitfalls)
+## 9. Pitfalls
 
 - `margin` is supported (folded into positioning / a padding wrapper, or promoted to `gap`),
   but `padding`, `gap`, and `flex: N` map more directly — prefer them when laying out flex
@@ -372,7 +371,8 @@ Behavior is controlled through `HTMLImporter::Options` (API-level; `pagx import`
 Before the importer traverses the DOM it runs `HTMLSubsetTransformer` (see
 `include/pagx/HTMLSubsetTransformer.h`). The transformer rewrites the input into strict subset
 form so that the rest of the pipeline only ever sees compliant HTML. It is on by default;
-`HTMLImporter::Options::autoNormalize = false` (or `--html-no-normalize`) disables it.
+`HTMLImporter::Options::autoNormalize = false` disables it (API-level only — `pagx import`
+exposes no `--html-*` flag for it).
 
 The transformer runs as a fixed pipeline of eight core passes plus one optional pass (the
 optional `AbsoluteToFlexInference` runs between PropertyFilter and MarginToGapPromotion).
@@ -387,7 +387,7 @@ Behaviour:
 | AbsoluteToFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |
-| StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `--html-preserve-unknown` they're kept as `<div data-html-unknown="<tag>">` instead |
+| StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `HTMLImporter::Options::preserveUnknownElements` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
 
 All diagnostics share the `subset:<category>` code namespace and are surfaced through
