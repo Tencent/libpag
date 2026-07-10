@@ -421,16 +421,29 @@ bool PAGStateMachine::tryChangeState(RegionInstance& ri) {
   return true;
 }
 
-void PAGStateMachine::advanceRegion(int64_t deltaUs) {
-  float frameRate = 60.0f;
-  if (contextDoc != nullptr) {
-    for (auto* node : contextDoc->animations) {
-      if (node != nullptr && node->nodeType() == NodeType::Animation) {
-        frameRate = static_cast<Animation*>(node)->frameRate;
-        break;
-      }
-    }
+void PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
+  if (ri.transition == nullptr) {
+    return;
   }
+  // The crossfade duration is authored in frames against the incoming state's animation, so convert
+  // it using that animation's own frame rate rather than a document-wide guess.
+  float frameRate = ri.currentTimeline != nullptr ? ri.currentTimeline->frameRate() : 0.0f;
+  if (frameRate <= 0.0f) {
+    frameRate = 60.0f;
+  }
+  int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
+  if (mixDurationUs <= 0) {
+    ri.mix = 1.0f;
+  } else {
+    ri.mix = std::min(1.0f, std::max(0.0f, ri.mix + static_cast<float>(deltaUs) / mixDurationUs));
+  }
+  if (ri.mix >= 1.0f) {
+    ri.fadingOut.clear();
+    ri.transition = nullptr;
+  }
+}
+
+void PAGStateMachine::advanceRegion(int64_t deltaUs) {
   for (auto& ri : regions) {
     if (ri.region == nullptr || ri.currentState == nullptr) {
       continue;
@@ -443,19 +456,7 @@ void PAGStateMachine::advanceRegion(int64_t deltaUs) {
         f.timeline->advance(deltaUs);
       }
     }
-    if (ri.transition != nullptr) {
-      int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
-      if (mixDurationUs <= 0) {
-        ri.mix = 1.0f;
-      } else {
-        ri.mix =
-            std::min(1.0f, std::max(0.0f, ri.mix + static_cast<float>(deltaUs) / mixDurationUs));
-      }
-      if (ri.mix >= 1.0f) {
-        ri.fadingOut.clear();
-        ri.transition = nullptr;
-      }
-    }
+    advanceMix(ri, deltaUs);
     const StateTransition* alreadyAdvanced = ri.transition;
     for (int i = 0; i < MAX_TRANSITIONS_PER_FRAME; i++) {
       if (!tryChangeState(ri)) {
@@ -464,19 +465,9 @@ void PAGStateMachine::advanceRegion(int64_t deltaUs) {
     }
     // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
     // delta so the first apply sees a non-zero mix (prevents a one-frame blank output). Skip a
-    // carried-over transition that block above already advanced this frame, to avoid 2x speed.
-    if (ri.transition != nullptr && ri.transition != alreadyAdvanced && ri.mix < 1.0f) {
-      int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
-      if (mixDurationUs <= 0) {
-        ri.mix = 1.0f;
-      } else {
-        ri.mix =
-            std::min(1.0f, std::max(0.0f, ri.mix + static_cast<float>(deltaUs) / mixDurationUs));
-      }
-      if (ri.mix >= 1.0f) {
-        ri.fadingOut.clear();
-        ri.transition = nullptr;
-      }
+    // carried-over transition that was already advanced above this frame, to avoid 2x speed.
+    if (ri.transition != alreadyAdvanced) {
+      advanceMix(ri, deltaUs);
     }
   }
 }
