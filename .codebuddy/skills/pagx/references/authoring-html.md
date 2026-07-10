@@ -14,8 +14,9 @@ the authoritative subset reference is `spec/html_subset.md`.
 - [ ] Icons are inline `<svg>` or an icon webfont — never typed glyphs.
 - [ ] Real, selectable text for all copy (not text baked into images).
 - [ ] No interactive widgets, no scrolling content, no video/iframe.
-- [ ] Any motion auto-plays and animates only `opacity` / `translate` / `color` /
-      `background-color` (see §8 + `references/animation.md`).
+- [ ] Any motion auto-plays and stays inside the playable channels — `opacity`, `transform`
+      (translate/scale/rotate/skew), `color` / `background-color`, `filter` (drop-shadow/blur),
+      `clip-path` (see §8 + `references/animation.md`).
 
 ---
 
@@ -96,11 +97,14 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 
 Motion is captured, not flattened: animations the page runs (CSS `@keyframes` + `animation`, GSAP,
 anime.js, the Web Animations API) become a real PAGX animation timeline, automatically. Keep it
-faithful by animating only the channels the runtime can play — `opacity`, `transform: translate`,
-`color`, `background-color` — and by making the animation auto-play and `infinite`. Scale, rotate,
-skew, and size/layout changes are not animatable and convert to a static element. Full rules,
-playable-channel table, preview instructions, and warnings live in `references/animation.md` — read
-it before authoring any animation.
+faithful by animating the channels the runtime can play — `opacity`, `transform` (translate, scale,
+rotate, skew), `color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and
+`clip-path` reveals; inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset`
+line-draw — and by making the animation auto-play and `infinite`. Only layout/size changes
+(`width`, `height`, `margin`, …) and 3D transforms (`matrix3d`/`rotate3d`/`perspective`) are not
+animatable and convert to a static element. Full rules, playable-channel table, preview
+instructions, and warnings live in `references/animation.md` — read it before authoring any
+animation.
 
 ## What to avoid
 

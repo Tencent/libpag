@@ -138,10 +138,12 @@ Core rules to honor while writing:
 **If the design should move** (loader, animated banner, ambient motion, kinetic text), add the
 animation in the HTML — the converter captures it automatically into the PAGX timeline. Author it
 with CSS `@keyframes` + `animation` (or GSAP / anime.js / the Web Animations API), make it auto-play
-and `infinite`, and animate only `opacity`, `transform: translate`, `color`, or `background-color` —
-those are the channels the PAGX runtime can play back. **Read `references/animation.md` before
-writing any animation** for the full capture rules, the playable channels, and how to preview the
-motion.
+and `infinite`. The runtime plays back `opacity`, `transform` (translate, scale, rotate, skew),
+`color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and `clip-path` reveals;
+inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset` line-draw. Only layout
+properties (`width`, `height`, `margin`, …) and 3D transforms are not playable. **Read
+`references/animation.md` before writing any animation** for the full capture rules, the playable
+channels, and how to preview the motion.
 
 Save it as `<name>.html` in the working directory (choose a short, descriptive `<name>`).
 
@@ -204,6 +206,7 @@ the warm HTTP server for fast iteration, and a manual step-by-step path for debu
    - An element missing from the PNG → it was hidden, an unsupported widget, or a tainted
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
    - Motion missing or wrong → the animation was hover/scroll-triggered, finished before the
-     snapshot, or used a non-playable property (scale/rotate); see `references/animation.md`.
+     snapshot, or animated a non-playable property (a layout size like `width`/`height`, or a 3D
+     transform); see `references/animation.md`.
 4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
    it contains. Do not commit generated `.png` / `.subset.html` files.

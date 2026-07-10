@@ -180,7 +180,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-clip: text` (alias `-webkit-background-clip: text`) | combined with a gradient `background-image`: routes the gradient onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient) and suppresses the rectangle that would otherwise paint behind the text. Without a gradient `background-image`, the property is a no-op. |
 | `background-image: url(...)` | recovered as an `<ImagePattern>` fill on the background rectangle (the inverse of `HTMLWriter`'s url-background emission). `background-size` / `background-repeat` / `background-position` drive the pattern's `scaleMode` / tile modes / matrix |
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
-| `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning |
+| `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
 | `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
@@ -493,6 +493,9 @@ Everything else inside a `@keyframes` stop is warned and dropped
 | `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
 | `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
 | `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
+| `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
+| `filter: blur(...)` | `blurX` / `blurY` | a `BlurFilter` on the element's `Layer` | float |
+| `clip-path` (geometric `inset`/`circle`/`ellipse`/`polygon`/`path`) | `point{i}.x` / `point{i}.y` | a `Path` inside a contour-mask `Layer` | float |
 
 `transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
 compound chains — `translate[X|Y]` / `scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`). When
@@ -515,6 +518,26 @@ The animated element's `Layer` is given a generated `id` (prefix `anim`) when it
 element to paint a solid `background-color` (or, for text, a solid `color`); when no `SolidColor`
 fill is present the `color` channel is dropped (`subset:animation-unsupported-property`).
 
+**Filter animation.** A `filter` chain animated between `none` and `drop-shadow(...)` / `blur(...)`
+(or an animated `box-shadow`, which the capture layer folds into an equivalent `drop-shadow`) lowers
+onto the runtime's animatable filter nodes. Every `drop-shadow` in the chain is kept in author order
+— a "chromatic aberration" stack of several offset-only shadows becomes one animated
+`DropShadowFilter` per slot, so the whole stack composites rather than a single representative. A
+stop that omits a given shadow slot drives that slot's `color` alpha to zero so the ghost fades in
+and out instead of snapping. `blur(...)` folds onto a single `BlurFilter` radius. An existing static
+filter node on the element is reused as the animation target; otherwise a zero/transparent baseline
+node is minted so fill-mode can restore the "off" state.
+
+**Clip-path animation.** A `clip-path` animated through geometric shapes (`inset()` / `circle()` /
+`ellipse()` / `polygon()` / `path()`) becomes an animated contour mask — a wipe / reveal / iris.
+This is broader than the static path, which only accepts `clip-path: url(#id)` and drops geometric
+forms (§4.4): the capture layer normalizes every keyframe shape to a canonical `path("d")` in
+border-box pixels, and the importer drives the mask's `Path` with per-point `point{i}.x` / `.y`
+channels. All keyframes must resolve to the **same** shape structure (same verb / point count); CSS
+itself refuses to interpolate mismatched shapes, so a mismatch drops the clip channel with
+`subset:animation-unsupported-property`. Only the point coordinates that actually vary across the
+timeline emit a channel.
+
 ### 13.3 Timing mapping
 
 - Frame rate is fixed at 60 fps. `@keyframes` percentages are converted to frame times:
@@ -522,14 +545,25 @@ fill is present the `color` channel is dropped (`subset:animation-unsupported-pr
   `ms` units.
 - `animation-timing-function`: `linear` → `linear`; `ease` / `ease-in` / `ease-out` /
   `ease-in-out` and `cubic-bezier(x1, y1, x2, y2)` → `bezier` (the easing is written onto the
-  keyframe's `bezier-out` / next keyframe's `bezier-in` handles); `steps(…)` / `step-start` /
-  `step-end` → `hold`.
+  keyframe's `bezier-out` / next keyframe's `bezier-in` handles). `steps(n, <jump>)` /
+  `step-start` / `step-end` are not a runtime interpolation type; each `@keyframes` segment is
+  expanded into `n` `hold` sub-keyframes reproducing the CSS staircase (all four jump terms —
+  `jump-start` / `jump-end` / `jump-none` / `jump-both` — are honoured).
 - `animation-iteration-count`: `infinite` → `Animation.loop="loop"`; any finite count → `once`
   (PAGX has no finite repeat count — a finite count > 1 warns with `subset:animation-finite-count`).
-- `animation-direction`: `alternate` → `Animation.loop="pingPong"`; `reverse` reverses the
-  keyframe order; `normal` keeps source order.
+  A non-positive count suppresses playback (dropped with the same diagnostic).
+- `animation-direction`: `alternate` → `Animation.loop="pingPong"` **only when the count is
+  infinite** (finite `alternate` cannot be expressed and is downgraded to `once` with
+  `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
+  and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
 - `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
-  are clamped to 0.
+  are clamped to 0. For looping animations the delay applies to the first iteration only (it is
+  excluded from `Animation.duration` so the gap is not replayed each cycle).
+- `animation-fill-mode`: `none` (default) shows the element's non-animated baseline before the
+  delay elapses and after a `once` animation ends; `forwards` holds the final keyframe past the
+  end; `backwards` shows the first keyframe during the delay; `both` combines the two. Implemented
+  by injecting baseline `hold` keyframes at the boundaries (`Loop` / `PingPong` have no "after"
+  region, so only the leading baseline applies there).
 
 ### 13.4 Resulting PAGX
 
@@ -555,7 +589,30 @@ The example in §13.1 converts to:
 </pagx>
 ```
 
-### 13.5 Diagnostics
+### 13.5 Inline SVG shape animation
+
+Animations on inline `<svg>` shapes are lowered onto the per-shape painter nodes rather than the
+element `Layer`, unlocking icon and line-art motion:
+
+| SVG animated property | PAGX channel | Target node |
+|-----------------------|--------------|-------------|
+| `opacity` | `alpha` | the shape's `Layer` |
+| `transform` (pure translation only) | `x` / `y` | the shape's `Layer` |
+| `fill` | `color` | the shape's `Fill` |
+| `fill-opacity` | `alpha` | the shape's `Fill` |
+| `stroke` | `color` | the shape's `Stroke` |
+| `stroke-opacity` | `alpha` | the shape's `Stroke` |
+| `stroke-dashoffset` | `dashOffset` | the shape's `Stroke` |
+
+`stroke-dashoffset` drives the path-trace **line-draw** idiom (`stroke-dasharray: 1;
+stroke-dashoffset: 1 → 0` with `pathLength="1"`); the captured author-space value is rescaled into
+user units exactly like the static dash import. A non-translation `transform` on an SVG shape has no
+`matrix` channel (unlike a regular HTML element) and is dropped with
+`subset:animation-unsupported-property`. Unlike regular elements, one inline-SVG shape may carry a
+**comma-separated `animation` list** — each entry becomes its own `Animation` (the line-draw + fill-in
+idiom `animation: draw 1s …, fill 0.4s …` is the common case).
+
+### 13.6 Diagnostics
 
 | Code | Meaning |
 |------|---------|
