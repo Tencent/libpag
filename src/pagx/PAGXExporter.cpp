@@ -364,6 +364,7 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
   xml.addRequiredAttribute("from", transition->from);
   xml.addRequiredAttribute("to", transition->to);
   xml.addRequiredAttribute("duration", std::to_string(transition->duration));
+  xml.addAttribute("frameRate", transition->frameRate, 60.0f);
   if (transition->interpolation != KeyframeInterpolationType::Linear) {
     xml.addAttribute("interpolation", KeyframeInterpolationToString(transition->interpolation));
     if (transition->interpolation == KeyframeInterpolationType::Bezier) {

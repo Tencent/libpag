@@ -425,12 +425,9 @@ void PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
   if (ri.transition == nullptr) {
     return;
   }
-  // The crossfade duration is authored in frames against the incoming state's animation, so convert
-  // it using that animation's own frame rate rather than a document-wide guess.
-  float frameRate = ri.currentTimeline != nullptr ? ri.currentTimeline->frameRate() : 0.0f;
-  if (frameRate <= 0.0f) {
-    frameRate = 60.0f;
-  }
+  // The crossfade duration is authored in frames and converted using the transition's own frame
+  // rate, so the crossfade speed does not depend on which state animations it connects.
+  float frameRate = ri.transition->frameRate > 0.0f ? ri.transition->frameRate : 60.0f;
   int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
   if (mixDurationUs <= 0) {
     ri.mix = 1.0f;

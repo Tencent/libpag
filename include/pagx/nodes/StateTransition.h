@@ -53,9 +53,15 @@ class StateTransition : public Node {
 
   /**
    * The crossfade duration, in frames, over which the outgoing state's weight fades to 0 and the
-   * incoming state's weight rises to 1.
+   * incoming state's weight rises to 1. Converted to time using this transition's own frameRate,
+   * so the crossfade speed is independent of which state animations it connects.
    */
   Frame duration = 0;
+
+  /**
+   * The frame rate used to convert duration (in frames) to elapsed time during the crossfade.
+   */
+  float frameRate = 60.0f;
 
   /**
    * The interpolation curve applied to the crossfade weight over duration. Reuses the keyframe

@@ -1928,6 +1928,7 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
     return transition;
   }
   transition->duration = GetInt64Attribute(node, "duration", 0, doc);
+  transition->frameRate = GetFloatAttribute(node, "frameRate", 60.0f, doc);
   auto interp = GetAttribute(node, "interpolation", "linear");
   transition->interpolation = ParseKeyframeInterpolation(interp, doc, node);
   if (transition->interpolation == KeyframeInterpolationType::Bezier) {

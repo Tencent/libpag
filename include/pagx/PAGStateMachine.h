@@ -188,9 +188,9 @@ class PAGStateMachine : public PAGTimeline {
 
   // Region advance helpers.
   void advanceRegion(int64_t deltaUs);
-  // Advances the region's crossfade mix by one frame's worth of deltaUs, using the incoming
-  // state animation's own frame rate to convert the transition duration (in frames) to time.
-  // Clears the transition and fading slots once mix reaches 1.0.
+  // Advances the region's crossfade mix by one frame's worth of deltaUs, using the transition's
+  // own frame rate to convert its duration (in frames) to time. Clears the transition and fading
+  // slots once mix reaches 1.0.
   void advanceMix(RegionInstance& ri, int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
