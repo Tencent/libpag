@@ -11738,7 +11738,7 @@ PAGX_TEST(PAGXTest, SMAnyStateTransition) {
 
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
-  region->initialState = "a";
+  region->initialState = "b";
   auto sa = doc->makeNode<pagx::AnimationState>();
   sa->name = "a";
   region->states.push_back(sa);
@@ -11761,10 +11761,10 @@ PAGX_TEST(PAGXTest, SMAnyStateTransition) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // First move to b via setState (simulate being in b).
+  // Start in "b"; the any-state transition must not fire without the trigger.
   timeline->advance(0);
-  EXPECT_EQ(timeline->getCurrentState("main"), "a");
-  // Now fire reset trigger; from="any" should match and go back to a.
+  EXPECT_EQ(timeline->getCurrentState("main"), "b");
+  // Fire reset trigger; from="any" should match from "b" and move to "a".
   timeline->fireTrigger("reset");
   timeline->advance(0);
   EXPECT_EQ(timeline->getCurrentState("main"), "a");
