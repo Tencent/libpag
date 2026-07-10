@@ -437,13 +437,36 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
   return nullptr;
 }
 
+// Collects StateMachine nodes that are owned by a Composition (nested), so top-level lookups can
+// skip them. Composition-owned StateMachines live in document->nodes alongside top-level ones, but
+// are referenced from a Composition's animations list.
+static std::unordered_set<const Node*> CollectCompositionOwnedStateMachines(
+    const PAGXDocument* document) {
+  std::unordered_set<const Node*> compOwned;
+  for (const auto& node : document->nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Composition) {
+      continue;
+    }
+    for (const auto* animChild : static_cast<const Composition*>(node.get())->animations) {
+      if (animChild != nullptr && animChild->nodeType() == NodeType::StateMachine) {
+        compOwned.insert(animChild);
+      }
+    }
+  }
+  return compOwned;
+}
+
 std::vector<std::string> PAGScene::getStateMachineIds() const {
   std::vector<std::string> ids;
   if (document == nullptr) {
     return ids;
   }
+  // Composition-owned StateMachines live in document->nodes but belong to a nested composition, not
+  // the document root; exclude them so only top-level state machines are reported.
+  std::unordered_set<const Node*> compOwned = CollectCompositionOwnedStateMachines(document.get());
   for (const auto& node : document->nodes) {
-    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
+        compOwned.find(node.get()) == compOwned.end()) {
       ids.push_back(node->id);
     }
   }
@@ -458,9 +481,13 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (it != stateMachineTimelines.end()) {
     return it->second;
   }
+  // Composition-owned StateMachines live in document->nodes but belong to a nested composition;
+  // exclude them so only top-level state machines are vended, matching getStateMachineIds().
+  std::unordered_set<const Node*> compOwned = CollectCompositionOwnedStateMachines(document.get());
   StateMachine* matched = nullptr;
   for (const auto& node : document->nodes) {
-    if (node != nullptr && node->nodeType() == NodeType::StateMachine && node->id == id) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine && node->id == id &&
+        compOwned.find(node.get()) == compOwned.end()) {
       matched = static_cast<StateMachine*>(node.get());
       break;
     }
