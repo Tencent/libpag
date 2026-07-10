@@ -103,29 +103,29 @@ describe('inlineBoxLineRects', () => {
   });
 
   test('applies the highlighter band to a single-line inline gradient box', () => {
-    // `background-size: 100% 0.6em; background-position: 0 88%; no-repeat` on a
+    // `background-size: 100% 10px; background-position: 0 50%; no-repeat` on a
     // single-line mark still takes the fragment path so the band is honoured.
-    const el = mockEl([{ left: 20, top: 20, width: 100, height: 22 }]);
+    const el = mockEl([{ left: 20, top: 20, width: 100, height: 20 }]);
     const computed = mockComputed({
       props: {
         'background-image': GRADIENT,
-        'background-size': '100% 9.408px',
-        'background-position': '0% 88%',
+        'background-size': '100% 10px',
+        'background-position': '0% 50%',
         'background-repeat': 'no-repeat',
       },
     });
     const rects = inlineBoxLineRects(el, parentRect, computed);
     expect(rects).toHaveLength(1);
-    // band height = 9.408; top offset = (22 - 9.408) * 0.88 = 11.08096.
-    expect(rects[0].width).toBeCloseTo(100, 3);
-    expect(rects[0].height).toBeCloseTo(9.408, 3);
-    expect(rects[0].top).toBeCloseTo(20 - parentRect.top + 11.08096, 3);
+    // band height = 10; top offset = (20 - 10) * 0.5 = 5.
+    expect(rects[0].width).toBe(100);
+    expect(rects[0].height).toBe(10);
+    expect(rects[0].top).toBe(20 - parentRect.top + 5);
     expect(rects[0].left).toBe(20 - parentRect.left);
   });
 });
 
 describe('bandInsetRect', () => {
-  const rect = { left: 10, top: 20, width: 100, height: 22 };
+  const rect = { left: 10, top: 20, width: 100, height: 20 };
 
   function computed(props) {
     return { getPropertyValue: (p) => (p in props ? props[p] : '') };
@@ -134,14 +134,14 @@ describe('bandInsetRect', () => {
   test('insets a no-repeat gradient band near the baseline', () => {
     const band = bandInsetRect(rect, computed({
       'background-image': GRADIENT,
-      'background-size': '100% 9.408px',
-      'background-position': '0% 88%',
+      'background-size': '100% 10px',
+      'background-position': '0% 50%',
       'background-repeat': 'no-repeat',
     }));
-    expect(band.left).toBeCloseTo(10, 3);
-    expect(band.width).toBeCloseTo(100, 3);
-    expect(band.height).toBeCloseTo(9.408, 3);
-    expect(band.top).toBeCloseTo(20 + (22 - 9.408) * 0.88, 3);
+    expect(band.left).toBe(10);
+    expect(band.width).toBe(100);
+    expect(band.height).toBe(10);
+    expect(band.top).toBe(20 + (20 - 10) * 0.5);
   });
 
   test('resolves a percentage height and bottom position', () => {
@@ -151,15 +151,15 @@ describe('bandInsetRect', () => {
       'background-position': '0% 100%',
       'background-repeat': 'no-repeat',
     }));
-    expect(band.height).toBeCloseTo(11, 3);
-    expect(band.top).toBeCloseTo(20 + 11, 3); // bottom-aligned: (22-11)*100%
+    expect(band.height).toBe(10);
+    expect(band.top).toBe(20 + 10); // bottom-aligned: (20-10)*100%
   });
 
   test('returns null when the axis repeats (band tiles to fill the box)', () => {
     expect(bandInsetRect(rect, computed({
       'background-image': GRADIENT,
-      'background-size': '100% 9.408px',
-      'background-position': '0% 88%',
+      'background-size': '100% 10px',
+      'background-position': '0% 50%',
       'background-repeat': 'repeat-y',
     }))).toBeNull();
   });
@@ -174,16 +174,16 @@ describe('bandInsetRect', () => {
   test('returns null when a border or background-color needs the full box', () => {
     expect(bandInsetRect(rect, computed({
       'background-image': GRADIENT,
-      'background-size': '100% 9.408px',
-      'background-position': '0% 88%',
+      'background-size': '100% 10px',
+      'background-position': '0% 50%',
       'background-repeat': 'no-repeat',
       'border-top-width': '1px',
     }))).toBeNull();
     expect(bandInsetRect(rect, computed({
       'background-image': GRADIENT,
       'background-color': 'rgb(255, 255, 0)',
-      'background-size': '100% 9.408px',
-      'background-position': '0% 88%',
+      'background-size': '100% 10px',
+      'background-position': '0% 50%',
       'background-repeat': 'no-repeat',
     }))).toBeNull();
   });

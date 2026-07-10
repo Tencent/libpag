@@ -1252,6 +1252,22 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafWithBackgroundKeepsWidth) {
   EXPECT_FLOAT_EQ(leaf->width, 305.0f);
 }
 
+// An inline nowrap text leaf that is a flex-grow child keeps its width: the flex engine is
+// distributing free space through it, so its measured width carries the growth the layout
+// depends on and must not be dropped. Guards the `notFlexGrow` term of the shrink-to-fit
+// condition — without it a grown flex item would collapse back to its intrinsic glyph width.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px;display:flex">
+      <span style="width:305px;height:80px;font-size:60px;white-space:nowrap;flex:1">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -5813,6 +5829,31 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceCentersMainAxisInsteadOfSym
   // The symmetric leading/trailing insets are absorbed by centering, so no left/right padding is
   // baked in.
   EXPECT_FALSE(StyleContains(body, "padding"));
+}
+
+// Reverse of the symmetric case: when the leading and trailing insets differ by more than the
+// inference tolerance (1.5px), the layout is not centred and the asymmetric insets must survive
+// as real padding. Guards the `std::fabs(paddingLeading - paddingTrailing) <= tol` boundary so a
+// near-but-not-symmetric layout is not silently promoted to justify-content:center.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsPaddingWhenInsetsExceedTolerance) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  // Two children (50px + 50px + 10px gap = 110px) in a 208px-wide body: leading inset 50px,
+  // trailing inset 48px. The 2px asymmetry exceeds the 1.5px tolerance, so this is padding, not
+  // centering.
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:208px;height:50px">
+               <div style="position:absolute;left:50px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:110px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_FALSE(StyleContains(body, "justify-content: center"));
+  EXPECT_TRUE(StyleContains(body, "padding"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversColumnLayoutWithCenter) {

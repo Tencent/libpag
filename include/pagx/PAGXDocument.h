@@ -41,9 +41,10 @@ class Image;
 class ImagePattern;
 
 /**
- * PAGXDocument is the root container for a PAGX document.
- * It contains resources and layers. This is a pure data structure class.
- * Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
+ * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
+ * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
+ * PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
