@@ -32,8 +32,10 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
+#include "pagx/html/importer/HTMLTransformPassUtils.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -1065,6 +1067,129 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionedSpanWithInlineRunHonoursPerRunC
   EXPECT_TRUE(ColorNear(solid1->color, HexColor(0x111111, 0.7f)));
 }
 
+// `white-space: pre-line` collapses runs of spaces/tabs but keeps a source newline as a hard line
+// break, so the resulting text run carries a `\n`.
+PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreLineKeepsNewlineCollapsesSpaces) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:80px\">"
+      "<p style=\"white-space:pre-line;font-size:16px\">Alpha   Beta\nGamma</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  if (auto* tb = FindElementOfType<pagx::TextBox>(leaf)) {
+    GatherTextRuns(tb->elements, &texts, &fills);
+  } else {
+    GatherTextRuns(leaf->contents, &texts, &fills);
+  }
+  ASSERT_FALSE(texts.empty());
+  const std::string& t = texts.front()->text;
+  EXPECT_NE(t.find('\n'), std::string::npos);
+  // Consecutive spaces between the first two words are folded into one.
+  EXPECT_EQ(t.find("Alpha   Beta"), std::string::npos);
+  EXPECT_NE(t.find("Alpha Beta"), std::string::npos);
+}
+
+// `white-space: pre` keeps source spaces and newlines verbatim (no folding, no per-fragment trim).
+PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreKeepsSpacesVerbatim) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:80px\">"
+      "<p style=\"white-space:pre;font-size:16px\">A   B\nC</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  EXPECT_FALSE(tb->wordWrap);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(tb->elements, &texts, &fills);
+  ASSERT_FALSE(texts.empty());
+  const std::string& t = texts.front()->text;
+  EXPECT_NE(t.find("A   B"), std::string::npos);
+  EXPECT_NE(t.find('\n'), std::string::npos);
+}
+
+// `writing-mode: vertical-rl` produces a vertical TextBox.
+PAG_TEST(PAGXHTMLImporterTest, VerticalWritingModeProducesVerticalTextBox) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:80px;height:200px\">"
+      "<p style=\"writing-mode:vertical-rl;font-size:16px\">Vertical</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(tb, nullptr);
+  EXPECT_EQ(tb->writingMode, pagx::WritingMode::Vertical);
+  EXPECT_FLOAT_EQ(tb->percentHeight, 100.0f);
+}
+
+// An unrecognised `text-align` value warns rather than silently mapping to a default.
+PAG_TEST(PAGXHTMLImporterTest, UnsupportedTextAlignWarns) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<p style=\"text-align:sideways;font-size:16px\">Aligned</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("unsupported text-align") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+// `text-decoration: overline` is unsupported and warns.
+PAG_TEST(PAGXHTMLImporterTest, TextDecorationOverlineWarns) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<p style=\"text-decoration:overline;font-size:16px\">Over</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("text-decoration overline not supported") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+}
+
+// Two adjacent inline runs carrying the identical `-webkit-text-stroke` share a stroke fingerprint
+// and merge into a single fragment (exercising the both-stroked branch of the stroke comparison).
+PAG_TEST(PAGXHTMLImporterTest, AdjacentIdenticalTextStrokeRunsMerge) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<p style=\"font-size:20px\">"
+      "<span style=\"-webkit-text-stroke:2px #0EA5E9\">AA</span>"
+      "<span style=\"-webkit-text-stroke:2px #0EA5E9\">BB</span></p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
+  if (tb) {
+    GatherTextRuns(tb->elements, &texts, &fills);
+  } else {
+    GatherTextRuns(leaf->contents, &texts, &fills);
+  }
+  ASSERT_FALSE(texts.empty());
+  EXPECT_EQ(texts.front()->text, "AABB");
+}
+
+// Padding on a text leaf without any background visuals is applied directly to the outer text host
+// layer (no extra inner layer is synthesised).
+PAG_TEST(PAGXHTMLImporterTest, TextLeafPaddingWithoutBackgroundAppliesToHost) {
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:80px\">"
+      "<p style=\"padding:6px;font-size:16px\">Padded</p>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_GT(leaf->padding.top + leaf->padding.right + leaf->padding.bottom + leaf->padding.left,
+            0.0f);
+}
+
 // A non-wrapping inline text leaf (<span>/<a>) shrinks to fit its own shaped glyphs instead
 // of freezing the browser-measured px width the html-snapshot pipeline bakes onto every text
 // span. Freezing it would peg the box to the browser's font metrics, so a render host that
@@ -1492,6 +1617,100 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgResolvesCurrentColorCaseInsensitiveStrok
   ASSERT_FALSE(content.empty());
   EXPECT_EQ(content.find("urrentColor"), std::string::npos);
   EXPECT_NE(content.find("stroke=\"#22AA44\""), std::string::npos);
+}
+
+// A `color` declared through a descendant's inline `style="color: …"` (rather than the attribute
+// form) also overrides the cascade for that element and its children.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgCurrentColorRespectsDescendantStyleColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px;color:#112233">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <g style="color:#99AABB">
+          <rect x="0" y="0" width="40" height="40" fill="currentColor"/>
+        </g>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_EQ(content.find("currentColor"), std::string::npos);
+  EXPECT_NE(content.find("#99AABB"), std::string::npos);
+}
+
+// A consuming inline <svg> that references two shared gradients — one of which inherits its stops
+// from a third via `href="#base"` — pulls the transitive closure of defs into a local <defs>. This
+// exercises the href local-reference collection, the quoted `url('#id')` form, and the multi-def
+// chaining of the injected list.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgInjectsTransitiveDefsViaHref) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:60px">
+      <svg style="position:absolute;width:0;height:0;overflow:hidden">
+        <defs>
+          <linearGradient id="base">
+            <stop offset="0" stop-color="#FF0000"/>
+            <stop offset="1" stop-color="#0000FF"/>
+          </linearGradient>
+          <linearGradient id="g1" href="#base" x1="0" y1="0" x2="1" y2="0"/>
+          <radialGradient id="g2" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#00FF00"/>
+            <stop offset="1" stop-color="#000000"/>
+          </radialGradient>
+        </defs>
+      </svg>
+      <svg width="200" height="60" viewBox="0 0 200 60">
+        <rect x="0" y="0" width="90" height="60" fill="url(#g1)"/>
+        <rect x="100" y="0" width="90" height="60" fill="url('#g2')"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* rectSvg = doc->layers.front()->children.back();
+  const auto& content = rectSvg->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_NE(content.find("id=\"g1\""), std::string::npos);
+  EXPECT_NE(content.find("id=\"g2\""), std::string::npos);
+  // The transitively referenced base gradient must be injected too.
+  EXPECT_NE(content.find("id=\"base\""), std::string::npos);
+}
+
+// The serialiser must escape and emit text-node content inside an inline <svg> (e.g. an SVG
+// <text> element's character data), not just element markup.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgSerializesTextNodeContent) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:120px;height:40px">
+      <svg width="120" height="40" viewBox="0 0 120 40">
+        <text x="4" y="24" fill="#000000">Hi &amp; Bye</text>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  EXPECT_NE(content.find("Hi &amp; Bye"), std::string::npos);
+}
+
+// `formatColorForAttribute` emits an 8-digit `#RRGGBBAA` hex when the resolved colour carries
+// partial alpha, so the downstream SVG importer picks up the transparency.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, FormatColorForAttributeEmitsAlphaHex) {
+  pagx::Color opaque;
+  opaque.red = 1.0f;
+  opaque.green = 0.0f;
+  opaque.blue = 0.0f;
+  opaque.alpha = 1.0f;
+  opaque.colorSpace = pagx::ColorSpace::SRGB;
+  EXPECT_EQ(pagx::HTMLInlineSvgEmitter::formatColorForAttribute(opaque), "#FF0000");
+
+  pagx::Color translucent;
+  translucent.red = 0.0f;
+  translucent.green = 0.0f;
+  translucent.blue = 1.0f;
+  translucent.alpha = 0.5f;
+  translucent.colorSpace = pagx::ColorSpace::SRGB;
+  // 0.5 * 255 rounds to 128 (0x80).
+  EXPECT_EQ(pagx::HTMLInlineSvgEmitter::formatColorForAttribute(translucent), "#0000FF80");
 }
 
 PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
@@ -5436,6 +5655,63 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, ScriptElementInHeadIsDropped) {
   EXPECT_NE(root->getFirstChild("head")->getFirstChild("title"), nullptr);
 }
 
+// A document whose root element is not <html> is rejected with a fatal diagnostic.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DocumentRootMustBeHtml) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<div style="width:10px;height:10px"></div>)HTML", &root);
+  EXPECT_FALSE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:no-html-root"));
+}
+
+// Stray text directly under <html> (between the tag and <head>/<body>) is stripped so the
+// canonical skeleton is restored.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StrayTextAtHtmlRootRemoved) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html> stray text <head></head><body style=\"width:10px;height:10px\"></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  ASSERT_NE(root, nullptr);
+  // The only element children of <html> are <head> and <body>; no text node survives.
+  for (auto c = root->firstChild; c; c = c->nextSibling) {
+    EXPECT_EQ(c->type, pagx::DOMNodeType::Element);
+  }
+}
+
+// A duplicate <head> is absorbed into the first one; when the first head is empty its child list
+// is adopted directly from the duplicate.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, DuplicateEmptyHeadAbsorbsSecondHead) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><head></head><head><title>t</title></head>"
+      "<body style=\"width:10px;height:10px\"></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  ASSERT_NE(root, nullptr);
+  auto head = root->getFirstChild("head");
+  ASSERT_NE(head, nullptr);
+  EXPECT_NE(head->getFirstChild("title"), nullptr);
+  // Exactly one <head> remains after the merge.
+  size_t headCount = 0;
+  for (auto c = root->firstChild; c; c = c->nextSibling) {
+    if (c->name == "head") headCount++;
+  }
+  EXPECT_EQ(headCount, 1u);
+}
+
+// A CSS property that is not part of the PAGX subset table is dropped with a warning.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, UnknownPropertyDroppedWithWarning) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:10px;height:10px">
+               <div style="width:10px;height:10px;-webkit-not-a-real-prop:1px"></div>
+             </body></html>)HTML",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+}
+
 //==================================================================================================
 // HTMLSubsetTransformer — Strict mode
 //==================================================================================================
@@ -5636,6 +5912,72 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceLeavesExistingFlexAlone) {
   auto body = root->getFirstChild("body");
   // The original gap survives untouched.
   EXPECT_TRUE(StyleContains(body, "gap: 5px"));
+}
+
+// Children arranged on a clean diagonal (a staircase) have no overlap on *either* axis, so both
+// row and column orderings are valid. The pass then falls back to the axis with the larger start
+// spread. Their cross-axis offsets differ, so the layout is ultimately kept absolute — but the
+// both-axes-valid tie-break path (AxisStartSpread) is exercised.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceDiagonalStaircaseUsesLargerSpread) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:200px;height:200px">
+               <div style="position:absolute;left:0px;top:0px;width:10px;height:10px"></div>
+               <div style="position:absolute;left:40px;top:40px;width:10px;height:10px"></div>
+               <div style="position:absolute;left:80px;top:80px;width:10px;height:10px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  // Diagonal children cannot share a single cross-axis alignment, so the layout stays absolute.
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inference-skipped"));
+}
+
+// A wrapper container with no explicit width/height falls back to the children bounding box for its
+// content range. A shared top inset on every child in that fallback is lifted into padding.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceBboxFallbackLiftsSharedCrossInset) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:300px;height:300px">
+               <div style="position:relative">
+                 <div style="position:absolute;left:0px;top:20px;width:50px;height:50px"></div>
+                 <div style="position:absolute;left:60px;top:20px;width:50px;height:50px"></div>
+               </div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  auto wrapper = FirstBodyChild(root, "div");
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(StyleContains(wrapper, "display: flex"));
+  EXPECT_TRUE(StyleContains(wrapper, "flex-direction: row"));
+  (void)body;
+}
+
+// A column layout whose content sits with symmetric top/bottom insets inside an explicitly-sized
+// parent is centred via justify-content instead of baking symmetric main-axis padding.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceColumnCentersMainAxis) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  // Two 50px-tall children + 10px gap = 110px centred in a 210px-tall body leaves a symmetric 50px
+  // inset top and bottom.
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:120px;height:210px">
+               <div style="position:absolute;left:0px;top:50px;width:120px;height:50px"></div>
+               <div style="position:absolute;left:0px;top:110px;width:120px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_TRUE(StyleContains(body, "flex-direction: column"));
+  EXPECT_TRUE(StyleContains(body, "justify-content: center"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceReordersChildrenWhenDomOrderDiffersFromAxis) {
@@ -6686,6 +7028,94 @@ PAG_TEST(PAGXHTMLImporterTest, MaskSizeSingleLengthTiesHeightToWidthRatio) {
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 0.5f, 0.001f));
   EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 0.5f, 0.001f));
+}
+
+// `mask-size: auto <pct>` leaves the width axis to follow the height ratio while a percentage on
+// the height axis resolves against the element box. A 50% height on a 200px box scales the 100px
+// intrinsic mask to 100px (0.5x), tying the width to the same ratio.
+PAG_TEST(PAGXHTMLImporterTest, MaskSizeAutoWidthPercentHeightTiesWidthToHeightRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:200px;height:200px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Cellipse cx=%2250%22 cy=%2250%22 rx=%2250%22 ry=%2250%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha;mask-size:auto 50%;mask-repeat:no-repeat">
+        <div style="width:200px;height:200px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  // 50% of the 200px box is 100px; against a 100px intrinsic mask that is a uniform 1.0x scale.
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 1.0f, 0.001f));
+}
+
+// An element carrying both `mask-image` and `clip-path` keeps the mask-image (tgfx models a single
+// mask per layer) and warns that the clip-path is dropped.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageAndClipPathKeepsMaskDropsClip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs><clipPath id="clip0"><path d="M0,0L110,0L110,110L0,110Z"/></clipPath></defs>
+      </svg>
+      <div style="width:110px;height:110px;clip-path:url(#clip0);mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22110%22 height=%22110%22 viewBox=%220 0 110 110%22%3E%3Cellipse cx=%2255%22 cy=%2255%22 rx=%2255%22 ry=%2255%22 fill=%22white%22/%3E%3C/svg%3E');mask-mode:alpha">
+        <div style="width:110px;height:110px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "clip-path ignored"));
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+}
+
+// A `mask-image` that is not a decodable `data:image/svg+xml` URI (e.g. a raster data URI) is
+// ignored with a warning rather than producing a broken mask.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageNonSvgDataUriIgnored) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;mask-image:url('data:image/png;base64,iVBORw0KGgo=');mask-mode:alpha">
+        <div style="width:110px;height:110px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not a decodable data:image/svg+xml URI"));
+  auto* masked = doc->layers.front()->children.front();
+  EXPECT_EQ(masked->mask, nullptr);
+}
+
+// A `clip-path: url(#id)` whose id has no matching <clipPath> def is ignored with a warning.
+PAG_TEST(PAGXHTMLImporterTest, ClipPathUnknownIdIgnored) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;clip-path:url(#missing)">
+        <div style="width:110px;height:110px;background-color:#F59E0B"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "references an unknown <clipPath> id"));
+  auto* masked = doc->layers.front()->children.front();
+  EXPECT_EQ(masked->mask, nullptr);
+}
+
+// A `clip-path` that resolves to an empty <clipPath> (no child geometry) is ignored with a warning.
+PAG_TEST(PAGXHTMLImporterTest, ClipPathEmptyGeometryIgnored) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs><clipPath id="clip0"></clipPath></defs>
+      </svg>
+      <div style="width:110px;height:110px;clip-path:url(#clip0)">
+        <div style="width:110px;height:110px;background-color:#F59E0B"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "clip-path <clipPath> has no geometry"));
+  auto* masked = doc->layers.front()->children.back();
+  EXPECT_EQ(masked->mask, nullptr);
 }
 
 // `mask-position: right bottom` anchors a mask smaller than the element to the far corner:
@@ -7891,6 +8321,109 @@ PAG_TEST(PAGXHTMLDetailTest, ReplaceChildSplicesInPlace) {
   EXPECT_EQ(next, c);
   EXPECT_EQ(x->nextSibling, a2);
   EXPECT_EQ(a2->nextSibling, c);
+}
+
+//==================================================================================================
+// HTMLTransformPassUtils — direct unit tests for the shared flex/length helpers
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLPassUtilsTest, ApproxEqualHonoursTolerance) {
+  EXPECT_TRUE(pagx::html::ApproxEqual(1.0f, 1.0005f, 0.001f));
+  EXPECT_FALSE(pagx::html::ApproxEqual(1.0f, 1.01f, 0.001f));
+  EXPECT_TRUE(pagx::html::ApproxEqual(-2.0f, -2.0f, 0.0f));
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, LookupResolvedWrappers) {
+  pagx::PropertyMap props;
+  props["color"] = "  RED  ";
+  EXPECT_EQ(pagx::html::LookupResolved(props, "color"), "  RED  ");
+  EXPECT_EQ(pagx::html::LookupResolvedLower(props, "color"), "red");
+  EXPECT_TRUE(pagx::html::LookupResolved(props, "missing").empty());
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, ShouldSkipWalkerNodeGuards) {
+  pagx::HTMLSubsetTransformer::Options opts;
+  pagx::HTMLTransformContext ctx(opts);
+
+  // Null node is always skipped.
+  EXPECT_TRUE(pagx::html::ShouldSkipWalkerNode(nullptr, 0, ctx, "phase"));
+
+  // Non-element (text) nodes are skipped without a diagnostic.
+  auto text = std::make_shared<pagx::DOMNode>();
+  text->type = pagx::DOMNodeType::Text;
+  EXPECT_TRUE(pagx::html::ShouldSkipWalkerNode(text, 0, ctx, "phase"));
+
+  // A regular element under the recursion limit is walked.
+  auto element = std::make_shared<pagx::DOMNode>();
+  element->name = "div";
+  EXPECT_FALSE(pagx::html::ShouldSkipWalkerNode(element, 0, ctx, "phase"));
+  EXPECT_TRUE(ctx.diagnostics().empty());
+
+  // Reaching the recursion limit skips the subtree and records a max-depth warning.
+  EXPECT_TRUE(
+      pagx::html::ShouldSkipWalkerNode(element, pagx::MAX_HTML_RECURSION_DEPTH, ctx, "phase-x"));
+  ASSERT_FALSE(ctx.diagnostics().empty());
+  EXPECT_EQ(ctx.diagnostics().back().code, "subset:max-depth");
+  EXPECT_NE(ctx.diagnostics().back().message.find("phase-x"), std::string::npos);
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, ParseNormalisedPxRejectsNonPixelUnits) {
+  float px = -1.0f;
+  EXPECT_FALSE(pagx::html::ParseNormalisedPx("", px));
+  EXPECT_FALSE(pagx::html::ParseNormalisedPx("auto", px));
+  EXPECT_FALSE(pagx::html::ParseNormalisedPx("10em", px));
+  EXPECT_FALSE(pagx::html::ParseNormalisedPx("50%", px));
+  EXPECT_TRUE(pagx::html::ParseNormalisedPx("12px", px));
+  EXPECT_TRUE(NearlyEqual(px, 12.0f));
+  EXPECT_TRUE(pagx::html::ParseNormalisedPx("  8  ", px));
+  EXPECT_TRUE(NearlyEqual(px, 8.0f));
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, TryParseResolvedPxHandlesMalformedValues) {
+  pagx::PropertyMap props;
+  float out = 42.0f;
+
+  // Absent property leaves `out` untouched and returns false.
+  EXPECT_FALSE(pagx::html::TryParseResolvedPx(props, "padding-top", out));
+  EXPECT_TRUE(NearlyEqual(out, 42.0f));
+
+  // Present but non-pixel: requireParse=true bails, requireParse=false tolerates.
+  props["padding-top"] = "auto";
+  EXPECT_FALSE(pagx::html::TryParseResolvedPx(props, "padding-top", out, /*requireParse=*/true));
+  out = 7.0f;
+  EXPECT_TRUE(pagx::html::TryParseResolvedPx(props, "padding-top", out, /*requireParse=*/false));
+  EXPECT_TRUE(NearlyEqual(out, 7.0f));
+
+  // Present and valid px writes through.
+  props["padding-top"] = "16px";
+  EXPECT_TRUE(pagx::html::TryParseResolvedPx(props, "padding-top", out));
+  EXPECT_TRUE(NearlyEqual(out, 16.0f));
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, ClearChildMainMarginRowPreservesCrossAxis) {
+  pagx::PropertyMap props;
+  props["margin"] = "4px 8px 12px 16px";  // top=4 right=8 bottom=12 left=16
+  pagx::html::ClearChildMainMargin(props, /*row=*/true);
+  // For a row container the main axis is horizontal: left/right + shorthand are removed while the
+  // cross-axis top/bottom margins are re-emitted as longhands.
+  EXPECT_EQ(props.count("margin"), 0u);
+  EXPECT_EQ(props.count("margin-left"), 0u);
+  EXPECT_EQ(props.count("margin-right"), 0u);
+  EXPECT_EQ(pagx::html::LookupProperty(props, "margin-top"), "4px");
+  EXPECT_EQ(pagx::html::LookupProperty(props, "margin-bottom"), "12px");
+}
+
+PAG_TEST(PAGXHTMLPassUtilsTest, ClearChildMainMarginColumnPreservesCrossAxis) {
+  pagx::PropertyMap props;
+  props["margin"] = "4px 8px 12px 16px";  // top=4 right=8 bottom=12 left=16
+  pagx::html::ClearChildMainMargin(props, /*row=*/false);
+  // For a column container the main axis is vertical: top/bottom + shorthand are removed while the
+  // cross-axis left/right margins are re-emitted as longhands.
+  EXPECT_EQ(props.count("margin"), 0u);
+  EXPECT_EQ(props.count("margin-top"), 0u);
+  EXPECT_EQ(props.count("margin-bottom"), 0u);
+  EXPECT_EQ(pagx::html::LookupProperty(props, "margin-left"), "16px");
+  EXPECT_EQ(pagx::html::LookupProperty(props, "margin-right"), "8px");
 }
 
 }  // namespace pag
