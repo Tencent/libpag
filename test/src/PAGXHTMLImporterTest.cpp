@@ -5658,8 +5658,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, ScriptElementInHeadIsDropped) {
 // A document whose root element is not <html> is rejected with a fatal diagnostic.
 PAG_TEST(PAGXHTMLSubsetTransformerTest, DocumentRootMustBeHtml) {
   std::shared_ptr<pagx::DOMNode> root;
-  auto result = RunTransform(
-      R"HTML(<div style="width:10px;height:10px"></div>)HTML", &root);
+  auto result = RunTransform(R"HTML(<div style="width:10px;height:10px"></div>)HTML", &root);
   EXPECT_FALSE(result.ok);
   EXPECT_TRUE(HasDiagnostic(result, "subset:no-html-root"));
 }
