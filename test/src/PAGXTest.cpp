@@ -11507,6 +11507,9 @@ PAGX_TEST(PAGXTest, SMTriggerConsumedOnce) {
   auto stateB = doc->makeNode<pagx::AnimationState>();
   stateB->name = "active";
   region->states.push_back(stateB);
+  auto stateC = doc->makeNode<pagx::AnimationState>();
+  stateC->name = "done";
+  region->states.push_back(stateC);
   auto t = doc->makeNode<pagx::StateTransition>();
   t->from = "idle";
   t->to = "active";
@@ -11516,14 +11519,28 @@ PAGX_TEST(PAGXTest, SMTriggerConsumedOnce) {
   c->op = pagx::TransitionConditionOp::Trigger;
   t->conditions.push_back(c);
   region->transitions.push_back(t);
+  // active -> done gated on the SAME trigger. A single fire must not chain through both.
+  auto t2 = doc->makeNode<pagx::StateTransition>();
+  t2->from = "active";
+  t2->to = "done";
+  t2->duration = 0;
+  auto c2 = doc->makeNode<pagx::TransitionCondition>();
+  c2->inputName = "fire";
+  c2->op = pagx::TransitionConditionOp::Trigger;
+  t2->conditions.push_back(c2);
+  region->transitions.push_back(t2);
   sm->regions.push_back(region);
 
   auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Fire trigger and advance; should transition once.
+  // Fire trigger and advance; it is consumed by the first transition and must not chain into
+  // active -> done within the same advance.
   ASSERT_TRUE(timeline->fireTrigger("fire"));
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  // Advance again without re-firing; the consumed trigger must not drive active -> done.
   timeline->advance(0);
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
 }
