@@ -347,6 +347,12 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 
+  // Rewrite the exporter's conic-gradient-stroke workaround (`<mask>` + `<foreignObject>` with a
+  // CSS-gradient `<div>`) back into native stroked shapes. The downstream SVG importer does not
+  // understand `<foreignObject>` and would otherwise paint the masked region opaque black, dropping
+  // the shape. Run before defs injection so the cleaned tree drives the remaining passes.
+  _svgEmitter->reconstructForeignObjectPaints(element, *_valueParser);
+
   // Pull in any shared `<defs>` (gradients/patterns/clip paths) this SVG references by id but
   // does not itself define, so the standalone import directive resolves `url(#…)` locally.
   _svgEmitter->injectReferencedDefs(element);

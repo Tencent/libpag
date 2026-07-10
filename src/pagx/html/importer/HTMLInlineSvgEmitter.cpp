@@ -21,11 +21,17 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <unordered_set>
 #include <vector>
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLValueParser.h"
+#include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/types/Color.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -280,6 +286,121 @@ std::string RemoveOpacityFromInlineStyle(const std::string& style) {
   return out;
 }
 
+constexpr float kInlineSvgPi = 3.14159265358979323846f;
+
+// Returns the `background` / `background-image` value from a `<div>`'s inline `style`, or empty
+// when the div carries no background paint. `background` wins over `background-image` on a tie
+// (last-writer semantics are irrelevant here — the exporter only ever writes one).
+std::string ExtractBackgroundPaint(const std::string& style) {
+  std::string paint;
+  for (const auto& decl : ParseStyleDeclarations(style)) {
+    if (EqualsIgnoreCase(decl.first, "background") ||
+        EqualsIgnoreCase(decl.first, "background-image")) {
+      if (!decl.second.empty()) paint = Trim(decl.second);
+    }
+  }
+  return paint;
+}
+
+// Linearly interpolates a gradient's stop list (assumed sorted by offset, sRGB channels) at
+// position `t` in [0, 1]. Clamps to the endpoint colours outside the stop range.
+Color InterpolateStops(const std::vector<ColorStop*>& stops, float t) {
+  if (stops.empty()) return {0, 0, 0, 1, ColorSpace::SRGB};
+  if (t <= stops.front()->offset) return stops.front()->color;
+  if (t >= stops.back()->offset) return stops.back()->color;
+  for (size_t i = 1; i < stops.size(); ++i) {
+    if (t > stops[i]->offset) continue;
+    const Color& a = stops[i - 1]->color;
+    const Color& b = stops[i]->color;
+    float span = stops[i]->offset - stops[i - 1]->offset;
+    float f = span > 1e-6f ? (t - stops[i - 1]->offset) / span : 0.0f;
+    Color c = {};
+    c.red = a.red + (b.red - a.red) * f;
+    c.green = a.green + (b.green - a.green) * f;
+    c.blue = a.blue + (b.blue - a.blue) * f;
+    c.alpha = a.alpha + (b.alpha - a.alpha) * f;
+    c.colorSpace = ColorSpace::SRGB;
+    return c;
+  }
+  return stops.back()->color;
+}
+
+// Averages every stop colour, used as the neutral fallback when a conic's centre coincides with
+// the sampling point (the sweep angle is undefined there).
+Color AverageStops(const std::vector<ColorStop*>& stops) {
+  if (stops.empty()) return {0, 0, 0, 1, ColorSpace::SRGB};
+  Color c = {0, 0, 0, 0, ColorSpace::SRGB};
+  for (const auto* stop : stops) {
+    c.red += stop->color.red;
+    c.green += stop->color.green;
+    c.blue += stop->color.blue;
+    c.alpha += stop->color.alpha;
+  }
+  float n = static_cast<float>(stops.size());
+  c.red /= n;
+  c.green /= n;
+  c.blue /= n;
+  c.alpha /= n;
+  return c;
+}
+
+// Resolves a single CSS `<length-percentage>` token against `axis` (percentages are box-relative;
+// bare numbers / `px` are absolute). Other units are treated as px, which is all the exporter
+// writes for a conic centre.
+float ResolveConicAxis(const std::string& token, float axis) {
+  float fraction = NAN;
+  if (ParseCssPercentage(token, fraction)) return fraction * axis;
+  return std::strtof(token.c_str(), nullptr);
+}
+
+// Parses the `at <cx> <cy>` centre from a `conic-gradient(...)` value into box-local pixels,
+// defaulting to the box centre (CSS default `at 50% 50%`) when absent.
+void ParseConicCenter(const std::string& value, float boxW, float boxH, float& cx, float& cy) {
+  cx = boxW * 0.5f;
+  cy = boxH * 0.5f;
+  std::string args = ExtractParenArgs(value);
+  if (args.empty()) return;
+  auto parts = SplitTopLevelCommas(args);
+  if (parts.empty()) return;
+  auto tokens = SplitTopLevelWhitespace(parts[0]);
+  for (size_t i = 0; i + 2 < tokens.size() + 1 && i < tokens.size(); ++i) {
+    if (ToLower(tokens[i]) != "at") continue;
+    if (i + 1 < tokens.size()) cx = ResolveConicAxis(tokens[i + 1], boxW);
+    if (i + 2 < tokens.size()) cy = ResolveConicAxis(tokens[i + 2], boxH);
+    break;
+  }
+}
+
+// Sets (or overwrites, case-insensitively) attribute `name` on `node` to `value`.
+void SetAttribute(const std::shared_ptr<DOMNode>& node, const char* name, const std::string& value) {
+  for (auto& attr : node->attributes) {
+    if (EqualsIgnoreCase(attr.name, name)) {
+      attr.value = value;
+      return;
+    }
+  }
+  DOMAttribute added;
+  added.name = name;
+  added.value = value;
+  node->attributes.push_back(added);
+}
+
+// Samples a conic gradient at the centre of its `boxW x boxH` box. `cssStartDeg` is the CSS
+// `from` angle (0deg = up, clockwise); `cx`/`cy` are the sweep centre in box-local pixels. The
+// exporter's conic-stroke centre sits far outside each small shape box, so the sweep varies only
+// slightly across the box and this single sample reproduces the browser's near-uniform hue.
+Color SampleConicOverBox(const std::vector<ColorStop*>& stops, float cssStartDeg, float cx,
+                         float cy, float boxW, float boxH) {
+  float dx = boxW * 0.5f - cx;
+  float dy = boxH * 0.5f - cy;
+  if (std::abs(dx) < 1e-4f && std::abs(dy) < 1e-4f) return AverageStops(stops);
+  float angle = std::atan2(dx, -dy) * 180.0f / kInlineSvgPi;
+  angle -= cssStartDeg;
+  angle = std::fmod(angle, 360.0f);
+  if (angle < 0.0f) angle += 360.0f;
+  return InterpolateStops(stops, angle / 360.0f);
+}
+
 }  // namespace
 
 void HTMLInlineSvgEmitter::stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot) {
@@ -354,6 +475,141 @@ void HTMLInlineSvgEmitter::injectReferencedDefs(const std::shared_ptr<DOMNode>& 
   }
   defs->nextSibling = svgRoot->firstChild;
   svgRoot->firstChild = defs;
+}
+
+void HTMLInlineSvgEmitter::reconstructForeignObjectPaints(const std::shared_ptr<DOMNode>& svgRoot,
+                                                          HTMLValueParser& valueParser) {
+  reconstructForeignObjectsRecursive(svgRoot, valueParser, /*depth=*/0);
+}
+
+void HTMLInlineSvgEmitter::reconstructForeignObjectsRecursive(const std::shared_ptr<DOMNode>& node,
+                                                              HTMLValueParser& valueParser,
+                                                              int depth) {
+  if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
+  if (node->type != DOMNodeType::Element) return;
+
+  std::shared_ptr<DOMNode> prev = nullptr;
+  auto child = node->firstChild;
+  while (child) {
+    std::shared_ptr<DOMNode> replacement = nullptr;
+    if (child->type == DOMNodeType::Element && EqualsIgnoreCase(child->name, "foreignObject")) {
+      replacement = buildForeignObjectReplacement(child, valueParser);
+    }
+    if (replacement) {
+      replacement->nextSibling = child->nextSibling;
+      if (prev) {
+        prev->nextSibling = replacement;
+      } else {
+        node->firstChild = replacement;
+      }
+      prev = replacement;
+      child = replacement->nextSibling;
+    } else {
+      reconstructForeignObjectsRecursive(child, valueParser, depth + 1);
+      prev = child;
+      child = child->nextSibling;
+    }
+  }
+}
+
+std::shared_ptr<DOMNode> HTMLInlineSvgEmitter::buildForeignObjectReplacement(
+    const std::shared_ptr<DOMNode>& foreignObject, HTMLValueParser& valueParser) {
+  // The div child carries the paint as a CSS background; without one there is nothing to recover.
+  std::shared_ptr<DOMNode> div = nullptr;
+  for (auto c = foreignObject->getFirstChild(); c; c = c->getNextSibling()) {
+    if (c->type == DOMNodeType::Element) {
+      div = c;
+      break;
+    }
+  }
+  if (!div) return nullptr;
+  const auto* styleAttr = div->findAttribute("style");
+  if (!styleAttr) return nullptr;
+  std::string paint = ExtractBackgroundPaint(*styleAttr);
+  if (paint.empty()) return nullptr;
+
+  const auto* wAttr = foreignObject->findAttribute("width");
+  const auto* hAttr = foreignObject->findAttribute("height");
+  float boxW = wAttr ? std::strtof(wAttr->c_str(), nullptr) : 0.0f;
+  float boxH = hAttr ? std::strtof(hAttr->c_str(), nullptr) : 0.0f;
+
+  // Resolve the div's background to a single concrete colour: solid verbatim, gradient sampled to
+  // its representative hue over the box. `url(...)` image backgrounds are left for the existing
+  // path (returning nullptr keeps the node untouched).
+  std::string lowered = ToLower(paint);
+  Color color = {0, 0, 0, 1, ColorSpace::SRGB};
+  if (lowered.compare(0, 15, "conic-gradient(") == 0) {
+    auto* grad = valueParser.parseConicGradient(paint);
+    if (!grad || grad->colorStops.empty()) return nullptr;
+    float cx = NAN;
+    float cy = NAN;
+    ParseConicCenter(paint, boxW, boxH, cx, cy);
+    color = SampleConicOverBox(grad->colorStops, grad->startAngle + 90.0f, cx, cy, boxW, boxH);
+  } else if (lowered.compare(0, 16, "linear-gradient(") == 0) {
+    auto* grad = valueParser.parseLinearGradient(paint, boxW, boxH);
+    if (!grad || grad->colorStops.empty()) return nullptr;
+    color = InterpolateStops(grad->colorStops, 0.5f);
+  } else if (lowered.compare(0, 16, "radial-gradient(") == 0) {
+    auto* grad = valueParser.parseRadialGradient(paint, boxW, boxH);
+    if (!grad || grad->colorStops.empty()) return nullptr;
+    color = InterpolateStops(grad->colorStops, 0.5f);
+  } else if (lowered.find("url(") != std::string::npos) {
+    return nullptr;
+  } else {
+    color = valueParser.parseColor(paint);
+  }
+  std::string colorHex = formatColorForAttribute(color);
+
+  // With a mask, the masked region is exactly the mask's stroke shapes — rebuild them directly and
+  // recolour their stroke, dropping the foreignObject + mask indirection entirely.
+  const auto* maskAttr = foreignObject->findAttribute("mask");
+  std::string maskId = maskAttr ? ExtractUrlFragmentId(*maskAttr) : std::string();
+  auto maskNode = maskId.empty() ? nullptr : lookupSharedDef(maskId);
+  if (maskNode) {
+    std::vector<std::shared_ptr<DOMNode>> shapes;
+    for (auto c = maskNode->getFirstChild(); c; c = c->getNextSibling()) {
+      if (c->type != DOMNodeType::Element) continue;
+      auto clone = CloneDOMSubtree(c, /*depth=*/0);
+      if (!clone) continue;
+      SetAttribute(clone, "stroke", colorHex);
+      shapes.push_back(clone);
+    }
+    if (shapes.empty()) return nullptr;
+    const auto* transform = foreignObject->findAttribute("transform");
+    if (shapes.size() == 1 && !transform) {
+      return shapes.front();
+    }
+    auto group = std::make_shared<DOMNode>();
+    group->name = "g";
+    group->type = DOMNodeType::Element;
+    if (transform) SetAttribute(group, "transform", *transform);
+    std::shared_ptr<DOMNode> last = nullptr;
+    for (auto& shape : shapes) {
+      if (last) {
+        last->nextSibling = shape;
+      } else {
+        group->firstChild = shape;
+      }
+      last = shape;
+    }
+    return group;
+  }
+
+  // No mask: the foreignObject was a plain painted box. Emit a solid-filled <rect> so it renders a
+  // representative colour instead of the SVG importer's fallback black.
+  const auto* xAttr = foreignObject->findAttribute("x");
+  const auto* yAttr = foreignObject->findAttribute("y");
+  auto rect = std::make_shared<DOMNode>();
+  rect->name = "rect";
+  rect->type = DOMNodeType::Element;
+  SetAttribute(rect, "x", xAttr ? *xAttr : "0");
+  SetAttribute(rect, "y", yAttr ? *yAttr : "0");
+  if (wAttr) SetAttribute(rect, "width", *wAttr);
+  if (hAttr) SetAttribute(rect, "height", *hAttr);
+  SetAttribute(rect, "fill", colorHex);
+  const auto* transform = foreignObject->findAttribute("transform");
+  if (transform) SetAttribute(rect, "transform", *transform);
+  return rect;
 }
 
 std::string HTMLInlineSvgEmitter::serialize(const std::shared_ptr<DOMNode>& svgNode) {
