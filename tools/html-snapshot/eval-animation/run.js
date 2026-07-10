@@ -51,6 +51,17 @@ const USAGE = `Usage: node run.js [options]
   --samples <n>       Frames sampled across the timeline (default: 5)
   --scale <float>     pagx render scale (default: 1.0)
   --no-infer-flex     Disable the C++ AbsoluteToFlexInferencePass during import
+  --download-images   Download the page's external images (snapshot.js) and
+                      reference them by local file path instead of inlining them
+                      as base64. Images land in a single shared, content-
+                      addressed cache at out/<label>/images/ (identical images
+                      stored once); pagx render reads the files directly, so no
+                      per-case manifest is needed.
+  --pagx-images <m>   How images are stored in each .pagx: 'external' (default;
+                      write image files next to the case's .pagx, keeping their
+                      relative path, producing a portable per-case folder) or
+                      'embed' (base64 data URIs). Independent of
+                      --download-images.
   --skip-existing     Reuse existing baseline / render frames if present
   --only <substr>     Only run cases whose relative path contains <substr>.
                       Repeat the flag or pass a comma-separated list to match any of them.
@@ -67,6 +78,15 @@ function parseArgs(argv) {
     samples: 5,
     scale: 1,
     inferFlex: true,
+    // When true, snapshot.js downloads the page's external images into a shared,
+    // content-addressed cache (out/<label>/images/) and rewrites each subset
+    // HTML to reference them by their absolute file path instead of inlining
+    // them as base64 data URIs.
+    downloadImages: false,
+    // How images are stored in the exported .pagx: 'external' (default; write
+    // image files next to each case's .pagx, keeping their relative path) or
+    // 'embed' (base64 data URIs). Independent of --download-images.
+    pagxImages: 'external',
     skipExisting: false,
     only: [],
     label: 'current',
@@ -88,6 +108,14 @@ function parseArgs(argv) {
       if (!Number.isFinite(v) || v <= 0) fail(`--scale requires a positive number, got '${argv[i]}'`);
       opts.scale = v;
     } else if (a === '--no-infer-flex') opts.inferFlex = false;
+    else if (a === '--download-images') opts.downloadImages = true;
+    else if (a === '--pagx-images') {
+      const mode = argv[++i];
+      if (mode !== 'embed' && mode !== 'external') {
+        fail(`--pagx-images expects 'embed' or 'external', got '${mode}'`);
+      }
+      opts.pagxImages = mode;
+    }
     else if (a === '--skip-existing') opts.skipExisting = true;
     else if (a === '--only') {
       const parts = String(argv[++i])
@@ -295,6 +323,12 @@ async function processCase(entry, outDir, opts) {
       output: subsetHtml,
       scriptDir: TOOL_DIR,
       browserEngine: opts.browserEngine || undefined,
+      // Image download writes the page's images into the shared cache and
+      // rewrites the subset HTML to reference them by absolute path. The path is
+      // baked into the .pagx by `pagx import`, so render reads the files
+      // directly — no per-case manifest / `--fallback` wiring needed.
+      downloadImages: opts.downloadImages,
+      imageDir: opts.downloadImages ? opts.imageCacheDir : '',
       stderrPath: snapshotStderr,
     });
     if (r.code !== 0) {
@@ -327,6 +361,12 @@ async function processCase(entry, outDir, opts) {
     const r = await runPagxResolve({
       pagxBin: opts.pagxBin,
       pagxFile: subsetPagx,
+      // Image resources (both <img> and inline-SVG <image>) only exist after
+      // resolve, so image storage is applied here. The subset lives in the case
+      // dir, but its relative on-disk images are addressed relative to the
+      // original HTML — point relocation there.
+      imageStorage: opts.pagxImages,
+      imageBaseDir: path.dirname(htmlPath),
       stderrPath: path.join(caseDir, 'resolve.stderr.txt'),
     });
     if (r.code !== 0) {
@@ -789,6 +829,13 @@ async function main() {
   if (!opts.outDir) opts.outDir = path.join(SCRIPT_DIR, 'out', opts.label);
   ensureDir(opts.outDir);
 
+  // Single shared, content-addressed image cache for the whole run. Every case
+  // downloads into it; identical images (e.g. a shared logo/hero across a
+  // corpus) are stored once. The subset HTML references images by absolute
+  // path, so no per-case manifest is needed.
+  opts.imageCacheDir = path.join(opts.outDir, 'images');
+  if (opts.downloadImages) ensureDir(opts.imageCacheDir);
+
   if (!fs.existsSync(opts.pagxBin)) {
     fail(`pagx binary not found: ${opts.pagxBin}`, 1);
   }
@@ -798,7 +845,7 @@ async function main() {
     fail(`no html cases found in ${opts.corpus}${hint}`, 1);
   }
   const concurrency = Math.max(1, Math.min(opts.concurrency, cases.length));
-  console.log(`anim-run: ${cases.length} cases → ${opts.outDir}  (samples=${opts.samples}, concurrency=${concurrency})`);
+  console.log(`anim-run: ${cases.length} cases → ${opts.outDir}  (samples=${opts.samples}, concurrency=${concurrency}${opts.downloadImages ? ', download-images=on' : ''}, pagx-images=${opts.pagxImages})`);
 
   const rows = new Array(cases.length);
   let nextIdx = 0;
