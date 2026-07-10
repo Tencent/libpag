@@ -1748,22 +1748,22 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     WriteLayer(xml, layer, options);
   }
   // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
-  // definitions parsed from the document's <Animations> block (in declaration order). StateMachine
-  // nodes created programmatically may only live in doc.nodes, so also scan doc.nodes for any SM
-  // not already in doc.animations.
+  // definitions parsed from the document's <Animations> block (in declaration order). Animation and
+  // StateMachine nodes created programmatically only live in doc.nodes, so also scan doc.nodes for
+  // any of them not already written (either in doc.animations or nested inside a Composition).
   std::set<const Node*> written;
   for (const auto* node : doc.animations) {
     written.insert(node);
   }
-  // Composition-owned StateMachines live in doc.nodes but are written nested inside their
-  // Composition (see WriteResource). Record them here so the orphan scan below does not emit them
-  // a second time at document root.
+  // Composition-owned Animation and StateMachine nodes live in doc.nodes but are written nested
+  // inside their Composition (see WriteResource). Record them here so the orphan scan below does
+  // not emit them a second time at document root.
   for (const auto& node : doc.nodes) {
     if (node == nullptr || node->nodeType() != NodeType::Composition) {
       continue;
     }
     for (const auto* animChild : static_cast<const Composition*>(node.get())->animations) {
-      if (animChild != nullptr && animChild->nodeType() == NodeType::StateMachine) {
+      if (animChild != nullptr) {
         written.insert(animChild);
       }
     }
@@ -1771,7 +1771,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   bool hasAnimOrSM = !doc.animations.empty();
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
+      if (node != nullptr &&
+          (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine) &&
           written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
@@ -1792,8 +1793,14 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
       }
     }
     for (const auto& node : doc.nodes) {
-      if (node != nullptr && node->nodeType() == NodeType::StateMachine &&
-          written.find(node.get()) == written.end()) {
+      if (node == nullptr ||
+          (node->nodeType() != NodeType::Animation && node->nodeType() != NodeType::StateMachine) ||
+          written.find(node.get()) != written.end()) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
+      } else {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }
     }
