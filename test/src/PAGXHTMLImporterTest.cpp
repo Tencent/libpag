@@ -546,6 +546,55 @@ PAG_TEST(PAGXHTMLImporterTest, MixBlendModeMapsToBlendMode) {
   EXPECT_EQ(div->blendMode, pagx::BlendMode::Multiply);
 }
 
+// CSS `mix-blend-mode` uses hyphenated keywords for the multi-word modes; the importer must accept
+// them (they differ from PAGX's internal camelCase names, which single-word modes happen to share).
+PAG_TEST(PAGXHTMLImporterTest, MixBlendModeHyphenatedKeywords) {
+  struct Case {
+    const char* css;
+    pagx::BlendMode mode;
+  };
+  const Case cases[] = {
+      {"color-dodge", pagx::BlendMode::ColorDodge}, {"color-burn", pagx::BlendMode::ColorBurn},
+      {"hard-light", pagx::BlendMode::HardLight},   {"soft-light", pagx::BlendMode::SoftLight},
+      {"plus-lighter", pagx::BlendMode::PlusLighter}, {"plus-darker", pagx::BlendMode::PlusDarker},
+  };
+  for (const auto& c : cases) {
+    std::string html = "<html><body style=\"width:50px;height:50px\">"
+                       "<div style=\"width:50px;height:50px;background-color:#000;mix-blend-mode:" +
+                       std::string(c.css) + "\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr) << c.css;
+    auto* div = doc->layers.front()->children.front();
+    EXPECT_EQ(div->blendMode, c.mode) << c.css;
+  }
+}
+
+// `plus-darker` has no CSS mix-blend-mode, so the exporter bakes the backdrop into a PNG applied via
+// a `pagx_pd_*` feImage+feComposite(arithmetic) filter. The importer recovers PlusDarker from the
+// marker id and drops the browser-only filter rather than treating it as an unknown effect.
+PAG_TEST(PAGXHTMLImporterTest, PlusDarkerFilterMarkerRoundTrips) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:60px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="pagx_pd_0" x="0" y="0" width="50" height="50" filterUnits="userSpaceOnUse"
+                  primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feImage href="data:image/png;base64,iVBORw0KGgo=" x="0" y="0" width="50" height="50"
+                     preserveAspectRatio="none" result="bg"/>
+            <feComposite in="SourceGraphic" in2="bg" operator="arithmetic" k1="0" k2="1" k3="1"
+                         k4="-1"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:50px;height:50px;background-color:#404040;filter:url(#pagx_pd_0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  EXPECT_EQ(div->blendMode, pagx::BlendMode::PlusDarker);
+  EXPECT_TRUE(div->filters.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FlexLayoutMapping) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">

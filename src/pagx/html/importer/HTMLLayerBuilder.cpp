@@ -45,6 +45,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/svg/SVGBlendMode.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -491,8 +492,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
                                             const HTMLBoxAttributes& box) {
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
-    BlendMode mode = BlendModeFromString(box.mixBlendMode);
-    layer->blendMode = mode;
+    // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,
+    // `plus-lighter`), which SVGBlendModeFromString maps directly. BlendModeFromString expects
+    // PAGX's internal camelCase names and would reject the multi-word CSS values.
+    layer->blendMode = SVGBlendModeFromString(box.mixBlendMode);
   }
   if (box.clipOverflow) layer->clipToBounds = true;
 
@@ -514,9 +517,17 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
       } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
-        auto decoded = _filterDecoder.decode(step.refId);
-        for (auto* f : decoded) {
-          layer->filters.push_back(f);
+        // `plus-darker` has no CSS mix-blend-mode; the exporter bakes the backdrop into a PNG and
+        // applies it through a `pagx_pd_*` feImage+feComposite(arithmetic) filter. That baked filter
+        // is a browser-only rendering aid — PAGX blends PlusDarker against the real backdrop, so
+        // recover the blend mode from the marker id and drop the filter.
+        if (step.refId.compare(0, 8, "pagx_pd_") == 0) {
+          layer->blendMode = BlendMode::PlusDarker;
+        } else {
+          auto decoded = _filterDecoder.decode(step.refId);
+          for (auto* f : decoded) {
+            layer->filters.push_back(f);
+          }
         }
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
