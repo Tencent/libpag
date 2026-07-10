@@ -12355,6 +12355,17 @@ PAGX_TEST(PAGXTest, SMListenerDetach) {
   c->valueBool = true;
   t->conditions.push_back(c);
   region->transitions.push_back(t);
+  // active -> idle on go==false, so a state change WOULD occur after listener removal.
+  auto tBack = doc->makeNode<pagx::StateTransition>();
+  tBack->from = "active";
+  tBack->to = "idle";
+  tBack->duration = 0;
+  auto cBack = doc->makeNode<pagx::TransitionCondition>();
+  cBack->inputName = "go";
+  cBack->op = pagx::TransitionConditionOp::Equal;
+  cBack->valueBool = false;
+  tBack->conditions.push_back(cBack);
+  region->transitions.push_back(tBack);
   sm->regions.push_back(region);
 
   auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
@@ -12367,7 +12378,9 @@ PAGX_TEST(PAGXTest, SMListenerDetach) {
   EXPECT_EQ(callCount, 1);
   timeline->removeStateChangeListener(lid);
   timeline->setBool("go", false);
+  // The state genuinely transitions back to idle, but the detached listener must not fire.
   timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
   EXPECT_EQ(callCount, 1);
 }
 
