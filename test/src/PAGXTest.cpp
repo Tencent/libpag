@@ -12731,6 +12731,66 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXStateMachine/Crossfade"));
 }
 
+PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto animA = doc->makeNode<pagx::Animation>("animA");
+  animA->duration = 30;
+  animA->frameRate = 60.0f;
+  doc->animations.push_back(animA);
+  auto animB = doc->makeNode<pagx::Animation>("animB");
+  animB->duration = 30;
+  animB->frameRate = 60.0f;
+  doc->animations.push_back(animB);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
+  auto in = doc->makeNode<pagx::StateMachineInput>();
+  in->name = "go";
+  in->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(in);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto sa = doc->makeNode<pagx::AnimationState>();
+  sa->name = "a";
+  sa->animationId = "animA";
+  region->states.push_back(sa);
+  auto sb = doc->makeNode<pagx::AnimationState>();
+  sb->name = "b";
+  sb->animationId = "animB";
+  region->states.push_back(sb);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "a";
+  t->to = "b";
+  t->duration = 10;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "go";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueBool = true;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+  doc->applyLayout();
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("crossSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  // duration=10 frames @60fps -> mixDuration ~166666us; each 16667us frame advances mix by ~0.1,
+  // so a correctly single-advanced crossfade needs ~10 frames to reach mix=1.0 and finish.
+  // advance() returns true while a crossfade is in progress and false once it has completed.
+  smTimeline->setBool("go", true);
+  int frames = 0;
+  while (smTimeline->advance(16667) && frames < 100) {
+    frames++;
+  }
+  // A carried-over transition advanced twice per frame would finish in ~half the frames (~5).
+  // Assert the crossfade takes the full ~10 frames, proving mix advances only once per frame.
+  EXPECT_GE(frames, 9);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "b");
+}
+
 PAGX_TEST(PAGXTest, SMStableStateOutput) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
