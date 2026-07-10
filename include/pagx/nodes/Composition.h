@@ -23,10 +23,8 @@
 
 namespace pagx {
 
-class Animation;
 class DataBind;
 class Layer;
-class StateMachine;
 class ViewModel;
 
 /**
