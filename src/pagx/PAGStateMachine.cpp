@@ -451,14 +451,16 @@ void PAGStateMachine::advanceRegion(int64_t deltaUs) {
         ri.transition = nullptr;
       }
     }
+    const StateTransition* alreadyAdvanced = ri.transition;
     for (int i = 0; i < MAX_TRANSITIONS_PER_FRAME; i++) {
       if (!tryChangeState(ri)) {
         break;
       }
     }
     // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
-    // delta so the first apply sees a non-zero mix (prevents a one-frame blank output).
-    if (ri.transition != nullptr && ri.mix < 1.0f) {
+    // delta so the first apply sees a non-zero mix (prevents a one-frame blank output). Skip a
+    // carried-over transition that block above already advanced this frame, to avoid 2x speed.
+    if (ri.transition != nullptr && ri.transition != alreadyAdvanced && ri.mix < 1.0f) {
       int64_t mixDurationUs = FramesToUs(ri.transition->duration, frameRate);
       if (mixDurationUs <= 0) {
         ri.mix = 1.0f;
