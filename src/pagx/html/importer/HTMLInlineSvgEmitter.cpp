@@ -372,7 +372,8 @@ void ParseConicCenter(const std::string& value, float boxW, float boxH, float& c
 }
 
 // Sets (or overwrites, case-insensitively) attribute `name` on `node` to `value`.
-void SetAttribute(const std::shared_ptr<DOMNode>& node, const char* name, const std::string& value) {
+void SetAttribute(const std::shared_ptr<DOMNode>& node, const char* name,
+                  const std::string& value) {
   for (auto& attr : node->attributes) {
     if (EqualsIgnoreCase(attr.name, name)) {
       attr.value = value;
