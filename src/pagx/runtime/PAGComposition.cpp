@@ -137,6 +137,7 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
 void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
   timelines.clear();
   stateMachineTimelines.clear();
+  pausedTimelineIds.clear();
   if (node == nullptr) {
     return;
   }
