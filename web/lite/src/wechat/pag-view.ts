@@ -9,8 +9,6 @@ import type { VideoSequence } from '../base/video-sequence';
 
 declare const setInterval: (callback: () => void, delay: number) => number;
 
-const ANDROID_16_ALIGN = 16;
-
 export class PAGView extends PAGWebGLView {
   public static init(data: ArrayBuffer, canvas: HTMLCanvasElement) {
     const clock = new Clock();
@@ -105,9 +103,14 @@ export class PAGView extends PAGWebGLView {
         this.currentFrame = frameData.id;
         this.setDebugData({ getFrame: Date.now() - getFrameMark });
         if (isAndroid) {
+          // On Android, WeChat's VideoDecoder returns frames padded to 16-pixel (macroblock)
+          // alignment, so frameData.width/height are the aligned buffer dimensions with padding on
+          // the right/bottom. Scale the texture coordinates by aligned/real so only the real content
+          // region (MP4Width/MP4Height) is sampled, excluding the padding that would otherwise
+          // squeeze and distort the visible image.
           this.scale = {
-            x: (Math.ceil(this.frameData.width / ANDROID_16_ALIGN) * ANDROID_16_ALIGN) / this.frameData.width,
-            y: (Math.ceil(this.frameData.height / ANDROID_16_ALIGN) * ANDROID_16_ALIGN) / this.frameData.height,
+            x: frameData.width / this.videoParam.MP4Width,
+            y: frameData.height / this.videoParam.MP4Height,
           };
         }
         draw();
@@ -170,7 +173,7 @@ export class PAGView extends PAGWebGLView {
 
   protected override clearTimer() {
     if (this.renderTimer) {
-      clearTimeout(this.renderTimer);
+      clearInterval(this.renderTimer);
       this.renderTimer = null;
     }
     this.videoReader.clearCallback();

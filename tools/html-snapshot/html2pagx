@@ -90,6 +90,11 @@ Options (any unknown flag is forwarded to snapshot.js):
                              read from disk at render time. Default: disabled.
   --image-dir <dir>          Where downloaded images are written
                              (default: <output>.images/)
+  --pagx-images <mode>       How image resources are stored in the .pagx:
+                             'external' (default; write image files next to the
+                             .pagx and keep their relative path) or 'embed'
+                             (inline as base64 data URIs for a single self-
+                             contained file)
   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
@@ -131,6 +136,7 @@ function parseArgs(argv) {
     fontDir: '',
     downloadImages: false,
     imageDir: '',
+    pagxImages: 'external',
     cookies: [],
     headers: [],
     viewportWidth: undefined,
@@ -219,6 +225,14 @@ function parseArgs(argv) {
       case '--image-dir':
         opts.imageDir = requireValue(a, argv[++i]);
         break;
+      case '--pagx-images': {
+        const mode = requireValue(a, argv[++i]);
+        if (mode !== 'external' && mode !== 'embed') {
+          failArg(`--pagx-images expects 'external' or 'embed', got '${mode}'`);
+        }
+        opts.pagxImages = mode;
+        break;
+      }
       case '--cookie':
         opts.cookies.push(requireValue(a, argv[++i]));
         break;
@@ -384,6 +398,7 @@ async function main() {
         fontDir: opts.fontDir,
         downloadImages: opts.downloadImages,
         imageDir: opts.imageDir,
+        pagxImages: opts.pagxImages,
         browserEngine: opts.browserEngine,
         inlineIconFonts: opts.inlineIconFonts,
         scrollReveal: opts.scrollReveal,
@@ -428,6 +443,7 @@ async function main() {
       fontDir: opts.fontDir,
       downloadImages: opts.downloadImages,
       imageDir: opts.imageDir,
+      pagxImages: opts.pagxImages,
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
       scrollReveal: opts.scrollReveal,

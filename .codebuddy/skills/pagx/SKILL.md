@@ -6,8 +6,8 @@ description: >-
   GSAP, anime.js, Web Animations) becomes a real PAGX animation timeline. Use
   when the user asks to create a PAGX from a visual description, convert HTML to
   PAGX, make an animated PAGX or loading animation, or run pagx CLI commands
-  (render, verify, format, layout, bounds, font info/embed, import/export,
-  export to HTML for browser preview).
+  (render, verify, format, layout, bounds, font info/embed, import, resolve,
+  export to SVG/HTML/PPTX, or export to HTML for browser preview).
 ---
 
 # PAGX Skill
@@ -24,10 +24,11 @@ reference:
 
 | Reference | Content | Loading |
 |-----------|--------|---------|
-| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `export` (SVG, HTML) | As needed |
+| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `resolve`, `export` (SVG, HTML, PPTX) | As needed |
 | `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML |
 | `references/animation.md` | How to author motion that converts (playable channels, capture rules), preview frames with `pagx render --time`, and animation warnings | Read before writing animated HTML |
 | `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed |
+| `spec/html_subset.md` | Authoritative HTML/CSS subset the importer accepts — every allowed tag/property and its PAGX mapping, diagnostics, auto-normalization passes | Debugging conversion warnings or edge cases |
 
 ---
 

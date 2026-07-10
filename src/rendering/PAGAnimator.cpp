@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGAnimator.h"
+#include "base/utils/Log.h"
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
 #include "rendering/utils/DisplayLinkWrapper.h"
@@ -220,8 +221,18 @@ void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
   auto pendingTask = std::move(task);
   task = nullptr;
   lock.unlock();
-  if (pendingTask) {
-    pendingTask->wait();
+  if (pendingTask == nullptr) {
+    return;
+  }
+  // Wait with a timeout to avoid blocking the caller thread indefinitely when the async flush task
+  // is stuck (for example, when the hardware video decoder hangs inside the system layer). If the
+  // timeout fires, the pending task is left running in the background and will release itself on
+  // completion.
+  static constexpr uint64_t TASK_WAIT_TIMEOUT_MS = 500;
+  if (!pendingTask->wait(TASK_WAIT_TIMEOUT_MS)) {
+    LOGE(
+        "PAGAnimator::extractAndWaitTask(): timed out waiting for the flush task, the task will "
+        "be abandoned in the background.");
   }
 }
 

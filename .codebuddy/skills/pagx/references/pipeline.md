@@ -94,6 +94,7 @@ On native Windows, invoke it through `node` (the shebang/executable bit is a Uni
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<outputDir>/<name>.fonts`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 (keeps the `.pagx` small) |
 | `--image-dir <dir>` | Where downloaded images are written (default `<outputDir>/<name>.images`) |
+| `--pagx-images <mode>` | How image resources are stored **in the `.pagx`**: `external` (default; write image files next to the `.pagx`, keeping their relative path) or `embed` (inline as base64). Only affects local file images; data URIs are left as-is. Orthogonal to `--download-images` (which is a snapshot-side option) |
 | `--no-inline-icon-fonts` | Disable webfont-glyph → inline `<svg>` conversion (icon inlining is on by default) |
 | `--no-render` | Stop after resolve (no PNG) |
 | `--no-resolve` | Stop after import (no resolve/render) |
@@ -130,10 +131,24 @@ uninstalled web font therefore renders with a wrong fallback.
 
 ## Images
 
-By default external images are inlined as base64 data URIs, making the `.pagx` self-contained but
-large for image-heavy pages. Use `--download-images` to write them to a sidecar directory and
-reference them by path; the images are read from disk at render time. Use `--image-dir <dir>` to
-choose the location.
+Two independent knobs control images, at two different stages:
+
+- **`--download-images` (snapshot stage)** — when the browser fetches *external* images, save them
+  to a sidecar directory (`--image-dir <dir>`) and reference them by path in the intermediate
+  subset HTML, instead of inlining them as base64. Without it, the browser inlines fetched images as
+  `data:` URIs. This governs what the snapshot produces.
+- **`--pagx-images <mode>` (PAGX export stage)** — how the final `.pagx` stores its `<Image>`
+  resources: `external` (default) writes image files next to the `.pagx` at their relative path
+  (portable folder); `embed` inlines them as base64 (single self-contained file). It only ever
+  touches **local file** images — images already inline as `data:` URIs (e.g. small icons the
+  browser base64-inlined) are left untouched. Locally rasterized assets (e.g. conic-gradient PNGs
+  the snapshot bakes) and `--download-images` sidecar files are local files, so they follow this
+  mode.
+
+In practice: browser-inlined base64 images stay inline regardless of `--pagx-images`; to force
+*everything* into one self-contained file use `--pagx-images embed`, and to keep a small `.pagx`
+with a sidecar image folder use the default `--pagx-images external` (optionally with
+`--download-images` so fetched images also land on disk rather than inline).
 
 ## URL inputs
 

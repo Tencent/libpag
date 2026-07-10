@@ -225,14 +225,24 @@ export async function runPagxImportToFile(
 export interface RunPagxResolveOptions extends SpawnCaptureOptions {
   pagxBin?: string;
   pagxFile?: string;
+  // How image resources are stored in the resolved PAGX: 'external' (default; write image files
+  // next to the .pagx, keeping their relative path) or 'embed' (inline as base64 data URIs).
+  imageStorage?: 'external' | 'embed';
+  // Directory used to resolve relative image paths (e.g. inline-SVG <image href>) to real files.
+  // For subset HTML produced from a source document, this is the source document's directory.
+  imageBaseDir?: string;
 }
 
-// Step 3 — `pagx resolve <pagx>`.
+// Step 3 — `pagx resolve <pagx>`. Image resources created while resolving inline SVG are
+// normalised to the requested storage mode via `--images` / `--image-base-dir`.
 export async function runPagxResolve(opts: RunPagxResolveOptions = {}): Promise<SpawnCaptureResult> {
-  const { pagxBin, pagxFile, stderrPath, timeoutMs } = opts;
+  const { pagxBin, pagxFile, imageStorage, imageBaseDir, stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxResolve: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxResolve: pagxFile is required');
-  return spawnCapture(pagxBin, ['resolve', pagxFile], { stderrPath, timeoutMs });
+  const args = ['resolve', pagxFile];
+  if (imageStorage) args.push('--images', imageStorage);
+  if (imageBaseDir) args.push('--image-base-dir', imageBaseDir);
+  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
 export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
@@ -337,6 +347,11 @@ export interface RunHtmlToPagxOptions {
   fontDir?: string;
   downloadImages?: boolean;
   imageDir?: string;
+  // How image resources are stored in the exported .pagx: 'external' (default; write image files
+  // next to the .pagx, keeping their relative path) or 'embed' (inline as base64 data URIs).
+  pagxImages?: 'external' | 'embed';
+  // Directory relative image paths resolve against. Defaults to the input document's directory.
+  pagxImageBaseDir?: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
   scrollReveal?: boolean;
@@ -480,7 +495,17 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     }
 
     log(`[3/${totalSteps}] resolve   ${pagxFile}`);
-    const resolveResult = await runPagxResolve({ pagxBin, pagxFile });
+    // Image resources (both <img> and inline-SVG <image>) exist only after resolve, so the image
+    // storage mode is applied here. Relative paths in the subset resolve against the original input
+    // document's directory (the subset may live in a different output dir).
+    const pagxImageBaseDir = opts.pagxImageBaseDir
+      || (inputIsUrl ? '' : path.dirname(path.resolve(opts.input)));
+    const resolveResult = await runPagxResolve({
+      pagxBin,
+      pagxFile,
+      imageStorage: opts.pagxImages || 'external',
+      imageBaseDir: pagxImageBaseDir,
+    });
     assertStepOk('pagx resolve', resolveResult);
 
     if (embedFonts && fonts.length > 0) {

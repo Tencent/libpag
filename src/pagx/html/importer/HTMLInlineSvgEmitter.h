@@ -26,6 +26,7 @@ namespace pagx {
 
 struct DOMNode;
 struct Color;
+class HTMLValueParser;
 
 /**
  * Captures inline `<svg>` subtrees as PAGX import-directive content.
@@ -85,6 +86,24 @@ class HTMLInlineSvgEmitter {
   void stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot);
 
   /**
+   * Rewrites the exporter's conic-gradient-stroke workaround back into native stroked shapes.
+   *
+   * `HTMLWriter::renderSVGConicStroke` cannot express a conic-gradient stroke in plain SVG (SVG has
+   * no sweep-gradient primitive), so it emits a `<mask>` holding the white stroke shapes plus a
+   * sibling `<foreignObject mask="url(#…)">` whose `<div>` carries the paint as a CSS
+   * `background: conic-gradient(...)`. The downstream SVG importer does not understand
+   * `<foreignObject>`; it drops the div and paints the masked region opaque black, so the shape
+   * vanishes on a dark background. This pass detects that pattern and replaces each such
+   * `<foreignObject>` with the mask's stroke shapes recolored to a concrete paint derived from the
+   * div's background: a solid colour is used verbatim, and a gradient is sampled to the
+   * representative colour it shows over the shape's box (for the small, far-centred conic the
+   * exporter emits, that single hue matches the browser almost exactly). `valueParser` is reused so
+   * gradient/colour parsing stays identical to the rest of the importer.
+   */
+  void reconstructForeignObjectPaints(const std::shared_ptr<DOMNode>& svgRoot,
+                                      HTMLValueParser& valueParser);
+
+  /**
    * Serialises the subtree rooted at `svgNode` into XML suitable for embedding in
    * `Layer::importDirective::content`. Recursion is bounded by `MAX_HTML_RECURSION_DEPTH`.
    */
@@ -105,6 +124,17 @@ class HTMLInlineSvgEmitter {
   static std::string formatColorForAttribute(const Color& color);
 
  private:
+  // Depth-bounded walk backing `reconstructForeignObjectPaints`. Splices any qualifying
+  // `<foreignObject>` child of `node` in place; recurses into every other child.
+  void reconstructForeignObjectsRecursive(const std::shared_ptr<DOMNode>& node,
+                                          HTMLValueParser& valueParser, int depth);
+
+  // Builds the replacement subtree for one `<foreignObject>` (recolored mask stroke shapes, or a
+  // filled `<rect>` when the foreignObject carries no mask). Returns nullptr when the node does not
+  // match the reconstructable pattern, leaving it untouched.
+  std::shared_ptr<DOMNode> buildForeignObjectReplacement(
+      const std::shared_ptr<DOMNode>& foreignObject, HTMLValueParser& valueParser);
+
   // id -> the shared definition node (a `<defs>` child) bearing that id. Populated by
   // `collectSharedDefs`; read by `injectReferencedDefs`.
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _sharedDefs = {};

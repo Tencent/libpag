@@ -4334,6 +4334,61 @@ PAGX_TEST(PAGXTest, ImagePatternInlineImage) {
   EXPECT_TRUE(pattern5->image->data != nullptr);
 }
 
+/**
+ * Test case: loadFileData(path, PAGImage) supplies a host-decoded image for an external file path
+ * so the ImagePattern referencing that path renders with the host image instead of decoding itself.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer id="L">
+    <Rectangle width="100" height="100"/>
+    <Fill>
+      <ImagePattern id="pat" image="avatar.png"/>
+    </Fill>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+  auto* pattern = doc->findNode<pagx::ImagePattern>("pat");
+  ASSERT_TRUE(pattern != nullptr);
+  ASSERT_TRUE(pattern->image != nullptr);
+
+  // The host decodes the resource itself and supplies it for the declared file path.
+  auto hostImage =
+      pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(hostImage != nullptr);
+  auto expectedTgfx = pagx::LayerBuilder::GetTGFXImage(hostImage);
+  ASSERT_TRUE(expectedTgfx != nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage));
+
+  // The bound tgfx ImagePattern now renders with the host-supplied image.
+  auto& binding = *scene->rootComposition()->binding;
+  auto tgfxPattern = binding.get<tgfx::ImagePattern>(pattern);
+  ASSERT_TRUE(tgfxPattern != nullptr);
+  ASSERT_TRUE(tgfxPattern->image() != nullptr);
+  EXPECT_EQ(tgfxPattern->image()->width(), expectedTgfx->width());
+  EXPECT_EQ(tgfxPattern->image()->height(), expectedTgfx->height());
+
+  // Supplying a different image for the same path switches the pattern to it, and only the
+  // referencing layers are refreshed in place (the tree is not rebuilt).
+  auto hostImage2 =
+      pagx::PAGImage::MakeFromPath(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
+  ASSERT_TRUE(hostImage2 != nullptr);
+  auto expectedTgfx2 = pagx::LayerBuilder::GetTGFXImage(hostImage2);
+  ASSERT_TRUE(expectedTgfx2 != nullptr);
+  EXPECT_TRUE(doc->loadFileData("avatar.png", hostImage2));
+  auto tgfxPattern2 = scene->rootComposition()->binding->get<tgfx::ImagePattern>(pattern);
+  ASSERT_TRUE(tgfxPattern2 != nullptr);
+  ASSERT_TRUE(tgfxPattern2->image() != nullptr);
+  EXPECT_EQ(tgfxPattern2->image()->width(), expectedTgfx2->width());
+  EXPECT_EQ(tgfxPattern2->image()->height(), expectedTgfx2->height());
+}
+
 // =====================================================================================
 // ClipToBounds
 // =====================================================================================
@@ -10880,6 +10935,73 @@ PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
   ASSERT_TRUE(surface != nullptr);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/NotifyChangeDocumentSize_after"));
+}
+
+/**
+ * Test case: when a flex child is resized and only that child is notified, sibling layers that
+ * auto-layout repositioned are auto-refreshed by the engine (their runtime transform is re-synced)
+ * without the caller having to list them in dirtyNodes.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeAutoLayoutRepositionsSiblings) {
+  auto doc = pagx::PAGXDocument::Make(400, 600);
+
+  auto parent = doc->makeNode<pagx::Layer>("parent");
+  parent->width = 400;
+  parent->height = 600;
+  parent->layout = pagx::LayoutMode::Vertical;
+  parent->gap = 10;
+  doc->layers = {parent};
+
+  auto child1 = doc->makeNode<pagx::Layer>("child1");
+  child1->width = 100;
+  child1->height = 100;
+  auto rect1 = doc->makeNode<pagx::Rectangle>();
+  rect1->size.width = 100;
+  rect1->size.height = 100;
+  auto fill1 = doc->makeNode<pagx::Fill>();
+  auto solid1 = doc->makeNode<pagx::SolidColor>();
+  solid1->color = {1, 0, 0, 1};
+  fill1->color = solid1;
+  child1->contents = {rect1, fill1};
+
+  auto child2 = doc->makeNode<pagx::Layer>("child2");
+  child2->width = 100;
+  child2->height = 150;
+  auto rect2 = doc->makeNode<pagx::Rectangle>();
+  rect2->size.width = 100;
+  rect2->size.height = 150;
+  auto fill2 = doc->makeNode<pagx::Fill>();
+  auto solid2 = doc->makeNode<pagx::SolidColor>();
+  solid2->color = {0, 0, 1, 1};
+  fill2->color = solid2;
+  child2->contents = {rect2, fill2};
+
+  parent->children = {child1, child2};
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  ASSERT_EQ(scene->rootComposition()->children.size(), 1u);
+  auto& parentChildren = scene->rootComposition()->children[0]->children;
+  ASSERT_EQ(parentChildren.size(), 2u);
+  auto child2Handle = parentChildren[1];
+
+  // child1 at y=0 (first flex child), child2 at y=110 (100 + 10 gap).
+  EXPECT_NEAR(child1->renderPosition().y, 0.0f, 1.0e-3f);
+  EXPECT_NEAR(child2->renderPosition().y, 110.0f, 1.0e-3f);
+  auto bounds = scene->getGlobalBounds(child2Handle);
+  EXPECT_NEAR(bounds.y, 110.0f, 1.0e-3f);
+
+  // Resize child1 only and notify ONLY child1. Auto layout pushes child2 down to y=210.
+  child1->height = 200;
+  rect1->size.height = 200;
+  doc->notifyChange({child1}, /*layoutChanged=*/true);
+
+  // Data model: child2 moved to y=210 (200 + 10 gap).
+  EXPECT_NEAR(child2->renderPosition().y, 210.0f, 1.0e-3f);
+  // Runtime: child2's transform must also reflect the new position without notifying it.
+  bounds = scene->getGlobalBounds(child2Handle);
+  EXPECT_NEAR(bounds.y, 210.0f, 1.0e-3f);
 }
 
 PAGX_TEST(PAGXTest, GetRequiredFonts) {

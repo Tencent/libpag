@@ -2476,4 +2476,78 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncPreservesColorSpaceOnReadback) {
   EXPECT_EQ(bg->value().colorSpace, pagx::ColorSpace::DisplayP3);
 }
 
+// A ViewModel property declared with viewModelRef but not bound to any Composition must still
+// instantiate its nested VM, so referenceViewModel() returns it and $vm.child.leaf DataBind paths
+// resolve. This covers pure data nesting (e.g. a "face" VM grouping an "eyes" sub-VM) where no
+// Composition slot exists; previously the nested VM was only created when a Layer bound a
+// Composition via vmContext.
+PAGX_TEST(PAGXViewModelTest, NestedViewModelInstantiatedWithoutComposition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  // EyesVM: color(Color), size(Number).
+  auto* eyesVM = doc->makeNode<pagx::ViewModel>("EyesVM");
+  auto* eyesColorProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesColorProp->name = "color";
+  eyesColorProp->propertyType = pagx::ViewModelPropertyType::Color;
+  eyesColorProp->defaultColor = pagx::Color{32.0f / 255.0f, 32.0f / 255.0f, 32.0f / 255.0f, 1.0f};
+  eyesVM->properties.push_back(eyesColorProp);
+  auto* eyesSizeProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesSizeProp->name = "size";
+  eyesSizeProp->propertyType = pagx::ViewModelPropertyType::Number;
+  eyesSizeProp->defaultNumber = 1.0f;
+  eyesVM->properties.push_back(eyesSizeProp);
+
+  // FaceVM: faceColor(Color), eyes(@EyesVM). No Composition — pure data nesting.
+  auto* faceVM = doc->makeNode<pagx::ViewModel>("FaceVM");
+  auto* faceColorProp = doc->makeNode<pagx::ViewModelProperty>();
+  faceColorProp->name = "faceColor";
+  faceColorProp->propertyType = pagx::ViewModelPropertyType::Color;
+  faceColorProp->defaultColor = pagx::Color{1.0f, 199.0f / 255.0f, 82.0f / 255.0f, 1.0f};
+  faceVM->properties.push_back(faceColorProp);
+  auto* eyesSlotProp = doc->makeNode<pagx::ViewModelProperty>();
+  eyesSlotProp->name = "eyes";
+  eyesSlotProp->propertyType = pagx::ViewModelPropertyType::ViewModel;
+  eyesSlotProp->viewModelRef = eyesVM;
+  faceVM->properties.push_back(eyesSlotProp);
+  doc->viewModel = faceVM;
+
+  auto layer = doc->makeNode<pagx::Layer>("face");
+  layer->width = 200;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+
+  // The nested EyesVM is reachable through the VM API without any Composition binding.
+  auto rootVM = scene->viewModel();
+  ASSERT_NE(rootVM, nullptr);
+  EXPECT_EQ(rootVM->id(), "FaceVM");
+  auto eyesProp = rootVM->propertyViewModel("eyes");
+  ASSERT_NE(eyesProp, nullptr);
+  auto eyesVMRuntime = eyesProp->referenceViewModel();
+  ASSERT_NE(eyesVMRuntime, nullptr);
+  EXPECT_EQ(eyesVMRuntime->id(), "EyesVM");
+
+  // Nested property defaults are populated.
+  auto eyesColor = eyesVMRuntime->propertyColor("color");
+  ASSERT_NE(eyesColor, nullptr);
+  EXPECT_FLOAT_EQ(eyesColor->value().red, 32.0f / 255.0f);
+  EXPECT_FLOAT_EQ(eyesColor->value().green, 32.0f / 255.0f);
+  EXPECT_FLOAT_EQ(eyesColor->value().blue, 32.0f / 255.0f);
+  auto eyesSize = eyesVMRuntime->propertyNumber("size");
+  ASSERT_NE(eyesSize, nullptr);
+  EXPECT_FLOAT_EQ(eyesSize->value(), 1.0f);
+
+  // The $vm.eyes.color path resolves through referenceInstance (DataContext descends into the
+  // nested VM), so DataBind sources like $vm.eyes.color bind correctly without a Composition.
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_NE(rootComp->dataContext, nullptr);
+  auto* resolved = rootComp->dataContext->resolve({"$vm", "eyes", "color"});
+  ASSERT_NE(resolved, nullptr);
+  EXPECT_EQ(resolved, eyesColor.get());
+}
+
 }  // namespace pag

@@ -64,6 +64,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/MixUtils.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/FillRule.h"
@@ -784,7 +785,7 @@ class LayerBuilderContext {
   }
 
   // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
-  // conversion goes through getOrCreateImage() again and re-queries the provider.
+  // conversion goes through getOrCreateImage() again and re-reads the node's runtimeImage.
   void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
     if (filePath.empty()) {
       return;
@@ -1483,7 +1484,7 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
       // an opaque SolidColor here would paint a black placeholder over every shape that uses an
-      // ImagePattern before its image is resolved via the provider; leaving the fill empty keeps
+      // ImagePattern before its runtimeImage is set via loadFileData; leaving the fill empty keeps
       // those shapes transparent until the image is ready.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
@@ -1527,7 +1528,7 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
       // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
-      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // an ImagePattern before its runtimeImage is set via loadFileData; leaving the stroke empty
       // keeps those shapes transparent until the image is ready, matching convertFill.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
@@ -1607,7 +1608,7 @@ class LayerBuilderContext {
 
   static bool ReadImagePatternImage(const void* object, KeyValue* out) {
     auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
-    *out = KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    *out = KeyValue{MakeFrom(image)};
     return true;
   }
 
@@ -1945,21 +1946,17 @@ class LayerBuilderContext {
       return it->second;
     }
     // Resolution chain. Two camps of sources exist:
-    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
-    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
-    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
+    //   1. Host-supplied texture-backed images (from PAGImage::MakeFromTexture): already mipmapped
+    //      at upload time by the host. Re-wrapping with makeMipmapped(true) would force tgfx to
+    //      allocate a parallel mipmapped texture and copy the pixels. Use as-is.
     //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    bool isBackendTexture = false;
-    // Priority 1: query the provider for a platform-decoded image.
-    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
-    if (provider && !imageNode->filePath.empty()) {
-      image = provider->resolveImage(imageNode->filePath);
-      if (image) {
-        isBackendTexture = true;
-      }
+    // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
+    auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
+    if (runtimeImage != nullptr) {
+      image = LayerBuilder::GetTGFXImage(runtimeImage);
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -1971,12 +1968,11 @@ class LayerBuilderContext {
         image = tgfx::Image::MakeFromFile(imageNode->filePath);
       }
     }
-    if (image && !isBackendTexture) {
+    if (image && !image->isTextureBacked()) {
       image = image->makeMipmapped(true);
     }
-    // Only memoize successful results. A null entry would cache the absence of a provider-
-    // resolved image forever, so a later provider update would never take effect after
-    // invalidation.
+    // Only memoize successful results. A null entry would cache the absence of a host-provided
+    // image forever, so a later loadFileData() update would never take effect after invalidation.
     if (image) {
       _imageCache[imageNode] = image;
     }
@@ -3279,7 +3275,7 @@ size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
     return 0;
   }
   // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
-  // into convertImagePattern() re-queries the provider for the updated image.
+  // into convertImagePattern() re-reads the node's runtimeImage for the updated image.
   impl->context.invalidateImagesByFilePath(*impl->document, filePath);
 
   const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
@@ -3369,14 +3365,11 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   return context.buildLayerInto(node, binding);
 }
 
-std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
-  return image ? image->_tgfxImage : nullptr;
+std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
+  return node != nullptr ? node->runtimeImage : nullptr;
 }
 
-std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
+std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
 }
 }  // namespace pagx

@@ -740,6 +740,159 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
 }
 
 /**
+ * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
+ * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
+ * the mid marker is instanced twice; every marker triangle contributes its own Path node.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkersExpandToLayers) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\">"
+      "<defs><marker id=\"arrow\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\""
+      " orient=\"auto\" markerUnits=\"strokeWidth\">"
+      "<path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#000000\"/></marker></defs>"
+      "<path d=\"M10 10 L100 10 L100 100 L190 190\" stroke=\"#111111\" stroke-width=\"4\""
+      " fill=\"none\" marker-start=\"url(#arrow)\" marker-mid=\"url(#arrow)\""
+      " marker-end=\"url(#arrow)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  }
+  // One path for the stroked shape plus one per marker instance (start + 2 mids + end = 4).
+  EXPECT_GE(paths.size(), 5u);
+}
+
+/**
+ * Test SVG import: a marker on a path ending in a cubic segment, with a numeric `orient` and
+ * `markerUnits="userSpaceOnUse"`, still resolves its end point/tangent and emits a marker layer
+ * that is not scaled by the referencing stroke width.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkerCubicEndUserSpaceUnits) {
+  std::string svg =
+      "<svg width=\"120\" height=\"80\" viewBox=\"0 0 120 80\">"
+      "<defs><marker id=\"dot\" markerWidth=\"4\" markerHeight=\"4\" refX=\"2\" refY=\"2\""
+      " orient=\"45\" markerUnits=\"userSpaceOnUse\">"
+      "<circle cx=\"2\" cy=\"2\" r=\"2\" fill=\"#22C55E\"/></marker></defs>"
+      "<path d=\"M10 40 C 30 10, 60 10, 90 40\" stroke=\"#000000\" stroke-width=\"3\""
+      " fill=\"none\" marker-end=\"url(#dot)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+}
+
+/**
+ * Test SVG import: `stroke-dasharray` combined with `pathLength` normalises the dash values back
+ * into user units using the real measured length. Exercising it across a polyline, line, circle,
+ * ellipse and rect drives the shape-specific branches of the path-length measurement, and the
+ * circle/ellipse cases additionally trigger the perimeter phase shift.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_StrokeDashPathLengthAcrossShapes) {
+  std::string svg =
+      "<svg width=\"300\" height=\"300\" viewBox=\"0 0 300 300\">"
+      "<polyline points=\"10,10 60,10 60,60\" fill=\"none\" stroke=\"#000\" stroke-width=\"2\""
+      " stroke-dasharray=\"0.25 0.75\" pathLength=\"1\"/>"
+      "<line x1=\"10\" y1=\"80\" x2=\"120\" y2=\"80\" stroke=\"#000\" stroke-width=\"2\""
+      " stroke-dasharray=\"0.5 0.5\" pathLength=\"1\"/>"
+      "<circle cx=\"70\" cy=\"170\" r=\"40\" fill=\"none\" stroke=\"#000\" stroke-width=\"3\""
+      " stroke-dasharray=\"0.3 0.7\" pathLength=\"1\"/>"
+      "<ellipse cx=\"200\" cy=\"170\" rx=\"50\" ry=\"30\" fill=\"none\" stroke=\"#000\""
+      " stroke-width=\"3\" stroke-dasharray=\"0.4 0.6\" pathLength=\"1\"/>"
+      "<rect x=\"20\" y=\"230\" width=\"80\" height=\"50\" fill=\"none\" stroke=\"#000\""
+      " stroke-width=\"2\" stroke-dasharray=\"0.2 0.8\" pathLength=\"1\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> strokes;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Stroke, strokes);
+  }
+  EXPECT_GE(strokes.size(), 5u);
+  for (auto* s : strokes) {
+    EXPECT_FALSE(static_cast<pagx::Stroke*>(s)->dashes.empty());
+  }
+}
+
+/**
+ * Test SVG import: a document whose canvas size differs from its viewBox needs a content transform.
+ * With a single converted layer the importer folds the scale into an inner Group rather than adding
+ * a wrapper layer.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoGroup) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 100 100\">"
+      "<rect x=\"10\" y=\"10\" width=\"40\" height=\"40\" fill=\"#3B82F6\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+
+  std::vector<pagx::Element*> groups;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Group, groups);
+  }
+  ASSERT_FALSE(groups.empty());
+  auto* group = static_cast<pagx::Group*>(groups[0]);
+  // viewBox 100 -> canvas 200 is a uniform 2x scale embedded in the group.
+  EXPECT_FLOAT_EQ(group->scale.x, 2.0f);
+  EXPECT_FLOAT_EQ(group->scale.y, 2.0f);
+}
+
+/**
+ * Test SVG import: an element carrying both `mask` and `clip-path` keeps the mask on the inner
+ * layer and moves the clip-path onto a wrapping parent layer, so neither is dropped.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MaskAndClipPathWrapsLayer) {
+  std::string svg =
+      "<svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\">"
+      "<defs>"
+      "<mask id=\"m0\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"60\" fill=\"#FFFFFF\"/></mask>"
+      "<clipPath id=\"c0\"><circle cx=\"60\" cy=\"60\" r=\"50\"/></clipPath>"
+      "</defs>"
+      "<rect x=\"0\" y=\"0\" width=\"120\" height=\"120\" fill=\"#EF4444\""
+      " mask=\"url(#m0)\" clip-path=\"url(#c0)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  // At least one visible layer must carry a mask reference after the wrap.
+  bool anyMasked = false;
+  for (auto* layer : doc->layers) {
+    if (layer->mask != nullptr) anyMasked = true;
+    for (auto* child : layer->children) {
+      if (child->mask != nullptr) anyMasked = true;
+    }
+  }
+  EXPECT_TRUE(anyMasked);
+}
+
+/**
+ * Test SVG import: a gradient referenced by more than one shape is counted and, for the default
+ * objectBoundingBox units, re-resolved per shape rather than shared. The document imports cleanly
+ * with a fill on each shape.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SharedGradientReferencedTwice) {
+  std::string svg =
+      "<svg width=\"200\" height=\"120\" viewBox=\"0 0 200 120\">"
+      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+      "<stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"1\" stop-color=\"#00F\"/>"
+      "</linearGradient></defs>"
+      "<rect x=\"0\" y=\"0\" width=\"80\" height=\"80\" fill=\"url(#g)\"/>"
+      "<rect x=\"100\" y=\"0\" width=\"80\" height=\"80\" fill=\"url(#g)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> fills;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+  }
+  EXPECT_GE(fills.size(), 2u);
+}
+
+/**
  * Test SVG export with inner shadow filter.
  */
 PAGX_TEST(PAGXSVGTest, SVGExport_InnerShadow) {

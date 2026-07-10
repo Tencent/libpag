@@ -145,6 +145,7 @@ export interface RunBatchOptions {
   fontDir?: string;
   downloadImages?: boolean;
   imageDir?: string;
+  pagxImages?: 'external' | 'embed';
   inlineIconFonts?: boolean;
   scrollReveal?: boolean;
   cookies?: string[];
@@ -247,6 +248,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           fontDir: opts.fontDir,
           downloadImages: opts.downloadImages,
           imageDir: opts.imageDir,
+          pagxImages: opts.pagxImages,
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
           scrollReveal: opts.scrollReveal,

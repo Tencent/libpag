@@ -30,6 +30,7 @@
 #include <system_error>
 #include "cli/CliUtils.h"
 #include "cli/CommandResolve.h"
+#include "cli/ImageStorage.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -380,6 +381,12 @@ struct ImportOptions {
   // references and inline `<svg>` elements. These are expanded into native PAGX nodes in the
   // same pass by default so the output is fully flattened; `--no-resolve` keeps the directives.
   bool resolve = true;
+  // How image resources are stored in the exported PAGX. Defaults to writing image files next to
+  // the output (External); `--images embed` inlines them as base64 data URIs instead.
+  ImageStorageMode imageStorage = ImageStorageMode::External;
+  // Directory used to resolve relative image `source` paths to real files. Defaults to the input
+  // file's directory. Only meaningful for local (non-URL) inputs.
+  std::string imageBaseDir = {};
 };
 
 static void PrintUsage() {
@@ -394,6 +401,11 @@ static void PrintUsage() {
       << "  --format <format>              Force input format (svg, html)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
       << "                                 <svg>) instead of expanding them into native nodes\n"
+      << "  --images <mode>                How image resources are stored: 'external' (default;\n"
+      << "                                 write image files next to the output PAGX and keep the\n"
+      << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
+      << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
+      << "                                 (default: the input file's directory)\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -421,6 +433,15 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->format = argv[++i];
     } else if (arg == "--no-resolve") {
       options->resolve = false;
+    } else if (arg == "--images" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseImageStorageMode(mode, &options->imageStorage)) {
+        std::cerr << "pagx import: error: invalid --images value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
+    } else if (arg == "--image-base-dir" && i + 1 < argc) {
+      options->imageBaseDir = argv[++i];
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
@@ -489,6 +510,23 @@ int RunImport(int argc, char* argv[]) {
   if (options.verbose && !optimizeResult.converged) {
     std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
+
+  // Normalise image resources to the requested storage mode. Relative image paths recorded by the
+  // importer are anchored at the input document's directory, so that is the default base; copied
+  // files land next to the output PAGX. URL inputs have no local base, so image relocation is
+  // skipped for them.
+  {
+    ImageStorageOptions imageOptions = {};
+    imageOptions.mode = options.imageStorage;
+    std::string inputDir =
+        IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
+    imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : inputDir;
+    // The importer anchors relative `<img>` paths at the input file's directory, so that is the
+    // prefix to strip back off when recovering the authored `source`.
+    imageOptions.documentDir = inputDir;
+    imageOptions.outputDir = GetDirectory(options.outputFile);
+    ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
   }
 
   auto xml = PAGXExporter::ToXML(*result.document);
