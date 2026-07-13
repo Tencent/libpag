@@ -363,7 +363,7 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
   xml.openElement("Transition");
   xml.addRequiredAttribute("from", transition->from);
   xml.addRequiredAttribute("to", transition->to);
-  xml.addRequiredAttribute("duration", std::to_string(transition->duration));
+  xml.addRequiredAttribute("duration", transition->duration);
   xml.addAttribute("frameRate", transition->frameRate, 60.0f);
   if (transition->interpolation != KeyframeInterpolationType::Linear) {
     xml.addAttribute("interpolation", KeyframeInterpolationToString(transition->interpolation));
