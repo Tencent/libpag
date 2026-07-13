@@ -123,6 +123,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
                                              object:nil];
 }
 
+// Thread safety note: [animator cancel] / [animator release] are intentionally called BEFORE
+// acquiring imageViewLock. cancel() blocks up to 500ms waiting for an in-flight async flush task,
+// and that flush also needs imageViewLock; taking the lock first would self-deadlock. Once the
+// animator is cancelled no flush can re-enter, and [self reset] is itself lock-free, so acquiring
+// the non-recursive imageViewLock here is safe and simply serializes reset against any lingering
+// flush.
 - (void)dealloc {
   [animator cancel];
   [animator release];
