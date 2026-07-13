@@ -46,6 +46,13 @@ static bool IsExternalFilePath(const std::string& filePath) {
   return !filePath.empty() && filePath.find("data:") != 0;
 }
 
+// A local file path is an external file path that can be opened via local I/O (ifstream). URL
+// schemes (http/https/file/etc.) contain "://" and are not directly readable; the host is
+// responsible for downloading them and supplying the data via loadFileData.
+static bool IsLocalFilePath(const std::string& filePath) {
+  return IsExternalFilePath(filePath) && filePath.find("://") == std::string::npos;
+}
+
 static bool IsExpiredScene(const std::weak_ptr<PAGScene>& scene) {
   return scene.expired();
 }
@@ -75,6 +82,30 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
         AppendExternalFilePaths(layer->externalDoc.get(), paths, visited);
+      }
+    }
+  }
+}
+
+static void AppendExternalImagePaths(const PAGXDocument* document, std::vector<std::string>* paths,
+                                     std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->data != nullptr) {
+        continue;
+      }
+      if (!IsLocalFilePath(image->filePath)) {
+        continue;
+      }
+      paths->push_back(image->filePath);
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        AppendExternalImagePaths(layer->externalDoc.get(), paths, visited);
       }
     }
   }
@@ -352,6 +383,13 @@ std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   std::unordered_set<const PAGXDocument*> visited = {};
   AppendExternalFilePaths(this, &paths, visited);
+  return paths;
+}
+
+std::vector<std::string> PAGXDocument::getExternalImagePaths() const {
+  std::vector<std::string> paths = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendExternalImagePaths(this, &paths, visited);
   return paths;
 }
 

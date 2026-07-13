@@ -148,6 +148,15 @@ class PAGXDocument : public Node {
   std::vector<std::string> getExternalFilePaths() const;
 
   /**
+   * Returns a list of local file paths referenced by Image nodes that have no embedded data and
+   * can be read via local I/O. Data URIs and URL-scheme paths (http/https/file/etc., containing
+   * "://") are excluded, as are external composition layer paths. Use this instead of
+   * getExternalFilePaths() when the consumer performs direct local file reads (e.g. ImageEmbedder);
+   * URL-form resources are left untouched for the host to resolve.
+   */
+  std::vector<std::string> getExternalImagePaths() const;
+
+  /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
    * For performance, load all external file data before creating any PAGScene from this document.

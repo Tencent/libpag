@@ -3184,6 +3184,53 @@ CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
   EXPECT_FALSE(std::filesystem::exists(outPagx));
 }
 
+CLI_TEST(PAGXCliTest, Embed_UrlImageSource_NotInlinedAndSucceeds) {
+  auto tempPagx = CopyToTemp("embed_url_image.pagx", "embed_url_image.pagx");
+  CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+
+  // getExternalFilePaths() is host-facing and returns all external paths including URL sources.
+  auto document = pagx::PAGXImporter::FromFile(tempPagx);
+  ASSERT_NE(document, nullptr);
+  EXPECT_EQ(document->getExternalFilePaths().size(), 3u);
+
+  // getExternalImagePaths() excludes URL-scheme paths; only the local image is returned.
+  auto imagePaths = document->getExternalImagePaths();
+  ASSERT_EQ(imagePaths.size(), 1u);
+  EXPECT_NE(imagePaths.front().find("image_as_mask.png"), std::string::npos);
+
+  auto outPagx = TempDir() + "/embed_url_out.pagx";
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(capturedOut.str().find("pagx embed: wrote"), std::string::npos);
+
+  auto result = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(result, nullptr);
+  bool hasLocalImageData = false;
+  bool hasHttpsUrlPreserved = false;
+  bool hasFileUrlPreserved = false;
+  for (auto& node : result->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasLocalImageData = true;
+      }
+      if (image->filePath.find("https://") == 0) {
+        hasHttpsUrlPreserved = true;
+      }
+      if (image->filePath.find("file://") == 0) {
+        hasFileUrlPreserved = true;
+      }
+    }
+  }
+  EXPECT_TRUE(hasLocalImageData);
+  EXPECT_TRUE(hasHttpsUrlPreserved);
+  EXPECT_TRUE(hasFileUrlPreserved);
+}
+
 CLI_TEST(PAGXCliTest, Embed_Success_PrintsWroteAndExitsZero) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
   auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
