@@ -17,56 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JStringUtil.h"
-#include <cstring>
 
 namespace pag {
-/**
- * There is a known bug in env->NewStringUTF which will lead to crash in some devices.
- * So we use this method instead.
- */
 jstring SafeConvertToJString(JNIEnv* env, const std::string& text) {
-  static Global<jclass> StringClass = env->FindClass("java/lang/String");
-  static jmethodID StringConstructID =
-      env->GetMethodID(StringClass.get(), "<init>", "([BLjava/lang/String;)V");
-  auto array = env->NewByteArray(static_cast<jsize>(text.size()));
-  if (array == nullptr) {
-    return nullptr;
-  }
-  env->SetByteArrayRegion(array, 0, static_cast<jsize>(text.size()),
-                          reinterpret_cast<const jbyte*>(text.data()));
-  auto stringUTF = env->NewStringUTF("UTF-8");
-  auto result = (jstring)env->NewObject(StringClass.get(), StringConstructID, array, stringUTF);
-  env->DeleteLocalRef(array);
-  env->DeleteLocalRef(stringUTF);
-  return result;
+  return env->NewStringUTF(text.c_str());
 }
 
 std::string SafeConvertToStdString(JNIEnv* env, jstring jText) {
   if (jText == nullptr) {
     return "";
   }
-  std::string result;
-  static Global<jclass> StringClass = env->FindClass("java/lang/String");
-  static jmethodID GetBytesID =
-      env->GetMethodID(StringClass.get(), "getBytes", "(Ljava/lang/String;)[B");
-  auto encoding = env->NewStringUTF("utf-8");
-  auto jBytes = (jbyteArray)env->CallObjectMethod(jText, GetBytesID, encoding);
-  env->DeleteLocalRef(encoding);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
+  const char* chars = env->GetStringUTFChars(jText, nullptr);
+  if (chars == nullptr) {
     return "";
   }
-  if (jBytes == nullptr) {
-    return "";
-  }
-  auto textLength = env->GetArrayLength(jBytes);
-  if (textLength > 0) {
-    char* bytes = new char[textLength];
-    env->GetByteArrayRegion(jBytes, 0, textLength, (jbyte*)bytes);
-    result = std::string(bytes, (unsigned)textLength);
-    delete[] bytes;
-  }
-  env->DeleteLocalRef(jBytes);
+  std::string result(chars);
+  env->ReleaseStringUTFChars(jText, chars);
   return result;
 }
 }  // namespace pag
