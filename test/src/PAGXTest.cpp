@@ -7458,8 +7458,8 @@ PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("test.png", imageData));
 
-  // After loading, image data is set and filePath is cleared.
-  EXPECT_TRUE(img->filePath.empty());
+  // After loading, image data is set and filePath is preserved as the serialization anchor.
+  EXPECT_EQ(img->filePath, "test.png");
   ASSERT_TRUE(img->data != nullptr);
   EXPECT_EQ(img->data->size(), sizeof(bytes));
 
@@ -7480,7 +7480,7 @@ PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("test.png", imageData));
 
-  EXPECT_TRUE(img->filePath.empty());
+  EXPECT_EQ(img->filePath, "test.png");
   ASSERT_TRUE(img->data != nullptr);
 }
 
