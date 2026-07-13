@@ -11951,8 +11951,7 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto anim = doc->makeNode<pagx::Animation>("anim");
   anim->duration = 60;
-  anim->frameRate = 60.0f;
-  anim->loop = pagx::LoopMode::Loop;
+  anim->frameRate = 60;
   doc->animations.push_back(anim);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
@@ -11975,6 +11974,7 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   t->from = "idle";
   t->to = "active";
   t->duration = 10;
+  t->frameRate = 60;
   t->pauseOnExit = true;
   auto c = doc->makeNode<pagx::TransitionCondition>();
   c->inputName = "go";
@@ -11988,10 +11988,15 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Set go=true and advance; the condition fires immediately and pauseOnExit freezes the outgoing
-  // state's timeline at its current frame for the duration of the crossfade.
+  // Advance idle by a sub-crossfade amount (5 frames of 10-frame transition), then fire go. The
+  // outgoing idle animation is frozen at its current frame during the crossfade.
+  timeline->advance(5 * 16667);
   timeline->setBool("go", true);
-  timeline->advance(30 * 16667);
+  ASSERT_TRUE(timeline->advance(5 * 16667));
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  // The crossfade (10 frames total, 5 advanced so far) is still in progress. Advance another 6
+  // frames to push past the crossfade end and verify the SM lands stably in the target state.
+  EXPECT_TRUE(timeline->advance(6 * 16667));
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
 }
 
