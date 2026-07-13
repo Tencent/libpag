@@ -71,20 +71,12 @@ void PAGComposition::advance(int64_t deltaMicroseconds) {
       timeline->advance(deltaMicroseconds);
     }
   }
-  for (auto& sm : stateMachineTimelines) {
-    if (isTimelinePlaying(sm->getId())) {
-      sm->advance(deltaMicroseconds);
-    }
-  }
   PAGLayer::advance(deltaMicroseconds);
 }
 
 void PAGComposition::apply(float mix) {
   for (auto& timeline : timelines) {
     timeline->apply(mix);
-  }
-  for (auto& sm : stateMachineTimelines) {
-    sm->apply(mix);
   }
   PAGLayer::apply(mix);
 }
@@ -136,7 +128,6 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
 
 void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
   timelines.clear();
-  stateMachineTimelines.clear();
   pausedTimelineIds.clear();
   if (node == nullptr) {
     return;
@@ -168,7 +159,7 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
-      stateMachineTimelines.push_back(std::move(smTimeline));
+      timelines.push_back(std::move(smTimeline));
     }
   }
 }

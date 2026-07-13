@@ -231,9 +231,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
-  std::unordered_map<Animation*, std::shared_ptr<PAGAnimation>> timelinesByAnimation = {};
-  std::unordered_map<std::string, std::shared_ptr<PAGStateMachine>>
-      stateMachineTimelines = {};
+  // Top-level timelines instantiated on demand by getTimeline/getStateMachineTimeline, keyed by
+  // their source definition node so repeated lookups return the same instance.
+  std::unordered_map<const Node*, std::shared_ptr<PAGTimeline>> instantiatedTimelines = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
 

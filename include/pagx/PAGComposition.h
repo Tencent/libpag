@@ -30,6 +30,7 @@ namespace pagx {
 
 class PAGAnimation;
 class PAGStateMachine;
+class PAGTimeline;
 class PAGScene;
 class PAGViewModel;
 class PAGXDocument;
@@ -173,8 +174,7 @@ class PAGComposition : public PAGLayer {
   // sealed external composition this is the layer's externalDoc; otherwise the scene's document.
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
-  std::vector<std::shared_ptr<PAGAnimation>> timelines = {};
-  std::vector<std::shared_ptr<PAGStateMachine>> stateMachineTimelines = {};
+  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   // Timeline ids that are paused. advance() skips these, but apply() still runs so the current
   // frame keeps contributing to the output. Mirrors Rive's NestedSimpleAnimation.isPlaying, which
   // gates time advancement but not application.

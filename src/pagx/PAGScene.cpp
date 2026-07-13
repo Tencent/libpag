@@ -107,8 +107,7 @@ void PAGScene::buildRuntimeTree() {
   // deferred notifications surviving a runtime-tree rebuild.
   pendingNotifications.clear();
   suppressNotify = false;
-  timelinesByAnimation.clear();
-  stateMachineTimelines.clear();
+  instantiatedTimelines.clear();
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
@@ -406,16 +405,16 @@ std::shared_ptr<PAGAnimation> PAGScene::getTimeline(const std::string& id) {
   if (matched == nullptr) {
     return nullptr;
   }
-  auto it = timelinesByAnimation.find(matched);
-  if (it != timelinesByAnimation.end()) {
-    return it->second;
+  auto it = instantiatedTimelines.find(matched);
+  if (it != instantiatedTimelines.end()) {
+    return std::static_pointer_cast<PAGAnimation>(it->second);
   }
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
   // at apply time. A user-cached handle then survives a runtime-tree rebuild (foreign external-doc
   // edit) that replaces _rootComposition and frees the old binding, instead of dangling.
   auto timeline = std::shared_ptr<PAGAnimation>(
       new PAGAnimation(matched, nullptr, document.get(), weak_from_this()));
-  timelinesByAnimation.emplace(matched, timeline);
+  instantiatedTimelines.emplace(matched, timeline);
   return timeline;
 }
 
@@ -477,10 +476,6 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (document == nullptr) {
     return nullptr;
   }
-  auto it = stateMachineTimelines.find(id);
-  if (it != stateMachineTimelines.end()) {
-    return it->second;
-  }
   // Composition-owned StateMachines live in document->nodes but belong to a nested composition;
   // exclude them so only top-level state machines are vended, matching getStateMachineIds().
   std::unordered_set<const Node*> compOwned = CollectCompositionOwnedStateMachines(document.get());
@@ -495,11 +490,15 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (matched == nullptr) {
     return nullptr;
   }
+  auto it = instantiatedTimelines.find(matched);
+  if (it != instantiatedTimelines.end()) {
+    return std::static_pointer_cast<PAGStateMachine>(it->second);
+  }
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
   // at apply time, same as PAGAnimation.
   auto timeline = std::shared_ptr<PAGStateMachine>(
       new PAGStateMachine(matched, nullptr, document.get(), weak_from_this()));
-  stateMachineTimelines.emplace(id, timeline);
+  instantiatedTimelines.emplace(matched, timeline);
   return timeline;
 }
 
@@ -751,8 +750,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     if (_rootComposition != nullptr) {
       _rootComposition->resetTimelines();
     }
-    timelinesByAnimation.clear();
-    stateMachineTimelines.clear();
+    instantiatedTimelines.clear();
   }
 }
 

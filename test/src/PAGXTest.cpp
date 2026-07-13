@@ -12946,8 +12946,13 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   ASSERT_FALSE(rootChildren.empty());
   ASSERT_EQ(rootChildren[0]->layerType(), pagx::LayerType::Composition);
   auto* slotComp = static_cast<pagx::PAGComposition*>(rootChildren[0].get());
-  ASSERT_FALSE(slotComp->stateMachineTimelines.empty());
-  auto nestedSM = slotComp->stateMachineTimelines[0];
+  std::shared_ptr<pagx::PAGStateMachine> nestedSM = nullptr;
+  for (auto& tl : slotComp->timelines) {
+    if (tl != nullptr && tl->type() == pagx::TimelineType::StateMachine) {
+      nestedSM = std::static_pointer_cast<pagx::PAGStateMachine>(tl);
+      break;
+    }
+  }
   ASSERT_TRUE(nestedSM != nullptr);
 
   auto vmDim = scene->viewModel()->propertyBoolean("dim");
