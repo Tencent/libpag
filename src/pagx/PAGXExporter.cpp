@@ -428,7 +428,7 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
 
 static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
   xml.openElement("StateMachine");
-  xml.addRequiredAttribute("id", sm->id);
+  xml.addAttribute("id", sm->id);
   xml.closeElementStart();
 
   if (!sm->inputs.empty()) {
