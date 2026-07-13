@@ -103,6 +103,7 @@
 #include <OpenGL/gl3.h>
 #endif
 #include "pagx/PAGStateMachine.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
@@ -11949,10 +11950,16 @@ PAGX_TEST(PAGXTest, SMConditionAnd) {
 
 PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto anim = doc->makeNode<pagx::Animation>("anim");
-  anim->duration = 60;
-  anim->frameRate = 60;
-  doc->animations.push_back(anim);
+  auto animIdle = doc->makeNode<pagx::Animation>("animIdle");
+  animIdle->duration = 60;
+  animIdle->frameRate = 60;
+  animIdle->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animIdle);
+  auto animActive = doc->makeNode<pagx::Animation>("animActive");
+  animActive->duration = 60;
+  animActive->frameRate = 60;
+  animActive->loop = pagx::LoopMode::Loop;
+  doc->animations.push_back(animActive);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
   auto input = doc->makeNode<pagx::StateMachineInput>();
@@ -11965,10 +11972,11 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   region->initialState = "idle";
   auto s1 = doc->makeNode<pagx::AnimationState>();
   s1->name = "idle";
-  s1->animationId = "anim";
+  s1->animationId = "animIdle";
   region->states.push_back(s1);
   auto s2 = doc->makeNode<pagx::AnimationState>();
   s2->name = "active";
+  s2->animationId = "animActive";
   region->states.push_back(s2);
   auto t = doc->makeNode<pagx::StateTransition>();
   t->from = "idle";
@@ -11988,16 +11996,30 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   auto timeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(timeline != nullptr);
 
-  // Advance idle by a sub-crossfade amount (5 frames of 10-frame transition), then fire go. The
-  // outgoing idle animation is frozen at its current frame during the crossfade.
+  // Advance idle 5 frames, then fire go to start the 10-frame crossfade. pauseOnExit freezes the
+  // outgoing idle animation at its current frame while the crossfade runs.
   timeline->advance(5 * 16667);
   timeline->setBool("go", true);
-  ASSERT_TRUE(timeline->advance(5 * 16667));
-  EXPECT_EQ(timeline->getCurrentState("main"), "active");
-  // The crossfade (10 frames total, 5 advanced so far) is still in progress. Advance another 6
-  // frames to push past the crossfade end and verify the SM lands stably in the target state.
+  ASSERT_TRUE(timeline->advance(3 * 16667));
+  ASSERT_EQ(timeline->regions.size(), 1u);
+  auto& ri = timeline->regions[0];
+  ASSERT_EQ(ri.fadingOut.size(), 1u);
+  ASSERT_TRUE(ri.fadingOut[0].frozen);
+  ASSERT_TRUE(ri.fadingOut[0].timeline != nullptr);
+  int64_t frozenTime = ri.fadingOut[0].timeline->currentTime();
+
+  // Advance again while still mid-crossfade: the frozen outgoing timeline must hold its frame,
+  // while the incoming timeline keeps advancing.
+  int64_t incomingBefore = ri.currentTimeline->currentTime();
+  ASSERT_TRUE(timeline->advance(3 * 16667));
+  ASSERT_EQ(ri.fadingOut.size(), 1u);
+  EXPECT_EQ(ri.fadingOut[0].timeline->currentTime(), frozenTime);
+  EXPECT_GT(ri.currentTimeline->currentTime(), incomingBefore);
+
+  // Finish the crossfade; the region lands stably in the target state and the fading slot clears.
   EXPECT_TRUE(timeline->advance(6 * 16667));
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  EXPECT_TRUE(ri.fadingOut.empty());
 }
 
 PAGX_TEST(PAGXTest, SMDefaultInputValue) {

@@ -22,6 +22,7 @@
 #include "base/utils/Log.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueNumber.h"
@@ -37,26 +38,6 @@
 namespace pagx {
 
 static constexpr int MAX_TRANSITIONS_PER_FRAME = 100;
-
-// =============================================================================
-// RegionInstance (hidden in .cpp)
-// =============================================================================
-
-struct PAGStateMachine::RegionInstance {
-  struct FadingState {
-    std::shared_ptr<PAGAnimation> timeline;
-    float mixFrom = 1.0f;
-    bool frozen = false;
-  };
-
-  const StateRegion* region = nullptr;
-  const State* currentState = nullptr;
-  std::shared_ptr<PAGAnimation> currentTimeline;
-  float mix = 1.0f;
-  const StateTransition* transition = nullptr;
-  std::vector<FadingState> fadingOut;
-  std::set<std::string> consumedTriggers;
-};
 
 // =============================================================================
 // Helpers (anonymous namespace)
