@@ -150,7 +150,7 @@ class PAGStateMachine : public PAGTimeline {
   /**
    * Binds a ViewModel property to a StateMachine input, so that changes to the VM value are
    * automatically synchronized to the SM input. The VM property type must be compatible with the
-   * SM input type: Boolean for Bool inputs, Number for Number inputs, Boolean for Trigger inputs
+   * SM input type: Boolean for Bool inputs, Number for Number inputs, Trigger for Trigger inputs
    * (where a true transition fires the trigger).
    * @param inputName the name of the SM input declared in <Inputs>.
    * @param vmValue the ViewModel property value to bind. The binding holds a weak reference to
