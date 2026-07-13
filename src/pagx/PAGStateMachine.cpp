@@ -199,6 +199,9 @@ static int FindInputIndex(const StateMachine* sm, const std::string& name) {
 }
 
 bool PAGStateMachine::setBool(const std::string& name, bool value) {
+  if (stateMachine == nullptr || owner.expired()) {
+    return false;
+  }
   int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Bool) {
     return false;
@@ -208,6 +211,9 @@ bool PAGStateMachine::setBool(const std::string& name, bool value) {
 }
 
 bool PAGStateMachine::setNumber(const std::string& name, float value) {
+  if (stateMachine == nullptr || owner.expired()) {
+    return false;
+  }
   int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Number) {
     return false;
@@ -217,6 +223,9 @@ bool PAGStateMachine::setNumber(const std::string& name, float value) {
 }
 
 bool PAGStateMachine::fireTrigger(const std::string& name) {
+  if (stateMachine == nullptr || owner.expired()) {
+    return false;
+  }
   int idx = FindInputIndex(stateMachine, name);
   if (idx < 0 || inputValues[idx].type != StateMachineInputType::Trigger) {
     return false;
@@ -600,7 +609,7 @@ class TriggerInputObserver {
 
 bool PAGStateMachine::bindInput(const std::string& inputName,
                                 const std::shared_ptr<PAGViewModelValue>& vmValue) {
-  if (!vmValue || !stateMachine) {
+  if (!vmValue || !stateMachine || owner.expired()) {
     return false;
   }
   int idx = -1;
