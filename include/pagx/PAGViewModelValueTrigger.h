@@ -34,6 +34,10 @@ class PAGViewModelValueTrigger : public PAGViewModelValue {
    * Fires the trigger, notifying all registered observers. Each call is an independent event;
    * repeated calls produce repeated notifications (subject to consumption by the receiver, e.g. a
    * StateMachine consumes a trigger at most once per advance).
+   *
+   * Caveat: within an active SuppressDelegation scope, observer notifications are deferred and
+   * de-duplicated per value, so multiple fire() calls on the same trigger inside one suppressed
+   * scope coalesce into a single notification when the scope exits.
    */
   void fire();
 
