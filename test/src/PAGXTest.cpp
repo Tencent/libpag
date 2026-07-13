@@ -7429,7 +7429,8 @@ PAGX_TEST(PAGXTest, LoadFileDataExternalCompositionAfterSceneCreation) {
 
 /**
  * Test case: loading image data via loadFileData AFTER PAGScene::Make() sets the Image node data
- * and notifies existing scenes without crashing. Verifies both node-level state and scene integrity.
+ * and notifies existing scenes without crashing. Verifies node-level state (data set, filePath
+ * preserved as the serialization anchor) and scene integrity.
  */
 PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -7469,7 +7470,8 @@ PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
 
 /**
  * Test case: loadFileData is a no-op on notifyChange when called before any PAGScene exists.
- * Verifies that empty dirtyNodes or no liveScenes path is handled correctly.
+ * Verifies that empty dirtyNodes or no liveScenes path is handled correctly, and that node-level
+ * state (data set, filePath preserved as the serialization anchor) is still updated.
  */
 PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -7480,6 +7482,7 @@ PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("test.png", imageData));
 
+  // data is set and filePath is preserved even without any live scene to notify.
   EXPECT_EQ(img->filePath, "test.png");
   ASSERT_TRUE(img->data != nullptr);
 }
