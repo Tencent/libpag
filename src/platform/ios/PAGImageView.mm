@@ -126,8 +126,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)dealloc {
   [animator cancel];
   [animator release];
-  [self reset];
-  pagComposition = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(imageViewLock);
+    [self reset];
+    pagComposition = nullptr;
+  }
   if (_currentUIImage) {
     [_currentUIImage release];
   }
