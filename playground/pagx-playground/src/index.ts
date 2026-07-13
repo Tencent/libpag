@@ -18,6 +18,7 @@
 
 import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
 import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
+import { init as initEditor } from './editor';
 
 interface I18nStrings {
     dropText: string;
@@ -820,6 +821,9 @@ function goHome(pushHistory: boolean = true): void {
     if (pushHistory) {
         history.pushState(null, '', window.location.pathname);
     }
+
+    // Notify the Source Editor module that the document has been cleared.
+    window.dispatchEvent(new CustomEvent('pagx:loaded', { detail: { xmlText: null } }));
 }
 
 function isSafeRelativePath(path: string): boolean {
@@ -883,6 +887,29 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     toolbar.classList.remove('hidden');
     navBtns.classList.add('hidden');
     document.title = 'PAGX Playground - ' + name;
+    currentFileName = name;
+
+    // Notify the Source Editor module that a new XML document is available.
+    const decoder = new TextDecoder('utf-8');
+    const xmlText = decoder.decode(data);
+    window.dispatchEvent(new CustomEvent('pagx:loaded', { detail: { xmlText } }));
+}
+
+const LOADING_TIMEOUT_MS = 60000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: number | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = window.setTimeout(
+            () => reject(new Error('Loading timed out. Please check your network and try again.')),
+            ms
+        );
+    });
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer !== undefined) {
+            window.clearTimeout(timer);
+        }
+    }) as Promise<T>;
 }
 
 async function prepareForLoading(): Promise<void> {
@@ -901,7 +928,17 @@ async function prepareForLoading(): Promise<void> {
     }
 
     const loadingStartTime = Date.now();
-    await Promise.all([wasmLoadPromise, fontLoadPromise]);
+    try {
+        await withTimeout(
+            Promise.all([wasmLoadPromise, fontLoadPromise]),
+            LOADING_TIMEOUT_MS
+        );
+    } catch (error) {
+        // Reset promises so the next attempt can retry from scratch.
+        wasmLoadPromise = null;
+        fontLoadPromise = null;
+        throw error;
+    }
     updateProgressUI();
 
     const elapsed = Date.now() - loadingStartTime;
@@ -922,7 +959,8 @@ async function loadPAGXFile(file: File) {
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        showErrorUI(t().errorFormat);
+        const message = error instanceof Error ? error.message : t().errorFormat;
+        showErrorUI(message);
     }
 }
 
@@ -1125,6 +1163,7 @@ function applyI18n(): void {
 
 let sampleFiles: string[] = [];
 let currentPlayingFile: string | null = null;
+let currentFileName: string = 'export.pagx';
 
 async function loadSampleList(): Promise<void> {
     if (sampleFiles.length > 0) {
@@ -1250,6 +1289,47 @@ if (typeof window !== 'undefined') {
         if (sampleName) {
             loadPAGXSample(sampleName, false);
         }
+
+        // Initialize the Source Editor module (keyboard shortcut L to toggle).
+        initEditor({
+            onApply: (xmlText: string): string => {
+                if (playgroundState.pagxView === null) {
+                    return 'PAGXView not initialized';
+                }
+                try {
+                    const data = new TextEncoder().encode(xmlText);
+                    playgroundState.pagxView.parsePAGX(data);
+                    playgroundState.pagxView.buildLayers();
+                    playgroundState.pagxView.draw();
+                    return '';
+                } catch (e) {
+                    return e instanceof Error ? e.message : String(e);
+                }
+            },
+            onSave: (xmlText: string): string => {
+                if (playgroundState.pagxView === null) {
+                    return 'PAGXView not initialized';
+                }
+                try {
+                    const data = new TextEncoder().encode(xmlText);
+                    playgroundState.pagxView.parsePAGX(data);
+                    playgroundState.pagxView.buildLayers();
+                    playgroundState.pagxView.draw();
+                    const blob = new Blob([xmlText], { type: 'application/xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = currentFileName.endsWith('.pagx') ? currentFileName : currentFileName + '.pagx';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    return '';
+                } catch (e) {
+                    return e instanceof Error ? e.message : String(e);
+                }
+            },
+        });
     };
 
     // Observe container resize. The C++ PAGXView::draw() now auto-detects
