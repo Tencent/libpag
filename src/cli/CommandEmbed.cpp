@@ -127,7 +127,7 @@ int RunEmbed(int argc, char* argv[]) {
             std::cerr << "pagx embed: failed to load font '" << font->file << "'\n";
             return 1;
           }
-          fontConfig.registerTypeface(typeface);
+          fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
         }
       }
     }

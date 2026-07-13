@@ -25,14 +25,17 @@
 
 namespace pagx {
 
+class PAGImage;
+
 /**
  * Image represents an image resource that can be referenced by other nodes. The image source can
- * be a file path, a URL, or a base64-encoded data URI.
+ * be a file path, a URL, or a base64-encoded data URI. A host-supplied decoded image (provided at
+ * runtime via PAGXDocument::loadFileData) is cached on the node but never serialized.
  */
 class Image : public Node {
  public:
   /**
-   * Image binary data (decoded from base64).
+   * Image binary data (decoded from base64 or loaded via loadFileData).
    */
   std::shared_ptr<Data> data = nullptr;
 
@@ -48,7 +51,12 @@ class Image : public Node {
  private:
   Image() = default;
 
+  // Host-supplied ready-to-render image for this resource (set via loadFileData(path, PAGImage)).
+  // Runtime-only state; never serialized. Takes priority over decoding from data / filePath.
+  std::shared_ptr<PAGImage> runtimeImage = nullptr;
+
   friend class PAGXDocument;
+  friend class LayerBuilder;
 };
 
 }  // namespace pagx

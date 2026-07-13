@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: scrollRect layout keeps children in flex flow. -->
+<pagx width="320" height="120">
+  <Layer id="clip" width="300" height="100" layout="horizontal" gap="12"
+         alignment="stretch" scrollRect="5,7,300,100">
+    <Layer id="first" width="80" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="second" width="90" height="100">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>

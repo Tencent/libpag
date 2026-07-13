@@ -25,9 +25,9 @@
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
-#include "pagx/html/Woff2FontGenerator.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/Woff2FontGenerator.h"
 
 namespace pagx {
 

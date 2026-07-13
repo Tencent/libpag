@@ -27,8 +27,7 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
-                                   const tgfx::Point&) {
+void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point&, const tgfx::Point&) {
   opacity = layerStyle->opacity->getValueAt(layerFrame);
   colors = layerStyle->colors->getValueAt(layerFrame);
   angle = layerStyle->angle->getValueAt(layerFrame);
@@ -37,7 +36,6 @@ void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterSc
   scale = layerStyle->scale->getValueAt(layerFrame) / 100.f;
   offset = layerStyle->offset->getValueAt(layerFrame);
   blendMode = layerStyle->blendMode->getValueAt(layerFrame);
-  _filterScale = filterScale;
 }
 
 bool GradientOverlayFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> source) {
@@ -82,10 +80,7 @@ bool GradientOverlayFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> so
   tgfx::Paint paint;
   paint.setShader(shader);
   auto rect = tgfx::Rect::MakeWH(width, height);
-  canvas->save();
-  canvas->scale(1.f / _filterScale.x, 1.f / _filterScale.y);
   canvas->drawRect(rect, paint);
-  canvas->restore();
   return true;
 }
 

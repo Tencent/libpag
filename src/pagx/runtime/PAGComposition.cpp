@@ -19,9 +19,11 @@
 #include "pagx/PAGComposition.h"
 #include <unordered_map>
 #include <unordered_set>
+#include "pagx/DataBindRuntime.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -42,6 +44,10 @@ PAGComposition::~PAGComposition() = default;
 
 LayerType PAGComposition::layerType() const {
   return LayerType::Composition;
+}
+
+std::shared_ptr<PAGViewModel> PAGComposition::viewModel() const {
+  return compositionViewModel;
 }
 
 void PAGComposition::advance(int64_t deltaMicroseconds) {
@@ -85,12 +91,12 @@ std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
   // When the composition is not yet loaded (composition == nullptr), BuildCompositionSubtree
   // returns an empty root. Build a minimal tgfx slot layer so the PAGComposition has a valid
   // runtimeLayer for syncChildren to attach children into later.
-  if (composition->runtimeLayer == nullptr) {
-    composition->runtimeLayer =
-        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get());
-  }
   auto* externalDoc = ownerLayer->externalDoc.get();
   composition->document = externalDoc != nullptr ? externalDoc : parentScene->document.get();
+  if (composition->runtimeLayer == nullptr) {
+    composition->runtimeLayer =
+        LayerBuilder::BuildLayerInto(ownerLayer, composition->binding.get(), composition->document);
+  }
   if (externalDoc != nullptr) {
     externalDoc->registerLiveScene(parentScene);
   }
@@ -174,6 +180,25 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
+void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+                                              std::vector<PAGComposition*>& outChildren) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto& child : layer->children) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->layerType() == LayerType::Composition) {
+      outChildren.push_back(static_cast<PAGComposition*>(child.get()));
+    } else {
+      // A plain layer container holds no view model of its own but may nest compositions; descend
+      // through it so those compositions are still reached.
+      CollectChildCompositions(child.get(), outChildren);
+    }
+  }
+}
+
 void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
                                   const std::unordered_set<const Node*>& dirtySet,
                                   std::unordered_set<const Composition*>& visited) {
@@ -192,14 +217,22 @@ void PAGComposition::refreshNodes(const std::vector<Node*>& dirtyNodes,
   }
 
   if (binding != nullptr) {
+    bool refreshedLayer = false;
     for (auto* dirty : dirtyNodes) {
       if (dirty == nullptr || dirty->nodeType() != NodeType::Layer) {
         continue;
       }
       auto* dirtyLayer = static_cast<Layer*>(dirty);
       if (binding->get<tgfx::Layer>(dirtyLayer) != nullptr) {
-        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get());
+        LayerBuilder::RefreshLayerInPlace(dirtyLayer, binding.get(), document);
+        refreshedLayer = true;
       }
+    }
+    // A refreshed layer rebuilds its runtime targets, resetting their channels to the node
+    // defaults. Re-mark this composition's bindings dirty so the next updateDataBinds re-applies
+    // the current ViewModel values instead of leaving the rebuilt targets at their defaults.
+    if (refreshedLayer && dataBindRuntime != nullptr) {
+      dataBindRuntime->markAllDirty();
     }
   }
   for (auto& child : children) {
@@ -234,7 +267,7 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     }
     auto slot = binding->get<tgfx::Layer>(layer);
     if (slot == nullptr) {
-      slot = LayerBuilder::BuildLayerInto(layer, binding);
+      slot = LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
     }
     if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
       slot->addChild(childComposition->runtimeLayer);
@@ -243,7 +276,8 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
   }
   auto layerRuntime = binding->get<tgfx::Layer>(layer);
   if (layerRuntime == nullptr) {
-    layerRuntime = LayerBuilder::BuildLayerInto(layer, binding);
+    layerRuntime =
+        LayerBuilder::BuildLayerInto(layer, binding, scene ? scene->document.get() : nullptr);
   }
   if (layerRuntime == nullptr) {
     return nullptr;
@@ -390,6 +424,18 @@ void PAGComposition::refreshPlainContainerChildren(
     } else if (!child->children.empty()) {
       refreshPlainContainerChildren(child.get(), dirtyNodes, visited, dirtySet);
     }
+  }
+}
+
+void PAGComposition::updateDataBinds(float mix) {
+  if (dataBindRuntime != nullptr) {
+    dataBindRuntime->syncBack(binding.get());
+    dataBindRuntime->update(binding.get(), mix);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->updateDataBinds(mix);
   }
 }
 

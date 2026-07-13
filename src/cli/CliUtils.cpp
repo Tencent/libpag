@@ -46,20 +46,38 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
       return false;
     }
-    fontConfig->registerTypeface(typeface);
+    fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());
   }
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
   for (const auto& fallbackStr : fallbacks) {
-    auto typeface = ResolveFallbackTypeface(fallbackStr);
-    if (typeface == nullptr) {
-      std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      return false;
+    bool isFilePath = fallbackStr.find('/') != std::string::npos;
+    if (!isFilePath) {
+      auto dot = fallbackStr.rfind('.');
+      if (dot != std::string::npos) {
+        auto ext = fallbackStr.substr(dot);
+        isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
+                     ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
+      }
     }
-    fontConfig->registerTypeface(typeface);
-    fallbackTypefaces.push_back(typeface);
-  }
-  if (!fallbackTypefaces.empty()) {
-    fontConfig->addFallbackTypefaces(std::move(fallbackTypefaces));
+    if (isFilePath) {
+      // Register as both a main font (precise family match) and a fallback font, matching the
+      // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
+      auto typeface = tgfx::Typeface::MakeFromPath(fallbackStr);
+      if (typeface == nullptr) {
+        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
+      } else {
+        fontConfig->registerFont(fallbackStr, 0, typeface->fontFamily(), typeface->fontStyle());
+        fontConfig->addFallbackFont(fallbackStr, 0);
+      }
+    } else {
+      auto commaPos = fallbackStr.find(',');
+      auto family = commaPos != std::string::npos ? fallbackStr.substr(0, commaPos) : fallbackStr;
+      auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
+      if (!fontConfig->registerSystemFont(family, style)) {
+        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
+      } else {
+        fontConfig->addFallbackSystemFont(family, style);
+      }
+    }
   }
   return true;
 }

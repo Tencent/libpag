@@ -22,9 +22,12 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGXImporter.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
@@ -90,22 +93,14 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetTGFXDataFromEmscripten(fontVal);
   if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(fontData->data(), fontData->size(), 0);
   }
   auto emojiFontData = GetTGFXDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(emojiFontData->data(), emojiFontData->size(), 0);
   }
-  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -205,7 +200,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (!ensureWindow() || canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
-  if (pagSurface != nullptr && lastSurfaceWidth == canvasWidth &&
+  if (tgfxSurface != nullptr && lastSurfaceWidth == canvasWidth &&
       lastSurfaceHeight == canvasHeight) {
     return;
   }
@@ -214,15 +209,12 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (context == nullptr) {
     return;
   }
-  pag::GLFrameBufferInfo frameBufferInfo = {};
-  frameBufferInfo.id = 0;
-  frameBufferInfo.format = GL_RGBA8;
-  pag::BackendRenderTarget renderTarget(frameBufferInfo, canvasWidth, canvasHeight);
-  pagSurface = PAGSurface::MakeFrom(renderTarget, pag::ImageOrigin::BottomLeft);
+  tgfxSurface = tgfx::Surface::MakeFrom(context, window);
   device->unlock();
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
     return;
   }
+  pagSurface = pagx::MakeFrom(tgfxSurface);
   lastSurfaceWidth = canvasWidth;
   lastSurfaceHeight = canvasHeight;
   updateContentTransform();
@@ -325,7 +317,7 @@ void PAGXView::draw() {
   int currentCanvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
   syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
     return;
   }
   if (useCustomBackgroundColor) {
@@ -333,11 +325,10 @@ void PAGXView::draw() {
   } else {
     scene->getDisplayOptions()->setBackgroundColor({});
   }
-  scene->draw(pagSurface, true);
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context != nullptr) {
-    auto recording = context->flush();
+    auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
       presentImmediately = false;
       lastRecording = nullptr;

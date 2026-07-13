@@ -1,0 +1,26 @@
+/**
+ * Copyright (C) 2026 Tencent. All Rights Reserved.
+ * WXS module for comment overlay positioning.
+ * Runs on the render thread to avoid setData latency during zoom/pan gestures.
+ */
+
+/**
+ * Called on each comment-pin node when commentTransform changes.
+ * Reads baseX/baseY from the node's dataset and computes screen position.
+ */
+function onTransformChanged(newVal, oldVal, ownerInstance, instance) {
+  if (!newVal || !newVal.zoom) {
+    return;
+  }
+  var dataset = instance.getDataset();
+  var screenX = (dataset.basex * newVal.zoom + newVal.panOffsetX) / newVal.dpr;
+  var screenY = (dataset.basey * newVal.zoom + newVal.panOffsetY) / newVal.dpr;
+  instance.setStyle({
+    left: screenX + 'px',
+    top: screenY + 'px'
+  });
+}
+
+module.exports = {
+  onTransformChanged: onTransformChanged
+};

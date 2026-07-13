@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: flex item with child layer keeps measured width. -->
+<pagx width="240" height="80">
+  <Layer id="row" width="200" height="40" layout="horizontal" arrangement="spaceBetween">
+    <Layer id="first" width="40" height="40">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Layer id="wrapper" height="40">
+      <Layer id="inner" width="40" height="40">
+        <Rectangle left="0" right="0" top="0" bottom="0"/>
+        <Fill color="#00FF00"/>
+      </Layer>
+    </Layer>
+    <Layer id="last" width="40" height="40">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+  </Layer>
+</pagx>

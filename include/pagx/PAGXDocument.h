@@ -24,6 +24,7 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
@@ -31,8 +32,13 @@
 
 namespace pagx {
 
+class DataBind;
+class PAGImage;
 class LayoutContext;
 class PAGScene;
+class ViewModel;
+class Image;
+class ImagePattern;
 
 /**
  * PAGXDocument is the root container for a PAGX document.
@@ -67,6 +73,16 @@ class PAGXDocument : public Node {
    * Top-level animations.
    */
   std::vector<Animation*> animations = {};
+
+  /**
+   * The ViewModel schema bound to this document (raw pointer, owned by nodes).
+   */
+  ViewModel* viewModel = nullptr;
+  /**
+   * DataBind nodes that bind ViewModel properties to this document's layers (raw pointers, owned
+   * by nodes).
+   */
+  std::vector<DataBind*> dataBinds = {};
 
   /**
    * Creates a node of the specified type and adds it to the document management.
@@ -126,7 +142,8 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. The caller is
+   * responsible for skipping paths it has already supplied (e.g. via PAGXDocument::loadFileData).
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -151,6 +168,23 @@ class PAGXDocument : public Node {
    */
   void loadFileDataMap(
       const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+
+  /**
+   * Supplies a host-decoded image for the given external file path. Image nodes whose filePath
+   * matches (in this document and its resolved external documents) render with this image instead
+   * of decoding from their own data or file path; passing an empty shared_ptr clears a previous
+   * one. The image is runtime-only state and is not serialized. Use this for resources the host
+   * loads itself (e.g. asynchronously, or from a GPU texture via PAGImage::MakeFromTexture).
+   * Existing scenes refresh the affected layers in place.
+   *
+   * Note: this affects ImagePattern rendering only. ViewModel image-valued properties resolve
+   * images through their own decode chain (data → dataURI → filePath) and do not consult the
+   * runtime image set here.
+   * @param filePath the external file path as declared in the document's Image nodes
+   * @param image the decoded image to use, or an empty shared_ptr to clear it
+   * @return true if a matching Image node was found
+   */
+  bool loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
@@ -188,43 +222,37 @@ class PAGXDocument : public Node {
   void clearEmbed();
 
   /**
-   * Reflects post-build edits to the given nodes in every scene created from this document. Layer
-   * handles are preserved wherever possible. Pass a container node to reflect changes to its child
-   * list; an animation, animation object, or channel to apply new timeline data.
+   * Returns the set of unique (fontFamily, fontStyle) pairs required by Text nodes in this
+   * document and all loaded external composition documents (externalDoc). Call after all
+   * external file data has been loaded via loadFileData() to get complete results. The caller
+   * can use this list to register fonts with FontConfig before applyLayout() or embed().
+   * Empty fontFamily entries are skipped.
+   * @return deduplicated list of PAGFont. Results are sorted.
+   */
+  std::vector<PAGFont> getRequiredFonts() const;
+
+  /**
+   * Reflects post-build edits to the given nodes in every scene created from this document, reusing
+   * Layer handles where possible. Accepts Layer, timeline (Animation / AnimationObject / Channel),
+   * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
+   * supported — edit the Text node with layoutChanged = true instead.
    *
-   * Content nodes (Image, SolidColor, Gradient, ColorStop, Fill, Stroke, Group, TextBox, filters,
-   * styles, etc.) are also accepted — the scene refreshes the Layer that contains the content
-   * node. Filters and styles are matched by top-level pointer only (their color fields are value
-   * types, not node references). You may still pass the Layer directly; both are equivalent.
+   * When layoutChanged is true, only list nodes directly edited or whose child list changed: the
+   * whole chain for an "@id" reference change, or the container Layer for a structural child-list
+   * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,
+   * so callers do not need to list such siblings. For external compositions, notify the document
+   * that owns the nodes; foreign nodes are skipped (see ownsNode()).
    *
-   * GlyphRun, Font, and Glyph nodes are NOT supported. They are generated by applyLayout() at
-   * runtime. To update text content or font properties, mark the Text node dirty and re-apply
-   * layout (layoutChanged = true) instead.
+   * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
+   * null and foreign entries are skipped; an empty list is a no-op.
+   * @param layoutChanged true if any edit affects layout (size, fonts, text, geometry) or changes a
+   * child list, which re-runs layout before refreshing; false skips layout for a cheaper
+   * render-only refresh (safe only for edits that cannot move geometry, e.g. alpha, color). Adding
+   * or removing content always requires true. SetNodeChannel callers can derive it from
+   * RequiresLayout(NodeType, channel).
    *
-   * When an edit changes a node's "@id" reference (e.g. AnimationObject.target, Fill.color), mark
-   * every node on the affected reference chain dirty, not just the mutated one — notifyChange only
-   * refreshes the nodes it is given.
-   *
-   * Editing an external composition: call notifyChange on the document that owns the edited nodes.
-   * Scenes that embed this document as an external composition are refreshed automatically. A node
-   * may only be notified through its owning document; foreign nodes are skipped. Use ownsNode() if
-   * the caller does not statically know which document owns a given node.
-   *
-   * @param dirtyNodes the nodes whose fields (or child lists) were mutated. Must reference nodes
-   * still owned by this document. Null entries and foreign nodes are skipped. Content nodes are
-   * accepted alongside Layer and timeline nodes. An empty list is a no-op.
-   * @param layoutChanged whether any mutated field affects layout (size, constraints, padding,
-   * fonts, text, geometry) or a child list changed. Pass true to re-run layout before refreshing;
-   * pass false for a cheaper render-only refresh, only safe for edits that do not affect layout
-   * (e.g. alpha, color). Must pass true when adding or removing geometry content (Rectangle,
-   * Ellipse, Path, etc.) from a Layer's contents list, even if individual elements keep their
-   * sizes — new elements have no resolved layout bounds until a layout pass runs. Callers that
-   * mutate via SetNodeChannel can derive the right value from RequiresLayout(NodeType, channel);
-   * structural add/remove must pass true.
-   *
-   * Performance note: Prefer passing the owning Layer directly when known. Resolving a content
-   * node to its owning Layer requires scanning all document nodes (O(N)). For batch edits to a
-   * known Layer, pass the Layer once instead of every modified content child.
+   * Prefer passing the owning Layer when known: resolving a content node to its Layer scans all
+   * nodes (O(N)).
    */
   void notifyChange(const std::vector<Node*>& dirtyNodes, bool layoutChanged);
 
@@ -244,10 +272,24 @@ class PAGXDocument : public Node {
 
  private:
   PAGXDocument() = default;
+
+  const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
+
+  // Sets runtimeImage on every Image node matching filePath in this document and its resolved
+  // external documents, collecting the touched Image nodes per owning document.
+  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
+                               const std::shared_ptr<PAGImage>& image,
+                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+                               std::unordered_set<const PAGXDocument*>& visited);
+
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
-  // is detected and stops the recursion instead of overflowing the stack.
-  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
+  // is detected and stops the recursion instead of overflowing the stack. When changedOut is not
+  // null and the document was already laid out, every Layer whose layoutBounds differ from before
+  // the re-layout is appended to it, so notifyChange can auto-refresh siblings that auto layout
+  // repositioned without the caller having to list them.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited,
+                   std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
@@ -272,11 +314,21 @@ class PAGXDocument : public Node {
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
   friend class FontEmbedder;
+
+  // Lazily built index of Image node filePath -> pagx Layer list, used by
+  // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits
+  // may alter the tree topology or Image node filePath values. Also freed when the document is
+  // destroyed (on the next parsePAGX() call).
+  std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
+  bool layersByImageFilePathBuilt = false;
+
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;
   friend class PAGScene;
   friend class PAGComposition;
+  friend class LayerBuilderContext;
+  friend class LayerBuilderSession;
 };
 
 }  // namespace pagx

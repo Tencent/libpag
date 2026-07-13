@@ -21,6 +21,7 @@
 #include <pag/types.h>
 #include <tgfx/core/Buffer.h>
 #include <QThread>
+#include <atomic>
 #include "VideoEncoder.h"
 
 namespace exporter {
@@ -52,14 +53,16 @@ class PAGEncodeThread : public QThread {
   Q_SIGNAL void encodeHeadersSignal();
   Q_SIGNAL void encodeFrameSignal(std::shared_ptr<pag::ByteData> data, FrameType frameType,
                                   int stride);
+  Q_SIGNAL void closeSignal();
 
   Q_SLOT void getEncodeFrame();
   Q_SLOT void encodeHeadersInternal();
   Q_SLOT void encodeFrameInternal(std::shared_ptr<pag::ByteData> data, FrameType frameType,
                                   int stride);
+  Q_SLOT void closeInternal();
 
   bool valid = true;
-  bool inputFinished = false;
+  std::atomic<bool> inputFinished = false;
   int64_t needEncodeNum = 0;
   int64_t hasEncodedNum = 0;
   int32_t alphaStartX = 0;

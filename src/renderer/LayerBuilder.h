@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "tgfx/layers/Layer.h"
@@ -52,6 +53,12 @@ struct RuntimeColorStop {
  */
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
+// Reads the current value of a channel back from a runtime object into *out. Returns false when the
+// channel currently has no value to sync back (e.g. an unset optional property), in which case the
+// channel is skipped by DataBind syncBack. Symmetric to RuntimeWriter; used to flow target changes
+// back into ViewModel properties.
+using RuntimeReader = bool (*)(const void* object, KeyValue* out);
+
 struct RuntimeTarget {
   virtual ~RuntimeTarget() = default;
 
@@ -75,6 +82,12 @@ struct RuntimeTarget {
     }
   }
 
+  void setReader(const std::string& channel, RuntimeReader reader) {
+    if (!channel.empty() && reader != nullptr) {
+      readers[channel] = reader;
+    }
+  }
+
   // Returns true if this target can apply the given channel. Virtual so a subclass that intercepts
   // channels in apply() (LayerRuntimeTarget's x / y / matrix) reports them as handled even though
   // they are not in the writers map.
@@ -93,9 +106,22 @@ struct RuntimeTarget {
     return true;
   }
 
+  // Reads the current value of a channel back from the bound object. Virtual so a subclass
+  // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y). Returns
+  // false if no reader is registered for the channel, the object is null, or the reader reports the
+  // channel currently has no value to sync back.
+  virtual bool read(const std::string& channel, KeyValue* out) const {
+    auto it = readers.find(channel);
+    if (it == readers.end() || object == nullptr || out == nullptr) {
+      return false;
+    }
+    return it->second(object.get(), out);
+  }
+
  protected:
   std::shared_ptr<void> object = nullptr;
   std::unordered_map<std::string, RuntimeWriter> writers = {};
+  std::unordered_map<std::string, RuntimeReader> readers = {};
 };
 
 struct RuntimeBinding {
@@ -107,11 +133,16 @@ struct RuntimeBinding {
     ensureTarget(node)->setObject(std::move(object));
   }
 
-  void setWriter(const Node* node, const std::string& channel, RuntimeWriter writer) {
+  // Registers a writer and its symmetric reader for a channel in one call, declaring the channel as
+  // two-way capable (ViewModel -> target via the writer, target -> ViewModel via the reader).
+  void setAccessor(const Node* node, const std::string& channel, RuntimeWriter writer,
+                   RuntimeReader reader) {
     if (node == nullptr) {
       return;
     }
-    ensureTarget(node)->setWriter(channel, std::move(writer));
+    auto* target = ensureTarget(node);
+    target->setWriter(channel, std::move(writer));
+    target->setReader(channel, std::move(reader));
   }
 
   template <typename T>
@@ -234,6 +265,16 @@ struct RuntimeBinding {
     return it->second->apply(channel, value, mix);
   }
 
+  // Reads the current value of a node's channel back into out. Returns false if the node has no
+  // target or no reader for the channel. Used by DataBind syncBack.
+  bool read(const Node* node, const std::string& channel, KeyValue* out) const {
+    auto it = targets.find(node);
+    if (it == targets.end()) {
+      return false;
+    }
+    return it->second->read(channel, out);
+  }
+
   // Returns true if the node has a target that can apply the given channel. Used by tests to verify
   // every Animatable channel in the reflection registry has a matching runtime writer.
   bool hasWriter(const Node* node, const std::string& channel) const {
@@ -295,6 +336,9 @@ struct RuntimeBinding {
 struct LayerBuildResult {
   std::shared_ptr<tgfx::Layer> root = nullptr;
   RuntimeBinding binding = {};
+  // 1:1 pagx Layer -> tgfx Layer map, exposing only the first copy when a Composition is
+  // referenced by multiple Layers. Session users that need every copy use getTgfxLayers().
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> layerMap = {};
 
   /**
    * Returns the tgfx layer corresponding to the specified PAGX Layer node, or nullptr if the node
@@ -317,6 +361,9 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
+  static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
+  static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
+
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from. Must have had applyLayout() called.
@@ -362,9 +409,11 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
+   * @param document The owning document, used to decode image resources.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
-  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding);
+  static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
+                                  const PAGXDocument* document);
 
   /**
    * Builds a single Layer node (and its vector contents and recursive sub-layers) into the supplied
@@ -374,9 +423,87 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
+   * @param document The owning document, used to decode image resources.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
-  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding);
+  static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
+                                                     const PAGXDocument* document);
+};
+
+/**
+ * LayerBuilderSession wraps LayerBuilder with stateful behavior: it retains the build context
+ * after build() returns so callers can later re-generate a layer's contents when an underlying
+ * Image resource changes (e.g. progressive upgrade from a low-resolution thumbnail to a full
+ * version). The class is intended for the progressive image loading flow on WeChat; other
+ * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
+ *
+ * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
+ * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
+ * changes (new image attached or evicted). Destroying the session releases all
+ * cached layer/image state.
+ *
+ * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
+ * for the entire lifetime of this session. The session stores a non-owning pointer to the
+ * document and dereferences it on every rebuildForFilePath() call. Destroy the session before
+ * (or together with) the document.
+ */
+class LayerBuilderSession {
+ public:
+  LayerBuilderSession();
+  ~LayerBuilderSession();
+
+  LayerBuilderSession(const LayerBuilderSession&) = delete;
+  LayerBuilderSession& operator=(const LayerBuilderSession&) = delete;
+
+  /**
+   * Builds the layer tree for the given document. Behaves identically to
+   * LayerBuilder::BuildWithMap() but keeps the internal context alive for later rebuilds.
+   * @return The LayerBuildResult (root layer + pagx Layer to tgfx Layer mapping). The mapping
+   *         reflects the first tgfx layer produced for each pagx Layer; callers that need all
+   *         copies (for example to refresh every Composition instance that shares a Layer)
+   *         should use getTgfxLayers() instead.
+   */
+  LayerBuildResult build(PAGXDocument* document);
+
+  /**
+   * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
+   * ImagePattern backed by an Image node whose filePath matches the given value. Call this
+   * after the decoded image for the path changes so the renderer re-resolves it and picks up
+   * the new tgfx::Image. A single filePath may match multiple Image
+   * nodes and each Image node may be referenced by multiple Layers, which in turn may have
+   * been duplicated by Composition instancing; all such copies are refreshed in one call.
+   * @return The number of tgfx layers whose contents were regenerated. Zero means no layer
+   *         currently references the given filePath (or the document has not been built yet).
+   */
+  size_t rebuildForFilePath(const std::string& filePath);
+
+  /**
+   * Drops the entire internal image cache. Call this after the document undergoes structural
+   * node changes (e.g. after notifyChange with node additions or removals) because the
+   * cache keys are raw Image* pointers that become dangling when nodes are replaced.
+   */
+  void invalidateAllImages();
+
+  /**
+   * Returns every tgfx::Layer that was produced for layers referencing the given image file
+   * path. Combines findLayersByImageFilePath() and getTgfxLayers() into a single call so
+   * callers do not need to handle internal pagx::Layer pointers.
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayersByImageFilePath(
+      const std::string& filePath) const;
+
+  /**
+   * Returns every tgfx::Layer that was produced for the given pagx Layer during build(). A
+   * pagx Layer may map to several tgfx layers when its owning Composition is instanced more
+   * than once; the returned vector preserves build order.
+   * @return An empty vector when the pagx Layer was not seen during build() (e.g. nullptr,
+   *         a mask-only layer that got skipped, or no build() call has been made yet).
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getTgfxLayers(const Layer* pagxLayer) const;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl;
 };
 
 }  // namespace pagx

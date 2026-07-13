@@ -34,6 +34,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "renderer/FontEmbedder.h"
@@ -53,22 +54,27 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths) {
-  if (document == nullptr || paths == nullptr) {
+static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths,
+                                    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
     return;
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
-      if (image->data == nullptr && IsExternalFilePath(image->filePath)) {
-        paths->push_back(image->filePath);
+      if (image->data != nullptr) {
+        continue;
       }
+      if (!IsExternalFilePath(image->filePath)) {
+        continue;
+      }
+      paths->push_back(image->filePath);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
         paths->push_back(layer->compositionFilePath);
       } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), paths);
+        AppendExternalFilePaths(layer->externalDoc.get(), paths, visited);
       }
     }
   }
@@ -159,11 +165,12 @@ static bool LoadFileDataInChain(
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  applyLayout(config, visited);
+  applyLayout(config, visited, nullptr);
 }
 
 void PAGXDocument::applyLayout(const FontConfig* config,
-                               std::unordered_set<const PAGXDocument*>& visited) {
+                               std::unordered_set<const PAGXDocument*>& visited,
+                               std::vector<Layer*>* changedOut) {
   if (!visited.insert(this).second) {
     errors.push_back("Cyclic external composition reference detected during layout.");
     return;
@@ -174,12 +181,20 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
+  // When changedOut is requested, snapshot each Layer's layoutBounds here (before resetLayout()
+  // clears them to NAN) so the post-layout pass can detect which Layers auto layout repositioned.
+  std::unordered_map<Layer*, Rect> beforeBounds = {};
   if (layoutApplied) {
     for (auto& node : nodes) {
       switch (node->nodeType()) {
-        case NodeType::Layer:
-          static_cast<Layer*>(node.get())->resetLayout();
+        case NodeType::Layer: {
+          auto* layer = static_cast<Layer*>(node.get());
+          if (changedOut != nullptr) {
+            beforeBounds.emplace(layer, layer->layoutBounds());
+          }
+          layer->resetLayout();
           break;
+        }
         case NodeType::Rectangle:
         case NodeType::Ellipse:
         case NodeType::Path:
@@ -216,7 +231,9 @@ void PAGXDocument::applyLayout(const FontConfig* config,
         // its own layoutApplied flag internally. The host's fontConfig is passed down intentionally
         // so external compositions are measured and rendered with the host's fonts, keeping text
         // consistent across the embedded boundary rather than using the external doc's own config.
-        layer->externalDoc->applyLayout(&fontConfig, visited);
+        // changedOut is intentionally not forwarded: an external document has its own notifyChange
+        // chain, and runtime layers inside it are rebuilt by that document's scenes.
+        layer->externalDoc->applyLayout(&fontConfig, visited, nullptr);
       }
     }
   }
@@ -224,6 +241,16 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // leave the document flagged as laid out even when a downstream cycle aborts the recursion,
   // letting PAGScene::Make build from an inconsistent tree.
   layoutApplied = true;
+  if (changedOut != nullptr) {
+    // Layout is deterministic, so a Layer that auto layout did not move produces an identical
+    // layoutBounds; only those whose bounds actually changed are appended, so notifyChange can
+    // refresh the repositioned siblings the caller did not list.
+    for (auto& [layer, oldBounds] : beforeBounds) {
+      if (layer->layoutBounds() != oldBounds) {
+        changedOut->push_back(layer);
+      }
+    }
+  }
   visited.erase(this);
 }
 
@@ -323,7 +350,8 @@ bool PAGXDocument::hasUnresolvedImports() const {
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
-  AppendExternalFilePaths(this, &paths);
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendExternalFilePaths(this, &paths, visited);
   return paths;
 }
 
@@ -343,6 +371,48 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
     }
   }
   return found;
+}
+
+// Sets runtimeImage on every Image node matching filePath in this document and its resolved
+// external documents, collecting the touched Image nodes per owning document for notifyChange.
+void PAGXDocument::LoadImageInChain(
+    PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* imageNode = static_cast<Image*>(node.get());
+      if (imageNode->filePath == filePath) {
+        imageNode->runtimeImage = image;  // filePath is kept as the serialization anchor.
+        docDirtyImages[document].push_back(imageNode);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        LoadImageInChain(layer->externalDoc.get(), filePath, image, docDirtyImages, visited);
+      }
+    }
+  }
+}
+
+bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image) {
+  if (filePath.empty()) {
+    return false;
+  }
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyImages = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  LoadImageInChain(this, filePath, image, docDirtyImages, visited);
+  if (docDirtyImages.empty()) {
+    return false;
+  }
+  // A decoded image swap does not change geometry, so layout is not re-run (layoutChanged = false).
+  for (auto& entry : docDirtyImages) {
+    entry.first->notifyChange(entry.second, false);
+  }
+  return true;
 }
 
 bool PAGXDocument::embed() {
@@ -365,6 +435,35 @@ void PAGXDocument::clearEmbed() {
       static_cast<Font*>(node.get())->resetRenderCache();
     }
   }
+}
+
+static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFont>* outFonts,
+                                std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || outFonts == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Text) {
+      auto* text = static_cast<Text*>(node.get());
+      if (!text->fontFamily.empty()) {
+        outFonts->emplace_back(text->fontFamily, text->fontStyle);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        AppendRequiredFonts(layer->externalDoc.get(), outFonts, visited);
+      }
+    }
+  }
+}
+
+std::vector<PAGFont> PAGXDocument::getRequiredFonts() const {
+  std::vector<PAGFont> fonts = {};
+  std::unordered_set<const PAGXDocument*> visited = {};
+  AppendRequiredFonts(this, &fonts, visited);
+  std::sort(fonts.begin(), fonts.end());
+  fonts.erase(std::unique(fonts.begin(), fonts.end()), fonts.end());
+  return fonts;
 }
 
 namespace {
@@ -504,6 +603,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (ownedDirty.empty()) {
     return;
   }
+  // Invalidate the filePath -> Layer index so the next query rebuilds it from the (possibly
+  // modified) tree topology. Edits may add/remove Image references or change filePath values.
+  layersByImageFilePathBuilt = false;
+  layersByImageFilePath.clear();
   // Resolve content nodes (Image, SolidColor, Gradient, Fill, Stroke, Group, Filter, Style, etc.)
   // to their owning Layers. refreshNodes only processes Layer nodes directly; non-Layer content
   // nodes are resolved here so callers can pass them to notifyChange without having to find the
@@ -515,6 +618,16 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // - GlyphRun, Font, and Glyph nodes are layout-time data generated by applyLayout() and live
   //   outside the Layer tree; re-layout the owning Layer or mark its Text node dirty instead.
   // - Orphan nodes no longer attached to any Layer are dropped.
+  // Collect dirty <Image> resource nodes before the Layer collapse below. An Image referenced by a
+  // ViewModel image default (and not by any Layer's ImagePattern) is not reachable from the Layer
+  // tree, so it would otherwise be dropped; ViewModel image values are refreshed off these nodes
+  // directly via PAGScene::onImageResourcesChanged.
+  std::vector<Image*> changedImages = {};
+  for (auto* node : ownedDirty) {
+    if (node != nullptr && node->nodeType() == NodeType::Image) {
+      changedImages.push_back(static_cast<Image*>(node));
+    }
+  }
   {
     std::vector<Node*> layerDirty = {};
     for (auto* node : ownedDirty) {
@@ -528,6 +641,11 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
       } else {
         auto owningLayers = findLayerForContentNode(nodes, node);
         if (owningLayers.empty()) {
+          // An Image used only by a ViewModel default has no owning Layer; it is handled by the
+          // image-resource refresh below, so skip it silently rather than logging an error.
+          if (type == NodeType::Image) {
+            continue;
+          }
           LOGE(
               "PAGXDocument::notifyChange: content node (type=%d) not reachable from any Layer "
               "and dropped. GlyphRun, Font, and Glyph are layout-time data and must be resolved "
@@ -545,7 +663,7 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
     std::sort(layerDirty.begin(), layerDirty.end());
     layerDirty.erase(std::unique(layerDirty.begin(), layerDirty.end()), layerDirty.end());
     ownedDirty = std::move(layerDirty);
-    if (ownedDirty.empty()) {
+    if (ownedDirty.empty() && changedImages.empty()) {
       return;
     }
   }
@@ -554,13 +672,32 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // list changes require a full re-layout, since layout is resolved top-down and a single node
   // cannot be re-measured in isolation. applyLayout() discards the cached layout outputs first when
   // the document is already laid out (see its reset branch). Pure render edits skip this entirely.
+  // Auto layout can reposition siblings the caller did not list (e.g. a flex container pushing
+  // other children when one child is resized); applyLayout collects every Layer whose layoutBounds
+  // changed, and those are merged into ownedDirty below so refreshNodes re-syncs their runtime
+  // transform too.
   if (layoutChanged) {
-    applyLayout();
+    std::unordered_set<const PAGXDocument*> visited = {};
+    std::vector<Layer*> layoutRepositioned = {};
+    applyLayout(nullptr, visited, &layoutRepositioned);
+    if (!layoutRepositioned.empty()) {
+      ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
+      for (auto* layer : layoutRepositioned) {
+        ownedDirty.push_back(layer);
+      }
+      std::sort(ownedDirty.begin(), ownedDirty.end());
+      ownedDirty.erase(std::unique(ownedDirty.begin(), ownedDirty.end()), ownedDirty.end());
+    }
   }
   for (auto& weakScene : liveScenes) {
     auto scene = weakScene.lock();
     if (scene != nullptr) {
-      scene->onNodesChanged(ownedDirty);
+      if (!ownedDirty.empty()) {
+        scene->onNodesChanged(ownedDirty);
+      }
+      if (!changedImages.empty()) {
+        scene->onImageResourcesChanged(changedImages);
+      }
     }
   }
 }
@@ -617,6 +754,97 @@ void PAGXDocument::loadFileDataMap(
     image->data = it->second;
     image->filePath = {};
   }
+}
+
+// Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
+// `index`, scoped to the owning `layer`.
+static void RecordImagePattern(
+    const ColorSource* color, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!color || color->nodeType() != NodeType::ImagePattern) {
+    return;
+  }
+  const auto* pattern = static_cast<const ImagePattern*>(color);
+  if (!pattern->image || pattern->image->filePath.empty()) {
+    return;
+  }
+  (*index)[pattern->image->filePath].insert(layer);
+}
+
+// Records into `index` every Image node filePath referenced by an ImagePattern inside
+// `element`, scoped to the owning `layer`. The inner unordered_set deduplicates layers that
+// have multiple fills or strokes pointing at the same filePath so the resulting index keeps
+// each Layer exactly once per path.
+static void CollectImageFilePathsFromElement(
+    const Element* element, const Layer* layer,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index) {
+  if (!element || !layer) {
+    return;
+  }
+  switch (element->nodeType()) {
+    case NodeType::Fill:
+      RecordImagePattern(static_cast<const Fill*>(element)->color, layer, index);
+      break;
+    case NodeType::Stroke:
+      RecordImagePattern(static_cast<const Stroke*>(element)->color, layer, index);
+      break;
+    case NodeType::Group:
+    case NodeType::TextBox: {
+      const auto* group = static_cast<const Group*>(element);
+      for (const auto* child : group->elements) {
+        CollectImageFilePathsFromElement(child, layer, index);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void CollectImageFilePathsFromLayers(
+    const std::vector<Layer*>& layers,
+    std::unordered_map<std::string, std::unordered_set<const Layer*>>* index,
+    std::unordered_set<const Composition*>* visitedCompositions) {
+  for (const auto* layer : layers) {
+    if (!layer) {
+      continue;
+    }
+    for (const auto* element : layer->contents) {
+      CollectImageFilePathsFromElement(element, layer, index);
+    }
+    CollectImageFilePathsFromLayers(layer->children, index, visitedCompositions);
+    // A Composition may be referenced by many Layers; skip re-entry once we have already
+    // walked its inner layers to avoid quadratic blowups in documents that instance the
+    // same Composition repeatedly.
+    if (layer->composition && visitedCompositions->insert(layer->composition).second) {
+      CollectImageFilePathsFromLayers(layer->composition->layers, index, visitedCompositions);
+    }
+  }
+}
+
+const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
+    const std::string& imageFilePath) {
+  static const std::vector<const Layer*> empty;
+  if (imageFilePath.empty()) {
+    return empty;
+  }
+  if (!layersByImageFilePathBuilt) {
+    std::unordered_map<std::string, std::unordered_set<const Layer*>> tempIndex;
+    std::unordered_set<const Composition*> visitedCompositions;
+    CollectImageFilePathsFromLayers(layers, &tempIndex, &visitedCompositions);
+    layersByImageFilePath.clear();
+    layersByImageFilePath.reserve(tempIndex.size());
+    for (auto& [path, layerSet] : tempIndex) {
+      std::vector<const Layer*> layerList(layerSet.begin(), layerSet.end());
+      layersByImageFilePath.emplace(path, std::move(layerList));
+    }
+    layersByImageFilePathBuilt = true;
+  }
+  auto it = layersByImageFilePath.find(imageFilePath);
+  if (it == layersByImageFilePath.end()) {
+    return empty;
+  }
+  return it->second;
 }
 
 }  // namespace pagx
