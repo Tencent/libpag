@@ -77,6 +77,7 @@ class PAGStateMachine : public PAGTimeline {
   /**
    * Returns the name of the current state in the given region. Returns an empty string if the
    * region name is not found or the owning scene has been destroyed.
+   * @param regionName the name of the region to query, as returned by getRegionIds().
    */
   std::string getCurrentState(const std::string& regionName) const;
 
@@ -138,12 +139,14 @@ class PAGStateMachine : public PAGTimeline {
    *
    * Reentrant add/remove is safe: listeners are snapshotted before dispatch, so a callback that
    * adds or removes listeners during dispatch does not invalidate the ongoing iteration.
+   * @param callback invoked on each region transition with the region name and the new state name.
    */
   int addStateChangeListener(
       std::function<void(const std::string& regionName, const std::string& newState)> callback);
 
   /**
    * Removes a previously registered state-change listener. Safe to call with an unknown id.
+   * @param listenerId the id returned by addStateChangeListener(); ignored if it matches none.
    */
   void removeStateChangeListener(int listenerId);
 
