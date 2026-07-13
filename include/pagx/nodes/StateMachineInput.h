@@ -29,12 +29,12 @@ namespace pagx {
  */
 enum class StateMachineInputType : uint8_t {
   /**
-   * A persistent boolean value. Used with equal / notEqual conditions.
+   * A persistent boolean value. Used with Equal / NotEqual conditions.
    */
   Bool = 0,
   /**
-   * A persistent numeric value. Used with equal / notEqual / lessThan / lessThanOrEqual /
-   * greaterThan / greaterThanOrEqual conditions.
+   * A persistent numeric value. Used with Equal / NotEqual / LessThan / LessThanOrEqual /
+   * GreaterThan / GreaterThanOrEqual conditions.
    */
   Number = 1,
   /**
