@@ -146,8 +146,8 @@ void PAGXView::buildLayers() {
   // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
   // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
   // them to absolute coordinates to ensure correct rendering.
-  ResolveAllImagePatternMatrices(document.get());
-  ResolveAllGradientCoordinates(document.get());
+  // ResolveAllImagePatternMatrices(document.get());
+  // ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {

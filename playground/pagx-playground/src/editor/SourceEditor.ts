@@ -18,10 +18,11 @@
 
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { basicSetup } from 'codemirror';
+import { minimalSetup } from 'codemirror';
+import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { xml } from '@codemirror/lang-xml';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 
 /** Syntax highlight colors matching the desktop client (VS Code Dark+ palette). */
@@ -39,7 +40,7 @@ const pagxHighlightStyle = HighlightStyle.define([
 
 /**
  * Wraps a CodeMirror 6 instance for editing PAGX XML source.
- * The editor is created lazily on first open to avoid impacting initial page load.
+ * Search relies on the browser's built-in Ctrl+F.
  */
 export class SourceEditor {
     private host: HTMLElement;
@@ -47,23 +48,23 @@ export class SourceEditor {
 
     constructor(host: HTMLElement) {
         this.host = host;
+        this.createView();
     }
 
-    /** Creates the CodeMirror view if it does not exist yet. */
-    private ensureView(): void {
-        if (this.view !== null) {
-            return;
-        }
+    private createView(): void {
         this.view = new EditorView({
             parent: this.host,
             state: EditorState.create({
                 doc: '',
                 extensions: [
-                    basicSetup,
+                    minimalSetup,
                     xml(),
                     syntaxHighlighting(pagxHighlightStyle),
                     highlightSelectionMatches(),
-                    keymap.of([...searchKeymap]),
+                    // basicSetup includes searchKeymap which intercepts Ctrl+F. Use minimalSetup
+                    // (which omits it) and add only the keymaps we need, so the browser's
+                    // built-in Ctrl+F is free to handle search.
+                    keymap.of([...defaultKeymap, ...historyKeymap]),
                     EditorView.theme({
                         '&': {
                             backgroundColor: '#1E1E1E',
@@ -105,7 +106,6 @@ export class SourceEditor {
 
     /** Replaces the entire document content. */
     setContent(text: string): void {
-        this.ensureView();
         if (this.view === null) {
             return;
         }
@@ -132,6 +132,11 @@ export class SourceEditor {
         if (this.view !== null) {
             this.view.focus();
         }
+    }
+
+    /** Returns the underlying CodeMirror view, or null if not yet created. */
+    getView(): EditorView | null {
+        return this.view;
     }
 
     /** Releases the CodeMirror instance and frees DOM nodes. */

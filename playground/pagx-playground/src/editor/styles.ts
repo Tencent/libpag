@@ -92,6 +92,11 @@ export const EDITOR_STYLES = `
     overflow: auto;
 }
 
+/* Fix white square at scrollbar corner */
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-corner {
+    background: #1E1E1E;
+}
+
 #editor-panel .editor-host .cm-gutters {
     background: #1E1E1E;
     border-right: 1px solid #3C3C3C;
@@ -100,6 +105,26 @@ export const EDITOR_STYLES = `
 
 #editor-panel .editor-host .cm-focused {
     outline: none;
+}
+
+/* Selection highlight */
+#editor-panel .editor-host .cm-editor .cm-selectionBackground,
+#editor-panel .editor-host .cm-editor.cm-focused .cm-selectionBackground,
+#editor-panel .editor-host .cm-editor ::selection {
+    background-color: rgba(68, 142, 249, 0.35) !important;
+}
+
+#editor-panel .editor-host .cm-editor .cm-selectionLayer .cm-selectionBackground {
+    background-color: rgba(68, 142, 249, 0.35);
+}
+
+/* highlightSelectionMatches - subtle highlight for matching text under cursor */
+#editor-panel .editor-host .cm-editor .cm-selectionMatch {
+    background-color: rgba(234, 179, 8, 0.15);
+}
+
+#editor-panel .editor-host .cm-editor .cm-selectionMatch-selected {
+    background-color: rgba(68, 142, 249, 0.3);
 }
 
 .editor-toast {
