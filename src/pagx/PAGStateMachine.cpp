@@ -28,14 +28,11 @@
 #include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
-#include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
 #include "pagx/runtime/BezierEasing.h"
-#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
