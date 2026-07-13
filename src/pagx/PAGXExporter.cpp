@@ -331,6 +331,7 @@ static std::string TransitionConditionOpToString(TransitionConditionOp op) {
 static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition,
                            const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("Condition");
+  xml.addAttribute("id", condition->id);
   xml.addRequiredAttribute("input", condition->inputName);
   xml.addRequiredAttribute("op", TransitionConditionOpToString(condition->op));
   if (condition->op != TransitionConditionOp::Trigger) {
@@ -361,6 +362,7 @@ static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition
 static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
                             const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("Transition");
+  xml.addAttribute("id", transition->id);
   xml.addRequiredAttribute("from", transition->from);
   xml.addRequiredAttribute("to", transition->to);
   xml.addRequiredAttribute("duration", transition->duration);
@@ -394,6 +396,7 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
 static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
                              const std::vector<StateMachineInput*>& inputs) {
   xml.openElement("StateRegion");
+  xml.addAttribute("id", region->id);
   xml.addRequiredAttribute("name", region->name);
   xml.addRequiredAttribute("initialState", region->initialState);
   xml.closeElementStart();
@@ -403,6 +406,7 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
   for (const auto* state : region->states) {
     if (state == nullptr) continue;
     xml.openElement("State");
+    xml.addAttribute("id", state->id);
     xml.addRequiredAttribute("name", state->name);
     if (state->stateType() == StateType::Animation) {
       auto* animState = static_cast<const AnimationState*>(state);
@@ -437,6 +441,7 @@ static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
     for (const auto* input : sm->inputs) {
       if (input == nullptr) continue;
       xml.openElement("Input");
+      xml.addAttribute("id", input->id);
       xml.addRequiredAttribute("name", input->name);
       std::string typeStr;
       switch (input->type) {
