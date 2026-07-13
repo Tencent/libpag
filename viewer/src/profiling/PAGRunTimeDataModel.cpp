@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGRunTimeDataModel.h"
+#include <cmath>
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
 
@@ -128,8 +129,28 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
 }
 
 void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
-  frameModeEnabled = false;
-  totalFrame = pagxDocument ? 1 : 0;
+  if (pagxDocument != nullptr && !pagxDocument->animations.empty()) {
+    auto* anim = pagxDocument->animations[0];
+    // Derive totalFrame from the microsecond duration using the same two-step rounding as the
+    // render path (PAGTimeline::duration truncates frames→microseconds, then frames are recovered
+    // via round). Using anim->duration directly would diverge by up to one frame at non-integer
+    // frame rates, causing the render-side clamped last frame to be dropped by updateData's guard.
+    if (anim->frameRate > 0.0f && anim->duration > 0) {
+      auto durationUs = static_cast<int64_t>(static_cast<double>(anim->duration) * 1000000.0 /
+                                             static_cast<double>(anim->frameRate));
+      totalFrame = static_cast<int64_t>(std::round(
+          static_cast<double>(durationUs) * static_cast<double>(anim->frameRate) / 1000000.0));
+    } else {
+      totalFrame = 0;
+    }
+    if (totalFrame < 1) {
+      totalFrame = 1;
+    }
+    frameModeEnabled = true;
+  } else {
+    totalFrame = pagxDocument ? 1 : 0;
+    frameModeEnabled = false;
+  }
   currentFrame = pagxDocument ? 0 : -1;
   lastUpdatedFrame = -1;
   chartDataModel.clearItems();

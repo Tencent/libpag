@@ -602,27 +602,31 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="315"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="331"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
         <translation>解析 XML 失败：语法或结构无效</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="321"/>
         <source>Failed to build layer from XML document</source>
-        <translation>从 XML 文档构建图层失败</translation>
+        <translation type="vanished">从 XML 文档构建图层失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="352"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="337"/>
+        <source>Failed to build PAGScene from XML document</source>
+        <translation>从 XML 文档构建 PAGScene 失败</translation>
+    </message>
+    <message>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="364"/>
         <source>No file path specified</source>
         <translation>未指定文件路径</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="356"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="368"/>
         <source>Failed to open file for writing: %1</source>
         <translation>无法打开文件进行写入：%1</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="361"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="373"/>
         <source>Failed to write all data to file</source>
         <translation>写入文件数据不完整</translation>
     </message>

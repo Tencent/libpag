@@ -18,11 +18,11 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QFile>
+#include <QMetaObject>
 #include <QQuickWindow>
 #include <cmath>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
-#include "renderer/LayerBuilder.h"
 
 namespace pag {
 
@@ -150,14 +150,47 @@ void PAGXViewModel::markNeedsRender() {
   needsRender = true;
 }
 
+void PAGXViewModel::updateProgressFromRender(double newProgress, uint64_t generation) {
+  QMetaObject::invokeMethod(this, "applyProgressFromRender", Qt::QueuedConnection,
+                            Q_ARG(double, newProgress),
+                            Q_ARG(quint64, static_cast<quint64>(generation)));
+}
+
+void PAGXViewModel::applyProgressFromRender(double newProgress, quint64 generation) {
+  // Ignore a progress update from an earlier playback session; content may have been reloaded.
+  if (generation != playbackGeneration.load()) {
+    return;
+  }
+  if (std::abs(progress - newProgress) < 1e-9) {
+    return;
+  }
+  progress = newProgress;
+  Q_EMIT progressChanged(progress);
+}
+
+void PAGXViewModel::notifyPlaybackFinished(uint64_t generation) {
+  QMetaObject::invokeMethod(this, "handlePlaybackFinished", Qt::QueuedConnection,
+                            Q_ARG(quint64, static_cast<quint64>(generation)));
+}
+
+void PAGXViewModel::handlePlaybackFinished(quint64 generation) {
+  // Ignore a finish event from an earlier playback: if the user restarted playback after the
+  // event was queued, playbackGeneration has advanced and this notification is stale.
+  if (generation != playbackGeneration.load()) {
+    return;
+  }
+  setIsPlaying(false);
+}
+
 PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
-  return {displayList, pagxRootLayer, pagxWidth, pagxHeight};
+  return {scene,    defaultTimeline,          pagxWidth, pagxHeight, isPlaying_.load(),
+          progress, playbackGeneration.load()};
 }
 
 bool PAGXViewModel::hasContent() {
   std::lock_guard<std::mutex> lock(renderMutex);
-  return displayList != nullptr;
+  return scene != nullptr;
 }
 
 void PAGXViewModel::setIsPlaying(bool isPlaying) {
@@ -167,11 +200,15 @@ void PAGXViewModel::setIsPlaying(bool isPlaying) {
   if (isPlaying_ == isPlaying) {
     return;
   }
+  if (isPlaying) {
+    playbackGeneration++;
+  }
   isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
-  if (isPlaying) {
-    Q_EMIT requestFlush();
-  }
+  // Request a render on every transition, not just on play: the render thread needs one flush to
+  // observe the state change (re-arm or seek the timeline and update its transition tracker).
+  needsRender = true;
+  Q_EMIT requestFlush();
 }
 
 void PAGXViewModel::setProgress(double newProgress) {
@@ -205,24 +242,21 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   document->applyLayout();
 
-  auto newContentLayer = pagx::LayerBuilder::Build(document.get());
-  if (newContentLayer == nullptr) {
+  auto newScene = pagx::PAGScene::Make(document);
+  if (newScene == nullptr) {
     {
       std::lock_guard<std::mutex> lock(renderMutex);
       clearContent();
+      // Reset playback state so a prior playing session does not leave the controls stuck; with a
+      // null timeline this stops playback, zeroes the frame counters, and bumps the generation.
+      updateAnimationState();
     }
     Q_EMIT filePathChanged("");
     Q_EMIT pagxDocumentChanged(nullptr);
+    emitContentStateReset();
     return false;
   }
 
-  auto newContainer = tgfx::Layer::Make();
-  newContainer->addChild(newContentLayer);
-
-  auto newDisplayList = std::make_shared<tgfx::DisplayList>();
-  newDisplayList->root()->addChild(newContainer);
-
-  // Store XML content for later update to XmlLinesModel
   auto xmlString = QString::fromUtf8(reinterpret_cast<const char*>(byteData->data()),
                                      static_cast<qsizetype>(byteData->length()));
 
@@ -231,18 +265,17 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     clearContent();
     currentFilePath = strPath;
     pagxDocument = document;
+    scene = newScene;
+    defaultTimeline = scene->getDefaultTimeline();
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxRootLayer = newContainer;
     updateAnimationState();
-    displayList = std::move(newDisplayList);
     needsRender = true;
   }
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
   Q_EMIT widthChanged(pagxWidth);
   Q_EMIT heightChanged(pagxHeight);
-  Q_EMIT totalFrameChanged();
-  Q_EMIT hasAnimationChanged(hasAnimation());
+  emitContentStateReset();
   Q_EMIT preferredSizeChanged();
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);
@@ -290,17 +323,39 @@ void PAGXViewModel::previousFrame() {
 
 void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
-  pagxRootLayer = nullptr;
-  displayList = nullptr;
+  scene = nullptr;
+  defaultTimeline = nullptr;
+}
+
+void PAGXViewModel::emitContentStateReset() {
+  Q_EMIT progressChanged(0.0);
+  Q_EMIT isPlayingChanged(hasAnimation());
+  Q_EMIT totalFrameChanged();
+  Q_EMIT hasAnimationChanged(hasAnimation());
 }
 
 void PAGXViewModel::updateAnimationState() {
-  // TODO: Read timeline properties from PAGXDocument when available.
-  totalFrames = 1;
-  frameRate = 0.0f;
+  if (defaultTimeline != nullptr && defaultTimeline->duration() > 0) {
+    auto durationUs = defaultTimeline->duration();
+    auto rate = defaultTimeline->frameRate();
+    totalFrames =
+        static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
+    if (totalFrames < 1) {
+      totalFrames = 1;
+    }
+    frameRate = rate;
+    progressPerFrame = 1.0 / static_cast<double>(totalFrames);
+  } else {
+    totalFrames = 1;
+    frameRate = 0.0f;
+    progressPerFrame = 1.0;
+  }
   progress = 0.0;
-  progressPerFrame = 1.0;
-  isPlaying_ = false;
+  // Bump the generation on every content rebuild so any progress or finish notification still
+  // queued from the previously loaded content is treated as stale and dropped on the main thread,
+  // even when the new content does not animate.
+  playbackGeneration++;
+  isPlaying_ = hasAnimation();
 }
 
 XmlLinesModel* PAGXViewModel::linesModel() const {
@@ -316,30 +371,25 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   }
   document->applyLayout();
 
-  auto newContentLayer = pagx::LayerBuilder::Build(document.get());
-  if (newContentLayer == nullptr) {
-    return tr("Failed to build layer from XML document");
+  auto newScene = pagx::PAGScene::Make(document);
+  if (newScene == nullptr) {
+    return tr("Failed to build PAGScene from XML document");
   }
-
-  auto newContainer = tgfx::Layer::Make();
-  newContainer->addChild(newContentLayer);
-
-  auto newDisplayList = std::make_shared<tgfx::DisplayList>();
-  newDisplayList->root()->addChild(newContainer);
 
   {
     std::lock_guard<std::mutex> lock(renderMutex);
     pagxDocument = document;
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
-    pagxRootLayer = newContainer;
+    scene = newScene;
+    defaultTimeline = scene->getDefaultTimeline();
     updateAnimationState();
-    displayList = std::move(newDisplayList);
     needsRender = true;
   }
 
   Q_EMIT widthChanged(pagxWidth);
   Q_EMIT heightChanged(pagxHeight);
+  emitContentStateReset();
   Q_EMIT contentSizeChanged();
   Q_EMIT pagxDocumentChanged(pagxDocument);
   Q_EMIT requestFlush();

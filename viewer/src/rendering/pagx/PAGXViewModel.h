@@ -20,18 +20,18 @@
 
 #include <atomic>
 #include <mutex>
+#include "pagx/PAGScene.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
 #include "rendering/pagx/XmlLinesModel.h"
-#include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/Layer.h"
 
 class QQuickWindow;
 
 namespace pag {
 
 /**
- * ViewModel for PAGX format content. Owns PAGXDocument and DisplayList,
+ * ViewModel for PAGX format content. Owns PAGXDocument and PAGScene with PAGTimeline,
  * and manages playback state for PAGX content.
  */
 class PAGXViewModel : public ContentViewModel {
@@ -72,19 +72,47 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE QString saveXmlToFile(const QString& xml);
 
   struct RenderState {
-    std::shared_ptr<tgfx::DisplayList> displayList;
-    // A transform container whose single child is the layer built by LayerBuilder.
-    std::shared_ptr<tgfx::Layer> rootLayer;
+    std::shared_ptr<pagx::PAGScene> scene;
+    std::shared_ptr<pagx::PAGTimeline> timeline;
     int contentWidth = 0;
     int contentHeight = 0;
+    bool isPlaying = false;
+    double progress = 0.0;
+    uint64_t generation = 0;
   };
 
   void setWindow(QQuickWindow* window);
   bool takeNeedsRender();
   void markNeedsRender();
-  // Returns a snapshot of render state with shared ownership; safe to use without holding any lock.
+  /**
+   * Returns a snapshot of render state with shared ownership; the render thread may then operate on
+   * the snapshot's scene/timeline without holding renderMutex.
+   *
+   * This is safe even though PAGScene/PAGTimeline are not thread-safe, because each content load
+   * builds brand-new scene/timeline objects (never reused) and swaps them into the members under
+   * renderMutex. The main thread performs all of its accesses to a given object (build,
+   * getDefaultTimeline, updateAnimationState) inside that lock and never touches the object again
+   * after the swap. The render thread reaches an object only via this snapshot, whose lock
+   * establishes a happens-before ordering with the main thread's setup. So any single
+   * scene/timeline is accessed by the main thread first (under the lock) and by the render thread
+   * afterwards, never concurrently: the caller-serialization the classes require is satisfied.
+   */
   RenderState getRenderState();
   bool hasContent();
+
+  /**
+   * Updates playback progress from any thread; the signal is emitted on the main thread. The
+   * generation identifies the playback session the update belongs to, so an update from a session
+   * that ended (e.g. after a content reload) is ignored on the main thread.
+   */
+  void updateProgressFromRender(double newProgress, uint64_t generation);
+
+  /**
+   * Signals from any thread that the animation for the given playback generation has reached its
+   * end and stopped; the playing state is cleared on the main thread only if the generation is
+   * still current.
+   */
+  void notifyPlaybackFinished(uint64_t generation);
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
 
@@ -98,13 +126,28 @@ class PAGXViewModel : public ContentViewModel {
   void clearContent();
   void updateAnimationState();
 
+  // Emits the content-state reset signals shared by loadFile (both success and failure paths) and
+  // applyXmlChanges: progress, playing, total-frame and has-animation. Centralized so a new content
+  // load cannot silently forget to refresh one of them. Call after updateAnimationState() so the
+  // emitted values reflect the freshly loaded (or cleared) content.
+  void emitContentStateReset();
+
+  // Applies a progress update on the main thread. Invoked by name from updateProgressFromRender via
+  // a queued connection so the signal is always emitted on the main thread. The generation
+  // identifies the playback session; a stale update from a session that ended is ignored.
+  Q_SLOT void applyProgressFromRender(double newProgress, quint64 generation);
+
+  // Clears the playing state on the main thread. Invoked by name from notifyPlaybackFinished via a
+  // queued connection when the animation reaches its end. The generation identifies the playback
+  // session the notification belongs to, so a stale event from a finished session is ignored.
+  Q_SLOT void handlePlaybackFinished(quint64 generation);
+
   QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
   std::mutex renderMutex = {};
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
-  // A transform container whose single child is the layer built by LayerBuilder.
-  std::shared_ptr<tgfx::Layer> pagxRootLayer = nullptr;
-  std::shared_ptr<tgfx::DisplayList> displayList = nullptr;
+  std::shared_ptr<pagx::PAGScene> scene = nullptr;
+  std::shared_ptr<pagx::PAGTimeline> defaultTimeline = nullptr;
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};
@@ -112,9 +155,12 @@ class PAGXViewModel : public ContentViewModel {
   QString pendingXmlContent = {};
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
-  double progress = 0.0;
+  std::atomic<double> progress = 0.0;
   double progressPerFrame = 1.0;
   std::atomic<bool> isPlaying_ = false;
+  // Incremented each time playback starts. Stamped onto finish notifications so a notification from
+  // a prior session can be distinguished from the current one and dropped if the user restarted.
+  std::atomic<uint64_t> playbackGeneration = 0;
 };
 
 }  // namespace pag
