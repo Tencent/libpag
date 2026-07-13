@@ -4522,6 +4522,47 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   EXPECT_EQ(tgfxPattern2->image()->height(), expectedTgfx2->height());
 }
 
+/**
+ * Test case: loadFileData(path, Data) preserves filePath so that export writes the original
+ * external reference (e.g. "hash:abc123") instead of inlining the image as base64.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataPreservesFilePathInExport) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer id="L">
+    <Rectangle width="100" height="100"/>
+    <Fill>
+      <ImagePattern id="pat" image="hash:abc123"/>
+    </Fill>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+  auto* pattern = doc->findNode<pagx::ImagePattern>("pat");
+  ASSERT_TRUE(pattern != nullptr);
+  ASSERT_TRUE(pattern->image != nullptr);
+  EXPECT_EQ(pattern->image->filePath, "hash:abc123");
+  EXPECT_TRUE(pattern->image->data == nullptr);
+
+  // Load image data via the Data overload — filePath must be preserved.
+  auto tgfxData =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(tgfxData != nullptr);
+  auto imageData = pagx::Data::MakeWithCopy(tgfxData->data(), tgfxData->size());
+  ASSERT_TRUE(imageData != nullptr);
+  EXPECT_TRUE(doc->loadFileData("hash:abc123", imageData));
+
+  // filePath is kept as the serialization anchor; data is the runtime cache.
+  EXPECT_EQ(pattern->image->filePath, "hash:abc123");
+  EXPECT_TRUE(pattern->image->data != nullptr);
+
+  // Export must write the original filePath, not base64.
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exportedXml.find("hash:abc123"), std::string::npos);
+  EXPECT_EQ(exportedXml.find("base64"), std::string::npos);
+}
+
 // =====================================================================================
 // ClipToBounds
 // =====================================================================================

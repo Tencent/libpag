@@ -131,7 +131,6 @@ static bool LoadFileDataInChain(
       auto* image = static_cast<Image*>(node.get());
       if (image->filePath == filePath) {
         image->data = data;
-        image->filePath = {};
         docDirtyNodes[document].push_back(image);
         found = true;
       }

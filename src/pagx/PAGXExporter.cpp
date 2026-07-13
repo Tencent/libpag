@@ -443,12 +443,12 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->image != nullptr) {
         if (!pattern->image->id.empty()) {
           xml.addAttribute("image", "@" + pattern->image->id);
+        } else if (!pattern->image->filePath.empty()) {
+          xml.addAttribute("image", pattern->image->filePath);
         } else if (pattern->image->data) {
           xml.addAttribute("image",
                            "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
                                                                    pattern->image->data->size()));
-        } else if (!pattern->image->filePath.empty()) {
-          xml.addAttribute("image", pattern->image->filePath);
         }
       }
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
@@ -1209,11 +1209,11 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      if (image->data) {
+      if (!image->filePath.empty()) {
+        xml.addAttribute("source", image->filePath);
+      } else if (image->data) {
         xml.addAttribute("source", "data:image/png;base64," +
                                        Base64Encode(image->data->bytes(), image->data->size()));
-      } else {
-        xml.addAttribute("source", image->filePath);
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1276,12 +1276,12 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           if (glyph->image != nullptr) {
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
+            } else if (!glyph->image->filePath.empty()) {
+              xml.addAttribute("image", glyph->image->filePath);
             } else if (glyph->image->data) {
               xml.addAttribute("image",
                                "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
                                                                        glyph->image->data->size()));
-            } else if (!glyph->image->filePath.empty()) {
-              xml.addAttribute("image", glyph->image->filePath);
             }
           }
           if (glyph->offset != Default<Glyph>().offset) {
