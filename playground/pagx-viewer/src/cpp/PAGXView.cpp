@@ -338,15 +338,19 @@ void PAGXView::draw() {
   if (context != nullptr) {
     auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
+      // Force the freshest frame on screen right now. Drop whatever frame is still parked in
+      // lastRecording so the deferred (older) content cannot resurface one frame later.
       presentImmediately = false;
       lastRecording = nullptr;
       if (recording) {
         context->submit(std::move(recording));
       }
-    } else if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      lastRecording = std::move(recording);
     } else {
+      // Double buffer: park this frame's recording and submit the one deferred from the previous
+      // frame, giving the GPU an extra frame to finish. When the scene content is unchanged,
+      // Record() returns null; swapping that null into lastRecording lets the dirty gate resume
+      // skipping idle frames once the last deferred frame has been flushed out.
+      std::swap(lastRecording, recording);
       if (recording) {
         context->submit(std::move(recording));
       }
