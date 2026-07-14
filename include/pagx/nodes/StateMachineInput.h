@@ -39,7 +39,7 @@ enum class StateMachineInputType : uint8_t {
   Number = 1,
   /**
    * A one-shot event. Fired by host code, consumed at most once per region, then cleared at the
-   * end of the advance in which it was consumed.
+   * end of every advance (whether consumed or not).
    */
   Trigger = 2,
 };
