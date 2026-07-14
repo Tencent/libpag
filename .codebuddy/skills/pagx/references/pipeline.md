@@ -1,9 +1,16 @@
 # Conversion pipeline reference
 
-Full details for converting HTML to PAGX. The one-shot tool is
-`tools/html-snapshot/html2pagx`; everything below explains its options, setup, fonts/images, URL
-inputs, a warm server for fast iteration, a manual debugging path, and troubleshooting. Paths are
-relative to the repository root.
+Full details for converting HTML to PAGX. **Inside the libpag repo the recommended path is the
+locally built `pagx` driving the conversion directly**: `pagx import` snapshots the page (via
+`tools/html-snapshot/snapshot.js`), imports, and resolves in one command, then `pagx render`
+previews it — see [Manual step-by-step pipeline](#manual-step-by-step-pipeline). No wrapper script
+is required.
+
+`tools/html-snapshot/html2pagx` is an **optional** convenience wrapper around that same pipeline; it
+adds extras the plain CLI does not (web-font download/embedding, batch conversion, custom viewport
+flags in one place). Everything below explains its options, setup, fonts/images, URL inputs, a warm
+server for fast iteration, a manual debugging path, and troubleshooting. Paths are relative to the
+repository root.
 
 ## Table of contents
 
@@ -188,15 +195,28 @@ curl -sG --data-urlencode 'url=https://example.com/' \
 ```
 
 The server needs the `pagx` binary for `format=pagx`/`both`; point it with `--pagx-bin` if it is not
-at the default location. The server's `pagx import` already resolves inline `<svg>`/import
-directives, so after getting the `.pagx` just run `pagx render` (or `pagx verify`) to preview.
+at the default location. The server runs `pagx import --no-resolve`, so the `.pagx` it returns still
+contains unresolved inline `<svg>`/import directives — run `pagx resolve page.pagx` before
+`pagx render`, or use `pagx verify page.pagx` (which resolves as its first step) to preview.
 
 ## Manual step-by-step pipeline
 
-For debugging a single step, run them individually:
+This is the recommended in-repo path (uses only the locally built `pagx`, no `html2pagx`). The
+simplest form lets `pagx import` snapshot the page itself — it auto-locates
+`tools/html-snapshot/snapshot.js` in the repo, imports, and resolves in one call:
 
 ```bash
-node tools/html-snapshot/snapshot.js page.html            # → page.subset.html
+pagx import --input page.html --output page.pagx          # snapshot + import + resolve
+pagx render page.pagx -o page.png --scale 2                # preview
+```
+
+To control the snapshot (custom viewport, extra settle time, a specific selector) or to debug a
+single step, run the snapshot separately first and import the flat subset with the browser pass
+disabled:
+
+```bash
+node tools/html-snapshot/snapshot.js page.html \
+  --viewport-width 1080 --viewport-height 1440 -o page.subset.html   # → page.subset.html
 PAGX_HTML_SNAPSHOT=0 pagx import --format html \
   --input page.subset.html --output page.pagx             # → page.pagx (skip re-snapshot, auto-resolves)
 pagx render page.pagx -o page.png --scale 2                # preview
@@ -249,7 +269,7 @@ usually-harmless ones:
 | `'puppeteer' is not installed` / `bundled Chrome is missing` | Run `npm install` in `tools/html-snapshot`, then the `puppeteer browsers install chrome` command the tool prints. |
 | `cannot find module './dist/...'` | The tool was not built. Run `npm run build` in `tools/html-snapshot`. |
 | Blank / mostly-empty PNG | Content was hidden, off-canvas, or rendered after the snapshot. Match `--viewport-width/height` to the `body` size and raise `--wait-ms`; check `<input>.subset.html` for what was captured. |
-| Text in the wrong font | The web font was not embedded. Keep the Google Fonts `<link>` and convert with `--embed-fonts`. |
+| Text in the wrong font | The web font is not on the render host. Keep the Google Fonts `<link>`, then install the font locally or embed it with `pagx font embed --file <font>` (or `html2pagx --embed-fonts`). |
 | An element is missing | It was hidden (`display:none`/`opacity:0`), an unsupported/interactive widget, or a tainted/WebGL `<canvas>`. Include only visible content; use a styled `<div>` for controls and same-origin/CORS image sources. |
 | Chart is missing or empty | Canvas captured before it drew (raise `--wait-ms`/`--selector`) or it is tainted/WebGL (use same-origin/CORS sources). |
 | Relative `<img>`/CSS not loading (local file) | Local relative resources do not resolve. Inline as data URIs or use absolute URLs; or convert from a URL instead. |

@@ -588,6 +588,56 @@ PAG_TEST(PAGXHTMLImporterTest, MixBlendModeMapsToBlendMode) {
   EXPECT_EQ(div->blendMode, pagx::BlendMode::Multiply);
 }
 
+// CSS `mix-blend-mode` uses hyphenated keywords for the multi-word modes; the importer must accept
+// them (they differ from PAGX's internal camelCase names, which single-word modes happen to share).
+PAG_TEST(PAGXHTMLImporterTest, MixBlendModeHyphenatedKeywords) {
+  struct Case {
+    const char* css;
+    pagx::BlendMode mode;
+  };
+  const Case cases[] = {
+      {"color-dodge", pagx::BlendMode::ColorDodge},   {"color-burn", pagx::BlendMode::ColorBurn},
+      {"hard-light", pagx::BlendMode::HardLight},     {"soft-light", pagx::BlendMode::SoftLight},
+      {"plus-lighter", pagx::BlendMode::PlusLighter}, {"plus-darker", pagx::BlendMode::PlusDarker},
+  };
+  for (const auto& c : cases) {
+    std::string html =
+        "<html><body style=\"width:50px;height:50px\">"
+        "<div style=\"width:50px;height:50px;background-color:#000;mix-blend-mode:" +
+        std::string(c.css) + "\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr) << c.css;
+    auto* div = doc->layers.front()->children.front();
+    EXPECT_EQ(div->blendMode, c.mode) << c.css;
+  }
+}
+
+// `plus-darker` has no CSS mix-blend-mode, so the exporter bakes the backdrop into a PNG applied via
+// a `pagx_pd_*` feImage+feComposite(arithmetic) filter. The importer recovers PlusDarker from the
+// marker id and drops the browser-only filter rather than treating it as an unknown effect.
+PAG_TEST(PAGXHTMLImporterTest, PlusDarkerFilterMarkerRoundTrips) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:60px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <filter id="pagx_pd_0" x="0" y="0" width="50" height="50" filterUnits="userSpaceOnUse"
+                  primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feImage href="data:image/png;base64,iVBORw0KGgo=" x="0" y="0" width="50" height="50"
+                     preserveAspectRatio="none" result="bg"/>
+            <feComposite in="SourceGraphic" in2="bg" operator="arithmetic" k1="0" k2="1" k3="1"
+                         k4="-1"/>
+          </filter>
+        </defs>
+      </svg>
+      <div style="width:50px;height:50px;background-color:#404040;filter:url(#pagx_pd_0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  EXPECT_EQ(div->blendMode, pagx::BlendMode::PlusDarker);
+  EXPECT_TRUE(div->filters.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FlexLayoutMapping) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
@@ -1456,6 +1506,22 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafWithBackgroundKeepsWidth) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:420px;height:80px">
       <span style="position:absolute;left:0;top:0;width:305px;height:80px;font-size:60px;white-space:nowrap;background-color:#000">Title</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 305.0f);
+}
+
+// An inline nowrap text leaf that is a flex-grow child keeps its width: the flex engine is
+// distributing free space through it, so its measured width carries the growth the layout
+// depends on and must not be dropped. Guards the `notFlexGrow` term of the shrink-to-fit
+// condition — without it a grown flex item would collapse back to its intrinsic glyph width.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:80px;display:flex">
+      <span style="width:305px;height:80px;font-size:60px;white-space:nowrap;flex:1">Title</span>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
@@ -7022,6 +7088,31 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceCentersMainAxisInsteadOfSym
   // The symmetric leading/trailing insets are absorbed by centering, so no left/right padding is
   // baked in.
   EXPECT_FALSE(StyleContains(body, "padding"));
+}
+
+// Reverse of the symmetric case: when the leading and trailing insets differ by more than the
+// inference tolerance (1.5px), the layout is not centred and the asymmetric insets must survive
+// as real padding. Guards the `std::fabs(paddingLeading - paddingTrailing) <= tol` boundary so a
+// near-but-not-symmetric layout is not silently promoted to justify-content:center.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsPaddingWhenInsetsExceedTolerance) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  // Two children (50px + 50px + 10px gap = 110px) in a 208px-wide body: leading inset 50px,
+  // trailing inset 48px. The 2px asymmetry exceeds the 1.5px tolerance, so this is padding, not
+  // centering.
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:208px;height:50px">
+               <div style="position:absolute;left:50px;top:0px;width:50px;height:50px"></div>
+               <div style="position:absolute;left:110px;top:0px;width:50px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  EXPECT_TRUE(StyleContains(body, "display: flex"));
+  EXPECT_FALSE(StyleContains(body, "justify-content: center"));
+  EXPECT_TRUE(StyleContains(body, "padding"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversColumnLayoutWithCenter) {

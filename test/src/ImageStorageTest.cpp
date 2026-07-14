@@ -222,7 +222,15 @@ CLI_TEST(ImageStorageTest, EmbedSchemeAndDriveLetterPathsAreNotRelative) {
 }
 
 CLI_TEST(ImageStorageTest, EmbedColonAfterSlashIsRelative) {
-  auto dir = ScratchDir("EmbedColonAfterSlash");
+  // The colon in "a:b.png" is illegal in filenames on some file systems (e.g. NTFS) and breaks
+  // CI artifact upload, so this scratch directory lives in the system temp location rather than
+  // under test/out where it would be collected as a build artifact.
+  auto dir = (std::filesystem::temp_directory_path() / "ImageStorageTest" / "EmbedColonAfterSlash")
+                 .generic_string();
+  std::error_code ec;
+  std::filesystem::remove_all(dir, ec);
+  std::filesystem::create_directories(dir, ec);
+
   // A colon appearing only after a slash is still a plain relative path.
   WriteFile(dir + "/dir/a:b.png", "COLON");
   auto doc = PAGXDocument::Make(100, 100);
@@ -232,6 +240,8 @@ CLI_TEST(ImageStorageTest, EmbedColonAfterSlashIsRelative) {
   options.mode = ImageStorageMode::Embed;
   options.baseDir = WithSlash(dir);
   ApplyImageStorage(doc.get(), options, "test");
+
+  std::filesystem::remove_all(dir, ec);
 
   ASSERT_NE(image->data, nullptr);
   EXPECT_TRUE(image->filePath.empty());

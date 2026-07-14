@@ -196,10 +196,14 @@ public class PAGSurface {
         // Must call freeCache() here, otherwise, the cache may not be freed until the PAGPlayer is
         // garbage collected.
         freeCache();
+        releaseSurface();
+        nativeRelease();
+    }
+
+    private void releaseSurface() {
         if (needsReleaseSurface && surface != null) {
             surface.release();
         }
-        nativeRelease();
     }
 
     private native void nativeRelease();
@@ -209,6 +213,7 @@ public class PAGSurface {
     private native void nativeFinalize();
 
     protected void finalize() {
+        releaseSurface();
         nativeFinalize();
     }
 

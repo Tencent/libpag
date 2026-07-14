@@ -2,7 +2,8 @@
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
 operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
-setup script in `SKILL.md`).
+setup script in `SKILL.md`). Run `pagx --version` (or `pagx -v`) to check the installed version,
+and `pagx <command> --help` for per-command usage.
 
 ## Table of contents
 
@@ -62,8 +63,9 @@ file:line: description. Fix: suggested check direction
 - Two-node problems (e.g., overlap): two line numbers comma-separated.
 - Spatial problems include bounds in the description.
 - Text diagnostics: nothing is printed to stderr when there are no problems.
-- `--json`: diagnostics are always written to **stdout** as JSON (e.g. `{"ok": true, "diagnostics": []}`
-  when clean), and the text diagnostics above are suppressed.
+- `--json`: diagnostics are always written to **stdout** as JSON (e.g.
+  `{"file": "input.pagx", "ok": true, "diagnostics": []}` when clean), and the text diagnostics above
+  are suppressed.
 - The layout XML is written silently; only the screenshot prints a `Wrote …` confirmation line.
 
 Example:
@@ -325,8 +327,9 @@ printed regardless of `--verbose`.
 `import` expands those into native PAGX nodes in the same pass, so the output is fully flattened
 and a separate `pagx resolve` is normally unnecessary. Pass `--no-resolve` to keep the directives
 in place (e.g. to preserve external references, or to resolve later with different options).
-Resolve failures are non-fatal: the file is still written with the failed directives left in
-place, and the process exits non-zero so scripts can detect it.
+If any directive fails to resolve, `pagx import` reports the error and exits non-zero **without
+writing the output file** — fix the source (or pass `--no-resolve` to import the directives
+unexpanded and resolve them later) and retry.
 
 ```bash
 pagx import --input icon.svg                      # SVG to icon.pagx
@@ -341,7 +344,7 @@ pagx import --input page.html -v                  # print conversion warnings
 |--------|-------------|
 | `--input <file\|url>` | Input file or URL to import (required) |
 | `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
-| `--format <format>` | Force input format (`svg` or `html`; default: inferred from extension/content) |
+| `--format <format>` | Force input format (`svg` or `html`; default: inferred from the input file extension) |
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
 | `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
@@ -428,6 +431,10 @@ or `<!-- Resolved from: assets/logo.svg -->`).
 `pagx import` already runs this pass by default, so this command is mainly for **hand-authored**
 PAGX files that reference external SVG or embed inline `<svg>`, or for PAGX produced with
 `pagx import --no-resolve`. It is idempotent — running it on an already-resolved file is a no-op.
+
+Most other commands require a fully-resolved file: `render`, `layout`, `bounds`, `export`, and
+`font embed` error out on any remaining `import` directive or inline `<svg>`. Run `pagx resolve`
+(or `pagx import` without `--no-resolve`, or `pagx verify`, which resolves first) before them.
 
 ```bash
 pagx resolve design.pagx                          # resolve in place

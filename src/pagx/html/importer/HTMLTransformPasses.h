@@ -99,9 +99,9 @@ class PropertyFilterPass : public HTMLTransformPass {
  * `display: flex` container and strips the children's `position`/`left`/`right`/`top`/
  * `bottom` declarations.
  *
- * Off by default (`Options::inferFlexFromAbsolute`). Enable via `--html-infer-flex` in the
- * CLI when the upstream HTML is known to be flat absolute output and you want the resulting
- * PAGX to be edit-friendly.
+ * On by default (`Options::inferFlexFromAbsolute`): the pass is always wired into the default
+ * pipeline and self-disables when that option is false. There is no CLI flag — `pagx import`
+ * always runs it, which is what makes the flat absolute snapshot output edit-friendly.
  *
  * Containers that don't admit a clean 1D inference (overlapping siblings, mixed cross-axis
  * alignment, inconsistent spacing, mixed `position` values) are left untouched and an
