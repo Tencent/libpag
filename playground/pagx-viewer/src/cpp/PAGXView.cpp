@@ -28,7 +28,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
 
@@ -143,11 +142,6 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
-  // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
-  // them to absolute coordinates to ensure correct rendering.
-  ResolveAllImagePatternMatrices(document.get());
-  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
