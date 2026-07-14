@@ -332,7 +332,7 @@ TransitionBoolCondition::evaluate 直接读
 
 对 `src/`、`include/`、`test/src/` 全量搜索 `StateMachine|stateMachine|skeleton|Skeleton|bone|Bone`：
 - `src/pagx/utils/RasterUtils.cpp:55` 仅有注释 "Common skeleton shared by every off-screen GPU render path"，与骨骼动画无关
-- `test/src/PAGXTest.cpp:5664` 测试用例注释把 PAGTimeline 的 play/pause/stop 行为称为 "state machine"，是描述性称呼，不是独立类
+- `test/src/PAGXTest.cpp:5733` 测试用例注释把 PAGTimeline 的 play/pause/stop 行为称为 "state machine"，是描述性称呼，不是独立类
 - 没有任何 `stateMachineTimeline`、`Skeleton`、`Bone` 类型存在
 
 **结论**：state machine 能力是从零开始新增，没有可冲突的存量同名实现。
@@ -358,7 +358,7 @@ int64_t currentTimeUs = 0;
 
 **数据层**（`include/pagx/`）：
 - `pagx::PAGXDocument`（`include/pagx/PAGXDocument.h:48`）— 数据根，继承 `Node`，`NodeType::Document`。拥有 `layers`、`animations`、`viewModel`、`dataBinds`、`nodes`（owning unique_ptr vector）、`nodeMap`（id 索引）
-- `pagx::Node`（`include/pagx/nodes/Node.h:247`）— 所有数据节点基类，仅含 `id`、`customData`、`sourceLine`、`virtual nodeType()`
+- `pagx::Node`（`include/pagx/nodes/Node.h:273`）— 所有数据节点基类，仅含 `id`、`customData`、`sourceLine`、`virtual nodeType()`
 - `pagx::Layer`（`include/pagx/nodes/Layer.h:51`）— 层节点，含 `visible`、`alpha`、`matrix`、`composition`、`timelines`（vector<unique_ptr<Timeline>>）、`contents`、`styles`、`filters`、`children`、布局字段
 - `pagx::Composition`（`include/pagx/nodes/Composition.h:35`）— 可复用合成资源，含 `layers`、`animations`、`viewModel`、`dataBinds`
 - `pagx::Animation`（`include/pagx/nodes/Animation.h:52`）— timeline 数据，含 `duration`、`frameRate`、`loop`（LoopMode）、`objects`
@@ -367,8 +367,8 @@ int64_t currentTimeUs = 0;
 - `pagx::Keyframe<T>`（`include/pagx/nodes/Keyframe.h:86`）— 单个关键帧
 
 **运行时层**（`include/pagx/` + `src/pagx/runtime/`）：
-- `pagx::PAGScene`（`include/pagx/PAGScene.h:69`）— **runtime root**，继承 `enable_shared_from_this<PAGScene>`（不继承 PAGComposition）。拥有 `_rootComposition`（shared_ptr<PAGComposition>）、`displayList`、`instantiatedTimelines`（const Node* → shared_ptr<PAGTimeline> 缓存）、`layerRegistry`。提供 `getTimeline(id)` / `getStateMachineTimeline(id)` / `getDefaultTimeline()` / `advanceAndApply(delta)` / `draw(surface)`
-- `pagx::PAGComposition`（`include/pagx/PAGComposition.h:45`）— 继承 `PAGLayer`，增加 `binding`（unique_ptr<RuntimeBinding>）、`timelines`（vector<shared_ptr<PAGTimeline>>）、`compositionViewModel`、`dataBindRuntime`、`dataContext`、`document`（PAGXDocument* 用于 channel target 解析）
+- `pagx::PAGScene`（`include/pagx/PAGScene.h:69`）— **runtime root**，继承 `enable_shared_from_this<PAGScene>`（不继承 PAGComposition）。拥有 `_rootComposition`（shared_ptr<PAGComposition>）、`displayList`、`instantiatedTimelines`（const Node* → shared_ptr<PAGTimeline> 缓存）、`layerRegistry`。提供 `getAnimation(id)` / `getStateMachineTimeline(id)` / `getDefaultTimeline()` / `advanceAndApply(delta)` / `draw(surface)`
+- `pagx::PAGComposition`（`include/pagx/PAGComposition.h:49`）— 继承 `PAGLayer`，增加 `binding`（unique_ptr<RuntimeBinding>）、`timelines`（vector<shared_ptr<PAGTimeline>>）、`compositionViewModel`、`dataBindRuntime`、`dataContext`、`document`（PAGXDocument* 用于 channel target 解析）
 - `pagx::PAGLayer`（`include/pagx/PAGLayer.h:52`）— 运行时层基类，含 `node`（源 Layer*）、`runtimeLayer`（shared_ptr<tgfx::Layer>）、`children`、`rootScene`（weak_ptr<PAGScene>）。`advance(delta)` / `apply(mix)` 是 virtual
 - `pagx::PAGTimeline`（`include/pagx/PAGTimeline.h:40`）— 运行时播放驱动的**抽象基类**，只声明虚方法 `type()` / `getId()` / `advance()` / `apply()` / `advanceAndApply()`，无数据字段。`PAGAnimation`（`include/pagx/PAGAnimation.h:50`）和 `PAGStateMachine`（`include/pagx/PAGStateMachine.h:55`）是其具体子类
 
@@ -421,7 +421,7 @@ void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
 ```
 
 调用链：
-1. 业务侧调用 `scene->advanceAndApply(deltaUs)` 或 `scene->getTimeline(id)->advanceAndApply(deltaUs, mix)`
+1. 业务侧调用 `scene->advanceAndApply(deltaUs)` 或 `scene->getAnimation(id)->advanceAndApply(deltaUs, mix)`
 2. `PAGComposition::advance(delta)`（`src/pagx/runtime/PAGComposition.cpp:68-75`）：先迭代 `timelines` 调 `timeline->advance(delta)`，再调 `PAGLayer::advance(delta)` 递归到 children
 3. `PAGComposition::apply(mix)`（`src/pagx/runtime/PAGComposition.cpp:77-81`）：先迭代 `timelines` 调 `timeline->apply(mix)`，再调 `PAGLayer::apply(mix)` 递归到 children
 4. `PAGLayer::advance/apply`（`src/pagx/PAGLayer.cpp:99-111`）是基础情况，只递归 children
@@ -467,7 +467,7 @@ binding->apply(targetNode, channel->name,
                channel->evaluateAt(microseconds, animation->frameRate), mix);
 ```
 
-**Mix 叠加规则**（`include/pagx/PAGTimeline.h:113-125`）：
+**Mix 叠加规则**（`include/pagx/PAGAnimation.h:99-107`）：
 - 连续 channel（float / Color）：`result = lerp(current, evaluated, mix)`
 - 离散 channel（bool / int / string / ImageRef）：mix > 0 时直接覆盖
 - 多个 timeline 按调用顺序叠加，后写入的 mix 与前一次写入的结果混合
@@ -538,7 +538,7 @@ class ObserverHandle {
 
 ### 3.3 完整示例
 
-以一个按钮为例，它有两个正交维度：视觉状态（normal/hover/pressed）和启用状态（enabled/disabled）。两个维度用两个并行 StateRegion 表达，避免 3×2=6 个状态的组合爆炸。这里 `btnSM` 是**顶层 SM**——定义在 `<Animations>` 里，业务通过 `getStateMachineTimeline("btnSM")` 拿来自己驱动，**不需要**被 Layer 的 `<Timelines>` 引用（对齐顶层 Animation 通过 `getTimeline` 拿取的模型）：
+以一个按钮为例，它有两个正交维度：视觉状态（normal/hover/pressed）和启用状态（enabled/disabled）。两个维度用两个并行 StateRegion 表达，避免 3×2=6 个状态的组合爆炸。这里 `btnSM` 是**顶层 SM**——定义在 `<Animations>` 里，业务通过 `getStateMachineTimeline("btnSM")` 拿来自己驱动，**不需要**被 Layer 的 `<Timelines>` 引用（对齐顶层 Animation 通过 `getAnimation` 拿取的模型）：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -985,7 +985,7 @@ rive 的 NestedStateMachine 是为跨文件 NestedArtboard 引用设计，libpag
 | `include/pagx/PAGScene.h` | 加 `getStateMachineTimeline(id)` 访问器 |
 | `src/pagx/runtime/PAGComposition.cpp:129-165` | `spawnTimelines` 加 `case TimelineType::StateMachine` 分支 |
 | `src/pagx/PAGXImporter.cpp:698-712` | `ParseLayerTimelines` 加 `<StateMachine ref="@id">` 分支 |
-| `src/pagx/PAGXImporter.cpp:2055` | `ParseAnimations` 加 `<StateMachine>` 子标签分支（含 Inputs/StateRegion 解析） |
+| `src/pagx/PAGXImporter.cpp:2085` | `ParseAnimations` 加 `<StateMachine>` 子标签分支（含 Inputs/StateRegion 解析） |
 | `src/pagx/PAGXExporter.cpp:437` | `WriteStateMachine` 写出 `<StateMachine>`（含 Inputs/StateRegion） |
 | `src/pagx/PAGXExporter.cpp:1724` | Timelines switch 加 `case TimelineType::StateMachine` |
 
@@ -1017,7 +1017,7 @@ class PAGStateMachine {
 
   // time-driven advance + apply, paralleling PAGTimeline
   //   内部对所有 region 并行 advance/apply，trigger 帧末统一清空
-  void advance(int64_t deltaMicroseconds);
+  bool advance(int64_t deltaMicroseconds);
   void apply(float mix = 1.0f);
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
@@ -1041,7 +1041,7 @@ class PAGStateMachine {
 
 其中 `RegionInstance` 是内部实现细节（类比 rive 把 `StateMachineLayerInstance` 藏在 cpp 匿名命名空间），持有该 region 的 `currentState`、`stateFrom`、`transitionProgress`、以及本帧已消费的 trigger 集合。对外只暴露 `PAGStateMachine` 一个入口类。
 
-`PAGScene` 上的访问器（与 `getTimeline` / `getTimelineIds` 对偶，顶层 only，同 id 返回同一缓存实例；详见 8.7 两条驱动路径）：
+`PAGScene` 上的访问器（与 `getAnimation` / `getAnimationIds` 对偶，顶层 only，同 id 返回同一缓存实例；详见 8.7 两条驱动路径）：
 
 ```cpp
 std::vector<std::string> getStateMachineIds() const;
@@ -1598,6 +1598,9 @@ FadingState {
 PAGStateMachine::advance(deltaUs):
     for region in regions:
         region.advance(deltaUs)         // 各 region 独立推进
+    // 本次 advance 末尾清空 trigger（评估已在上面完成；fire 只置标志、advance 才评估消费）
+    for input in triggerInputs: input.fired = false
+    for region in regions: region.consumedTriggers.clear()
 
 PAGStateMachine::apply(smMix):
     for region in regions:
@@ -1607,9 +1610,6 @@ PAGStateMachine::apply(smMix):
 PAGStateMachine::advanceAndApply(deltaUs, smMix):
     advance(deltaUs)
     apply(smMix)
-    // 本次 advance 末尾清空 trigger（评估已在上面完成；fire 只置标志、advance 才评估消费）
-    for input in triggerInputs: input.fired = false
-    for region in regions: region.consumedTriggers.clear()
 ```
 
 ### 8.3 单个 region 的 advance
@@ -1631,8 +1631,14 @@ RegionInstance::advance(deltaUs):
             transition = null
 
     // 3. 尝试触发新的状态切换（单帧内可链式切换，上限 100 与 rive 一致）
+    alreadyAdvanced = transition             // 记住步骤 2 已推进的过渡
     for i in 0 .. MaxTransitionsPerFrame:   // MaxTransitionsPerFrame = 100
         if not tryChangeState(): break
+
+    // 4. 若本帧 tryChangeState 启动了新过渡（与步骤 2 已推进的不同），再推进一次 mix，
+    //    使首次 apply 见到非零 mix（防止新过渡首帧空白输出）；跳过步骤 2 已推进的过渡避免 2x 速度
+    if transition != alreadyAdvanced:
+        advanceMix(deltaUs)
 
 RegionInstance::tryChangeState():
     inTransition = (transition != null and mix < 1)
@@ -1770,7 +1776,7 @@ StateMachine 的驱动模型与现有 Animation/PAGTimeline 一致，也与 rive
 | **谁创建** | 业务调 `getStateMachineTimeline(id)` 现场创建 + 缓存 | 构建运行时树时 `spawnTimelines` 自动创建 |
 | **谁驱动** | **业务自己**每帧 `sm->advanceAndApply(dt)` | **scene 递归**：`scene->advanceAndApply` → `PAGComposition::advance` 遍历 timelines 自动带跑 |
 | **是否在 composition.timelines 里** | 否（游离对象，`scene->advanceAndApply` 不碰它） | 是 |
-| **对齐现有** | = 顶层 Animation（`getTimeline` 现场 new、business drive） | = 嵌套 Animation（`spawnTimelines` 建、scene drive） |
+| **对齐现有** | = 顶层 Animation（`getAnimation` 现场 new、business drive） | = 嵌套 Animation（`spawnTimelines` 建、scene drive） |
 
 **顶层 SM 用法（业务主控）**：
 
@@ -1791,9 +1797,9 @@ scene->draw(surface);
 ```
 
 **关键对齐点**：
-- 顶层 SM 定义在 `<Animations>` 里，**不需要**被任何 Layer 的 `<Timelines>` 引用即可通过 `getStateMachineTimeline(id)` 拿到驱动——与顶层 Animation 通过 `getTimeline(id)` 拿到完全一致（`getStateMachineIds()` 直接列 document 顶层的 StateMachine）。
+- 顶层 SM 定义在 `<Animations>` 里，**不需要**被任何 Layer 的 `<Timelines>` 引用即可通过 `getStateMachineTimeline(id)` 拿到驱动——与顶层 Animation 通过 `getAnimation(id)` 拿到完全一致（`getStateMachineIds()` 直接列 document 顶层的 StateMachine）。
 - `<Timelines><StateMachine ref="@id">` 仅用于**嵌套场景**：子 composition 的 Layer 挂一个 SM，让 scene 递归时自动带跑（类比子 Layer `<Timelines><Animation ref>`）。
-- `getStateMachineTimeline` 只返回顶层 SM（对齐 `getTimeline` 只返回 `document->animations`），嵌套 SM 是 per-composition 实例，按 id 全局查有歧义，故走 composition 树访问。
+- `getStateMachineTimeline` 只返回顶层 SM（对齐 `getAnimation` 只返回 `document->animations`），嵌套 SM 是 per-composition 实例，按 id 全局查有歧义，故走 composition 树访问。
 
 **与 rive 对照**：rive 最外层 `stateMachineNamed()` 业务创建 + `advanceAndApply` 业务驱动；嵌套 `NestedStateMachine` 文件自带、由外层 `advanceInternal(AdvanceNested)` 递归带跑。libpag 顶层 SM ≈ rive 最外层，嵌套 SM ≈ rive NestedStateMachine，驱动归属一一对应。
 
@@ -1949,7 +1955,7 @@ scene->draw(surface);
 | `SMGetSameInstance` | 同一 id 多次 `getStateMachineTimeline` 返回同一实例（缓存）|
 | `SMGetUnknownTimeline` | `getStateMachineTimeline("nope")` 返回 nullptr，不崩溃 |
 | `SMTwoDrivePathsSameInstance` | 路径A（scene->advanceAndApply 整体驱动）与路径B（getStateMachineTimeline 单独驱动）操作同一实例：单独设 input 后整体驱动能看到、整体驱动的状态变化单独查 getCurrentState 能读到 |
-| `SMGetStateMachineIdsTopLevelOnly` | `getStateMachineIds()` 只返回顶层 StateMachine，不含子 composition 内的（对齐 getTimelineIds 约定）|
+| `SMGetStateMachineIdsTopLevelOnly` | `getStateMachineIds()` 只返回顶层 StateMachine，不含子 composition 内的（对齐 getAnimationIds 约定）|
 | `SMNestedComposition` | 子 composition 内的状态机独立运行；顶层 `getStateMachineTimeline` 不返回它，需经 rootComposition 向下访问 |
 | `SMCoexistWithAnimation` | 同一 Layer 同时挂 AnimationTimeline + StateMachineTimeline，两者输出按叠加规则共存 |
 | `SMScopedInputAcrossCompositions` | 两个 composition 各自的 SM 实例的 input 相互隔离，设一个不影响另一个 |
