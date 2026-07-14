@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -28,16 +29,12 @@
 
 namespace pagx {
 
-static constexpr int64_t MICROS_PER_SECOND = 1'000'000;
-
 // Returns the animation duration in microseconds. Returns 0 for invalid animations.
 static int64_t DurationMicros(const Animation* animation) {
   if (animation == nullptr || animation->frameRate <= 0.0f || animation->duration <= 0) {
     return 0;
   }
-  return static_cast<int64_t>(static_cast<double>(animation->duration) *
-                              static_cast<double>(MICROS_PER_SECOND) /
-                              static_cast<double>(animation->frameRate));
+  return FramesToUs(animation->duration, animation->frameRate);
 }
 
 // Evaluates the given animation at the given microsecond time and writes the results into the

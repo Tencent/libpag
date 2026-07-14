@@ -45,13 +45,6 @@ static constexpr int MAX_TRANSITIONS_PER_FRAME = 100;
 
 namespace {
 
-int64_t FramesToUs(Frame frames, float frameRate) {
-  if (frameRate <= 0.0f) {
-    return 0;
-  }
-  return static_cast<int64_t>(static_cast<double>(frames) / frameRate * 1000000.0);
-}
-
 const State* FindStateByName(const StateRegion* region, const std::string& name) {
   if (region == nullptr) {
     return nullptr;
