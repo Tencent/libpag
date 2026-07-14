@@ -24,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/nodes/Keyframe.h"
@@ -95,15 +96,28 @@ class StateMachineInputTarget : public RuntimeTarget {
     switch (it->second) {
       case StateMachineInputType::Bool: {
         auto* v = std::get_if<bool>(&value);
-        return sm->setBool(channel, v != nullptr ? *v : false);
+        if (v == nullptr) {
+          LOGE("DataBind: VM value type does not match Bool SM input '%s'.", channel.c_str());
+          return false;
+        }
+        return sm->setBool(channel, *v);
       }
       case StateMachineInputType::Number: {
         auto* v = std::get_if<float>(&value);
-        return sm->setNumber(channel, v != nullptr ? *v : 0.0f);
+        if (v == nullptr) {
+          LOGE("DataBind: VM value type does not match Number SM input '%s'.", channel.c_str());
+          return false;
+        }
+        return sm->setNumber(channel, *v);
       }
-      case StateMachineInputType::Trigger:
+      case StateMachineInputType::Trigger: {
+        auto* v = std::get_if<bool>(&value);
+        if (v == nullptr || !*v) {
+          return false;
+        }
         sm->fireTrigger(channel);
         return true;
+      }
     }
     return false;
   }

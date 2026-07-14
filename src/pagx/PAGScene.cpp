@@ -485,7 +485,15 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (it != instantiatedTimelines.end()) {
     return std::static_pointer_cast<PAGStateMachine>(it->second);
   }
-  return nullptr;
+  if (_rootComposition == nullptr) {
+    return nullptr;
+  }
+  auto timeline = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
+      matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+  instantiatedTimelines.emplace(matched, timeline);
+  _rootComposition->binding->setTarget(
+      matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
+  return timeline;
 }
 
 std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {

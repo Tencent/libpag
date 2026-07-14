@@ -426,10 +426,10 @@ bool PAGStateMachine::advanceRegion(int64_t deltaUs) {
       }
       changed = true;
       if (i == MAX_TRANSITIONS_PER_FRAME - 1) {
-        fprintf(stderr,
-                "PAGStateMachine: exceeded max transitions per frame (%d), "
-                "possible zero-duration state loop.\n",
-                MAX_TRANSITIONS_PER_FRAME);
+        LOGE(
+            "PAGStateMachine: exceeded max transitions per frame (%d), "
+            "possible zero-duration state loop.",
+            MAX_TRANSITIONS_PER_FRAME);
       }
     }
     // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
@@ -502,9 +502,13 @@ ObserverHandle PAGStateMachine::addStateChangeListener(
   if (!callback) {
     return ObserverHandle();
   }
+  auto self = weak_from_this().lock();
+  if (self == nullptr) {
+    return ObserverHandle();
+  }
   int id = nextListenerId++;
   stateChangeListeners.emplace_back(id, std::move(callback));
-  return ObserverHandle(shared_from_this(), id);
+  return ObserverHandle(self, id);
 }
 
 void PAGStateMachine::removeObserver(int listenerId) {
