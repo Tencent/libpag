@@ -410,7 +410,7 @@ bool PAGStateMachine::advanceMix(RegionInstance& ri, int64_t deltaUs) {
 bool PAGStateMachine::advanceRegion(int64_t deltaUs) {
   bool changed = false;
   for (auto& ri : regions) {
-    if (ri.region == nullptr || ri.currentState == nullptr) {
+    if (ri.region == nullptr) {
       continue;
     }
     if (ri.currentTimeline != nullptr && ri.currentTimeline->advance(deltaUs)) {
