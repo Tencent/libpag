@@ -75,6 +75,7 @@ enum class AlertInfoType {
   TextPathVertial,              // Text path does not support vertical text
   TextPathBoxText,          // Text path does not support box text (already supported, abandoned)
   TextPathAnimator,         // Text path and text animation are not compatible
+  TextSuperscriptOrSubscript,  // Text has superscript or subscript which is not supported
   VideoCompositionOverlap,  // The references of videoComposition have duplicate time intervals
 
   OtherWarning,  // Other warnings
