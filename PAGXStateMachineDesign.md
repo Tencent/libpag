@@ -337,24 +337,22 @@ TransitionBoolCondition::evaluate 直接读
 
 **结论**：state machine 能力是从零开始新增，没有可冲突的存量同名实现。
 
-### 2.2 PAGTimeline 已有一个最小的"隐式状态机"
+### 2.2 PAGAnimation 已有一个最小的"隐式状态机"
 
-`include/pagx/PAGTimeline.h:51-167` 与 `src/pagx/PAGTimeline.cpp:104-176`：
+`PAGTimeline`（`include/pagx/PAGTimeline.h:40`）是运行时播放驱动的抽象基类，只声明虚方法 `type()` / `getId()` / `advance()` / `apply()` / `advanceAndApply()`，无数据字段。`PAGAnimation`（`include/pagx/PAGAnimation.h:50`）是其具体子类，控制单段 Animation 的播放，持有运行时状态：
 
 ```cpp
-// include/pagx/PAGTimeline.h:162-163
+// include/pagx/PAGAnimation.h:146
 int64_t currentTimeUs = 0;
-bool playing = true;
 ```
 
-状态字段只有 `playing`（bool）+ `currentTimeUs`（int64_t）。状态转移方法：
-- `play()` — `playing = true`
-- `pause()` — `playing = false`，时间保留
-- `stop()` — `playing = false` + `currentTimeUs = 0`
+`PAGAnimation` 的状态字段是 `currentTimeUs`（int64_t）。播放/暂停由 `PAGComposition::pausedTimelineIds`（`include/pagx/PAGComposition.h:181`）管理——`advance()` 跳过已暂停的 timeline，`apply()` 仍执行。状态转移方法：
 - `setCurrentTime(us)` — 直接设置时间
-- `advance(deltaUs)` — 按 `LoopMode` 推进时间，可能触发 `playing = false`（Once 模式到尾）
+- `advance(deltaUs)` — 按 `LoopMode` 推进时间
 
-这是一个"隐式状态机"：状态空间是 `{playing, paused, stopped}` + 连续时间值，但没有命名状态、转移条件、守卫的概念。state machine timeline 不是替代它，而是并列——一个 Layer 可同时挂 `AnimationTimeline`（驱动连续动画）和 `StateMachineTimeline`（驱动离散状态切换），两者按 mix 叠加到同一 channel。
+`AnimationTimeline.playing`（`include/pagx/nodes/AnimationTimeline.h:45`）是数据层的初始播放状态标志，不是运行时字段。
+
+这是一个"隐式状态机"：状态空间是 `{playing, paused}` + 连续时间值，但没有命名状态、转移条件、守卫的概念。state machine timeline 不是替代它，而是并列——一个 Layer 可同时挂 `AnimationTimeline`（驱动连续动画）和 `StateMachineTimeline`（驱动离散状态切换），两者按 mix 叠加到同一 channel。
 
 ### 2.3 PAGX 的数据/运行时分离结构
 
@@ -369,10 +367,10 @@ bool playing = true;
 - `pagx::Keyframe<T>`（`include/pagx/nodes/Keyframe.h:86`）— 单个关键帧
 
 **运行时层**（`include/pagx/` + `src/pagx/runtime/`）：
-- `pagx::PAGScene`（`include/pagx/PAGScene.h:64`）— **runtime root**，继承 `enable_shared_from_this<PAGScene>`（不继承 PAGComposition）。拥有 `_rootComposition`（shared_ptr<PAGComposition>）、`displayList`、`timelinesByAnimation`（Animation* → PAGTimeline 缓存）、`layerRegistry`。提供 `getTimeline(id)` / `getDefaultTimeline()` / `advanceAndApply(delta)` / `draw(surface)`
+- `pagx::PAGScene`（`include/pagx/PAGScene.h:69`）— **runtime root**，继承 `enable_shared_from_this<PAGScene>`（不继承 PAGComposition）。拥有 `_rootComposition`（shared_ptr<PAGComposition>）、`displayList`、`instantiatedTimelines`（const Node* → shared_ptr<PAGTimeline> 缓存）、`layerRegistry`。提供 `getTimeline(id)` / `getStateMachineTimeline(id)` / `getDefaultTimeline()` / `advanceAndApply(delta)` / `draw(surface)`
 - `pagx::PAGComposition`（`include/pagx/PAGComposition.h:45`）— 继承 `PAGLayer`，增加 `binding`（unique_ptr<RuntimeBinding>）、`timelines`（vector<shared_ptr<PAGTimeline>>）、`compositionViewModel`、`dataBindRuntime`、`dataContext`、`document`（PAGXDocument* 用于 channel target 解析）
 - `pagx::PAGLayer`（`include/pagx/PAGLayer.h:52`）— 运行时层基类，含 `node`（源 Layer*）、`runtimeLayer`（shared_ptr<tgfx::Layer>）、`children`、`rootScene`（weak_ptr<PAGScene>）。`advance(delta)` / `apply(mix)` 是 virtual
-- `pagx::PAGTimeline`（`include/pagx/PAGTimeline.h:51`）— 单 Animation 控制器，含 `owner`（weak_ptr<PAGScene>）、`animation`、`binding`、`contextDoc`、`resolvedTargets`（缓存）、`currentTimeUs`、`playing`
+- `pagx::PAGTimeline`（`include/pagx/PAGTimeline.h:40`）— 运行时播放驱动的**抽象基类**，只声明虚方法 `type()` / `getId()` / `advance()` / `apply()` / `advanceAndApply()`，无数据字段。`PAGAnimation`（`include/pagx/PAGAnimation.h:50`）和 `PAGStateMachine`（`include/pagx/PAGStateMachine.h:55`）是其具体子类
 
 ### 2.4 Timeline 体系已为 state machine 预留扩展点
 
@@ -407,11 +405,11 @@ protected:
 
 ### 2.5 没有 skeleton / bone 预留
 
-`NodeType` 枚举（`include/pagx/nodes/Node.h:30-240`）列出所有节点类型，分九大类：Document、Resources、Animation（Animation/AnimationObject/Channel）、Layer、Layer Styles、Layer Filters、Elements、Text Selectors、ViewModel/DataBind/DataConverter。**没有 Skeleton、Bone、StateMachine、State、Transition 任何相关类型**。`TimelineType` 是唯一明确提到 state machine 的预留点。
+`NodeType` 枚举（`include/pagx/nodes/Node.h:30`）列出所有节点类型。状态机实现前只有 Document、Resources、Animation（Animation/AnimationObject/Channel）、Layer、Layer Styles、Layer Filters、Elements、Text Selectors、ViewModel/DataBind/DataConverter 九大类，**没有 Skeleton、Bone** 任何相关类型。状态机实现后新增了 `StateMachine`、`StateRegion`、`State`、`StateTransition`、`TransitionCondition`、`StateMachineInput` 六个节点类型（`Node.h:101-126`）。`TimelineType` 也已从仅 `Animation` 扩展为包含 `StateMachine`（`Timeline.h:30-33`）。
 
 ### 2.6 动画播放体系
 
-**PAGX 播放循环**（`src/pagx/PAGScene.cpp:442-447`）：
+**PAGX 播放循环**（`src/pagx/PAGScene.cpp:558-563`）：
 
 ```cpp
 void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
@@ -424,8 +422,8 @@ void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
 
 调用链：
 1. 业务侧调用 `scene->advanceAndApply(deltaUs)` 或 `scene->getTimeline(id)->advanceAndApply(deltaUs, mix)`
-2. `PAGComposition::advance(delta)`（`src/pagx/runtime/PAGComposition.cpp:53-58`）：先迭代 `timelines` 调 `timeline->advance(delta)`，再调 `PAGLayer::advance(delta)` 递归到 children
-3. `PAGComposition::apply(mix)`（`src/pagx/runtime/PAGComposition.cpp:60-65`）：先迭代 `timelines` 调 `timeline->apply(mix)`，再调 `PAGLayer::apply(mix)` 递归到 children
+2. `PAGComposition::advance(delta)`（`src/pagx/runtime/PAGComposition.cpp:68-75`）：先迭代 `timelines` 调 `timeline->advance(delta)`，再调 `PAGLayer::advance(delta)` 递归到 children
+3. `PAGComposition::apply(mix)`（`src/pagx/runtime/PAGComposition.cpp:77-81`）：先迭代 `timelines` 调 `timeline->apply(mix)`，再调 `PAGLayer::apply(mix)` 递归到 children
 4. `PAGLayer::advance/apply`（`src/pagx/PAGLayer.cpp:99-111`）是基础情况，只递归 children
 5. 业务侧单独调 `scene->draw(surface)`，draw 内部先 `flushDataBinds()` 再 `displayList->render()`
 
@@ -751,8 +749,7 @@ class ObserverHandle {
 ```xml
 <Transitions>
   <Transition from="normal" to="hover" duration="10"
-              interpolation="bezier" bezier-out="0.42,0" bezier-in="0.58,1"
-              exitTime="15">
+              interpolation="bezier" bezier-out="0.42,0" bezier-in="0.58,1">
     <Condition input="isHover" op="equal" value="true"/>
   </Transition>
   <Transition from="any" to="normal" duration="5">
@@ -772,12 +769,12 @@ class ObserverHandle {
 | `from` | 是 | — | 起始状态 id。`any` 表示本 region 内任意状态（对应 rive 的 AnyState 伪状态） |
 | `to` | 是 | — | 目标状态 id（本 region 内） |
 | `duration` | 是 | — | 过渡时长，单位帧（与 `Keyframe.time` 一致） |
+| `frameRate` | 否 | `60` | 将 `duration`（帧）换算为时间的帧率，使过渡速度独立于所连接的状态动画 |
 | `interpolation` | 否 | `linear` | `none`/`linear`/`bezier`/`hold`，复用 Keyframe 系统 |
 | `bezier-out` | 否 | `0,0` | 贝塞尔出向控制点，仅 `bezier` 有效 |
 | `bezier-in` | 否 | `0,0` | 贝塞尔入向控制点，仅 `bezier` 有效 |
-| `exitTime` | 否 | 无 | 动画播到该帧后才允许转移 |
 | `earlyExit` | 否 | `false` | 是否允许在过渡未完成时打断当前过渡触发本转移 |
-| `pauseOnExit` | 否 | `false` | 过渡期间是否把来源状态冻结在 exitTime 帧（仅在设了 exitTime 时有意义）|
+| `pauseOnExit` | 否 | `false` | 过渡期间是否把来源状态冻结在当前帧（不依赖 exitTime）|
 
 **`interpolation` 各值含义**：
 - `none`：不过渡，立即跳变
@@ -785,11 +782,11 @@ class ObserverHandle {
 - `bezier`：贝塞尔曲线插值（用 `bezier-out`/`bezier-in`）
 - `hold`：保持起始值直到过渡结束再跳变
 
-**`exitTime` 语义**：即使所有 Condition 都满足，也要等到当前 Animation 播到 `exitTime` 帧才允许转换。典型场景：loading 动画 60 帧，`exitTime="60"` 表示必须播完才能转 success 状态。
+**`exitTime` 语义**（未实现，暂缓）：原计划即使所有 Condition 都满足，也要等到当前 Animation 播到 `exitTime` 帧才允许转换。当前版本未实现此字段，转移仅由 condition 和 earlyExit 门控。
 
 **`earlyExit` 语义**：默认 `false`——转移只在本 region 没有正在进行的过渡时才被评估。设为 `true` 时，可在过渡进行中打断：当前 outgoing 状态继续淡出，新目标状态淡入（多个 outgoing 状态可叠加淡出）。对应 rive 的 `EnableEarlyExit` flag。
 
-**`pauseOnExit` 语义**：默认 `false`——过渡期间来源状态继续播放。设为 `true` 时（需配合 `exitTime`），来源状态在过渡期间冻结在 exitTime 帧不动，只做混合不继续播。用于让淡出的姿势保持稳定（如走路→跑步时走路停在某个稳定姿势再混合，避免腿部继续摆动的抖动）。对应 rive 的 `PauseOnExit` flag。
+**`pauseOnExit` 语义**：默认 `false`——过渡期间来源状态继续播放。设为 `true` 时，来源状态在过渡期间冻结在当前帧不动，只做混合不继续播。用于让淡出的姿势保持稳定（如走路→跑步时走路停在某个稳定姿势再混合，避免腿部继续摆动的抖动）。对应 rive 的 `PauseOnExit` flag，但不依赖 exitTime。
 
 #### 3.4.7 `<Condition>` — 转移条件
 
@@ -867,7 +864,7 @@ while (running) {
 
 运行时：VM value 变化 → 经现有 `PAGViewModelValue::addObserver` 回调 → 回调里 `sm->setBool("isHover", newValue)`（trigger 则 `sm->fireTrigger("click")`）。bool/number 喂当前值，trigger 喂 fire。多个 SM 绑同一 VM 值时各自注册 observer、各自被喂值，天然"每个 SM 独立响应"。
 
-这条不在初版范围，但方向明确：**VM 直接喂 SM input，行为等同宿主直接设置**，不做 rive 的 BindableProperty 端口层。
+此能力已实现：`PAGStateMachine::bindInput(inputName, vmValue)`（`include/pagx/PAGStateMachine.h:164`，`src/pagx/PAGStateMachine.cpp:588-636`）封装了 Bool/Number/Trigger 三种 VM→SM input 绑定。**VM 直接喂 SM input，行为等同宿主直接设置**，不做 rive 的 BindableProperty 端口层。
 
 ### 3.6 待确认的 XML 设计点
 
@@ -875,7 +872,7 @@ while (running) {
 
 2. **EntryState 伪状态**：用每个 StateRegion 的 `initialState` 属性替代 EntryState。已确认不做 EntryState。
 
-3. **ExitTime**：已确认做。
+3. **ExitTime**：未实现（暂缓）。当前版本不包含 exitTime 字段及门控逻辑。
 
 4. **空状态**：已确认支持 `<State name="idle"/>` 空状态。
 
@@ -908,17 +905,17 @@ while (running) {
 
 - **mix 权重叠加**（rive 模式）：outgoing/incoming 按各自权重 `apply(mix)` 叠加，复用现有 `RuntimeBinding::apply` 的 mix 机制，采用 rive 的独立 `mixFrom` 权重模型（非 `1-mix`）
 - **Keyframe 的 `interpolation`/`bezier-out`/`bezier-in`** 用在 mix 权重本身的曲线上（不是 keyframe 序列）
-- **ExitTime 做**：transition 的 allowed 检查里加 Animation 时间 >= exitTime 判断
+- **ExitTime 未实现（暂缓）**：原计划在 transition 的 allowed 检查里加 Animation 时间 >= exitTime 判断，当前版本未实现
 - **earlyExit 做**：per-transition flag（默认 false），控制过渡进行中能否被本转移打断
-- **pauseOnExit 做**：per-transition flag（默认 false），配合 exitTime——过渡期间把来源状态冻结在 exitTime 帧做混合，避免来源动画继续播产生抖动
-- **waitingForExit 三态不做**：libpag 宿主时钟持续驱动，exitTime 靠外部时钟自然到达，`allowed()` 返回 bool 即可（详见 8.6）
+- **pauseOnExit 做**：per-transition flag（默认 false），过渡期间把来源状态冻结在当前帧做混合，不依赖 exitTime，避免来源动画继续播产生抖动
+- **waitingForExit 三态不做**：libpag 宿主时钟持续驱动，`allowed()` 返回 bool 即可（详见 8.6）
 
 **使用场景**：
 - **mix 过渡 (`duration`)**：状态切换时的视觉平滑。如 normal→hover 用 `duration=10` 做 10 帧淡入淡出，避免瞬间跳变。`duration=0` 则硬切。
 - **interpolation 曲线**：过渡的缓动手感。`bezier` 做 ease-in-out 让过渡更自然；`hold` 做"保持旧值直到过渡末尾突然切新值"（适合离散内容如换图不希望半透明叠影）。
-- **exitTime**：等当前动画播到某帧才允许转移。如：loading 动画 60 帧，`exitTime=60` 表示 loading 必须播完整才能转 success，即使 success 条件提前满足；又如攻击动作必须打完才能转 idle。
+- **exitTime**（未实现，暂缓）：原计划等当前动画播到某帧才允许转移（如 loading 动画 60 帧，`exitTime=60` 表示 loading 必须播完整才能转 success）。当前版本不支持。
 - **earlyExit**：过渡进行中能否被打断。如：`idle→walk` 过渡到一半用户松开方向键，若 `walk→idle` 设 `earlyExit=true` 就能立刻反向过渡（响应灵敏）；反之攻击动作 `combo1→combo2` 不设 earlyExit（默认 false），保证连招过渡不被中途打断。
-- **pauseOnExit**：过渡期间来源是否冻结。如：走路→跑步，`pauseOnExit=true` + `exitTime` 让走路停在某个稳定姿势（如双脚着地帧）再与跑步混合，避免混合期间走路动画继续摆动造成的腿部抖动。UI 场景通常不需要（默认 false）。
+- **pauseOnExit**：过渡期间来源是否冻结。如：走路→跑步，`pauseOnExit=true` 让走路停在过渡开始时的当前帧再与跑步混合，避免混合期间走路动画继续摆动造成的腿部抖动。UI 场景通常不需要（默认 false）。
 
 ### 决策点 5：多 timeline 共存的 apply 顺序 ✅
 
@@ -986,11 +983,11 @@ rive 的 NestedStateMachine 是为跨文件 NestedArtboard 引用设计，libpag
 | `include/pagx/nodes/Timeline.h:30` | `TimelineType` 加 `StateMachine` 枚举值 |
 | `include/pagx/nodes/Node.h:30` | `NodeType` 加 StateMachine/StateRegion/State/Transition/Input 类型 |
 | `include/pagx/PAGScene.h` | 加 `getStateMachineTimeline(id)` 访问器 |
-| `src/pagx/runtime/PAGComposition.cpp:112-134` | `spawnTimelines` 加 `case TimelineType::StateMachine` 分支 |
-| `src/pagx/PAGXImporter.cpp:673-699` | `ParseLayerTimelines` 加 `<StateMachine ref="@id">` 分支 |
-| `src/pagx/PAGXImporter.cpp:1855` | `ParseAnimations` 加 `<StateMachine>` 子标签分支（含 Inputs/StateRegion 解析） |
-| `src/pagx/PAGXExporter.cpp:302` | `WriteAnimations` 加 `case` 写出 `<StateMachine>`（含 Inputs/StateRegion） |
-| `src/pagx/PAGXExporter.cpp:1494-1510` | Timelines switch 加 `case TimelineType::StateMachine` |
+| `src/pagx/runtime/PAGComposition.cpp:129-165` | `spawnTimelines` 加 `case TimelineType::StateMachine` 分支 |
+| `src/pagx/PAGXImporter.cpp:698-712` | `ParseLayerTimelines` 加 `<StateMachine ref="@id">` 分支 |
+| `src/pagx/PAGXImporter.cpp:2055` | `ParseAnimations` 加 `<StateMachine>` 子标签分支（含 Inputs/StateRegion 解析） |
+| `src/pagx/PAGXExporter.cpp:437` | `WriteStateMachine` 写出 `<StateMachine>`（含 Inputs/StateRegion） |
+| `src/pagx/PAGXExporter.cpp:1724` | Timelines switch 加 `case TimelineType::StateMachine` |
 
 **无需改动**：
 - `PreRegisterResource` / `IsExportableResource`（StateMachine 不在 `<Resources>` 里，不需要预注册）
@@ -1010,7 +1007,7 @@ class PAGStateMachine {
   std::vector<std::string> getRegionIds() const;
 
   // per-region current state query
-  std::string getCurrentState(const std::string& regionId) const;
+  std::string getCurrentState(const std::string& regionName) const;
 
   // inputs (business-driven, shared across regions)
   //   返回 typed value handle，对标 PAGViewModel 的 typed accessor
@@ -1059,9 +1056,9 @@ std::shared_ptr<PAGStateMachine> getStateMachineTimeline(const std::string& id);
 
 **初版实现范围总结**：
 - 数据层：StateMachine（inputs + regions）/ StateRegion（initialState + states + transitions）/ State (AnimationState) / StateTransition / TransitionCondition / StateMachineInput (bool/number/trigger) / StateMachineTimeline
-- 运行时层：PAGStateMachine（多 StateRegion 并行、mix 过渡、ExitTime、trigger per-region 消费帧末清空）
+- 运行时层：PAGStateMachine（多 StateRegion 并行、mix 过渡、trigger per-region 消费帧末清空）
 - XML 导入导出：`<StateMachine>` 放 `<Animations>` 容器（含 `<Inputs>` + 多个 `<StateRegion>`），`<StateMachine ref="@id"/>` 挂 Timelines
-- 暂不实现：BlendState、声明式 VM 联动、NestedStateMachine、waitingForExit 三态（libpag 驱动模型不需要）
+- 暂不实现：BlendState、NestedStateMachine、ExitTime、waitingForExit 三态（libpag 驱动模型不需要）
 
 ---
 
@@ -1382,6 +1379,11 @@ class StateTransition : public Node {
   Frame duration = 0;
 
   /**
+   * The frame rate used to convert duration (in frames) to elapsed time during the crossfade.
+   */
+  float frameRate = 60.0f;
+
+  /**
    * The interpolation curve applied to the crossfade weight over duration. Reuses the keyframe
    * interpolation model (None / Linear / Bezier / Hold).
    */
@@ -1398,13 +1400,6 @@ class StateTransition : public Node {
   Point bezierIn = {};
 
   /**
-   * Optional exit-time gate, in frames. When set, the transition is only allowed after the source
-   * state's animation has advanced past this frame, even if all conditions already hold. nullopt
-   * means no exit-time gate.
-   */
-  std::optional<Frame> exitTime = std::nullopt;
-
-  /**
    * Whether this transition may interrupt an in-progress crossfade. When false (default), the
    * transition is only evaluated once the region has no active crossfade; when true, it can be
    * taken mid-crossfade, and the current outgoing state keeps fading out while the new target
@@ -1413,16 +1408,15 @@ class StateTransition : public Node {
   bool enableEarlyExit = false;
 
   /**
-   * Whether the source state's animation is held (frozen) at its exitTime frame during the
-   * crossfade, instead of continuing to play. Only takes effect together with exitTime (a frozen
-   * frame is only meaningful when there is an exit frame to hold). Default false: the source keeps
-   * advancing while fading out. Useful to keep the outgoing pose stable during blending.
+   * Whether the source state's animation is held (frozen) at its current frame when the transition
+   * begins, instead of continuing to play during the crossfade. Default false: the source keeps
+   * advancing while fading out.
    */
   bool pauseOnExit = false;
 
   /**
    * The conditions gating this transition. All must evaluate true (AND). An empty list means the
-   * transition is always allowed (subject to exitTime).
+   * transition is always allowed.
    */
   std::vector<TransitionCondition*> conditions = {};
 
@@ -1538,7 +1532,7 @@ PAGXDocument (拥有所有 Node，unique_ptr in nodes vector)
 
 1. **State 的 NodeType 归并** ✅：所有 State 子类共用 `NodeType::State`，靠 `StateType` 细分。避免 NodeType 膨胀，后续加 BlendState 不动 NodeType。
 2. **condition value 拆字段** ✅：用 `valueBool` + `valueNumber` 独立字段（对齐 ViewModelProperty.defaultBoolean/defaultNumber），不用 KeyValue variant。
-3. **exitTime 用 optional** ✅：`std::optional<Frame>`（对齐 ViewModelProperty.minValue/maxValue 的 optional 用法），比 -1 magic number 清晰。
+3. **exitTime** ❌（未实现，暂缓）：原计划用 `std::optional<Frame>`，当前版本未包含此字段。
 4. **AnyState 用 "any" 常量** ✅：`constexpr AnyStateName = "any"`，显式，避免空字符串与"未填写"混淆。
 5. **Input/Region/State 继承 Node，标识用 name** ✅：参照 ViewModelProperty——继承 Node、进 document.nodes、用 `name` 而非 `id`（不进 nodeMap）。只有 StateMachine 用 `id`（被 `@ref` 引用）。
 
@@ -1553,14 +1547,14 @@ PAGXDocument (拥有所有 Node，unique_ptr in nodes vector)
 **libpag 与 rive 的驱动模型不同，但不影响状态逻辑结果，只影响"谁决定要不要 tick"。**
 
 - **rive：按需唤醒**。`advance` 返回 bool 上抛给宿主，宿主 `while(needsAdvance()) advanceAndApply()` 自己决定是否继续；状态机稳定后返回 false，宿主停止 tick（省电睡眠）；改 input 经 `markNeedsAdvance` 唤醒。为此 rive 需要 needsAdvance / markNeedsAdvance / waitingForExit 一整套让外部知情的机制。
-- **libpag：时钟持续驱动**。宿主每帧无条件调 `scene->advanceAndApply(delta)`，"要不要干活、干多少"全在 timeline 内部消化——`PAGComposition::advance` 直接调 `timeline->advance(delta)` 并忽略返回值（`runtime/PAGComposition.cpp:55`），与现有 PAGTimeline 一致。
+- **libpag：时钟持续驱动**。宿主每帧无条件调 `scene->advanceAndApply(delta)`，"要不要干活、干多少"全在 timeline 内部消化——`PAGComposition::advance` 直接调 `timeline->advance(delta)` 并忽略返回值（`runtime/PAGComposition.cpp:68`），与现有 PAGTimeline 一致。
 
 **契约**：`PAGStateMachine` 假设宿主每帧持续驱动，**不做按需唤醒**。因此：
 - 不需要 `needsAdvance`（外部不问）
 - 不需要 `markNeedsAdvance`（外部本就每帧来，改 input 下一帧自然被评估）
-- 不需要 `waitingForExit` 三态（不睡眠，exitTime 靠外部时钟自然累加到达）
+- 不需要 `waitingForExit` 三态（不睡眠，`allowed()` 返回 bool 即可）
 
-**结果一致性**：只要宿主遵守"每帧调 advanceAndApply"契约，所有状态逻辑（转移时机、mix、exitTime 自动转移、trigger 响应）与 rive 结果一致。差异仅在：rive 静止时睡眠省电，libpag 静止时空转——这对 PAG"合成动画持续播放"的既有假设无影响。若将来需要省电模式，可另行补 needsAdvance 机制，不影响状态机语义。
+**结果一致性**：只要宿主遵守"每帧调 advanceAndApply"契约，所有状态逻辑（转移时机、mix、trigger 响应）与 rive 结果一致。差异仅在：rive 静止时睡眠省电，libpag 静止时空转——这对 PAG"合成动画持续播放"的既有假设无影响。若将来需要省电模式，可另行补 needsAdvance 机制，不影响状态机语义。
 
 **trigger 延迟消费——两种策略的差异**：trigger 的"fire 只记录、advance 才评估消费"是固有语义（两边都有）。但"延迟多久消费"两种策略不同：
 
@@ -1594,7 +1588,7 @@ FadingState {
   State* state;
   int64_t elapsedUs;   // 该来源状态的动画时间
   float mixFrom;       // 淡出权重起点：进入淡出那一刻 currentState 的 mix 值（rive 的 m_mixFrom）
-  bool frozen;         // pauseOnExit：true 则 elapsedUs 冻结不再推进（固定在 exitTime 帧）
+  bool frozen;         // pauseOnExit：true 则 elapsedUs 冻结不再推进（固定在当前帧）
 }
 ```
 
@@ -1625,7 +1619,7 @@ RegionInstance::advance(deltaUs):
     // 1. 推进所有状态的动画时间
     currentElapsedUs += deltaUs
     for f in fadingOut:
-        if not f.frozen:                // pauseOnExit 冻结的来源保持在 exitTime 帧不动
+        if not f.frozen:                // pauseOnExit 冻结的来源保持在当前帧不动
             f.elapsedUs += deltaUs
 
     // 2. 推进当前过渡的淡入进度
@@ -1659,17 +1653,7 @@ RegionInstance::findAllowedTransition(fromName, inTransition):
     return null
 
 RegionInstance::allowed(t):
-    // exitTime 门槛：当前状态动画的累计播放时间未越过 exitTime 则不允许（即使条件满足）
-    if t.exitTime.hasValue():
-        anim = document.findAnimation(currentState.animationId)
-        if anim != null:
-            exitUs = FramesToMicros(t.exitTime, frameRate)
-            durationUs = FramesToMicros(anim.duration, frameRate)
-            // 对齐 rive：exitTime 若落在单个循环周期内且动画是循环模式，
-            // 把 exitTime 抬到当前所在的循环周期，实现"每遍循环相同位置都可退出"
-            if exitUs <= durationUs and anim.loop != Once and durationUs > 0:
-                exitUs += floor(currentElapsedUs / durationUs) * durationUs
-            if currentElapsedUs < exitUs: return false
+    // exitTime 门槛未实现（暂缓）；当前仅由 condition 和 earlyExit 门控
     // 所有 condition AND
     for c in t.conditions:
         if not evaluateCondition(c): return false
@@ -1696,9 +1680,8 @@ RegionInstance::changeState(t):
         mixFrom:  mix,                  // 关键：起点是当前 mix，不是 1（支持连续/early-exit 叠加）
         frozen:   false,
     }
-    // pauseOnExit：冻结来源在 exitTime 帧（需配合 exitTime；对齐 rive applyExitCondition）
-    if t.pauseOnExit and t.exitTime.hasValue():
-        fadingState.elapsedUs = FramesToMicros(t.exitTime, frameRate)
+    // pauseOnExit：冻结来源在当前帧（不依赖 exitTime）
+    if t.pauseOnExit:
         fadingState.frozen = true
     fadingOut.push_back(fadingState)
     currentState = region.findState(t.to)
@@ -1750,10 +1733,10 @@ RegionInstance::applyState(state, elapsedUs, weight):
 
 - **独立权重模型（对齐 rive）**：来源状态用 `mixFrom`（进入淡出时保存的淡入权重），**不是 `1-mix`**。这样 early-exit 时多个未完成过渡可以叠加淡出（A 淡出中被打断转 B，A 保留残留权重、B 又淡出、C 淡入）。参见 rive `state_machine_instance.cpp:577,609-640`
 - **early-exit**：`findAllowedTransition` 在过渡进行中只接受 `enableEarlyExit==true` 的转移；默认 false 时行为与 rive 一致（不可打断）
-- **pauseOnExit**：`changeState` 时若转移设了 `pauseOnExit`（且有 exitTime），把来源 FadingState 的 `elapsedUs` 固定为 exitTime 并标记 `frozen`，advance 不再推进它——过渡期间来源冻结在 exitTime 帧做混合（对齐 rive `applyExitCondition`）
+- **pauseOnExit**：`changeState` 时若转移设了 `pauseOnExit`，把来源 FadingState 标记 `frozen`，advance 不再推进它的 elapsedUs——过渡期间来源冻结在当前帧做混合（不依赖 exitTime）
 - **mix 曲线复用 Keyframe**：`curve()` 把权重值经 `interpolation`/`bezier` 曲线映射，与 keyframe easing 同一套 bezier 求值
 - **过渡叠加**：过渡中同一 channel 被多个 outgoing + 一个 incoming 各写一次，`RuntimeBinding::apply` 的 mix 规则自动做 lerp（连续）或覆盖（离散）；currentState 最后 apply，权重最高
-- **exitTime**：`allowed()` 里条件检查前先卡累计时间 `currentElapsedUs >= exitUs`。对 loop 动画，若 exitTime 落在单个周期内则每遍循环对齐重触发（对齐 rive `state_transition.cpp:192-196` 的 `floor(lastTime/duration)*duration` 逻辑）；`currentElapsedUs` 本身累计不回绕（对应 rive `totalTime`），只在 `applyLoop` 采样时回绕。`allowed()` 返回 bool（yes/no），不需要 rive 的 waitingForExit 三态——rive 的三态是为驱动 `needsAdvance` 循环，而 libpag 宿主时钟持续驱动，exitTime 靠外部时钟自然到达（详见 8.6）
+- **exitTime**（未实现，暂缓）：原计划 `allowed()` 里条件检查前先卡累计时间 `currentElapsedUs >= exitUs`，对 loop 动画每遍循环对齐重触发。当前版本未实现此门控，`allowed()` 仅检查 condition。`allowed()` 返回 bool（yes/no），不需要 rive 的 waitingForExit 三态——rive 的三态是为驱动 `needsAdvance` 循环，而 libpag 宿主时钟持续驱动（详见 8.6）
 - **trigger 时序**：`fireTrigger` 只置 `input.fired=true`（不评估，仅记录，若之后不 advance 则标志保留）→ 下一次 `advance` 内各 region 的 `evaluateCondition` 读到 → 触发的 region 记入 `consumedTriggers` → 本次 advance 末尾（评估之后）统一清 `fired` 和 `consumedTriggers`。即 fire 与消费解耦：fire 记录、advance 评估消费，两者可跨调用。对齐 rive `SMITrigger`（`fire` 置位 + `markNeedsAdvance`，`layer.advance` 评估在前、`input.advanced()` 清空在后，同一次 advance 内）
 - **单帧链式切换**：`advance` 里循环 `tryChangeState` 最多 100 次（与 rive `maxIterations=100` 一致），处理 A→B→C 链
 
@@ -1766,16 +1749,16 @@ RegionInstance::applyState(state, elapsedUs, weight):
 | 单帧链式切换上限 | 100 | 100（`maxIterations`） | ✅ |
 | trigger per-region 消费 | 每 region 各消费一次，帧末清空 | 每 layer 各消费一次，帧末清空（`m_usedLayers`） | ✅ |
 | trigger 过渡中 fire 但无法消费 | 帧末清空，需重新 fire | 帧末无条件清空（`advanced()` reset） | ✅ |
-| exitTime 与 loop 动画 | 累计时间比较；exitTime≤周期时每遍循环对齐重触发 | 同（`totalTime` + `floor(lastTime/duration)*duration`） | ✅ |
+| exitTime 与 loop 动画 | 未实现（暂缓） | 累计时间比较；exitTime≤周期时每遍循环对齐重触发 | ❌ 暂缓 |
 | mix 权重模型 | 独立 `mixFrom`，非 `1-mix` | 独立 `m_mixFrom` | ✅ |
 | pauseOnExit（过渡冻结来源） | 支持（FadingState.frozen） | 支持（`m_holdAnimationFrom`/`m_holdTime`） | ✅ |
 | waitingForExit（三态） | 不需要 | 三态（no/yes/waitingForExit） | ⚠️ 驱动模型不同，见下 |
 
 **两处差异的说明**：
 
-- **pauseOnExit**：已支持。`changeState` 时若转移设了 pauseOnExit + exitTime，来源 FadingState 冻结在 exitTime 帧（`frozen=true`，advance 不推进其 elapsedUs），过渡期间保持稳定姿势做混合，避免走路→跑步时来源动画继续摆动的抖动。对齐 rive `state_transition.cpp:208-221` 的 applyExitCondition。
+- **pauseOnExit**：已支持。`changeState` 时若转移设了 pauseOnExit，来源 FadingState 冻结在当前帧（`frozen=true`，advance 不推进其 elapsedUs），过渡期间保持稳定姿势做混合，避免走路→跑步时来源动画继续摆动的抖动。不依赖 exitTime。
 
-- **waitingForExit**：rive 的三态（`state_transition.hpp:21-26`）中 `waitingForExit` 的真正作用是驱动 `advance` 返回值（`state_machine_instance.cpp:255`：`return ... || m_waitingForExit || ...`），让宿主的 `while(needsAdvance())` 循环在"条件满足但等 exitTime"时继续 tick，否则时间停止推进、exitTime 永远到不了。**libpag 不需要这个机制**——libpag 是宿主时钟持续驱动模型：`PAGComposition::advance` 直接调 `timeline->advance(delta)` 并忽略返回值（`runtime/PAGComposition.cpp:55`），宿主每帧无条件推进时间。`currentElapsedUs` 每帧照常累加，exitTime 靠外部时钟自然到达。因此 `allowed()` 返回 bool（yes/no 合并）即可，无需三态。
+- **waitingForExit**：rive 的三态（`state_transition.hpp:21-26`）中 `waitingForExit` 的真正作用是驱动 `advance` 返回值（`state_machine_instance.cpp:255`：`return ... || m_waitingForExit || ...`），让宿主的 `while(needsAdvance())` 循环在"条件满足但等 exitTime"时继续 tick，否则时间停止推进、exitTime 永远到不了。**libpag 不需要这个机制**——libpag 是宿主时钟持续驱动模型：`PAGComposition::advance` 直接调 `timeline->advance(delta)` 并忽略返回值（`runtime/PAGComposition.cpp:68`），宿主每帧无条件推进时间。因此 `allowed()` 返回 bool（yes/no 合并）即可，无需三态。
 
 ### 8.7 顶层 SM 与嵌套 SM 的驱动归属（完全对齐 Animation / rive）
 
@@ -1830,14 +1813,14 @@ scene->draw(surface);
 | `InputAllTypesRoundTrip` | 三种 input（bool/number/trigger）+ 各自 default（defaultBool/defaultNumber/trigger 无 default）round-trip |
 | `TransitionAllOpsRoundTrip` | 所有 op（equal/notEqual/lessThan/lessThanOrEqual/greaterThan/greaterThanOrEqual/trigger）round-trip，op↔字符串映射正确 |
 | `TransitionInterpolationRoundTrip` | transition 的 interpolation（none/linear/bezier/hold）/bezier-out/bezier-in/duration round-trip |
-| `TransitionExitTimeRoundTrip` | exitTime 的 nullopt（不写属性）与有值（写属性）两种情况 round-trip，区分清楚 |
+| `TransitionExitTimeRoundTrip` | ~~exitTime round-trip~~ **不适用（exitTime 未实现）** |
 | `TransitionEarlyExitRoundTrip` | earlyExit 的 true/false round-trip；false 为默认时不写属性（对齐 playing 默认省略的风格） |
 | `TransitionPauseOnExitRoundTrip` | pauseOnExit 的 true/false round-trip；false 为默认时不写属性 |
 | `AnyStateTransitionRoundTrip` | `from="any"` 的转移 round-trip，from 值保持 "any" |
 | `EmptyStateRoundTrip` | `<State name="idle"/>` 无 animation 的空状态 round-trip，animationId 为空 |
 | `MultiRegionRoundTrip` | 多个 StateRegion（各自 name/initialState/states/transitions）round-trip，顺序与内容一致 |
 | `MultiConditionRoundTrip` | 一条 transition 挂多个 Condition round-trip，顺序一致 |
-| `StateMachineDefaultsOmitted` | 默认值属性（interpolation=linear、earlyExit=false、无 exitTime）导出时省略，再导入仍得默认值 |
+| `StateMachineDefaultsOmitted` | 默认值属性（interpolation=linear、earlyExit=false）导出时省略，再导入仍得默认值 |
 | `StateMachineInComposition` | StateMachine 定义在 `<Composition>` 内部（而非顶层）时 round-trip 正确，被组合内 Layer 引用 |
 
 ### 9.2 导入错误处理
@@ -1893,16 +1876,16 @@ scene->draw(surface);
 | `SMAnyStateTransition` | `from="any"` 的转移从任意当前状态都能触发 |
 | `SMAnyStatePriority` | 同时存在 any 转移和当前状态转移且都满足时，any 优先（对齐伪代码先查 any）|
 | `SMConditionAnd` | 多 condition 的 transition：全满足才切，缺一不切 |
-| `SMEmptyConditionAlwaysAllowed` | 无 condition 的 transition：进入 from 状态后立即（受 exitTime 约束）自动转移 |
+| `SMEmptyConditionAlwaysAllowed` | 无 condition 的 transition：进入 from 状态后立即自动转移 |
 
-**exitTime**
+**exitTime**（未实现，暂缓——以下用例不适用）
 
 | 用例 | 验证点 |
 |---|---|
-| `SMExitTimeGate` | 有 exitTime 的转移：条件满足但动画未播到 exitTime 时不切，播过后才切 |
-| `SMExitTimeZero` | exitTime=0：条件满足即可立即转（等价无门槛）|
-| `SMExitTimeWithLoop` | 绑定 loop 动画的状态，exitTime≤周期时每遍循环相同位置都可触发（第 1 遍累计 exitTime 触发，未转成则第 2 遍累计 duration+exitTime 再触发）| 
-| `SMExitTimeNoConditionAutoAdvance` | 无 condition + 有 exitTime：动画播到 exitTime 帧自动转移（loading→success 场景）|
+| `SMExitTimeGate` | ~~有 exitTime 的转移：条件满足但动画未播到 exitTime 时不切~~ **不适用** |
+| `SMExitTimeZero` | ~~exitTime=0：条件满足即可立即转~~ **不适用** |
+| `SMExitTimeWithLoop` | ~~绑定 loop 动画的状态，exitTime≤周期时每遍循环相同位置都可触发~~ **不适用** |
+| `SMExitTimeNoConditionAutoAdvance` | ~~无 condition + 有 exitTime：动画播到 exitTime 帧自动转移~~ **不适用** |
 
 **earlyExit / 过渡打断**
 
@@ -1917,8 +1900,7 @@ scene->draw(surface);
 
 | 用例 | 验证点 |
 |---|---|
-| `SMPauseOnExitFreezesSource` | pauseOnExit=true + exitTime：过渡开始后来源 FadingState 的 elapsedUs 固定为 exitTime，多次 advance 不变（frozen=true）|
-| `SMPauseOnExitNeedsExitTime` | pauseOnExit=true 但未设 exitTime：不冻结（frozen=false，来源继续推进）|
+| `SMPauseOnExitFreezesSource` | pauseOnExit=true：过渡开始后来源 FadingState 的 elapsedUs 固定在当前帧，多次 advance 不变（frozen=true）|
 | `SMPauseOnExitDefault` | 默认 pauseOnExit=false：来源过渡期间继续推进 elapsedUs |
 
 **链式 / 边界**
@@ -1951,7 +1933,7 @@ scene->draw(surface);
 | `SMHoldInterpolation` | hold interpolation：过渡期间保持来源值，末尾才跳变到目标 | `PAGXStateMachine/Hold` |
 | `SMNoneInterpolation` | none interpolation：无过渡感，立即跳变（与 hold 效果对比）| `PAGXStateMachine/None` |
 | `SMEarlyExitOverlap` | early-exit 造成两个来源同时淡出 + 一个淡入，三者叠加渲染正确 | `PAGXStateMachine/EarlyExitOverlap` |
-| `SMPauseOnExitFrozenFrame` | pauseOnExit 过渡中来源冻结在 exitTime 帧渲染（对比不冻结时来源继续播的不同输出）| `PAGXStateMachine/PauseOnExit` |
+| `SMPauseOnExitFrozenFrame` | pauseOnExit 过渡中来源冻结在当前帧渲染（对比不冻结时来源继续播的不同输出）| `PAGXStateMachine/PauseOnExit` |
 | `SMMultiRegionStack` | visual region（scaleX）+ enable region（alpha）同时作用，输出叠加正确 | `PAGXStateMachine/MultiRegionStack` |
 | `SMMultiRegionSameChannel` | 两 region 写同一 channel，按声明顺序后者叠加在前者结果上 | `PAGXStateMachine/MultiRegionSameChannel` |
 | `SMEmptyStateNoOutput` | 空状态激活时不写 channel，目标保持进入空状态前的值 | `PAGXStateMachine/EmptyState` |
@@ -1986,4 +1968,4 @@ scene->draw(surface);
 2. **单元测试 vs 截图测试分层**：9.3 只查状态字段不 draw；9.4 才 draw 比对截图。（待你最终确认）
 3. **多 region 写同一 channel（`SMMultiRegionSameChannel`）**：按声明顺序叠加（后者叠在前者结果上）。建议在文档里作为契约明确。（待你最终确认）
 4. **trigger 跨帧行为（`SMTriggerFireDuringTransition`）** ✅：对齐 rive——帧末无条件清空。过渡中 fire 但因 earlyExit=false 无法消费时，该 trigger 当帧末即清空，业务需在过渡完成后重新 fire。
-5. **exitTime 与 loop（`SMExitTimeWithLoop`）** ✅：对齐 rive——按累计时间 `currentElapsedUs` 比较，且当 exitTime≤单个循环周期时**每遍循环的相同位置都可触发**（`exitUs += floor(currentElapsedUs/durationUs)*durationUs`）。测试预期：动画 10 帧、exitTime=5、loop 模式，条件恒真 → 第 1 遍累计 5 帧触发、若那次没转成则第 2 遍累计 15 帧再次可触发。exitTime>周期或 Once 模式则只首次到达触发一次。
+5. **exitTime 与 loop（`SMExitTimeWithLoop`）** ❌（未实现，暂缓）：exitTime 字段当前不存在，此用例不适用。
