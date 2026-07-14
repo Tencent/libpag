@@ -2017,6 +2017,38 @@ static StateRegion* ParseStateRegion(const DOMNode* node, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+  std::vector<StateTransition*> validTransitions = {};
+  for (const auto* tr : region->transitions) {
+    if (tr == nullptr) {
+      continue;
+    }
+    bool toFound = false;
+    for (const auto* st : region->states) {
+      if (st != nullptr && st->name == tr->to) {
+        toFound = true;
+        break;
+      }
+    }
+    if (!toFound) {
+      ReportError(doc, node, "Transition references unknown target state '" + tr->to + "'.");
+      continue;
+    }
+    if (tr->from != AnyStateName) {
+      bool fromFound = false;
+      for (const auto* st : region->states) {
+        if (st != nullptr && st->name == tr->from) {
+          fromFound = true;
+          break;
+        }
+      }
+      if (!fromFound) {
+        ReportError(doc, node, "Transition references unknown source state '" + tr->from + "'.");
+        continue;
+      }
+    }
+    validTransitions.push_back(tr);
+  }
+  region->transitions = std::move(validTransitions);
   return region;
 }
 
