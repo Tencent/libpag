@@ -190,21 +190,10 @@ class PAGStateMachine : public PAGTimeline {
   // VM→SM input bindings. Each entry holds an ObserverHandle that detaches on destruction.
   std::vector<ObserverHandle> inputBindings;
 
-  // Region advance helpers.
-  // Advances every region by deltaUs and returns true if any region's playback state changed this
-  // frame: an active or fading animation advanced its time, a state transition occurred, or the
-  // crossfade mix moved.
   bool advanceRegion(int64_t deltaUs);
-  // Advances the region's crossfade mix by one frame's worth of deltaUs, using the transition's
-  // own frame rate to convert its duration (in frames) to time. Clears the transition and fading
-  // slots once mix reaches 1.0. Returns true if the mix value changed.
   bool advanceMix(RegionInstance& ri, int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
-  // Constructs a fresh PAGAnimation that plays the given state's animation. Each playback slot
-  // (current or fading) owns its own instance so their playback times stay independent. Returns
-  // nullptr for an empty state or a missing animation (asserts in debug builds to surface a
-  // dangling reference).
   std::shared_ptr<PAGAnimation> createTimelineForState(const State* state);
 
   friend class PAGScene;
