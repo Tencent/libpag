@@ -5743,7 +5743,7 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   doc->animations.push_back(anim);
 
   auto file = pagx::PAGScene::Make(doc);
-  auto timeline = file->getTimeline("loop");
+  auto timeline = file->getAnimation("loop");
   ASSERT_TRUE(timeline != nullptr);
 
   // Duration is 60 frames @ 60fps = 1_000_000 microseconds.
@@ -5771,7 +5771,7 @@ PAGX_TEST(PAGXTest, PAGTimelineStateMachine) {
   onceAnim->loop = pagx::LoopMode::Once;
   doc->animations.push_back(onceAnim);
 
-  auto onceTimeline = file->getTimeline("once");
+  auto onceTimeline = file->getAnimation("once");
   EXPECT_TRUE(onceTimeline->advance(2'000'000));
   EXPECT_EQ(onceTimeline->currentTime(), 1'000'000);
   // Once clamps at the end; further advances produce no change.
@@ -5791,7 +5791,7 @@ PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
   doc->animations.push_back(anim);
 
   auto file = pagx::PAGScene::Make(doc);
-  auto timeline = file->getTimeline("pp");
+  auto timeline = file->getAnimation("pp");
   ASSERT_TRUE(timeline != nullptr);
   EXPECT_EQ(timeline->currentTime(), 0);
 
@@ -5836,13 +5836,13 @@ PAGX_TEST(PAGXTest, PAGTimelineNegativeDelta) {
   auto file = pagx::PAGScene::Make(doc);
 
   // Loop: negative delta wraps correctly.
-  auto loopTl = file->getTimeline("loop");
+  auto loopTl = file->getAnimation("loop");
   loopTl->setCurrentTime(200'000);
   EXPECT_TRUE(loopTl->advance(-500'000));
   EXPECT_EQ(loopTl->currentTime(), 700'000);
 
   // Once: negative delta clamps at 0.
-  auto onceTl = file->getTimeline("once");
+  auto onceTl = file->getAnimation("once");
   onceTl->setCurrentTime(300'000);
   EXPECT_TRUE(onceTl->advance(-500'000));
   EXPECT_EQ(onceTl->currentTime(), 0);
@@ -5862,7 +5862,7 @@ PAGX_TEST(PAGXTest, PAGTimelineZeroDuration) {
   doc->animations.push_back(anim);
 
   auto file = pagx::PAGScene::Make(doc);
-  auto timeline = file->getTimeline("zero");
+  auto timeline = file->getAnimation("zero");
   ASSERT_TRUE(timeline != nullptr);
   EXPECT_FALSE(timeline->advance(100'000));
   EXPECT_EQ(timeline->currentTime(), 0);
@@ -5880,7 +5880,7 @@ PAGX_TEST(PAGXTest, PAGTimelineOutlivesScene) {
   doc->animations.push_back(anim);
 
   auto scene = pagx::PAGScene::Make(doc);
-  auto timeline = scene->getTimeline("loop");
+  auto timeline = scene->getAnimation("loop");
   ASSERT_TRUE(timeline != nullptr);
   timeline->setCurrentTime(200'000);
 
@@ -6369,8 +6369,8 @@ PAGX_TEST(PAGXTest, ChannelMultiTimelineStacking) {
   auto tgfxLayer = tree.get<tgfx::Layer>(layer);
   tgfxLayer->setAlpha(0.5f);
 
-  auto base = file->getTimeline("base");
-  auto hint = file->getTimeline("hint");
+  auto base = file->getAnimation("base");
+  auto hint = file->getAnimation("hint");
 
   // base writes 0.0 fully, then hint blends 30% toward 1.0 from 0.0.
   base->apply(1.0f);
@@ -6811,13 +6811,13 @@ PAGX_TEST(PAGXTest, CompositionDriveSemantics) {
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  auto mainTimeline = file->getTimeline("main");
-  auto hintTimeline = file->getTimeline("hint");
+  auto mainTimeline = file->getAnimation("main");
+  auto hintTimeline = file->getAnimation("hint");
   ASSERT_TRUE(mainTimeline != nullptr);
   ASSERT_TRUE(hintTimeline != nullptr);
 
   // PAGScene::advance drives only composition-spawned timelines; top-level animations obtained
-  // via getTimeline() are separate instances and are not touched by the composition's advance loop.
+  // via getAnimation() are separate instances and are not touched by the composition's advance loop.
   file->rootComposition()->advance(500'000);
   EXPECT_EQ(mainTimeline->currentTime(), 0);
   EXPECT_EQ(hintTimeline->currentTime(), 0);

@@ -84,21 +84,21 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Returns the ids of all top-level animations in the source document, preserving declaration
    * order. Animations declared inside child Compositions are not included.
    */
-  std::vector<std::string> getTimelineIds() const;
+  std::vector<std::string> getAnimationIds() const;
 
   /**
    * Returns the PAGAnimation driving the named top-level animation. Repeated calls with the same
    * id return the same instance, so playback state is shared across all callers driving that
    * animation.
-   * @param id an animation id from getTimelineIds(). Returns nullptr if no top-level
+   * @param id an animation id from getAnimationIds(). Returns nullptr if no top-level
    *           Animation matches the given id.
    */
-  std::shared_ptr<PAGAnimation> getTimeline(const std::string& id);
+  std::shared_ptr<PAGAnimation> getAnimation(const std::string& id);
 
   /**
    * Returns the first top-level playback driver (animation or state machine) in declaration order,
    * or nullptr if the document has none. The returned shared_ptr points to a PAGAnimation or
-   * PAGStateMachine; use getTimeline() / getStateMachineTimeline() for typed access.
+   * PAGStateMachine; use getAnimation() / getStateMachineTimeline() for typed access.
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
@@ -157,7 +157,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
    * apply() drive the animations that play automatically in this scene (including nested
    * compositions). Top-level animations are not driven here; play them explicitly via
-   * getTimeline(id)->advanceAndApply(...).
+   * getAnimation(id)->advanceAndApply(...).
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
@@ -231,7 +231,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
-  // Top-level timelines instantiated on demand by getTimeline/getStateMachineTimeline, keyed by
+  // Top-level timelines instantiated on demand by getAnimation/getStateMachineTimeline, keyed by
   // their source definition node so repeated lookups return the same instance.
   std::unordered_map<const Node*, std::shared_ptr<PAGTimeline>> instantiatedTimelines = {};
 

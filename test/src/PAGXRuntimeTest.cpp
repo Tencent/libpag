@@ -84,23 +84,23 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneTimelineLookup) {
   auto file = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(file != nullptr);
 
-  auto ids = file->getTimelineIds();
+  auto ids = file->getAnimationIds();
   ASSERT_EQ(ids.size(), 2u);
   EXPECT_EQ(ids[0], "main");
   EXPECT_EQ(ids[1], "hint");
 
-  auto t1 = file->getTimeline("main");
-  auto t1Again = file->getTimeline("main");
+  auto t1 = file->getAnimation("main");
+  auto t1Again = file->getAnimation("main");
   ASSERT_TRUE(t1 != nullptr);
   EXPECT_EQ(t1.get(), t1Again.get());
   EXPECT_EQ(t1->getId(), "main");
   EXPECT_EQ(t1->duration(), 1'000'000);
 
-  auto t2 = file->getTimeline("hint");
+  auto t2 = file->getAnimation("hint");
   ASSERT_TRUE(t2 != nullptr);
   EXPECT_NE(t1.get(), t2.get());
 
-  EXPECT_EQ(file->getTimeline("missing"), nullptr);
+  EXPECT_EQ(file->getAnimation("missing"), nullptr);
 
   auto def = std::static_pointer_cast<pagx::PAGAnimation>(file->getDefaultTimeline());
   EXPECT_EQ(def.get(), t1.get());

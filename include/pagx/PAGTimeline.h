@@ -30,7 +30,7 @@ namespace pagx {
  * Animation clip; a PAGStateMachine drives a state machine that switches between clips. Both share
  * the advance/apply contract used by the owning PAGComposition to drive per-frame playback.
  *
- * Obtain concrete instances through PAGScene: getTimeline() / getStateMachineTimeline() return the
+ * Obtain concrete instances through PAGScene: getAnimation() / getStateMachineTimeline() return the
  * typed subclasses; getDefaultTimeline() returns whichever comes first in the document's
  * &lt;Animations&gt; block.
  *

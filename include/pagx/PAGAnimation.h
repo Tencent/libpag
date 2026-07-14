@@ -39,7 +39,7 @@ class Channel;
  * playback time and applies the animation to the scene's content via apply(). Playback advancement
  * is gated by the owning PAGComposition's pausedTimelineIds, not by state on PAGAnimation itself.
  *
- * PAGAnimation must not be constructed directly; obtain instances through PAGScene::getTimeline().
+ * PAGAnimation must not be constructed directly; obtain instances through PAGScene::getAnimation().
  * Multiple lookups for the same animation name return the same PAGAnimation instance, so playback
  * state is shared across all callers driving that animation.
  *

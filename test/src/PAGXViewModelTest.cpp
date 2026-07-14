@@ -748,9 +748,9 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   int obs = 0;
   auto h = alphaProp->addObserver([&]() { obs++; });
   EXPECT_EQ(obs, 0);
-  auto t1 = scene->getTimeline("a1");
+  auto t1 = scene->getAnimation("a1");
   ASSERT_NE(t1, nullptr);
-  auto t2 = scene->getTimeline("a2");
+  auto t2 = scene->getAnimation("a2");
   ASSERT_NE(t2, nullptr);
   int64_t f30 = 500000;
   t1->setCurrentTime(f30);

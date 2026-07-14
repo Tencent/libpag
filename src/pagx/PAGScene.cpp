@@ -375,7 +375,7 @@ PAGScene::~PAGScene() {
   }
 }
 
-std::vector<std::string> PAGScene::getTimelineIds() const {
+std::vector<std::string> PAGScene::getAnimationIds() const {
   std::vector<std::string> ids = {};
   if (document == nullptr) {
     return ids;
@@ -388,7 +388,7 @@ std::vector<std::string> PAGScene::getTimelineIds() const {
   return ids;
 }
 
-std::shared_ptr<PAGAnimation> PAGScene::getTimeline(const std::string& id) {
+std::shared_ptr<PAGAnimation> PAGScene::getAnimation(const std::string& id) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -427,7 +427,7 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
       continue;
     }
     if (node->nodeType() == NodeType::Animation) {
-      return getTimeline(static_cast<Animation*>(node)->id);
+      return getAnimation(static_cast<Animation*>(node)->id);
     }
     if (node->nodeType() == NodeType::StateMachine) {
       return getStateMachineTimeline(static_cast<StateMachine*>(node)->id);
