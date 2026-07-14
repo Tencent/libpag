@@ -435,6 +435,9 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
 }
 
 static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
+  if (sm == nullptr) {
+    return;
+  }
   xml.openElement("StateMachine");
   xml.addAttribute("id", sm->id);
   WriteCustomData(xml, sm);
