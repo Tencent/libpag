@@ -1944,6 +1944,10 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
       if (condition != nullptr) {
         transition->conditions.push_back(condition);
       }
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(doc, child.get(),
+                  "Element '" + child->name +
+                      "' is not allowed in 'Transition'. Expected: Condition.");
     }
     child = child->nextSibling;
   }
@@ -1995,6 +1999,10 @@ static StateRegion* ParseStateRegion(const DOMNode* node, PAGXDocument* doc) {
           if (st != nullptr) {
             region->states.push_back(st);
           }
+        } else if (stateChild->type == DOMNodeType::Element) {
+          ReportError(doc, stateChild.get(),
+                      "Element '" + stateChild->name +
+                          "' is not allowed in 'States'. Expected: State.");
         }
         stateChild = stateChild->nextSibling;
       }
@@ -2006,6 +2014,10 @@ static StateRegion* ParseStateRegion(const DOMNode* node, PAGXDocument* doc) {
           if (tr != nullptr) {
             region->transitions.push_back(tr);
           }
+        } else if (transChild->type == DOMNodeType::Element) {
+          ReportError(doc, transChild.get(),
+                      "Element '" + transChild->name +
+                          "' is not allowed in 'Transitions'. Expected: Transition.");
         }
         transChild = transChild->nextSibling;
       }
