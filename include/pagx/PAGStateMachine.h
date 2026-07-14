@@ -52,8 +52,8 @@ class StateTransition;
  * Thread safety: PAGStateMachine is not thread-safe. Callers must serialize access.
  */
 class PAGStateMachine : public PAGTimeline,
-                        public std::enable_shared_from_this<PAGStateMachine>,
-                        public Observable {
+                        public Observable,
+                        public std::enable_shared_from_this<PAGStateMachine> {
  public:
   ~PAGStateMachine();
 

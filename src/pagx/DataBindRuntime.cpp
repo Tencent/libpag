@@ -47,18 +47,19 @@ namespace {
 
 class TriggerInputObserver {
  public:
-  TriggerInputObserver(PAGStateMachine* sm, std::string inputName)
-      : sm(sm), inputName(std::move(inputName)) {
+  TriggerInputObserver(std::weak_ptr<PAGStateMachine> sm, std::string inputName)
+      : sm(std::move(sm)), inputName(std::move(inputName)) {
   }
 
   void operator()() const {
-    if (sm != nullptr) {
-      sm->fireTrigger(inputName);
+    auto locked = sm.lock();
+    if (locked != nullptr) {
+      locked->fireTrigger(inputName);
     }
   }
 
  private:
-  PAGStateMachine* sm = nullptr;
+  std::weak_ptr<PAGStateMachine> sm;
   std::string inputName;
 };
 
@@ -93,7 +94,6 @@ static std::vector<std::string> ParseSourcePath(const std::string& source) {
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
                            PAGXDocument* doc, RuntimeBinding* binding) {
   boundBinding = binding;
-  entries.reserve(entries.size() + binds.size());
   for (auto* db : binds) {
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
@@ -124,13 +124,27 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
 
     // StateMachine input targets: register a Trigger observer for event-based binding.
     // Bool/Number SM inputs are handled via the normal value-based applyEntry path.
-    if (targetNode->nodeType() == NodeType::StateMachine &&
-        sourceValue->valueType() == ViewModelPropertyType::Trigger) {
+    if (targetNode->nodeType() == NodeType::StateMachine) {
+      auto sourceType = sourceValue->valueType();
+      if (sourceType != ViewModelPropertyType::Boolean &&
+          sourceType != ViewModelPropertyType::Number &&
+          sourceType != ViewModelPropertyType::Trigger) {
+        LOGE(
+            "DataBind skipped: VM property type %d is not supported for SM input binding "
+            "(source '%s', target '%s').",
+            static_cast<int>(sourceType), db->source.c_str(), db->target.c_str());
+        continue;
+      }
       auto sm = binding->get<PAGStateMachine>(targetNode);
-      if (sm != nullptr) {
+      if (sm == nullptr) {
+        LOGE("DataBind skipped: StateMachine instance not found for target '%s'.",
+             db->target.c_str());
+        continue;
+      }
+      if (sourceType == ViewModelPropertyType::Trigger) {
         auto triggerVal =
             std::static_pointer_cast<PAGViewModelValueTrigger>(sourceValue->shared_from_this());
-        triggerHandles[db] = triggerVal->addObserver(TriggerInputObserver(sm.get(), db->channel));
+        triggerHandles[db] = triggerVal->addObserver(TriggerInputObserver(sm, db->channel));
       }
     }
 
@@ -240,14 +254,22 @@ void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, f
   if (entry.targetNode->nodeType() == NodeType::StateMachine) {
     auto sm = binding->get<PAGStateMachine>(entry.targetNode);
     if (sm == nullptr) {
+      LOGE("DataBind apply skipped: StateMachine instance not found for target '%s'.",
+           entry.dataBind->target.c_str());
       return;
     }
     if (entry.source->valueType() == ViewModelPropertyType::Boolean) {
       auto* boolVal = std::get_if<bool>(&keyValue);
-      sm->setBool(entry.channel, boolVal != nullptr ? *boolVal : false);
+      if (!sm->setBool(entry.channel, boolVal != nullptr ? *boolVal : false)) {
+        LOGE("DataBind apply failed: SM input '%s' not found or not Bool type.",
+             entry.channel.c_str());
+      }
     } else if (entry.source->valueType() == ViewModelPropertyType::Number) {
       auto* numVal = std::get_if<float>(&keyValue);
-      sm->setNumber(entry.channel, numVal != nullptr ? *numVal : 0.0f);
+      if (!sm->setNumber(entry.channel, numVal != nullptr ? *numVal : 0.0f)) {
+        LOGE("DataBind apply failed: SM input '%s' not found or not Number type.",
+             entry.channel.c_str());
+      }
     }
   } else {
     binding->apply(entry.targetNode, entry.channel, keyValue, mix);
