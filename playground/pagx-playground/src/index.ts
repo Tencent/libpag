@@ -18,7 +18,7 @@
 
 import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
 import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
-import { init as initEditor } from './editor';
+import { init as initEditor, togglePanel as toggleEditorPanel } from './editor';
 
 interface I18nStrings {
     dropText: string;
@@ -1330,6 +1330,13 @@ if (typeof window !== 'undefined') {
                 }
             },
         });
+
+        const sourceEditorBtn = document.getElementById('source-editor-btn');
+        if (sourceEditorBtn) {
+            sourceEditorBtn.addEventListener('click', () => {
+                toggleEditorPanel();
+            });
+        }
     };
 
     // Observe container resize. The C++ PAGXView::draw() now auto-detects

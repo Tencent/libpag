@@ -108,7 +108,7 @@ function closePanel(): void {
     }
 }
 
-function togglePanel(): void {
+export function togglePanel(): void {
     if (isPanelOpen()) {
         closePanel();
     } else {
@@ -158,6 +158,19 @@ function handlePagxLoaded(event: Event): void {
     }
 }
 
+/** Validates XML well-formedness using DOMParser. Returns empty string on success, error message on failure. */
+function validateXml(xmlText: string): string {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+        const errorText = parseError.textContent || 'Invalid XML';
+        const firstLine = errorText.trim().split('\n')[0].trim();
+        return firstLine || 'Invalid XML format';
+    }
+    return '';
+}
+
 function handleDiscard(): void {
     if (editor === null) {
         return;
@@ -173,6 +186,11 @@ function handleApply(): void {
         return;
     }
     const xmlText = editor.getContent();
+    const validationError = validateXml(xmlText);
+    if (validationError !== '') {
+        showToast(validationError, false);
+        return;
+    }
     const error = callbacks.onApply(xmlText);
     showToast(error === '' ? 'Changes applied' : error, error === '');
 }
@@ -182,6 +200,11 @@ function handleSave(): void {
         return;
     }
     const xmlText = editor.getContent();
+    const validationError = validateXml(xmlText);
+    if (validationError !== '') {
+        showToast(validationError, false);
+        return;
+    }
     const error = callbacks.onSave(xmlText);
     showToast(error === '' ? 'File saved' : error, error === '');
 }
