@@ -42,6 +42,10 @@ elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | 
 fi
 ```
 
+**Contributors working inside the libpag repo** should skip the npm package and use the `pagx` they
+build from source instead, so every command runs their local changes — see
+[Step 0 Case B](#step-0-one-time-setup).
+
 The most frequently used command is `pagx verify`:
 
 ```bash
@@ -85,19 +89,32 @@ it. This stays light — the ~150 MB headless browser is **not** downloaded then
 automatically on the first conversion that needs it (Step 3), into a per-user cache, with progress
 shown on screen. Requires `node` on PATH.
 
-**Case B — inside the libpag repository (contributor).** Run the setup script from anywhere inside
-the repo (it runs on `node`, so it works the same on macOS / Linux / Windows):
+**Case B — inside the libpag repository (contributor).** Build `pagx` from source and use it
+instead of the published npm package, so every conversion exercises local changes:
 
-```bash
-node .codebuddy/skills/pagx/scripts/setup.js
-```
-
-Expected output ends with `setup: ready`. It checks `node` and `pagx`, installs the snapshot tool's
-dependencies and headless browser if missing, and builds it. If it reports a missing headless
-browser, follow the exact install command it prints, then re-run it.
+1. **Build the CLI from source** — produces `cmake-build-debug/pagx`:
+   ```bash
+   cmake --build cmake-build-debug --target pagx
+   ```
+2. **Use it as `pagx`.** Put the build directory on `PATH` for the session so every `pagx …`
+   command below (and `pagx verify`) runs the local binary, then confirm it resolves:
+   ```bash
+   export PATH="$(git rev-parse --show-toplevel)/cmake-build-debug:$PATH"
+   pagx -v
+   ```
+   (Alternatively call it by path as `cmake-build-debug/pagx` everywhere.)
+3. **Build the snapshot tool** that `pagx import` shells out to when flattening HTML. The setup
+   script installs its dependencies + headless browser and builds it; it detects the local `pagx`
+   already on `PATH` and will not touch npm. It runs on `node`, so the same command works on
+   macOS / Linux / Windows:
+   ```bash
+   node .codebuddy/skills/pagx/scripts/setup.js
+   ```
+   Expected output ends with `setup: ready`. If it reports a missing headless browser, follow the
+   exact install command it prints, then re-run it.
 
 Skip this step on later runs unless a conversion fails with a setup-related error (see
-`references/pipeline.md` §Troubleshooting).
+`references/pipeline.md` §Troubleshooting). Rebuild `pagx` (step 1) after any change to the CLI source.
 
 ### Step 1: Understand the request
 
@@ -122,8 +139,9 @@ clean (fixed canvas size, self-contained resources, icons as SVG, real text not 
 what to avoid) plus design-quality tips.
 
 Core rules to honor while writing:
-- Set the canvas size on `body`, e.g. `<body style="margin:0; width:1080px; height:1440px;">`, and
-  remember that width for the convert command's `--viewport-width`.
+- Set the canvas size on `body`, e.g. `<body style="margin:0; width:1080px; height:1440px;">`; the
+  importer sizes the PAGX from that `<body>`. If a design larger than the default 1400×900 snapshot
+  viewport comes out clipped, snapshot it with a matching viewport (Step 3, Custom viewport).
 - Make it self-contained: inline images as data URIs or use absolute `https://` URLs; pull web fonts
   via a Google Fonts `<link>`; do not rely on local relative files.
 - Build the layout with normal CSS (flexbox, gradients, shadows, rounded corners). Use inline
@@ -133,30 +151,32 @@ Save it as `<name>.html` in the working directory (choose a short, descriptive `
 
 ### Step 3: Convert to PAGX
 
-**Inside the libpag repo (Case B):** run the one-shot converter. It snapshots the page in a browser,
-imports it to PAGX, resolves it, and renders a preview PNG:
+**Inside the libpag repo (Case B):** drive the conversion with the locally built `pagx`
+(Step 0) directly — no `html2pagx` wrapper. `pagx import` snapshots the page in a headless browser,
+imports it to PAGX, **and resolves** inline `<svg>`/import directives in one command (it
+auto-locates `tools/html-snapshot/snapshot.js` in the repo), so no separate `pagx resolve` is
+needed. `pagx render` then writes the preview PNG:
 
 ```bash
-tools/html-snapshot/html2pagx <name>.html --embed-fonts
+pagx import --input <name>.html --output <name>.pagx   # snapshot + import + resolve
+pagx render <name>.pagx -o <name>.png                  # preview; add --scale 2 for a crisp image
 ```
 
-On native Windows (where the shebang/executable bit does not apply), invoke it through `node`:
+- Output: `<name>.pagx` (the result) and `<name>.png` (the preview render).
+- A public URL works the same way (`--input https://… --output <name>.pagx`).
+- **Custom viewport / tall designs.** `pagx import` snapshots at snapshot.js's default viewport
+  (1400×900) and cannot be given a viewport directly. When a design needs a specific viewport (or
+  comes out clipped), snapshot it separately with a matching `--viewport-width`/`--viewport-height`,
+  then import the flat subset with the browser pass disabled — still only the local `pagx`, never
+  `html2pagx`. See `references/pipeline.md` §Manual step-by-step pipeline.
+- **Fonts.** This path does not embed the page's web fonts. If text renders in the wrong typeface,
+  install that font on the machine, or embed it explicitly with `pagx font embed --file <font>`
+  (see `references/cli.md` §pagx font). See `references/pipeline.md` §Fonts.
 
-```powershell
-node tools/html-snapshot/html2pagx <name>.html --embed-fonts
-```
-
-- Output: `<name>.subset.html` (the flattened intermediate), `<name>.pagx` (the result), and
-  `<name>.png` (a preview render).
-- `--embed-fonts` bakes the page's web fonts into the `.pagx` so text renders correctly on any
-  machine. Omit it only if the design uses just common system fonts (Arial, etc.).
-- If the design's width is not the default `1400`, match it: append `--viewport-width <bodyWidth>`
-  (and `--viewport-height <bodyHeight>` for tall designs) so nothing is clipped.
-- For a URL or non-default output location, add `--output-name <name>` / `--output-dir <dir>`.
-
-Expected: the command prints each step and exits `0`. Warnings about skipped/downgraded CSS are
-normal and usually harmless — see `references/pipeline.md` for what they mean. A hard failure or an
-empty/blank PNG means the design needs a fix (Step 4) or setup is incomplete (Step 0).
+Expected: the commands print their progress and exit `0`. Warnings about skipped/downgraded CSS are
+normal and usually harmless — pass `-v` to `pagx import` to see them (see `references/pipeline.md`).
+A hard failure or an empty/blank PNG means the design needs a fix (Step 4) or setup is incomplete
+(Step 0).
 
 **Installed via npm, no repo (Case A):** the one-shot `html2pagx` wrapper is not on PATH, so run the
 built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically (the first call
@@ -170,10 +190,11 @@ pagx render <name>.pagx -o <name>.png   # preview; add --scale 2 for a crisp ima
 
 A public URL works the same way (`--input https://… --output <name>.pagx`). Note: this path does not
 auto-embed web fonts — if text renders in the wrong typeface, either install that font on the
-machine, or use the in-repo `html2pagx --embed-fonts` path. See `references/pipeline.md` §Fonts.
+machine, or embed it explicitly with `pagx font embed --file <font>`. See `references/pipeline.md`
+§Fonts.
 
-See `references/pipeline.md` for all flags (URL inputs, `--download-images`, custom `pagx` binary,
-the warm HTTP server for fast iteration, and a manual step-by-step path for debugging).
+See `references/pipeline.md` for advanced options (URL inputs, image storage modes, custom viewport
+via `snapshot.js`, and a manual step-by-step path for debugging).
 
 ### Step 4: Review and iterate
 

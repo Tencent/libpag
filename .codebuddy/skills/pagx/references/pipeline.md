@@ -1,9 +1,16 @@
 # Conversion pipeline reference
 
-Full details for converting HTML to PAGX. The one-shot tool is
-`tools/html-snapshot/html2pagx`; everything below explains its options, setup, fonts/images, URL
-inputs, a warm server for fast iteration, a manual debugging path, and troubleshooting. Paths are
-relative to the repository root.
+Full details for converting HTML to PAGX. **Inside the libpag repo the recommended path is the
+locally built `pagx` driving the conversion directly**: `pagx import` snapshots the page (via
+`tools/html-snapshot/snapshot.js`), imports, and resolves in one command, then `pagx render`
+previews it — see [Manual step-by-step pipeline](#manual-step-by-step-pipeline). No wrapper script
+is required.
+
+`tools/html-snapshot/html2pagx` is an **optional** convenience wrapper around that same pipeline; it
+adds extras the plain CLI does not (web-font download/embedding, batch conversion, custom viewport
+flags in one place). Everything below explains its options, setup, fonts/images, URL inputs, a warm
+server for fast iteration, a manual debugging path, and troubleshooting. Paths are relative to the
+repository root.
 
 ## Table of contents
 
@@ -193,10 +200,22 @@ directives, so after getting the `.pagx` just run `pagx render` (or `pagx verify
 
 ## Manual step-by-step pipeline
 
-For debugging a single step, run them individually:
+This is the recommended in-repo path (uses only the locally built `pagx`, no `html2pagx`). The
+simplest form lets `pagx import` snapshot the page itself — it auto-locates
+`tools/html-snapshot/snapshot.js` in the repo, imports, and resolves in one call:
 
 ```bash
-node tools/html-snapshot/snapshot.js page.html            # → page.subset.html
+pagx import --input page.html --output page.pagx          # snapshot + import + resolve
+pagx render page.pagx -o page.png --scale 2                # preview
+```
+
+To control the snapshot (custom viewport, extra settle time, a specific selector) or to debug a
+single step, run the snapshot separately first and import the flat subset with the browser pass
+disabled:
+
+```bash
+node tools/html-snapshot/snapshot.js page.html \
+  --viewport-width 1080 --viewport-height 1440 -o page.subset.html   # → page.subset.html
 PAGX_HTML_SNAPSHOT=0 pagx import --format html \
   --input page.subset.html --output page.pagx             # → page.pagx (skip re-snapshot, auto-resolves)
 pagx render page.pagx -o page.png --scale 2                # preview

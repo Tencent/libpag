@@ -141,4 +141,11 @@ These either drop out or convert poorly. Design around them:
 </html>
 ```
 
-Convert it with `tools/html-snapshot/html2pagx page.html --embed-fonts --viewport-width 640`.
+Convert it in-repo with the locally built `pagx`. If the design fits the default snapshot viewport,
+`pagx import --input page.html --output page.pagx` is enough; to pin the 640px width, snapshot first
+then import the subset:
+
+```bash
+node tools/html-snapshot/snapshot.js page.html --viewport-width 640 -o page.subset.html
+PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
+```
