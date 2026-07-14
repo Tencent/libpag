@@ -322,11 +322,12 @@ std::shared_ptr<PAGAnimation> PAGStateMachine::createTimelineForState(const Stat
     return nullptr;
   }
   auto* anim = contextDoc->findNode<Animation>(animState->animationId);
-  // A state referencing a missing animation is a malformed document (import only validates the
-  // "@id" syntax, not existence). Surface it loudly in debug builds; in release fall back to an
-  // empty state that drives no channels.
+  // A state referencing a missing or wrong-typed node is a malformed document (import only
+  // validates the "@id" syntax, not existence or type). Surface it loudly in debug builds; in
+  // release fall back to an empty state that drives no channels.
   DEBUG_ASSERT(anim != nullptr);
-  if (anim == nullptr) {
+  DEBUG_ASSERT(anim == nullptr || anim->nodeType() == NodeType::Animation);
+  if (anim == nullptr || anim->nodeType() != NodeType::Animation) {
     return nullptr;
   }
   return std::shared_ptr<PAGAnimation>(new PAGAnimation(anim, binding, contextDoc, owner));
