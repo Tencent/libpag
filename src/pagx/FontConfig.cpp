@@ -217,4 +217,13 @@ bool FontConfig::addFallbackSystemFont(const PAGFont& font) {
   return addFallbackSystemFont(font.fontFamily, font.fontStyle);
 }
 
+std::vector<std::string> FontConfig::fallbackFamilyNames() const {
+  std::vector<std::string> names = {};
+  names.reserve(data->fallbackTypefaces.size());
+  for (auto& holder : data->fallbackTypefaces) {
+    names.push_back(holder.getFontFamily());
+  }
+  return names;
+}
+
 }  // namespace pagx

@@ -65,6 +65,7 @@
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -445,10 +446,13 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
           xml.addAttribute("image", "@" + pattern->image->id);
         } else if (!pattern->image->filePath.empty()) {
           xml.addAttribute("image", pattern->image->filePath);
+        } else if (!pattern->image->filePath.empty()) {
+          xml.addAttribute("image", pattern->image->filePath);
         } else if (pattern->image->data) {
-          xml.addAttribute("image",
-                           "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
-                                                                   pattern->image->data->size()));
+          const auto* bytes = pattern->image->data->bytes();
+          auto size = pattern->image->data->size();
+          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                        ";base64," + Base64Encode(bytes, size));
         }
       }
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
@@ -1212,8 +1216,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       if (!image->filePath.empty()) {
         xml.addAttribute("source", image->filePath);
       } else if (image->data) {
-        xml.addAttribute("source", "data:image/png;base64," +
-                                       Base64Encode(image->data->bytes(), image->data->size()));
+        const auto* bytes = image->data->bytes();
+        auto size = image->data->size();
+        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                       ";base64," + Base64Encode(bytes, size));
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1279,9 +1285,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
             } else if (glyph->image->data) {
-              xml.addAttribute("image",
-                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
-                                                                       glyph->image->data->size()));
+              const auto* bytes = glyph->image->data->bytes();
+              auto size = glyph->image->data->size();
+              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                            ";base64," + Base64Encode(bytes, size));
             }
           }
           if (glyph->offset != Default<Glyph>().offset) {

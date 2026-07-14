@@ -17,9 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <system_error>
 #include "cli/CliUtils.h"
+#include "cli/CommandResolve.h"
+#include "cli/ImageStorage.h"
+#include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
@@ -58,12 +70,191 @@ static std::string InferFormatFromContent(const std::string& content) {
         for (auto& ch : tagName) {
           ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         }
+        if (tagName == "html" || tagName == "body") {
+          return "html";
+        }
         return tagName;
       }
     }
     pos = content.find('<', pos + 1);
   }
   return {};
+}
+
+static std::string NormalizeFormat(const std::string& format, const std::string& fallback) {
+  std::string f = format.empty() ? fallback : format;
+  for (auto& ch : f) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (f == "htm" || f == "xhtml") f = "html";
+  return f;
+}
+
+//--------------------------------------------------------------------------------------------------
+// html-snapshot bridge
+//--------------------------------------------------------------------------------------------------
+
+// Returns true when `path[0..n)` matches `prefix[0..n)` after ASCII lower-casing. Caller
+// passes the prefix length explicitly so we don't pay for `strlen` on a literal each call.
+static bool StartsWithLower(const std::string& path, const char* prefix, size_t n) {
+  if (path.size() < n) return false;
+  for (size_t i = 0; i < n; ++i) {
+    if (std::tolower(static_cast<unsigned char>(path[i])) != prefix[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Returns true when `path` begins with `http://` or `https://` (case-insensitive). The
+// html-snapshot script accepts URLs natively, so we bypass the on-disk file checks for
+// these inputs.
+static bool IsHttpUrl(const std::string& path) {
+  if (path.size() < 7) {
+    return false;
+  }
+  return StartsWithLower(path, "http://", 7) || StartsWithLower(path, "https://", 8);
+}
+
+// POSIX shell quoting (single-quote wrap, escape any embedded single quotes). The
+// snapshot.js path and input path are user-controlled, so we route them through this
+// before they hit `popen`'s shell.
+static std::string ShellQuote(const std::string& value) {
+  std::string out = "'";
+  for (char ch : value) {
+    if (ch == '\'') {
+      out += "'\\''";
+    } else {
+      out += ch;
+    }
+  }
+  out += "'";
+  return out;
+}
+
+// Resolve the path to the html-snapshot driver script. The path is fixed in code; resolution
+// order (first hit wins):
+//   1. the relative path `tools/html-snapshot/snapshot.js` when it resolves from cwd,
+//   2. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
+//   3. Upward search from cwd for `tools/html-snapshot/snapshot.js` (max 8 levels — covers
+//      the common case of running `pagx` from anywhere under the repo).
+// Returns empty when nothing matched; the caller surfaces a clear error in that case.
+static std::string ResolveSnapshotBin() {
+  std::error_code existsEc;
+  const std::string relativeDefault = "tools/html-snapshot/snapshot.js";
+  if (std::filesystem::exists(relativeDefault, existsEc) && !existsEc) {
+    return relativeDefault;
+  }
+  if (const char* env = std::getenv("PAGX_HTML_SNAPSHOT_BIN")) {
+    if (env[0] != '\0') {
+      return env;
+    }
+  }
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  auto cur = fs::current_path(ec);
+  if (ec) {
+    return {};
+  }
+  for (int depth = 0; depth < 8; ++depth) {
+    auto candidate = cur / "tools" / "html-snapshot" / "snapshot.js";
+    if (fs::exists(candidate, ec) && !ec) {
+      return candidate.string();
+    }
+    auto parent = cur.parent_path();
+    if (parent == cur) {
+      break;
+    }
+    cur = parent;
+  }
+  return {};
+}
+
+// Whether the html-snapshot pre-pass runs before the HTML importer. Enabled by default; set
+// the `PAGX_HTML_SNAPSHOT` environment variable to a falsy value (`0`, `false`, `no`, `off`,
+// case-insensitive) to disable it. The html-snapshot tooling (`html2pagx`, the snapshot
+// server) sets this when it has already rendered the page to a flat subset and hands that
+// directly to the importer — a second in-importer snapshot would be redundant (and would
+// require a browser the tool already ran).
+static bool HTMLSnapshotEnabled() {
+  const char* env = std::getenv("PAGX_HTML_SNAPSHOT");
+  if (env == nullptr || env[0] == '\0') {
+    return true;
+  }
+  std::string value = env;
+  for (auto& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return !(value == "0" || value == "false" || value == "no" || value == "off");
+}
+
+struct SnapshotResult {
+  std::string html = {};
+  std::string error = {};
+};
+
+// Spawn `node <snapshot.js> <input> -o -` and capture its stdout (the rendered HTML
+// subset). snapshot.js routes its `wrote ...` progress line and any browser errors to
+// stderr, which `popen` leaves connected to the parent's stderr — so the user still sees
+// progress and diagnostics while we get a clean HTML payload back on stdout.
+static SnapshotResult RunHTMLSnapshot(const std::string& inputPath) {
+  SnapshotResult result;
+  auto bin = ResolveSnapshotBin();
+  if (bin.empty()) {
+    result.error =
+        "html-snapshot script not found; set PAGX_HTML_SNAPSHOT_BIN or run from a directory "
+        "that contains tools/html-snapshot/snapshot.js";
+    return result;
+  }
+  std::string command = "node ";
+  command += ShellQuote(bin);
+  command += " ";
+  command += ShellQuote(inputPath);
+  command += " -o -";
+
+  FILE* pipe = popen(command.c_str(), "r");
+  if (pipe == nullptr) {
+    result.error = "failed to spawn html-snapshot (popen failed)";
+    return result;
+  }
+  std::string html;
+  char buffer[4096];
+  while (true) {
+    auto n = std::fread(buffer, 1, sizeof(buffer), pipe);
+    if (n == 0) break;
+    html.append(buffer, n);
+  }
+  int status = pclose(pipe);
+  if (status != 0) {
+    // `pclose` returns the wait(2) status on POSIX (so 127 lives in the high byte and means
+    // "shell could not exec the command", typically `node` not on PATH) and the raw exit code
+    // on Windows. Decode where we can so the diagnostic distinguishes `node` missing from a
+    // genuine snapshot failure — without this the raw status integer (e.g. 32512 == 127 << 8)
+    // looks identical to "snapshot crashed".
+#ifdef _WIN32
+    int exitCode = status;
+#else
+    int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+    if (exitCode == 127) {
+      result.error =
+          "html-snapshot failed: `node` not found on PATH. Install Node.js (>=18) or set "
+          "PATH to a shell where it is reachable, then re-run.";
+    } else if (exitCode >= 0) {
+      result.error = "html-snapshot failed (exit code " + std::to_string(exitCode) +
+                     "); see stderr above for details";
+    } else {
+      result.error = "html-snapshot terminated abnormally (status " + std::to_string(status) +
+                     "); see stderr above for details";
+    }
+    return result;
+  }
+  if (html.empty()) {
+    result.error = "html-snapshot produced empty output";
+    return result;
+  }
+  result.html = std::move(html);
+  return result;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -81,6 +272,16 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
   return svgOptions;
 }
 
+// HTML import behaviour is fixed in code (no longer exposed via CLI/ImportFormatOptions): the
+// importer always normalizes the subset, prefers the <body> intrinsic size, recovers flex from
+// absolute layout, and downgrades unsupported constructs to warnings rather than hard errors.
+static HTMLImporter::Options ToHTMLOptions(float targetWidth = NAN, float targetHeight = NAN) {
+  HTMLImporter::Options options = {};
+  options.targetWidth = targetWidth;
+  options.targetHeight = targetHeight;
+  return options;
+}
+
 static void InlinePathData(PAGXDocument* doc) {
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::PathData) {
@@ -93,13 +294,44 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
                         const ImportFormatOptions& formatOptions, float targetWidth,
                         float targetHeight) {
   ImportResult result = {};
-  auto effectiveFormat = format.empty() ? GetFileExtension(filePath) : format;
-  if (effectiveFormat != "svg") {
+  // URL inputs (http/https) are routed through html-snapshot (the snapshot renderer fetches
+  // the page) — the SVG/HTML importers can't fetch them on their own. Force the effective
+  // format to html for URLs (the extension heuristic would otherwise pick up nonsense like
+  // "com" from the hostname).
+  bool isUrl = IsHttpUrl(filePath);
+  std::string effectiveFormat =
+      isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
+  bool snapshotEnabled = HTMLSnapshotEnabled();
+  if (isUrl && !snapshotEnabled) {
+    result.error =
+        "URL inputs require the html-snapshot pre-pass, but it is disabled via "
+        "PAGX_HTML_SNAPSHOT; the importer cannot fetch http(s) URLs itself";
+    return result;
+  }
+  if (effectiveFormat == "svg") {
+    result.document =
+        SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  } else if (effectiveFormat == "html") {
+    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
+    if (snapshotEnabled) {
+      // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
+      // subset HTML) straight to the importer. No temp file touches the disk; the HTML
+      // lives in this string for the duration of the call.
+      auto snap = RunHTMLSnapshot(filePath);
+      if (!snap.error.empty()) {
+        result.error = snap.error;
+        return result;
+      }
+      result.document = HTMLImporter::ParseString(snap.html, htmlOptions);
+    } else {
+      // Snapshot disabled (PAGX_HTML_SNAPSHOT): the caller already handed us a flat subset
+      // (e.g. html2pagx pre-snapshotted), so import the file directly.
+      result.document = HTMLImporter::Parse(filePath, htmlOptions);
+    }
+  } else {
     result.error = "unsupported format '" + effectiveFormat + "'";
     return result;
   }
-  result.document =
-      SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse '" + filePath + "'";
     return result;
@@ -113,13 +345,16 @@ ImportResult ImportString(const std::string& content, const std::string& format,
                           const ImportFormatOptions& formatOptions, float targetWidth,
                           float targetHeight) {
   ImportResult result = {};
-  auto effectiveFormat = format.empty() ? InferFormatFromContent(content) : format;
-  if (effectiveFormat != "svg") {
+  std::string effectiveFormat = NormalizeFormat(format, InferFormatFromContent(content));
+  if (effectiveFormat == "svg") {
+    result.document =
+        SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  } else if (effectiveFormat == "html") {
+    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
+  } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
   }
-  result.document =
-      SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   if (result.document == nullptr) {
     result.error = "failed to parse inline content";
     return result;
@@ -138,26 +373,52 @@ struct ImportOptions {
   std::string outputFile = {};
   std::string format = {};
   ImportFormatOptions formatOptions = {};
+  // Conversion warnings (e.g. flex inference fallbacks, unsupported constructs) are noisy and
+  // non-fatal. They are suppressed by default; `--verbose`/`-v` opts back in. Errors are always
+  // printed.
+  bool verbose = false;
+  // Some importers (notably HTML) leave `import` directives behind for external SVG `<img>`
+  // references and inline `<svg>` elements. These are expanded into native PAGX nodes in the
+  // same pass by default so the output is fully flattened; `--no-resolve` keeps the directives.
+  bool resolve = true;
+  // How image resources are stored in the exported PAGX. Defaults to writing image files next to
+  // the output (External); `--images embed` inlines them as base64 data URIs instead.
+  ImageStorageMode imageStorage = ImageStorageMode::External;
+  // Directory used to resolve relative image `source` paths to real files. Defaults to the input
+  // file's directory. Only meaningful for local (non-URL) inputs.
+  std::string imageBaseDir = {};
 };
 
 static void PrintUsage() {
-  std::cout << "Usage: pagx import [options]\n"
-            << "\n"
-            << "Import a file from another format and convert it to PAGX.\n"
-            << "\n"
-            << "Options:\n"
-            << "  --input <file>              Input file to import (required)\n"
-            << "  --output <file>             Output PAGX file (default: <input>.pagx)\n"
-            << "  --format <format>           Force input format (svg)\n"
-            << "\n"
-            << "SVG options:\n"
-            << "  --svg-no-expand-use         Do not expand <use> references\n"
-            << "  --svg-flatten-transforms    Flatten nested transforms into single matrices\n"
-            << "  --svg-preserve-unknown      Preserve unsupported SVG elements as Unknown nodes\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx import --input icon.svg                     # SVG to icon.pagx\n"
-            << "  pagx import --input icon.svg --output out.pagx   # SVG to out.pagx\n";
+  std::cout
+      << "Usage: pagx import [options]\n"
+      << "\n"
+      << "Import a file from another format and convert it to PAGX.\n"
+      << "\n"
+      << "Options:\n"
+      << "  --input <file|url>             Input file or URL to import (required)\n"
+      << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
+      << "  --format <format>              Force input format (svg, html)\n"
+      << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
+      << "                                 <svg>) instead of expanding them into native nodes\n"
+      << "  --images <mode>                How image resources are stored: 'external' (default;\n"
+      << "                                 write image files next to the output PAGX and keep the\n"
+      << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
+      << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
+      << "                                 (default: the input file's directory)\n"
+      << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
+      << "\n"
+      << "SVG options:\n"
+      << "  --svg-no-expand-use            Do not expand <use> references\n"
+      << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
+      << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
+      << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
+      << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
+      << "  pagx import --input page.html --no-resolve        # keep import directives\n"
+      << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
@@ -170,6 +431,19 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
+    } else if (arg == "--no-resolve") {
+      options->resolve = false;
+    } else if (arg == "--images" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseImageStorageMode(mode, &options->imageStorage)) {
+        std::cerr << "pagx import: error: invalid --images value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
+    } else if (arg == "--image-base-dir" && i + 1 < argc) {
+      options->imageBaseDir = argv[++i];
+    } else if (arg == "--verbose" || arg == "-v") {
+      options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
                arg == "--svg-preserve-unknown") {
       // Handled by ParseFormatOptions below.
@@ -192,6 +466,10 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
 
   if (options->outputFile.empty()) {
+    if (IsHttpUrl(options->inputFile)) {
+      std::cerr << "pagx import: error: --output is required when --input is a URL\n";
+      return 1;
+    }
     options->outputFile = ReplaceExtension(options->inputFile, "pagx");
   }
 
@@ -211,14 +489,44 @@ int RunImport(int argc, char* argv[]) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;
   }
-  for (auto& warning : result.warnings) {
-    std::cerr << "pagx import: warning: " << warning << "\n";
+  if (options.verbose) {
+    for (auto& warning : result.warnings) {
+      std::cerr << "pagx import: warning: " << warning << "\n";
+    }
+  }
+
+  if (options.resolve) {
+    // The HTML importer records external SVG `<img>` sources as already-resolved paths and
+    // inline `<svg>` as directive content, so no base directory prefix is needed here.
+    auto resolveStats = ResolveDocument(result.document.get(), "", options.formatOptions);
+    if (resolveStats.errorCount > 0) {
+      std::cerr << "pagx import: error: failed to resolve " << resolveStats.errorCount
+                << " import directive(s)\n";
+      return 1;
+    }
   }
 
   auto optimizeResult = PAGXOptimizer::Optimize(result.document.get());
-  if (!optimizeResult.converged) {
+  if (options.verbose && !optimizeResult.converged) {
     std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
+
+  // Normalise image resources to the requested storage mode. Relative image paths recorded by the
+  // importer are anchored at the input document's directory, so that is the default base; copied
+  // files land next to the output PAGX. URL inputs have no local base, so image relocation is
+  // skipped for them.
+  {
+    ImageStorageOptions imageOptions = {};
+    imageOptions.mode = options.imageStorage;
+    std::string inputDir =
+        IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
+    imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : inputDir;
+    // The importer anchors relative `<img>` paths at the input file's directory, so that is the
+    // prefix to strip back off when recovering the authored `source`.
+    imageOptions.documentDir = inputDir;
+    imageOptions.outputDir = GetDirectory(options.outputFile);
+    ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
   }
 
   auto xml = PAGXExporter::ToXML(*result.document);
