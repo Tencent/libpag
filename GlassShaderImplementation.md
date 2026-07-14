@@ -26,7 +26,7 @@ GlassStyle 模拟光线穿过玻璃的物理行为：折射、色散、磨砂模
 | 参数 | uniform 名 | 类型 | 语义 |
 |---|---|---|---|
 | 折射强度 | `refractionIntensity` | float | 折射偏移的最终缩放系数 |
-| 折射距离 | `refractionDistance` | float | 梯度采样步长 + 偏移 clamp 上限 |
+| 折射距离 | `refractionDistance` | float | 梯度采样步长 + 折射偏移乘数 |
 | 光照强度 | `lightIntensity` | float | 边缘高光亮度（**实际被使用**，非死参数） |
 | 光照角度 | `lightAngle` | float | 光源方向角度（弧度），叠加 `frameRotation` 偏移 |
 | 斜面大小 | `bevelSize` | float | 斜面/边缘带宽度，影响高光范围 |
@@ -304,7 +304,7 @@ void main() {
 | 4 | **折射距离** | 线性 `refDist × (1 - height)` | 非线性：`pow(abs(eo), 1.4)` + bevel 权重双路径混合 |
 | 5 | **色散** | 三通道分别偏移采样（3 次 texture） | **8 点卷积**，每点取不同通道（8 次 texture） |
 | 6 | **splay 混合** | `mix(gradDir, centerDir, splay)` 返回纯方向 | 同上但**乘回原长度** `ep`，保留距离信息 |
-| 7 | **中心点 NaN** | 担心 `normalize(vec2(0))` 产生 NaN | 实际用 `max(dot(.,.), 1e-12)` + `inversesqrt` 保护 |
+| 7 | **中心点 NaN** | 担心 `normalize(vec2(0))` 产生 NaN | 仅 `ek` 路径用 `max(dot(.,.), 1e-12)` + `inversesqrt` 保护；`en` 路径的 `normalize` 仍无保护（见 4.6/8.1） |
 | 8 | **bevel 斜面** | 未提及 | 有独立纹理 + `bevelSize` uniform，控制高光范围和折射混合权重 |
 | 9 | **高光计算** | 无 | `smoothstep(0.35, 1.0, dot(refractDir, lightDir))` × bevel 权重 × lightIntensity |
 | 10 | **折射双路径** | 单一路径 | `mix(fullRefraction, reducedRefraction, bevelWeight)` — bevel 区折射减弱到 20% |
@@ -315,7 +315,7 @@ void main() {
 
 ```
 refractionDistance ──→ 梯度采样步长 (clamp [1, 6])
-                    └→ 折射偏移 clamp 上限
+                    └→ 折射偏移乘数
                     └→ 非线性缩放系数 (refractionDistance - 1) × 0.5
 
 refractionIntensity ──→ 折射偏移最终缩放
