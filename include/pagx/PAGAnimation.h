@@ -35,9 +35,9 @@ class Node;
 class Channel;
 
 /**
- * PAGAnimation controls the playback of a single animation in a PAGScene. It holds the playback
- * state (current time and playing flag) and applies the animation to the scene's content via
- * apply().
+ * PAGAnimation controls the playback of a single animation in a PAGScene. It holds the current
+ * playback time and applies the animation to the scene's content via apply(). Playback advancement
+ * is gated by the owning PAGComposition's pausedTimelineIds, not by state on PAGAnimation itself.
  *
  * PAGAnimation must not be constructed directly; obtain instances through PAGScene::getTimeline().
  * Multiple lookups for the same animation name return the same PAGAnimation instance, so playback
