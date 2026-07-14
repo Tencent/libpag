@@ -171,17 +171,6 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
-  /**
-   * Returns the bounds of every runtime layer that references the image resource at the given
-   * filePath, each expressed in the root composition's local coordinate space (before the display
-   * zoomScale and content offset are applied). Returns an empty vector when the scene has no
-   * matching layer. Intended for hosts that maintain their own texture cache keyed by filePath and
-   * need per-image bounds for viewport-intersection and eviction scoring without the display
-   * transform folded in. For a single layer's bounds in surface coordinates, use getGlobalBounds.
-   * @param filePath the external image file path to match against Image resource nodes.
-   */
-  std::vector<Rect> getImageBounds(const std::string& filePath) const;
-
  private:
   PAGScene();
 

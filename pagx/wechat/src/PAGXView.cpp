@@ -29,9 +29,16 @@
 #include <limits>
 #include "base/utils/Log.h"
 #include "pagx/PAGImage.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -720,7 +727,7 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   if (canvasWidth <= 0 || canvasHeight <= 0 || !scene) {
     return tgfx::Rect::MakeEmpty();
   }
-  // PAGScene::getImageBounds() returns bounds in the root composition's local (document)
+  // collectRootLocalImageBounds() returns bounds in the root composition's local (document)
   // coordinate space, before the display zoomScale/contentOffset are applied. The effective
   // zoom/offset written to PAGDisplayOptions by applyMergedTransform() map that space onto the
   // canvas:
@@ -747,30 +754,149 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   return tgfx::Rect::MakeLTRB(left, top, left + width, top + height).makeOutset(expandX, expandY);
 }
 
+namespace {
+
+// Records the Image node filePath referenced by `color` (when it is an ImagePattern) into `out`.
+// Mirrors PAGXDocument's RecordImagePattern so the WeChat host can resolve per-image bounds
+// without the (now-removed) PAGScene::getImageBounds helper.
+void CollectFilePathFromColor(const ColorSource* color, std::unordered_set<std::string>* out) {
+  if (color == nullptr || color->nodeType() != NodeType::ImagePattern) {
+    return;
+  }
+  const auto* pattern = static_cast<const ImagePattern*>(color);
+  if (pattern->image != nullptr && !pattern->image->filePath.empty()) {
+    out->insert(pattern->image->filePath);
+  }
+}
+
+// Recursively collects every ImagePattern filePath referenced by `element`. Fill/Stroke expose a
+// color source directly; Group/TextBox nest further elements. Mirrors PAGXDocument's
+// CollectImageFilePathsFromElement so matching stays byte-for-byte compatible with the old index.
+void CollectFilePathsFromElement(const Element* element, std::unordered_set<std::string>* out) {
+  if (element == nullptr) {
+    return;
+  }
+  switch (element->nodeType()) {
+    case NodeType::Fill:
+      CollectFilePathFromColor(static_cast<const Fill*>(element)->color, out);
+      break;
+    case NodeType::Stroke:
+      CollectFilePathFromColor(static_cast<const Stroke*>(element)->color, out);
+      break;
+    case NodeType::Group:
+    case NodeType::TextBox: {
+      const auto* group = static_cast<const Group*>(element);
+      for (const auto* child : group->elements) {
+        CollectFilePathsFromElement(child, out);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Returns the deduplicated set of ImagePattern filePaths referenced by a source layer's contents.
+// Returns an empty set when node is null (e.g. the root composition, which has no source layer).
+std::unordered_set<std::string> CollectImagePatternFilePaths(const Layer* node) {
+  std::unordered_set<std::string> paths;
+  if (node == nullptr) {
+    return paths;
+  }
+  for (const auto* element : node->contents) {
+    CollectFilePathsFromElement(element, &paths);
+  }
+  return paths;
+}
+
+}  // namespace
+
+tgfx::Rect PAGXView::rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) const {
+  if (scene == nullptr || layer == nullptr) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  auto* options = scene->getDisplayOptions();
+  float zoom = options->getZoomScale();
+  if (zoom <= 0.0f) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  auto offset = options->getContentOffset();
+  Rect surfaceBounds = scene->getGlobalBounds(layer);
+  if (surfaceBounds.isEmpty()) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  // getGlobalBounds maps root-local bounds to surface space through a uniform-scale-plus-translate
+  // transform (surface = root * zoom + offset). That transform has no rotation/skew, so inverting
+  // it recovers the exact axis-aligned root-local rect the removed getImageBounds returned (up to
+  // negligible float round-trip error). getDisplayOptions' zoom/offset are the same values
+  // getGlobalBounds folds in, so the inverse is consistent by construction.
+  float x = (surfaceBounds.x - offset.x) / zoom;
+  float y = (surfaceBounds.y - offset.y) / zoom;
+  float w = surfaceBounds.width / zoom;
+  float h = surfaceBounds.height / zoom;
+  return tgfx::Rect::MakeXYWH(x, y, w, h);
+}
+
+std::unordered_map<std::string, std::vector<tgfx::Rect>> PAGXView::collectRootLocalImageBounds()
+    const {
+  std::unordered_map<std::string, std::vector<tgfx::Rect>> result;
+  if (scene == nullptr) {
+    return result;
+  }
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return result;
+  }
+  if (scene->getDisplayOptions()->getZoomScale() <= 0.0f) {
+    return result;
+  }
+  // Iterative pre-order walk over the whole runtime tree. The root composition's source node is
+  // null and contributes no paths; every runtime instance of a source layer is a distinct
+  // PAGLayer, so multi-instanced layers are captured once per on-screen instance.
+  std::vector<std::shared_ptr<PAGLayer>> stack = {root};
+  while (!stack.empty()) {
+    auto layer = stack.back();
+    stack.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    auto paths = CollectImagePatternFilePaths(layer->getNode());
+    if (!paths.empty()) {
+      tgfx::Rect rect = rootLocalBounds(layer);
+      if (!rect.isEmpty()) {
+        for (const auto& path : paths) {
+          result[path].push_back(rect);
+        }
+      }
+    }
+    for (const auto& child : layer->getChildren()) {
+      stack.push_back(child);
+    }
+  }
+  return result;
+}
+
 std::unordered_map<std::string, tgfx::Rect> PAGXView::computeFullPathBounds() const {
   std::unordered_map<std::string, tgfx::Rect> result;
   if (!scene) {
     return result;
   }
+  auto allBounds = collectRootLocalImageBounds();
   result.reserve(externalTextures.size());
-  // Only inspect paths actually present in the cache — they are the only candidates the
-  // eviction sweep needs to reason about. Iterating every image node in the document would
-  // waste cycles on paths that have no full-quality entry to begin with.
+  // Only inspect paths actually present in the cache — they are the only candidates the eviction
+  // sweep needs to reason about. Paths without a full-quality entry are skipped.
   for (const auto& kv : externalTextures) {
     const auto& path = kv.first;
-    // getImageBounds() returns document-space bounds (pagx::Rect) for every runtime layer that
-    // references this path; tgfx caches each layer's bounds after the first evaluation.
-    auto boundsList = scene->getImageBounds(path);
-    if (boundsList.empty()) {
+    auto it = allBounds.find(path);
+    if (it == allBounds.end()) {
       continue;
     }
     tgfx::Rect unionBounds = tgfx::Rect::MakeEmpty();
     bool hasAny = false;
-    for (const auto& r : boundsList) {
-      if (r.isEmpty()) {
+    for (const auto& bounds : it->second) {
+      if (bounds.isEmpty()) {
         continue;
       }
-      tgfx::Rect bounds = tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
       if (!hasAny) {
         unionBounds = bounds;
         hasAny = true;
@@ -916,11 +1042,12 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   tgfx::Matrix fitMatrix = tgfx::Matrix::MakeTrans(centerOffsetX, centerOffsetY);
   fitMatrix.preScale(fitScale, fitScale);
 
+  auto allBounds = collectRootLocalImageBounds();
   auto count = filePathList["length"].as<unsigned>();
   for (unsigned i = 0; i < count; ++i) {
     std::string filePath = filePathList[i].as<std::string>();
-    auto boundsList = scene->getImageBounds(filePath);
-    if (boundsList.empty()) {
+    auto it = allBounds.find(filePath);
+    if (it == allBounds.end() || it->second.empty()) {
       result.set(filePath, val::null());
       continue;
     }
@@ -928,11 +1055,10 @@ val PAGXView::getImageBounds(const val& filePathList) const {
     tgfx::Rect largestBounds = tgfx::Rect::MakeEmpty();
     float largestArea = 0.0f;
     bool hasAny = false;
-    for (const auto& r : boundsList) {
-      if (r.isEmpty()) {
+    for (const auto& docRect : it->second) {
+      if (docRect.isEmpty()) {
         continue;
       }
-      tgfx::Rect docRect = tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
       tgfx::Rect bounds = fitMatrix.mapRect(docRect);
       if (bounds.isEmpty()) {
         continue;

@@ -622,21 +622,37 @@ class PAGXView {
 
   // Computes the current viewport rectangle in the root composition's local coordinate space
   // (the document coordinate system, before the display zoomScale/contentOffset are applied).
-  // The result is suitable for direct intersection with the bounds returned by
-  // PAGScene::getImageBounds(). Reads the effective zoom/offset back from the scene's
+  // The result is suitable for direct intersection with the root-local bounds returned by
+  // collectRootLocalImageBounds(). Reads the effective zoom/offset back from the scene's
   // PAGDisplayOptions so it stays in the same space as the bounds. Returns an empty rect when the
   // canvas is unavailable, the scene is not built, or the effective zoom is non-positive
   // (degenerate transform); callers must treat empty as "no viewport protection possible".
   tgfx::Rect computeViewportInRootCoords() const;
 
   // Collects the union of layer bounds (in the root composition's local coordinate space) for
-  // every filePath currently sitting in externalTextures, via PAGScene::getImageBounds(). Used by
-  // enforceFullBudget for two consecutive decisions: (1) whether each path intersects the viewport
-  // (visibility protection) and (2) how far the off-viewport paths sit from the viewport center
-  // (eviction priority). tgfx caches each layer's bounds after the first evaluation, so repeated
-  // invocations across frames are O(1). Paths whose layers all return empty bounds are absent from
-  // the result.
+  // every filePath currently sitting in externalTextures, via collectRootLocalImageBounds(). Used
+  // by enforceFullBudget for two consecutive decisions: (1) whether each path intersects the
+  // viewport (visibility protection) and (2) how far the off-viewport paths sit from the viewport
+  // center (eviction priority). tgfx caches each layer's bounds after the first evaluation, so
+  // repeated invocations across frames are O(1). Paths whose layers all return empty bounds are
+  // absent from the result.
   std::unordered_map<std::string, tgfx::Rect> computeFullPathBounds() const;
+
+  // Walks the runtime layer tree once (rootComposition() + getChildren() recursion) and, for every
+  // runtime layer whose source node references an image through an ImagePattern fill/stroke,
+  // records that layer's root-local bounds under each referenced filePath. Replaces the former
+  // PAGScene::getImageBounds() by matching image references on the source node's contents directly
+  // and inverting the display transform via rootLocalBounds(). The result feeds both
+  // computeFullPathBounds() (LRU eviction scoring) and getImageBounds() (JS binding). Returns an
+  // empty map when the scene is not built or the effective zoom is non-positive.
+  std::unordered_map<std::string, std::vector<tgfx::Rect>> collectRootLocalImageBounds() const;
+
+  // Returns the given runtime layer's bounds in the root composition's local coordinate space.
+  // PAGScene only exposes getGlobalBounds (surface space = root-local * zoom + offset), so this
+  // inverts that uniform-scale-plus-translate transform to recover the root-local rect. Returns an
+  // empty rect when the scene is missing, the layer is null, the effective zoom is non-positive, or
+  // the surface bounds are empty.
+  tgfx::Rect rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) const;
 
   // Attempts to free at least neededBytes from the thumbnail cache by evicting entries in
   // hash-map iteration order until the requested amount is freed (or the cache is empty).
