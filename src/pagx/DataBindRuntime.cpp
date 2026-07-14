@@ -22,7 +22,6 @@
 #include "base/utils/Log.h"
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
-#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
@@ -35,7 +34,6 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
-#include "pagx/nodes/StateMachine.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "renderer/LayerBuilder.h"
@@ -45,22 +43,20 @@ namespace pagx {
 
 namespace {
 
-class TriggerInputObserver {
+class TriggerChannelObserver {
  public:
-  TriggerInputObserver(std::weak_ptr<PAGStateMachine> sm, std::string inputName)
-      : sm(std::move(sm)), inputName(std::move(inputName)) {
+  TriggerChannelObserver(RuntimeBinding* binding, const Node* targetNode, std::string channel)
+      : binding(binding), targetNode(targetNode), channel(std::move(channel)) {
   }
 
   void operator()() const {
-    auto locked = sm.lock();
-    if (locked != nullptr) {
-      locked->fireTrigger(inputName);
-    }
+    binding->apply(targetNode, channel, KeyValue{true}, 1.0f);
   }
 
  private:
-  std::weak_ptr<PAGStateMachine> sm;
-  std::string inputName;
+  RuntimeBinding* binding;
+  const Node* targetNode;
+  std::string channel;
 };
 
 }  // namespace
@@ -122,30 +118,15 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.targetNode = targetNode;
     entry.channel = db->channel;
 
-    // StateMachine input targets: register a Trigger observer for event-based binding.
-    // Bool/Number SM inputs are handled via the normal value-based applyEntry path.
-    if (targetNode->nodeType() == NodeType::StateMachine) {
-      auto sourceType = sourceValue->valueType();
-      if (sourceType != ViewModelPropertyType::Boolean &&
-          sourceType != ViewModelPropertyType::Number &&
-          sourceType != ViewModelPropertyType::Trigger) {
-        LOGE(
-            "DataBind skipped: VM property type %d is not supported for SM input binding "
-            "(source '%s', target '%s').",
-            static_cast<int>(sourceType), db->source.c_str(), db->target.c_str());
-        continue;
-      }
-      auto sm = binding->get<PAGStateMachine>(targetNode);
-      if (sm == nullptr) {
-        LOGE("DataBind skipped: StateMachine instance not found for target '%s'.",
-             db->target.c_str());
-        continue;
-      }
-      if (sourceType == ViewModelPropertyType::Trigger) {
-        auto triggerVal =
-            std::static_pointer_cast<PAGViewModelValueTrigger>(sourceValue->shared_from_this());
-        triggerHandles[db] = triggerVal->addObserver(TriggerInputObserver(sm, db->channel));
-      }
+    // Trigger sources are event-based: register an observer that pushes through the channel
+    // accessor immediately. All other source types (Bool, Number, etc.) go through the normal
+    // value-based applyEntry path via binding->apply, which routes to the target's channel writer
+    // (StateMachineInputTarget for SM inputs, RuntimeTarget writers for render nodes).
+    if (sourceValue->valueType() == ViewModelPropertyType::Trigger) {
+      auto triggerVal =
+          std::static_pointer_cast<PAGViewModelValueTrigger>(sourceValue->shared_from_this());
+      triggerHandles[db] =
+          triggerVal->addObserver(TriggerChannelObserver(binding, targetNode, db->channel));
     }
 
     entries.push_back(std::move(entry));
@@ -249,31 +230,7 @@ void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, f
   if (entry.source->converter != nullptr) {
     keyValue = DataConverterRegistry::GetInstance().apply(entry.source->converter, keyValue);
   }
-  // StateMachine input targets: route to setBool/setNumber instead of binding->apply.
-  // Trigger inputs are handled via observer in bind(), not here.
-  if (entry.targetNode->nodeType() == NodeType::StateMachine) {
-    auto sm = binding->get<PAGStateMachine>(entry.targetNode);
-    if (sm == nullptr) {
-      LOGE("DataBind apply skipped: StateMachine instance not found for target '%s'.",
-           entry.dataBind->target.c_str());
-      return;
-    }
-    if (entry.source->valueType() == ViewModelPropertyType::Boolean) {
-      auto* boolVal = std::get_if<bool>(&keyValue);
-      if (!sm->setBool(entry.channel, boolVal != nullptr ? *boolVal : false)) {
-        LOGE("DataBind apply failed: SM input '%s' not found or not Bool type.",
-             entry.channel.c_str());
-      }
-    } else if (entry.source->valueType() == ViewModelPropertyType::Number) {
-      auto* numVal = std::get_if<float>(&keyValue);
-      if (!sm->setNumber(entry.channel, numVal != nullptr ? *numVal : 0.0f)) {
-        LOGE("DataBind apply failed: SM input '%s' not found or not Number type.",
-             entry.channel.c_str());
-      }
-    }
-  } else {
-    binding->apply(entry.targetNode, entry.channel, keyValue, mix);
-  }
+  binding->apply(entry.targetNode, entry.channel, keyValue, mix);
   if (entry.dataBind->direction == DataBindDirection::Once) {
     entry.onceApplied = true;
   }

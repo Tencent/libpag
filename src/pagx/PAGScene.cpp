@@ -24,6 +24,7 @@
 #include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGStateMachine.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
@@ -126,7 +127,8 @@ void PAGScene::buildRuntimeTree() {
         auto instance = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
             smNode, _rootComposition->binding.get(), document.get(), shared_from_this()));
         instantiatedTimelines.emplace(smNode, instance);
-        _rootComposition->binding->set<PAGStateMachine>(smNode, instance);
+        _rootComposition->binding->setTarget(
+            smNode, std::make_unique<StateMachineInputTarget>(instance, smNode));
       }
     }
   }

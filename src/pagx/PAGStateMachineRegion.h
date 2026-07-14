@@ -22,13 +22,17 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
+#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
@@ -58,6 +62,54 @@ struct PAGStateMachine::RegionInstance {
   const StateTransition* transition = nullptr;
   std::vector<FadingState> fadingOut;
   std::set<std::string> consumedTriggers;
+};
+
+// A RuntimeTarget subclass that routes channel writes to PAGStateMachine inputs. Each channel
+// name corresponds to an SM input name; the target stores the input type map so it can dispatch
+// to setBool/setNumber/fireTrigger correctly. This lets DataBindRuntime treat SM inputs the same
+// as render node channels — no SM-specific routing needed.
+class StateMachineInputTarget : public RuntimeTarget {
+ public:
+  StateMachineInputTarget(std::shared_ptr<PAGStateMachine> sm, const StateMachine* schema) {
+    setObject(sm);
+    for (auto* input : schema->inputs) {
+      if (input != nullptr) {
+        inputTypes[input->name] = input->type;
+      }
+    }
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    return inputTypes.find(channel) != inputTypes.end();
+  }
+
+  bool apply(const std::string& channel, const KeyValue& value, float /*mix*/) override {
+    auto it = inputTypes.find(channel);
+    if (it == inputTypes.end()) {
+      return false;
+    }
+    auto sm = getObject<PAGStateMachine>();
+    if (sm == nullptr) {
+      return false;
+    }
+    switch (it->second) {
+      case StateMachineInputType::Bool: {
+        auto* v = std::get_if<bool>(&value);
+        return sm->setBool(channel, v != nullptr ? *v : false);
+      }
+      case StateMachineInputType::Number: {
+        auto* v = std::get_if<float>(&value);
+        return sm->setNumber(channel, v != nullptr ? *v : 0.0f);
+      }
+      case StateMachineInputType::Trigger:
+        sm->fireTrigger(channel);
+        return true;
+    }
+    return false;
+  }
+
+ private:
+  std::unordered_map<std::string, StateMachineInputType> inputTypes = {};
 };
 
 }  // namespace pagx

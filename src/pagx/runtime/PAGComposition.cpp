@@ -24,6 +24,7 @@
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachine.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -159,7 +160,7 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
-      binding->set<PAGStateMachine>(sm, smTimeline);
+      binding->setTarget(sm, std::make_unique<StateMachineInputTarget>(smTimeline, sm));
       timelines.push_back(std::move(smTimeline));
     }
   }
