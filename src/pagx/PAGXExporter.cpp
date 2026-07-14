@@ -338,8 +338,9 @@ static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition
     if (condition->op == TransitionConditionOp::Equal ||
         condition->op == TransitionConditionOp::NotEqual) {
       // Equal/NotEqual apply to both Bool and Number inputs. Look up the referenced input's type
-      // so the matching value field is serialized; fall back to valueBool when the input is
-      // missing, preserving the legacy behavior for forward references to unresolved inputs.
+      // so the matching value field is serialized. Fall back to Bool serialization when the input
+      // is not found in sm->inputs (e.g. broken reference), which loses valueNumber for Number
+      // conditions but keeps the document exportable.
       auto inputType = StateMachineInputType::Bool;
       for (const auto* input : inputs) {
         if (input != nullptr && input->name == condition->inputName) {
@@ -356,6 +357,7 @@ static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition
       xml.addAttribute("value", FloatToString(condition->valueNumber));
     }
   }
+  WriteCustomData(xml, condition);
   xml.closeElementSelfClosing();
 }
 
@@ -384,6 +386,7 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
   if (transition->pauseOnExit) {
     xml.addAttribute("pauseOnExit", "true");
   }
+  WriteCustomData(xml, transition);
   xml.closeElementStart();
   for (const auto* condition : transition->conditions) {
     if (condition != nullptr) {
@@ -399,6 +402,7 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
   xml.addAttribute("id", region->id);
   xml.addRequiredAttribute("name", region->name);
   xml.addRequiredAttribute("initialState", region->initialState);
+  WriteCustomData(xml, region);
   xml.closeElementStart();
 
   xml.openElement("States");
@@ -433,6 +437,7 @@ static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
 static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
   xml.openElement("StateMachine");
   xml.addAttribute("id", sm->id);
+  WriteCustomData(xml, sm);
   xml.closeElementStart();
 
   if (!sm->inputs.empty()) {
