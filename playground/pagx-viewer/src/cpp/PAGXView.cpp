@@ -146,8 +146,8 @@ void PAGXView::buildLayers() {
   // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
   // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
   // them to absolute coordinates to ensure correct rendering.
-  // ResolveAllImagePatternMatrices(document.get());
-  // ResolveAllGradientCoordinates(document.get());
+  ResolveAllImagePatternMatrices(document.get());
+  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
@@ -318,6 +318,14 @@ void PAGXView::draw() {
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
   syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
   if (tgfxSurface == nullptr) {
+    return;
+  }
+  // Dirty gate: skip the Record()/submit pass on idle frames. advanceTimelines() above already
+  // refreshed the scene's content-changed flag, so hasContentChanged() reflects the latest state
+  // (a running animation or in-progress tile refinement keeps it true). presentImmediately forces a
+  // render after loads/resizes/zoom/background changes; lastRecording must still be flushed when
+  // present, otherwise the double-buffered frame it holds would be dropped.
+  if (!presentImmediately && lastRecording == nullptr && !scene->hasContentChanged()) {
     return;
   }
   if (useCustomBackgroundColor) {
