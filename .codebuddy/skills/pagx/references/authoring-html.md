@@ -10,7 +10,7 @@ the authoritative subset reference is `spec/html_subset.md`.
 
 - [ ] One self-contained `.html` file (no local relative assets).
 - [ ] `body` has an explicit pixel `width` and `height` = the target canvas, and `margin:0`.
-- [ ] Web fonts loaded via a Google Fonts `<link>` (then convert with `--embed-fonts`).
+- [ ] Web fonts loaded via a Google Fonts `<link>` (embed with `pagx font embed` if text renders in the wrong typeface).
 - [ ] Icons are inline `<svg>` or an icon webfont — never typed glyphs.
 - [ ] Real, selectable text for all copy (not text baked into images).
 - [ ] No interactive widgets, no scrolling content, no video/iframe.
@@ -39,10 +39,12 @@ resolve when the page is rendered. Inline or absolutize everything:
   external images into the output automatically.
 - **CSS**: put it in a `<style>` block or inline `style=""` attributes. A Tailwind CDN `<script>`
   works because the page runs in a browser, but plain inline CSS is the most predictable.
-- **Fonts**: load via a Google Fonts (or other CDN) `<link rel="stylesheet">`. The browser fetches
-  them; convert with `--embed-fonts` to bake the actual glyphs into the `.pagx`. Without embedding,
-  text falls back to whatever font is installed on the rendering host. URL inputs resolve their own
-  relative resources, so this caveat applies mainly to local files.
+- **Fonts**: load via a Google Fonts (or other CDN) `<link rel="stylesheet">` so the browser fetches
+  them and the snapshot captures the right glyphs. PAGX resolves fonts by name at render time, so if
+  that typeface is not installed on the render host, install it there or embed it into the `.pagx`
+  with `pagx font embed --file <font>` (the optional `html2pagx` wrapper can do this in one step with
+  `--embed-fonts`). URL inputs resolve their own relative resources, so this caveat applies mainly to
+  local files.
 
 ## 3. Layout
 

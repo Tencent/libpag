@@ -224,9 +224,10 @@ instead of the published npm package, so every conversion exercises local change
    ```
    (Alternatively call it by path as `cmake-build-debug/pagx` everywhere.)
 3. **Build the snapshot tool** that `pagx import` shells out to when flattening HTML. The setup
-   script installs its dependencies + headless browser and builds it; it detects the local `pagx`
-   already on `PATH` and will not touch npm. It runs on `node`, so the same command works on
-   macOS / Linux / Windows:
+   script installs its dependencies and builds it, then checks the headless browser is present
+   (printing the exact install command if it is missing). With the repo-built `pagx` already on
+   `PATH` from Step 2 it will not install the npm package. It runs on `node`, so the same command
+   works on macOS / Linux / Windows:
    ```bash
    node .codebuddy/skills/pagx/scripts/setup.js
    ```
@@ -322,7 +323,8 @@ via `snapshot.js`, and a manual step-by-step path for debugging).
 2. If something is wrong, **edit the `<name>.html`** (not the PAGX) and re-run Step 3. The HTML is
    the source of truth; treat the `.pagx` as a build artifact.
 3. Common fixes:
-   - Text in the wrong font → ensure the Google Fonts `<link>` is present and keep `--embed-fonts`.
+   - Text in the wrong font → ensure the Google Fonts `<link>` is present; if the typeface is still
+     wrong, install that font on the machine or embed it with `pagx font embed --file <font>`.
    - Content clipped or off-canvas → match `--viewport-width`/`--viewport-height` to the `body` size.
    - An element missing from the PNG → it was hidden, an unsupported widget, or a tainted
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
