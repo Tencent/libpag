@@ -504,7 +504,7 @@ class ObserverHandle {
 - `ObserverHandle` 是 RAII 句柄，析构自动 detach
 - `dirty` 标志 + `clearDirty()` 在帧末重置
 
-**结论**：这套 observer 模式可直接复用做 state change 通知。state machine 的"当前态改变"事件可以照搬：`PAGStateMachine::addStateChangeListener(callback)` 返回 `ObserverHandle`。
+**结论**：这套 observer 模式可参考做 state change 通知。state machine 的"当前态改变"事件：`PAGStateMachine::addStateChangeListener(callback)` 返回 `int`（listener id），配套 `removeStateChangeListener(id)` 注销。
 
 ### 2.8 现有 ViewModel 与 DataBind 系统
 
@@ -1024,9 +1024,11 @@ class PAGStateMachine {
   void apply(float mix = 1.0f);
   bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f);
 
-  // state change observation (regionId + new state)
-  ObserverHandle addStateChangeListener(
-      std::function<void(const std::string& regionId, const std::string& newState)> callback);
+  // state change observation (regionName + new state)
+  //   返回 int listener id；传给 removeStateChangeListener 注销
+  int addStateChangeListener(
+      std::function<void(const std::string& regionName, const std::string& newState)> callback);
+  void removeStateChangeListener(int listenerId);
 
  private:
   std::weak_ptr<PAGScene> owner;
@@ -1933,7 +1935,7 @@ scene->draw(surface);
 | 用例 | 验证点 |
 |---|---|
 | `SMStateChangeListener` | 状态切换触发 observer 回调，回调收到正确的 regionName + newState；未切换不回调 |
-| `SMListenerDetach` | ObserverHandle 析构/detach 后不再回调 |
+| `SMListenerDetach` | `removeStateChangeListener(id)` 后不再回调 |
 | `SMMultiRegionIndependent` | 两 region 各自独立推进，一个切状态不影响另一个 |
 | `SMMultiRegionSharedInput` | 一个 input 被多个 region 的 condition 读取，各自独立判断 |
 | `SMGetCurrentStatePerRegion` | `getCurrentState(regionName)` 返回对应 region 的当前状态；未知 regionName 的处理 |
