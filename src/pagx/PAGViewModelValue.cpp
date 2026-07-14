@@ -21,7 +21,6 @@
 #include "pagx/DataBindRuntime.h"
 #include "pagx/ObserverHandle.h"
 #include "pagx/PAGScene.h"
-#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
 #include "pagx/PAGViewModelValueEnum.h"
@@ -206,12 +205,8 @@ void PAGViewModelValueTrigger::fire() {
 
 ObserverHandle::ObserverHandle() = default;
 
-ObserverHandle::ObserverHandle(std::shared_ptr<PAGViewModelValue> src, int observerId)
-    : type(SourceType::ViewModel), vmSource(std::move(src)), id(observerId) {
-}
-
-ObserverHandle::ObserverHandle(std::shared_ptr<PAGStateMachine> src, int listenerId)
-    : type(SourceType::StateMachine), smSource(std::move(src)), id(listenerId) {
+ObserverHandle::ObserverHandle(std::shared_ptr<Observable> src, int observerId)
+    : source(std::move(src)), id(observerId) {
 }
 
 ObserverHandle::~ObserverHandle() {
@@ -219,20 +214,15 @@ ObserverHandle::~ObserverHandle() {
 }
 
 ObserverHandle::ObserverHandle(ObserverHandle&& other) noexcept
-    : type(other.type), vmSource(std::move(other.vmSource)), smSource(std::move(other.smSource)),
-      id(other.id) {
-  other.type = SourceType::None;
+    : source(std::move(other.source)), id(other.id) {
   other.id = -1;
 }
 
 ObserverHandle& ObserverHandle::operator=(ObserverHandle&& other) noexcept {
   if (this != &other) {
     detach();
-    type = other.type;
-    vmSource = std::move(other.vmSource);
-    smSource = std::move(other.smSource);
+    source = std::move(other.source);
     id = other.id;
-    other.type = SourceType::None;
     other.id = -1;
   }
   return *this;
@@ -242,21 +232,12 @@ void ObserverHandle::detach() {
   if (id < 0) {
     return;
   }
-  if (type == SourceType::ViewModel) {
-    auto src = vmSource.lock();
-    if (src) {
-      src->removeObserver(id);
-    }
-  } else if (type == SourceType::StateMachine) {
-    auto src = smSource.lock();
-    if (src) {
-      src->removeStateChangeListenerInternal(id);
-    }
+  auto src = source.lock();
+  if (src) {
+    src->removeObserver(id);
   }
   id = -1;
-  type = SourceType::None;
-  vmSource.reset();
-  smSource.reset();
+  source.reset();
 }
 
 }  // namespace pagx

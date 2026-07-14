@@ -10,7 +10,7 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "AS is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -22,8 +22,20 @@
 
 namespace pagx {
 
-class PAGViewModelValue;
-class PAGStateMachine;
+/**
+ * Observable is a base class for objects that support observer registration and removal via
+ * integer IDs. PAGViewModelValue and PAGStateMachine both inherit from it so that ObserverHandle
+ * can manage any observer type through a single weak_ptr.
+ */
+class Observable {
+ public:
+  virtual ~Observable() = default;
+
+  /**
+   * Removes the observer identified by the given id. Safe to call with an unknown id.
+   */
+  virtual void removeObserver(int id) = 0;
+};
 
 /**
  * ObserverHandle is an RAII handle for a registered value-change observer. The observer is
@@ -47,17 +59,11 @@ class ObserverHandle {
    */
   void detach();
 
-  /** Creates a handle for a PAGViewModelValue observer. */
-  ObserverHandle(std::shared_ptr<PAGViewModelValue> source, int observerId);
-
-  /** Creates a handle for a PAGStateMachine state-change listener. */
-  ObserverHandle(std::shared_ptr<PAGStateMachine> source, int listenerId);
+  /** Creates a handle for an Observable source (PAGViewModelValue or PAGStateMachine). */
+  ObserverHandle(std::shared_ptr<Observable> source, int observerId);
 
  private:
-  enum class SourceType { None, ViewModel, StateMachine };
-  SourceType type = SourceType::None;
-  std::weak_ptr<PAGViewModelValue> vmSource;
-  std::weak_ptr<PAGStateMachine> smSource;
+  std::weak_ptr<Observable> source;
   int id = -1;
 };
 

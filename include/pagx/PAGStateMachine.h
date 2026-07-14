@@ -51,7 +51,9 @@ class StateTransition;
  *
  * Thread safety: PAGStateMachine is not thread-safe. Callers must serialize access.
  */
-class PAGStateMachine : public PAGTimeline, public std::enable_shared_from_this<PAGStateMachine> {
+class PAGStateMachine : public PAGTimeline,
+                        public std::enable_shared_from_this<PAGStateMachine>,
+                        public Observable {
  public:
   ~PAGStateMachine();
 
@@ -181,7 +183,7 @@ class PAGStateMachine : public PAGTimeline, public std::enable_shared_from_this<
   std::vector<std::pair<int, std::function<void(const std::string&, const std::string&)>>>
       stateChangeListeners;
 
-  void removeStateChangeListenerInternal(int listenerId);
+  void removeObserver(int id) override;
 
   bool advanceRegion(int64_t deltaUs);
   bool advanceMix(RegionInstance& ri, int64_t deltaUs);
@@ -191,7 +193,6 @@ class PAGStateMachine : public PAGTimeline, public std::enable_shared_from_this<
 
   friend class PAGScene;
   friend class PAGComposition;
-  friend class ObserverHandle;
 };
 
 }  // namespace pagx

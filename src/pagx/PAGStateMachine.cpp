@@ -507,7 +507,7 @@ ObserverHandle PAGStateMachine::addStateChangeListener(
   return ObserverHandle(shared_from_this(), id);
 }
 
-void PAGStateMachine::removeStateChangeListenerInternal(int listenerId) {
+void PAGStateMachine::removeObserver(int listenerId) {
   for (auto it = stateChangeListeners.begin(); it != stateChangeListeners.end(); ++it) {
     if (it->first == listenerId) {
       stateChangeListeners.erase(it);
