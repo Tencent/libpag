@@ -11204,6 +11204,7 @@ PAGX_TEST(PAGXTest, StateMachineRoundTrip) {
   doc->animations.push_back(anim);
 
   auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  doc->animations.push_back(sm);
 
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "isHover";
@@ -11265,6 +11266,7 @@ PAGX_TEST(PAGXTest, StateMachineTimelineRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "idle";
@@ -11299,6 +11301,7 @@ PAGX_TEST(PAGXTest, SMInCompositionRoundTrip) {
   comp->width = 50;
   comp->height = 50;
   auto sm = doc->makeNode<pagx::StateMachine>("compSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "idle";
@@ -11350,6 +11353,7 @@ PAGX_TEST(PAGXTest, SMRuntimeInitialState) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "start";
@@ -11379,6 +11383,7 @@ PAGX_TEST(PAGXTest, SMBoolTransition) {
   doc->animations.push_back(anim);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -11428,6 +11433,7 @@ PAGX_TEST(PAGXTest, SMMultiRegion) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
 
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
@@ -11495,6 +11501,7 @@ PAGX_TEST(PAGXTest, SMMultiRegion) {
 PAGX_TEST(PAGXTest, SMTriggerConsumedOnce) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "fire";
   input->type = pagx::StateMachineInputType::Trigger;
@@ -11549,6 +11556,7 @@ PAGX_TEST(PAGXTest, SMTriggerConsumedOnce) {
 PAGX_TEST(PAGXTest, SMTriggerPerRegion) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Trigger;
@@ -11608,6 +11616,7 @@ PAGX_TEST(PAGXTest, SMTriggerPerRegion) {
 PAGX_TEST(PAGXTest, SMTriggerFireWithoutAdvanceKeeps) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Trigger;
@@ -11648,6 +11657,7 @@ PAGX_TEST(PAGXTest, SMEarlyExitInterrupts) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto interrupt = doc->makeNode<pagx::StateMachineInput>();
   interrupt->name = "interrupt";
   interrupt->type = pagx::StateMachineInputType::Bool;
@@ -11709,6 +11719,7 @@ PAGX_TEST(PAGXTest, SMChainedTransition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "a";
@@ -11749,6 +11760,7 @@ PAGX_TEST(PAGXTest, SMAnyStateTransition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "reset";
   input->type = pagx::StateMachineInputType::Trigger;
@@ -11791,6 +11803,7 @@ PAGX_TEST(PAGXTest, SMAnyStateTransition) {
 PAGX_TEST(PAGXTest, SMStateChangeListener) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -11855,6 +11868,7 @@ PAGX_TEST(PAGXTest, SMStateChangeListener) {
 PAGX_TEST(PAGXTest, SMNumberTransitionOps) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "val";
   input->type = pagx::StateMachineInputType::Number;
@@ -11899,6 +11913,7 @@ PAGX_TEST(PAGXTest, SMNumberTransitionOps) {
 PAGX_TEST(PAGXTest, SMConditionAnd) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto inputA = doc->makeNode<pagx::StateMachineInput>();
   inputA->name = "a";
   inputA->type = pagx::StateMachineInputType::Bool;
@@ -11962,6 +11977,7 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
   doc->animations.push_back(animActive);
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -12025,6 +12041,7 @@ PAGX_TEST(PAGXTest, SMPauseOnExitFreezes) {
 PAGX_TEST(PAGXTest, SMDefaultInputValue) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -12064,6 +12081,7 @@ PAGX_TEST(PAGXTest, SMDefaultInputValue) {
 PAGX_TEST(PAGXTest, SMGetStateMachineIds) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm1 = doc->makeNode<pagx::StateMachine>("sm1");
+  doc->animations.push_back(sm1);
   auto r1 = doc->makeNode<pagx::StateRegion>();
   r1->name = "main";
   r1->initialState = "s";
@@ -12072,6 +12090,7 @@ PAGX_TEST(PAGXTest, SMGetStateMachineIds) {
   r1->states.push_back(s);
   sm1->regions.push_back(r1);
   auto sm2 = doc->makeNode<pagx::StateMachine>("sm2");
+  doc->animations.push_back(sm2);
   auto r2 = doc->makeNode<pagx::StateRegion>();
   r2->name = "main";
   r2->initialState = "s";
@@ -12109,6 +12128,7 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForMissingRegion) {
 PAGX_TEST(PAGXTest, SMChainedMaxIterations) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "a";
@@ -12147,6 +12167,7 @@ PAGX_TEST(PAGXTest, SMChainedMaxIterations) {
 PAGX_TEST(PAGXTest, SMTransitionAllOpsRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
 
   auto inBool = doc->makeNode<pagx::StateMachineInput>();
   inBool->name = "b";
@@ -12222,6 +12243,7 @@ PAGX_TEST(PAGXTest, SMTransitionAllOpsRoundTrip) {
 PAGX_TEST(PAGXTest, SMTransitionBezierRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "s";
@@ -12262,6 +12284,7 @@ PAGX_TEST(PAGXTest, SMTransitionBezierRoundTrip) {
 PAGX_TEST(PAGXTest, SMGetSameInstance) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "idle";
@@ -12305,6 +12328,7 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForUnknownState) {
 PAGX_TEST(PAGXTest, SMZeroDeltaAdvance) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -12341,6 +12365,7 @@ PAGX_TEST(PAGXTest, SMZeroDeltaAdvance) {
 PAGX_TEST(PAGXTest, SMListenerDetach) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -12396,6 +12421,7 @@ PAGX_TEST(PAGXTest, SMListenerDetach) {
 PAGX_TEST(PAGXTest, SMAnyStatePriority) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "a";
@@ -12430,6 +12456,7 @@ PAGX_TEST(PAGXTest, SMAnyStatePriority) {
 PAGX_TEST(PAGXTest, SMMultiRegionSharedInput) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "val";
   input->type = pagx::StateMachineInputType::Number;
@@ -12470,6 +12497,7 @@ PAGX_TEST(PAGXTest, SMMultiRegionSharedInput) {
 PAGX_TEST(PAGXTest, SMMultiConditionRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto inA = doc->makeNode<pagx::StateMachineInput>();
   inA->name = "a";
   inA->type = pagx::StateMachineInputType::Bool;
@@ -12519,6 +12547,7 @@ PAGX_TEST(PAGXTest, SMMultiConditionRoundTrip) {
 PAGX_TEST(PAGXTest, SMEmptyStateRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "idle";
@@ -12547,6 +12576,7 @@ PAGX_TEST(PAGXTest, SMEmptyStateRoundTrip) {
 PAGX_TEST(PAGXTest, SMDefaultsOmittedInExport) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "s";
@@ -12682,6 +12712,7 @@ PAGX_TEST(PAGXTest, SMCrossfade) {
   objB->channels.push_back(chB);
 
   auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
+  doc->animations.push_back(sm);
   auto in = doc->makeNode<pagx::StateMachineInput>();
   in->name = "go";
   in->type = pagx::StateMachineInputType::Bool;
@@ -12732,6 +12763,7 @@ PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
   doc->animations.push_back(animA);
 
   auto sm = doc->makeNode<pagx::StateMachine>("crossSM");
+  doc->animations.push_back(sm);
   auto in = doc->makeNode<pagx::StateMachineInput>();
   in->name = "go";
   in->type = pagx::StateMachineInputType::Bool;
@@ -12817,6 +12849,7 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
   obj->channels.push_back(ch);
 
   auto sm = doc->makeNode<pagx::StateMachine>("stableSM");
+  doc->animations.push_back(sm);
   auto region = doc->makeNode<pagx::StateRegion>();
   region->name = "main";
   region->initialState = "fade";
@@ -12903,6 +12936,7 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
 
   // StateMachine: visible → dim on "dim" bool input.
   auto sm = doc->makeNode<pagx::StateMachine>("cardSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "dim";
   input->type = pagx::StateMachineInputType::Bool;
@@ -13009,6 +13043,7 @@ PAGX_TEST(PAGXTest, SMVMBoolBinding) {
   doc->viewModel = vm;
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "go";
   input->type = pagx::StateMachineInputType::Bool;
@@ -13064,6 +13099,7 @@ PAGX_TEST(PAGXTest, SMVMNumberBinding) {
   doc->viewModel = vm;
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "score";
   input->type = pagx::StateMachineInputType::Number;
@@ -13120,6 +13156,7 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
   doc->viewModel = vm;
 
   auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
   auto input = doc->makeNode<pagx::StateMachineInput>();
   input->name = "fire";
   input->type = pagx::StateMachineInputType::Trigger;
@@ -13180,6 +13217,7 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
   doc->viewModel = vm;
 
   auto sm = doc->makeNode<pagx::StateMachine>("charSM");
+  doc->animations.push_back(sm);
 
   // Input: hp (number, bound to VM) and deathTrigger (trigger, manual).
   auto inHP = doc->makeNode<pagx::StateMachineInput>();
@@ -13304,6 +13342,7 @@ PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
   doc->viewModel = vm;
 
   auto sm = doc->makeNode<pagx::StateMachine>("uiSM");
+  doc->animations.push_back(sm);
   auto inVis = doc->makeNode<pagx::StateMachineInput>();
   inVis->name = "visible";
   inVis->type = pagx::StateMachineInputType::Bool;
