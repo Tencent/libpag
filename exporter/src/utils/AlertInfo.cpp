@@ -409,9 +409,9 @@ DEFINE_GETINFO(TextPathAnimator) {
 }
 
 DEFINE_GETINFO(TextSuperscriptOrSubscript) {
-  auto infoData =
-      QObject::tr("Some characters of the text layer use superscript or subscript, which is not "
-                  "supported by PAG.");
+  auto infoData = QObject::tr(
+      "Some characters of the text layer use superscript or subscript, which is not "
+      "supported by PAG.");
   auto suggestData = QObject::tr(
       "Recommend disabling superscript/subscript in the Character panel and adjusting the font "
       "size manually.");
