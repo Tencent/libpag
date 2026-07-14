@@ -2,29 +2,41 @@
 name: pagx
 description: >-
   Converts an HTML file/URL or a described visual (poster, card, banner, social
-  post) to a PAGX file. Use when the user asks to create a PAGX from a visual
-  description, convert HTML to PAGX, or run pagx CLI commands (render, verify,
-  format, layout, bounds, font info/embed, import, resolve, export to
-  SVG/HTML/PPTX, or export to HTML for browser preview).
+  post) to a PAGX file, and edits existing PAGX files. Use when the user asks to
+  create a PAGX from a visual description, convert HTML to PAGX, modify/update an
+  existing PAGX, run pagx CLI commands (render, verify, format, layout, bounds,
+  font info/embed, import, resolve, export to SVG/HTML/PPTX, or export to HTML for
+  browser preview), or look up PAGX element attributes and syntax.
 ---
 
 # PAGX Skill
 
-Produce a PAGX file from a visual design: design a normal HTML page (or take an
-existing `.html`/URL) and convert it to PAGX with a single command. Best for
-non-technical users, visual descriptions in plain language, or when an HTML
-file/URL already exists. See [HTML to PAGX Workflow](#html-to-pagx-workflow).
+Pick the workflow that fits the request:
+
+- **HTML → PAGX** — design a normal HTML page (or take an existing `.html`/URL) and
+  convert it to PAGX with a single command. This is the way to create a new PAGX file.
+  Best for non-technical users, visual descriptions in plain language, or when an HTML
+  file/URL already exists. See [HTML to PAGX Workflow](#html-to-pagx-workflow).
+- **Update an existing PAGX** — edit PAGX XML directly with full control over structure,
+  constraints, and animation-ready layout. Best for modifying an existing `.pagx`, precise
+  PAGX semantics, or hand-editing XML. See [Update Workflow](#update-workflow).
+
+To create a PAGX from scratch, use **HTML → PAGX**. To modify an existing `.pagx`, use the
+**Update Workflow**.
 
 ## Reference Lookup
 
-When looking up PAGX syntax, node behavior, or CLI usage, consult the relevant
-reference:
+When looking up PAGX syntax, attributes, node behavior, or CLI usage, consult the
+relevant reference:
 
 | Reference | Content | Loading |
 |-----------|--------|---------|
+| `references/guide.md` | Spec rules, techniques, common pitfalls | Read before editing |
+| `references/patterns.md` | Structural patterns for UI components, layouts, tables, charts, decorative effects | Read before editing |
+| `references/attributes.md` | Attribute defaults, enumerations, required attributes | As needed |
 | `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `resolve`, `export` (SVG, HTML, PPTX) | As needed |
-| `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML |
-| `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed |
+| `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML (HTML → PAGX) |
+| `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed (HTML → PAGX) |
 | `spec/html_subset.md` | Authoritative HTML/CSS subset the importer accepts — every allowed tag/property and its PAGX mapping, diagnostics, auto-normalization passes | Debugging conversion warnings or edge cases |
 
 ---
@@ -62,6 +74,111 @@ all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`
 
 ---
 
+## Update Workflow
+
+**When**: User asks to modify, edit, adjust, or fix an existing PAGX file.
+
+Before editing any PAGX code, read `references/guide.md` (spec rules, techniques,
+and especially §Common Pitfalls) and `references/patterns.md` (structural patterns
+for components and layouts). Read `references/attributes.md` as needed for attribute defaults.
+
+### Task tracking
+
+At the start of every update task, create a task list to track progress:
+- One task per section being changed (e.g., "Update section: heroCard")
+- One task for the final Polish & QA pass
+
+Mark each task in-progress before starting it and completed after all checks pass.
+Do NOT start the next task until the current one is completed.
+
+---
+
+### Step 1: Assess the current file
+
+**Do**:
+1. Read the existing `.pagx` end to end to understand its structure — the section
+   `id`s, nesting, layout attributes, and fills already in place.
+2. Run `pagx verify input.pagx` to capture a baseline: fix any pre-existing
+   diagnostics first (re-run until exit code is 0), then read `input.layout.xml`
+   and `input.png` to see the current state.
+3. Clarify the requested change with the user if the target, scope, or intent is
+   unclear or ambiguous. Identify exactly which section `id`(s) the change touches.
+
+**Forbidden**: Do NOT rewrite unrelated sections. Keep edits scoped to what the
+change requires.
+
+---
+
+### Step 2: Make the edits
+
+For each section being changed (identified by `id`), one at a time:
+
+**Do**: Edit only the elements in this section. Preserve the existing structure,
+naming, and layout conventions unless the change requires altering them.
+
+**Checks**:
+1. Run `pagx verify --scale 2 --id "sectionId" input.pagx` — **ALL diagnostics MUST be
+   fixed**. Re-run until exit code is 0 with no diagnostic output.
+2. Read the section `.layout.xml` and verify element bounds match the intended change
+   — check sizes (e.g., input height, icon dimensions), spacing, and that nothing
+   has zero or unexpected dimensions. Fix any issues.
+3. Read the section screenshot and verify the change landed as intended — check that
+   colors, font sizes, text content, and icons are correct, and that nothing else in
+   the section regressed. Fix any issues.
+
+**Cleanup**: After all checks pass, delete that section's scoped artifacts
+(`input.{id}.png`, `input.{id}.layout.xml`) before moving on.
+
+**Forbidden**: Do NOT edit sections the change does not require. Do NOT proceed to the
+next section until verify exits cleanly with zero diagnostics.
+
+---
+
+### Step 3: Polish & QA
+
+**Do**: Review the full design holistically and confirm the edits are consistent with
+the rest of the file — spacing, alignment, color consistency, visual hierarchy — and
+that nothing outside the intended change regressed.
+
+**Checks**:
+1. Run `pagx verify --scale 2 input.pagx` — **ALL diagnostics MUST be fixed**. Re-run
+   until exit code is 0 with no diagnostic output.
+2. Launch a sub-agent as an adversarial reviewer — this is the core of quality
+   assurance. **NEVER** read `references/checklist.md` yourself; it is exclusively
+   for the sub-agent. Use `subagent_type="general-purpose"` and `model="reasoning"`.
+   Use the following prompt, replacing placeholders with absolute paths:
+
+   ```
+   You are a strict, adversarial visual QA reviewer for a PAGX design file (an XML-based
+   vector graphics format). Find every problem you can. Assume something is wrong until
+   you prove it correct.
+
+   Design intent: {design_intent}
+
+   Files:
+   - PAGX source: {pagx_path}
+   - Layout XML: {layout_path}
+   - Screenshot: {screenshot_path}
+
+   Read all three files and {checklist_path}, then check every item in the
+   checklist. Report every issue you find.
+   ```
+
+3. Copy every reported issue into the Polish task description as a numbered list.
+   Work through each one: default to fixing; only mark `[FALSE POSITIVE]` if you
+   can prove QA misread the file (e.g., layout.xml shows correct bounds). Do NOT
+   dismiss issues as "minor", "looks okay", or "design constraint".
+
+**Final verification**: After all fixes, run `pagx verify` one last time. If ANY diagnostic
+appears, the task is NOT complete — fix it. Only mark the task complete when verify exits
+with code 0 and produces no diagnostic output.
+
+Keep final `input.png` for reference (do not commit). If further edits are made after
+this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
+scoped `{id}` artifacts produced during the fix.
+
+---
+
 ## HTML to PAGX Workflow
 
 Help regular users (no design-tool or PAGX experience) produce a PAGX file without writing PAGX by
@@ -73,7 +190,10 @@ icons, charts on `<canvas>`) is flattened automatically into clean PAGX.
 **When**: the goal is a finished PAGX and the user is approaching it visually — describes what they
 want in plain language ("一张活动海报", "a product card with price and button"), already has an `.html`
 file or a public URL to convert, or is a non-developer who should not be asked PAGX-specific
-questions.
+questions. To modify an already-existing `.pagx` — precise PAGX semantics (constraints, repeaters,
+layer styles, animation-ready structure) or hand-editing XML — use the
+[Update Workflow](#update-workflow) above instead; you can also hand a freshly converted `.pagx`
+off to it for deeper polish.
 
 **Communicate in the user's language.** Mirror the language the user is writing in for all questions,
 explanations, and summaries. Keep the conversation non-technical — describe progress in terms of
@@ -208,3 +328,6 @@ via `snapshot.js`, and a manual step-by-step path for debugging).
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
 4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
    it contains. Do not commit generated `.png` / `.subset.html` files.
+
+For deeper polish of the resulting PAGX (precise spacing, constraints, animation-ready structure),
+switch to the [Update Workflow](#update-workflow), which edits the `.pagx` directly.
