@@ -61,7 +61,7 @@ void PAGComposition::pauseTimeline(const std::string& id) {
   pausedTimelineIds.insert(id);
 }
 
-bool PAGComposition::isTimelinePlaying(const std::string& id) {
+bool PAGComposition::isTimelinePlaying(const std::string& id) const {
   return pausedTimelineIds.find(id) == pausedTimelineIds.end();
 }
 

@@ -76,7 +76,7 @@ class PAGComposition : public PAGLayer {
   /**
    * Returns true if the named timeline is advancing (not paused).
    */
-  bool isTimelinePlaying(const std::string& id);
+  bool isTimelinePlaying(const std::string& id) const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
