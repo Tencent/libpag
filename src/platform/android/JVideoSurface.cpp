@@ -101,8 +101,14 @@ PAG_API void Java_org_libpag_VideoSurface_nativeFinalize(JNIEnv* env, jobject th
 }
 
 PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz, jint width,
-                                                      jint height) {
-  auto imageStream = tgfx::SurfaceTextureReader::Make(width, height, thiz);
+                                                      jint height, jobject listener) {
+  // Pass the weak-referencing listener (instead of `thiz`) to the native
+  // SurfaceTexture. This breaks the circular strong reference chain
+  // (native SurfaceTexture -> Java SurfaceTexture -> OnFrameAvailableListener
+  // -> Java VideoSurface -> JVideoSurface -> SurfaceTextureReader ->
+  // native SurfaceTexture) so that the Java VideoSurface can be reclaimed by
+  // GC after its owning HardwareDecoder releases its GlobalRef.
+  auto imageStream = tgfx::SurfaceTextureReader::Make(width, height, listener);
   if (imageStream == nullptr) {
     return;
   }

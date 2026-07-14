@@ -53,13 +53,15 @@ HardwareDecoder::~HardwareDecoder() {
     delete bufferInfo;
     bufferInfo = nullptr;
   }
-  if (videoSurface.get() != nullptr) {
-    JNIEnvironment environment;
-    auto env = environment.current();
-    if (env != nullptr) {
-      JVideoSurface::Release(env, videoSurface.get());
-    }
-  }
+  // No need to explicitly break the SurfaceTextureReader <-> Java VideoSurface
+  // circular reference here: the Java VideoSurface now registers a weakly
+  // referencing OnFrameAvailableListener on the native SurfaceTexture (see
+  // VideoSurface.java), so once our GlobalRef to the Java VideoSurface is
+  // dropped (below, when this function returns), the Java VideoSurface loses
+  // all strong references and becomes eligible for GC. Its finalize() then
+  // releases the underlying SurfaceTextureReader on the Java Finalizer thread,
+  // which avoids the Surface.release() vs framework teardown race that used
+  // to crash tgfx worker threads at RefBase::incStrong.
 }
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
