@@ -32,7 +32,6 @@ namespace pagx {
 struct RuntimeBinding;
 class PAGScene;
 class PAGXDocument;
-class PAGViewModelValue;
 class PAGAnimation;
 class State;
 class StateTransition;
@@ -52,7 +51,7 @@ class StateTransition;
  *
  * Thread safety: PAGStateMachine is not thread-safe. Callers must serialize access.
  */
-class PAGStateMachine : public PAGTimeline {
+class PAGStateMachine : public PAGTimeline, public std::enable_shared_from_this<PAGStateMachine> {
  public:
   ~PAGStateMachine();
 
@@ -127,41 +126,18 @@ class PAGStateMachine : public PAGTimeline {
   void apply(float mix = 1.0f) override;
 
   /**
-   * Convenience method exactly equivalent to advance(deltaMicroseconds) followed by apply(mix).
-   * Returns the result of advance(deltaMicroseconds).
-   */
-  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f) override;
-
-  /**
    * Registers a state-change listener. The callback receives the region name and the new state
-   * name whenever a region transitions. Returns an opaque listener id; pass it to
-   * removeStateChangeListener() to unregister. Returns -1 if callback is null.
+   * name whenever a region transitions. The returned ObserverHandle automatically unregisters the
+   * listener when destroyed; call detach() on the handle to unregister early.
    *
    * Reentrant add/remove is safe: listeners are snapshotted before dispatch, so a callback that
    * adds or removes listeners during dispatch does not invalidate the ongoing iteration.
    * @param callback invoked on each region transition with the region name and the new state name.
+   * @return an ObserverHandle whose destruction unregisters the listener. Returns an empty handle
+   *         if callback is null.
    */
-  int addStateChangeListener(
+  ObserverHandle addStateChangeListener(
       std::function<void(const std::string& regionName, const std::string& newState)> callback);
-
-  /**
-   * Removes a previously registered state-change listener. Safe to call with an unknown id.
-   * @param listenerId the id returned by addStateChangeListener(); ignored if it matches none.
-   */
-  void removeStateChangeListener(int listenerId);
-
-  /**
-   * Binds a ViewModel property to a StateMachine input, so that changes to the VM value are
-   * automatically synchronized to the SM input. The VM property type must be compatible with the
-   * SM input type: Boolean for Bool inputs, Number for Number inputs, Trigger for Trigger inputs
-   * (where a true transition fires the trigger).
-   * @param inputName the name of the SM input declared in <Inputs>.
-   * @param vmValue the ViewModel property value to bind. The binding holds a weak reference to
-   *        vmValue; if vmValue is destroyed, the binding becomes inactive and future notifications
-   *        are dropped silently.
-   * @return true if the binding was established successfully.
-   */
-  bool bindInput(const std::string& inputName, const std::shared_ptr<PAGViewModelValue>& vmValue);
 
   /**
    * InputValue holds the live runtime value of a single StateMachine input. It is an implementation
@@ -205,8 +181,7 @@ class PAGStateMachine : public PAGTimeline {
   std::vector<std::pair<int, std::function<void(const std::string&, const std::string&)>>>
       stateChangeListeners;
 
-  // VM→SM input bindings. Each entry holds an ObserverHandle that detaches on destruction.
-  std::vector<ObserverHandle> inputBindings;
+  void removeStateChangeListenerInternal(int listenerId);
 
   bool advanceRegion(int64_t deltaUs);
   bool advanceMix(RegionInstance& ri, int64_t deltaUs);
@@ -216,6 +191,7 @@ class PAGStateMachine : public PAGTimeline {
 
   friend class PAGScene;
   friend class PAGComposition;
+  friend class ObserverHandle;
 };
 
 }  // namespace pagx

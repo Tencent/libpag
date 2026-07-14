@@ -182,10 +182,4 @@ void PAGAnimation::apply(float mix) {
   ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
 }
 
-bool PAGAnimation::advanceAndApply(int64_t deltaMicroseconds, float mix) {
-  bool changed = advance(deltaMicroseconds);
-  apply(mix);
-  return changed;
-}
-
 }  // namespace pagx

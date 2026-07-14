@@ -55,6 +55,7 @@
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -11845,7 +11846,7 @@ PAGX_TEST(PAGXTest, SMStateChangeListener) {
 
   std::string receivedRegion;
   std::string receivedState;
-  int lid = timeline->addStateChangeListener([&](const std::string& rn, const std::string& sn) {
+  auto handle = timeline->addStateChangeListener([&](const std::string& rn, const std::string& sn) {
     receivedRegion = rn;
     receivedState = sn;
   });
@@ -11855,7 +11856,7 @@ PAGX_TEST(PAGXTest, SMStateChangeListener) {
   EXPECT_EQ(receivedRegion, "main");
   EXPECT_EQ(receivedState, "active");
 
-  timeline->removeStateChangeListener(lid);
+  handle.detach();
   receivedRegion.clear();
   receivedState.clear();
   timeline->setBool("go", false);
@@ -12405,12 +12406,12 @@ PAGX_TEST(PAGXTest, SMListenerDetach) {
   auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
   auto timeline = scene->getStateMachineTimeline("testSM");
   int callCount = 0;
-  int lid = timeline->addStateChangeListener(
+  auto handle = timeline->addStateChangeListener(
       [&](const std::string&, const std::string&) { callCount++; });
   timeline->setBool("go", true);
   timeline->advance(0);
   EXPECT_EQ(callCount, 1);
-  timeline->removeStateChangeListener(lid);
+  handle.detach();
   timeline->setBool("go", false);
   // The state genuinely transitions back to idle, but the detached listener must not fire.
   timeline->advance(0);
@@ -12992,28 +12993,19 @@ PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
   smDriver->stateMachineId = "cardSM";
   slot->timelines.push_back(std::move(smDriver));
   doc->layers.push_back(slot);
+  auto dbDim = doc->makeNode<pagx::DataBind>();
+  dbDim->source = "$vm.dim";
+  dbDim->target = "@cardSM";
+  dbDim->channel = "dim";
+  dbDim->direction = pagx::DataBindDirection::ToTarget;
+  comp->dataBinds.push_back(dbDim);
   doc->applyLayout();
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
-  // Get the nested SM instance and bind VM "dim" property to SM "dim" input.
-  auto& rootChildren = scene->rootComposition()->children;
-  ASSERT_FALSE(rootChildren.empty());
-  ASSERT_EQ(rootChildren[0]->layerType(), pagx::LayerType::Composition);
-  auto* slotComp = static_cast<pagx::PAGComposition*>(rootChildren[0].get());
-  std::shared_ptr<pagx::PAGStateMachine> nestedSM = nullptr;
-  for (auto& tl : slotComp->timelines) {
-    if (tl != nullptr && tl->type() == pagx::TimelineType::StateMachine) {
-      nestedSM = std::static_pointer_cast<pagx::PAGStateMachine>(tl);
-      break;
-    }
-  }
-  ASSERT_TRUE(nestedSM != nullptr);
-
   auto vmDim = scene->viewModel()->propertyBoolean("dim");
   ASSERT_TRUE(vmDim != nullptr);
-  ASSERT_TRUE(nestedSM->bindInput("dim", vmDim));
 
   // Baseline 1: visible state (alpha=1.0, full red). VM dim=false.
   scene->advanceAndApply(5 * 16667);
@@ -13068,6 +13060,12 @@ PAGX_TEST(PAGXTest, SMVMBoolBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.go";
+  db->target = "@testSM";
+  db->channel = "go";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
   doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -13079,10 +13077,9 @@ PAGX_TEST(PAGXTest, SMVMBoolBinding) {
 
   auto smTimeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(smTimeline != nullptr);
-  ASSERT_TRUE(smTimeline->bindInput("go", vmBool));
 
   EXPECT_EQ(smTimeline->getCurrentState("main"), "idle");
-  // Setting VM value to true should automatically set the SM input.
+  // Setting VM value to true should automatically set the SM input via DataBind.
   vmBool->value(true);
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("main"), "active");
@@ -13124,6 +13121,12 @@ PAGX_TEST(PAGXTest, SMVMNumberBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.score";
+  db->target = "@testSM";
+  db->channel = "score";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
   doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -13133,7 +13136,6 @@ PAGX_TEST(PAGXTest, SMVMNumberBinding) {
 
   auto smTimeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(smTimeline != nullptr);
-  ASSERT_TRUE(smTimeline->bindInput("score", vmNum));
 
   // VM number <= 50: no transition.
   vmNum->value(30);
@@ -13180,6 +13182,12 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
   t->conditions.push_back(c);
   region->transitions.push_back(t);
   sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.fire";
+  db->target = "@testSM";
+  db->channel = "fire";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
   doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -13189,7 +13197,6 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
 
   auto smTimeline = scene->getStateMachineTimeline("testSM");
   ASSERT_TRUE(smTimeline != nullptr);
-  ASSERT_TRUE(smTimeline->bindInput("fire", vmTrigger));
 
   // VM trigger fire pulses the SM trigger input.
   vmTrigger->fire();
@@ -13198,7 +13205,7 @@ PAGX_TEST(PAGXTest, SMVMTriggerBinding) {
 }
 
 // =============================================================================
-// VM as data hub — VM values drive SM transitions via bindInput.
+// VM as data hub — VM values drive SM transitions via DataBind.
 // The VM is the single source of truth; SM never reads external data directly.
 // =============================================================================
 
@@ -13291,6 +13298,12 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
   tDie->conditions.push_back(cDie);
   region->transitions.push_back(tDie);
   sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.hp";
+  db->target = "@charSM";
+  db->channel = "hp";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
   doc->applyLayout();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -13300,9 +13313,6 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
 
   auto smTimeline = scene->getStateMachineTimeline("charSM");
   ASSERT_TRUE(smTimeline != nullptr);
-
-  // Bind VM hp to SM hp input. VM is the data hub.
-  ASSERT_TRUE(smTimeline->bindInput("hp", vmHP));
 
   // Initial state: alive (hp=100)
   smTimeline->advance(0);
@@ -13325,7 +13335,7 @@ PAGX_TEST(PAGXTest, SMVMHealthBarScenario) {
 }
 
 // Scenario: two independent VM properties feed two SM inputs simultaneously via
-// bindInput. This models a real-world case where a UI receives data from
+// DataBind. This models a real-world case where a UI receives data from
 // multiple sources that all flow through the VM hub into a single SM.
 PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -13394,6 +13404,20 @@ PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
   regionS->transitions.push_back(tDark);
   sm->regions.push_back(regionS);
 
+  auto dbVis = doc->makeNode<pagx::DataBind>();
+  dbVis->source = "$vm.visible";
+  dbVis->target = "@uiSM";
+  dbVis->channel = "visible";
+  dbVis->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(dbVis);
+
+  auto dbStyle = doc->makeNode<pagx::DataBind>();
+  dbStyle->source = "$vm.styleIndex";
+  dbStyle->target = "@uiSM";
+  dbStyle->channel = "styleIndex";
+  dbStyle->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(dbStyle);
+
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
 
@@ -13404,8 +13428,6 @@ PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
 
   auto smTimeline = scene->getStateMachineTimeline("uiSM");
   ASSERT_TRUE(smTimeline != nullptr);
-  ASSERT_TRUE(smTimeline->bindInput("visible", vmVis));
-  ASSERT_TRUE(smTimeline->bindInput("styleIndex", vmStyle));
 
   // Initially hidden/default.
   EXPECT_EQ(smTimeline->getCurrentState("visibility"), "hidden");
@@ -13427,7 +13449,7 @@ PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
 // =============================================================================
 // Health bar scenario: VM-driven SM with rendering output.
 // A health bar rectangle changes width (scaleX) and color based on role state.
-// VM holds hp; SM reads it via bindInput and switches animations.
+// VM holds hp; SM reads it via DataBind and switches animations.
 // =============================================================================
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.

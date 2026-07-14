@@ -109,11 +109,6 @@ class PAGAnimation : public PAGTimeline {
    */
   void apply(float mix = 1.0f) override;
 
-  /**
-   * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(mix). Returns
-   * the result of advance(deltaMicroseconds).
-   */
-  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f) override;
 
  private:
   PAGAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,

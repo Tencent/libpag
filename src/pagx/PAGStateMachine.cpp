@@ -20,13 +20,10 @@
 #include <algorithm>
 #include <set>
 #include "base/utils/Log.h"
+#include "base/utils/MathUtil.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachineRegion.h"
-#include "pagx/PAGViewModelValue.h"
-#include "pagx/PAGViewModelValueBoolean.h"
-#include "pagx/PAGViewModelValueNumber.h"
-#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/State.h"
@@ -230,9 +227,9 @@ static bool EvaluateCondition(const TransitionCondition* condition,
     case StateMachineInputType::Number:
       switch (condition->op) {
         case TransitionConditionOp::Equal:
-          return input.numberValue == condition->valueNumber;
+          return pag::FloatNearlyEqual(input.numberValue, condition->valueNumber);
         case TransitionConditionOp::NotEqual:
-          return input.numberValue != condition->valueNumber;
+          return !pag::FloatNearlyEqual(input.numberValue, condition->valueNumber);
         case TransitionConditionOp::LessThan:
           return input.numberValue < condition->valueNumber;
         case TransitionConditionOp::LessThanOrEqual:
@@ -428,6 +425,12 @@ bool PAGStateMachine::advanceRegion(int64_t deltaUs) {
         break;
       }
       changed = true;
+      if (i == MAX_TRANSITIONS_PER_FRAME - 1) {
+        fprintf(stderr,
+                "PAGStateMachine: exceeded max transitions per frame (%d), "
+                "possible zero-duration state loop.\n",
+                MAX_TRANSITIONS_PER_FRAME);
+      }
     }
     // A new transition started by tryChangeState begins at mix=0. Advance it by this frame's
     // delta so the first apply sees a non-zero mix (prevents a one-frame blank output). Skip a
@@ -471,6 +474,9 @@ void PAGStateMachine::apply(float smMix) {
   }
   // Each playback slot owns its PAGAnimation, which holds the playback time and resolves the binding
   // (including the null-binding lazy path for top-level timelines) internally.
+  // Crossfade weight model: the outgoing animation keeps its full weight (mixFrom, typically 1.0)
+  // so the source state remains stable while the incoming animation blends in on top (mix 0 to 1).
+  // This is a "new-over-old" model, matching rive's crossfade semantics, not a bidirectional fade.
   for (auto& ri : regions) {
     for (const auto& f : ri.fadingOut) {
       float weight = clamped * CurveMix(ri.transition, f.mixFrom);
@@ -487,145 +493,27 @@ void PAGStateMachine::apply(float smMix) {
   }
 }
 
-bool PAGStateMachine::advanceAndApply(int64_t deltaMicroseconds, float smMix) {
-  bool result = advance(deltaMicroseconds);
-  apply(smMix);
-  return result;
-}
-
 // =============================================================================
 // State change listeners
 // =============================================================================
 
-int PAGStateMachine::addStateChangeListener(
+ObserverHandle PAGStateMachine::addStateChangeListener(
     std::function<void(const std::string&, const std::string&)> callback) {
   if (!callback) {
-    return -1;
+    return ObserverHandle();
   }
   int id = nextListenerId++;
   stateChangeListeners.emplace_back(id, std::move(callback));
-  return id;
+  return ObserverHandle(shared_from_this(), id);
 }
 
-void PAGStateMachine::removeStateChangeListener(int listenerId) {
+void PAGStateMachine::removeStateChangeListenerInternal(int listenerId) {
   for (auto it = stateChangeListeners.begin(); it != stateChangeListeners.end(); ++it) {
     if (it->first == listenerId) {
       stateChangeListeners.erase(it);
       break;
     }
   }
-}
-
-// =============================================================================
-// ViewModel→StateMachine input binding functors
-// =============================================================================
-namespace {
-
-class BoolInputObserver {
- public:
-  BoolInputObserver(PAGStateMachine* timeline, std::string inputName,
-                    std::weak_ptr<PAGViewModelValueBoolean> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
-  }
-
-  void operator()() const {
-    auto locked = vmValue.lock();
-    if (locked == nullptr) {
-      return;
-    }
-    timeline->setBool(inputName, locked->value());
-  }
-
- private:
-  PAGStateMachine* timeline = nullptr;
-  std::string inputName;
-  std::weak_ptr<PAGViewModelValueBoolean> vmValue;
-};
-
-class NumberInputObserver {
- public:
-  NumberInputObserver(PAGStateMachine* timeline, std::string inputName,
-                      std::weak_ptr<PAGViewModelValueNumber> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
-  }
-
-  void operator()() const {
-    auto locked = vmValue.lock();
-    if (locked == nullptr) {
-      return;
-    }
-    timeline->setNumber(inputName, locked->value());
-  }
-
- private:
-  PAGStateMachine* timeline = nullptr;
-  std::string inputName;
-  std::weak_ptr<PAGViewModelValueNumber> vmValue;
-};
-
-class TriggerInputObserver {
- public:
-  TriggerInputObserver(PAGStateMachine* timeline, std::string inputName,
-                       std::weak_ptr<PAGViewModelValueTrigger> vmValue)
-      : timeline(timeline), inputName(std::move(inputName)), vmValue(std::move(vmValue)) {
-  }
-
-  void operator()() const {
-    if (vmValue.lock() != nullptr) {
-      timeline->fireTrigger(inputName);
-    }
-  }
-
- private:
-  PAGStateMachine* timeline = nullptr;
-  std::string inputName;
-  std::weak_ptr<PAGViewModelValueTrigger> vmValue;
-};
-
-}  // namespace
-
-bool PAGStateMachine::bindInput(const std::string& inputName,
-                                const std::shared_ptr<PAGViewModelValue>& vmValue) {
-  if (!vmValue || !stateMachine || owner.expired()) {
-    return false;
-  }
-  int idx = FindInputIndex(stateMachine, inputName);
-  if (idx < 0) {
-    return false;
-  }
-  auto inputType = inputValues[idx].type;
-
-  if (inputType == StateMachineInputType::Bool) {
-    if (vmValue->valueType() != ViewModelPropertyType::Boolean) {
-      return false;
-    }
-    auto boolVal = std::static_pointer_cast<PAGViewModelValueBoolean>(vmValue);
-    auto handle = boolVal->addObserver(
-        BoolInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueBoolean>(boolVal)));
-    inputBindings.push_back(std::move(handle));
-    return true;
-  }
-  if (inputType == StateMachineInputType::Number) {
-    if (vmValue->valueType() != ViewModelPropertyType::Number) {
-      return false;
-    }
-    auto numVal = std::static_pointer_cast<PAGViewModelValueNumber>(vmValue);
-    auto handle = numVal->addObserver(
-        NumberInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueNumber>(numVal)));
-    inputBindings.push_back(std::move(handle));
-    return true;
-  }
-  if (inputType == StateMachineInputType::Trigger) {
-    if (vmValue->valueType() != ViewModelPropertyType::Trigger) {
-      return false;
-    }
-    auto triggerVal = std::static_pointer_cast<PAGViewModelValueTrigger>(vmValue);
-    auto handle = triggerVal->addObserver(
-        TriggerInputObserver(this, inputName, std::weak_ptr<PAGViewModelValueTrigger>(triggerVal)));
-    inputBindings.push_back(std::move(handle));
-    return true;
-  }
-  return false;
 }
 
 }  // namespace pagx

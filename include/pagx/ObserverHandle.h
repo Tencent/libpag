@@ -23,6 +23,7 @@
 namespace pagx {
 
 class PAGViewModelValue;
+class PAGStateMachine;
 
 /**
  * ObserverHandle is an RAII handle for a registered value-change observer. The observer is
@@ -46,13 +47,18 @@ class ObserverHandle {
    */
   void detach();
 
- private:
+  /** Creates a handle for a PAGViewModelValue observer. */
   ObserverHandle(std::shared_ptr<PAGViewModelValue> source, int observerId);
 
-  std::weak_ptr<PAGViewModelValue> source;
-  int observerId = 0;
+  /** Creates a handle for a PAGStateMachine state-change listener. */
+  ObserverHandle(std::shared_ptr<PAGStateMachine> source, int listenerId);
 
-  friend class PAGViewModelValue;
+ private:
+  enum class SourceType { None, ViewModel, StateMachine };
+  SourceType type = SourceType::None;
+  std::weak_ptr<PAGViewModelValue> vmSource;
+  std::weak_ptr<PAGStateMachine> smSource;
+  int id = -1;
 };
 
 }  // namespace pagx

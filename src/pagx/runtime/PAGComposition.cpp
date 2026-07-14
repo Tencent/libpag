@@ -159,6 +159,7 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
+      binding->set<PAGStateMachine>(sm, smTimeline);
       timelines.push_back(std::move(smTimeline));
     }
   }

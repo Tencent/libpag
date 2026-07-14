@@ -70,7 +70,11 @@ class PAGTimeline {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(mix). Returns
    * the result of advance(deltaMicroseconds).
    */
-  virtual bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f) = 0;
+  bool advanceAndApply(int64_t deltaMicroseconds, float mix = 1.0f) {
+    bool changed = advance(deltaMicroseconds);
+    apply(mix);
+    return changed;
+  }
 };
 
 }  // namespace pagx

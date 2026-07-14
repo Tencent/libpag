@@ -117,6 +117,19 @@ void PAGScene::buildRuntimeTree() {
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
   displayList->root()->addChild(rootComp->runtimeLayer);
+  // Eagerly create top-level PAGStateMachine instances so DataBindRuntime can resolve
+  // DataBind targets that reference state machines during buildViewModels().
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      auto* smNode = static_cast<StateMachine*>(node);
+      if (instantiatedTimelines.find(smNode) == instantiatedTimelines.end()) {
+        auto instance = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
+            smNode, _rootComposition->binding.get(), document.get(), shared_from_this()));
+        instantiatedTimelines.emplace(smNode, instance);
+        _rootComposition->binding->set<PAGStateMachine>(smNode, instance);
+      }
+    }
+  }
   buildViewModels();
 }
 
@@ -470,12 +483,7 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (it != instantiatedTimelines.end()) {
     return std::static_pointer_cast<PAGStateMachine>(it->second);
   }
-  // Construct with a null binding so the timeline resolves the scene's current root binding lazily
-  // at apply time, same as PAGAnimation.
-  auto timeline = std::shared_ptr<PAGStateMachine>(
-      new PAGStateMachine(matched, nullptr, document.get(), weak_from_this()));
-  instantiatedTimelines.emplace(matched, timeline);
-  return timeline;
+  return nullptr;
 }
 
 std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {

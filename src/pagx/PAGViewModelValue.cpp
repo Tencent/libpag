@@ -21,6 +21,7 @@
 #include "pagx/DataBindRuntime.h"
 #include "pagx/ObserverHandle.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
 #include "pagx/PAGViewModelValueEnum.h"
@@ -205,8 +206,12 @@ void PAGViewModelValueTrigger::fire() {
 
 ObserverHandle::ObserverHandle() = default;
 
-ObserverHandle::ObserverHandle(std::shared_ptr<PAGViewModelValue> src, int id)
-    : source(std::move(src)), observerId(id) {
+ObserverHandle::ObserverHandle(std::shared_ptr<PAGViewModelValue> src, int observerId)
+    : type(SourceType::ViewModel), vmSource(std::move(src)), id(observerId) {
+}
+
+ObserverHandle::ObserverHandle(std::shared_ptr<PAGStateMachine> src, int listenerId)
+    : type(SourceType::StateMachine), smSource(std::move(src)), id(listenerId) {
 }
 
 ObserverHandle::~ObserverHandle() {
@@ -214,30 +219,44 @@ ObserverHandle::~ObserverHandle() {
 }
 
 ObserverHandle::ObserverHandle(ObserverHandle&& other) noexcept
-    : source(std::move(other.source)), observerId(other.observerId) {
-  other.observerId = 0;
+    : type(other.type), vmSource(std::move(other.vmSource)), smSource(std::move(other.smSource)),
+      id(other.id) {
+  other.type = SourceType::None;
+  other.id = -1;
 }
 
 ObserverHandle& ObserverHandle::operator=(ObserverHandle&& other) noexcept {
   if (this != &other) {
     detach();
-    source = std::move(other.source);
-    observerId = other.observerId;
-    other.observerId = 0;
+    type = other.type;
+    vmSource = std::move(other.vmSource);
+    smSource = std::move(other.smSource);
+    id = other.id;
+    other.type = SourceType::None;
+    other.id = -1;
   }
   return *this;
 }
 
 void ObserverHandle::detach() {
-  if (observerId == 0) {
+  if (id < 0) {
     return;
   }
-  auto src = source.lock();
-  if (src) {
-    src->removeObserver(observerId);
+  if (type == SourceType::ViewModel) {
+    auto src = vmSource.lock();
+    if (src) {
+      src->removeObserver(id);
+    }
+  } else if (type == SourceType::StateMachine) {
+    auto src = smSource.lock();
+    if (src) {
+      src->removeStateChangeListenerInternal(id);
+    }
   }
-  observerId = 0;
-  source.reset();
+  id = -1;
+  type = SourceType::None;
+  vmSource.reset();
+  smSource.reset();
 }
 
 }  // namespace pagx

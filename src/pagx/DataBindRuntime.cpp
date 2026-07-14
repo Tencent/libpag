@@ -22,6 +22,7 @@
 #include "base/utils/Log.h"
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGViewModelValue.h"
 #include "pagx/PAGViewModelValueBoolean.h"
 #include "pagx/PAGViewModelValueColor.h"
@@ -29,16 +30,39 @@
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
+#include "pagx/nodes/StateMachine.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
 
 namespace pagx {
+
+namespace {
+
+class TriggerInputObserver {
+ public:
+  TriggerInputObserver(PAGStateMachine* sm, std::string inputName)
+      : sm(sm), inputName(std::move(inputName)) {
+  }
+
+  void operator()() const {
+    if (sm != nullptr) {
+      sm->fireTrigger(inputName);
+    }
+  }
+
+ private:
+  PAGStateMachine* sm = nullptr;
+  std::string inputName;
+};
+
+}  // namespace
 
 // ---- Destructor — cleanup dependents ---------------------------------------
 
@@ -69,6 +93,7 @@ static std::vector<std::string> ParseSourcePath(const std::string& source) {
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
                            PAGXDocument* doc, RuntimeBinding* binding) {
   boundBinding = binding;
+  entries.reserve(entries.size() + binds.size());
   for (auto* db : binds) {
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
@@ -96,7 +121,20 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.sourceGuard = sourceValue->weak_from_this();
     entry.targetNode = targetNode;
     entry.channel = db->channel;
-    entries.push_back(entry);
+
+    // StateMachine input targets: register a Trigger observer for event-based binding.
+    // Bool/Number SM inputs are handled via the normal value-based applyEntry path.
+    if (targetNode->nodeType() == NodeType::StateMachine &&
+        sourceValue->valueType() == ViewModelPropertyType::Trigger) {
+      auto sm = binding->get<PAGStateMachine>(targetNode);
+      if (sm != nullptr) {
+        auto triggerVal =
+            std::static_pointer_cast<PAGViewModelValueTrigger>(sourceValue->shared_from_this());
+        triggerHandles[db] = triggerVal->addObserver(TriggerInputObserver(sm.get(), db->channel));
+      }
+    }
+
+    entries.push_back(std::move(entry));
 
     // Mark dirty so the first update() applies the ViewModel's configured default to the target.
     // Only ToTarget/TwoWay bindings drive the target, so a pure ToSource binding is not dirtied
@@ -197,7 +235,23 @@ void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, f
   if (entry.source->converter != nullptr) {
     keyValue = DataConverterRegistry::GetInstance().apply(entry.source->converter, keyValue);
   }
-  binding->apply(entry.targetNode, entry.channel, keyValue, mix);
+  // StateMachine input targets: route to setBool/setNumber instead of binding->apply.
+  // Trigger inputs are handled via observer in bind(), not here.
+  if (entry.targetNode->nodeType() == NodeType::StateMachine) {
+    auto sm = binding->get<PAGStateMachine>(entry.targetNode);
+    if (sm == nullptr) {
+      return;
+    }
+    if (entry.source->valueType() == ViewModelPropertyType::Boolean) {
+      auto* boolVal = std::get_if<bool>(&keyValue);
+      sm->setBool(entry.channel, boolVal != nullptr ? *boolVal : false);
+    } else if (entry.source->valueType() == ViewModelPropertyType::Number) {
+      auto* numVal = std::get_if<float>(&keyValue);
+      sm->setNumber(entry.channel, numVal != nullptr ? *numVal : 0.0f);
+    }
+  } else {
+    binding->apply(entry.targetNode, entry.channel, keyValue, mix);
+  }
   if (entry.dataBind->direction == DataBindDirection::Once) {
     entry.onceApplied = true;
   }
