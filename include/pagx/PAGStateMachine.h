@@ -163,10 +163,28 @@ class PAGStateMachine : public PAGTimeline {
    */
   bool bindInput(const std::string& inputName, const std::shared_ptr<PAGViewModelValue>& vmValue);
 
+  /**
+   * InputValue holds the live runtime value of a single StateMachine input. It is an implementation
+   * detail exposed publicly so that non-member helper functions in the .cpp can access it; callers
+   * should not construct or inspect instances directly.
+   */
   struct InputValue {
+    /**
+     * The value kind, copied from the referenced StateMachineInput at construction.
+     */
     StateMachineInputType type = StateMachineInputType::Bool;
+    /**
+     * The current bool value when type is Bool. Ignored for other types.
+     */
     bool boolValue = false;
+    /**
+     * The current number value when type is Number. Ignored for other types.
+     */
     float numberValue = 0.0f;
+    /**
+     * The fired flag when type is Trigger. Set by fireTrigger(), cleared at the end of each
+     * advance(). Ignored for other types.
+     */
     bool fired = false;
   };
 
