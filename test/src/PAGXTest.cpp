@@ -13452,5 +13452,156 @@ PAGX_TEST(PAGXTest, SMVMMultiPropertyBinding) {
 // VM holds hp; SM reads it via DataBind and switches animations.
 // =============================================================================
 
+// =============================================================================
+// Edge case tests for code review fixes.
+// =============================================================================
+
+PAGX_TEST(PAGXTest, SMNumberFloatNearlyEqual) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "val";
+  input->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "low";
+  auto sLow = doc->makeNode<pagx::AnimationState>();
+  sLow->name = "low";
+  region->states.push_back(sLow);
+  auto sHigh = doc->makeNode<pagx::AnimationState>();
+  sHigh->name = "high";
+  region->states.push_back(sHigh);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "low";
+  t->to = "high";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "val";
+  c->op = pagx::TransitionConditionOp::Equal;
+  c->valueNumber = 0.3f;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  smTimeline->setNumber("val", 0.1f + 0.2f);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "high");
+}
+
+PAGX_TEST(PAGXTest, SMImporterErrorsForUnknownChildInStates) {
+  auto xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Animations>
+    <StateMachine id="sm">
+      <StateRegion name="main" initialState="idle">
+        <States>
+          <State name="idle"/>
+          <Typo name="bad"/>
+        </States>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_FALSE(doc->errors.empty());
+}
+
+PAGX_TEST(PAGXTest, SMBoolNonEqualOpReturnsFalse) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "flag";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto sIdle = doc->makeNode<pagx::AnimationState>();
+  sIdle->name = "idle";
+  region->states.push_back(sIdle);
+  auto sActive = doc->makeNode<pagx::AnimationState>();
+  sActive->name = "active";
+  region->states.push_back(sActive);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "idle";
+  t->to = "active";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "flag";
+  c->op = pagx::TransitionConditionOp::LessThan;
+  c->valueNumber = 0.5f;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+
+  smTimeline->setBool("flag", true);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "idle");
+}
+
+PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "flag";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "hp";
+  input->type = pagx::StateMachineInputType::Number;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "low";
+  auto sLow = doc->makeNode<pagx::AnimationState>();
+  sLow->name = "low";
+  region->states.push_back(sLow);
+  auto sHigh = doc->makeNode<pagx::AnimationState>();
+  sHigh->name = "high";
+  region->states.push_back(sHigh);
+  auto t = doc->makeNode<pagx::StateTransition>();
+  t->from = "low";
+  t->to = "high";
+  t->duration = 0;
+  auto c = doc->makeNode<pagx::TransitionCondition>();
+  c->inputName = "hp";
+  c->op = pagx::TransitionConditionOp::GreaterThan;
+  c->valueNumber = 50;
+  t->conditions.push_back(c);
+  region->transitions.push_back(t);
+  sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.flag";
+  db->target = "@testSM";
+  db->channel = "hp";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(smTimeline != nullptr);
+  auto vmBool = scene->viewModel()->propertyBoolean("flag");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  vmBool->value(true);
+  smTimeline->advance(0);
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
+}
+
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
 }  // namespace pag
