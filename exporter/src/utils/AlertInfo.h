@@ -73,9 +73,10 @@ enum class AlertInfoType {
   TextPathParamPerpendicularToPath,  // Text path parameter "perpendicular to path" only supports the default value true
   TextPathParamForceAlignment,  // Text path parameter "force alignment" only supports the default value false
   TextPathVertial,              // Text path does not support vertical text
-  TextPathBoxText,          // Text path does not support box text (already supported, abandoned)
-  TextPathAnimator,         // Text path and text animation are not compatible
-  VideoCompositionOverlap,  // The references of videoComposition have duplicate time intervals
+  TextPathBoxText,             // Text path does not support box text (already supported, abandoned)
+  TextPathAnimator,            // Text path and text animation are not compatible
+  TextSuperscriptOrSubscript,  // Text has superscript or subscript which is not supported
+  VideoCompositionOverlap,     // The references of videoComposition have duplicate time intervals
 
   OtherWarning,  // Other warnings
 
