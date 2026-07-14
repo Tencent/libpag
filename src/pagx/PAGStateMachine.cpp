@@ -226,9 +226,14 @@ static bool EvaluateCondition(const TransitionCondition* condition,
   }
   switch (input.type) {
     case StateMachineInputType::Bool:
-      return condition->op == TransitionConditionOp::Equal
-                 ? (input.boolValue == condition->valueBool)
-                 : (input.boolValue != condition->valueBool);
+      switch (condition->op) {
+        case TransitionConditionOp::Equal:
+          return input.boolValue == condition->valueBool;
+        case TransitionConditionOp::NotEqual:
+          return input.boolValue != condition->valueBool;
+        default:
+          return false;
+      }
     case StateMachineInputType::Number:
       switch (condition->op) {
         case TransitionConditionOp::Equal:
@@ -591,13 +596,7 @@ bool PAGStateMachine::bindInput(const std::string& inputName,
   if (!vmValue || !stateMachine || owner.expired()) {
     return false;
   }
-  int idx = -1;
-  for (size_t i = 0; i < stateMachine->inputs.size(); i++) {
-    if (stateMachine->inputs[i] && stateMachine->inputs[i]->name == inputName) {
-      idx = static_cast<int>(i);
-      break;
-    }
-  }
+  int idx = FindInputIndex(stateMachine, inputName);
   if (idx < 0) {
     return false;
   }
