@@ -29,13 +29,11 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.view.TextureView;
 import android.view.View;
-import org.extra.tools.Lifecycle;
-import org.extra.tools.LifecycleListener;
 import java.util.ArrayList;
 
 
 public class PAGView extends TextureView implements TextureView.SurfaceTextureListener,
-        LifecycleListener, PAGAnimator.Listener {
+        PAGAnimator.Listener {
 
     public interface PAGViewListener {
         /**
@@ -472,7 +470,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     private void setupSurfaceTexture() {
-        Lifecycle.getInstance().addListener(this);
         setOpaque(false);
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
@@ -619,10 +616,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     @Override
-    public void onResume() {
-        // When the device is locked and then unlocked, the PAGView's content may disappear,
-        // use the following way to make the content appear.
-        if (isVisible) {
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == View.VISIBLE && isVisible) {
             setVisibility(View.INVISIBLE);
             setVisibility(View.VISIBLE);
         }
