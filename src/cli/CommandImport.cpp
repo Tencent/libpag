@@ -17,7 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CommandImport.h"
-#ifndef _WIN32
+#ifdef _WIN32
+// MSVC exposes the POSIX pipe helpers under underscore-prefixed names (declared in <cstdio>).
+#define popen _popen
+#define pclose _pclose
+#else
 #include <sys/wait.h>
 #endif
 #include <cstdio>
