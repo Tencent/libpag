@@ -1030,6 +1030,12 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   if (!document || !scene) {
     return result;
   }
+  // This native binding is exposed directly to JS, so a caller bypassing the TS wrapper may pass
+  // a non-array value. Reading ["length"].as<unsigned>() on undefined/null/non-array traps in
+  // emscripten, which cannot be caught (try/catch is disabled), so validate before touching it.
+  if (!filePathList.isArray()) {
+    return result;
+  }
   float fitScale = computeFitScale();
   if (fitScale <= 0.0f) {
     return result;

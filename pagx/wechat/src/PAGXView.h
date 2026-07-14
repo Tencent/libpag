@@ -213,7 +213,8 @@ class PAGXView {
    * window after the initial frame has rendered) rather than running it synchronously alongside
    * buildLayers().
    *
-   * @param filePathList A JavaScript Array of file path strings.
+   * @param filePathList A JavaScript Array of file path strings. A non-array value (undefined,
+   *        null, or any other type) yields an empty object.
    * @return A JavaScript object keyed by filePath. Each value is either
    *         { unionBounds: {x,y,w,h}, largestBounds: {x,y,w,h} } or null.
    */
