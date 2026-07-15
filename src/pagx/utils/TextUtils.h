@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "pagx/TextGlyphParams.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"

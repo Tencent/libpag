@@ -21,7 +21,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/TextGlyphParams.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Channel.h"

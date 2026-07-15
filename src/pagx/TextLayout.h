@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
-#include "pagx/TextGlyphParams.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/Rect.h"
 #include "tgfx/core/Font.h"
