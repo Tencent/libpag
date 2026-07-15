@@ -567,7 +567,7 @@ void PAGScene::flushDataBinds() {
 
 void PAGScene::flushTextHolders() {
   if (_rootComposition != nullptr && document != nullptr) {
-    _rootComposition->flushTextHolders(&document->fontConfig());
+    _rootComposition->flushTextHolders(&document->_fontConfig);
   }
 }
 
