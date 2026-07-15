@@ -46,7 +46,7 @@ static void PrintUsage() {
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
             << "  font           Query font metrics or embed fonts into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
-            << "  import         Import from another format (e.g. SVG) to PAGX\n"
+            << "  import         Import from another format (e.g. SVG, HTML) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"

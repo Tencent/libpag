@@ -241,6 +241,17 @@ std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 
 /**
+ * Parses a CSS `hsl()` / `hsla()` color string per CSS Color Module Level 4. Supports both
+ * the legacy comma syntax (`hsl(120, 100%, 50%)`, `hsla(120, 100%, 50%, 0.5)`) and the modern
+ * space-separated form (`hsl(120 100% 50%)`, `hsl(120 100% 50% / 50%)`). Hue accepts `deg`,
+ * `rad`, `grad`, `turn`, or a unitless number (interpreted as degrees). Saturation / lightness
+ * accept a percentage with `%` or a unitless number on a 0..100 scale. Alpha is unitless in
+ * [0, 1] or a percentage in [0%, 100%]. Returns false on malformed input and leaves `out`
+ * untouched. Function head matching is ASCII case-insensitive.
+ */
+bool ParseCSSHSLColor(const std::string& value, Color& out);
+
+/**
  * Formats a float as a pixel coordinate or size with at most two decimal places. Unlike
  * FloatToString (which uses %g and preserves full float precision), this trims sub-pixel
  * noise that only adds visual clutter to HTML/CSS output. Use this for left/top/width/height

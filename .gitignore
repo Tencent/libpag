@@ -111,12 +111,13 @@ public
 spec/node_modules
 spec/package-lock.json
 
-# PAGX CLI npm link
-cli/npm/darwin
-cli/npm/linux
-cli/npm/win32
+# PAGX CLI npm package (built binaries + local artifacts; never commit these)
+cli/npm/bin/darwin
+cli/npm/bin/linux
+cli/npm/bin/win32
 cli/npm/node_modules
 cli/npm/package-lock.json
+cli/npm/*.tgz
 
 # PAGX verify artifacts
 *.layout.xml

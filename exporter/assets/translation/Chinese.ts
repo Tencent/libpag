@@ -862,72 +862,82 @@
         <translation>建议去掉文本路径或去掉文本动画。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="412"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="413"/>
+        <source>Some characters of the text layer use superscript or subscript, which is not supported by PAG.</source>
+        <translation>文本图层中的部分字符使用了上标或下标，PAG 不支持该属性。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="415"/>
+        <source>Recommend disabling superscript/subscript in the Character panel and adjusting the font size manually.</source>
+        <translation>建议在字符面板中取消上标/下标设置，并手动调整字体大小。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="423"/>
         <source>There are overlapping time intervals for references to video composition &quot;%1&quot;.</source>
         <translation>对视频合成“%1”的引用存在时间重叠。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="414"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="425"/>
         <source>Recommend adjusting the start time and duration of the layers referencing video composition &quot;%1&quot;.</source>
         <translation>建议调整视频合成“%1”的引用图层的起始时间和持续时间。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="430"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="441"/>
         <source>AE export error.</source>
         <translation>AE导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="435"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="446"/>
         <source>Bitmap sequence export error.</source>
         <translation>位图序列帧导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="440"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="451"/>
         <source>Video sequence export error.</source>
         <translation>视频序列帧导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="445"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="456"/>
         <source>Audio export error.</source>
         <translation>音频导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="461"/>
         <source>WebP encoding error.</source>
         <translation>Webp编码错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="455"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="466"/>
         <source>Export rendering error.</source>
         <translation>导出渲染错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="460"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="471"/>
         <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
         <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="464"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="475"/>
         <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
         <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="471"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="482"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="472"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="483"/>
         <source>Recommend removing this effect or redirecting the displacement layer to another layer.</source>
         <translation>建议去掉该效果，或修改该置换图层指向其它图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="479"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="490"/>
         <source>[Text Animation - Selector] export error.</source>
         <translation>[文本动画-选择器]导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="484"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="495"/>
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
     </message>

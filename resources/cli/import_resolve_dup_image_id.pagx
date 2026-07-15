@@ -1,0 +1,12 @@
+<pagx width="40" height="20">
+  <Layer centerX="0" centerY="0">
+    <svg viewBox="0 0 20 20">
+      <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" x="0" y="0" width="20" height="20"/>
+    </svg>
+  </Layer>
+  <Layer centerX="0" centerY="0">
+    <svg viewBox="0 0 20 20">
+      <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" x="0" y="0" width="20" height="20"/>
+    </svg>
+  </Layer>
+</pagx>

@@ -1,0 +1,91 @@
+# html-snapshot eval
+
+Quantify the fidelity of the `snapshot.js → pagx import → pagx render`
+pipeline against the source HTML corpus. Used to drive iteration on the
+snapshot's layout-preserving rewrites.
+
+## Layout
+
+| File | Role |
+|------|------|
+| `baseline.js` | Render an original HTML in headless Chromium, save a PNG cropped to the body's measured rect — this is the ground truth. |
+| `compare.js`  | Pixel metrics (pixelmatch + mean RGB delta + luma SSIM), Chromium-based flex container counter (same method for live and subset), importer-warning parser. Importable as a module or runnable per-case. |
+| `run.js`      | Per-case driver: baseline → snapshot → import → resolve → render → compare. Emits `report.csv`, `report.md`, and `index.html`. |
+| `run.sh`      | Wrapper around `run.js`. |
+
+## Usage
+
+```bash
+# Full run with the default corpus (~/Desktop/tmp_pagx) and label=current.
+./run.sh
+
+# Tag the run for diff-friendly comparison across iterations.
+./run.sh --label baseline-v1
+
+# Only iterate on a subset of cases (matches by filename substring).
+./run.sh --only meitu
+
+# Reuse already-generated PNGs (only re-runs metrics).
+./run.sh --skip-existing --label current
+
+# Download the page's web fonts, embed them into the .pagx and pass them to
+# the renderer as fallbacks (mirrors html2pagx; useful for CJK corpora).
+./run.sh --download-fonts --label fonts-on
+
+# Download the page's external images and reference them by file path instead
+# of inlining base64 (mirrors html2pagx; keeps subset HTML / .pagx small).
+./run.sh --download-images --label images-on
+```
+
+With `--download-fonts`, `snapshot.js` saves each web font the page uses into a
+single shared, content-addressed cache at `out/<label>/fonts/` — a face common
+to the corpus is stored once instead of being re-downloaded per case — and each
+case records the subset it uses in `out/<label>/<case>/fonts.txt`. `run.js` then
+runs `pagx font embed --fallback …` on the resolved document and passes the same
+per-case files to `pagx render --fallback`, so text in an uninstalled web font
+renders with the correct face instead of a host system fallback. Cases with no
+web fonts are unaffected.
+
+With `--download-images`, `snapshot.js` saves each external image the page uses
+into a single shared, content-addressed cache at `out/<label>/images/` (an image
+common to the corpus is stored once) and rewrites the subset HTML to reference
+it by its absolute file path instead of inlining it as a base64 `data:` URI.
+This keeps the subset HTML — and the `.pagx` produced from it — small for
+image-heavy corpora. Unlike fonts, the path is baked into the `.pagx` by
+`pagx import`, so `pagx render` reads the files directly with no per-case
+manifest or `--fallback` wiring. Cases with no external images are unaffected.
+
+Outputs land in `eval/out/<label>/`:
+
+- `report.csv` — machine-readable per-case row.
+- `report.md` — markdown table with corpus-level means at the top.
+- `index.html` — side-by-side `baseline / subset / diff` viewer; open in a browser.
+- `<case>/baseline.png`, `subset.png`, `diff.png`, `subset.html`, `subset.pagx`,
+  `import.stderr.txt`, `snapshot.stderr.txt`, …
+
+## Metrics
+
+| Field | Meaning |
+|-------|---------|
+| `ssim` | Single-window luma SSIM. Higher is better. Robust to small offsets. |
+| `pixelDiffRatio` | Fraction of differing pixels per `pixelmatch` (threshold 0.1, AA off). Lower is better. |
+| `meanRgbDelta` | Mean per-channel absolute difference (0..255). Lower is better. |
+| `flexLive` | Number of `display: flex \| inline-flex` elements in the live original DOM (Chromium-rendered). |
+| `flexSubset` | Same count, but on the rendered subset DOM. Both counts come from `getComputedStyle` over `document.body.querySelectorAll('*')`, so they are directly comparable. |
+| `flexDelta` | `flexSubset - flexLive`. Signed; positive means the subset emits more flex containers than the live DOM. |
+| `flexRetention` | `min(flexSubset, flexLive) / flexLive` — capped retention. 1.0 means the subset preserved at least every flex container in the live DOM. |
+| `flexInflation` | `flexSubset / flexLive` — raw ratio. Values above ~1.0 indicate the snapshot invented extra flex wrappers (regression signal). |
+| `importerWarnings` | Total `pagx import` warnings parsed from stderr. |
+| `flexInferred` | `subset:flex-inferred` warnings — C++ `AbsoluteToFlexInferencePass` recovered a flex layout from absolute children. |
+| `flexSkipped` | `subset:flex-inference-skipped` warnings — the C++ pass gave up and left the parent absolute. |
+
+The acceptance criterion is "corpus-level mean improves" (no per-case
+regression gate), so use the markdown summary rows at the top of `report.md`
+for direction.
+
+## Why a baseline at all
+
+The snapshot pipeline strips JS, animations, and any subpixel detail Chromium
+paints differently from PAG. A naive perfect-fidelity comparison is therefore
+unattainable; what matters is the *delta* across iterations of `snapshot.js`,
+which is exactly what the labelled `out/<label>/` directories let us track.

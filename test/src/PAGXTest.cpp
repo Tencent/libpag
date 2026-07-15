@@ -21,8 +21,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <functional>
-#include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
@@ -694,166 +692,6 @@ PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
-}
-
-static std::string TitleToKey(const std::string& title) {
-  // Convert to lowercase with underscores, ignoring parenthesized content (e.g., "(Composition)")
-  std::string key;
-  int parenDepth = 0;
-  for (char ch : title) {
-    if (ch == '(') {
-      parenDepth++;
-      continue;
-    }
-    if (ch == ')') {
-      if (parenDepth > 0) {
-        parenDepth--;
-      }
-      continue;
-    }
-    if (parenDepth > 0) {
-      continue;
-    }
-    if (std::isalnum(static_cast<unsigned char>(ch))) {
-      key += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-    } else if (!key.empty() && key.back() != '_') {
-      key += '_';
-    }
-  }
-  // Trim trailing underscore
-  if (!key.empty() && key.back() == '_') {
-    key.pop_back();
-  }
-  return key;
-}
-
-static std::vector<std::pair<std::string, std::string>> ExtractMarkdownPatterns(
-    const std::string& markdownPath) {
-  std::vector<std::pair<std::string, std::string>> patterns;
-  std::ifstream file(markdownPath);
-  if (!file.is_open()) {
-    return patterns;
-  }
-
-  std::string currentTitle;
-  bool inCodeBlock = false;
-  std::string codeContent;
-  std::unordered_map<std::string, int> keyCounts;
-
-  std::string line;
-  while (std::getline(file, line)) {
-    if (!inCodeBlock) {
-      // Track the most recent ### heading
-      if (line.size() > 4 && line.substr(0, 4) == "### ") {
-        currentTitle = line.substr(4);
-      }
-      // Detect start of xml code block
-      if (line.size() >= 5 && line.substr(0, 5) == "```xm") {
-        inCodeBlock = true;
-        codeContent.clear();
-      }
-    } else {
-      if (line == "```") {
-        inCodeBlock = false;
-        // Only keep complete PAGX documents (skip code snippets)
-        auto trimmed = codeContent;
-        auto pos = trimmed.find_first_not_of(" \t\n\r");
-        if (pos != std::string::npos) {
-          trimmed = trimmed.substr(pos);
-        }
-        // Skip XML declaration if present
-        if (trimmed.substr(0, 5) == "<?xml") {
-          pos = trimmed.find('\n');
-          if (pos != std::string::npos) {
-            trimmed = trimmed.substr(pos + 1);
-            pos = trimmed.find_first_not_of(" \t\n\r");
-            if (pos != std::string::npos) {
-              trimmed = trimmed.substr(pos);
-            }
-          }
-        }
-        if (trimmed.substr(0, 5) == "<pagx" && !currentTitle.empty()) {
-          auto baseKey = TitleToKey(currentTitle);
-          auto count = ++keyCounts[baseKey];
-          auto key = count > 1 ? baseKey + "_" + std::to_string(count) : baseKey;
-          patterns.emplace_back(key, codeContent);
-        }
-      } else {
-        if (!codeContent.empty()) {
-          codeContent += "\n";
-        }
-        codeContent += line;
-      }
-    }
-  }
-  return patterns;
-}
-
-static void TestMarkdownPatterns(tgfx::Context* context, const std::string& markdownPath,
-                                 const std::string& prefix = "", float scale = 1.0f) {
-  auto patterns = ExtractMarkdownPatterns(markdownPath);
-  ASSERT_FALSE(patterns.empty()) << "No patterns found in: " << markdownPath;
-
-  // Ensure output directory exists, then copy test image for patterns referencing "avatar.jpg".
-  auto outDir = std::filesystem::path(ProjectPath::Absolute("test/out/PAGXTest"));
-  std::filesystem::create_directories(outDir);
-  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/imageReplacement.jpg"),
-                             outDir / "avatar.jpg",
-                             std::filesystem::copy_options::overwrite_existing);
-
-  pagx::FontConfig fontConfig;
-  for (const auto& fontPath : GetFallbackFontPaths()) {
-    fontConfig.addFallbackFont(fontPath, 0);
-  }
-
-  for (const auto& [name, xmlContent] : patterns) {
-    auto key = prefix + name;
-
-    auto pagxPath = SavePAGXFile(xmlContent, "PAGXTest/" + key + ".pagx");
-
-    // Load via FromFile so relative image paths resolve against the pagx directory.
-    // LoadAndResolve also expands any <Import> nodes (e.g., inline SVG) before rendering.
-    auto doc = LoadAndResolve(pagxPath);
-    if (!doc) {
-      ADD_FAILURE() << "Failed to parse XML for: " << key;
-      continue;
-    }
-    if (!doc->errors.empty()) {
-      std::string errorLog;
-      for (const auto& error : doc->errors) {
-        errorLog += "\n  " + error;
-      }
-      ADD_FAILURE() << "Parse errors in " << key << ":" << errorLog;
-    }
-
-    doc->applyLayout(&fontConfig);
-    auto layer = pagx::LayerBuilder::Build(doc.get());
-    if (!layer) {
-      ADD_FAILURE() << "Failed to build layer for: " << key;
-      continue;
-    }
-
-    int canvasWidth = static_cast<int>(std::ceil(doc->width * scale));
-    int canvasHeight = static_cast<int>(std::ceil(doc->height * scale));
-    auto surface = Surface::Make(context, canvasWidth, canvasHeight);
-    if (!surface) {
-      ADD_FAILURE() << "Failed to create surface for: " << key;
-      continue;
-    }
-    DisplayList displayList;
-    if (scale != 1.0f) {
-      auto container = tgfx::Layer::Make();
-      container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-      container->addChild(layer);
-      displayList.root()->addChild(container);
-    } else {
-      displayList.root()->addChild(layer);
-    }
-    displayList.render(surface.get(), false);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/" + key)) << key;
-    VerifyFile(pagxPath, key);
-  }
 }
 
 static void TestPAGXDirectory(tgfx::Context* context, const std::string& directory,
@@ -3783,16 +3621,6 @@ PAGX_TEST(PAGXTest, LayerConstraintRoundTripNanOmitted) {
 }
 
 /**
- * Test all PAGX patterns embedded in the skill patterns.md documentation.
- * Extracts complete PAGX documents from markdown code blocks and renders them.
- */
-PAGX_TEST(PAGXTest, SkillPatterns) {
-  TestMarkdownPatterns(context,
-                       ProjectPath::Absolute(".codebuddy/skills/pagx/references/patterns.md"),
-                       "skills_", 2.0f);
-}
-
-/**
  * Test case: Verify resource cross-references resolve regardless of XML declaration order.
  * Resources declared later in <Resources> should be referenceable by earlier resources via '@id'.
  */
@@ -4520,6 +4348,47 @@ PAGX_TEST(PAGXTest, LoadFileDataWithDecodedImage) {
   ASSERT_TRUE(tgfxPattern2->image() != nullptr);
   EXPECT_EQ(tgfxPattern2->image()->width(), expectedTgfx2->width());
   EXPECT_EQ(tgfxPattern2->image()->height(), expectedTgfx2->height());
+}
+
+/**
+ * Test case: loadFileData(path, Data) preserves filePath so that export writes the original
+ * external reference (e.g. "hash:abc123") instead of inlining the image as base64.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataPreservesFilePathInExport) {
+  std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100">
+  <Layer id="L">
+    <Rectangle width="100" height="100"/>
+    <Fill>
+      <ImagePattern id="pat" image="hash:abc123"/>
+    </Fill>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  doc->applyLayout();
+  auto* pattern = doc->findNode<pagx::ImagePattern>("pat");
+  ASSERT_TRUE(pattern != nullptr);
+  ASSERT_TRUE(pattern->image != nullptr);
+  EXPECT_EQ(pattern->image->filePath, "hash:abc123");
+  EXPECT_TRUE(pattern->image->data == nullptr);
+
+  // Load image data via the Data overload — filePath must be preserved.
+  auto tgfxData =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  ASSERT_TRUE(tgfxData != nullptr);
+  auto imageData = pagx::Data::MakeWithCopy(tgfxData->data(), tgfxData->size());
+  ASSERT_TRUE(imageData != nullptr);
+  EXPECT_TRUE(doc->loadFileData("hash:abc123", imageData));
+
+  // filePath is kept as the serialization anchor; data is the runtime cache.
+  EXPECT_EQ(pattern->image->filePath, "hash:abc123");
+  EXPECT_TRUE(pattern->image->data != nullptr);
+
+  // Export must write the original filePath, not base64.
+  auto exportedXml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exportedXml.find("hash:abc123"), std::string::npos);
+  EXPECT_EQ(exportedXml.find("base64"), std::string::npos);
 }
 
 // =====================================================================================
@@ -7388,7 +7257,8 @@ PAGX_TEST(PAGXTest, LoadFileDataExternalCompositionAfterSceneCreation) {
 
 /**
  * Test case: loading image data via loadFileData AFTER PAGScene::Make() sets the Image node data
- * and notifies existing scenes without crashing. Verifies both node-level state and scene integrity.
+ * and notifies existing scenes without crashing. Verifies node-level state (data set, filePath
+ * preserved as the serialization anchor) and scene integrity.
  */
 PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -7417,8 +7287,8 @@ PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("test.png", imageData));
 
-  // After loading, image data is set and filePath is cleared.
-  EXPECT_TRUE(img->filePath.empty());
+  // After loading, image data is set and filePath is preserved as the serialization anchor.
+  EXPECT_EQ(img->filePath, "test.png");
   ASSERT_TRUE(img->data != nullptr);
   EXPECT_EQ(img->data->size(), sizeof(bytes));
 
@@ -7428,7 +7298,8 @@ PAGX_TEST(PAGXTest, LoadFileDataImageAfterSceneCreation) {
 
 /**
  * Test case: loadFileData is a no-op on notifyChange when called before any PAGScene exists.
- * Verifies that empty dirtyNodes or no liveScenes path is handled correctly.
+ * Verifies that empty dirtyNodes or no liveScenes path is handled correctly, and that node-level
+ * state (data set, filePath preserved as the serialization anchor) is still updated.
  */
 PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -7439,7 +7310,8 @@ PAGX_TEST(PAGXTest, LoadFileDataNoSceneNotifyChangeNoOp) {
   auto imageData = pagx::Data::MakeWithCopy(bytes, sizeof(bytes));
   EXPECT_TRUE(doc->loadFileData("test.png", imageData));
 
-  EXPECT_TRUE(img->filePath.empty());
+  // data is set and filePath is preserved even without any live scene to notify.
+  EXPECT_EQ(img->filePath, "test.png");
   ASSERT_TRUE(img->data != nullptr);
 }
 

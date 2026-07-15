@@ -41,6 +41,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -119,7 +120,11 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
+                            const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
+  Element* convertImage(const std::shared_ptr<DOMNode>& element);
+  Group* buildImageGroup(const std::string& imageHref, float x, float y, float width, float height);
 
   LinearGradient* convertLinearGradient(const std::shared_ptr<DOMNode>& element,
                                         const Rect& shapeBounds);
@@ -143,6 +148,11 @@ class SVGParserContext {
                      const InheritedStyle& inheritedStyle);
 
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
+
+  // Returns the total geometric length of the element's outline by building its tgfx::Path and
+  // summing every contour via PathMeasure. Used to honour the SVG `pathLength` attribute when
+  // scaling `stroke-dasharray` / `stroke-dashoffset`. Returns 0 for unsupported or empty shapes.
+  float computePathTotalLength(const std::shared_ptr<DOMNode>& element);
 
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);

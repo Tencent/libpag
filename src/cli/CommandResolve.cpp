@@ -21,9 +21,11 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include "base/utils/MathUtil.h"
 #include "cli/CliUtils.h"
 #include "cli/CommandImport.h"
+#include "cli/ImageStorage.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
@@ -36,24 +38,39 @@ struct ResolveOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   ImportFormatOptions formatOptions = {};
+  // How image resources are stored in the resolved PAGX. Defaults to writing image files next to
+  // the output (External); `--images embed` inlines them as base64 data URIs instead.
+  ImageStorageMode imageStorage = ImageStorageMode::External;
+  // Directory used to resolve relative image `source` paths (e.g. inline-SVG <image href>) to real
+  // files. Defaults to the input file's directory.
+  std::string imageBaseDir = {};
+  // True when --images or --image-base-dir was passed, forcing an image pass (and file write) even
+  // when there were no import directives to resolve.
+  bool imageStorageRequested = false;
 };
 
 static void PrintResolveUsage() {
-  std::cout << "Usage: pagx resolve <file> [options]\n"
-            << "\n"
-            << "Resolve all import directives in a PAGX file into native PAGX nodes.\n"
-            << "Expands inline <svg> elements and external file references (import attribute)\n"
-            << "within Layers.\n"
-            << "\n"
-            << "Options:\n"
-            << "  -o, --output <file>         Output PAGX file (default: overwrite input)\n"
-            << "\n"
-            << "Format-specific options are shared with `pagx import`;\n"
-            << "see `pagx import --help` for details.\n"
-            << "\n"
-            << "Examples:\n"
-            << "  pagx resolve design.pagx                # resolve in place\n"
-            << "  pagx resolve design.pagx -o out.pagx    # resolve to new file\n";
+  std::cout
+      << "Usage: pagx resolve <file> [options]\n"
+      << "\n"
+      << "Resolve all import directives in a PAGX file into native PAGX nodes.\n"
+      << "Expands inline <svg> elements and external file references (import attribute)\n"
+      << "within Layers.\n"
+      << "\n"
+      << "Options:\n"
+      << "  -o, --output <file>         Output PAGX file (default: overwrite input)\n"
+      << "  --images <mode>             How image resources are stored: 'external' (default;\n"
+      << "                              write image files next to the output PAGX and keep the\n"
+      << "                              relative path) or 'embed' (inline as base64 data URIs)\n"
+      << "  --image-base-dir <dir>      Directory to resolve relative image paths against\n"
+      << "                              (default: the input file's directory)\n"
+      << "\n"
+      << "Format-specific options are shared with `pagx import`;\n"
+      << "see `pagx import --help` for details.\n"
+      << "\n"
+      << "Examples:\n"
+      << "  pagx resolve design.pagx                # resolve in place\n"
+      << "  pagx resolve design.pagx -o out.pagx    # resolve to new file\n";
 }
 
 static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) {
@@ -62,6 +79,17 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
     std::string arg = argv[i];
     if ((arg == "--output" || arg == "-o") && i + 1 < argc) {
       options->outputFile = argv[++i];
+    } else if (arg == "--images" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseImageStorageMode(mode, &options->imageStorage)) {
+        std::cerr << "pagx resolve: error: invalid --images value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
+      options->imageStorageRequested = true;
+    } else if (arg == "--image-base-dir" && i + 1 < argc) {
+      options->imageBaseDir = argv[++i];
+      options->imageStorageRequested = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintResolveUsage();
       return -1;
@@ -262,6 +290,33 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   return true;
 }
 
+// Each inline <svg> is imported by its own SVGImporter instance, which numbers auto-generated ids
+// (image1, path1, color1, ...) from scratch. When several inline SVGs in one document are resolved
+// and their nodes merged into the same target document, those counters collide — e.g. two unrelated
+// <image> elements both become Image id="image1". On reload the second registration overwrites the
+// first in the id index, so every reference (@image1) binds to the same node and the other resource
+// is lost. Walk the merged node list and rename any id that repeats to a fresh unique one; node
+// references are in-memory pointers, so the exporter picks up the new id automatically.
+static void DeduplicateNodeIds(PAGXDocument* doc) {
+  std::unordered_set<std::string> usedIds;
+  for (auto& node : doc->nodes) {
+    if (node->id.empty()) {
+      continue;
+    }
+    if (usedIds.insert(node->id).second) {
+      continue;
+    }
+    std::string base = node->id;
+    std::string candidate;
+    int suffix = 2;
+    do {
+      candidate = base + "_" + std::to_string(suffix++);
+    } while (usedIds.count(candidate) > 0);
+    node->id = candidate;
+    usedIds.insert(candidate);
+  }
+}
+
 static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& baseDir,
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
@@ -284,6 +339,36 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
 }
 
 //--------------------------------------------------------------------------------------------------
+// Reusable document resolve
+//--------------------------------------------------------------------------------------------------
+
+ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
+                             const ImportFormatOptions& formatOptions) {
+  ResolveStats stats = {};
+  if (doc == nullptr) {
+    return stats;
+  }
+
+  ResolveLayers(doc->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
+
+  // Also resolve in Composition layers.
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
+                    stats.errorCount);
+    }
+  }
+
+  if (stats.resolvedCount > 0) {
+    // Merging several inline-SVG imports into one document can collide their auto-generated ids;
+    // rename the duplicates before the optimizer and exporter consume the merged tree.
+    DeduplicateNodeIds(doc);
+  }
+  return stats;
+}
+
+//--------------------------------------------------------------------------------------------------
 // Entry point
 //--------------------------------------------------------------------------------------------------
 
@@ -300,32 +385,40 @@ int RunResolve(int argc, char* argv[]) {
   }
 
   auto baseDir = GetDirectory(options.inputFile);
-  int resolvedCount = 0;
-  int errorCount = 0;
+  auto stats = ResolveDocument(doc.get(), baseDir, options.formatOptions);
+  int resolvedCount = stats.resolvedCount;
+  int errorCount = stats.errorCount;
 
-  ResolveLayers(doc->layers, baseDir, options.formatOptions, doc.get(), resolvedCount, errorCount);
-
-  // Also resolve in Composition layers.
-  for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      ResolveLayers(comp->layers, baseDir, options.formatOptions, doc.get(), resolvedCount,
-                    errorCount);
-    }
-  }
-
-  if (resolvedCount == 0 && errorCount == 0) {
+  // Nothing to resolve and no image work requested: leave the file untouched.
+  if (resolvedCount == 0 && errorCount == 0 && !options.imageStorageRequested) {
     return 0;
   }
 
-  // Always run the optimizer so the resolve output is stable regardless of whether the input
-  // contained imports or already-authored structure. The optimizer is conservative: any Layer
-  // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
-  // so this only cleans up the newly inlined import payload.
-  auto optimizeResult = PAGXOptimizer::Optimize(doc.get());
-  if (!optimizeResult.converged) {
-    std::cerr << "pagx resolve: warning: PAGXOptimizer did not converge within "
-              << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  if (resolvedCount > 0 || errorCount > 0) {
+    // Always run the optimizer so the resolve output is stable regardless of whether the input
+    // contained imports or already-authored structure. The optimizer is conservative: any Layer
+    // carrying id/name/customData/layout/constraints (typical hand-authored content) is untouched,
+    // so this only cleans up the newly inlined import payload.
+    auto optimizeResult = PAGXOptimizer::Optimize(doc.get());
+    if (!optimizeResult.converged) {
+      std::cerr << "pagx resolve: warning: PAGXOptimizer did not converge within "
+                << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+    }
+  }
+
+  // Normalise image resources to the requested storage mode. Inline-SVG <image href> paths created
+  // during resolve are relative to the original document location, so the input directory is the
+  // default base; copied files land next to the output PAGX.
+  {
+    ImageStorageOptions imageOptions = {};
+    imageOptions.mode = options.imageStorage;
+    imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : baseDir;
+    // PAGXImporter::FromFile prefixes relative Image sources with the input file's directory; strip
+    // that back off to recover the authored `source`, independently of the (possibly overridden)
+    // base dir used to locate loose files.
+    imageOptions.documentDir = baseDir;
+    imageOptions.outputDir = GetDirectory(options.outputFile);
+    ApplyImageStorage(doc.get(), imageOptions, "pagx resolve");
   }
 
   auto xml = PAGXExporter::ToXML(*doc);

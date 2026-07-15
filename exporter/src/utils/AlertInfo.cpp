@@ -408,6 +408,17 @@ DEFINE_GETINFO(TextPathAnimator) {
   suggest = suggestData.toStdString();
 }
 
+DEFINE_GETINFO(TextSuperscriptOrSubscript) {
+  auto infoData = QObject::tr(
+      "Some characters of the text layer use superscript or subscript, which is not "
+      "supported by PAG.");
+  auto suggestData = QObject::tr(
+      "Recommend disabling superscript/subscript in the Character panel and adjusting the font "
+      "size manually.");
+  info = infoData.toStdString();
+  suggest = suggestData.toStdString();
+}
+
 DEFINE_GETINFO(VideoCompositionOverlap) {
   auto infoData = QObject::tr(
       "There are overlapping time intervals for references to video composition \"%1\".");
@@ -545,6 +556,7 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
                         LINE_GETINFO(TextPathVertial),
                         LINE_GETINFO(TextPathBoxText),
                         LINE_GETINFO(TextPathAnimator),
+                        LINE_GETINFO(TextSuperscriptOrSubscript),
                         LINE_GETINFO(VideoCompositionOverlap),
                         LINE_GETINFO(OtherWarning),
                         LINE_GETINFO(UnknownError),

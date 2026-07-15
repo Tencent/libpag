@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tab Bar</title>
+    <style>
+      .bar { display: flex; flex-direction: row; padding: 4px;
+             background-color: #F1F5F9; border-radius: 24px; gap: 4px; }
+      .tab { flex: 1; padding: 8px 12px; border-radius: 20px;
+             color: #475569; font-size: 14px; text-align: center; }
+      .tab-active { background-color: #FFFFFF; color: #0F172A; font-weight: bold;
+                    box-shadow: 0 1px 3px #00000014; }
+    </style>
+  </head>
+  <body style="width: 320px; height: 48px;">
+    <div class="bar">
+      <div class="tab tab-active">Home</div>
+      <div class="tab">Browse</div>
+      <div class="tab">Library</div>
+    </div>
+  </body>
+</html>
