@@ -385,6 +385,17 @@ static void CollectSpacingGlyph(
   }
 }
 
+// Generates the next __embed_font_N id that does not collide with an existing user node, so
+// setNodeId never silently displaces a user-defined id from the nodeMap. fontIndex is advanced
+// across calls so each embedded font gets a distinct sequential id.
+static std::string NextEmbedFontId(PAGXDocument* document, int& fontIndex) {
+  std::string id;
+  do {
+    id = "__embed_font_" + std::to_string(fontIndex++);
+  } while (document->findNode(id) != nullptr);
+  return id;
+}
+
 void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   if (document == nullptr) {
     return;
@@ -475,15 +486,8 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // Assign sequential IDs to all embedded fonts. Skip any index already taken by a user node to
   // avoid silently displacing it from the nodeMap.
   int fontIndex = 1;
-  auto nextEmbedFontId = [&]() -> std::string {
-    std::string id;
-    do {
-      id = "__embed_font_" + std::to_string(fontIndex++);
-    } while (document->findNode(id) != nullptr);
-    return id;
-  };
   if (vectorBuilder.font != nullptr) {
-    document->setNodeId(vectorBuilder.font, nextEmbedFontId());
+    document->setNodeId(vectorBuilder.font, NextEmbedFontId(document, fontIndex));
   }
   for (auto* typeface : bitmapTypefaces) {
     if (typeface == nullptr) {
@@ -491,7 +495,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     }
     auto builderIt = bitmapBuilders.find(typeface);
     if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-      document->setNodeId(builderIt->second.font, nextEmbedFontId());
+      document->setNodeId(builderIt->second.font, NextEmbedFontId(document, fontIndex));
     }
   }
 
