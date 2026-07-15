@@ -116,12 +116,9 @@ class PAGImageViewHelper {
         }
 
         boolean isValid() {
-            locker.lock();
-            try {
-                return _width > 0 && _height > 0 && decoderToken == resetToken.get();
-            } finally {
-                locker.unlock();
-            }
+            // Lock-free: all fields are volatile or atomic, so this read is safe without holding
+            // the lock and avoids blocking the main thread when the worker is stuck in readFrame().
+            return _width > 0 && _height > 0 && decoderToken == resetToken.get();
         }
 
         boolean hasPAGDecoder() {
@@ -183,9 +180,20 @@ class PAGImageViewHelper {
                 } else {
                     scaleFactor = height * 1.0f / composition.height();
                 }
-                _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
-                _width = _pagDecoder.width();
-                _height = _pagDecoder.height();
+                PAGDecoder decoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
+                if (decoder == null) {
+                    return false;
+                }
+                // Re-check the reset token after the slow Make() call. If reset() was called during
+                // Make(), the token will have been bumped, meaning this decoder is already stale and
+                // should not overwrite the reset state.
+                if (resetToken.get() != token) {
+                    decoder.release();
+                    return false;
+                }
+                _pagDecoder = decoder;
+                _width = decoder.width();
+                _height = decoder.height();
                 duration = composition.duration();
                 decoderToken = token;
                 return true;
