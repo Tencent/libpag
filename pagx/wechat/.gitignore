@@ -13,3 +13,6 @@ ts/wasm
 types/
 lib/
 docs/
+
+# Local design/planning notes
+PAGScene_*.md

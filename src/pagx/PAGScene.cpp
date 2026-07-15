@@ -680,6 +680,10 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
   return displayList.get();
 }
 
+bool PAGScene::hasContentChanged() const {
+  return displayList != nullptr && displayList->hasContentChanged();
+}
+
 std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
                                         const std::shared_ptr<PAGScene>& scene,
                                         const std::shared_ptr<PAGSurface>& surface,
