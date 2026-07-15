@@ -20,16 +20,20 @@
 /**
  * Prebuild script for pagx-playground.
  *
- * This script ensures pagx-viewer is built and copies the wasm files to wasm-mt/
- * before the main rollup build starts.
+ * This script copies the pre-built pagx-viewer wasm/glue files to wasm-mt/
+ * before the main rollup build starts. It does NOT build pagx-viewer itself;
+ * if the required artifacts are missing, the user must build them first in
+ * the pagx-viewer directory.
  *
  * Usage:
- *   node scripts/prebuild.js [--release]
+ *   node scripts/prebuild.js                  # multi-threaded (default), debug
+ *   node scripts/prebuild.js --arch st        # single-threaded, debug
+ *   node scripts/prebuild.js --release        # multi-threaded, release
+ *   node scripts/prebuild.js --arch st --release  single-threaded, release
  */
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,88 +42,41 @@ const __dirname = path.dirname(__filename);
 const PLAYGROUND_DIR = path.dirname(__dirname);
 const PAGX_VIEWER_DIR = path.resolve(PLAYGROUND_DIR, '../pagx-viewer');
 const PAGX_VIEWER_LIB_DIR = path.join(PAGX_VIEWER_DIR, 'lib');
-const WASM_MT_DIR = path.join(PLAYGROUND_DIR, 'wasm-mt');
+const OUTPUT_DIR = path.join(PLAYGROUND_DIR, 'wasm-mt');
 
-const REQUIRED_FILES = ['pagx-viewer.wasm', 'pagx-viewer.esm.js'];
+// Parse CLI arguments: --arch <mt|st> selects the wasm flavor (default: auto-detect).
+const CLI_ARGS = process.argv.slice(2);
+function getArgValue(name) {
+  const index = CLI_ARGS.indexOf(name);
+  return index !== -1 ? CLI_ARGS[index + 1] : null;
+}
+const archArg = getArgValue('--arch');
+const isRelease = CLI_ARGS.includes('--release');
 
-// Source directories/files that should invalidate the build when newer than the artifacts.
-const SOURCE_PATHS = [
-  path.join(PAGX_VIEWER_DIR, 'src'),
-  path.join(PAGX_VIEWER_DIR, 'CMakeLists.txt'),
-  path.join(PAGX_VIEWER_DIR, 'package.json'),
-];
-
-const isRelease = process.argv.includes('--release');
-
-/**
- * Returns the most recent modification time (in ms) among the given files/directories.
- * Directories are walked recursively. Missing paths are skipped.
- */
-function latestMtimeMs(targetPath) {
-  let latest = 0;
-  const stack = [targetPath];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    let stat;
-    try {
-      stat = fs.statSync(current);
-    } catch {
-      continue;
-    }
-    if (stat.isDirectory()) {
-      for (const entry of fs.readdirSync(current)) {
-        stack.push(path.join(current, entry));
-      }
-    } else if (stat.mtimeMs > latest) {
-      latest = stat.mtimeMs;
-    }
-  }
-  return latest;
+// Auto-detect which arch artifacts exist in pagx-viewer/lib/.
+// If neither exists, fall back to the default (multi-threaded) and let
+// copyWasmFiles() report the error with helpful instructions.
+function detectArch() {
+  const mtExists = fs.existsSync(path.join(PAGX_VIEWER_LIB_DIR, 'pagx-viewer.wasm'));
+  const stExists = fs.existsSync(path.join(PAGX_VIEWER_LIB_DIR, 'pagx-viewer.st.wasm'));
+  if (archArg === 'st') return true;
+  if (archArg === 'mt') return false;
+  // No explicit --arch: prefer whichever exists. If both exist, pick multi-threaded.
+  if (stExists && !mtExists) return true;
+  return false;
 }
 
-/**
- * Check if pagx-viewer artifacts exist and are newer than the sources.
- */
-function isPagxViewerBuilt() {
-  let oldestArtifactMs = Number.POSITIVE_INFINITY;
-  for (const file of REQUIRED_FILES) {
-    const filePath = path.join(PAGX_VIEWER_LIB_DIR, file);
-    if (!fs.existsSync(filePath)) {
-      return false;
-    }
-    const artifactMs = fs.statSync(filePath).mtimeMs;
-    if (artifactMs < oldestArtifactMs) {
-      oldestArtifactMs = artifactMs;
-    }
-  }
-  let latestSourceMs = 0;
-  for (const sourcePath of SOURCE_PATHS) {
-    const ms = latestMtimeMs(sourcePath);
-    if (ms > latestSourceMs) {
-      latestSourceMs = ms;
-    }
-  }
-  return latestSourceMs <= oldestArtifactMs;
-}
+const isSingleThreaded = detectArch();
 
-/**
- * Build pagx-viewer.
- */
-function buildPagxViewer() {
-  const buildCmd = isRelease ? 'npm run build:release' : 'npm run build';
-  console.log(`Building pagx-viewer (${isRelease ? 'release' : 'debug'})...`);
-  console.log(`  Running: ${buildCmd}`);
-  try {
-    execSync(buildCmd, {
-      cwd: PAGX_VIEWER_DIR,
-      stdio: 'inherit',
-    });
-    console.log('  pagx-viewer built successfully.\n');
-  } catch (error) {
-    console.error('Failed to build pagx-viewer:', error.message);
-    process.exit(1);
-  }
-}
+// The single-threaded variant adds a `.st` infix so its glue/wasm don't collide
+// with the multi-threaded ones.
+const artifactInfix = isSingleThreaded ? '.st' : '';
+const REQUIRED_FILES = [`pagx-viewer${artifactInfix}.wasm`, `pagx-viewer${artifactInfix}.esm.js`];
+// When switching arch, remove the opposite-arch artifacts from the output dir
+// so a stale wasm/glue of the wrong flavor can't linger.
+const STALE_NAMES = isSingleThreaded
+  ? ['pagx-viewer.wasm', 'pagx-viewer.esm.js']
+  : ['pagx-viewer.st.wasm', 'pagx-viewer.st.esm.js'];
 
 /**
  * Copy wasm files to wasm-mt/.
@@ -127,18 +84,35 @@ function buildPagxViewer() {
 function copyWasmFiles() {
   console.log('Copying wasm files to wasm-mt/...');
 
-  if (!fs.existsSync(WASM_MT_DIR)) {
-    fs.mkdirSync(WASM_MT_DIR, { recursive: true });
+  if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  }
+
+  // Remove artifacts from the opposite arch before copying.
+  for (const stale of STALE_NAMES) {
+    const stalePath = path.join(OUTPUT_DIR, stale);
+    if (fs.existsSync(stalePath)) {
+      fs.unlinkSync(stalePath);
+      console.log(`  Removed stale: ${stale}`);
+    }
   }
 
   for (const file of REQUIRED_FILES) {
     const src = path.join(PAGX_VIEWER_LIB_DIR, file);
-    const dest = path.join(WASM_MT_DIR, file);
+    const dest = path.join(OUTPUT_DIR, file);
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, dest);
       console.log(`  Copied: ${file}`);
     } else {
-      console.error(`  ERROR: Source file not found: ${src}`);
+      console.error(`\nERROR: Required artifact not found: ${src}`);
+      console.error('Please build pagx-viewer first:');
+      let buildCmd;
+      if (isSingleThreaded) {
+        buildCmd = isRelease ? 'npm run build:release:st' : 'npm run build:debug:st';
+      } else {
+        buildCmd = isRelease ? 'npm run build:release' : 'npm run build:debug';
+      }
+      console.error(`  cd ${PAGX_VIEWER_DIR} && ${buildCmd}\n`);
       process.exit(1);
     }
   }
@@ -147,14 +121,8 @@ function copyWasmFiles() {
 }
 
 function main() {
-  console.log('Prebuild: Preparing pagx-viewer wasm files...\n');
-
-  if (!isPagxViewerBuilt()) {
-    console.log('pagx-viewer not built or out of date, building now...\n');
-    buildPagxViewer();
-  } else {
-    console.log('pagx-viewer already built and up to date.\n');
-  }
+  const archLabel = isSingleThreaded ? 'single-threaded' : 'multi-threaded';
+  console.log(`Prebuild: Preparing pagx-viewer (${archLabel}) wasm files...\n`);
 
   copyWasmFiles();
 

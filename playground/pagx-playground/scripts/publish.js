@@ -18,8 +18,8 @@
  * Output structure:
  *     <output>/index.html
  *     <output>/index.css
- *     <output>/fonts/
  *     <output>/wasm-mt/
+ *     <output>/fonts/
  *     <output>/samples/           (.pagx files, images, and generated index.json)
  *     <output>/skills/<name>/     (static skill files for online browsing)
  *     <output>/skills/<name>.zip  (skill archive for AI tool downloads)

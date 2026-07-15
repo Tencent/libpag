@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { minimalSetup } from 'codemirror';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
@@ -43,21 +43,24 @@ const pagxHighlightStyle = HighlightStyle.define([
  * Search relies on the browser's built-in Ctrl+F.
  */
 export class SourceEditor {
-    private host: HTMLElement;
+    private readonly host: HTMLElement;
     private view: EditorView | null = null;
 
     constructor(host: HTMLElement) {
         this.host = host;
-        this.createView();
+        // Defer EditorView creation to the first setContent call so that the initial
+        // document is the loaded XML content (not an empty doc). This prevents
+        // Ctrl+Z from unwinding past the load point into an empty editor.
     }
 
-    private createView(): void {
+    private createView(initialContent: string): void {
         this.view = new EditorView({
             parent: this.host,
             state: EditorState.create({
-                doc: '',
+                doc: initialContent,
                 extensions: [
                     minimalSetup,
+                    lineNumbers(),
                     xml(),
                     syntaxHighlighting(pagxHighlightStyle),
                     highlightSelectionMatches(),
@@ -106,10 +109,11 @@ export class SourceEditor {
 
     /** Replaces the entire document content. */
     setContent(text: string): void {
+        const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
         if (this.view === null) {
+            this.createView(trimmed);
             return;
         }
-        const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
         this.view.dispatch({
             changes: {
                 from: 0,

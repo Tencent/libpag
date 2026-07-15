@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGXInit } from '../wasm-mt/pagx-viewer.esm';
+// Resolved to the selected arch's pagx-viewer glue at build time via the
+// `pagx-viewer-glue` alias in scripts/rollup.js (single-threaded adds a `.st` infix).
+import { PAGXInit } from 'pagx-viewer-glue';
 import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
 import { init as initEditor, togglePanel as toggleEditorPanel } from './editor';
 
@@ -116,7 +118,13 @@ const MAX_ZOOM = 1000.0;
 // Font URLs for preloading
 const FONT_URL = './fonts/NotoSansSC-Regular.otf';
 const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
-const WASM_URL = './wasm-mt/pagx-viewer.wasm';
+
+// __PAGX_INFIX__ is injected at build time by scripts/rollup.js: empty for the
+// multi-threaded build, ".st" for the single-threaded build. The matching wasm is
+// placed at wasm-mt/ by scripts/prebuild.js.
+declare const __PAGX_INFIX__: string;
+const WASM_INFIX = __PAGX_INFIX__;
+const WASM_URL = `./wasm-mt/pagx-viewer${WASM_INFIX}.wasm`;
 
 // Estimated sizes for progress calculation (in bytes)
 const ESTIMATED_WASM_SIZE = 2400000;

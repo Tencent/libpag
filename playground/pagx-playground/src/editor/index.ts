@@ -145,12 +145,15 @@ function handlePagxLoaded(event: Event): void {
     const detail = (event as CustomEvent<PagxLoadedDetail>).detail;
     currentXmlText = detail ? detail.xmlText : null;
     if (currentXmlText === null) {
-        // File cleared (goHome) - close panel and clear editor content.
+        // File cleared (goHome) - close panel and destroy the editor instance so that
+        // the next file load creates a fresh view with clean undo history rooted at the
+        // new content (instead of an empty doc reachable via Ctrl+Z).
         if (isPanelOpen()) {
             closePanel();
         }
         if (editor !== null) {
-            editor.setContent('');
+            editor.destroy();
+            editor = null;
         }
     } else if (isPanelOpen() && editor !== null) {
         // Panel already open and a new file loaded - refresh content.
