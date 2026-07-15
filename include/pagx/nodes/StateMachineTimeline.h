@@ -18,36 +18,29 @@
 
 #pragma once
 
-#include <cstdint>
+#include <string>
+#include "pagx/nodes/Timeline.h"
 
 namespace pagx {
 
 /**
- * Discriminator for Timeline subclasses. Used by importers, exporters, and runtime layout to
- * dispatch on the concrete timeline kind without dynamic_cast. Future timeline kinds (e.g. time
- * machines, state machines) extend this enum.
+ * StateMachineTimeline attaches a referenced StateMachine to the owning Layer's runtime
+ * composition. The referenced StateMachine is looked up by stateMachineId against the owning
+ * document's id table. Unlike AnimationTimeline, the initial state is not specified here; each
+ * StateRegion carries its own initialState.
  */
-enum class TimelineType : uint8_t {
-  Animation = 0,
-  StateMachine = 1,
-};
-
-/**
- * Timeline is the abstract base for entries inside a Layer's <Timelines> XML element. Each entry
- * describes a time-driven behavior to attach when the owning Layer references a Composition.
- * v1 only ships AnimationTimeline; future versions may add other timeline kinds.
- */
-class Timeline {
+class StateMachineTimeline : public Timeline {
  public:
-  virtual ~Timeline() = default;
+  StateMachineTimeline() = default;
 
   /**
-   * Returns the concrete timeline kind, used by importers/exporters and runtime dispatch.
+   * The id of the referenced StateMachine. Resolved against the owning document's id table.
    */
-  virtual TimelineType timelineType() const = 0;
+  std::string stateMachineId = {};
 
- protected:
-  Timeline() = default;
+  TimelineType timelineType() const override {
+    return TimelineType::StateMachine;
+  }
 };
 
 }  // namespace pagx

@@ -65,11 +65,18 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
+#include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -141,8 +148,7 @@ static EnumType GetEnumAttribute(const DOMNode* node, const char* name,
 // Forward declarations for parse functions
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc);
 static void ParseResources(const DOMNode* node, PAGXDocument* doc);
-static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
-                            PAGXDocument* doc);
+static void ParseAnimations(const DOMNode* node, std::vector<Node*>* animations, PAGXDocument* doc);
 static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
 static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
@@ -704,11 +710,21 @@ static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument*
       driver->animationId = refAttr.substr(1);
       driver->playing = GetBoolAttribute(current.get(), "playing", true, doc);
       layer->timelines.push_back(std::move(driver));
+    } else if (current->name == "StateMachine") {
+      auto refAttr = GetAttribute(current.get(), "ref");
+      if (refAttr.empty() || refAttr[0] != '@') {
+        ReportError(doc, current.get(),
+                    "Timelines/StateMachine requires 'ref' attribute starting with '@'.");
+        continue;
+      }
+      auto driver = std::make_unique<StateMachineTimeline>();
+      driver->stateMachineId = refAttr.substr(1);
+      layer->timelines.push_back(std::move(driver));
     } else {
       ReportError(doc, current.get(),
                   "Element '" + current->name +
                       "' is not allowed in 'Timelines'."
-                      " Expected: Animation.");
+                      " Expected: Animation or StateMachine.");
     }
   }
 }
@@ -1867,7 +1883,233 @@ static Animation* ParseAnimation(const DOMNode* node, PAGXDocument* doc) {
   return animation;
 }
 
-static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animations,
+// =============================================================================
+// State Machine Parsing
+// =============================================================================
+
+static TransitionCondition* ParseCondition(const DOMNode* node, PAGXDocument* doc) {
+  auto condition = makeNodeFromXML<TransitionCondition>(node, doc);
+  if (!condition) {
+    return nullptr;
+  }
+  condition->inputName = GetAttribute(node, "input");
+  if (condition->inputName.empty()) {
+    ReportError(doc, node, "Condition requires a non-empty 'input' attribute.");
+    return condition;
+  }
+  auto opStr = GetAttribute(node, "op");
+  if (opStr == "equal") {
+    condition->op = TransitionConditionOp::Equal;
+  } else if (opStr == "notEqual") {
+    condition->op = TransitionConditionOp::NotEqual;
+  } else if (opStr == "lessThan") {
+    condition->op = TransitionConditionOp::LessThan;
+  } else if (opStr == "lessThanOrEqual") {
+    condition->op = TransitionConditionOp::LessThanOrEqual;
+  } else if (opStr == "greaterThan") {
+    condition->op = TransitionConditionOp::GreaterThan;
+  } else if (opStr == "greaterThanOrEqual") {
+    condition->op = TransitionConditionOp::GreaterThanOrEqual;
+  } else if (opStr == "trigger") {
+    condition->op = TransitionConditionOp::Trigger;
+  } else {
+    ReportError(doc, node, "Condition requires a valid 'op' attribute.");
+    return condition;
+  }
+  if (condition->op != TransitionConditionOp::Trigger) {
+    auto valueStr = GetAttribute(node, "value");
+    if (valueStr.empty()) {
+      ReportError(doc, node,
+                  "Condition requires a non-empty 'value' attribute for op '" + opStr + "'.");
+      return condition;
+    }
+    condition->valueBool = (valueStr == "true");
+    if (!condition->valueBool && valueStr != "false") {
+      condition->valueNumber = GetFloatAttribute(node, "value", 0.0f, doc);
+    }
+  }
+  return condition;
+}
+
+static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) {
+  auto transition = makeNodeFromXML<StateTransition>(node, doc);
+  if (!transition) {
+    return nullptr;
+  }
+  transition->from = GetAttribute(node, "from");
+  transition->to = GetAttribute(node, "to");
+  if (transition->from.empty() || transition->to.empty()) {
+    ReportError(doc, node, "Transition requires non-empty 'from' and 'to' attributes.");
+    return transition;
+  }
+  transition->duration = GetInt64Attribute(node, "duration", 0, doc);
+  transition->frameRate = GetFloatAttribute(node, "frameRate", 60.0f, doc);
+  auto interp = GetAttribute(node, "interpolation", "linear");
+  transition->interpolation = ParseKeyframeInterpolation(interp, doc, node);
+  if (transition->interpolation == KeyframeInterpolationType::Bezier) {
+    transition->bezierOut = GetPointAttribute(node, "bezier-out", {0.0f, 0.0f}, doc);
+    transition->bezierIn = GetPointAttribute(node, "bezier-in", {0.0f, 0.0f}, doc);
+  }
+  transition->enableEarlyExit = GetBoolAttribute(node, "earlyExit", false, doc);
+  transition->pauseOnExit = GetBoolAttribute(node, "pauseOnExit", false, doc);
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name == "Condition") {
+      auto condition = ParseCondition(child.get(), doc);
+      if (condition != nullptr) {
+        transition->conditions.push_back(condition);
+      }
+    } else if (child->type == DOMNodeType::Element) {
+      ReportError(
+          doc, child.get(),
+          "Element '" + child->name + "' is not allowed in 'Transition'. Expected: Condition.");
+    }
+    child = child->nextSibling;
+  }
+  return transition;
+}
+
+static State* ParseState(const DOMNode* node, PAGXDocument* doc) {
+  auto state = makeNodeFromXML<AnimationState>(node, doc);
+  if (!state) {
+    return nullptr;
+  }
+  state->name = GetAttribute(node, "name");
+  if (state->name.empty()) {
+    ReportError(doc, node, "State requires a non-empty 'name' attribute.");
+    return state;
+  }
+  auto animationAttr = GetAttribute(node, "animation");
+  if (!animationAttr.empty() && animationAttr[0] == '@') {
+    state->animationId = animationAttr.substr(1);
+  } else if (!animationAttr.empty()) {
+    ReportError(doc, node,
+                "State 'animation' must reference an Animation by id (e.g. \"@id\"), got '" +
+                    animationAttr + "'.");
+  }
+  return state;
+}
+
+static StateRegion* ParseStateRegion(const DOMNode* node, PAGXDocument* doc) {
+  auto region = makeNodeFromXML<StateRegion>(node, doc);
+  if (!region) {
+    return nullptr;
+  }
+  region->name = GetAttribute(node, "name");
+  region->initialState = GetAttribute(node, "initialState");
+  if (region->initialState.empty()) {
+    ReportError(doc, node, "StateRegion requires a non-empty 'initialState' attribute.");
+  }
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type != DOMNodeType::Element) {
+      child = child->nextSibling;
+      continue;
+    }
+    if (child->name == "States") {
+      auto stateChild = child->firstChild;
+      while (stateChild) {
+        if (stateChild->type == DOMNodeType::Element && stateChild->name == "State") {
+          auto st = ParseState(stateChild.get(), doc);
+          if (st != nullptr) {
+            region->states.push_back(st);
+          }
+        } else if (stateChild->type == DOMNodeType::Element) {
+          ReportError(
+              doc, stateChild.get(),
+              "Element '" + stateChild->name + "' is not allowed in 'States'. Expected: State.");
+        }
+        stateChild = stateChild->nextSibling;
+      }
+    } else if (child->name == "Transitions") {
+      auto transChild = child->firstChild;
+      while (transChild) {
+        if (transChild->type == DOMNodeType::Element && transChild->name == "Transition") {
+          auto tr = ParseTransition(transChild.get(), doc);
+          if (tr != nullptr) {
+            region->transitions.push_back(tr);
+          }
+        } else if (transChild->type == DOMNodeType::Element) {
+          ReportError(doc, transChild.get(),
+                      "Element '" + transChild->name +
+                          "' is not allowed in 'Transitions'. Expected: Transition.");
+        }
+        transChild = transChild->nextSibling;
+      }
+    } else {
+      ReportError(doc, child.get(),
+                  "Element '" + child->name +
+                      "' is not allowed in 'StateRegion'. Expected: States, "
+                      "Transitions.");
+    }
+    child = child->nextSibling;
+  }
+  return region;
+}
+
+static StateMachine* ParseStateMachine(const DOMNode* node, PAGXDocument* doc) {
+  auto sm = makeNodeFromXML<StateMachine>(node, doc);
+  if (!sm) {
+    return nullptr;
+  }
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type != DOMNodeType::Element) {
+      child = child->nextSibling;
+      continue;
+    }
+    if (child->name == "Inputs") {
+      auto inputChild = child->firstChild;
+      while (inputChild) {
+        if (inputChild->type == DOMNodeType::Element && inputChild->name == "Input") {
+          auto input = makeNodeFromXML<StateMachineInput>(inputChild.get(), doc);
+          if (input) {
+            input->name = GetAttribute(inputChild.get(), "name");
+            auto typeStr = GetAttribute(inputChild.get(), "type");
+            if (typeStr == "bool") {
+              input->type = StateMachineInputType::Bool;
+              input->defaultBool = GetBoolAttribute(inputChild.get(), "default", false, doc);
+            } else if (typeStr == "number") {
+              input->type = StateMachineInputType::Number;
+              input->defaultNumber = GetFloatAttribute(inputChild.get(), "default", 0.0f, doc);
+            } else if (typeStr == "trigger") {
+              input->type = StateMachineInputType::Trigger;
+            } else {
+              ReportError(doc, inputChild.get(),
+                          "Input requires a valid 'type' attribute ('bool', 'number', or "
+                          "'trigger').");
+            }
+            if (input->name.empty()) {
+              ReportError(doc, inputChild.get(), "Input requires a non-empty 'name' attribute.");
+            }
+            sm->inputs.push_back(input);
+          }
+        } else if (inputChild->type == DOMNodeType::Element) {
+          ReportError(
+              doc, inputChild.get(),
+              "Element '" + inputChild->name + "' is not allowed in 'Inputs'. Expected: Input.");
+        }
+        inputChild = inputChild->nextSibling;
+      }
+    } else if (child->name == "StateRegion") {
+      auto region = ParseStateRegion(child.get(), doc);
+      if (region != nullptr) {
+        sm->regions.push_back(region);
+      }
+    } else {
+      ReportError(doc, child.get(),
+                  "Element '" + child->name +
+                      "' is not allowed in 'StateMachine'. Expected: Inputs, StateRegion.");
+    }
+    child = child->nextSibling;
+  }
+  if (sm->regions.empty()) {
+    ReportError(doc, node, "StateMachine requires at least one StateRegion.");
+  }
+  return sm;
+}
+
+static void ParseAnimations(const DOMNode* node, std::vector<Node*>* animations,
                             PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
@@ -1877,10 +2119,15 @@ static void ParseAnimations(const DOMNode* node, std::vector<Animation*>* animat
         if (animation != nullptr) {
           animations->push_back(animation);
         }
+      } else if (child->name == "StateMachine") {
+        auto* sm = ParseStateMachine(child.get(), doc);
+        if (sm != nullptr) {
+          animations->push_back(sm);
+        }
       } else {
-        ReportError(
-            doc, child.get(),
-            "Element '" + child->name + "' is not allowed in 'Animations'. Expected: Animation.");
+        ReportError(doc, child.get(),
+                    "Element '" + child->name +
+                        "' is not allowed in 'Animations'. Expected: Animation or StateMachine.");
       }
     }
     child = child->nextSibling;

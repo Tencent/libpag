@@ -71,9 +71,11 @@ class PAGXDocument : public Node {
   std::vector<Layer*> layers = {};
 
   /**
-   * Top-level animations.
+   * Top-level animation and state-machine definitions from the document's &lt;Animations&gt; block,
+   * in declaration order. Each entry is either an Animation or a StateMachine; check nodeType() to
+   * dispatch.
    */
-  std::vector<Animation*> animations = {};
+  std::vector<Node*> animations = {};
 
   /**
    * The ViewModel schema bound to this document (raw pointer, owned by nodes).
