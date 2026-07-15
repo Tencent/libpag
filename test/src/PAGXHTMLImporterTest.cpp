@@ -4556,18 +4556,20 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundUrlRecoversImagePattern) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {
+  // Standard CSS colour/geometry filter functions (blur, drop-shadow, grayscale, hue-rotate, ...)
+  // are all modelled; an unrecognized filter function is the genuinely unsupported case and warns.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="width:50px;height:50px;background-color:#000;filter:grayscale(50%)"></div>
+      <div style="width:50px;height:50px;background-color:#000;filter:sharpen(50%)"></div>
     </body></html>
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
   bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("filter") != std::string::npos && msg.find("grayscale") != std::string::npos) {
+    if (msg.find("filter") != std::string::npos && msg.find("sharpen") != std::string::npos) {
       warned = true;
     }
   }
