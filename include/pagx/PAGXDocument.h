@@ -171,7 +171,6 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
-  /**
    * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches
    * a key in the map in a single pass over the nodes. More efficient than calling loadFileData
    * individually for each file when embedding multiple images.

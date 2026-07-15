@@ -329,6 +329,8 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
   for (size_t readIdx = 0; readIdx < nodes.size(); readIdx++) {
     if (toRemove.count(nodes[readIdx].get()) == 0) {
       nodes[writeIdx++] = std::move(nodes[readIdx]);
+    } else {
+      nodeSet.erase(nodes[readIdx].get());
     }
   }
   nodes.resize(writeIdx);
