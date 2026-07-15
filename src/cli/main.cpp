@@ -48,7 +48,7 @@ static void PrintUsage() {
             << "  font           Query font metrics\n"
             << "  embed          Embed fonts and images into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
-            << "  import         Import from another format (e.g. SVG) to PAGX\n"
+            << "  import         Import from another format (e.g. SVG, HTML) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"

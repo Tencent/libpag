@@ -162,7 +162,6 @@ static bool LoadFileDataInChain(
       auto* image = static_cast<Image*>(node.get());
       if (image->filePath == filePath) {
         image->data = data;
-        image->filePath = {};
         docDirtyNodes[document].push_back(image);
         found = true;
       }
@@ -207,7 +206,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     return;
   }
   if (config != nullptr) {
-    fontConfig = *config;
+    _fontConfig = *config;
   }
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
@@ -245,7 +244,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       }
     }
   }
-  LayoutContext context(&fontConfig);
+  LayoutContext context(&_fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Composition) {
@@ -264,7 +263,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
         // consistent across the embedded boundary rather than using the external doc's own config.
         // changedOut is intentionally not forwarded: an external document has its own notifyChange
         // chain, and runtime layers inside it are rebuilt by that document's scenes.
-        layer->externalDoc->applyLayout(&fontConfig, visited, nullptr);
+        layer->externalDoc->applyLayout(&_fontConfig, visited, nullptr);
       }
     }
   }

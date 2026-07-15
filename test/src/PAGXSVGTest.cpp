@@ -59,6 +59,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "renderer/FontEmbedder.h"
@@ -624,6 +625,271 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmptyDocument) {
   EXPECT_NE(svg.find("width=\"400\""), std::string::npos);
   EXPECT_NE(svg.find("height=\"300\""), std::string::npos);
   EXPECT_NE(svg.find("</svg>"), std::string::npos);
+}
+
+/**
+ * Test SVG import: a zero-size SVG that only hosts <defs> (a common hidden
+ * container in snapshotted HTML) is legal and must import to a valid empty
+ * document rather than failing the parse.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ZeroSizeDefsOnly) {
+  std::string svg =
+      "<svg width=\"0\" height=\"0\"><defs><path id=\"p0\" d=\"M0 0L10 0L5 8Z\"/>"
+      "</defs></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->layers.empty());
+}
+
+// Recursively collect every element of the given node type from a layer tree, descending into
+// Layer contents, child Layers, and Group elements. Used by the textPath import tests below.
+static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
+                                  std::vector<pagx::Element*>& out);
+static void CollectElementsFromElement(pagx::Element* element, pagx::NodeType type,
+                                       std::vector<pagx::Element*>& out) {
+  if (element == nullptr) {
+    return;
+  }
+  if (element->nodeType() == type) {
+    out.push_back(element);
+  }
+  if (element->nodeType() == pagx::NodeType::Group) {
+    auto group = static_cast<pagx::Group*>(element);
+    for (auto child : group->elements) {
+      CollectElementsFromElement(child, type, out);
+    }
+  }
+}
+static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
+                                  std::vector<pagx::Element*>& out) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto element : layer->contents) {
+    CollectElementsFromElement(element, type, out);
+  }
+  for (auto child : layer->children) {
+    CollectElementsByType(child, type, out);
+  }
+}
+
+/**
+ * Test SVG import: a <text> element with a <textPath href="#..."> child resolves the referenced
+ * path into a TextPath modifier alongside a Text node, so path-following text imports instead of
+ * collapsing into an empty fill. startOffset maps to firstMargin, and textLength +
+ * lengthAdjust="spacing" maps to forceAlignment with a recovered lastMargin.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<defs><path id=\"line\" d=\"M10 50L270 50\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\" textLength=\"220\""
+      " lengthAdjust=\"spacing\">"
+      "<textPath href=\"#line\" startOffset=\"20\">Along The Line</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  ASSERT_EQ(textPaths.size(), 1u);
+
+  auto text = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(text->text, "Along The Line");
+
+  auto textPath = static_cast<pagx::TextPath*>(textPaths[0]);
+  ASSERT_NE(textPath->path, nullptr);
+  EXPECT_FALSE(textPath->path->isEmpty());
+  EXPECT_FLOAT_EQ(textPath->firstMargin, 20.0f);
+  EXPECT_TRUE(textPath->forceAlignment);
+  // Path length is 260 (straight line from x=10 to x=270). lastMargin = 260 - 20 - 220 = 20.
+  EXPECT_FLOAT_EQ(textPath->lastMargin, 20.0f);
+}
+
+/**
+ * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
+ * modifier but still keeps the text content as a plain Text node, so the run is not lost.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<text font-family=\"Arial\" font-size=\"12\">"
+      "<textPath href=\"#missing\">Orphan Text</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "Orphan Text");
+  EXPECT_TRUE(textPaths.empty());
+}
+
+/**
+ * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
+ * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
+ * the mid marker is instanced twice; every marker triangle contributes its own Path node.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkersExpandToLayers) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\">"
+      "<defs><marker id=\"arrow\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\""
+      " orient=\"auto\" markerUnits=\"strokeWidth\">"
+      "<path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#000000\"/></marker></defs>"
+      "<path d=\"M10 10 L100 10 L100 100 L190 190\" stroke=\"#111111\" stroke-width=\"4\""
+      " fill=\"none\" marker-start=\"url(#arrow)\" marker-mid=\"url(#arrow)\""
+      " marker-end=\"url(#arrow)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  }
+  // One path for the stroked shape plus one per marker instance (start + 2 mids + end = 4).
+  EXPECT_GE(paths.size(), 5u);
+}
+
+/**
+ * Test SVG import: a marker on a path ending in a cubic segment, with a numeric `orient` and
+ * `markerUnits="userSpaceOnUse"`, still resolves its end point/tangent and emits a marker layer
+ * that is not scaled by the referencing stroke width.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkerCubicEndUserSpaceUnits) {
+  std::string svg =
+      "<svg width=\"120\" height=\"80\" viewBox=\"0 0 120 80\">"
+      "<defs><marker id=\"dot\" markerWidth=\"4\" markerHeight=\"4\" refX=\"2\" refY=\"2\""
+      " orient=\"45\" markerUnits=\"userSpaceOnUse\">"
+      "<circle cx=\"2\" cy=\"2\" r=\"2\" fill=\"#22C55E\"/></marker></defs>"
+      "<path d=\"M10 40 C 30 10, 60 10, 90 40\" stroke=\"#000000\" stroke-width=\"3\""
+      " fill=\"none\" marker-end=\"url(#dot)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+}
+
+/**
+ * Test SVG import: `stroke-dasharray` combined with `pathLength` normalises the dash values back
+ * into user units using the real measured length. Exercising it across a polyline, line, circle,
+ * ellipse and rect drives the shape-specific branches of the path-length measurement, and the
+ * circle/ellipse cases additionally trigger the perimeter phase shift.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_StrokeDashPathLengthAcrossShapes) {
+  std::string svg =
+      "<svg width=\"300\" height=\"300\" viewBox=\"0 0 300 300\">"
+      "<polyline points=\"10,10 60,10 60,60\" fill=\"none\" stroke=\"#000\" stroke-width=\"2\""
+      " stroke-dasharray=\"0.25 0.75\" pathLength=\"1\"/>"
+      "<line x1=\"10\" y1=\"80\" x2=\"120\" y2=\"80\" stroke=\"#000\" stroke-width=\"2\""
+      " stroke-dasharray=\"0.5 0.5\" pathLength=\"1\"/>"
+      "<circle cx=\"70\" cy=\"170\" r=\"40\" fill=\"none\" stroke=\"#000\" stroke-width=\"3\""
+      " stroke-dasharray=\"0.3 0.7\" pathLength=\"1\"/>"
+      "<ellipse cx=\"200\" cy=\"170\" rx=\"50\" ry=\"30\" fill=\"none\" stroke=\"#000\""
+      " stroke-width=\"3\" stroke-dasharray=\"0.4 0.6\" pathLength=\"1\"/>"
+      "<rect x=\"20\" y=\"230\" width=\"80\" height=\"50\" fill=\"none\" stroke=\"#000\""
+      " stroke-width=\"2\" stroke-dasharray=\"0.2 0.8\" pathLength=\"1\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> strokes;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Stroke, strokes);
+  }
+  EXPECT_GE(strokes.size(), 5u);
+  for (auto* s : strokes) {
+    EXPECT_FALSE(static_cast<pagx::Stroke*>(s)->dashes.empty());
+  }
+}
+
+/**
+ * Test SVG import: a document whose canvas size differs from its viewBox needs a content transform.
+ * With a single converted layer the importer folds the scale into an inner Group rather than adding
+ * a wrapper layer.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoGroup) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 100 100\">"
+      "<rect x=\"10\" y=\"10\" width=\"40\" height=\"40\" fill=\"#3B82F6\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+
+  std::vector<pagx::Element*> groups;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Group, groups);
+  }
+  ASSERT_FALSE(groups.empty());
+  auto* group = static_cast<pagx::Group*>(groups[0]);
+  // viewBox 100 -> canvas 200 is a uniform 2x scale embedded in the group.
+  EXPECT_FLOAT_EQ(group->scale.x, 2.0f);
+  EXPECT_FLOAT_EQ(group->scale.y, 2.0f);
+}
+
+/**
+ * Test SVG import: an element carrying both `mask` and `clip-path` keeps the mask on the inner
+ * layer and moves the clip-path onto a wrapping parent layer, so neither is dropped.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MaskAndClipPathWrapsLayer) {
+  std::string svg =
+      "<svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\">"
+      "<defs>"
+      "<mask id=\"m0\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"60\" fill=\"#FFFFFF\"/></mask>"
+      "<clipPath id=\"c0\"><circle cx=\"60\" cy=\"60\" r=\"50\"/></clipPath>"
+      "</defs>"
+      "<rect x=\"0\" y=\"0\" width=\"120\" height=\"120\" fill=\"#EF4444\""
+      " mask=\"url(#m0)\" clip-path=\"url(#c0)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  // At least one visible layer must carry a mask reference after the wrap.
+  bool anyMasked = false;
+  for (auto* layer : doc->layers) {
+    if (layer->mask != nullptr) anyMasked = true;
+    for (auto* child : layer->children) {
+      if (child->mask != nullptr) anyMasked = true;
+    }
+  }
+  EXPECT_TRUE(anyMasked);
+}
+
+/**
+ * Test SVG import: a gradient referenced by more than one shape is counted and, for the default
+ * objectBoundingBox units, re-resolved per shape rather than shared. The document imports cleanly
+ * with a fill on each shape.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SharedGradientReferencedTwice) {
+  std::string svg =
+      "<svg width=\"200\" height=\"120\" viewBox=\"0 0 200 120\">"
+      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+      "<stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"1\" stop-color=\"#00F\"/>"
+      "</linearGradient></defs>"
+      "<rect x=\"0\" y=\"0\" width=\"80\" height=\"80\" fill=\"url(#g)\"/>"
+      "<rect x=\"100\" y=\"0\" width=\"80\" height=\"80\" fill=\"url(#g)\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> fills;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+  }
+  EXPECT_GE(fills.size(), 2u);
 }
 
 /**

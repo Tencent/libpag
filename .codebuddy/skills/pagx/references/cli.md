@@ -2,7 +2,20 @@
 
 The `pagx` command-line tool provides utilities for working with PAGX files. All commands
 operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
-setup script in `SKILL.md`).
+setup script in `SKILL.md`). Run `pagx --version` (or `pagx -v`) to check the installed version,
+and `pagx <command> --help` for per-command usage.
+
+## Table of contents
+
+- [pagx verify](#pagx-verify) — diagnostics + layout + render in one call
+- [pagx render](#pagx-render) — render a PAGX file to an image
+- [pagx format](#pagx-format) — pretty-print a PAGX file
+- [pagx layout](#pagx-layout) — layout-engine bounds as XML
+- [pagx bounds](#pagx-bounds) — rendered pixel bounds of Layers
+- [pagx font](#pagx-font) — `info` (query metrics) and `embed` (embed into PAGX)
+- [pagx import](#pagx-import) — convert SVG/HTML to PAGX
+- [pagx resolve](#pagx-resolve) — expand inline `<svg>` and `import` attributes
+- [pagx export](#pagx-export) — export PAGX to SVG/HTML/PPTX
 
 ---
 
@@ -49,7 +62,11 @@ file:line: description. Fix: suggested check direction
 - Single-node problems: single line number.
 - Two-node problems (e.g., overlap): two line numbers comma-separated.
 - Spatial problems include bounds in the description.
-- No output when there are no problems (when both `--skip-render` and `--skip-layout` are set).
+- Text diagnostics: nothing is printed to stderr when there are no problems.
+- `--json`: diagnostics are always written to **stdout** as JSON (e.g.
+  `{"file": "input.pagx", "ok": true, "diagnostics": []}` when clean), and the text diagnostics above
+  are suppressed.
+- The layout XML is written silently; only the screenshot prints a `Wrote …` confirmation line.
 
 Example:
 
@@ -58,7 +75,6 @@ input.pagx:8: unknown attribute "borderRadius" on Rectangle, use "roundness" ins
 input.pagx:18,22: overlapping siblings (20,10,200,40) and (180,10,40,40) in container layout. Fix: check parent layout direction, gap, padding, and children sizes
 input.pagx:60,75: duplicate PathData, identical to line 60. Fix: extract to <Resources> and reference via @id
 Wrote input.png (786x852 @2x)
-Wrote input.layout.xml
 ```
 
 ### File output
@@ -307,21 +323,112 @@ Image embedding inlines external file references (Image nodes with `filePath`) a
 
 ## pagx import
 
-Convert a file from another format (e.g. SVG) to a standalone PAGX file.
+Convert a file from another format to a standalone PAGX file. Two input formats are
+supported: **SVG** and **HTML** (a restricted HTML/CSS subset — see `spec/html_subset.md`).
+The format is inferred from the input file extension and can be forced with `--format`.
+The output is optimized via `PAGXOptimizer` (PathData is inlined rather than shared) so the
+result is close to hand-authored PAGX and can be polished further with the other CLI tools.
+
+Unsupported constructs are handled on a best-effort basis: offending elements/properties are
+skipped or downgraded and recorded as warnings. Conversion warnings are **suppressed by default**
+(they are noisy and non-fatal); pass `--verbose` / `-v` to print them to stderr. Errors are always
+printed regardless of `--verbose`.
+
+**Import directives are resolved by default.** The HTML importer represents external SVG
+`<img src="….svg">` and inline `<svg>…</svg>` as unresolved `import` directives on a Layer.
+`import` expands those into native PAGX nodes in the same pass, so the output is fully flattened
+and a separate `pagx resolve` is normally unnecessary. Pass `--no-resolve` to keep the directives
+in place (e.g. to preserve external references, or to resolve later with different options).
+If any directive fails to resolve, `pagx import` reports the error and exits non-zero **without
+writing the output file** — fix the source (or pass `--no-resolve` to import the directives
+unexpanded and resolve them later) and retry.
 
 ```bash
-pagx import --input icon.svg                     # SVG to icon.pagx
-pagx import --input icon.svg --output out.pagx   # SVG to out.pagx
+pagx import --input icon.svg                      # SVG to icon.pagx
+pagx import --input icon.svg --output out.pagx    # SVG to out.pagx
+pagx import --input layout.html                   # HTML to layout.pagx (import directives resolved)
+pagx import --input page.html --output card.pagx  # HTML to card.pagx
+pagx import --input page.html --no-resolve        # keep inline <svg>/import directives unexpanded
+pagx import --input page.html -v                  # print conversion warnings
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input file to import (required) |
-| `--output <file>` | Output PAGX file (default: `<input>.pagx`) |
-| `--format <format>` | Force input format (`svg`; default: inferred from extension) |
+| `--input <file\|url>` | Input file or URL to import (required) |
+| `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
+| `--format <format>` | Force input format (`svg` or `html`; default: inferred from the input file extension) |
+| `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
+| `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
+| `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+| `--verbose, -v` | Print conversion warnings (suppressed by default) |
+
+### Image storage
+
+Controls how `<Image>` resources are stored in the output PAGX (`--images`, default `external`).
+The two modes are symmetric and **only ever touch local file references** — an image already
+carried as embedded bytes or a `data:` URI is left exactly as it is in either mode (inline content
+is never extracted to a file, and existing data URIs are never rewritten). Absolute paths and remote
+`http(s)://` URLs are also left untouched.
+
+- **`external` (default)** — images that reference a local file are copied next to the output
+  `.pagx` at their original relative path, and `source` keeps that relative name unchanged, so the
+  `.pagx` plus its sidecar image files form a portable folder. The authored relative path is
+  preserved even when writing to a different output directory (e.g. `assets/logo.png` stays
+  `assets/logo.png`).
+- **`embed`** — images that reference a local file are read and inlined as base64 `data:` URIs,
+  producing a single self-contained `.pagx`.
+
+`--image-base-dir` sets the directory that relative image paths are resolved against when locating
+the files on disk; it defaults to the input file's directory.
+
+```bash
+pagx import --input page.html --output card.pagx                 # external (default): sidecar images
+pagx import --input page.html --output card.pagx --images embed  # self-contained: base64 images
+```
+
+### SVG options
+
+| Option | Description |
+|--------|-------------|
 | `--svg-no-expand-use` | Do not expand `<use>` references |
 | `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
 | `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+### HTML import behavior
+
+HTML import behavior is fixed in code (there are no `--html-*` flags). Every HTML input is:
+
+- **rendered through `tools/html-snapshot/snapshot.js`** (a headless browser) first, so
+  JS/React/Tailwind-driven pages are flattened into a static, absolute-positioned HTML subset
+  the importer understands;
+- **normalized** by the subset normalizer, which resolves the `<style>` cascade into inline
+  styles, drops disallowed properties, and prunes unsupported elements;
+- **flex-recovered** via flex inference (on by default), which recovers `display:flex` semantics
+  from the absolute-positioned snapshot output;
+- sized from the `<body>` intrinsic/declared size (preferred over any caller-provided target);
+- imported non-strictly — unsupported constructs become warnings, not hard errors.
+
+The snapshot step requires `node` on `PATH` and a `snapshot.js` install. The script is located
+in this order:
+
+1. relative `tools/html-snapshot/snapshot.js` from the current directory
+2. `PAGX_HTML_SNAPSHOT_BIN` environment variable
+3. Upward search from the current directory for `tools/html-snapshot/snapshot.js` (up to 8
+   parent levels)
+
+URL inputs (`http://` / `https://`) are imported the same way (the snapshot renderer fetches
+the page) and require an explicit `--output`.
+
+**Disabling the snapshot pre-pass.** Set `PAGX_HTML_SNAPSHOT=0` (also accepts
+`false`/`no`/`off`) to skip the browser step and import the HTML file directly — useful when the
+input is *already* a flat, subset-compliant snapshot (this is what the `html2pagx` tooling sets,
+since it renders the snapshot itself). With the pre-pass disabled, URL inputs are rejected (the
+importer cannot fetch them).
+
+```bash
+pagx import --input app.html                                        # React/Tailwind page
+pagx import --input https://example.com/demo --output demo.pagx     # URL input
+```
 
 ---
 
@@ -333,14 +440,29 @@ nodes. When a Layer has explicit `width`/`height`, content is uniformly scaled t
 dimensions. Adds a comment indicating the source (e.g., `<!-- Resolved from: inline svg -->`
 or `<!-- Resolved from: assets/logo.svg -->`).
 
+`pagx import` already runs this pass by default, so this command is mainly for **hand-authored**
+PAGX files that reference external SVG or embed inline `<svg>`, or for PAGX produced with
+`pagx import --no-resolve`. It is idempotent — running it on an already-resolved file is a no-op.
+
+Most other commands require a fully-resolved file: `render`, `layout`, `bounds`, `export`, and
+`font embed` error out on any remaining `import` directive or inline `<svg>`. Run `pagx resolve`
+(or `pagx import` without `--no-resolve`, or `pagx verify`, which resolves first) before them.
+
 ```bash
 pagx resolve design.pagx                          # resolve in place
 pagx resolve design.pagx -o out.pagx              # resolve to new file
+pagx resolve design.pagx --images embed           # also inline local images as base64
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
+| `--images <mode>` | How image resources are stored: `external` (default) or `embed`. Same behavior as [`pagx import`](#image-storage) — only local file references are affected; data URIs are left untouched |
+| `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+
+Image resources created while resolving inline `<svg>` (e.g. `<image href="…">`) are normalized to
+the requested storage mode in the same pass. Passing `--images`/`--image-base-dir` also forces the
+image pass (and file writes) even when there are no import directives to resolve.
 
 Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see above for details.
 
@@ -348,12 +470,13 @@ Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see abov
 
 ## pagx export
 
-Export a PAGX file to another format (SVG or HTML). The output format is inferred from the
-output file extension. If neither `--format` nor a recognizable output extension is provided,
-the command reports an error.
+Export a PAGX file to another format (SVG, PPTX, or HTML). The output format is inferred from the
+output file extension. If neither `--format` nor an output file with a recognizable extension is
+provided, the command reports an error (there is no implicit default format — `--input icon.pagx`
+alone fails). Once the format is known, `--output` defaults to `<input>.<format>`.
 
 ```bash
-pagx export --input icon.pagx                    # PAGX to icon.svg
+pagx export --format svg --input icon.pagx       # PAGX to icon.svg
 pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
 pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
@@ -372,5 +495,5 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
-| `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, and wide-gamut color. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes the backdrop beneath the layer is baked into the PNG so the blend composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
+| `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, wide-gamut color, and `BackgroundBlurStyle`. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes and `BackgroundBlurStyle` the backdrop beneath the layer is baked into the PNG too, so the blend/frosted-glass composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
 

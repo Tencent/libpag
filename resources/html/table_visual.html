@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Mini Stats Table</title>
+    <style>
+      .frame { display: flex; flex-direction: column; padding: 12px;
+               background-color: #0F172A; border-radius: 12px; }
+      .row { display: flex; flex-direction: row; padding: 6px 8px; gap: 8px;
+             align-items: center; }
+      .stripe { background-color: #1E293B; border-radius: 6px; }
+      .label { flex: 1; color: #CBD5E1; font-size: 13px; }
+      .value { color: #F8FAFC; font-size: 14px; font-weight: bold; }
+      .delta-up { color: #34D399; font-size: 12px; font-weight: bold; }
+      .delta-down { color: #F87171; font-size: 12px; font-weight: bold; }
+    </style>
+  </head>
+  <body style="width: 320px; height: 168px;">
+    <div class="frame">
+      <div class="row">
+        <span class="label">Revenue</span>
+        <span class="value">$12,480</span>
+        <span class="delta-up">+8.2%</span>
+      </div>
+      <div class="row stripe">
+        <span class="label">Visitors</span>
+        <span class="value">42,310</span>
+        <span class="delta-up">+3.1%</span>
+      </div>
+      <div class="row">
+        <span class="label">Conversion</span>
+        <span class="value">3.4%</span>
+        <span class="delta-down">-0.6%</span>
+      </div>
+    </div>
+  </body>
+</html>
