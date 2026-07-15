@@ -259,6 +259,10 @@ FontLocation SystemFonts::FindFont(const std::string& family, const std::string&
   }
   CFMutableDictionaryRef attributes = CFDictionaryCreateMutable(
       kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+  if (attributes == nullptr) {
+    CFRelease(cfFamily);
+    return {};
+  }
   CFDictionaryAddValue(attributes, kCTFontFamilyNameAttribute, cfFamily);
   CFRelease(cfFamily);
   if (!style.empty()) {
