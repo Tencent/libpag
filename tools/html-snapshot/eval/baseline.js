@@ -74,6 +74,23 @@ async function captureBodyRect(page) {
     const body = document.body;
     body.style.margin = '0';
     body.style.padding = '0';
+    // Pin <body> to the viewport origin. The snapshot's `<html>` carries
+    // `padding:32px 0` plus `display:flex; justify-content:center` purely so a
+    // browser preview of the subset has breathing room, but `pagx render` roots
+    // at `<body>` and ignores the `<html>` box — the subset PNG therefore places
+    // body content at (0,0). Left as-is, Chromium would honour the `<html>`
+    // padding/centring and push the baseline's body down 32px (and, for a body
+    // narrower than the viewport, right by the centring gap), so every diff
+    // would be offset. Neutralising the `<html>` box here reproduces pagx's
+    // body-rooted framing and — unlike clipping from the body's own origin —
+    // keeps the screenshot clip inside the viewport, so it behaves identically
+    // on both the puppeteer and playwright engines.
+    const de = document.documentElement;
+    if (de && de.style) {
+      de.style.margin = '0';
+      de.style.padding = '0';
+      de.style.display = 'block';
+    }
     if (typeof window.scrollTo === 'function') {
       try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
     }
@@ -110,6 +127,9 @@ async function main() {
     // per-page setter, playwright forwards to setViewportSize.
     await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
     await new Promise((r) => setTimeout(r, 50));
+    // captureBodyRect neutralised the `<html>` box, so <body> sits at the
+    // viewport origin — the same body-rooted framing `pagx render` produces for
+    // the subset. Clipping at (0,0) therefore keeps the two aligned.
     await page.screenshot({
       path: opts.output,
       type: 'png',
