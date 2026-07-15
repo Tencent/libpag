@@ -73,7 +73,9 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/TextUtils.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -120,6 +122,14 @@
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
+
+void RuntimeBinding::flushTextHolders(FontConfig* fontConfig) {
+  for (auto& holder : textHolders) {
+    if (holder != nullptr) {
+      holder->flush(fontConfig);
+    }
+  }
+}
 
 // Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
 // Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
@@ -225,7 +235,44 @@ struct LayerRuntimeTarget : RuntimeTarget {
   }
 };
 
-// Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
+// Runtime target for a Text's tgfx::Text. Text-shaping channels (text / fontFamily / fontStyle /
+// fontSize / letterSpacing / fauxBold / fauxItalic) are intercepted and forwarded to the shared
+// TextHolder, which records the change and reshapes once per draw. The x / y position channels
+// fall through to the base writer table (WriteTextX / WriteTextY) and mutate the tgfx::Text
+// directly, so position animation stays lightweight and independent of reshaping.
+struct TextRuntimeTarget : RuntimeTarget {
+  std::shared_ptr<TextHolder> holder = nullptr;
+  Text* node = nullptr;
+
+  static bool IsShapingChannel(const std::string& channel) {
+    return channel == "text" || channel == "fontFamily" || channel == "fontStyle" ||
+           channel == "fontSize" || channel == "letterSpacing" || channel == "fauxBold" ||
+           channel == "fauxItalic";
+  }
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      holder->apply(node, channel, value, mix);
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+
+  bool read(const std::string& channel, KeyValue* out) const override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      return holder->read(node, channel, out);
+    }
+    return RuntimeTarget::read(channel, out);
+  }
+};
+
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
   if (!data) {
@@ -1048,7 +1095,7 @@ class LayerBuilderContext {
           return nullptr;
         }
         prepareTextBoxTextBlobs(textBox);
-        result = convertGroup(textBox);
+        result = convertTextBox(textBox);
         break;
       }
       default:
@@ -1340,9 +1387,36 @@ class LayerBuilderContext {
     if (tgfxText) {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
-      _result.binding.set(node, tgfxText);
-      _result.binding.setAccessor(node, "x", WriteTextX, ReadTextX);
-      _result.binding.setAccessor(node, "y", WriteTextY, ReadTextY);
+      // Install a TextRuntimeTarget so ViewModel/Animation writes to the text-shaping channels are
+      // routed to a TextHolder (deferred reshape), while x / y keep the direct position writers.
+      auto* target = static_cast<TextRuntimeTarget*>(
+          _result.binding.setTarget(node, std::unique_ptr<RuntimeTarget>(new TextRuntimeTarget())));
+      target->node = node;
+      target->setObject(tgfxText);
+      target->setWriter("x", WriteTextX);
+      target->setReader("x", ReadTextX);
+      target->setWriter("y", WriteTextY);
+      target->setReader("y", ReadTextY);
+      if (_needsRuntimeData) {
+        if (_currentTextBoxHolder != nullptr) {
+          // TextBox child: attach to the box's shared holder with the child's inverse matrix and
+          // the box padding so a reshape reproduces the same coordinate transform as layout.
+          tgfx::Matrix inverse = {};
+          auto it = _textBoxInverseMatrices.find(node);
+          if (it != _textBoxInverseMatrices.end()) {
+            inverse = it->second;
+          }
+          _currentTextBoxHolder->addEntry(node, target, MakeGlyphParams(node), inverse,
+                                          _textBoxPaddingLeft, _textBoxPaddingTop);
+          target->holder = _currentTextBoxHolder;
+        } else {
+          // Standalone Text: its own holder, identity matrix, no padding.
+          auto holder = std::make_shared<TextHolder>(MakeStandaloneParams(node));
+          holder->addEntry(node, target, MakeGlyphParams(node), tgfx::Matrix::I(), 0.0f, 0.0f);
+          _result.binding.registerTextHolder(holder);
+          target->holder = holder;
+        }
+      }
     }
     return tgfxText;
   }
@@ -2166,6 +2240,47 @@ class LayerBuilderContext {
     modifier->setSelectors(std::move(tgfxSelectors));
 
     return modifier;
+  }
+
+  // Converts a TextBox, setting up a single shared TextHolder that all child Texts attach to (they
+  // share one line-breaking layout). Child inverse matrices and box padding are captured so a
+  // reshape reproduces the layout coordinate transform, then convertGroup builds the tgfx subtree.
+  std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) {
+    std::shared_ptr<TextHolder> previousHolder = _currentTextBoxHolder;
+    auto previousMatrices = std::move(_textBoxInverseMatrices);
+    float previousPaddingLeft = _textBoxPaddingLeft;
+    float previousPaddingTop = _textBoxPaddingTop;
+
+    _textBoxInverseMatrices.clear();
+    _currentTextBoxHolder = nullptr;
+    _textBoxPaddingLeft = 0.0f;
+    _textBoxPaddingTop = 0.0f;
+    if (_needsRuntimeData) {
+      _currentTextBoxHolder = std::make_shared<TextHolder>(MakeTextBoxParams(node));
+      bool hasPadding = !node->padding.isZero();
+      _textBoxPaddingLeft = hasPadding ? node->padding.left : 0.0f;
+      _textBoxPaddingTop = hasPadding ? node->padding.top : 0.0f;
+      std::vector<Text*> childText = {};
+      std::vector<tgfx::Matrix> matrices = {};
+      TextLayout::CollectTextElements(node->elements, childText, matrices);
+      for (size_t i = 0; i < childText.size(); i++) {
+        tgfx::Matrix inverse = {};
+        if (matrices[i].invert(&inverse)) {
+          _textBoxInverseMatrices[childText[i]] = inverse;
+        }
+      }
+    }
+
+    auto group = convertGroup(node);
+
+    if (_currentTextBoxHolder != nullptr) {
+      _result.binding.registerTextHolder(_currentTextBoxHolder);
+    }
+    _currentTextBoxHolder = previousHolder;
+    _textBoxInverseMatrices = std::move(previousMatrices);
+    _textBoxPaddingLeft = previousPaddingLeft;
+    _textBoxPaddingTop = previousPaddingTop;
+    return group;
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
@@ -3062,6 +3177,13 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
+  // While converting a TextBox's children, holds the shared TextHolder those children attach to
+  // (all Texts in a TextBox share one line-breaking layout) plus each child's inverse matrix and
+  // the box padding, so convertText can register each child as an entry. Null outside a TextBox.
+  std::shared_ptr<TextHolder> _currentTextBoxHolder = nullptr;
+  std::unordered_map<Text*, tgfx::Matrix> _textBoxInverseMatrices = {};
+  float _textBoxPaddingLeft = 0.0f;
+  float _textBoxPaddingTop = 0.0f;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.

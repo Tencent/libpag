@@ -508,6 +508,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     return false;
   }
   flushDataBinds();
+  flushTextHolders();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -562,6 +563,12 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::flushTextHolders() {
+  if (_rootComposition != nullptr && document != nullptr) {
+    _rootComposition->flushTextHolders(&document->fontConfig);
+  }
 }
 
 void PAGScene::clearAllViewModelsDirty() {
@@ -768,6 +775,7 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
     return nullptr;
   }
   scene->flushDataBinds();
+  scene->flushTextHolders();
   if (!scene->renderTo(surface, context, autoClear)) {
     return nullptr;
   }

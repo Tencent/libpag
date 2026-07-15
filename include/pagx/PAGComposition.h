@@ -37,6 +37,7 @@ class PAGXDocument;
 class Composition;
 class DataBindRuntime;
 class DataContext;
+class FontConfig;
 class Node;
 struct RuntimeBinding;
 
@@ -184,6 +185,10 @@ class PAGComposition : public PAGLayer {
   std::shared_ptr<DataContext> dataContext = nullptr;
 
   void updateDataBinds(float mix = 1.0f);
+
+  // Flushes every TextHolder in this composition's binding and its child compositions, reshaping
+  // ViewModel/Animation-driven text once per draw. fontConfig is borrowed for the call.
+  void flushTextHolders(FontConfig* fontConfig);
 
   friend class PAGScene;
 };

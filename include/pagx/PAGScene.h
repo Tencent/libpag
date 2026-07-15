@@ -215,6 +215,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
       ViewModel* schema, const std::shared_ptr<PAGScene>& scene,
       std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
+  void flushTextHolders();
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 

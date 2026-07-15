@@ -472,4 +472,15 @@ void PAGComposition::updateDataBinds(float mix) {
   }
 }
 
+void PAGComposition::flushTextHolders(FontConfig* fontConfig) {
+  if (binding != nullptr) {
+    binding->flushTextHolders(fontConfig);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->flushTextHolders(fontConfig);
+  }
+}
+
 }  // namespace pagx

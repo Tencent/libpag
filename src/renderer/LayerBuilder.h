@@ -37,6 +37,8 @@ namespace pagx {
 
 class ColorSource;
 class ImagePattern;
+class TextHolder;
+class FontConfig;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
@@ -303,6 +305,19 @@ struct RuntimeBinding {
     return it != targets.end() ? it->second.get() : nullptr;
   }
 
+  // Registers a TextHolder that owns the runtime text objects for a text layout source. Holders
+  // are flushed once per draw so ViewModel/Animation-driven text-shaping changes reshape at most
+  // once per frame instead of on every channel write.
+  void registerTextHolder(std::shared_ptr<TextHolder> holder) {
+    if (holder != nullptr) {
+      textHolders.push_back(std::move(holder));
+    }
+  }
+
+  // Reshapes every dirty TextHolder. Called from the pre-draw commit stage after ViewModel and
+  // Animation channels have been applied. fontConfig is borrowed for the duration of the call.
+  void flushTextHolders(FontConfig* fontConfig);
+
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
   RuntimeTarget* ensureTarget(const Node* node) {
@@ -328,6 +343,11 @@ struct RuntimeBinding {
   // reference it. Maintained incrementally so unbindImageIfUnreferenced can check for surviving
   // references in O(1).
   std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
+
+  // TextHolders owning runtime text objects for this layer tree. shared_ptr so the channel writer
+  // closures can co-own their holder; the vector moves with the binding while the RuntimeTarget
+  // pointers the holders hold stay valid (targets are heap-stable unique_ptr payloads).
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 };
 
 /**
