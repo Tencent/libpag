@@ -260,6 +260,11 @@ static pag::TextDocumentHandle ParseTextDocument(const AEGP_StreamVal2&, const Q
     }
   }
 
+  if (obj.value("superscript").toBool(false) || obj.value("subscript").toBool(false)) {
+    PAGExportSessionManager::GetInstance()->recordWarning(
+        AlertInfoType::TextSuperscriptOrSubscript);
+  }
+
   return {textDocument};
 }
 
