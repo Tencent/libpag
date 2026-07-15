@@ -526,6 +526,45 @@ html, body {
     background: rgba(255, 255, 255, 0.28);
 }
 
+/* Loop toggle - always a white loop icon. When looping is off (no .active class) a diagonal slash
+   is overlaid to signal a "no loop" state. The inline SVG follows the button's currentColor so the
+   state switch needs no swapped image assets. */
+.playback-btn-loop {
+    width: 24px;
+    height: 48px;
+    margin-left: 16px;
+    color: #ffffff;
+    opacity: 1;
+}
+
+.playback-btn-loop svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+/* The slash is hidden while looping (.active) and revealed when it is off. The thicker
+   background-colored line underneath cuts a gap so the white slash reads clearly over the arrows. */
+.playback-btn-loop .loop-slash,
+.playback-btn-loop .loop-slash-bg {
+    display: none;
+}
+
+.playback-btn-loop:not(.active) .loop-slash,
+.playback-btn-loop:not(.active) .loop-slash-bg {
+    display: block;
+}
+
+.loop-slash-bg {
+    stroke: #20202A;
+    stroke-width: 4;
+}
+
+.loop-slash {
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
 .progress-slider {
     -webkit-appearance: none;
     appearance: none;

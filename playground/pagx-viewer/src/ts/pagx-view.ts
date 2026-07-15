@@ -363,6 +363,23 @@ export class PAGXView {
   }
 
   /**
+   * Sets whether playback loops, overriding the loop mode stored in the file. When enabled, each
+   * cycle repeats (preserving PingPong mirroring); when disabled, playback stops at the last frame
+   * after a single pass.
+   * @param loop true to loop, false to play once
+   */
+  public setLoop(loop: boolean): void {
+    this.nativeView._setLoop(loop);
+  }
+
+  /**
+   * Returns whether playback is set to loop.
+   */
+  public isLoop(): boolean {
+    return this.nativeView._isLoop();
+  }
+
+  /**
    * Starts the render loop.
    */
   public start(): void {

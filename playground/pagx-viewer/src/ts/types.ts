@@ -177,6 +177,17 @@ export interface _PAGXView {
   _goToNextFrame(): void;
 
   /**
+   * Sets whether playback loops, overriding the file's loop mode.
+   * @param loop true to repeat after each cycle, false to stop at the end after a single pass
+   */
+  _setLoop(loop: boolean): void;
+
+  /**
+   * Returns whether playback is set to loop.
+   */
+  _isLoop(): boolean;
+
+  /**
    * Releases the native resources. Must be called when done.
    */
   delete(): void;

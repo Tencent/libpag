@@ -111,6 +111,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
   scene = nullptr;
   defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -148,6 +149,11 @@ void PAGXView::buildLayers() {
     return;
   }
   defaultTimeline = scene->getDefaultTimeline();
+  defaultAnimation = nullptr;
+  if (defaultTimeline != nullptr && defaultTimeline->type() == TimelineType::Animation) {
+    defaultAnimation = std::static_pointer_cast<PAGAnimation>(defaultTimeline);
+  }
+  playing = true;
   lastAnimationTimeMs = -1.0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
@@ -165,8 +171,38 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->advanceAndApply(deltaUs);
+  if (playing) {
+    if (defaultAnimation != nullptr) {
+      int64_t duration = defaultAnimation->duration();
+      int64_t before = defaultAnimation->currentTime();
+      // Let the engine advance and wrap according to the file's loop mode; this keeps the in-cycle
+      // motion intact, including PingPong mirroring. The view only overrides what happens at a cycle
+      // boundary based on loopEnabled, so the file's loop flag never dictates repeat vs stop.
+      bool changed = defaultAnimation->advanceAndApply(deltaUs);
+      int64_t after = defaultAnimation->currentTime();
+      if (!changed) {
+        // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
+        // when looping keep playing for the next cycle, otherwise park on the first frame so a
+        // finished single pass resets to the start instead of freezing on the last frame.
+        if (duration > 0) {
+          defaultAnimation->setCurrentTime(0);
+          defaultAnimation->apply();
+        }
+        if (!loopEnabled) {
+          playing = false;
+        }
+      } else if (!loopEnabled && duration > 0 && after < before) {
+        // A Loop/PingPong file wrapped or reversed past the end while the user wants a single pass.
+        // Forward motion is monotonic until the boundary, so the first backward step marks one
+        // completed pass: rewind to the first frame and stop there.
+        defaultAnimation->setCurrentTime(0);
+        defaultAnimation->apply();
+        playing = false;
+      }
+    } else if (defaultTimeline != nullptr) {
+      // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
+      defaultTimeline->advanceAndApply(deltaUs);
+    }
   }
   if (scene != nullptr) {
     scene->advanceAndApply(deltaUs);
@@ -444,81 +480,95 @@ void PAGXView::updateAdaptiveTileRefinement() {
 }
 
 void PAGXView::play() {
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->play();
+  if (defaultAnimation != nullptr) {
+    // If playback is parked at the end (a finished single pass), restart from the first frame so
+    // pressing play replays instead of staying stuck at the last frame.
+    int64_t duration = defaultAnimation->duration();
+    if (duration > 0 && defaultAnimation->currentTime() >= duration) {
+      defaultAnimation->setCurrentTime(0);
+      defaultAnimation->apply();
+      presentImmediately = true;
+    }
   }
+  playing = true;
 }
 
 void PAGXView::pause() {
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->pause();
-  }
+  playing = false;
 }
 
 bool PAGXView::isPlaying() const {
-  if (defaultTimeline != nullptr) {
-    return defaultTimeline->isPlaying();
-  }
-  return false;
+  return playing;
 }
 
 int64_t PAGXView::currentTimeMicros() const {
-  if (defaultTimeline != nullptr) {
-    return defaultTimeline->currentTime();
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->currentTime();
   }
   return 0;
 }
 
 int64_t PAGXView::durationMicros() const {
-  if (defaultTimeline != nullptr) {
-    return defaultTimeline->duration();
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->duration();
   }
   return 0;
 }
 
 float PAGXView::currentFrameRate() const {
-  if (defaultTimeline != nullptr) {
-    return defaultTimeline->frameRate();
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->frameRate();
   }
   return 0.0f;
 }
 
 void PAGXView::setCurrentTimeMicros(int64_t micros) {
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->setCurrentTime(micros);
+  if (defaultAnimation != nullptr) {
+    defaultAnimation->setCurrentTime(micros);
+    // setCurrentTime only moves the playhead; apply() is required to reflect it in the content.
+    // Force a present so a manual seek (e.g. dragging the progress bar while paused) updates the
+    // frame immediately instead of being skipped by the idle dirty gate in draw().
+    defaultAnimation->apply();
     lastAnimationTimeMs = -1.0;
+    presentImmediately = true;
   }
 }
 
 void PAGXView::goToPreviousFrame() {
-  if (defaultTimeline == nullptr || defaultTimeline->frameRate() <= 0.0f) {
+  if (defaultAnimation == nullptr || defaultAnimation->frameRate() <= 0.0f) {
     return;
   }
   // Stepping a frame always pauses playback first, matching the desktop client behavior.
   pause();
-  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultTimeline->frameRate());
-  int64_t newTime = defaultTimeline->currentTime() - frameDurationUs;
+  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultAnimation->frameRate());
+  int64_t newTime = defaultAnimation->currentTime() - frameDurationUs;
   if (newTime < 0) {
     newTime = 0;
   }
   setCurrentTimeMicros(newTime);
-  defaultTimeline->apply();
 }
 
 void PAGXView::goToNextFrame() {
-  if (defaultTimeline == nullptr || defaultTimeline->frameRate() <= 0.0f) {
+  if (defaultAnimation == nullptr || defaultAnimation->frameRate() <= 0.0f) {
     return;
   }
   // Stepping a frame always pauses playback first, matching the desktop client behavior.
   pause();
-  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultTimeline->frameRate());
-  int64_t duration = defaultTimeline->duration();
-  int64_t newTime = defaultTimeline->currentTime() + frameDurationUs;
+  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultAnimation->frameRate());
+  int64_t duration = defaultAnimation->duration();
+  int64_t newTime = defaultAnimation->currentTime() + frameDurationUs;
   if (duration > 0 && newTime > duration) {
     newTime = duration;
   }
   setCurrentTimeMicros(newTime);
-  defaultTimeline->apply();
+}
+
+void PAGXView::setLoop(bool loop) {
+  loopEnabled = loop;
+}
+
+bool PAGXView::isLoop() const {
+  return loopEnabled;
 }
 
 }  // namespace pagx

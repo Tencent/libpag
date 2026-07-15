@@ -905,10 +905,19 @@ function updateTimeDisplay(): void {
     frameText.textContent = String(getCurrentFrame()) + ' / ' + String(getTotalFrames());
 }
 
+function updateLoopIcon(): void {
+    const loopBtn = document.getElementById('loop-btn');
+    if (!playgroundState.pagxView || !loopBtn) {
+        return;
+    }
+    loopBtn.classList.toggle('active', playgroundState.pagxView.isLoop());
+}
+
 function updatePlaybackUI(): void {
     updatePlayPauseIcon();
     updateProgressSlider();
     updateTimeDisplay();
+    updateLoopIcon();
 }
 
 function togglePlayback(): void {
@@ -1249,6 +1258,17 @@ function setupPlaybackControls(): void {
             if (!playgroundState.pagxView) return;
             playgroundState.pagxView.goToNextFrame();
             updatePlaybackUI();
+        });
+    }
+
+    const loopBtn = document.getElementById('loop-btn') as HTMLButtonElement;
+    if (loopBtn) {
+        loopBtn.addEventListener('click', () => {
+            if (!playgroundState.pagxView) return;
+            playgroundState.pagxView.setLoop(!playgroundState.pagxView.isLoop());
+            updateLoopIcon();
+            // Release focus so the Space shortcut keeps working after clicking.
+            loopBtn.blur();
         });
     }
 

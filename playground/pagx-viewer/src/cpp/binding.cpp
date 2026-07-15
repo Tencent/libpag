@@ -68,5 +68,7 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
             self.setCurrentTimeMicros(static_cast<int64_t>(micros));
           }))
       .function("_goToPreviousFrame", &pagx::PAGXView::goToPreviousFrame)
-      .function("_goToNextFrame", &pagx::PAGXView::goToNextFrame);
+      .function("_goToNextFrame", &pagx::PAGXView::goToNextFrame)
+      .function("_setLoop", &pagx::PAGXView::setLoop)
+      .function("_isLoop", &pagx::PAGXView::isLoop);
 }
