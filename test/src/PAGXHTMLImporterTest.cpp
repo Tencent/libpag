@@ -5127,6 +5127,46 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOpacityProducesAlphaChannel) {
   EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Linear);
 }
 
+// The builder emits one Animation per animated element; a post-pass then coalesces animations that
+// share the same duration / frameRate / loop into a single Animation (objects concatenated) so a
+// staggered grid of siblings does not produce a long run of near-identical <Animation> blocks. The
+// merge is timing-aware: elements with a different duration or loop mode stay in their own
+// Animation so they are never forced onto a mismatched shared timeline.
+PAG_TEST(PAGXHTMLImporterTest, AnimationsWithMatchingTimingAreCoalesced) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="a" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 2s linear infinite"></div>
+      <div id="b" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 2s linear infinite"></div>
+      <div id="c" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  // `a` and `b` share (duration 120, 60fps, Loop) and merge into one Animation; `c` runs 1s so it
+  // has a different duration and stays in its own Animation.
+  ASSERT_EQ(doc->animations.size(), 2u);
+
+  auto* merged = doc->animations.front();
+  EXPECT_EQ(merged->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(merged->duration, 120);
+  EXPECT_NE(FindObjectByTarget(merged, "a"), nullptr);
+  EXPECT_NE(FindObjectByTarget(merged, "b"), nullptr);
+  EXPECT_EQ(FindObjectByTarget(merged, "c"), nullptr);
+
+  auto* separate = doc->animations.back();
+  EXPECT_EQ(separate->duration, 60);
+  EXPECT_NE(FindObjectByTarget(separate, "c"), nullptr);
+  EXPECT_EQ(FindObjectByTarget(separate, "a"), nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;

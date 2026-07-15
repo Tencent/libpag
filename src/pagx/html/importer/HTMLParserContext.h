@@ -194,6 +194,17 @@ class HTMLParserContext {
   // box-shadow fallback path in the HTML writer.
   void suppressBackdropBlurUnderOpacityFade();
 
+  // Post-tree animation coalescing: `HTMLAnimationBuilder` emits one `Animation` per animated
+  // element (each driving a single element's channels), so a page that animates many siblings
+  // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
+  // The runtime plays every top-level animation, so this is only a structural verbosity — but a
+  // single timeline is easier to read, edit, and drive. Merge animations that share the same
+  // `duration` / `frameRate` / `loop` into one `Animation` (their objects concatenated). Grouping
+  // by that triple keeps it general: animations with different lengths or loop behaviour (some
+  // `once`, some infinite) stay in separate `Animation` nodes so they are never forced onto a
+  // mismatched shared timeline. Runs after both animation build passes.
+  void coalesceAnimations();
+
   // Diagnostics ------------------------------------------------------------------------
   // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
   // sites where the unique_ptr-deref boilerplate would dominate the surrounding code.

@@ -270,9 +270,45 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     _animationBuilder->buildForInlineSvgShape(shape.style, shape.shapeTargetId, shape.fillTargetId,
                                               shape.strokeTargetId, shape.dashScale);
   }
+  coalesceAnimations();
   suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();
   return _document;
+}
+
+void HTMLParserContext::coalesceAnimations() {
+  if (!_document || _document->animations.size() < 2) {
+    return;
+  }
+  // First animation of each (duration, frameRate, loop) group becomes the group leader and keeps
+  // its id; later animations in the same group have their objects appended to the leader and are
+  // dropped from the list. Leaders are scanned linearly because a page has only a handful of
+  // distinct timings even when it animates hundreds of elements. Order is preserved so the
+  // resulting `<Animations>` block still follows document order.
+  std::vector<Animation*> coalesced;
+  coalesced.reserve(_document->animations.size());
+  for (auto* anim : _document->animations) {
+    if (anim == nullptr) {
+      continue;
+    }
+    Animation* group = nullptr;
+    for (auto* leader : coalesced) {
+      if (leader->duration == anim->duration && leader->loop == anim->loop &&
+          std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
+        group = leader;
+        break;
+      }
+    }
+    if (group == nullptr) {
+      coalesced.push_back(anim);
+      continue;
+    }
+    for (auto* obj : anim->objects) {
+      group->objects.push_back(obj);
+    }
+    anim->objects.clear();
+  }
+  _document->animations = std::move(coalesced);
 }
 
 void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
