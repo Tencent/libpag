@@ -33,6 +33,12 @@ static void GetVideoLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_lon
   if (renderOptions == nullptr) {
     return;
   }
+  // AEGP_NewFromLayer uses the current time indicator position which may be outside the layer's
+  // visible range. Explicitly set the time to the layer's in point in layer time to ensure the
+  // first visible frame is rendered correctly (including footage slip).
+  A_Time inPointLayer = {};
+  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_LayerTime, &inPointLayer);
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
   GetLayerRenderFrameSize(renderOptions, srcStride, width, height);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -48,6 +54,9 @@ static void GetVideoLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   if (renderOptions == nullptr) {
     return;
   }
+  A_Time inPointLayer = {};
+  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_LayerTime, &inPointLayer);
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
   GetLayerRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -81,6 +90,23 @@ static void GetImageLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   }
   GetRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
+}
+
+// Returns the masked bounds offset of a video layer in layer space. When a video layer has masks,
+// AEGP_RenderAndCheckoutLayerFrame returns a world cropped to the mask bounding box. This function
+// retrieves that bounding box so we can record the correct offset in the exported imageBytes.
+static void GetVideoLayerMaskedOffset(const AEGP_LayerH& layerHandle, A_long& offsetX,
+                                      A_long& offsetY) {
+  const auto& Suites = GetSuites();
+  A_Time inPoint = {};
+  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_CompTime, &inPoint);
+  A_FloatRect maskedBounds = {};
+  Suites->LayerSuite8()->AEGP_GetLayerMaskedBounds(layerHandle, AEGP_LTimeMode_CompTime, &inPoint,
+                                                   &maskedBounds);
+  // Floor toward negative infinity so masks with negative fractional bounds match AE's pixel-floor
+  // crop origin.
+  offsetX = static_cast<A_long>(floor(maskedBounds.left));
+  offsetY = static_cast<A_long>(floor(maskedBounds.top));
 }
 
 void GetImageBytes(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* imageBytes,
@@ -131,10 +157,26 @@ void GetImageBytes(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* i
   auto byteData = EncodeImageData(data, scaledWidth, scaledHeight, theStride,
                                   session->configParam.imageQuality);
   if (byteData != nullptr) {
-    imageBytes->width = width;
-    imageBytes->height = height;
-    imageBytes->anchorX = -rect.xPos;
-    imageBytes->anchorY = -rect.yPos;
+    A_long maskedOffsetX = 0;
+    A_long maskedOffsetY = 0;
+    A_long sourceWidth = width;
+    A_long sourceHeight = height;
+    if (isVideo) {
+      // For video layers, Layer Render may crop the output to the mask bounding box. We need to
+      // use the source item dimensions as the logical content size and record the mask offset so
+      // the player can position the placeholder image correctly in layer space.
+      AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
+      auto dimensions = GetItemDimensions(itemHandle);
+      sourceWidth = dimensions.width();
+      sourceHeight = dimensions.height();
+      if (sourceWidth != width || sourceHeight != height) {
+        GetVideoLayerMaskedOffset(layerHandle, maskedOffsetX, maskedOffsetY);
+      }
+    }
+    imageBytes->width = sourceWidth;
+    imageBytes->height = sourceHeight;
+    imageBytes->anchorX = -(rect.xPos + maskedOffsetX);
+    imageBytes->anchorY = -(rect.yPos + maskedOffsetY);
     imageBytes->scaleFactor = factor;
     imageBytes->fileBytes = byteData;
   }
