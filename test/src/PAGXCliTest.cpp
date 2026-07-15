@@ -25,6 +25,7 @@
 #include <vector>
 #include "base/PAGTest.h"
 #include "cli/CommandBounds.h"
+#include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
 #include "cli/CommandFormat.h"
@@ -36,6 +37,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
@@ -65,6 +67,14 @@ static std::string TestResourcePath(const std::string& name) {
 
 static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
   auto src = TestResourcePath(resourceName);
+  auto dst = TempDir() + "/" + tempName;
+  std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
+  return dst;
+}
+
+static std::string CopyResourceToTemp(const std::string& resourceRelPath,
+                                      const std::string& tempName) {
+  auto src = ProjectPath::Absolute(resourceRelPath);
   auto dst = TempDir() + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
@@ -104,6 +114,30 @@ static std::string ReadFile(const std::string& path) {
   std::ifstream in(path);
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
+
+// RAII helper that redirects an ostream (e.g. std::cout, std::cerr) into an internal
+// stringstream for the lifetime of the instance and restores the original buffer on
+// destruction. Use str() to read what was captured.
+class StreamCapture {
+ public:
+  explicit StreamCapture(std::ostream& stream) : stream_(stream), oldBuf_(stream.rdbuf()) {
+    stream_.rdbuf(captured_.rdbuf());
+  }
+  ~StreamCapture() {
+    stream_.rdbuf(oldBuf_);
+  }
+  StreamCapture(const StreamCapture&) = delete;
+  StreamCapture& operator=(const StreamCapture&) = delete;
+
+  std::string str() const {
+    return captured_.str();
+  }
+
+ private:
+  std::ostream& stream_;
+  std::streambuf* oldBuf_;
+  std::stringstream captured_;
+};
 
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
@@ -517,36 +551,190 @@ CLI_TEST(PAGXCliTest, Render_XPathNoMatch) {
 // Font tests
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, FontInfo_FromFile) {
+CLI_TEST(PAGXCliTest, Font_FromFile) {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", fontPath});
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", fontPath});
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_JsonOutput) {
+CLI_TEST(PAGXCliTest, Font_JsonOutput) {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", fontPath, "--json"});
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", fontPath, "--json"});
   EXPECT_EQ(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_FileNotFound) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "nonexistent.ttf"});
+CLI_TEST(PAGXCliTest, Font_FileNotFound) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", "nonexistent.ttf"});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_MutualExclusive) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "x.ttf", "--name", "Arial"});
+CLI_TEST(PAGXCliTest, Font_MutualExclusive) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--file", "x.ttf", "--name", "Arial"});
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, FontInfo_NoSource) {
-  auto ret = CallRun(pagx::cli::RunFont, {"font", "info"});
+CLI_TEST(PAGXCliTest, Font_NoSource) {
+  auto ret = CallRun(pagx::cli::RunFont, {"font"});
   EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, FontInfo_Retired_PrintsRedirectError) {
+  const std::string expected =
+      "pagx font: 'info' subcommand has been removed, use 'pagx font' instead";
+
+  // Variant 1: with a positional argument
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "info", "--file", "x.otf"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: no extra arguments
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "info"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+}
+
+CLI_TEST(PAGXCliTest, Font_HelpShowsCurrentFlags) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--help"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto help = capturedOut.str();
+  EXPECT_NE(help.find("--list"), std::string::npos);
+  EXPECT_NE(help.find("--file"), std::string::npos);
+  EXPECT_NE(help.find("--name"), std::string::npos);
+  EXPECT_NE(help.find("--size"), std::string::npos);
+  EXPECT_NE(help.find("--json"), std::string::npos);
+  EXPECT_EQ(help.find("embed"), std::string::npos);
+  EXPECT_EQ(help.find(" info "), std::string::npos);
+  EXPECT_EQ(help.find(" info\n"), std::string::npos);
+  EXPECT_EQ(help.find("\n  info "), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, FontList_TextOutput) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--list"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto out = capturedOut.str();
+  EXPECT_FALSE(out.empty());
+  EXPECT_NE(out.find('\n'), std::string::npos);
+  int nonEmptyLines = 0;
+  size_t start = 0;
+  while (start < out.size()) {
+    size_t end = out.find('\n', start);
+    if (end == std::string::npos) {
+      end = out.size();
+    }
+    if (end > start) {
+      std::string line = out.substr(start, end - start);
+      if (line.find_first_not_of(" \t\r") != std::string::npos) {
+        ++nonEmptyLines;
+      }
+    }
+    start = end + 1;
+  }
+  EXPECT_GE(nonEmptyLines, 2);
+}
+
+CLI_TEST(PAGXCliTest, FontList_JsonOutput) {
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--json"});
+  std::cout.rdbuf(oldCout);
+
+  EXPECT_EQ(ret, 0);
+  auto out = capturedOut.str();
+  EXPECT_FALSE(out.empty());
+  auto trimEnd = out.find_last_not_of(" \t\r\n");
+  ASSERT_NE(trimEnd, std::string::npos);
+  auto trimStart = out.find_first_not_of(" \t\r\n");
+  ASSERT_NE(trimStart, std::string::npos);
+  EXPECT_EQ(out[trimStart], '[');
+  EXPECT_EQ(out[trimEnd], ']');
+  EXPECT_NE(out.find("\"family\""), std::string::npos);
+  EXPECT_NE(out.find("\"styles\""), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, FontList_MutualExclusive) {
+  const std::string expected = "pagx font: --list cannot be combined with --file or --name";
+
+  // Variant 1: --list + --file
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--file", "x.otf"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: --list + --name
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "--list", "--name", "Arial"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
 }
 
 CLI_TEST(PAGXCliTest, Font_UnknownSubcommand) {
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
   auto ret = CallRun(pagx::cli::RunFont, {"font", "xyz"});
+  std::cerr.rdbuf(oldCerr);
   EXPECT_NE(ret, 0);
+  EXPECT_NE(capturedErr.str().find("pagx font: unknown subcommand 'xyz'"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, FontEmbed_Retired_PrintsRedirectError) {
+  const std::string expected =
+      "pagx font: 'embed' subcommand has been removed, use 'pagx embed' instead";
+
+  // Variant 1: with a positional argument
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "embed", "some.pagx"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
+
+  // Variant 2: no extra arguments
+  {
+    std::streambuf* oldCerr = std::cerr.rdbuf();
+    std::ostringstream capturedErr;
+    std::cerr.rdbuf(capturedErr.rdbuf());
+    auto ret = CallRun(pagx::cli::RunFont, {"font", "embed"});
+    std::cerr.rdbuf(oldCerr);
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(capturedErr.str().find(expected), std::string::npos);
+  }
 }
 
 //==============================================================================
@@ -2857,6 +3045,332 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
   auto output = oss.str();
   EXPECT_EQ(ret, 0);
   EXPECT_EQ(output.find("painter leaks geometry"), std::string::npos);
+}
+
+//==============================================================================
+// Embed tests
+//==============================================================================
+
+CLI_TEST(PAGXCliTest, Embed_BothDefault_EmbedsFontsAndImages) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto outPagx = TempDir() + "/embed_both_out.pagx";
+  // EMBED-09 implicitly covered: embed_sample.pagx references image_as_mask.png by relative path;
+  // resolution happens at PAGXImporter::FromFile load time per D1.2.
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(capturedOut.str().find("pagx embed: wrote"), std::string::npos);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  EXPECT_TRUE(document->getExternalFilePaths().empty());
+  bool hasImageData = false;
+  bool hasFontNode = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasImageData = true;
+      }
+    }
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
+  }
+  EXPECT_TRUE(hasImageData);
+  EXPECT_TRUE(hasFontNode);
+}
+
+CLI_TEST(PAGXCliTest, Embed_SkipFonts_ImagesOnly) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto outPagx = TempDir() + "/embed_skipfonts_out.pagx";
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-fonts", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 0);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasImageData = false;
+  bool hasFontNode = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasImageData = true;
+      }
+    }
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
+  }
+  EXPECT_TRUE(hasImageData);
+  EXPECT_FALSE(hasFontNode);
+}
+
+CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto outPagx = TempDir() + "/embed_skipimgs_out.pagx";
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-images", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 0);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasFilePath = false;
+  bool hasNoImageData = true;
+  bool hasFontNode = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (!image->filePath.empty()) {
+        hasFilePath = true;
+      }
+      if (image->data != nullptr) {
+        hasNoImageData = false;
+      }
+    }
+    if (node->nodeType() == pagx::NodeType::Font) {
+      hasFontNode = true;
+    }
+  }
+  EXPECT_TRUE(hasFilePath);
+  EXPECT_TRUE(hasNoImageData);
+  EXPECT_TRUE(hasFontNode);
+}
+
+CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto contentBefore = ReadFile(tempPagx);
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--skip-fonts", "--skip-images", tempPagx});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: --skip-fonts and --skip-images cannot both be set"),
+            std::string::npos);
+  auto contentAfter = ReadFile(tempPagx);
+  EXPECT_EQ(contentBefore, contentAfter);
+}
+
+CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
+  auto outPagx = TempDir() + "/embed_fontfile_out.pagx";
+  StreamCapture outCapture(std::cout);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(outCapture.str().find("pagx embed: wrote"), std::string::npos);
+  auto document = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(document, nullptr);
+  bool hasFileFont = false;
+  bool hasEmbedFont = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        hasFileFont = true;
+        EXPECT_TRUE(font->id == "noto");
+        // fileOriginal should be preserved; the resolved absolute path must not be written out.
+        EXPECT_EQ(font->fileOriginal, "NotoSansSC-Regular.otf")
+            << "fileOriginal should retain the verbatim relative path from the source XML";
+      }
+      if (font->id.find("__embed_font_") == 0) {
+        hasEmbedFont = true;
+      }
+    }
+  }
+  EXPECT_TRUE(hasFileFont);
+  EXPECT_TRUE(hasEmbedFont);
+}
+
+CLI_TEST(PAGXCliTest, Embed_FileFlag_RejectedAsUnknown) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", "--file", "font.ttf", tempPagx});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("pagx embed: unknown option"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Embed_FontFileImport_RoundTrips) {
+  // Import a PAGX with Font(file) — verify file path survives import without existence check
+  // (D-05: no file existence check during import).
+  auto path = TestResourcePath("embed_font_file.pagx");
+  auto document = pagx::PAGXImporter::FromFile(path);
+  ASSERT_NE(document, nullptr);
+  bool foundFileFont = false;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        foundFileFont = true;
+        EXPECT_NE(font->file.find("NotoSansSC-Regular"), std::string::npos)
+            << "Font::file should contain the resolved font filename";
+      }
+    }
+  }
+  EXPECT_TRUE(foundFileFont);
+}
+
+CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  auto content = ReadFile(tempPagx);
+  auto pos = content.find("NotoSansSC-Regular.otf");
+  ASSERT_NE(pos, std::string::npos);
+  content.replace(pos, std::strlen("NotoSansSC-Regular.otf"), "nonexistent_font.otf");
+  std::ofstream out(tempPagx);
+  out << content;
+  out.close();
+  auto outPagx = TempDir() + "/embed_missing_font_out.pagx";
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
+  auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
+  auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
+  auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});
+  EXPECT_EQ(ret1, 0);
+  auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", pass1, "-o", pass2});
+  EXPECT_EQ(ret2, 0);
+  auto doc2 = pagx::PAGXImporter::FromFile(pass2);
+  ASSERT_NE(doc2, nullptr);
+  bool hasFileFont = false;
+  for (auto& node : doc2->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        hasFileFont = true;
+        EXPECT_TRUE(font->id == "noto");
+        // fileOriginal must survive the second embed round-trip unchanged.
+        EXPECT_EQ(font->fileOriginal, "NotoSansSC-Regular.otf")
+            << "fileOriginal must not become absolute after a second embed round-trip";
+      }
+    }
+  }
+  EXPECT_TRUE(hasFileFont);
+}
+
+CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto out1 = TempDir() + "/embed_idempot_pass1.pagx";
+  auto out2 = TempDir() + "/embed_idempot_pass2.pagx";
+  auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", out1});
+  EXPECT_EQ(ret1, 0);
+  auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", out1, "-o", out2});
+  EXPECT_EQ(ret2, 0);
+  EXPECT_EQ(ReadFile(out1), ReadFile(out2));
+}
+
+CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_missing.pagx");
+  auto content = ReadFile(tempPagx);
+  auto pos = content.find("image_as_mask.png");
+  ASSERT_NE(pos, std::string::npos);
+  content.replace(pos, strlen("image_as_mask.png"), "missing.png");
+  std::ofstream out(tempPagx);
+  out << content;
+  out.close();
+  auto outPagx = TempDir() + "/embed_missing_out.pagx";
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: failed to load image '"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_UrlImageSource_NotInlinedAndSucceeds) {
+  auto tempPagx = CopyToTemp("embed_url_image.pagx", "embed_url_image.pagx");
+  CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+
+  // getExternalFilePaths() is host-facing and returns all external paths including URL sources.
+  auto document = pagx::PAGXImporter::FromFile(tempPagx);
+  ASSERT_NE(document, nullptr);
+  EXPECT_EQ(document->getExternalFilePaths().size(), 3u);
+
+  // getExternalImagePaths() excludes URL-scheme paths; only the local image is returned.
+  auto imagePaths = document->getExternalImagePaths();
+  ASSERT_EQ(imagePaths.size(), 1u);
+  EXPECT_NE(imagePaths.front().find("image_as_mask.png"), std::string::npos);
+
+  auto outPagx = TempDir() + "/embed_url_out.pagx";
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(capturedOut.str().find("pagx embed: wrote"), std::string::npos);
+
+  auto result = pagx::PAGXImporter::FromFile(outPagx);
+  ASSERT_NE(result, nullptr);
+  bool hasLocalImageData = false;
+  bool hasHttpsUrlPreserved = false;
+  bool hasFileUrlPreserved = false;
+  for (auto& node : result->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->data != nullptr) {
+        hasLocalImageData = true;
+      }
+      if (image->filePath.find("https://") == 0) {
+        hasHttpsUrlPreserved = true;
+      }
+      if (image->filePath.find("file://") == 0) {
+        hasFileUrlPreserved = true;
+      }
+    }
+  }
+  EXPECT_TRUE(hasLocalImageData);
+  EXPECT_TRUE(hasHttpsUrlPreserved);
+  EXPECT_TRUE(hasFileUrlPreserved);
+}
+
+CLI_TEST(PAGXCliTest, Embed_Success_PrintsWroteAndExitsZero) {
+  auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
+  auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
+  auto outPagx = TempDir() + "/embed_success_out.pagx";
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(ret, 0);
+  auto output = capturedOut.str();
+  EXPECT_NE(output.find("pagx embed: wrote"), std::string::npos);
+  EXPECT_NE(output.find(outPagx), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Embed_Usage_NoInputErrors_HelpPrints) {
+  std::streambuf* oldCerr = std::cerr.rdbuf();
+  std::ostringstream capturedErr;
+  std::cerr.rdbuf(capturedErr.rdbuf());
+  auto ret = CallRun(pagx::cli::RunEmbed, {"embed"});
+  std::cerr.rdbuf(oldCerr);
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(capturedErr.str().find("pagx embed: missing input file"), std::string::npos);
+
+  std::streambuf* oldCout = std::cout.rdbuf();
+  std::ostringstream capturedOut;
+  std::cout.rdbuf(capturedOut.rdbuf());
+  auto helpRet = CallRun(pagx::cli::RunEmbed, {"embed", "--help"});
+  std::cout.rdbuf(oldCout);
+  EXPECT_EQ(helpRet, 0);
+  auto helpOutput = capturedOut.str();
+  EXPECT_NE(helpOutput.find("Usage: pagx embed"), std::string::npos);
+  EXPECT_NE(helpOutput.find("--skip-fonts"), std::string::npos);
+  EXPECT_NE(helpOutput.find("--skip-images"), std::string::npos);
 }
 
 }  // namespace pag
