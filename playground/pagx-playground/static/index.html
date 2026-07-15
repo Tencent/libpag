@@ -111,7 +111,7 @@
     </div>
     <div id="drop-zone" class="drop-zone">
         <div class="brand">
-            <img class="logo" src="./logo.png" alt="PAGX Logo"/>
+            <img class="logo" src="./logo.png" alt="PAGX Logo" draggable="false"/>
             <h1 class="title">PAGX Playground</h1>
         </div>
         <div id="drop-zone-content" class="drop-zone-content">
@@ -139,6 +139,25 @@
             </svg>
             <p class="error-title">Failed to load file</p>
             <p id="error-message" class="error-message"></p>
+        </div>
+    </div>
+    <div id="playback-bar" class="playback-bar hidden">
+        <button id="play-pause-btn" class="playback-btn playback-btn-primary" title="Play / Pause (Space)">
+            <img id="play-pause-img" src="./play.png" alt="Play / Pause" draggable="false"/>
+        </button>
+        <button id="prev-frame-btn" class="playback-btn playback-btn-step" title="Previous Frame">
+            <img src="./previous.png" alt="Previous Frame" draggable="false"/>
+        </button>
+        <button id="next-frame-btn" class="playback-btn playback-btn-step" title="Next Frame">
+            <img src="./next.png" alt="Next Frame" draggable="false"/>
+        </button>
+        <div class="progress-wrapper">
+            <input id="progress-slider" class="progress-slider" type="range" min="0" max="1000" value="0" step="1"/>
+        </div>
+        <div id="time-display" class="time-display">
+            <span id="time-text" class="time-text">0.00s / 0.00s</span>
+            <span class="time-divider"></span>
+            <span id="frame-text" class="frame-text">0 / 0</span>
         </div>
     </div>
 </div>

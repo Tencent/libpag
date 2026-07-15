@@ -78,6 +78,17 @@ class PAGXView {
     return pagxHeight;
   }
 
+  // Playback control methods
+  void play();
+  void pause();
+  bool isPlaying() const;
+  int64_t currentTimeMicros() const;
+  int64_t durationMicros() const;
+  float currentFrameRate() const;
+  void setCurrentTimeMicros(int64_t micros);
+  void goToPreviousFrame();
+  void goToNextFrame();
+
  private:
   void updateContentTransform();
   void applyDisplayTransform();

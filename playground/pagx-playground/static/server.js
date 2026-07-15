@@ -80,7 +80,7 @@ app.get('/', (req, res) => {
   res.redirect('/index.html');
 });
 
-const port = 8080;
+const port = 8000;
 
 /** Returns the first non-internal IPv4 address for LAN sharing, or 'localhost' if none. */
 function getLanIp() {
@@ -95,9 +95,13 @@ function getLanIp() {
   return 'localhost';
 }
 
-app.listen(port, '0.0.0.0', () => {
+// LAN sharing is opt-in for security: set PAGX_LAN=1 to expose the server on the local
+// network so other devices (e.g. phones) can access it. Defaults to localhost-only.
+const enableLan = process.env.PAGX_LAN === '1';
+const host = enableLan ? '0.0.0.0' : '127.0.0.1';
+
+app.listen(port, host, () => {
   const localUrl = `http://localhost:${port}/`;
-  const lanUrl = `http://${getLanIp()}:${port}/`;
   if (process.platform === 'darwin') {
     execFile('open', [localUrl]);
   } else if (process.platform === 'win32') {
@@ -108,5 +112,7 @@ app.listen(port, '0.0.0.0', () => {
     execFile('xdg-open', [localUrl]);
   }
   console.log(`PAGX Playground running at ${localUrl}`);
-  console.log(`LAN access: ${lanUrl}`);
+  if (enableLan) {
+    console.log(`LAN access: http://${getLanIp()}:${port}/`);
+  }
 });

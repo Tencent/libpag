@@ -293,6 +293,75 @@ export class PAGXView {
     this.nativeView._draw();
   }
 
+  // Playback control methods
+
+  /**
+   * Starts or resumes playback of the default timeline.
+   */
+  public play(): void {
+    this.nativeView._play();
+  }
+
+  /**
+   * Pauses playback of the default timeline.
+   */
+  public pause(): void {
+    this.nativeView._pause();
+  }
+
+  /**
+   * Returns whether the default timeline is currently playing.
+   */
+  public isPlaying(): boolean {
+    return this.nativeView._isPlaying();
+  }
+
+  /**
+   * Returns the current playback time in microseconds.
+   */
+  public currentTimeMicros(): number {
+    return this.nativeView._currentTimeMicros();
+  }
+
+  /**
+   * Returns the total duration in microseconds. Returns 0 if no content is loaded.
+   */
+  public durationMicros(): number {
+    return this.nativeView._durationMicros();
+  }
+
+  /**
+   * Returns the frame rate of the animation. Returns 0 if no content is loaded.
+   */
+  public currentFrameRate(): number {
+    return this.nativeView._currentFrameRate();
+  }
+
+  /**
+   * Sets the current playback time in microseconds.
+   * @param micros Time position in microseconds
+   */
+  public setCurrentTimeMicros(micros: number): void {
+    this.nativeView._setCurrentTimeMicros(micros);
+    if (!this._isRunning) {
+      this.nativeView._draw();
+    }
+  }
+
+  /**
+   * Goes to the previous frame. Pauses playback if currently playing.
+   */
+  public goToPreviousFrame(): void {
+    this.nativeView._goToPreviousFrame();
+  }
+
+  /**
+   * Goes to the next frame. Pauses playback if currently playing.
+   */
+  public goToNextFrame(): void {
+    this.nativeView._goToNextFrame();
+  }
+
   /**
    * Starts the render loop.
    */

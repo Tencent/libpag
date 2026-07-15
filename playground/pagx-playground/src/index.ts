@@ -123,8 +123,7 @@ const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
 // multi-threaded build, ".st" for the single-threaded build. The matching wasm is
 // placed at wasm-mt/ by scripts/prebuild.js.
 declare const __PAGX_INFIX__: string;
-const WASM_INFIX = __PAGX_INFIX__;
-const WASM_URL = `./wasm-mt/pagx-viewer${WASM_INFIX}.wasm`;
+const WASM_URL = `./wasm-mt/pagx-viewer${__PAGX_INFIX__}.wasm`;
 
 // Estimated sizes for progress calculation (in bytes)
 const ESTIMATED_WASM_SIZE = 2400000;
@@ -708,6 +707,12 @@ function bindCanvasEvents(canvas: HTMLElement) {
     // Set initial cursor style
     canvas.style.cursor = 'grab';
 
+    // A press whose pointer barely moves is treated as a click that toggles playback,
+    // while a larger movement is a pan gesture handled by the gesture manager.
+    const CLICK_MOVE_THRESHOLD = 5;
+    let pressStartX = 0;
+    let pressStartY = 0;
+
     // Wheel events for scroll and zoom
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
@@ -717,13 +722,20 @@ function bindCanvasEvents(canvas: HTMLElement) {
     // Mouse drag events
     canvas.addEventListener('mousedown', (e: MouseEvent) => {
         e.preventDefault();
+        pressStartX = e.clientX;
+        pressStartY = e.clientY;
         gestureManager.onMouseDown(e, canvas);
     });
     canvas.addEventListener('mousemove', (e: MouseEvent) => {
         gestureManager.onMouseMove(e, playgroundState);
     });
-    canvas.addEventListener('mouseup', () => {
+    canvas.addEventListener('mouseup', (e: MouseEvent) => {
         gestureManager.onMouseUp(canvas);
+        if (e.button === 0 &&
+            Math.abs(e.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
+            Math.abs(e.clientY - pressStartY) < CLICK_MOVE_THRESHOLD) {
+            togglePlayback();
+        }
     });
     canvas.addEventListener('mouseleave', () => {
         gestureManager.onMouseUp(canvas);
@@ -732,6 +744,10 @@ function bindCanvasEvents(canvas: HTMLElement) {
     // Touch events for mobile
     canvas.addEventListener('touchstart', (e: TouchEvent) => {
         e.preventDefault();
+        if (e.touches.length === 1) {
+            pressStartX = e.touches[0].clientX;
+            pressStartY = e.touches[0].clientY;
+        }
         gestureManager.onTouchStart(e, canvas);
     }, { passive: false });
     canvas.addEventListener('touchmove', (e: TouchEvent) => {
@@ -739,7 +755,15 @@ function bindCanvasEvents(canvas: HTMLElement) {
         gestureManager.onTouchMove(e, canvas, playgroundState);
     }, { passive: false });
     canvas.addEventListener('touchend', (e: TouchEvent) => {
+        const wasSingleTouch = e.touches.length === 0 && e.changedTouches.length === 1;
         gestureManager.onTouchEnd(e, canvas);
+        if (wasSingleTouch) {
+            const touch = e.changedTouches[0];
+            if (Math.abs(touch.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
+                Math.abs(touch.clientY - pressStartY) < CLICK_MOVE_THRESHOLD) {
+                togglePlayback();
+            }
+        }
     });
     canvas.addEventListener('touchcancel', (e: TouchEvent) => {
         gestureManager.onTouchEnd(e, canvas);
@@ -801,11 +825,112 @@ function hideDropZone(): void {
     }
 }
 
+function showPlaybackBar(): void {
+    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
+    if (!playbackBar) {
+        return;
+    }
+    // Static PAGX has no animation (zero duration); hide the playback bar for it.
+    const hasAnimation = !!playgroundState.pagxView && playgroundState.pagxView.durationMicros() > 0;
+    if (hasAnimation) {
+        playbackBar.classList.remove('hidden');
+        updatePlaybackUI();
+    } else {
+        playbackBar.classList.add('hidden');
+    }
+}
+
+function formatTime(microseconds: number): string {
+    const seconds = Math.max(0, microseconds / 1_000_000);
+    return seconds.toFixed(2) + 's';
+}
+
+function getCurrentFrame(): number {
+    const view = playgroundState.pagxView;
+    if (!view) return 0;
+    const rate = view.currentFrameRate();
+    if (rate <= 0) return 0;
+    return Math.round(Math.max(0, view.currentTimeMicros()) * rate / 1_000_000);
+}
+
+function getTotalFrames(): number {
+    const view = playgroundState.pagxView;
+    if (!view) return 0;
+    const rate = view.currentFrameRate();
+    if (rate <= 0) return 0;
+    return Math.ceil(view.durationMicros() * rate / 1_000_000);
+}
+
+function updatePlayPauseIcon(): void {
+    const playPauseImg = document.getElementById('play-pause-img') as HTMLImageElement;
+    if (!playgroundState.pagxView || !playPauseImg) {
+        return;
+    }
+    const playing = playgroundState.pagxView.isPlaying();
+    playPauseImg.src = playing ? './pause.png' : './play.png';
+}
+
+function updateSliderFill(slider: HTMLInputElement): void {
+    const pct = (parseFloat(slider.value) / 1000) * 100;
+    slider.style.background =
+        'linear-gradient(90deg, #4c7cf3, #8b5cf0, #ec5b9c) no-repeat 0 0 / ' +
+        pct + '% 100%, rgba(255, 255, 255, 0.18)';
+}
+
+function updateProgressSlider(): void {
+    const slider = document.getElementById('progress-slider') as HTMLInputElement;
+    if (!playgroundState.pagxView || !slider) {
+        return;
+    }
+    const duration = playgroundState.pagxView.durationMicros();
+    if (duration <= 0) {
+        slider.value = '0';
+        updateSliderFill(slider);
+        return;
+    }
+    const current = Math.max(0, playgroundState.pagxView.currentTimeMicros());
+    slider.value = String(Math.round((current / duration) * 1000));
+    updateSliderFill(slider);
+}
+
+function updateTimeDisplay(): void {
+    const timeText = document.getElementById('time-text');
+    const frameText = document.getElementById('frame-text');
+    if (!playgroundState.pagxView || !timeText || !frameText) {
+        return;
+    }
+    const current = playgroundState.pagxView.currentTimeMicros();
+    const duration = playgroundState.pagxView.durationMicros();
+    timeText.textContent = formatTime(current) + ' / ' + formatTime(duration);
+    frameText.textContent = String(getCurrentFrame()) + ' / ' + String(getTotalFrames());
+}
+
+function updatePlaybackUI(): void {
+    updatePlayPauseIcon();
+    updateProgressSlider();
+    updateTimeDisplay();
+}
+
+function togglePlayback(): void {
+    const view = playgroundState.pagxView;
+    if (!view || view.durationMicros() <= 0) {
+        return;
+    }
+    if (view.isPlaying()) {
+        view.pause();
+    } else {
+        view.play();
+    }
+    updatePlaybackUI();
+}
+
 function hidePlaybackUI(): void {
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
     canvas.classList.add('hidden');
     toolbar.classList.add('hidden');
+    playbackBar.classList.add('hidden');
 }
 
 const DEFAULT_TITLE = 'PAGX Playground';
@@ -818,8 +943,10 @@ function goHome(pushHistory: boolean = true): void {
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
+    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
     canvas.classList.add('hidden');
     toolbar.classList.add('hidden');
+    playbackBar.classList.add('hidden');
     navBtns.classList.remove('hidden');
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
@@ -894,6 +1021,7 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
     navBtns.classList.add('hidden');
+    showPlaybackBar();
     document.title = 'PAGX Playground - ' + name;
     currentFileName = name;
 
@@ -1034,8 +1162,16 @@ function setupDragAndDrop() {
         document.body.addEventListener(eventName, preventDefaults, false);
     });
 
+    const isFileDrag = (e: DragEvent): boolean => {
+        const types = e.dataTransfer?.types;
+        return types ? Array.prototype.indexOf.call(types, 'Files') !== -1 : false;
+    };
+
     ['dragenter', 'dragover'].forEach(eventName => {
-        container.addEventListener(eventName, () => {
+        container.addEventListener(eventName, (e: Event) => {
+            if (!isFileDrag(e as DragEvent)) {
+                return;
+            }
             dropZone.classList.add('drag-over');
             dropZone.classList.remove('hidden');
         }, false);
@@ -1086,6 +1222,105 @@ function setupDragAndDrop() {
         }
         fileInput.value = '';
     });
+}
+
+function setupPlaybackControls(): void {
+    const playPauseBtn = document.getElementById('play-pause-btn') as HTMLButtonElement;
+    const prevFrameBtn = document.getElementById('prev-frame-btn') as HTMLButtonElement;
+    const nextFrameBtn = document.getElementById('next-frame-btn') as HTMLButtonElement;
+    const progressSlider = document.getElementById('progress-slider') as HTMLInputElement;
+
+    if (playPauseBtn) {
+        playPauseBtn.addEventListener('click', () => {
+            togglePlayback();
+        });
+    }
+
+    if (prevFrameBtn) {
+        prevFrameBtn.addEventListener('click', () => {
+            if (!playgroundState.pagxView) return;
+            playgroundState.pagxView.goToPreviousFrame();
+            updatePlaybackUI();
+        });
+    }
+
+    if (nextFrameBtn) {
+        nextFrameBtn.addEventListener('click', () => {
+            if (!playgroundState.pagxView) return;
+            playgroundState.pagxView.goToNextFrame();
+            updatePlaybackUI();
+        });
+    }
+
+    let isDraggingSlider = false;
+    let wasPlayingBeforeDrag = false;
+    if (progressSlider) {
+        const seekToSliderValue = () => {
+            if (!playgroundState.pagxView) return;
+            const duration = playgroundState.pagxView.durationMicros();
+            if (duration <= 0) return;
+            const value = parseFloat(progressSlider.value);
+            const targetTime = (value / 1000) * duration;
+            playgroundState.pagxView.setCurrentTimeMicros(targetTime);
+        };
+        progressSlider.addEventListener('input', () => {
+            if (!playgroundState.pagxView) return;
+            // Pause on drag start so the frame follows the slider instead of the render loop
+            // advancing over it; remember the state to restore on release.
+            if (!isDraggingSlider) {
+                isDraggingSlider = true;
+                wasPlayingBeforeDrag = playgroundState.pagxView.isPlaying();
+                if (wasPlayingBeforeDrag) {
+                    playgroundState.pagxView.pause();
+                }
+            }
+            updateSliderFill(progressSlider);
+            seekToSliderValue();
+            updateTimeDisplay();
+            updatePlayPauseIcon();
+        });
+        progressSlider.addEventListener('change', () => {
+            isDraggingSlider = false;
+            if (!playgroundState.pagxView) return;
+            seekToSliderValue();
+            if (wasPlayingBeforeDrag) {
+                playgroundState.pagxView.play();
+                wasPlayingBeforeDrag = false;
+            }
+            updatePlaybackUI();
+            // Release focus so the Space shortcut keeps working after dragging.
+            progressSlider.blur();
+        });
+    }
+
+    // Keyboard shortcut: Space for play/pause
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.code !== 'Space') return;
+        // Ignore only text entry fields; the range slider must still respond to Space.
+        const target = e.target;
+        const isTextInput =
+            (target instanceof HTMLInputElement && target.type !== 'range') ||
+            target instanceof HTMLTextAreaElement;
+        if (isTextInput) return;
+        const canvas = document.getElementById('pagx-canvas');
+        if (!canvas || canvas.classList.contains('hidden')) return;
+        e.preventDefault();
+        togglePlayback();
+    });
+
+    // Update playback UI periodically. Also fire once on the play -> stop transition so the slider,
+    // time and icon settle on the final frame after a single (non-looping) playback ends.
+    let wasPlaying = false;
+    setInterval(() => {
+        if (!playgroundState.pagxView) return;
+        const canvas = document.getElementById('pagx-canvas');
+        if (!canvas || canvas.classList.contains('hidden')) return;
+        const playing = playgroundState.pagxView.isPlaying();
+        if (!isDraggingSlider && (playing || wasPlaying)) {
+            updatePlaybackUI();
+        }
+        wasPlaying = playing;
+    }, 100);
 }
 
 function checkWebGL2Support(): boolean {
@@ -1271,6 +1506,7 @@ if (typeof window !== 'undefined') {
 
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
+        setupPlaybackControls();
 
         if (!checkWasmSupport() || !checkWebGL2Support()) {
             showErrorUI(getBrowserRequirements());
@@ -1298,44 +1534,40 @@ if (typeof window !== 'undefined') {
             loadPAGXSample(sampleName, false);
         }
 
+        // Encodes XML, reparses and redraws the view. Shared by the editor's Apply
+        // and Save actions. Returns '' on success, otherwise an error message.
+        const applyXmlToView = (xmlText: string): string => {
+            if (playgroundState.pagxView === null) {
+                return 'PAGXView not initialized';
+            }
+            try {
+                const data = new TextEncoder().encode(xmlText);
+                playgroundState.pagxView.parsePAGX(data);
+                playgroundState.pagxView.buildLayers();
+                playgroundState.pagxView.draw();
+                return '';
+            } catch (e) {
+                return e instanceof Error ? e.message : String(e);
+            }
+        };
         // Initialize the Source Editor module (keyboard shortcut L to toggle).
         initEditor({
-            onApply: (xmlText: string): string => {
-                if (playgroundState.pagxView === null) {
-                    return 'PAGXView not initialized';
-                }
-                try {
-                    const data = new TextEncoder().encode(xmlText);
-                    playgroundState.pagxView.parsePAGX(data);
-                    playgroundState.pagxView.buildLayers();
-                    playgroundState.pagxView.draw();
-                    return '';
-                } catch (e) {
-                    return e instanceof Error ? e.message : String(e);
-                }
-            },
+            onApply: applyXmlToView,
             onSave: (xmlText: string): string => {
-                if (playgroundState.pagxView === null) {
-                    return 'PAGXView not initialized';
+                const error = applyXmlToView(xmlText);
+                if (error !== '') {
+                    return error;
                 }
-                try {
-                    const data = new TextEncoder().encode(xmlText);
-                    playgroundState.pagxView.parsePAGX(data);
-                    playgroundState.pagxView.buildLayers();
-                    playgroundState.pagxView.draw();
-                    const blob = new Blob([xmlText], { type: 'application/xml' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = currentFileName.endsWith('.pagx') ? currentFileName : currentFileName + '.pagx';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    return '';
-                } catch (e) {
-                    return e instanceof Error ? e.message : String(e);
-                }
+                const blob = new Blob([xmlText], { type: 'application/xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentFileName.endsWith('.pagx') ? currentFileName : currentFileName + '.pagx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                return '';
             },
         });
 

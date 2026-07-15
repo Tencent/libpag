@@ -437,4 +437,82 @@ void PAGXView::updateAdaptiveTileRefinement() {
   }
 }
 
+void PAGXView::play() {
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->play();
+  }
+}
+
+void PAGXView::pause() {
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->pause();
+  }
+}
+
+bool PAGXView::isPlaying() const {
+  if (defaultTimeline != nullptr) {
+    return defaultTimeline->isPlaying();
+  }
+  return false;
+}
+
+int64_t PAGXView::currentTimeMicros() const {
+  if (defaultTimeline != nullptr) {
+    return defaultTimeline->currentTime();
+  }
+  return 0;
+}
+
+int64_t PAGXView::durationMicros() const {
+  if (defaultTimeline != nullptr) {
+    return defaultTimeline->duration();
+  }
+  return 0;
+}
+
+float PAGXView::currentFrameRate() const {
+  if (defaultTimeline != nullptr) {
+    return defaultTimeline->frameRate();
+  }
+  return 0.0f;
+}
+
+void PAGXView::setCurrentTimeMicros(int64_t micros) {
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->setCurrentTime(micros);
+    lastAnimationTimeMs = -1.0;
+  }
+}
+
+void PAGXView::goToPreviousFrame() {
+  if (defaultTimeline == nullptr || defaultTimeline->frameRate() <= 0.0f) {
+    return;
+  }
+  // Stepping a frame always pauses playback first, matching the desktop client behavior.
+  pause();
+  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultTimeline->frameRate());
+  int64_t newTime = defaultTimeline->currentTime() - frameDurationUs;
+  if (newTime < 0) {
+    newTime = 0;
+  }
+  setCurrentTimeMicros(newTime);
+  defaultTimeline->apply();
+}
+
+void PAGXView::goToNextFrame() {
+  if (defaultTimeline == nullptr || defaultTimeline->frameRate() <= 0.0f) {
+    return;
+  }
+  // Stepping a frame always pauses playback first, matching the desktop client behavior.
+  pause();
+  int64_t frameDurationUs = static_cast<int64_t>(1000000.0 / defaultTimeline->frameRate());
+  int64_t duration = defaultTimeline->duration();
+  int64_t newTime = defaultTimeline->currentTime() + frameDurationUs;
+  if (duration > 0 && newTime > duration) {
+    newTime = duration;
+  }
+  setCurrentTimeMicros(newTime);
+  defaultTimeline->apply();
+}
+
 }  // namespace pagx
