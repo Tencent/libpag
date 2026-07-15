@@ -349,23 +349,9 @@ export class PAGXView {
   }
 
   /**
-   * Goes to the previous frame. Pauses playback if currently playing.
-   */
-  public goToPreviousFrame(): void {
-    this.nativeView._goToPreviousFrame();
-  }
-
-  /**
-   * Goes to the next frame. Pauses playback if currently playing.
-   */
-  public goToNextFrame(): void {
-    this.nativeView._goToNextFrame();
-  }
-
-  /**
    * Sets whether playback loops, overriding the loop mode stored in the file. When enabled, each
-   * cycle repeats (preserving PingPong mirroring); when disabled, playback stops at the last frame
-   * after a single pass.
+   * cycle repeats (preserving PingPong mirroring); when disabled, playback rewinds to the first
+   * frame and stops after a single pass.
    * @param loop true to loop, false to play once
    */
   public setLoop(loop: boolean): void {

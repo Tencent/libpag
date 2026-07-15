@@ -167,18 +167,9 @@ export interface _PAGXView {
   _setCurrentTimeMicros(micros: number): void;
 
   /**
-   * Goes to the previous frame. Pauses if currently playing.
-   */
-  _goToPreviousFrame(): void;
-
-  /**
-   * Goes to the next frame. Pauses if currently playing.
-   */
-  _goToNextFrame(): void;
-
-  /**
    * Sets whether playback loops, overriding the file's loop mode.
-   * @param loop true to repeat after each cycle, false to stop at the end after a single pass
+   * @param loop true to repeat after each cycle, false to rewind to the first frame and stop after
+   *   a single pass
    */
   _setLoop(loop: boolean): void;
 

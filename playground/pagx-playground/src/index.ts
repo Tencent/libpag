@@ -928,8 +928,33 @@ function togglePlayback(): void {
     if (view.isPlaying()) {
         view.pause();
     } else {
+        // Restart from the head when starting playback at the last frame (the user stepped or
+        // dragged the playhead to the end), so play replays instead of being stuck at the end.
+        if (view.currentTimeMicros() >= view.durationMicros()) {
+            view.setCurrentTimeMicros(0);
+        }
         view.play();
     }
+    updatePlaybackUI();
+}
+
+// Steps the playhead by one frame in the given direction (-1 previous, +1 next). Stepping always
+// pauses first, then seeks by a single frame duration clamped to the animation range. Composed from
+// the view's playback primitives so the frame-navigation policy lives in the UI layer.
+function stepFrame(direction: number): void {
+    const view = playgroundState.pagxView;
+    if (!view) {
+        return;
+    }
+    const rate = view.currentFrameRate();
+    const duration = view.durationMicros();
+    if (rate <= 0 || duration <= 0) {
+        return;
+    }
+    view.pause();
+    const frameDurationUs = 1_000_000 / rate;
+    const target = view.currentTimeMicros() + direction * frameDurationUs;
+    view.setCurrentTimeMicros(Math.max(0, Math.min(duration, target)));
     updatePlaybackUI();
 }
 
@@ -1022,6 +1047,9 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     playgroundState.pagxView.parsePAGX(data);
     await loadExternalFiles(baseURL);
     playgroundState.pagxView.buildLayers();
+    // The view is a reused singleton, so reset loop to its default enabled state so each newly
+    // opened file starts fresh instead of inheriting the previous file's loop toggle.
+    playgroundState.pagxView.setLoop(true);
     gestureManager.resetTransform(playgroundState);
     updateSize();
     // Draw the first frame before showing canvas to avoid flashing old content
@@ -1247,17 +1275,13 @@ function setupPlaybackControls(): void {
 
     if (prevFrameBtn) {
         prevFrameBtn.addEventListener('click', () => {
-            if (!playgroundState.pagxView) return;
-            playgroundState.pagxView.goToPreviousFrame();
-            updatePlaybackUI();
+            stepFrame(-1);
         });
     }
 
     if (nextFrameBtn) {
         nextFrameBtn.addEventListener('click', () => {
-            if (!playgroundState.pagxView) return;
-            playgroundState.pagxView.goToNextFrame();
-            updatePlaybackUI();
+            stepFrame(1);
         });
     }
 

@@ -87,8 +87,6 @@ class PAGXView {
   int64_t durationMicros() const;
   float currentFrameRate() const;
   void setCurrentTimeMicros(int64_t micros);
-  void goToPreviousFrame();
-  void goToNextFrame();
   void setLoop(bool loop);
   bool isLoop() const;
 
