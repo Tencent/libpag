@@ -273,6 +273,17 @@ struct TextRuntimeTarget : RuntimeTarget {
   }
 };
 
+// Context threaded through convertGroup/convertVectorElement/convertText while converting a
+// TextBox's children. Carries the shared TextHolder all child Texts attach to (they share one
+// line-breaking layout), plus each child's inverse matrix and the box padding so a reshape
+// reproduces the layout coordinate transform. Null / empty for standalone Texts and plain Groups.
+struct TextBoxConvertContext {
+  std::shared_ptr<TextHolder> holder = nullptr;
+  std::unordered_map<Text*, tgfx::Matrix> inverseMatrices = {};
+  float paddingLeft = 0.0f;
+  float paddingTop = 0.0f;
+};
+
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
   if (!data) {
@@ -1040,7 +1051,8 @@ class LayerBuilderContext {
     }
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(Element* node) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(
+      Element* node, const TextBoxConvertContext* textBoxContext = nullptr) {
     if (!node) {
       return nullptr;
     }
@@ -1060,7 +1072,7 @@ class LayerBuilderContext {
         result = convertPath(static_cast<const Path*>(node));
         break;
       case NodeType::Text:
-        result = convertText(static_cast<Text*>(node));
+        result = convertText(static_cast<Text*>(node), textBoxContext);
         break;
       case NodeType::Fill:
         result = convertFill(static_cast<const Fill*>(node));
@@ -1087,7 +1099,7 @@ class LayerBuilderContext {
         result = convertTextModifier(static_cast<const TextModifier*>(node));
         break;
       case NodeType::Group:
-        result = convertGroup(static_cast<const Group*>(node));
+        result = convertGroup(static_cast<const Group*>(node), textBoxContext);
         break;
       case NodeType::TextBox: {
         auto* textBox = static_cast<const TextBox*>(node);
@@ -1377,7 +1389,8 @@ class LayerBuilderContext {
     return true;
   }
 
-  std::shared_ptr<tgfx::Text> convertText(Text* node) {
+  std::shared_ptr<tgfx::Text> convertText(Text* node,
+                                          const TextBoxConvertContext* textBoxContext = nullptr) {
     prepareTextBlobCached(node, tgfx::Matrix::I());
     auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
@@ -1398,17 +1411,17 @@ class LayerBuilderContext {
       target->setWriter("y", WriteTextY);
       target->setReader("y", ReadTextY);
       if (_needsRuntimeData) {
-        if (_currentTextBoxHolder != nullptr) {
+        if (textBoxContext != nullptr && textBoxContext->holder != nullptr) {
           // TextBox child: attach to the box's shared holder with the child's inverse matrix and
           // the box padding so a reshape reproduces the same coordinate transform as layout.
           tgfx::Matrix inverse = {};
-          auto it = _textBoxInverseMatrices.find(node);
-          if (it != _textBoxInverseMatrices.end()) {
+          auto it = textBoxContext->inverseMatrices.find(node);
+          if (it != textBoxContext->inverseMatrices.end()) {
             inverse = it->second;
           }
-          _currentTextBoxHolder->addEntry(node, target, MakeGlyphParams(node), inverse,
-                                          _textBoxPaddingLeft, _textBoxPaddingTop);
-          target->holder = _currentTextBoxHolder;
+          textBoxContext->holder->addEntry(node, target, MakeGlyphParams(node), inverse,
+                                           textBoxContext->paddingLeft, textBoxContext->paddingTop);
+          target->holder = textBoxContext->holder;
         } else {
           // Standalone Text: its own holder, identity matrix, no padding.
           auto holder = std::make_shared<TextHolder>(MakeStandaloneParams(node));
@@ -2242,48 +2255,34 @@ class LayerBuilderContext {
     return modifier;
   }
 
-  // Converts a TextBox, setting up a single shared TextHolder that all child Texts attach to (they
-  // share one line-breaking layout). Child inverse matrices and box padding are captured so a
-  // reshape reproduces the layout coordinate transform, then convertGroup builds the tgfx subtree.
+  // Converts a TextBox. Builds the shared TextHolder and per-child coordinate data up front, then
+  // threads it through convertGroup so each child Text attaches to the same holder (they share one
+  // line-breaking layout). The holder is registered on the binding after the subtree is built.
   std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) {
-    std::shared_ptr<TextHolder> previousHolder = _currentTextBoxHolder;
-    auto previousMatrices = std::move(_textBoxInverseMatrices);
-    float previousPaddingLeft = _textBoxPaddingLeft;
-    float previousPaddingTop = _textBoxPaddingTop;
-
-    _textBoxInverseMatrices.clear();
-    _currentTextBoxHolder = nullptr;
-    _textBoxPaddingLeft = 0.0f;
-    _textBoxPaddingTop = 0.0f;
-    if (_needsRuntimeData) {
-      _currentTextBoxHolder = std::make_shared<TextHolder>(MakeTextBoxParams(node));
-      bool hasPadding = !node->padding.isZero();
-      _textBoxPaddingLeft = hasPadding ? node->padding.left : 0.0f;
-      _textBoxPaddingTop = hasPadding ? node->padding.top : 0.0f;
-      std::vector<Text*> childText = {};
-      std::vector<tgfx::Matrix> matrices = {};
-      TextLayout::CollectTextElements(node->elements, childText, matrices);
-      for (size_t i = 0; i < childText.size(); i++) {
-        tgfx::Matrix inverse = {};
-        if (matrices[i].invert(&inverse)) {
-          _textBoxInverseMatrices[childText[i]] = inverse;
-        }
+    if (!_needsRuntimeData) {
+      return convertGroup(node);
+    }
+    TextBoxConvertContext context = {};
+    context.holder = std::make_shared<TextHolder>(MakeTextBoxParams(node));
+    bool hasPadding = !node->padding.isZero();
+    context.paddingLeft = hasPadding ? node->padding.left : 0.0f;
+    context.paddingTop = hasPadding ? node->padding.top : 0.0f;
+    std::vector<Text*> childText = {};
+    std::vector<tgfx::Matrix> matrices = {};
+    TextLayout::CollectTextElements(node->elements, childText, matrices);
+    for (size_t i = 0; i < childText.size(); i++) {
+      tgfx::Matrix inverse = {};
+      if (matrices[i].invert(&inverse)) {
+        context.inverseMatrices[childText[i]] = inverse;
       }
     }
-
-    auto group = convertGroup(node);
-
-    if (_currentTextBoxHolder != nullptr) {
-      _result.binding.registerTextHolder(_currentTextBoxHolder);
-    }
-    _currentTextBoxHolder = previousHolder;
-    _textBoxInverseMatrices = std::move(previousMatrices);
-    _textBoxPaddingLeft = previousPaddingLeft;
-    _textBoxPaddingTop = previousPaddingTop;
+    auto group = convertGroup(node, &context);
+    _result.binding.registerTextHolder(context.holder);
     return group;
   }
 
-  std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
+  std::shared_ptr<tgfx::VectorGroup> convertGroup(
+      const Group* node, const TextBoxConvertContext* textBoxContext = nullptr) {
     auto group = tgfx::VectorGroup::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
     elements.reserve(node->elements.size());
@@ -2298,7 +2297,7 @@ class LayerBuilderContext {
         }
       }
 
-      auto tgfxElement = convertVectorElement(element);
+      auto tgfxElement = convertVectorElement(element, textBoxContext);
       if (tgfxElement) {
         elements.push_back(tgfxElement);
       }
@@ -3177,13 +3176,6 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
-  // While converting a TextBox's children, holds the shared TextHolder those children attach to
-  // (all Texts in a TextBox share one line-breaking layout) plus each child's inverse matrix and
-  // the box padding, so convertText can register each child as an entry. Null outside a TextBox.
-  std::shared_ptr<TextHolder> _currentTextBoxHolder = nullptr;
-  std::unordered_map<Text*, tgfx::Matrix> _textBoxInverseMatrices = {};
-  float _textBoxPaddingLeft = 0.0f;
-  float _textBoxPaddingTop = 0.0f;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
