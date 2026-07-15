@@ -1043,8 +1043,7 @@ class LayerBuilderContext {
     }
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(
-      Element* node, const TextBoxConvertContext* textBoxContext = nullptr) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(Element* node) {
     if (!node) {
       return nullptr;
     }
@@ -1064,7 +1063,7 @@ class LayerBuilderContext {
         result = convertPath(static_cast<const Path*>(node));
         break;
       case NodeType::Text:
-        result = convertText(static_cast<Text*>(node), textBoxContext);
+        result = convertText(static_cast<Text*>(node));
         break;
       case NodeType::Fill:
         result = convertFill(static_cast<const Fill*>(node));
@@ -1091,7 +1090,7 @@ class LayerBuilderContext {
         result = convertTextModifier(static_cast<const TextModifier*>(node));
         break;
       case NodeType::Group:
-        result = convertGroup(static_cast<const Group*>(node), textBoxContext);
+        result = convertGroup(static_cast<const Group*>(node));
         break;
       case NodeType::TextBox: {
         auto* textBox = static_cast<const TextBox*>(node);
@@ -1381,8 +1380,7 @@ class LayerBuilderContext {
     return true;
   }
 
-  std::shared_ptr<tgfx::Text> convertText(Text* node,
-                                          const TextBoxConvertContext* textBoxContext = nullptr) {
+  std::shared_ptr<tgfx::Text> convertText(Text* node) {
     prepareTextBlobCached(node, tgfx::Matrix::I());
     auto textBlob = node->glyphData->textBlob;
     if (textBlob == nullptr) {
@@ -1402,7 +1400,7 @@ class LayerBuilderContext {
       target->setReader("x", ReadTextX);
       target->setWriter("y", WriteTextY);
       target->setReader("y", ReadTextY);
-      wireTextRuntime(node, target, textBoxContext);
+      wireTextRuntime(node, target);
     }
     return tgfxText;
   }
@@ -1410,9 +1408,8 @@ class LayerBuilderContext {
   // Hook for wiring the runtime text-reshaping mechanism (TextHolder) onto a freshly built
   // tgfx::Text. The base (static) build does nothing: a static tree carries no ViewModel/Animation
   // drivers, so the shaping channels never fire. RuntimeLayerBuilderContext overrides this to
-  // create/attach a TextHolder for the node.
-  virtual void wireTextRuntime(Text* /*node*/, TextRuntimeTarget* /*target*/,
-                               const TextBoxConvertContext* /*textBoxContext*/) {
+  // create/attach a TextHolder for the node, reading any active TextBox context from its own state.
+  virtual void wireTextRuntime(Text* /*node*/, TextRuntimeTarget* /*target*/) {
   }
 
   std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
@@ -2243,8 +2240,7 @@ class LayerBuilderContext {
     return convertGroup(node);
   }
 
-  std::shared_ptr<tgfx::VectorGroup> convertGroup(
-      const Group* node, const TextBoxConvertContext* textBoxContext = nullptr) {
+  std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
     auto group = tgfx::VectorGroup::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
     elements.reserve(node->elements.size());
@@ -2259,7 +2255,7 @@ class LayerBuilderContext {
         }
       }
 
-      auto tgfxElement = convertVectorElement(element, textBoxContext);
+      auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
         elements.push_back(tgfxElement);
       }
@@ -3170,8 +3166,9 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
   std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) override {
     // Build one shared TextHolder for the box: all child Texts share a single line-breaking layout,
     // so they reshape together. Capture each child's inverse matrix and the box padding so a reshape
-    // reproduces the same coordinate transform as the layout pass, then thread the context through
-    // convertGroup to every child Text.
+    // reproduces the same coordinate transform as the layout pass. The context is published on the
+    // instance for the duration of the subtree build so wireTextRuntime() can read it as each child
+    // Text is converted (Texts may sit under intermediate Groups), then cleared on return.
     TextBoxConvertContext context = {};
     context.holder = std::make_shared<TextHolder>(MakeTextBoxParams(node));
     bool hasPadding = !node->padding.isZero();
@@ -3186,13 +3183,16 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
         context.inverseMatrices[childText[i]] = inverse;
       }
     }
-    auto group = convertGroup(node, &context);
+    const TextBoxConvertContext* previous = _textBoxContext;
+    _textBoxContext = &context;
+    auto group = convertGroup(node);
+    _textBoxContext = previous;
     _result.binding.registerTextHolder(context.holder);
     return group;
   }
 
-  void wireTextRuntime(Text* node, TextRuntimeTarget* target,
-                       const TextBoxConvertContext* textBoxContext) override {
+  void wireTextRuntime(Text* node, TextRuntimeTarget* target) override {
+    const TextBoxConvertContext* textBoxContext = _textBoxContext;
     if (textBoxContext != nullptr && textBoxContext->holder != nullptr) {
       // TextBox child: attach to the box's shared holder with the child's inverse matrix and the
       // box padding so a reshape reproduces the same coordinate transform as layout.
@@ -3212,6 +3212,12 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
       target->holder = holder;
     }
   }
+
+ private:
+  // Active TextBox context during convertTextBox's subtree build; null outside it. Read by
+  // wireTextRuntime to attach a child Text to the box's shared holder. Saved/restored around the
+  // subtree build so it is robust even if TextBoxes were ever nested.
+  const TextBoxConvertContext* _textBoxContext = nullptr;
 };
 
 // Public API implementation
