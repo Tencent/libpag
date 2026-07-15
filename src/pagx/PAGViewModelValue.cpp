@@ -36,9 +36,13 @@ namespace pagx {
 // ---- Observer registration ---------------------------------------------------
 
 ObserverHandle PAGViewModelValue::addObserver(Observer observer) {
+  auto self = weak_from_this().lock();
+  if (self == nullptr) {
+    return ObserverHandle();
+  }
   int id = nextObserverId++;
   observers.push_back({id, std::move(observer)});
-  return ObserverHandle(shared_from_this(), id);
+  return ObserverHandle(self, id);
 }
 
 void PAGViewModelValue::removeObserver(int id) {

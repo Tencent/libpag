@@ -123,8 +123,12 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     // value-based applyEntry path via binding->apply, which routes to the target's channel writer
     // (StateMachineInputTarget for SM inputs, RuntimeTarget writers for render nodes).
     if (sourceValue->valueType() == ViewModelPropertyType::Trigger) {
-      auto triggerVal =
-          std::static_pointer_cast<PAGViewModelValueTrigger>(sourceValue->shared_from_this());
+      auto sourceSelf = sourceValue->weak_from_this().lock();
+      if (sourceSelf == nullptr) {
+        LOGE("DataBind skipped: Trigger source is not managed by shared_ptr.");
+        continue;
+      }
+      auto triggerVal = std::static_pointer_cast<PAGViewModelValueTrigger>(sourceSelf);
       triggerHandles[db] =
           triggerVal->addObserver(TriggerChannelObserver(binding, targetNode, db->channel));
     }
