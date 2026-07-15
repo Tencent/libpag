@@ -57,7 +57,7 @@ void TextBox::onMeasure(LayoutContext* context) {
   auto params = MakeTextLayoutParams(this, boxW, boxH);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  auto result = TextLayout::Layout(childText, params, context);
+  auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
   if (hasPadding) {
@@ -107,7 +107,7 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
     auto params = MakeTextLayoutParams(this, boxW, boxH);
     std::vector<Text*> childText = {};
     TextLayout::CollectTextElements(elements, childText);
-    auto result = TextLayout::Layout(childText, params, context);
+    auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
     // Measurement result: keep un-rounded so the TextBox mirrors the exact typeset extent.
     // Rounding is reserved for layout-allocation sites (see LayoutNode::setLayoutSize contract).
     float crossSize = horizontal ? result.bounds.height : result.bounds.width;
@@ -138,7 +138,7 @@ void TextBox::updateLayout(LayoutContext* context) {
   auto params = MakeTextLayoutParams(this, cw, ch);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  auto result = TextLayout::Layout(childText, params, context);
+  auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     auto* text = childText[i];
     text->textBounds = result.getTextBounds(text);

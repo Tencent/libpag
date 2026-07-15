@@ -34,7 +34,7 @@ Text::Text() : glyphData(new GlyphData()) {
 void Text::onMeasure(LayoutContext* context) {
   textScale = 1.0f;
   auto params = MakeStandaloneParams(this);
-  auto result = TextLayout::Layout({this}, params, context);
+  auto result = TextLayout::Layout({{this, MakeGlyphParams(this)}}, params, context);
   glyphData->layoutRuns = result.extractLayoutRuns(this);
   // The cached TextBlob was shaped from the previous layoutRuns; clear it so a re-layout (e.g. a
   // font or text change applied through applyLayout) re-shapes from the new runs instead of the
@@ -67,7 +67,7 @@ void Text::setLayoutSize(LayoutContext* context, float targetWidth, float target
     textScale = scale;
     auto params = MakeStandaloneParams(this);
     params.textScale = scale;
-    auto result = TextLayout::Layout({this}, params, context);
+    auto result = TextLayout::Layout({{this, MakeGlyphParams(this)}}, params, context);
     glyphData->layoutRuns = result.extractLayoutRuns(this);
     // Re-shaped runs invalidate the cached TextBlob; clear it so the render-time cache rebuilds.
     glyphData->textBlob = nullptr;

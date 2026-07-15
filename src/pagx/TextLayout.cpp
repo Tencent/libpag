@@ -25,6 +25,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/TextUtils.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
@@ -281,23 +282,26 @@ class TextLayoutContext {
     }
   }
 
-  TextLayoutResult processTextWithLayout(std::vector<Text*>& textElements,
+  TextLayoutResult processTextWithLayout(const std::vector<TextElement>& textElements,
                                          const TextLayoutParams& params) {
     // Shape each Text and concatenate all glyphs for unified layout within the TextBox.
     std::vector<GlyphInfo> allGlyphs = {};
     size_t estimatedGlyphCount = 0;
-    for (auto* text : textElements) {
-      estimatedGlyphCount += text->text.size();
+    for (const auto& element : textElements) {
+      estimatedGlyphCount += element.glyph.text.size();
     }
     allGlyphs.reserve(estimatedGlyphCount);
     float totalWidth = 0;
     bool paragraphRTL = false;
     bool directionResolved = false;
-    for (auto* text : textElements) {
+    for (const auto& element : textElements) {
+      auto* text = element.node;
+      glyphContent_[text] = element.glyph.text;
       ShapedInfo info = {};
       info.text = text;
-      if (!text->text.empty()) {
-        shapeText(text, info, params.writingMode == WritingMode::Vertical, params.textScale);
+      if (!element.glyph.text.empty()) {
+        shapeText(text, element.glyph, info, params.writingMode == WritingMode::Vertical,
+                  params.textScale);
         if (!directionResolved) {
           paragraphRTL = info.paragraphRTL;
           directionResolved = true;
@@ -374,8 +378,9 @@ class TextLayoutContext {
     return result;
   }
 
-  void shapeText(Text* text, ShapedInfo& info, bool vertical = false, float textScale = 1.0f) {
-    auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
+  void shapeText(Text* text, const TextGlyphParams& glyph, ShapedInfo& info, bool vertical = false,
+                 float textScale = 1.0f) {
+    auto primaryTypeface = findTypeface(glyph.fontFamily, glyph.fontStyle);
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
     // special characters (newline, tab) that do not go through per-character glyph fallback.
@@ -384,16 +389,16 @@ class TextLayoutContext {
       metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
-    float effectiveFontSize = text->fontSize * textScale;
+    float effectiveFontSize = glyph.fontSize * textScale;
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
-    primaryFont.setFauxBold(text->fauxBold);
-    primaryFont.setFauxItalic(text->fauxItalic);
+    primaryFont.setFauxBold(glyph.fauxBold);
+    primaryFont.setFauxItalic(glyph.fauxItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
-    metricsFont.setFauxBold(text->fauxBold);
-    metricsFont.setFauxItalic(text->fauxItalic);
+    metricsFont.setFauxBold(glyph.fauxBold);
+    metricsFont.setFauxItalic(glyph.fauxItalic);
     float currentX = 0;
-    const std::string& content = text->text;
-    float effectiveLetterSpacing = text->letterSpacing * textScale;
+    const std::string& content = glyph.text;
+    float effectiveLetterSpacing = glyph.letterSpacing * textScale;
     bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
 
     // Collect newline and tab positions, then shape non-special segments.
@@ -818,8 +823,8 @@ class TextLayoutContext {
   // top-to-bottom horizontal ordering. Empty ranges (whitespace-only or '\n'-only columns) are
   // skipped because the PPT writer reconstructs '\n' breaks by walking the source byte gap
   // between consecutive non-empty entries.
-  static void RecordPerTextColumnMetadata(const ColumnInfo& column, float columnX,
-                                          TextLayoutResult& result) {
+  void RecordPerTextColumnMetadata(const ColumnInfo& column, float columnX,
+                                   TextLayoutResult& result) {
     std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
     for (const auto& vg : column.glyphs) {
       for (const auto& g : vg.glyphs) {
@@ -837,10 +842,10 @@ class TextLayoutContext {
     }
     for (auto& [text, range] : perTextClusterRange) {
       uint32_t byteEnd = range.second;
-      if (byteEnd < text->text.size()) {
+      const std::string& content = glyphContent(text);
+      if (byteEnd < content.size()) {
         int32_t dummy = 0;
-        size_t charLen =
-            DecodeUTF8Char(text->text.data() + byteEnd, text->text.size() - byteEnd, &dummy);
+        size_t charLen = DecodeUTF8Char(content.data() + byteEnd, content.size() - byteEnd, &dummy);
         byteEnd += static_cast<uint32_t>(charLen > 0 ? charLen : 1);
       }
       TextLayoutLineInfo info = {};
@@ -867,8 +872,8 @@ class TextLayoutContext {
   // Records per-Text line metadata (byte ranges and positions) for text export. For each Text
   // element that contributes glyphs to this line, computes the min/max cluster (byte offset in
   // the source UTF-8 string) and stores it together with the line's baseline Y and start X.
-  static void RecordPerTextLineMetadata(const LineInfo& line, float baselineY, float xOffset,
-                                        float lineWidth, TextLayoutResult& result) {
+  void RecordPerTextLineMetadata(const LineInfo& line, float baselineY, float xOffset,
+                                 float lineWidth, TextLayoutResult& result) {
     std::unordered_map<Text*, std::pair<uint32_t, uint32_t>> perTextClusterRange;
     for (auto& g : line.glyphs) {
       if (g.unichar == '\n' || g.unichar == '\t' || g.sourceText == nullptr) {
@@ -884,10 +889,10 @@ class TextLayoutContext {
     }
     for (auto& [text, range] : perTextClusterRange) {
       uint32_t byteEnd = range.second;
-      if (byteEnd < text->text.size()) {
+      const std::string& content = glyphContent(text);
+      if (byteEnd < content.size()) {
         int32_t dummy = 0;
-        size_t charLen =
-            DecodeUTF8Char(text->text.data() + byteEnd, text->text.size() - byteEnd, &dummy);
+        size_t charLen = DecodeUTF8Char(content.data() + byteEnd, content.size() - byteEnd, &dummy);
         byteEnd += static_cast<uint32_t>(charLen > 0 ? charLen : 1);
       }
       TextLayoutLineInfo lineInfo = {};
@@ -1565,7 +1570,17 @@ class TextLayoutContext {
     return layoutContext_->findTypeface(fontFamily, fontStyle);
   }
 
+  // Returns the shaped text content for a Text element as supplied to processTextWithLayout. Used
+  // by line-metadata recording to walk UTF-8 cluster boundaries against the same content that was
+  // shaped, which may differ from text->text when a runtime holder overrode the content.
+  const std::string& glyphContent(Text* text) const {
+    static const std::string EMPTY;
+    auto it = glyphContent_.find(text);
+    return it != glyphContent_.end() ? it->second : EMPTY;
+  }
+
   LayoutContext* layoutContext_ = nullptr;
+  std::unordered_map<Text*, std::string> glyphContent_ = {};
 };
 
 Rect TextLayoutResult::getTextBounds(Text* text) const {
@@ -1622,9 +1637,18 @@ void TextLayout::CollectTextElements(const std::vector<Element*>& elements,
                                                      tgfx::Matrix::I());
 }
 
-static bool AllHaveEmbeddedGlyphRuns(const std::vector<Text*>& textElements) {
-  for (auto* text : textElements) {
-    if (text->glyphRuns.empty()) {
+std::vector<TextElement> TextLayout::MakeElements(const std::vector<Text*>& textNodes) {
+  std::vector<TextElement> elements = {};
+  elements.reserve(textNodes.size());
+  for (auto* node : textNodes) {
+    elements.push_back({node, MakeGlyphParams(node)});
+  }
+  return elements;
+}
+
+static bool AllHaveEmbeddedGlyphRuns(const std::vector<TextElement>& textElements) {
+  for (const auto& element : textElements) {
+    if (element.node->glyphRuns.empty()) {
       return false;
     }
   }
@@ -1651,11 +1675,11 @@ static Rect RectUnion(const Rect& a, const Rect& b) {
   return Rect::MakeXYWH(left, top, right - left, bottom - top);
 }
 
-static Rect MergeEmbeddedBounds(const std::vector<Text*>& textElements) {
+static Rect MergeEmbeddedBounds(const std::vector<TextElement>& textElements) {
   Rect totalBounds = {};
   bool hasAny = false;
-  for (auto* text : textElements) {
-    auto textBounds = ComputeEmbeddedTextBounds(text);
+  for (const auto& element : textElements) {
+    auto textBounds = ComputeEmbeddedTextBounds(element.node);
     if (textBounds.width <= 0 && textBounds.height <= 0) {
       continue;
     }
@@ -1669,7 +1693,7 @@ static Rect MergeEmbeddedBounds(const std::vector<Text*>& textElements) {
   return totalBounds;
 }
 
-TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
+TextLayoutResult TextLayout::Layout(const std::vector<TextElement>& textElements,
                                     const TextLayoutParams& params, LayoutContext* context) {
   if (textElements.empty()) {
     return {};
@@ -1681,8 +1705,7 @@ TextLayoutResult TextLayout::Layout(const std::vector<Text*>& textElements,
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
     result.bounds = MergeEmbeddedBounds(textElements);
   } else {
-    auto mutableElements = textElements;
-    result = layoutContext.processTextWithLayout(mutableElements, params);
+    result = layoutContext.processTextWithLayout(textElements, params);
   }
   return result;
 }

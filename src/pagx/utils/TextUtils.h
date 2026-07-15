@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "pagx/TextGlyphParams.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -212,6 +213,12 @@ TextLayoutParams MakeTextBoxParams(const TextBox* box);
  * Builds TextLayoutParams from a standalone Text element's attributes.
  */
 TextLayoutParams MakeStandaloneParams(const Text* text);
+
+/**
+ * Builds per-Text shaping attributes (text content, font, size, spacing, faux flags) from a Text
+ * element's document fields. Used to feed the shaper without reading the Text node directly.
+ */
+TextGlyphParams MakeGlyphParams(const Text* text);
 
 /**
  * Logical Start / End describe the *paragraph-relative* edges; the physical
