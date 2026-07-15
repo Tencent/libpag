@@ -776,23 +776,43 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
+// Embeds file data into every Image node whose filePath matches a key in fileDataMap, descending
+// into resolved external composition documents so nested images are embedded in the same pass.
+// Mirrors the recursion of AppendExternalImagePaths (read side) and LoadImageInChain (single-image
+// side); without the descent, getExternalImagePaths() collects child-document paths that
+// loadFileDataMap() would silently fail to match.
+static void LoadFileDataMapInChain(
+    PAGXDocument* document,
+    const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap,
+    std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || !visited.insert(document).second) {
+    return;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->data != nullptr || image->filePath.empty()) {
+        continue;
+      }
+      auto it = fileDataMap.find(image->filePath);
+      if (it == fileDataMap.end()) {
+        continue;
+      }
+      image->data = it->second;
+      image->filePath = {};
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited);
+      }
+    }
+  }
+}
+
 void PAGXDocument::loadFileDataMap(
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap) {
-  for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    auto* image = static_cast<Image*>(node.get());
-    if (image->data != nullptr || image->filePath.empty()) {
-      continue;
-    }
-    auto it = fileDataMap.find(image->filePath);
-    if (it == fileDataMap.end()) {
-      continue;
-    }
-    image->data = it->second;
-    image->filePath = {};
-  }
+  std::unordered_set<const PAGXDocument*> visited = {};
+  LoadFileDataMapInChain(this, fileDataMap, visited);
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into

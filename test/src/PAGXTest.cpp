@@ -6790,6 +6790,48 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionLoadFileData) {
 }
 
 /**
+ * Test case: loadFileDataMap descends into resolved external composition documents so Image nodes
+ * in nested child documents receive their file data in the same pass. getExternalImagePaths()
+ * already recurses to collect child-document paths; loadFileDataMap() must mirror that recursion
+ * or the collected paths' data is silently discarded and nested images stay unembedded.
+ */
+PAGX_TEST(PAGXTest, LoadFileDataMapDescendsIntoExternalDoc) {
+  std::string mainXML =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"slot\" composition=\"child.pagx\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(mainXML);
+  ASSERT_TRUE(doc != nullptr);
+
+  std::string childXML =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"childLayer\" width=\"50\" height=\"50\"/>\n"
+      "  <Resources>\n"
+      "    <Image id=\"img\" source=\"local.png\"/>\n"
+      "  </Resources>\n"
+      "</pagx>\n";
+  EXPECT_TRUE(doc->loadFileData("child.pagx", MakePAGXData(childXML)));
+
+  auto* slotLayer = doc->findNode<pagx::Layer>("slot");
+  ASSERT_TRUE(slotLayer != nullptr);
+  ASSERT_TRUE(slotLayer->externalDoc != nullptr);
+
+  auto paths = doc->getExternalImagePaths();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths[0], "local.png");
+
+  auto imageData = pagx::Data::MakeWithCopy("dummy", 5);
+  std::unordered_map<std::string, std::shared_ptr<pagx::Data>> fileDataMap = {
+      {"local.png", imageData}};
+  doc->loadFileDataMap(fileDataMap);
+
+  auto* childImage = slotLayer->externalDoc->findNode<pagx::Image>("img");
+  ASSERT_TRUE(childImage != nullptr);
+  EXPECT_TRUE(childImage->data != nullptr);
+  EXPECT_TRUE(childImage->filePath.empty());
+}
+
+/**
  * Test case: editing a child (external) document and calling its own notifyChange refreshes the
  * embedded subtree inside a parent scene that references it. The parent scene reverse-registered
  * with the child document, so the edit is reflected (the scene rebuilds its runtime tree).
