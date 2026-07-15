@@ -8557,6 +8557,12 @@
         "PAGSurfaceFromBackendRenderTarget": "60a88e548",
         "PAGSurfaceFromBackendTexture": "60a88e548"
     },
+    "PAGXStateMachine": {
+        "Crossfade": "514f5a0fc",
+        "NestedDim": "514f5a0fc",
+        "NestedVisible": "514f5a0fc",
+        "StableState": "514f5a0fc"
+    },
     "PAGXTest": {
         "GetRequiredFontsCrossDocument": "8b84d883",
         "LayerBuilderAPIConsistency": "60a88e548",

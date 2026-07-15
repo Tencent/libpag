@@ -41,9 +41,10 @@ class Image;
 class ImagePattern;
 
 /**
- * PAGXDocument is the root container for a PAGX document.
- * It contains resources and layers. This is a pure data structure class.
- * Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
+ * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
+ * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
+ * PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
@@ -70,9 +71,11 @@ class PAGXDocument : public Node {
   std::vector<Layer*> layers = {};
 
   /**
-   * Top-level animations.
+   * Top-level animation and state-machine definitions from the document's &lt;Animations&gt; block,
+   * in declaration order. Each entry is either an Animation or a StateMachine; check nodeType() to
+   * dispatch.
    */
-  std::vector<Animation*> animations = {};
+  std::vector<Node*> animations = {};
 
   /**
    * The ViewModel schema bound to this document (raw pointer, owned by nodes).
@@ -159,6 +162,19 @@ class PAGXDocument : public Node {
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  /**
+   * Returns the document's font configuration. Importers populate fallback fonts here
+   * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
+   * so glyph-level fallback can pick them up at layout time). Callers may also register
+   * additional typefaces or fallbacks directly before invoking `applyLayout`.
+   */
+  FontConfig& fontConfig() {
+    return _fontConfig;
+  }
+  const FontConfig& fontConfig() const {
+    return _fontConfig;
+  }
 
   /**
    * Supplies a host-decoded image for the given external file path. Image nodes whose filePath
@@ -289,7 +305,7 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
-  FontConfig fontConfig;
+  FontConfig _fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.

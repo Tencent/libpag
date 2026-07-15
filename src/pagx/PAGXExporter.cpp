@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
+#include <set>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -55,16 +56,24 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
+#include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -173,7 +182,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -300,28 +309,196 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
   }
 }
 
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
-  if (animations.empty()) {
+static std::string TransitionConditionOpToString(TransitionConditionOp op) {
+  switch (op) {
+    case TransitionConditionOp::Equal:
+      return "equal";
+    case TransitionConditionOp::NotEqual:
+      return "notEqual";
+    case TransitionConditionOp::LessThan:
+      return "lessThan";
+    case TransitionConditionOp::LessThanOrEqual:
+      return "lessThanOrEqual";
+    case TransitionConditionOp::GreaterThan:
+      return "greaterThan";
+    case TransitionConditionOp::GreaterThanOrEqual:
+      return "greaterThanOrEqual";
+    case TransitionConditionOp::Trigger:
+      return "trigger";
+  }
+  return "equal";
+}
+
+static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition,
+                           const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("Condition");
+  xml.addAttribute("id", condition->id);
+  xml.addRequiredAttribute("input", condition->inputName);
+  xml.addRequiredAttribute("op", TransitionConditionOpToString(condition->op));
+  if (condition->op != TransitionConditionOp::Trigger) {
+    if (condition->op == TransitionConditionOp::Equal ||
+        condition->op == TransitionConditionOp::NotEqual) {
+      // Equal/NotEqual apply to both Bool and Number inputs. Look up the referenced input's type
+      // so the matching value field is serialized. Fall back to Bool serialization when the input
+      // is not found in sm->inputs (e.g. broken reference), which loses valueNumber for Number
+      // conditions but keeps the document exportable.
+      auto inputType = StateMachineInputType::Bool;
+      for (const auto* input : inputs) {
+        if (input != nullptr && input->name == condition->inputName) {
+          inputType = input->type;
+          break;
+        }
+      }
+      if (inputType == StateMachineInputType::Number) {
+        xml.addAttribute("value", FloatToString(condition->valueNumber));
+      } else {
+        xml.addAttribute("value", condition->valueBool ? "true" : "false");
+      }
+    } else {
+      xml.addAttribute("value", FloatToString(condition->valueNumber));
+    }
+  }
+  WriteCustomData(xml, condition);
+  xml.closeElementSelfClosing();
+}
+
+static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
+                            const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("Transition");
+  xml.addAttribute("id", transition->id);
+  xml.addRequiredAttribute("from", transition->from);
+  xml.addRequiredAttribute("to", transition->to);
+  xml.addRequiredAttribute("duration", transition->duration);
+  xml.addAttribute("frameRate", transition->frameRate, 60.0f);
+  if (transition->interpolation != KeyframeInterpolationType::Linear) {
+    xml.addAttribute("interpolation", KeyframeInterpolationToString(transition->interpolation));
+    if (transition->interpolation == KeyframeInterpolationType::Bezier) {
+      if (transition->bezierOut != Point{}) {
+        xml.addAttribute("bezier-out", PointToString(transition->bezierOut));
+      }
+      if (transition->bezierIn != Point{}) {
+        xml.addAttribute("bezier-in", PointToString(transition->bezierIn));
+      }
+    }
+  }
+  if (transition->enableEarlyExit) {
+    xml.addAttribute("earlyExit", "true");
+  }
+  if (transition->pauseOnExit) {
+    xml.addAttribute("pauseOnExit", "true");
+  }
+  WriteCustomData(xml, transition);
+  xml.closeElementStart();
+  for (const auto* condition : transition->conditions) {
+    if (condition != nullptr) {
+      WriteCondition(xml, condition, inputs);
+    }
+  }
+  xml.closeElement();
+}
+
+static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
+                             const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("StateRegion");
+  xml.addAttribute("id", region->id);
+  xml.addRequiredAttribute("name", region->name);
+  xml.addRequiredAttribute("initialState", region->initialState);
+  WriteCustomData(xml, region);
+  xml.closeElementStart();
+
+  xml.openElement("States");
+  xml.closeElementStart();
+  for (const auto* state : region->states) {
+    if (state == nullptr) continue;
+    xml.openElement("State");
+    xml.addAttribute("id", state->id);
+    xml.addRequiredAttribute("name", state->name);
+    if (state->stateType() == StateType::Animation) {
+      auto* animState = static_cast<const AnimationState*>(state);
+      if (!animState->animationId.empty()) {
+        xml.addAttribute("animation", "@" + animState->animationId);
+      }
+    }
+    xml.closeElementSelfClosing();
+  }
+  xml.closeElement();
+
+  xml.openElement("Transitions");
+  xml.closeElementStart();
+  for (const auto* transition : region->transitions) {
+    if (transition != nullptr) {
+      WriteTransition(xml, transition, inputs);
+    }
+  }
+  xml.closeElement();
+
+  xml.closeElement();
+}
+
+static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
+  if (sm == nullptr) {
     return;
   }
-  xml.openElement("Animations");
+  xml.openElement("StateMachine");
+  xml.addAttribute("id", sm->id);
+  WriteCustomData(xml, sm);
   xml.closeElementStart();
-  for (const auto* animation : animations) {
-    xml.openElement("Animation");
-    xml.addAttribute("id", animation->id);
-    xml.addRequiredAttribute("duration", animation->duration);
-    xml.addAttribute("frameRate", animation->frameRate, 60.0f);
-    xml.addAttribute("loop", LoopModeToString(animation->loop));
+
+  if (!sm->inputs.empty()) {
+    xml.openElement("Inputs");
     xml.closeElementStart();
-    for (const auto* object : animation->objects) {
-      xml.openElement("Object");
-      xml.addAttribute("id", object->id);
-      xml.addRequiredAttribute("target", object->target);
-      xml.closeElementStart();
-      for (const auto* ch : object->channels) {
-        WriteChannel(xml, ch);
+    for (const auto* input : sm->inputs) {
+      if (input == nullptr) continue;
+      xml.openElement("Input");
+      xml.addAttribute("id", input->id);
+      xml.addRequiredAttribute("name", input->name);
+      std::string typeStr;
+      switch (input->type) {
+        case StateMachineInputType::Bool:
+          typeStr = "bool";
+          if (input->defaultBool) xml.addAttribute("default", "true");
+          break;
+        case StateMachineInputType::Number:
+          typeStr = "number";
+          if (input->defaultNumber != 0.0f)
+            xml.addAttribute("default", FloatToString(input->defaultNumber));
+          break;
+        case StateMachineInputType::Trigger:
+          typeStr = "trigger";
+          break;
       }
-      xml.closeElement();
+      xml.addRequiredAttribute("type", typeStr);
+      xml.closeElementSelfClosing();
+    }
+    xml.closeElement();
+  }
+
+  for (const auto* region : sm->regions) {
+    if (region != nullptr) {
+      WriteStateRegion(xml, region, sm->inputs);
+    }
+  }
+
+  xml.closeElement();
+}
+
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation) {
+  if (animation == nullptr) {
+    return;
+  }
+  xml.openElement("Animation");
+  xml.addAttribute("id", animation->id);
+  xml.addRequiredAttribute("duration", animation->duration);
+  xml.addAttribute("frameRate", animation->frameRate, 60.0f);
+  xml.addAttribute("loop", LoopModeToString(animation->loop));
+  xml.closeElementStart();
+  for (const auto* object : animation->objects) {
+    xml.openElement("Object");
+    xml.addAttribute("id", object->id);
+    xml.addRequiredAttribute("target", object->target);
+    xml.closeElementStart();
+    for (const auto* ch : object->channels) {
+      WriteChannel(xml, ch);
     }
     xml.closeElement();
   }
@@ -443,12 +620,15 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->image != nullptr) {
         if (!pattern->image->id.empty()) {
           xml.addAttribute("image", "@" + pattern->image->id);
-        } else if (pattern->image->data) {
-          xml.addAttribute("image",
-                           "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
-                                                                   pattern->image->data->size()));
         } else if (!pattern->image->filePath.empty()) {
           xml.addAttribute("image", pattern->image->filePath);
+        } else if (!pattern->image->filePath.empty()) {
+          xml.addAttribute("image", pattern->image->filePath);
+        } else if (pattern->image->data) {
+          const auto* bytes = pattern->image->data->bytes();
+          auto size = pattern->image->data->size();
+          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                        ";base64," + Base64Encode(bytes, size));
         }
       }
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
@@ -1209,11 +1389,13 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      if (image->data) {
-        xml.addAttribute("source", "data:image/png;base64," +
-                                       Base64Encode(image->data->bytes(), image->data->size()));
-      } else {
+      if (!image->filePath.empty()) {
         xml.addAttribute("source", image->filePath);
+      } else if (image->data) {
+        const auto* bytes = image->data->bytes();
+        auto size = image->data->size();
+        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                       ";base64," + Base64Encode(bytes, size));
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1243,7 +1425,21 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         for (const auto& layer : comp->layers) {
           WriteLayer(xml, layer, options);
         }
-        WriteAnimations(xml, comp->animations);
+        if (!comp->animations.empty()) {
+          xml.openElement("Animations");
+          xml.closeElementStart();
+          for (const auto* animChild : comp->animations) {
+            if (animChild == nullptr) {
+              continue;
+            }
+            if (animChild->nodeType() == NodeType::Animation) {
+              WriteAnimation(xml, static_cast<const Animation*>(animChild));
+            } else if (animChild->nodeType() == NodeType::StateMachine) {
+              WriteStateMachine(xml, static_cast<const StateMachine*>(animChild));
+            }
+          }
+          xml.closeElement();
+        }
         for (const auto& bind : comp->dataBinds) {
           WriteResource(xml, bind, options);
         }
@@ -1276,12 +1472,13 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           if (glyph->image != nullptr) {
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
-            } else if (glyph->image->data) {
-              xml.addAttribute("image",
-                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
-                                                                       glyph->image->data->size()));
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
+            } else if (glyph->image->data) {
+              const auto* bytes = glyph->image->data->bytes();
+              auto size = glyph->image->data->size();
+              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                            ";base64," + Base64Encode(bytes, size));
             }
           }
           if (glyph->offset != Default<Glyph>().offset) {
@@ -1531,6 +1728,13 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
           xml.closeElementSelfClosing();
           break;
         }
+        case TimelineType::StateMachine: {
+          auto* sm = static_cast<const StateMachineTimeline*>(timeline.get());
+          xml.openElement("StateMachine");
+          xml.addRequiredAttribute("ref", "@" + sm->stateMachineId);
+          xml.closeElementSelfClosing();
+          break;
+        }
       }
     }
     xml.closeElement();
@@ -1563,7 +1767,65 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
-  WriteAnimations(xml, doc.animations);
+  // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
+  // definitions parsed from the document's <Animations> block (in declaration order). Animation and
+  // StateMachine nodes created programmatically only live in doc.nodes, so also scan doc.nodes for
+  // any of them not already written (either in doc.animations or nested inside a Composition).
+  std::set<const Node*> written;
+  for (const auto* node : doc.animations) {
+    written.insert(node);
+  }
+  // Composition-owned Animation and StateMachine nodes live in doc.nodes but are written nested
+  // inside their Composition (see WriteResource). Record them here so the orphan scan below does
+  // not emit them a second time at document root.
+  for (const auto& node : doc.nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Composition) {
+      continue;
+    }
+    for (const auto* animChild : static_cast<const Composition*>(node.get())->animations) {
+      if (animChild != nullptr) {
+        written.insert(animChild);
+      }
+    }
+  }
+  bool hasAnimOrSM = !doc.animations.empty();
+  if (!hasAnimOrSM) {
+    for (const auto& node : doc.nodes) {
+      if (node != nullptr &&
+          (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine) &&
+          written.find(node.get()) == written.end()) {
+        hasAnimOrSM = true;
+        break;
+      }
+    }
+  }
+  if (hasAnimOrSM) {
+    xml.openElement("Animations");
+    xml.closeElementStart();
+    for (const auto* node : doc.animations) {
+      if (node == nullptr) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node));
+      } else if (node->nodeType() == NodeType::StateMachine) {
+        WriteStateMachine(xml, static_cast<const StateMachine*>(node));
+      }
+    }
+    for (const auto& node : doc.nodes) {
+      if (node == nullptr ||
+          (node->nodeType() != NodeType::Animation && node->nodeType() != NodeType::StateMachine) ||
+          written.find(node.get()) != written.end()) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
+      } else {
+        WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
+      }
+    }
+    xml.closeElement();
+  }
   for (const auto& bind : doc.dataBinds) {
     WriteResource(xml, bind, options);
   }
