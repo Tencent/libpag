@@ -34,6 +34,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -2618,6 +2619,177 @@ PAGX_TEST(PAGXViewModelTest, TextContentReshapeFromViewModel) {
   ASSERT_NE(original->textBlob(), nullptr);
   EXPECT_GT(reshaped->textBlob()->getBounds().width(), original->textBlob()->getBounds().width());
   // The document field is not mutated by the runtime reshape.
+  EXPECT_EQ(text->text, "AB");
+}
+
+// Builds a scene whose single standalone Text is bound to a ViewModel property on the given
+// channel. Returns the scene; out-params expose the Text node and the surface for driving draws.
+// Shared setup for the reshape tests below to avoid repeating the document scaffolding.
+static std::shared_ptr<pagx::PAGScene> MakeReshapeScene(
+    const std::shared_ptr<pagx::PAGXDocument>& doc, const std::string& propName,
+    pagx::ViewModelPropertyType propType, pagx::Text* text, const std::string& channel,
+    pagx::DataBindDirection direction, std::shared_ptr<pagx::PAGSurface>& outSurface) {
+  auto* schema = doc->makeNode<pagx::ViewModel>("TextVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = propName;
+  prop->propertyType = propType;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto* layer = doc->makeNode<pagx::Layer>("textLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  auto* group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
+  auto* db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm." + propName;
+  db->target = "@" + text->id;
+  db->channel = channel;
+  db->direction = direction;
+  doc->dataBinds.push_back(db);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  doc->applyLayout(&fontConfig);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  outSurface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  return scene;
+}
+
+// Driving fontSize (a continuous channel mixed via MixFloat) from the ViewModel reshapes the text
+// to the new size on the next draw, producing a taller blob. The document fontSize is not mutated.
+PAGX_TEST(PAGXViewModelTest, TextFontSizeReshapeFromViewModel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* text = doc->makeNode<pagx::Text>("sizedText");
+  text->text = "Ag";
+  text->fontSize = 20;
+  std::shared_ptr<pagx::PAGSurface> surface;
+  auto scene = MakeReshapeScene(doc, "size", pagx::ViewModelPropertyType::Number, text, "fontSize",
+                                pagx::DataBindDirection::ToTarget, surface);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(surface, nullptr);
+
+  auto* sizeValue = doc->viewModel->properties[0];
+  sizeValue->defaultNumber = 20.0f;
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto original = binding->get<tgfx::Text>(text);
+  ASSERT_NE(original, nullptr);
+  ASSERT_NE(original->textBlob(), nullptr);
+  float originalHeight = original->textBlob()->getBounds().height();
+
+  scene->viewModel()->propertyNumber("size")->value(60.0f);
+  EXPECT_TRUE(scene->draw(surface));
+
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  EXPECT_NE(reshaped.get(), original.get());
+  ASSERT_NE(reshaped->textBlob(), nullptr);
+  // A larger font size yields a taller blob.
+  EXPECT_GT(reshaped->textBlob()->getBounds().height(), originalHeight);
+  // The document field stays at the authored value.
+  EXPECT_FLOAT_EQ(text->fontSize, 20.0f);
+}
+
+// A runtime reshape rebuilds the tgfx::Text object, but the previous object's position (which x / y
+// animation may have moved) must be preserved rather than reset to the layout origin.
+PAGX_TEST(PAGXViewModelTest, TextReshapePreservesRuntimePosition) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* text = doc->makeNode<pagx::Text>("movedText");
+  text->text = "AB";
+  text->fontSize = 20;
+  std::shared_ptr<pagx::PAGSurface> surface;
+  auto scene = MakeReshapeScene(doc, "title", pagx::ViewModelPropertyType::String, text, "text",
+                                pagx::DataBindDirection::ToTarget, surface);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(surface, nullptr);
+  doc->viewModel->properties[0]->defaultString = "AB";
+
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto original = binding->get<tgfx::Text>(text);
+  ASSERT_NE(original, nullptr);
+  // Move the runtime object as an x / y animation would, then trigger a content reshape.
+  original->setPosition(tgfx::Point::Make(37.0f, 42.0f));
+
+  scene->viewModel()->propertyString("title")->value("ABCDEF");
+  EXPECT_TRUE(scene->draw(surface));
+
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  EXPECT_NE(reshaped.get(), original.get());
+  // The reshaped object keeps the runtime-moved position instead of resetting to the origin.
+  EXPECT_FLOAT_EQ(reshaped->position().x, 37.0f);
+  EXPECT_FLOAT_EQ(reshaped->position().y, 42.0f);
+}
+
+// A TextBox child bound to the "text" channel reshapes through the box's shared holder: the runtime
+// tgfx::Text is replaced and the document field is left untouched, mirroring the standalone path.
+PAGX_TEST(PAGXViewModelTest, TextBoxChildReshapeFromViewModel) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TextVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "title";
+  prop->propertyType = pagx::ViewModelPropertyType::String;
+  prop->defaultString = "AB";
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto* layer = doc->makeNode<pagx::Layer>("textLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto* textBox = doc->makeNode<pagx::TextBox>("box");
+  textBox->width = 200;
+  textBox->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("boxText");
+  text->text = "AB";
+  text->fontSize = 20;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  auto* db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.title";
+  db->target = "@boxText";
+  db->channel = "text";
+  doc->dataBinds.push_back(db);
+
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  doc->applyLayout(&fontConfig);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto original = binding->get<tgfx::Text>(text);
+  ASSERT_NE(original, nullptr);
+
+  scene->viewModel()->propertyString("title")->value("ABCDEF");
+  EXPECT_TRUE(scene->draw(surface));
+
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  EXPECT_NE(reshaped.get(), original.get());
+  ASSERT_NE(reshaped->textBlob(), nullptr);
+  ASSERT_NE(original->textBlob(), nullptr);
+  EXPECT_GT(reshaped->textBlob()->getBounds().width(), original->textBlob()->getBounds().width());
   EXPECT_EQ(text->text, "AB");
 }
 
