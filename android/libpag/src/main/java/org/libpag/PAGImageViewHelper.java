@@ -106,6 +106,10 @@ class PAGImageViewHelper {
         // always wins without having to block on the lock.
         private final AtomicInteger resetToken = new AtomicInteger(0);
         private volatile int decoderToken = 0;
+        // Cached snapshots so the main thread can query decoder state without taking the lock,
+        // which would block whenever the worker thread is stuck in readFrame() on a hung decoder.
+        private volatile boolean hasDecoder = false;
+        private volatile int frameCount = 0;
 
         void lock() {
             locker.lock();
@@ -122,16 +126,19 @@ class PAGImageViewHelper {
         }
 
         boolean hasPAGDecoder() {
-            locker.lock();
-            try {
-                return _pagDecoder != null;
-            } finally {
-                locker.unlock();
-            }
+            // Lock-free read of a volatile snapshot; see isValid() for why the main thread must not
+            // block on the lock here.
+            return hasDecoder;
         }
 
         boolean checkFrameChanged(int currentFrame) {
-            locker.lock();
+            // tryLock instead of lock: this is reachable from the main thread via handleFrame(), and
+            // a blocking lock would ANR when the worker holds the lock inside a hung readFrame().
+            // On a failed lock, report changed=true so the caller falls through to a real decode
+            // attempt rather than skipping the frame based on stale state.
+            if (!locker.tryLock()) {
+                return true;
+            }
             try {
                 return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
             } finally {
@@ -194,8 +201,10 @@ class PAGImageViewHelper {
                 _pagDecoder = decoder;
                 _width = decoder.width();
                 _height = decoder.height();
+                frameCount = decoder.numFrames();
                 duration = composition.duration();
                 decoderToken = token;
+                hasDecoder = true;
                 return true;
             } finally {
                 locker.unlock();
@@ -209,6 +218,7 @@ class PAGImageViewHelper {
                     _pagDecoder.release();
                     _pagDecoder = null;
                 }
+                hasDecoder = false;
             } finally {
                 locker.unlock();
             }
@@ -219,13 +229,20 @@ class PAGImageViewHelper {
             // thread is stuck in readFrame() (e.g. the hardware decoder hangs). Bump the reset token
             // first so that any initDecoder() building concurrently on the worker thread is marked
             // stale by isValid(); this wins the race even though the field writes below are lock-free.
-            // On a failed lock, skip the native release but still clear the size fields; the stale
-            // decoder is reclaimed by initDecoder() on reuse or PAGDecoder.finalize() on GC.
             resetToken.incrementAndGet();
+            hasDecoder = false;
+            frameCount = 0;
             if (!locker.tryLock()) {
+                // On a failed lock, skip the native release but still clear the size fields; the stale
+                // decoder is reclaimed by initDecoder() on reuse or PAGDecoder.finalize() on GC.
                 _width = 0;
                 _height = 0;
                 duration = 0;
+                // Bump the token a second time after clearing the fields. This closes the reverse race
+                // where an in-flight initDecoder() captured the token after our first increment: its
+                // post-Make() recheck (or the final isValid() comparison) now sees a newer resetToken
+                // than the token it recorded, so its stale decoder can never be judged valid.
+                resetToken.incrementAndGet();
                 return;
             }
             try {
@@ -239,12 +256,9 @@ class PAGImageViewHelper {
         }
 
         int numFrames() {
-            locker.lock();
-            try {
-                return _pagDecoder == null ? 0 : _pagDecoder.numFrames();
-            } finally {
-                locker.unlock();
-            }
+            // Lock-free read of the cached frame count; see isValid() for why the main thread must
+            // not block on the lock here.
+            return frameCount;
         }
     }
 }
