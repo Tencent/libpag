@@ -171,7 +171,12 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
       preComposeLayer->composition->uniqueID == videoComposition->uniqueID) {
     if (session->videoCompositionStartTime.find(videoComposition->uniqueID) !=
         session->videoCompositionStartTime.end()) {
-      preComposeLayer->compositionStartTime =
+      // The video sequence is encoded starting from its first visible frame
+      // (videoCompositionStartTime), so sequence frame 0 corresponds to that composition frame.
+      // Accumulate this trim offset onto the layer's own composition start time instead of
+      // overwriting it, otherwise multiple references to the same composition would all collapse
+      // to the same start time and every reference except the first would freeze (discussion #3548).
+      preComposeLayer->compositionStartTime +=
           session->videoCompositionStartTime[videoComposition->uniqueID];
     }
   }

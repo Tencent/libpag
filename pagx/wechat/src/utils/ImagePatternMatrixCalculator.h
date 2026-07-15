@@ -22,7 +22,6 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/Matrix.h"
@@ -43,10 +42,11 @@ enum class ImageScaleMode : int {
 // so the tile period stays stable while imageWidth/imageHeight grow from placeholder toward
 // full resolution. Pass 0 for both to disable compensation and fall back to cocraft's
 // ratio = scaleFactor behavior.
-pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
-                                         float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
-                                         float scaleFactor = 0.5f,
-                                         float origImageWidth = 0.0f, float origImageHeight = 0.0f);
+pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth,
+                                         float imageHeight, float nodeWidth, float nodeHeight,
+                                         const pagx::Matrix& paintTransform,
+                                         float scaleFactor = 0.5f, float origImageWidth = 0.0f,
+                                         float origImageHeight = 0.0f);
 
 // Per-image original-pixel-size lookup used by the new-format resolve path. Maps the Image
 // node's filePath ("hash:..." / "emoji:...") to the full-resolution pixel dimensions that the
@@ -80,8 +80,7 @@ using ImageOriginalSizeMap = std::unordered_map<std::string, std::pair<float, fl
 // refresh the matrix against a just-uploaded image before loadFileData installs it on the node.
 bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
                                const ImageOriginalSizeMap* origSizeMap = nullptr,
-                               float overrideWidth = 0.0f,
-                               float overrideHeight = 0.0f);
+                               float overrideWidth = 0.0f, float overrideHeight = 0.0f);
 
 // Resolves all ImagePattern transform matrices in the document. Should be called after loading
 // external image data and before LayerBuilder::Build().

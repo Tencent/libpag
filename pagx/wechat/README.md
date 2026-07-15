@@ -11,7 +11,7 @@ bundled into a single ESM module that can be consumed by a mini program.
 ```
 pagx/wechat/
 ├── CMakeLists.txt       # CMake entry for building the wasm module
-├── src/                 # C++ sources bound to JS (PAGXView, GridBackground, binding.cpp)
+├── src/                 # C++ sources bound to JS (PAGXView, binding.cpp)
 ├── ts/                  # TypeScript sources (pagx.ts, pagx-view.ts, gesture-manager.ts, ...)
 ├── script/              # Build scripts (cmake / rollup / emsdk setup / file copy)
 ├── wasm/                # Raw CMake output (pagx-viewer.wasm, pagx-viewer.js)
