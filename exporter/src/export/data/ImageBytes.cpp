@@ -24,12 +24,14 @@
 namespace exporter {
 
 // AEGP_NewFromLayer uses the current time indicator position which may be outside the layer's
-// visible range. Set the render time to the layer's in point so the first visible frame is
-// rendered correctly. In layer time the in point is always 0 (per the AE SDK), so we construct the
-// time directly instead of querying AEGP_GetLayerInPoint.
-static void SetVideoLayerRenderTime(const AEGP_LayerRenderOptionsH& renderOptions) {
+// visible range. Explicitly set the render time to the layer's in point in layer time so the first
+// visible frame is rendered correctly. The in point is queried per layer rather than assumed to be
+// 0 because footage slip and time stretch can shift it away from the layer's source start.
+static void SetVideoLayerRenderTime(const AEGP_LayerH& layerHandle,
+                                    const AEGP_LayerRenderOptionsH& renderOptions) {
   const auto& Suites = GetSuites();
-  A_Time inPointLayer = {0, 1};
+  A_Time inPointLayer = {};
+  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_LayerTime, &inPointLayer);
   Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
 }
 
@@ -43,7 +45,7 @@ static void GetVideoLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_lon
   if (renderOptions == nullptr) {
     return;
   }
-  SetVideoLayerRenderTime(renderOptions);
+  SetVideoLayerRenderTime(layerHandle, renderOptions);
   GetLayerRenderFrameSize(renderOptions, srcStride, width, height);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -59,7 +61,7 @@ static void GetVideoLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   if (renderOptions == nullptr) {
     return;
   }
-  SetVideoLayerRenderTime(renderOptions);
+  SetVideoLayerRenderTime(layerHandle, renderOptions);
   GetLayerRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
