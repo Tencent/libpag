@@ -51,22 +51,16 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_pause", &pagx::PAGXView::pause)
       .function("_isPlaying", &pagx::PAGXView::isPlaying)
       // Wrap int64_t returns/params as double: emscripten::bind does not support 64-bit integers.
-      .function(
-          "_currentTimeMicros",
-          optional_override([](pagx::PAGXView& self) -> double {
-            return static_cast<double>(self.currentTimeMicros());
-          }))
-      .function(
-          "_durationMicros",
-          optional_override([](pagx::PAGXView& self) -> double {
-            return static_cast<double>(self.durationMicros());
-          }))
+      .function("_currentTimeMicros", optional_override([](pagx::PAGXView& self) -> double {
+                  return static_cast<double>(self.currentTimeMicros());
+                }))
+      .function("_durationMicros", optional_override([](pagx::PAGXView& self) -> double {
+                  return static_cast<double>(self.durationMicros());
+                }))
       .function("_currentFrameRate", &pagx::PAGXView::currentFrameRate)
-      .function(
-          "_setCurrentTimeMicros",
-          optional_override([](pagx::PAGXView& self, double micros) {
-            self.setCurrentTimeMicros(static_cast<int64_t>(micros));
-          }))
+      .function("_setCurrentTimeMicros", optional_override([](pagx::PAGXView& self, double micros) {
+                  self.setCurrentTimeMicros(static_cast<int64_t>(micros));
+                }))
       .function("_setLoop", &pagx::PAGXView::setLoop)
       .function("_isLoop", &pagx::PAGXView::isLoop);
 }
