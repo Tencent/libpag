@@ -764,7 +764,16 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
 }
 
 bool PAGScene::hasContentChanged() const {
-  return displayList != nullptr && displayList->hasContentChanged();
+  if (displayList == nullptr) {
+    return false;
+  }
+  // A pending TextHolder reshape (ViewModel/Animation drove a text-shaping channel) has not yet
+  // touched the tgfx objects — flush runs inside Record(). Without this check the dirty gate would
+  // skip the frame and the reshape would never reach the screen.
+  if (_rootComposition != nullptr && _rootComposition->hasDirtyTextHolders()) {
+    return true;
+  }
+  return displayList->hasContentChanged();
 }
 
 std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,

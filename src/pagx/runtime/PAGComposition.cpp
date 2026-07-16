@@ -483,4 +483,18 @@ void PAGComposition::flushTextHolders(FontConfig* fontConfig) {
   }
 }
 
+bool PAGComposition::hasDirtyTextHolders() const {
+  if (binding != nullptr && binding->hasDirtyTextHolders()) {
+    return true;
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(const_cast<PAGComposition*>(this), childComps);
+  for (auto* childComp : childComps) {
+    if (childComp->hasDirtyTextHolders()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace pagx

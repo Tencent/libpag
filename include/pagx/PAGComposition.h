@@ -190,6 +190,11 @@ class PAGComposition : public PAGLayer {
   // ViewModel/Animation-driven text once per draw. fontConfig is borrowed for the call.
   void flushTextHolders(FontConfig* fontConfig);
 
+  // Returns true if any TextHolder in this composition's binding (or a descendant composition's)
+  // has a pending reshape. Used by PAGScene::hasContentChanged so a dirty holder is not dropped by
+  // the dirty gate before flush runs.
+  bool hasDirtyTextHolders() const;
+
   friend class PAGScene;
 };
 

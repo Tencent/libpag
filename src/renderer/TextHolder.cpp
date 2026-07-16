@@ -66,46 +66,56 @@ void TextHolder::apply(Text* node, const std::string& channel, const KeyValue& v
   auto& glyph = entry->glyph;
   // Continuous attributes mix from the current value (the role a tgfx object plays for other
   // channels); discrete attributes ignore mix and overwrite, matching the existing writer
-  // convention (WriteLayerBlendMode / WriteLayerName).
+  // convention (WriteLayerBlendMode / WriteLayerName). Only mark dirty when the value actually
+  // changes: Hold-interpolated animation channels re-apply the same value every advance, so a
+  // blind dirty flag would trigger a full reshape at every draw.
   if (channel == "fontSize") {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
       return;
     }
-    glyph.fontSize = MixFloat(glyph.fontSize, *v, mix);
+    auto mixed = MixFloat(glyph.fontSize, *v, mix);
+    if (mixed == glyph.fontSize) {
+      return;
+    }
+    glyph.fontSize = mixed;
   } else if (channel == "letterSpacing") {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
       return;
     }
-    glyph.letterSpacing = MixFloat(glyph.letterSpacing, *v, mix);
+    auto mixed = MixFloat(glyph.letterSpacing, *v, mix);
+    if (mixed == glyph.letterSpacing) {
+      return;
+    }
+    glyph.letterSpacing = mixed;
   } else if (channel == "text") {
     const auto* v = std::get_if<std::string>(&value);
-    if (v == nullptr) {
+    if (v == nullptr || *v == glyph.text) {
       return;
     }
     glyph.text = *v;
   } else if (channel == "fontFamily") {
     const auto* v = std::get_if<std::string>(&value);
-    if (v == nullptr) {
+    if (v == nullptr || *v == glyph.fontFamily) {
       return;
     }
     glyph.fontFamily = *v;
   } else if (channel == "fontStyle") {
     const auto* v = std::get_if<std::string>(&value);
-    if (v == nullptr) {
+    if (v == nullptr || *v == glyph.fontStyle) {
       return;
     }
     glyph.fontStyle = *v;
   } else if (channel == "fauxBold") {
     const auto* v = std::get_if<bool>(&value);
-    if (v == nullptr) {
+    if (v == nullptr || *v == glyph.fauxBold) {
       return;
     }
     glyph.fauxBold = *v;
   } else if (channel == "fauxItalic") {
     const auto* v = std::get_if<bool>(&value);
-    if (v == nullptr) {
+    if (v == nullptr || *v == glyph.fauxItalic) {
       return;
     }
     glyph.fauxItalic = *v;

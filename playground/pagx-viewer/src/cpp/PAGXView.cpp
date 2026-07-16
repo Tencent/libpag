@@ -21,6 +21,7 @@
 #include <emscripten/html5.h>
 #include <algorithm>
 #include <cstdint>
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"

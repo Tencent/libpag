@@ -318,6 +318,10 @@ struct RuntimeBinding {
   // Animation channels have been applied. fontConfig is borrowed for the duration of the call.
   void flushTextHolders(FontConfig* fontConfig);
 
+  // Returns true if any TextHolder has a pending reshape (apply recorded a change since the last
+  // flush). Used by PAGScene's content-changed check so a dirty holder is not skipped before flush.
+  bool hasDirtyTextHolders() const;
+
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
   RuntimeTarget* ensureTarget(const Node* node) {

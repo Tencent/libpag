@@ -13566,5 +13566,80 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
 }
 
+// Smoke test: the demo pagx file (animation + viewmodel driving text channels) parses cleanly.
+PAGX_TEST(PAGXTest, TextReshapeDemoParses) {
+  auto doc =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text_reshape_demo.pagx"));
+  ASSERT_NE(doc, nullptr);
+  for (const auto& err : doc->errors) {
+    FAIL() << "parse error: " << err;
+  }
+  EXPECT_EQ(doc->layers.size(), 2u);
+  EXPECT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(doc->dataBinds.size(), 2u);
+  ASSERT_NE(doc->viewModel, nullptr);
+  EXPECT_EQ(doc->viewModel->id, "MainVM");
+  EXPECT_NE(doc->findNode<pagx::Animation>("textAnim"), nullptr);
+  auto* vmText = doc->findNode<pagx::Text>("vmText");
+  ASSERT_NE(vmText, nullptr);
+  EXPECT_EQ(vmText->text, "VM Default");
+}
+
+// Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
+// after advancing the default timeline past the second keyframe, the animated Text's blob width
+// changes to the "Animated" glyph extent; after driving the ViewModel's "title" property, the
+// bound Text's blob width changes to the new content. Both go through PAGScene::draw so the
+// holder's flush (setTextBlob) reflects in the bound tgfx::Text.
+PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
+  auto doc =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text_reshape_demo.pagx"));
+  ASSERT_NE(doc, nullptr);
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(400, 200);
+  ASSERT_NE(surface, nullptr);
+
+  auto* animText = doc->findNode<pagx::Text>("animText");
+  ASSERT_NE(animText, nullptr);
+  auto* vmTextNode = doc->findNode<pagx::Text>("vmText");
+  ASSERT_NE(vmTextNode, nullptr);
+
+  // First frame: animation at time 0 ("Hello"), viewmodel default ("VM Default").
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto animRuntime = binding->get<tgfx::Text>(animText);
+  ASSERT_NE(animRuntime, nullptr);
+  ASSERT_NE(animRuntime->textBlob(), nullptr);
+  float animWidthBefore = animRuntime->textBlob()->getBounds().width();
+  auto vmRuntime = binding->get<tgfx::Text>(vmTextNode);
+  ASSERT_NE(vmRuntime, nullptr);
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthBefore = vmRuntime->textBlob()->getBounds().width();
+
+  // Advance the document-level animation past frame 60 (1s at 60fps) so the Hold keyframe value
+  // "Animated" takes effect, then draw.
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_NE(defaultTimeline, nullptr);
+  defaultTimeline->advanceAndApply(1'000'000);
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(animRuntime->textBlob(), nullptr);
+  float animWidthAfter = animRuntime->textBlob()->getBounds().width();
+  // "Animated" is longer than "Hello", so the blob width must grow.
+  EXPECT_GT(animWidthAfter, animWidthBefore) << "animation did not reshape animText to 'Animated'";
+
+  // Drive the ViewModel's "title" property and draw: the bound vmText must reshape.
+  scene->viewModel()->propertyString("title")->value("ReshapedByVM");
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthAfter = vmRuntime->textBlob()->getBounds().width();
+  EXPECT_NE(vmWidthAfter, vmWidthBefore) << "viewmodel did not reshape vmText to 'ReshapedByVM'";
+}
+
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
 }  // namespace pag

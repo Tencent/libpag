@@ -77,6 +77,13 @@ class TextHolder {
   // borrowed for the duration of the call to build a LayoutContext; the holder does not retain it.
   void flush(FontConfig* fontConfig);
 
+  // Returns true if apply() has recorded a change since the last flush(). Callers (PAGScene's
+  // content-changed check) use this to avoid skipping a frame that would otherwise drop the reshape
+  // before flush runs.
+  bool isDirty() const {
+    return dirty;
+  }
+
   // Drops the entry for the given node (called when its runtime target is being removed from the
   // binding, so a later flush never dereferences a freed target). Returns true if the holder has
   // no entries left, letting the binding drop the now-empty holder.
