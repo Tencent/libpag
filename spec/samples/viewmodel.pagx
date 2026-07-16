@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates PAGX ViewModel data binding with runtime-supported channels. -->
+<pagx width="400" height="400">
+
+  <Resources>
+    <DataConverter id="usageToWidth" type="rangeMapper">
+      <Param name="inputMin" value="0"/>
+      <Param name="inputMax" value="1"/>
+      <Param name="outputMin" value="0"/>
+      <Param name="outputMax" value="288"/>
+    </DataConverter>
+
+    <DataConverter id="temperatureToWidth" type="rangeMapper">
+      <Param name="inputMin" value="16"/>
+      <Param name="inputMax" value="32"/>
+      <Param name="outputMin" value="0"/>
+      <Param name="outputMax" value="288"/>
+    </DataConverter>
+
+    <ViewModel id="deviceVM">
+      <Property name="accent" type="color" default="#14B8A6"/>
+      <Property name="online" type="boolean" default="true"/>
+      <Property name="panelOpacity" type="number" default="0.96" min="0" max="1"/>
+      <Property name="utilization" type="number" default="0.68" min="0" max="1"
+                dataConverter="@usageToWidth"/>
+      <Property name="temperature" type="number" default="24" min="16" max="32"
+                dataConverter="@temperatureToWidth"/>
+    </ViewModel>
+  </Resources>
+
+  <!-- Background -->
+  <Layer name="bg" width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
+    <Fill>
+      <LinearGradient endPoint="1,1">
+        <ColorStop color="#020617" offset="0"/>
+        <ColorStop color="#111827" offset="1"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- Main card -->
+  <Layer id="deviceCard" left="28" top="32" width="344" height="336">
+    <Rectangle width="344" height="336" roundness="28"/>
+    <Fill color="#111827"/>
+    <DropShadowStyle offsetY="14" blurX="28" blurY="28" color="#00000066"/>
+  </Layer>
+
+  <!-- Accent strip -->
+  <Layer left="52" top="58" width="296" height="6">
+    <Rectangle width="296" height="6" roundness="3"/>
+    <Fill id="accentStripFill" color="#14B8A6"/>
+  </Layer>
+
+  <!-- Device glyph -->
+  <Layer left="56" top="82" width="64" height="64">
+    <Rectangle width="64" height="64" roundness="16"/>
+    <Fill id="deviceGlyphFill" color="#14B8A6"/>
+    <Layer left="18" top="14" width="28" height="36">
+      <Rectangle width="28" height="36" roundness="6"/>
+      <Stroke color="#ECFEFF" width="3"/>
+    </Layer>
+    <Layer left="24" top="42" width="16" height="3">
+      <Rectangle width="16" height="3" roundness="1.5"/>
+      <Fill color="#ECFEFF"/>
+    </Layer>
+  </Layer>
+
+  <!-- Static title text -->
+  <Layer left="136" top="84" width="212" height="58">
+    <TextBox textAlign="left" width="212" height="32">
+      <Text text="Device Status" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+      <Fill color="#F8FAFC"/>
+    </TextBox>
+    <TextBox textAlign="left" top="34" width="212" height="18">
+      <Text text="ViewModel driven UI" fontFamily="Arial" fontSize="13"/>
+      <Fill color="#94A3B8"/>
+    </TextBox>
+  </Layer>
+
+  <!-- Online badge -->
+  <Layer id="onlineBadge" left="270" top="132" width="78" height="26">
+    <Rectangle width="78" height="26" roundness="13"/>
+    <Fill id="badgeFill" color="#14B8A6"/>
+    <TextBox textAlign="center" width="78" height="26">
+      <Text text="ONLINE" fontFamily="Arial" fontStyle="Bold" fontSize="11" y="6"/>
+      <Fill color="#042F2E"/>
+    </TextBox>
+  </Layer>
+
+  <!-- Utilization meter -->
+  <Layer left="56" top="176" width="288" height="62">
+    <TextBox textAlign="left" width="288" height="20">
+      <Text text="Utilization" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#CBD5E1"/>
+    </TextBox>
+    <Layer top="30" width="288" height="18">
+      <Layer width="288" height="18">
+        <Rectangle width="288" height="18" roundness="9"/>
+        <Fill color="#1F2937"/>
+      </Layer>
+      <Layer width="288" height="18">
+        <Rectangle id="usageFill" width="196" height="18" roundness="9"/>
+        <Fill id="usageFillColor" color="#14B8A6"/>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Temperature meter -->
+  <Layer left="56" top="256" width="288" height="62">
+    <TextBox textAlign="left" width="288" height="20">
+      <Text text="Temperature Range" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
+      <Fill color="#CBD5E1"/>
+    </TextBox>
+    <Layer top="30" width="288" height="18">
+      <Layer width="288" height="18">
+        <Rectangle width="288" height="18" roundness="9"/>
+        <Fill color="#1F2937"/>
+      </Layer>
+      <Layer width="288" height="18">
+        <Rectangle id="temperatureFill" width="144" height="18" roundness="9"/>
+        <Fill id="temperatureFillColor" color="#38BDF8"/>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- Signal bars: static layout reference, not data-bound. -->
+  <Layer left="56" top="332" width="92" height="20" layout="horizontal" gap="6" alignment="end">
+    <Layer width="14" height="6"><Rectangle width="14" height="6" roundness="2"/><Fill color="#334155"/></Layer>
+    <Layer width="14" height="10"><Rectangle width="14" height="10" roundness="2"/><Fill color="#475569"/></Layer>
+    <Layer width="14" height="14"><Rectangle width="14" height="14" roundness="2"/><Fill color="#64748B"/></Layer>
+    <Layer width="14" height="18"><Rectangle width="14" height="18" roundness="2"/><Fill id="signalFill" color="#14B8A6"/></Layer>
+  </Layer>
+
+  <DataBind source="$vm.panelOpacity" target="@deviceCard" channel="alpha"/>
+  <DataBind source="$vm.online" target="@onlineBadge" channel="visible"/>
+  <DataBind source="$vm.utilization" target="@usageFill" channel="size.width"/>
+  <DataBind source="$vm.temperature" target="@temperatureFill" channel="size.width"/>
+  <DataBind source="$vm.accent" target="@accentStripFill" channel="color"/>
+  <DataBind source="$vm.accent" target="@deviceGlyphFill" channel="color"/>
+  <DataBind source="$vm.accent" target="@badgeFill" channel="color"/>
+  <DataBind source="$vm.accent" target="@usageFillColor" channel="color"/>
+  <DataBind source="$vm.accent" target="@signalFill" channel="color"/>
+</pagx>
