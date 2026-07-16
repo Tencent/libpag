@@ -943,6 +943,36 @@ function roundedUniformBorderSvg(computed, width, height) {
     `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${roundPx(W)} ${roundPx(H)}">${paths}</svg>`;
 }
 
+// Emit one inline <svg> for a single dashed / dotted border side so the
+// importer reproduces the dash pattern. A plain background-color <div> (used
+// for solid sides) would flatten a dashed/dotted divider into a solid strip.
+// The line is stroked down the centre of the side's overlay rectangle with a
+// dash pattern matching the importer's uniform-border proportions (dashed:
+// dash 2×width, gap 1×width; dotted: zero-length dashes with a round cap so
+// each becomes a dot of diameter width, spaced 1×width apart).
+function dashedBorderSideSvg(side, width, height, b) {
+  const t = b.width;
+  const half = t / 2;
+  let d;
+  if (side === 'top') {
+    d = `M 0 ${roundPx(half)} L ${roundPx(width)} ${roundPx(half)}`;
+  } else if (side === 'bottom') {
+    d = `M 0 ${roundPx(height - half)} L ${roundPx(width)} ${roundPx(height - half)}`;
+  } else if (side === 'left') {
+    d = `M ${roundPx(half)} 0 L ${roundPx(half)} ${roundPx(height)}`;
+  } else {
+    d = `M ${roundPx(width - half)} 0 L ${roundPx(width - half)} ${roundPx(height)}`;
+  }
+  const dotted = b.style === 'dotted';
+  const cap = dotted ? 'round' : 'butt';
+  const dash = dotted ? `0 ${roundPx(2 * t)}` : `${roundPx(2 * t)} ${roundPx(t)}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
+    `left: 0px; top: 0px; width: ${px(width)}; height: ${px(height)}; pointer-events: none" ` +
+    `width="${px(width)}" height="${px(height)}" viewBox="0 0 ${roundPx(width)} ${roundPx(height)}">` +
+    `<path d="${d}" fill="none" stroke="${b.color.trim()}" stroke-width="${px(t)}" ` +
+    `stroke-linecap="${cap}" stroke-dasharray="${dash}"/></svg>`;
+}
+
 // Returns an array of HTML strings — one absolutely-positioned <div> per
 // non-zero border side — to overlay onto the host box. Used when the element
 // has an asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list
@@ -964,10 +994,15 @@ function borderOverlayHTML(computed, width, height) {
   for (const side of SIDES) {
     const b = readBorderSide(computed, side);
     if (b.width <= 0) continue;
-    // The subset has no model for dashed/dotted/double per-side borders.
-    // Downgrade them to solid: it's an approximation but preserves the
-    // visual divider, which is what the page actually wanted.
     if (b.style === 'none' || b.style === 'hidden') continue;
+    if (colorAlpha(b.color) <= 0) continue;
+    // `dashed` / `dotted` sides are stroked as an inline <svg> line so the dash
+    // pattern survives; a solid background-color <div> would flatten them into a
+    // continuous strip. Other styles (`double`, `groove`, …) fall back to solid.
+    if (b.style === 'dashed' || b.style === 'dotted') {
+      out.push(dashedBorderSideSvg(side, width, height, b));
+      continue;
+    }
     const r = SIDE_OVERLAY[side](width, height, b.width);
     out.push(`<div style="position: absolute; left: ${px(r.left)}; top: ${px(r.top)}; ` +
       `width: ${px(r.w)}; height: ${px(r.h)}; background-color: ${b.color.trim()}"></div>`);
@@ -3725,6 +3760,7 @@ const HELPER_FNS = [
   buildStyle,
   readCornerRadii,
   roundedUniformBorderSvg,
+  dashedBorderSideSvg,
   borderOverlayHTML,
   colorAlpha,
   transformOriginXY,
@@ -4303,6 +4339,7 @@ export {
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  dashedBorderSideSvg,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
