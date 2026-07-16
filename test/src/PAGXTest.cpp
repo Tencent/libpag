@@ -9817,6 +9817,20 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   modifier->selectors.push_back(selector);
   layer->contents.push_back(modifier);
 
+  // A standalone Text exercises the text-shaping channel writers (text / font / size / ...).
+  // Text needs a registered fallback font to shape, so apply layout with one before building.
+  auto text = doc->makeNode<pagx::Text>("textNode");
+  text->text = "A";
+  text->fontSize = 20;
+  auto textFill = doc->makeNode<pagx::Fill>();
+  auto textColor = doc->makeNode<pagx::SolidColor>();
+  textColor->color = {0, 0, 0, 1};
+  textFill->color = textColor;
+  auto textGroup = doc->makeNode<pagx::Group>();
+  textGroup->elements.push_back(text);
+  textGroup->elements.push_back(textFill);
+  layer->contents.push_back(textGroup);
+
   // One of each layer style and filter kind so their animatable writers are covered.
   auto dropStyle = doc->makeNode<pagx::DropShadowStyle>();
   layer->styles.push_back(dropStyle);
@@ -9833,19 +9847,33 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   auto blendFilter = doc->makeNode<pagx::BlendFilter>();
   layer->filters.push_back(blendFilter);
 
+  // Text needs a registered fallback font to shape; apply layout with one before the scene build
+  // so the Text node's runtime target (and TextHolder) are created.
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto* binding = scene->mutableBinding();
   ASSERT_TRUE(binding != nullptr);
 
-  // For each built node, every Animatable channel in the registry must have a runtime writer. Text
-  // and TextBox are intentionally omitted: they require a registered font to build, while every
-  // other node type with animatable channels is covered here.
-  pagx::Node* nodes[] = {
-      layer,      rect,       ellipse,     polystar,   trim,      roundCorner, repeater,
-      fill,       stroke,     solid,       group,      linear,    linearStop,  radial,
-      conic,      diamond,    modifier,    selector,   dropStyle, innerStyle,  backgroundBlurStyle,
-      blurFilter, dropFilter, innerFilter, blendFilter};
+  // For each built node, every Animatable channel in the registry must have a runtime writer.
+  pagx::Node* nodes[] = {layer,       rect,
+                         ellipse,     polystar,
+                         trim,        roundCorner,
+                         repeater,    fill,
+                         stroke,      solid,
+                         group,       linear,
+                         linearStop,  radial,
+                         conic,       diamond,
+                         modifier,    selector,
+                         text,        dropStyle,
+                         innerStyle,  backgroundBlurStyle,
+                         blurFilter,  dropFilter,
+                         innerFilter, blendFilter};
   for (auto* node : nodes) {
     for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
       if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
