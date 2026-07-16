@@ -6,7 +6,8 @@ const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
 if (!fs.existsSync(emsdkPath)) {
     Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${Utils.escapeSpace(emsdkPath)}`);
 } else {
-    Utils.execSafe(`git -C ${Utils.escapeSpace(emsdkPath)} pull`);
+    let pullResult = Utils.execSafe(`git -C ${Utils.escapeSpace(emsdkPath)} pull`);
+    process.stdout.write(pullResult);
 }
 const emscriptenPath = path.resolve(emsdkPath, 'upstream/emscripten');
 process.env.PATH = process.platform === 'win32'
