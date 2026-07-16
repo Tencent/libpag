@@ -31,6 +31,7 @@ namespace pagx {
 
 class FontConfig;
 class LayoutContext;
+class Node;
 struct RuntimeTarget;
 class Text;
 
@@ -75,6 +76,11 @@ class TextHolder {
   // Reshapes the whole source and rebuilds every entry's tgfx::Text if dirty. fontConfig is
   // borrowed for the duration of the call to build a LayoutContext; the holder does not retain it.
   void flush(FontConfig* fontConfig);
+
+  // Drops the entry for the given node (called when its runtime target is being removed from the
+  // binding, so a later flush never dereferences a freed target). Returns true if the holder has
+  // no entries left, letting the binding drop the now-empty holder.
+  bool removeNode(const Node* node);
 
  private:
   TextHolderEntry* findEntry(Text* node);

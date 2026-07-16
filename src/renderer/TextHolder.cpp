@@ -178,3 +178,16 @@ void TextHolder::flush(FontConfig* fontConfig) {
 }
 
 }  // namespace pagx
+
+bool TextHolder::removeNode(const Node* node) {
+  if (node == nullptr) {
+    return entries.empty();
+  }
+  for (auto it = entries.begin(); it != entries.end(); ++it) {
+    if (static_cast<const Node*>(it->node) == node) {
+      entries.erase(it);
+      break;
+    }
+  }
+  return entries.empty();
+}

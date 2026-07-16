@@ -157,10 +157,10 @@ struct RuntimeBinding {
   }
 
   // Drops the mapping for the given node, including its tgfx object and channel writers. Used when
-  // a node is removed from the document so the binding does not keep a stale entry alive.
-  void remove(const Node* node) {
-    targets.erase(node);
-  }
+  // a node is removed from the document so the binding does not keep a stale entry alive. Also
+  // cleans up TextHolder entries for the node to prevent use-after-free when targets are
+  // deleted before a subsequent flush.
+  void remove(const Node* node);
 
   // Returns the node whose bound tgfx object is the given pointer, or nullptr if none. Linear scan;
   // used by in-place refresh to map a tgfx child layer back to its source node when reconciling
@@ -345,8 +345,8 @@ struct RuntimeBinding {
   std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
 
   // TextHolders owning runtime text objects for this layer tree. shared_ptr so the channel writer
-  // closures can co-own their holder; the vector moves with the binding while the RuntimeTarget
-  // pointers the holders hold stay valid (targets are heap-stable unique_ptr payloads).
+  // closures can co-own their holder. TextHolder entries are cleaned up when their RuntimeTargets
+  // are removed via remove(node) to prevent use-after-free on subsequent flush.
   std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 };
 

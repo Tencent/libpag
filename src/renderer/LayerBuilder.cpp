@@ -131,6 +131,17 @@ void RuntimeBinding::flushTextHolders(FontConfig* fontConfig) {
   }
 }
 
+void RuntimeBinding::remove(const Node* node) {
+  targets.erase(node);
+  std::vector<std::shared_ptr<TextHolder>> stillAlive;
+  for (auto& holder : textHolders) {
+    if (holder != nullptr && !holder->removeNode(node)) {
+      stillAlive.push_back(std::move(holder));
+    }
+  }
+  textHolders = std::move(stillAlive);
+}
+
 // Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
 // Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
 // sampling pass over the affected layer; large designs can carry hundreds of such effects
