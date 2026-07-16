@@ -176,17 +176,15 @@ void TextHolder::flush(FontConfig* fontConfig) {
     if (textBlob == nullptr) {
       continue;
     }
-    auto newText = tgfx::Text::Make(textBlob, {});
-    if (newText == nullptr) {
+    // Reshape in place: replace the existing tgfx::Text's blob rather than building a new object.
+    // The render tree (parent VectorGroup / VectorLayer) and the binding both hold the same Text
+    // object, so an in-place blob swap takes effect on the next draw without any reference sync.
+    // The runtime position set by x / y writers is preserved because the object is not replaced.
+    auto text = entry.target->getObject<tgfx::Text>();
+    if (text == nullptr) {
       continue;
     }
-    // Preserve the runtime position: x/y writers may have moved the previous tgfx::Text, and a
-    // content reshape must not reset that translation.
-    auto old = entry.target->getObject<tgfx::Text>();
-    if (old != nullptr) {
-      newText->setPosition(old->position());
-    }
-    entry.target->setObject(std::move(newText));
+    text->setTextBlob(textBlob);
   }
 }
 
