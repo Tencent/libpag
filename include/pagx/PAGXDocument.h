@@ -151,6 +151,15 @@ class PAGXDocument : public Node {
   std::vector<std::string> getExternalFilePaths() const;
 
   /**
+   * Returns a list of local file paths referenced by Image nodes that have no embedded data and
+   * can be read via local I/O. Data URIs and URL-scheme paths (http/https/file/etc., containing
+   * "://") are excluded, as are external composition layer paths. Use this instead of
+   * getExternalFilePaths() when the consumer performs direct local file reads (e.g. ImageEmbedder);
+   * URL-form resources are left untouched for the host to resolve.
+   */
+  std::vector<std::string> getExternalImagePaths() const;
+
+  /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
    * For performance, load all external file data before creating any PAGScene from this document.
@@ -162,6 +171,15 @@ class PAGXDocument : public Node {
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  /**
+   * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches
+   * a key in the map in a single pass over the nodes. More efficient than calling loadFileData
+   * individually for each file when embedding multiple images.
+   * @param fileDataMap a map from file path to the file content to embed
+   */
+  void loadFileDataMap(
+      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
 
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
@@ -198,7 +216,8 @@ class PAGXDocument : public Node {
    * constraints. Must be called before rendering or font embedding. Re-running layout on an
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
-   * current fields.
+   * current fields. Before re-embedding a document that already has embedded fonts, call
+   * clearEmbed() so layout uses fresh shaping data.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -311,9 +330,15 @@ class PAGXDocument : public Node {
   // O(1) containment check for ownsNode(), maintained alongside nodes.
   std::unordered_set<const Node*> nodeSet = {};
 
+  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+  void setNodeId(Node* node, const std::string& id);
+  void resetLayoutState();
+
   // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
+
+  friend class FontEmbedder;
 
   // Lazily built index of Image node filePath -> pagx Layer list, used by
   // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits
