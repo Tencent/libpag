@@ -4,12 +4,7 @@ const Utils = require("../../third_party/vendor_tools/lib/Utils");
 
 const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
 if (!fs.existsSync(emsdkPath)) {
-    try {
-        Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${emsdkPath}`);
-    } catch (error) {
-        console.error('clone emsdk failed:', error);
-        process.exit(1);
-    }
+    Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${emsdkPath}`);
 } else {
     Utils.exec(`git -C ${emsdkPath} pull`);
 }
