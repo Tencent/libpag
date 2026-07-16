@@ -1646,6 +1646,23 @@ std::vector<TextElement> TextLayout::MakeElements(const std::vector<Text*>& text
   return elements;
 }
 
+void ApplyPaddingToRuns(std::vector<TextLayoutGlyphRun>& runs, float paddingLeft,
+                        float paddingTop) {
+  if (paddingLeft == 0.0f && paddingTop == 0.0f) {
+    return;
+  }
+  for (auto& run : runs) {
+    for (auto& pos : run.positions) {
+      pos.x += paddingLeft;
+      pos.y += paddingTop;
+    }
+    for (auto& xf : run.xforms) {
+      xf.tx += paddingLeft;
+      xf.ty += paddingTop;
+    }
+  }
+}
+
 static bool AllHaveEmbeddedGlyphRuns(const std::vector<TextElement>& textElements) {
   for (const auto& element : textElements) {
     if (element.node->glyphRuns.empty()) {

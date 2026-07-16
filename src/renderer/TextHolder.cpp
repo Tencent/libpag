@@ -160,18 +160,7 @@ void TextHolder::flush(FontConfig* fontConfig) {
     auto runs = result.extractLayoutRuns(entry.node);
     // Bake the container padding offset into the run positions the same way TextBox::updateLayout
     // does, so a reshaped TextBox child stays aligned with its box inset.
-    if (entry.paddingLeft != 0.0f || entry.paddingTop != 0.0f) {
-      for (auto& run : runs) {
-        for (auto& pos : run.positions) {
-          pos.x += entry.paddingLeft;
-          pos.y += entry.paddingTop;
-        }
-        for (auto& xf : run.xforms) {
-          xf.tx += entry.paddingLeft;
-          xf.ty += entry.paddingTop;
-        }
-      }
-    }
+    ApplyPaddingToRuns(runs, entry.paddingLeft, entry.paddingTop);
     auto textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, entry.inverseMatrix);
     if (textBlob == nullptr) {
       continue;

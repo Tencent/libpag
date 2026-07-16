@@ -146,16 +146,7 @@ void TextBox::updateLayout(LayoutContext* context) {
     if (hasPadding) {
       text->textBounds.x += padding.left;
       text->textBounds.y += padding.top;
-      for (auto& run : text->glyphData->layoutRuns) {
-        for (auto& pos : run.positions) {
-          pos.x += padding.left;
-          pos.y += padding.top;
-        }
-        for (auto& xf : run.xforms) {
-          xf.tx += padding.left;
-          xf.ty += padding.top;
-        }
-      }
+      ApplyPaddingToRuns(text->glyphData->layoutRuns, padding.left, padding.top);
     }
     text->preferredX = text->textBounds.x;
     text->preferredY = text->textBounds.y;

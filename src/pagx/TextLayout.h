@@ -67,6 +67,13 @@ struct TextElement {
   TextGlyphParams glyph = {};
 };
 
+/**
+ * Offsets every glyph position and RSXform translation in the runs by (paddingLeft, paddingTop).
+ * Used by TextBox layout and runtime text reshaping so a reshaped TextBox child stays aligned with
+ * the box inset without duplicating the offset loop at each call site.
+ */
+void ApplyPaddingToRuns(std::vector<TextLayoutGlyphRun>& runs, float paddingLeft, float paddingTop);
+
 struct PositionedGlyph {
   tgfx::GlyphID glyphID = 0;
   tgfx::Font font = {};
