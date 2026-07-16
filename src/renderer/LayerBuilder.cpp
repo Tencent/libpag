@@ -3164,6 +3164,14 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) override {
+    // Collect child Texts first. If there are none, the box has nothing to reshape and no holder is
+    // needed — skip the shared-holder setup so an empty TextBox does not register a no-op holder.
+    std::vector<Text*> childText = {};
+    std::vector<tgfx::Matrix> matrices = {};
+    TextLayout::CollectTextElements(node->elements, childText, matrices);
+    if (childText.empty()) {
+      return convertGroup(node);
+    }
     // Build one shared TextHolder for the box: all child Texts share a single line-breaking layout,
     // so they reshape together. Capture each child's inverse matrix and the box padding so a reshape
     // reproduces the same coordinate transform as the layout pass. The context is published on the
@@ -3174,9 +3182,6 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
     bool hasPadding = !node->padding.isZero();
     context.paddingLeft = hasPadding ? node->padding.left : 0.0f;
     context.paddingTop = hasPadding ? node->padding.top : 0.0f;
-    std::vector<Text*> childText = {};
-    std::vector<tgfx::Matrix> matrices = {};
-    TextLayout::CollectTextElements(node->elements, childText, matrices);
     for (size_t i = 0; i < childText.size(); i++) {
       tgfx::Matrix inverse = {};
       if (matrices[i].invert(&inverse)) {
