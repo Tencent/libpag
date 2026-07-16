@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { openAndSettlePage } = require('../dist/lib/page-loader');
-const { makeFail, parseNumber } = require('../dist/lib/common');
+const { makeFail, parseNumber, MAX_CAPTURE_HEIGHT_PX } = require('../dist/lib/common');
 const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/browser-engine');
 
 const fail = makeFail('baseline');
@@ -66,11 +66,11 @@ function parseArgs(argv) {
   return opts;
 }
 
-async function captureBodyRect(page) {
+async function captureBodyRect(page, maxHeightPx) {
   // Force layout flush and read the body rect that snapshot.js will use as the
   // canvas. Anything outside this rect is not addressable in the subset output,
   // so cropping the baseline screenshot to the same rect keeps the diff fair.
-  return page.evaluate(() => {
+  return page.evaluate((maxHeight) => {
     const body = document.body;
     body.style.margin = '0';
     body.style.padding = '0';
@@ -97,9 +97,17 @@ async function captureBodyRect(page) {
     void body.offsetHeight;
     const rect = body.getBoundingClientRect();
     const width = Math.max(body.scrollWidth, Math.round(rect.width));
-    const height = Math.max(body.scrollHeight, Math.round(rect.height));
+    // Clamp to the same renderable maximum snapshot.js applies to the subset
+    // canvas. Infinite-scroll feeds inflate the body past what a single GL
+    // render surface can hold; without this the baseline PNG (ground truth)
+    // would be taller than the subset and the diff would compare mismatched
+    // canvases. Clamping both to MAX_CAPTURE_HEIGHT_PX keeps them aligned.
+    const height = Math.min(
+      maxHeight,
+      Math.max(body.scrollHeight, Math.round(rect.height)),
+    );
     return { width, height };
-  });
+  }, maxHeightPx);
 }
 
 async function main() {
@@ -120,7 +128,7 @@ async function main() {
         console.error(`page exception: ${err.message}`);
       },
     });
-    const { width, height } = await captureBodyRect(page);
+    const { width, height } = await captureBodyRect(page, MAX_CAPTURE_HEIGHT_PX);
     // Re-size the viewport to the captured body rect so the screenshot is
     // taken at the canvas dimensions (matches `pagx render --scale 1` output
     // size). `setViewport` is engine-aware: puppeteer keeps the legacy

@@ -39,6 +39,14 @@
 // @ts-nocheck
 
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
+// Imported under a distinct name because the value is only embedded as a
+// literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
+// `MAX_CAPTURE_HEIGHT_PX` that `snapshotMain` references is the const defined
+// there — keeping the names apart stops tsc from rewriting `snapshotMain`'s
+// reference to `common_1.MAX_CAPTURE_HEIGHT_PX`, which would be undefined once
+// the function is stringified into the browser payload (same pattern as
+// DROP_TAG_NAMES_JSON → the browser-scope DROP_TAGS Set).
+import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 
 /* eslint-disable no-undef, no-inner-declarations */
 
@@ -3333,7 +3341,14 @@ function snapshotMain() {
   // pages whose content extends past the viewport.
   const bodyRect = body.getBoundingClientRect();
   const canvasWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
-  const canvasHeight = Math.max(body.scrollHeight, Math.round(bodyRect.height));
+  // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
+  // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
+  // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
+  // and matches the same clamp baseline.js applies, so the two stay aligned.
+  const canvasHeight = Math.min(
+    MAX_CAPTURE_HEIGHT_PX,
+    Math.max(body.scrollHeight, Math.round(bodyRect.height)),
+  );
 
   const parts = [];
   for (const c of body.children) {
@@ -3424,6 +3439,8 @@ ${parts.join('')}
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
+
+const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
 
 const BOUNDARY_SPACE = '\\u00a0';
 
