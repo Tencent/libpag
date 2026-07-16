@@ -3315,44 +3315,106 @@ function render(el, parentRect, opts, precomputed) {
 
 // ===== Main snapshot entry =====
 
-function snapshotMain() {
+// Neutralise the <html>/<body> boxes exactly as baseline.js does before it
+// captures ground truth: zero <body>'s margin/padding, then zero <html>'s
+// margin/padding and force `display: block`. `pagx render` roots at <body> and
+// ignores <html> entirely, so any html-level padding/centring/flex the author
+// applied must not leak into the measured geometry — otherwise the subset's
+// child offsets would be shifted relative to the baseline (which measures with
+// <html> neutralised). Scroll is reset to (0,0) so every `getBoundingClientRect`
+// lands against the document origin rather than the current viewport. Shared by
+// `snapshotMain` and the standalone `measureCanvas` entry so the two always
+// agree on the neutralised layout. Keeping this in lock-step with baseline.js
+// is what makes the two renders comparable.
+function prepareBodyForSnapshot() {
   const body = document.body;
   body.style.margin = '0';
   body.style.padding = '0';
-  // If the page (or the user) scrolled before snapshot, every
-  // `getBoundingClientRect` call returns viewport-relative offsets shifted
-  // by the scroll position. Reset to (0,0) so that the body's own rect
-  // lands at the origin and every nested rect is measured against the
-  // document, not the current viewport.
+  const docEl = document.documentElement;
+  if (docEl && docEl.style) {
+    docEl.style.margin = '0';
+    docEl.style.padding = '0';
+    docEl.style.display = 'block';
+  }
   if (typeof window.scrollTo === 'function') {
     try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
   }
   // Force layout flush.
   void body.offsetHeight;
+}
 
-  // Pick canvas size from the body itself. We deliberately do NOT consult
-  // `document.documentElement.scrollWidth/scrollHeight` here — the root
-  // element is sized to the viewport whenever the body is smaller, so a
-  // phone-sized mock (`<body style="width: 375px; height: 812px">`) would
-  // otherwise be inflated to the puppeteer viewport (1400x900) and rendered
-  // as a tiny island in the top-left corner. `body.scrollWidth/scrollHeight`
-  // already includes any child content that overflows past the body's
-  // declared size, so it correctly captures both fixed-size mocks and fluid
-  // pages whose content extends past the viewport.
+// Neutralise the page and return the canvas dimensions the subset will use.
+// Exposed as its own entry (see `MEASURE_CANVAS_EXPR`) so the snapshot runner
+// can resize the browser viewport to this canvas *before* it measures element
+// geometry — matching baseline.js, which resizes to the same box before it
+// screenshots. Without that resize, any element whose containing block is the
+// initial containing block (a `position: absolute` box anchored by
+// `right`/`bottom` with no positioned ancestor, `position: fixed`, or a
+// `vw`/`vh` length) would resolve against the default 1400x900 viewport and
+// land at coordinates the body-rooted `pagx render` can't reproduce.
+//
+// We deliberately do NOT consult `document.documentElement.scrollWidth/
+// scrollHeight` here — the root element is sized to the viewport whenever the
+// body is smaller, so a phone-sized mock (`<body style="width: 375px; height:
+// 812px">`) would otherwise be inflated to the viewport and rendered as a tiny
+// island in the top-left corner. `body.scrollWidth/scrollHeight` already
+// includes any child content that overflows past the body's declared size, so
+// it correctly captures both fixed-size mocks and fluid pages whose content
+// extends past the viewport.
+function measureCanvas() {
+  prepareBodyForSnapshot();
+  const body = document.body;
   const bodyRect = body.getBoundingClientRect();
-  const canvasWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
   // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
   // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
   // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
   // and matches the same clamp baseline.js applies, so the two stay aligned.
-  const canvasHeight = Math.min(
+  const height = Math.min(
     MAX_CAPTURE_HEIGHT_PX,
     Math.max(body.scrollHeight, Math.round(bodyRect.height)),
   );
+  return { width, height };
+}
 
+function snapshotMain(opts) {
+  opts = opts || {};
+  // Neutralise the page and measure the canvas. When the runner has already
+  // resized the viewport to the canvas (the normal split-payload path) it
+  // passes the dimensions it measured *before* the resize via
+  // `opts.canvasWidth/canvasHeight`; we honour those so the emitted canvas
+  // matches the baseline's screenshot clip exactly, since re-measuring after
+  // the resize's reflow could drift by a pixel. Standalone callers (the
+  // browser bundle) pass nothing and we fall back to the fresh measurement.
+  const measured = measureCanvas();
+  const body = document.body;
+  const canvasWidth = (typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0)
+    ? opts.canvasWidth : measured.width;
+  const canvasHeight = (typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0)
+    ? opts.canvasHeight : measured.height;
+
+  // Measure the body's children against the canvas origin (0,0), NOT against
+  // `bodyRect`. When a block child's vertical margin collapses through the
+  // body (CSS parent/first-child margin collapsing: no border/padding/BFC
+  // separates them), the collapsed margin is hoisted ABOVE the body, so
+  // `bodyRect.top` is pushed down by that amount while the child's own rect
+  // stays pinned to the body edge — the rect difference then reads 0 and the
+  // visual gap is lost (e.g. `margin: 20px auto` centred a box horizontally
+  // but dropped its 20px top offset). The baseline captures from the canvas
+  // origin with the body's background propagated into that hoisted-margin
+  // band, and `pagx render` roots the body at (0,0), so anchoring children at
+  // the canvas origin reproduces the collapsed margin as leading space and
+  // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
+  // here (block body, zeroed margin), so the horizontal axis is unaffected.
+  const rootOrigin = {
+    left: 0, top: 0,
+    right: canvasWidth, bottom: canvasHeight,
+    width: canvasWidth, height: canvasHeight,
+    x: 0, y: 0,
+  };
   const parts = [];
   for (const c of body.children) {
-    parts.push(render(c, bodyRect));
+    parts.push(render(c, rootOrigin));
   }
 
   const title = (document.title || '').trim();
@@ -3637,6 +3699,8 @@ const HELPER_FNS = [
   renderContainer,
   renderChildrenInto,
   render,
+  prepareBodyForSnapshot,
+  measureCanvas,
   snapshotMain,
 ];
 
@@ -3665,13 +3729,23 @@ ${HELPERS_SRC}
 ${PAYLOAD_CONSTANTS_SRC}
 window.__pagxSnapshot = {
   takeSnapshot: snapshotMain,
+  measureCanvas: measureCanvas,
 };
 })();`;
 
 // Entry expression matching SNAPSHOT_INIT_SCRIPT. Compact enough that the
 // CDP roundtrip per snapshot is bounded by the protocol overhead, not the
-// payload size.
+// payload size. Callers that resized the viewport pass the pre-resize canvas
+// back in via `takeSnapshot({ canvasWidth, canvasHeight })` (see
+// snapshot-runner.ts); this no-arg form re-measures.
 const TAKE_SNAPSHOT_EXPR = '(() => window.__pagxSnapshot.takeSnapshot())()';
+
+// Entry expression for the standalone canvas measurement. The runner evaluates
+// this first (it neutralises <html>/<body> and returns the body canvas size),
+// resizes the viewport to the result, then evaluates the parametrised
+// `takeSnapshot({...})` form so element geometry is measured against a viewport
+// equal to the canvas — the same box baseline.js screenshots.
+const MEASURE_CANVAS_EXPR = '(() => window.__pagxSnapshot.measureCanvas())()';
 
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
@@ -4140,6 +4214,7 @@ export {
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,
+  MEASURE_CANVAS_EXPR,
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
