@@ -23,6 +23,16 @@
 
 namespace exporter {
 
+// AEGP_NewFromLayer uses the current time indicator position which may be outside the layer's
+// visible range. Set the render time to the layer's in point so the first visible frame is
+// rendered correctly. In layer time the in point is always 0 (per the AE SDK), so we construct the
+// time directly instead of querying AEGP_GetLayerInPoint.
+static void SetVideoLayerRenderTime(const AEGP_LayerRenderOptionsH& renderOptions) {
+  const auto& Suites = GetSuites();
+  A_Time inPointLayer = {0, 1};
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
+}
+
 static void GetVideoLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_long& srcStride,
                                          A_long& width, A_long& height) {
   const auto& Suites = GetSuites();
@@ -33,12 +43,7 @@ static void GetVideoLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_lon
   if (renderOptions == nullptr) {
     return;
   }
-  // AEGP_NewFromLayer uses the current time indicator position which may be outside the layer's
-  // visible range. Explicitly set the time to the layer's in point in layer time to ensure the
-  // first visible frame is rendered correctly (including footage slip).
-  A_Time inPointLayer = {};
-  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_LayerTime, &inPointLayer);
-  Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
+  SetVideoLayerRenderTime(renderOptions);
   GetLayerRenderFrameSize(renderOptions, srcStride, width, height);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -54,9 +59,7 @@ static void GetVideoLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   if (renderOptions == nullptr) {
     return;
   }
-  A_Time inPointLayer = {};
-  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_LayerTime, &inPointLayer);
-  Suites->LayerRenderOptionsSuite2()->AEGP_SetTime(renderOptions, inPointLayer);
+  SetVideoLayerRenderTime(renderOptions);
   GetLayerRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -99,10 +102,17 @@ static void GetVideoLayerMaskedOffset(const AEGP_LayerH& layerHandle, A_long& of
                                       A_long& offsetY) {
   const auto& Suites = GetSuites();
   A_Time inPoint = {};
-  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_CompTime, &inPoint);
+  A_Err err =
+      Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_CompTime, &inPoint);
+  if (err != A_Err_NONE || inPoint.scale == 0) {
+    return;
+  }
   A_FloatRect maskedBounds = {};
-  Suites->LayerSuite8()->AEGP_GetLayerMaskedBounds(layerHandle, AEGP_LTimeMode_CompTime, &inPoint,
-                                                   &maskedBounds);
+  err = Suites->LayerSuite8()->AEGP_GetLayerMaskedBounds(layerHandle, AEGP_LTimeMode_CompTime,
+                                                         &inPoint, &maskedBounds);
+  if (err != A_Err_NONE) {
+    return;
+  }
   // Floor toward negative infinity so masks with negative fractional bounds match AE's pixel-floor
   // crop origin.
   offsetX = static_cast<A_long>(floor(maskedBounds.left));
