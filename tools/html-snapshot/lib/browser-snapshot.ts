@@ -1993,6 +1993,80 @@ function isFlexLayoutFaithful(children, computed) {
   return true;
 }
 
+// The single cross-axis alignment a flex container will serialise to — the
+// value collectFlexProps() would emit (or the subset default `stretch` when
+// the source keyword is `stretch` / `baseline` / any value outside the
+// subset). PAGX's container layout has no per-child `align-self`, so this one
+// keyword is all that survives; `isFlexCrossAxisFaithful` checks it actually
+// reproduces every child's painted cross-axis position.
+function effectiveFlexAlignItems(computed) {
+  const align = computed.getPropertyValue('align-items').trim();
+  const alignNorm = ALIGN_ITEMS_ALIAS.get(align) || align;
+  if (alignNorm && ALIGN_ITEMS_OK.has(alignNorm) && alignNorm !== 'stretch') {
+    return alignNorm;
+  }
+  return 'stretch';
+}
+
+// Cross-axis margins of a flex item on the container's cross axis. Element
+// items forward their margins verbatim via buildStyle(); anonymous text items
+// carry none, so the faithfulness check must add these back before comparing
+// the child's painted cross-axis position to the alignment prediction.
+function flexItemCrossMargins(child, isRow) {
+  if (child.kind !== 'element') return { low: 0, high: 0 };
+  const m = readMargin(child.computed);
+  return isRow ? { low: m.top, high: m.bottom } : { low: m.left, high: m.right };
+}
+
+// Verify that re-aligning `children` with the container's single serialised
+// `align-items` (see effectiveFlexAlignItems) would land them on the cross
+// axis where the browser actually painted them. PAGX has no per-child
+// `align-self`, so a container whose children were individually shifted with
+// `align-self` (or aligned by text baseline, etc.) cannot be reproduced as a
+// flat flex container — emitting one would collapse every child onto the same
+// cross-axis edge. Bailing here keeps the exact painted pixels via absolute
+// positioning at the cost of one fewer flex container.
+//
+// Tolerance matches isFlexLayoutFaithful (1.5px) so sub-pixel rounding from
+// getBoundingClientRect is absorbed while a real align-self shift is caught.
+function isFlexCrossAxisFaithful(el, computed, children) {
+  const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
+  const isRow = !direction.startsWith('column');
+  const rect = el.getBoundingClientRect();
+  const pad = readPadding(computed);
+  let contentLow;
+  let contentHigh;
+  if (isRow) {
+    contentLow = rect.top + borderWidthOf(computed, 'top') + pad.top;
+    contentHigh = rect.bottom - borderWidthOf(computed, 'bottom') - pad.bottom;
+  } else {
+    contentLow = rect.left + borderWidthOf(computed, 'left') + pad.left;
+    contentHigh = rect.right - borderWidthOf(computed, 'right') - pad.right;
+  }
+  const effective = effectiveFlexAlignItems(computed);
+  const TOLERANCE = 1.5;
+  for (const child of children) {
+    const r = child.rect;
+    if (!r) continue;
+    const lo = isRow ? r.top : r.left;
+    const hi = isRow ? r.bottom : r.right;
+    const m = flexItemCrossMargins(child, isRow);
+    let delta;
+    if (effective === 'flex-end') {
+      delta = hi - (contentHigh - m.high);
+    } else if (effective === 'center') {
+      delta = (lo + hi) / 2 - (contentLow + m.low + contentHigh - m.high) / 2;
+    } else {
+      // flex-start and stretch both anchor the child to the cross-start edge
+      // (stretch additionally grows children without an explicit cross size,
+      // which keeps the start edge unchanged).
+      delta = lo - (contentLow + m.low);
+    }
+    if (Math.abs(delta) > TOLERANCE) return false;
+  }
+  return true;
+}
+
 // Returns a curated list of flex children when `el`'s computed style declares
 // a subset-friendly flex configuration AND its border/wrapping/child shape
 // don't require absolute positioning. `null` means "render as absolute".
@@ -2010,6 +2084,10 @@ function classifyFlexContainer(el, computed) {
   const children = flexItemChildren(el);
   if (!children) return null;
   if (!isFlexLayoutFaithful(children, computed)) return null;
+  // Per-child `align-self` (or baseline alignment) can't be expressed with the
+  // single `align-items` PAGX supports; keep such containers absolute so the
+  // painted cross-axis positions survive.
+  if (!isFlexCrossAxisFaithful(el, computed, children)) return null;
   return children;
 }
 
@@ -3684,6 +3762,9 @@ const HELPER_FNS = [
   isMultiLineTextLeafItem,
   flexItemChildren,
   isFlexLayoutFaithful,
+  effectiveFlexAlignItems,
+  flexItemCrossMargins,
+  isFlexCrossAxisFaithful,
   classifyFlexContainer,
   renderSvg,
   renderInlineIconSvg,
