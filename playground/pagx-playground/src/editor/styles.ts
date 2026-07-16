@@ -23,7 +23,10 @@ export const EDITOR_STYLES = `
     top: 0;
     right: 0;
     bottom: 0;
-    width: 50%;
+    /* Width is driven by the --editor-width variable set while dragging the resizer; falls back
+       to 50% before any drag. min-width guards the CSS-only case against an overly narrow panel. */
+    width: var(--editor-width, 50%);
+    min-width: 320px;
     display: none;
     flex-direction: column;
     background: #1E1E1E;
@@ -31,12 +34,29 @@ export const EDITOR_STYLES = `
     z-index: 10;
 }
 
+#editor-panel .editor-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    cursor: ew-resize;
+    z-index: 20;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+#editor-panel .editor-resizer:hover,
+#editor-panel .editor-resizer.dragging {
+    background: #448EF9;
+}
+
 #editor-panel.visible {
     display: flex;
 }
 
 .container.with-editor {
-    width: 50%;
+    width: calc(100% - var(--editor-width, 50%));
     margin: 0;
 }
 
@@ -107,15 +127,12 @@ export const EDITOR_STYLES = `
     outline: none;
 }
 
-/* Selection highlight */
+/* Selection highlight. !important guards against CodeMirror's baseTheme and any focused-state
+   rule that may be injected inline; specificity alone is not always enough. */
 #editor-panel .editor-host .cm-editor .cm-selectionBackground,
 #editor-panel .editor-host .cm-editor.cm-focused .cm-selectionBackground,
 #editor-panel .editor-host .cm-editor ::selection {
     background-color: rgba(68, 142, 249, 0.35) !important;
-}
-
-#editor-panel .editor-host .cm-editor .cm-selectionLayer .cm-selectionBackground {
-    background-color: rgba(68, 142, 249, 0.35);
 }
 
 /* highlightSelectionMatches - subtle highlight for matching text under cursor */

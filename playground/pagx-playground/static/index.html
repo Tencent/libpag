@@ -93,6 +93,7 @@
         </button>
     </div>
     <div id="editor-panel">
+        <div class="editor-resizer" title="Drag to resize"></div>
         <div class="editor-header">
             <span class="editor-title">Source Editor</span>
             <button class="editor-close-btn" title="Close (L)">
@@ -142,13 +143,13 @@
         </div>
     </div>
     <div id="playback-bar" class="playback-bar hidden">
-        <button id="play-pause-btn" class="playback-btn playback-btn-primary" title="Play / Pause (Space)">
+        <button id="play-pause-btn" class="playback-btn playback-btn-primary" aria-label="Play / Pause">
             <img id="play-pause-img" src="./play.png" alt="Play / Pause" draggable="false"/>
         </button>
-        <button id="prev-frame-btn" class="playback-btn playback-btn-step" title="Previous Frame">
+        <button id="prev-frame-btn" class="playback-btn playback-btn-step" aria-label="Previous Frame">
             <img src="./previous.png" alt="Previous Frame" draggable="false"/>
         </button>
-        <button id="next-frame-btn" class="playback-btn playback-btn-step" title="Next Frame">
+        <button id="next-frame-btn" class="playback-btn playback-btn-step" aria-label="Next Frame">
             <img src="./next.png" alt="Next Frame" draggable="false"/>
         </button>
         <div class="progress-wrapper">
@@ -159,14 +160,26 @@
             <span class="time-divider"></span>
             <span id="frame-text" class="frame-text">0 / 0</span>
         </div>
-        <button id="loop-btn" class="playback-btn playback-btn-loop" title="Loop">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <button id="loop-btn" class="playback-btn playback-btn-loop" aria-label="Loop">
+            <svg class="loop-icon-sequence" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polyline points="17 1 21 5 17 9"></polyline>
                 <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
                 <polyline points="7 23 3 19 7 15"></polyline>
                 <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-                <line class="loop-slash-bg" x1="3" y1="21" x2="21" y2="3"></line>
-                <line class="loop-slash" x1="3" y1="21" x2="21" y2="3"></line>
+            </svg>
+            <svg class="loop-icon-single" viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <!-- Flat rounded-rectangle loop with an independent chevron arrowhead attached at
+                     the top-right. The outline is a full closed rounded rectangle; the arrowhead is
+                     a separate ">"-shaped polyline whose vertex sits exactly on the top edge of the
+                     rectangle, so the two strokes visually merge without leaving a gap. This matches
+                     the Feather-Icons "repeat" style used by the sibling loop-icon above. -->
+                <path d="M20 6v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h14"></path>
+                <polyline points="15 1 19 3 15 5"></polyline>
+                <!-- Digit "1": a single polyline (short top serif joined into the vertical stem)
+                     so the two strokes share a proper round-join instead of stacking two round caps.
+                     The serif is intentionally short and centered inside the rounded rectangle to
+                     stop it from visually merging with the outline. -->
+                <polyline points="10 8 11 7.2 11 14"></polyline>
             </svg>
         </button>
     </div>

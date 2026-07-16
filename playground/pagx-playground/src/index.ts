@@ -835,6 +835,7 @@ function showPlaybackBar(): void {
     if (hasAnimation) {
         playbackBar.classList.remove('hidden');
         updatePlaybackUI();
+        updateLoopIcon();
     } else {
         playbackBar.classList.add('hidden');
     }
@@ -910,14 +911,18 @@ function updateLoopIcon(): void {
     if (!playgroundState.pagxView || !loopBtn) {
         return;
     }
-    loopBtn.classList.toggle('active', playgroundState.pagxView.isLoop());
+    const looping = playgroundState.pagxView.isLoop();
+    loopBtn.classList.toggle('active', looping);
 }
 
 function updatePlaybackUI(): void {
     updatePlayPauseIcon();
     updateProgressSlider();
     updateTimeDisplay();
-    updateLoopIcon();
+    // updateLoopIcon is intentionally NOT called here: the loop state only changes on user
+    // click, so refreshing it on the 100ms playback tick would be wasted DOM work. Call sites
+    // that toggle the loop state (loop button handler, initial showPlaybackBar) update it
+    // explicitly.
 }
 
 function togglePlayback(): void {

@@ -440,6 +440,11 @@ html, body {
     padding: 12px 24px;
     background: #20202A;
     border-radius: 8px;
+    /* Lock the pill to its natural content width so a narrow viewport clips the sides evenly
+       instead of collapsing the internal controls (buttons, time display, progress bar). This
+       relies on the parent .container having overflow: hidden so the overflowing edges are
+       clipped rather than pushing the layout wider or leaking onto the editor panel. */
+    min-width: max-content;
 }
 
 .playback-bar.hidden {
@@ -494,8 +499,8 @@ html, body {
     display: block;
     width: 24px;
     height: 20px;
-    /* Nudge the arrow glyphs down a touch so they sit on the progress bar center line */
-    margin-top: 3px;
+    /* Nudge the arrow glyphs down so they sit on the progress bar center line */
+    margin-top: 5px;
 }
 
 /* Widen the gap between the prev/next frame buttons */
@@ -512,8 +517,12 @@ html, body {
 .time-display {
     display: flex;
     align-items: center;
+    /* Right-align so the frame counter stays close to the loop button; the fixed width keeps
+       the bar length stable while the time/frame digit counts change, absorbing slack on the left. */
+    justify-content: flex-end;
     gap: 16px;
     margin-left: 8px;
+    width: 168px;
     color: #ffffff;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
@@ -526,9 +535,9 @@ html, body {
     background: rgba(255, 255, 255, 0.28);
 }
 
-/* Loop toggle - always a white loop icon. When looping is off (no .active class) a diagonal slash
-   is overlaid to signal a "no loop" state. The inline SVG follows the button's currentColor so the
-   state switch needs no swapped image assets. */
+/* Loop toggle - shows the sequence (repeat) icon when looping is off, and the single (repeat-one,
+   marked with a "1") icon when looping is on. Both inline SVGs follow the button's currentColor so
+   the state switch needs no swapped image assets. */
 .playback-btn-loop {
     width: 24px;
     height: 48px;
@@ -543,26 +552,25 @@ html, body {
     height: 20px;
 }
 
-/* The slash is hidden while looping (.active) and revealed when it is off. The thicker
-   background-colored line underneath cuts a gap so the white slash reads clearly over the arrows. */
-.playback-btn-loop .loop-slash,
-.playback-btn-loop .loop-slash-bg {
+/* The single-loop icon uses a wider viewBox (26x20) to accommodate the arrowhead protruding
+   from the rounded rectangle, so it needs a wider box to stay in proportion. */
+.playback-btn-loop .loop-icon-single {
+    width: 24px;
+    height: 18px;
+}
+
+/* The icon reflects the current playback mode: play-once shows the "1" (single) icon,
+   loop shows the sequence-loop icon. */
+.playback-btn-loop .loop-icon-sequence {
     display: none;
 }
 
-.playback-btn-loop:not(.active) .loop-slash,
-.playback-btn-loop:not(.active) .loop-slash-bg {
+.playback-btn-loop.active .loop-icon-single {
+    display: none;
+}
+
+.playback-btn-loop.active .loop-icon-sequence {
     display: block;
-}
-
-.loop-slash-bg {
-    stroke: #20202A;
-    stroke-width: 4;
-}
-
-.loop-slash {
-    stroke: currentColor;
-    stroke-width: 2;
 }
 
 .progress-slider {
@@ -633,6 +641,9 @@ html, body {
         left: 16px;
         right: 16px;
         transform: none;
+        /* Override the desktop min-width: on narrow layouts the bar stretches with the viewport
+           and its internal controls shrink instead of overflowing. */
+        min-width: 0;
     }
 
     .progress-wrapper {
@@ -779,3 +790,4 @@ html, body {
         margin-left: 4px;
     }
 }
+

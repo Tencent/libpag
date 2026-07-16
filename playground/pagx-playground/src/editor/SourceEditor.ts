@@ -53,74 +53,66 @@ export class SourceEditor {
         // Ctrl+Z from unwinding past the load point into an empty editor.
     }
 
-    private createView(initialContent: string): void {
-        this.view = new EditorView({
-            parent: this.host,
-            state: EditorState.create({
-                doc: initialContent,
-                extensions: [
-                    minimalSetup,
-                    lineNumbers(),
-                    xml(),
-                    syntaxHighlighting(pagxHighlightStyle),
-                    highlightSelectionMatches(),
-                    // basicSetup includes searchKeymap which intercepts Ctrl+F. Use minimalSetup
-                    // (which omits it) and add only the keymaps we need, so the browser's
-                    // built-in Ctrl+F is free to handle search.
-                    keymap.of([...defaultKeymap, ...historyKeymap]),
-                    EditorView.theme({
-                        '&': {
-                            backgroundColor: '#1E1E1E',
-                            color: '#D4D4D4',
-                            height: '100%',
-                        },
-                        '.cm-content': {
-                            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                            fontSize: '13px',
-                            caretColor: '#FFFFFF',
-                        },
-                        '.cm-cursor': {
-                            borderLeftColor: '#FFFFFF',
-                            borderLeftWidth: '2px',
-                        },
-                        '.cm-gutters': {
-                            backgroundColor: '#1E1E1E',
-                            color: '#6E7681',
-                            border: 'none',
-                            borderRight: '1px solid #3C3C3C',
-                        },
-                        '.cm-activeLine': {
-                            backgroundColor: '#2D2D2D',
-                        },
-                        '.cm-activeLineGutter': {
-                            backgroundColor: '#2D2D2D',
-                        },
-                        '.cm-selectionBackground, ::selection': {
-                            backgroundColor: '#264F78',
-                        },
-                        '&.cm-focused .cm-selectionBackground': {
-                            backgroundColor: '#264F78',
-                        },
-                    }),
-                ],
-            }),
+    private createState(initialContent: string): EditorState {
+        return EditorState.create({
+            doc: initialContent,
+            extensions: [
+                minimalSetup,
+                lineNumbers(),
+                xml(),
+                syntaxHighlighting(pagxHighlightStyle),
+                highlightSelectionMatches(),
+                // basicSetup includes searchKeymap which intercepts Ctrl+F. Use minimalSetup
+                // (which omits it) and add only the keymaps we need, so the browser's
+                // built-in Ctrl+F is free to handle search.
+                keymap.of([...defaultKeymap, ...historyKeymap]),
+                // Theme covers only CodeMirror internals that styles.ts does not target.
+                // Gutter and selection colors live in styles.ts (higher specificity overrides
+                // this theme anyway), so keeping them here would create two sources of truth.
+                EditorView.theme({
+                    '&': {
+                        backgroundColor: '#1E1E1E',
+                        color: '#D4D4D4',
+                        height: '100%',
+                    },
+                    '.cm-content': {
+                        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                        fontSize: '13px',
+                        caretColor: '#FFFFFF',
+                    },
+                    '.cm-cursor': {
+                        borderLeftColor: '#FFFFFF',
+                        borderLeftWidth: '2px',
+                    },
+                    '.cm-activeLine': {
+                        backgroundColor: '#2D2D2D',
+                    },
+                    '.cm-activeLineGutter': {
+                        backgroundColor: '#2D2D2D',
+                    },
+                }),
+            ],
         });
     }
 
-    /** Replaces the entire document content. */
+    private createView(initialContent: string): void {
+        this.view = new EditorView({
+            parent: this.host,
+            state: this.createState(initialContent),
+        });
+    }
+
+    /** Replaces the entire document content, resetting the undo history to this content. */
     setContent(text: string): void {
         const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
         if (this.view === null) {
             this.createView(trimmed);
             return;
         }
-        this.view.dispatch({
-            changes: {
-                from: 0,
-                to: this.view.state.doc.length,
-                insert: trimmed,
-            },
-        });
+        // Rebuild the state instead of dispatching a change so the undo history is rooted at this
+        // content. A plain change dispatch would be recorded as an undoable edit, letting Ctrl+Z
+        // revert to a previously loaded file's content.
+        this.view.setState(this.createState(trimmed));
     }
 
     /** Returns the current document text. */
@@ -129,18 +121,6 @@ export class SourceEditor {
             return '';
         }
         return this.view.state.doc.toString();
-    }
-
-    /** Moves keyboard focus into the editor. */
-    focus(): void {
-        if (this.view !== null) {
-            this.view.focus();
-        }
-    }
-
-    /** Returns the underlying CodeMirror view, or null if not yet created. */
-    getView(): EditorView | null {
-        return this.view;
     }
 
     /** Releases the CodeMirror instance and frees DOM nodes. */

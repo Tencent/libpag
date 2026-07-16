@@ -21,12 +21,19 @@ import { EDITOR_STYLES } from './styles';
 
 const MOBILE_BREAKPOINT = 768;
 const TOAST_DURATION_MS = 2000;
+// Resizing bounds: the panel never shrinks below MIN_PANEL_WIDTH, and always leaves at least
+// MIN_CANVAS_WIDTH for the preview area on the left.
+const MIN_PANEL_WIDTH = 320;
+const MIN_CANVAS_WIDTH = 360;
 
 let panel: HTMLElement | null = null;
 let editor: SourceEditor | null = null;
 let currentXmlText: string | null = null;
 let toastTimer: number | undefined;
 let toastEl: HTMLElement | null = null;
+let resizer: HTMLElement | null = null;
+let panelWidthPx: number | null = null;
+let resizing = false;
 
 /** Callbacks provided by the host application to apply/save XML changes. */
 export interface EditorCallbacks {
@@ -68,11 +75,13 @@ function showToast(message: string, success: boolean): void {
         return;
     }
     toastEl.textContent = message;
-    toastEl.className = `editor-toast visible ${success ? 'success' : 'error'}`;
+    toastEl.classList.add('visible');
+    toastEl.classList.toggle('success', success);
+    toastEl.classList.toggle('error', !success);
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => {
         if (toastEl !== null) {
-            toastEl.className = 'editor-toast';
+            toastEl.classList.remove('visible', 'success', 'error');
         }
     }, TOAST_DURATION_MS);
 }
@@ -105,6 +114,56 @@ function closePanel(): void {
     const container = document.getElementById('container');
     if (container !== null) {
         container.classList.remove('with-editor');
+    }
+}
+
+/** Applies a panel width in pixels, clamped to the resize bounds, via the --editor-width variable. */
+function applyPanelWidth(px: number): void {
+    const max = Math.max(MIN_PANEL_WIDTH, window.innerWidth - MIN_CANVAS_WIDTH);
+    const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(px, max));
+    panelWidthPx = clamped;
+    document.documentElement.style.setProperty('--editor-width', `${clamped}px`);
+}
+
+function onResizeMove(event: PointerEvent): void {
+    if (!resizing) {
+        return;
+    }
+    applyPanelWidth(window.innerWidth - event.clientX);
+}
+
+function onResizeEnd(event: PointerEvent): void {
+    if (!resizing) {
+        return;
+    }
+    resizing = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    if (resizer !== null) {
+        resizer.classList.remove('dragging');
+        if (resizer.hasPointerCapture(event.pointerId)) {
+            resizer.releasePointerCapture(event.pointerId);
+        }
+    }
+}
+
+function onResizeStart(event: PointerEvent): void {
+    event.preventDefault();
+    resizing = true;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ew-resize';
+    if (resizer !== null) {
+        resizer.classList.add('dragging');
+        // Pointer capture routes subsequent pointermove/pointerup to the resizer even when the
+        // cursor leaves the browser window, avoiding a stuck resizing state on mouseup-loss.
+        resizer.setPointerCapture(event.pointerId);
+    }
+}
+
+/** Re-clamps the current panel width so the panel/canvas bounds stay valid after a window resize. */
+function onWindowResize(): void {
+    if (panelWidthPx !== null) {
+        applyPanelWidth(panelWidthPx);
     }
 }
 
@@ -230,6 +289,16 @@ export function init(cb: EditorCallbacks): void {
         console.warn('SourceEditor: #editor-panel element not found, skipping init.');
         return;
     }
+    resizer = panel.querySelector<HTMLElement>('.editor-resizer');
+    if (resizer !== null) {
+        // Pointer events with setPointerCapture keep the drag alive even when the cursor leaves
+        // the window; pointermove/pointerup are attached to the resizer itself thanks to capture.
+        resizer.addEventListener('pointerdown', onResizeStart);
+        resizer.addEventListener('pointermove', onResizeMove);
+        resizer.addEventListener('pointerup', onResizeEnd);
+        resizer.addEventListener('pointercancel', onResizeEnd);
+    }
+    window.addEventListener('resize', onWindowResize);
     const closeBtn = panel.querySelector('.editor-close-btn');
     if (closeBtn !== null) {
         closeBtn.addEventListener('click', closePanel);
