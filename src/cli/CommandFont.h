@@ -21,11 +21,7 @@
 namespace pagx::cli {
 
 /**
- * Manages font operations: querying font metrics and embedding fonts into PAGX files.
- *
- * Subcommands:
- *   info   - Query font identity and metrics from a file or system font
- *   embed  - Embed fonts into a PAGX file with optional fallback list
+ * Queries font metrics from a file or system font.
  */
 int RunFont(int argc, char* argv[]);
 

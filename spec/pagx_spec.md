@@ -488,7 +488,7 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
 
 #### 3.3.5 Font
 
-Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). Embedding glyph data makes PAGX files fully self-contained, ensuring consistent rendering across platforms.
+Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). Embedding glyph data makes PAGX files fully self-contained, ensuring consistent rendering across platforms. Font nodes can also reference external font files via the optional `file` attribute, serving as font source declarations for `pagx embed` to discover and register before text layout.
 
 ```xml
 <!-- Embedded vector font -->
@@ -502,10 +502,14 @@ Font defines embedded font resources containing subsetted glyph data (vector out
   <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
+
+<!-- External font file reference (before embed) -->
+<Font id="Noto" file="./fonts/NotoSansSC-Regular.otf" unitsPerEm="1000"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `file` | string | - | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 | `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.

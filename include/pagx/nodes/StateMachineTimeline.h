@@ -18,28 +18,29 @@
 
 #pragma once
 
-#include "tgfx/layers/Layer.h"
-#include "tgfx/core/Color.h"
+#include <string>
+#include "pagx/nodes/Timeline.h"
 
 namespace pagx {
 
-class GridBackgroundLayer : public tgfx::Layer {
+/**
+ * StateMachineTimeline attaches a referenced StateMachine to the owning Layer's runtime
+ * composition. The referenced StateMachine is looked up by stateMachineId against the owning
+ * document's id table. Unlike AnimationTimeline, the initial state is not specified here; each
+ * StateRegion carries its own initialState.
+ */
+class StateMachineTimeline : public Timeline {
  public:
-  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density);
+  StateMachineTimeline() = default;
 
- protected:
-  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
+  /**
+   * The id of the referenced StateMachine. Resolved against the owning document's id table.
+   */
+  std::string stateMachineId = {};
 
- private:
-  GridBackgroundLayer(int width, int height, float density);
-
-  int gridWidth = 0;
-  int gridHeight = 0;
-  float density = 1.f;
+  TimelineType timelineType() const override {
+    return TimelineType::StateMachine;
+  }
 };
-
-void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);
-
-void DrawSolidBackground(tgfx::Canvas* canvas, int width, int height, const tgfx::Color& color);
 
 }  // namespace pagx

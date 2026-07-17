@@ -3,6 +3,7 @@
 #include "pagx/DataContext.h"
 #include "pagx/DataConverterRegistry.h"
 #include "pagx/ObserverHandle.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -667,7 +668,7 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncAnimationToViewModel) {
   auto alphaProp = vm->propertyNumber("alpha");
   ASSERT_NE(alphaProp, nullptr);
   EXPECT_FLOAT_EQ(alphaProp->value(), 1.0f);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_NE(timeline, nullptr);
   timeline->setCurrentTime(500000);
   timeline->apply();
@@ -747,9 +748,9 @@ PAGX_TEST(PAGXViewModelTest, TwoWaySyncNotifiesObserverOnce) {
   int obs = 0;
   auto h = alphaProp->addObserver([&]() { obs++; });
   EXPECT_EQ(obs, 0);
-  auto t1 = scene->getTimeline("a1");
+  auto t1 = scene->getAnimation("a1");
   ASSERT_NE(t1, nullptr);
-  auto t2 = scene->getTimeline("a2");
+  auto t2 = scene->getAnimation("a2");
   ASSERT_NE(t2, nullptr);
   int64_t f30 = 500000;
   t1->setCurrentTime(f30);
@@ -1293,7 +1294,7 @@ PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
   ASSERT_NE(vm, nullptr);
   auto xProp = vm->propertyNumber("x");
   ASSERT_NE(xProp, nullptr);
-  auto timeline = scene->getDefaultTimeline();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_NE(timeline, nullptr);
   timeline->setCurrentTime(500000);
   timeline->apply();

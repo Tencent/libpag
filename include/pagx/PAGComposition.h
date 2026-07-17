@@ -20,12 +20,16 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
+#include <string>
 #include <unordered_set>
 #include <vector>
 #include "pagx/PAGLayer.h"
 
 namespace pagx {
 
+class PAGAnimation;
+class PAGStateMachine;
 class PAGTimeline;
 class PAGScene;
 class PAGViewModel;
@@ -56,6 +60,23 @@ class PAGComposition : public PAGLayer {
    * ViewModel schema.
    */
   std::shared_ptr<PAGViewModel> viewModel() const;
+
+  /**
+   * Resumes advancing the named timeline (animation or state machine). The timeline continues to
+   * apply() each frame regardless of this state.
+   */
+  void playTimeline(const std::string& id);
+
+  /**
+   * Stops advancing the named timeline. apply() still runs, so the timeline's current frame
+   * continues to be written to the content. Call playTimeline() to resume advancing.
+   */
+  void pauseTimeline(const std::string& id);
+
+  /**
+   * Returns true if the named timeline is advancing (not paused).
+   */
+  bool isTimelinePlaying(const std::string& id) const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
@@ -154,6 +175,10 @@ class PAGComposition : public PAGLayer {
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+  // Timeline ids that are paused. advance() skips these, but apply() still runs so the current
+  // frame keeps contributing to the output. Mirrors Rive's NestedSimpleAnimation.isPlaying, which
+  // gates time advancement but not application.
+  std::set<std::string> pausedTimelineIds = {};
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
   std::unique_ptr<DataBindRuntime> dataBindRuntime;
   std::shared_ptr<DataContext> dataContext = nullptr;

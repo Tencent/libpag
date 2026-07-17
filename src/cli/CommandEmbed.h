@@ -18,23 +18,13 @@
 
 #pragma once
 
-#include "tgfx/layers/Layer.h"
+namespace pagx::cli {
 
-namespace pagx {
+/**
+ * Embeds font glyphs and images into a PAGX file, producing a self-contained output.
+ * Font embedding extracts glyph paths/images from laid-out text; image embedding inlines
+ * external files as base64. Run `pagx embed --help` for the full flag list.
+ */
+int RunEmbed(int argc, char* argv[]);
 
-class GridBackgroundLayer : public tgfx::Layer {
- public:
-  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density);
-
- protected:
-  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
-
- private:
-  GridBackgroundLayer(int width, int height, float density);
-
-  int width = 0;
-  int height = 0;
-  float density = 1.f;
-};
-
-}  // namespace pagx
+}  // namespace pagx::cli

@@ -63,11 +63,22 @@ std::shared_ptr<PAGViewModelValueBoolean> PAGViewModel::propertyBoolean(
   if (it == propertyMap.end()) {
     return nullptr;
   }
-  const auto type = it->second->valueType();
-  if (type != ViewModelPropertyType::Boolean && type != ViewModelPropertyType::Trigger) {
+  if (it->second->valueType() != ViewModelPropertyType::Boolean) {
     return nullptr;
   }
   return std::static_pointer_cast<PAGViewModelValueBoolean>(it->second);
+}
+
+std::shared_ptr<PAGViewModelValueTrigger> PAGViewModel::propertyTrigger(
+    const std::string& name) const {
+  auto it = propertyMap.find(name);
+  if (it == propertyMap.end()) {
+    return nullptr;
+  }
+  if (it->second->valueType() != ViewModelPropertyType::Trigger) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGViewModelValueTrigger>(it->second);
 }
 
 std::shared_ptr<PAGViewModelValueColor> PAGViewModel::propertyColor(const std::string& name) const {

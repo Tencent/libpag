@@ -11,7 +11,7 @@
 ```
 pagx/wechat/
 ├── CMakeLists.txt       # 构建 wasm 模块的 CMake 入口
-├── src/                 # 绑定到 JS 的 C++ 源码（PAGXView、GridBackground、binding.cpp）
+├── src/                 # 绑定到 JS 的 C++ 源码（PAGXView、binding.cpp）
 ├── ts/                  # TypeScript 源码（pagx.ts、pagx-view.ts、gesture-manager.ts 等）
 ├── script/              # 构建脚本（CMake / Rollup / emsdk 环境准备 / 产物拷贝）
 ├── wasm/                # CMake 原始产物（pagx-viewer.wasm、pagx-viewer.js）

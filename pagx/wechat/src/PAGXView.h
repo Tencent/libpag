@@ -18,22 +18,25 @@
 
 #pragma once
 
+#include <emscripten/val.h>
 #include <cstdint>
 #include <deque>
-#include <emscripten/val.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/FontConfig.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Device.h"
 #include "tgfx/gpu/Recording.h"
-#include "tgfx/layers/DisplayList.h"
-#include "pagx/FontConfig.h"
-#include "pagx/PAGXDocument.h"
 #include "utils/StringParser.h"
-#include "LayerBuilder.h"
 
 namespace tgfx {
 class Context;
@@ -195,24 +198,23 @@ class PAGXView {
    */
   bool isFullBudgetSaturated() const;
 
-
-
   /**
-   * Returns root-space bounds (canvas pixel coordinates, already accounting for fitScale and
-   * the centering offset applied to contentLayer) for every filePath in the input list. Each
+   * Returns bounds mapped into canvas pixel space by the contain-mode fit transform (fitScale +
+   * centerOffset, WITHOUT the user pan/zoom folded in) for every filePath in the input list. Each
    * returned entry has both a unionBounds (axis-aligned union of every referencing layer, used
    * for viewport-intersection tests) and a largestBounds (the single referencing layer with the
    * biggest area, used for focus-distance scoring). filePaths with no matching layer map to
    * null so callers can tell apart "off-canvas" from "no such filePath".
    *
-   * Must be called after buildLayers() so the contentLayer has been attached to the
-   * displayList; otherwise the result is an empty object. The first call triggers the tgfx
-   * layer tree to lazily compute and cache each layer's localBounds (estimated at 50-250ms
-   * total for a ~50-image document), so it is cheaper to defer the call to a moment when the
-   * user is already waiting (e.g. the first idle window after the initial frame has rendered)
-   * rather than running it synchronously alongside buildLayers().
+   * Must be called after buildLayers() so the scene's runtime layer tree exists; otherwise the
+   * result is an empty object. The first call triggers the tgfx layer tree to lazily compute and
+   * cache each layer's localBounds (estimated at 50-250ms total for a ~50-image document), so it
+   * is cheaper to defer the call to a moment when the user is already waiting (e.g. the first idle
+   * window after the initial frame has rendered) rather than running it synchronously alongside
+   * buildLayers().
    *
-   * @param filePathList A JavaScript Array of file path strings.
+   * @param filePathList A JavaScript Array of file path strings. A non-array value (undefined,
+   *        null, or any other type) yields an empty object.
    * @return A JavaScript object keyed by filePath. Each value is either
    *         { unionBounds: {x,y,w,h}, largestBounds: {x,y,w,h} } or null.
    */
@@ -253,7 +255,7 @@ class PAGXView {
    * @param width    Original image width in pixels (> 0).
    * @param height   Original image height in pixels (> 0).
    */
-  void setImageOriginalSize(const emscripten::val&  filePathVal, float width, float height);
+  void setImageOriginalSize(const emscripten::val& filePathVal, float width, float height);
 
   /**
    * Builds the layer tree from the previously parsed document. Call this after parsePAGX() and
@@ -324,31 +326,21 @@ class PAGXView {
   void setBoundsOrigin(float x, float y);
 
   /**
-   * Enables/disables gesture-freeze rendering. When enabled, draw() stops calling
-   * displayList.render() and instead blits the last fully-rendered frame to the surface,
-   * applying the delta between the snapshot's zoom/offset and the current ones. This
-   * eliminates per-frame shape retriangulation and slow-op execution for the duration of a
-   * user pan/zoom, at the cost of visual blur when zooming beyond the snapshot scale.
+   * Enables/disables gesture-freeze rendering.
+   *
+   * While active, draw() skips the full Record() pass and blits the cached fitSnapshot with an
+   * incremental translate/scale, keeping pan/zoom smooth. Takes effect only once a fitSnapshot has
+   * been captured (after the first full render); calling it before then leaves gestureActive false.
    *
    * The caller (JavaScript gesture layer) is responsible for calling setGestureActive(true)
-   * on zoomStart/panStart and setGestureActive(false) on zoomEnd/panEnd. The first draw()
-   * after disabling freezes performs a normal render, producing a "refocus" frame that is
-   * expected to be slow; subsequent idle frames are unaffected.
-   *
-   * No-op if a snapshot is unavailable (e.g. before the first frame has rendered). Freeze
-   * never latches across documents: parsePAGX/buildLayers clear the cached snapshot.
+   * on zoomStart/panStart and setGestureActive(false) on zoomEnd/panEnd.
    */
   void setGestureActive(bool active);
 
   /**
-   * Toggles the fitSnapshot fast path. When enabled (default), draw() blits a cached
-   * fit-to-canvas snapshot during gestures and at zoom <= 1.02 to avoid the cost of a full
-   * displayList.render(). When disabled, draw() always runs a full render and never captures
-   * a fit snapshot, trading per-frame rendering cost for first-frame clarity and freshness
-   * under progressive image loading.
-   *
-   * Disabling drops any existing fit snapshot and resets the zoom-out idle short-circuit so
-   * the next draw() runs a full render. The setting persists across parsePAGX/buildLayers.
+   * Toggles the fitSnapshot fast path (gesture-freeze blit, steady-state blit at zoom ~= 1, and
+   * the idle short-circuit). When disabled, draw() always performs a full render and the captured
+   * snapshot is dropped. The setting persists across parsePAGX/buildLayers.
    */
   void setSnapshotEnabled(bool enabled);
 
@@ -383,7 +375,27 @@ class PAGXView {
   int height() const;
 
  private:
-  void applyCenteringTransform();
+  // Folds the contain-mode fit (fitScale + centerOffset) and the user pan/zoom (userZoom +
+  // userOffset) into a single zoomScale/contentOffset pair written to the scene's
+  // PAGDisplayOptions. Replaces the old two-level transform (contentLayer matrix carried the fit,
+  // the display list carried the user pan/zoom) now that the runtime tree is owned by PAGScene.
+  void applyMergedTransform();
+
+  // Advances the scene's animations by the wall-clock delta since the previous draw() and applies
+  // them to the content. Drives both the top-level timeline (defaultTimeline, not advanced by
+  // scene->advanceAndApply) and the scene's auto-playing / nested-composition animations. No-op
+  // until the scene exists and on the first frame (delta seeded from lastAnimationTimeMs).
+  void advanceTimelines(double frameStartMs);
+
+  // Captures the current fit view (userZoom = 1) into fitSnapshot for the gesture-freeze / steady
+  // blit fast paths. Renders the scene into an offscreen tgfx::Surface at pixelScale supersampling
+  // (2x for very small fit scales, 1x otherwise, subject to the full-quality byte budget), then
+  // grabs an image snapshot. Temporarily overrides the scene's PAGDisplayOptions zoom/offset to
+  // the fit transform scaled by pixelScale and restores the user view via applyMergedTransform()
+  // afterwards. No-op unless snapshotEnabled is set, fitSnapshot is still null, and both scene and
+  // surface exist. Must run inside an active lockContext window (called from draw() after the main
+  // submit and before unlock).
+  void captureFitSnapshot(tgfx::Context* context);
 
   void applyDocumentCustomData();
 
@@ -400,13 +412,34 @@ class PAGXView {
 
   std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
-  tgfx::DisplayList displayList = {};
-  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  // PAGScene owns the runtime layer tree, ViewModel binding, and display options. Built in
+  // buildLayers() from the parsed document; reset to nullptr in parsePAGX().
+  std::shared_ptr<PAGScene> scene = nullptr;
+  // First top-level timeline of the scene, or nullptr when the document declares none. Driven by
+  // the JS animation-frame callback.
+  std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
+  // Wall-clock timestamp (emscripten_get_now ms) of the previous timeline advance, used to derive
+  // the per-frame delta. -1 means "no previous frame" (set on parsePAGX/buildLayers) so the first
+  // draw() after a (re)build advances by zero and starts animating from the next frame.
+  double lastAnimationTimeMs = -1.0;
+  // Wraps `surface` so pagx::Record() can render the scene into the same GL framebuffer. Shares
+  // the surface lifecycle: recreated whenever `surface` is (re)created and dropped alongside it in
+  // updateSize(). parsePAGX() keeps both alive (the on-screen render target is reused across a
+  // same-size reload); draw() re-wraps defensively if the wrapper is ever missing while `surface`
+  // is valid.
+  std::shared_ptr<PAGSurface> pagSurface = nullptr;
+  // User-driven pan/zoom relative to the fit transform, supplied by updateZoomScaleAndOffset().
+  // applyMergedTransform() combines these with the contain-mode fit (fitScale + centerOffset)
+  // into the single zoom/offset written to the scene's PAGDisplayOptions.
+  float userZoom = 1.0f;
+  float userOffsetX = 0.0f;
+  float userOffsetY = 0.0f;
   std::shared_ptr<PAGXDocument> document = nullptr;
 
-  // Gesture-freeze pipeline. During active pan/zoom we bypass displayList.render() and
-  // composite fitSnapshot (whole document at zoom=1, blurry when zoomed in but always fills
-  // the viewport) onto the surface. Cleared on parsePAGX/updateSize.
+  // Gesture-freeze pipeline. draw() captures fitSnapshot after each full render (captureFitSnapshot)
+  // and blits it during active gestures and the steady-state zoom ~= 1 path, keeping pan/zoom smooth
+  // without a full Record(). setGestureActive takes effect once a snapshot exists. Cleared on
+  // parsePAGX/updateSize.
   bool gestureActive = false;
   std::shared_ptr<tgfx::Image> fitSnapshot = nullptr;
   // Supersampling factor of the fit snapshot: 1 = same resolution; >1 = N× pixel density, used to
@@ -415,8 +448,9 @@ class PAGXView {
   // Idle token for the zoom-out fast path: once draw() has painted the current view from
   // fitSnapshot alone, further idle frames short-circuit. Cleared by any view change.
   bool zoomedOutFrameSettled = false;
-  // Master switch for the fitSnapshot fast path. When false, draw() always performs a full
-  // displayList.render() and never captures a fit snapshot. Toggled via setSnapshotEnabled().
+  // Master switch for the fitSnapshot fast path (gesture-freeze blit, steady-state blit, and the
+  // idle short-circuit). When false, draw() always performs a full render and no snapshot is used.
+  // Toggled via setSnapshotEnabled().
   bool snapshotEnabled = true;
   // Timestamp (emscripten_get_now ms) of the most recent gesture end. Used to defer the refresh of
   // fitSnapshot until the user truly stops: during dense gestures it reuses the last stable captured
@@ -424,11 +458,6 @@ class PAGXView {
   // memory churn of consecutive full renders.
   // 0 means a gesture has never happened (before the first frame); the first-frame capture is not gated.
   double lastGestureEndMs = 0.0;
-  // Session owns the LayerBuilder state so attachNativeImage() can regenerate a subset of the
-  // layer tree when a higher-resolution asset replaces the thumbnail attached during the initial
-  // buildLayers() pass. Destroyed on every parsePAGX() so old build state never leaks across
-  // documents.
-  std::unique_ptr<LayerBuilderSession> builderSession = nullptr;
 
   // Pending GPU upload requested by attachNativeImage(). Each entry parks the JS-side decoded
   // image (typically an OffscreenCanvas) until the next draw() so the actual texImage2D call
@@ -592,20 +621,39 @@ class PAGXView {
   // logged in this case so sustained overflow stays visible without flooding the console.
   void enforceFullBudget();
 
-  // Computes the current viewport rectangle in displayList.root() coordinates. The result is
-  // suitable for direct intersection with the bounds returned by Layer::getBounds(rootLayer).
-  // Returns an empty rect when the canvas is unavailable or the live zoom is non-positive
+  // Computes the current viewport rectangle in the root composition's local coordinate space
+  // (the document coordinate system, before the display zoomScale/contentOffset are applied).
+  // The result is suitable for direct intersection with the root-local bounds returned by
+  // collectRootLocalImageBounds(). Reads the effective zoom/offset back from the scene's
+  // PAGDisplayOptions so it stays in the same space as the bounds. Returns an empty rect when the
+  // canvas is unavailable, the scene is not built, or the effective zoom is non-positive
   // (degenerate transform); callers must treat empty as "no viewport protection possible".
   tgfx::Rect computeViewportInRootCoords() const;
 
-  // Collects the union of layer bounds (in displayList.root() coordinates) for every filePath
-  // currently sitting in externalTextures. Used by enforceFullBudget for two consecutive
-  // decisions: (1) whether each path intersects the viewport (visibility protection) and (2)
-  // how far the off-viewport paths sit from the viewport center (eviction priority). Sharing
-  // a single pass keeps the cost of one full bounds-collection low — every getBounds() call
-  // is cached by tgfx after the first hit, so repeated invocations across frames are O(1).
-  // Paths whose layers all return empty bounds are absent from the result.
+  // Collects the union of layer bounds (in the root composition's local coordinate space) for
+  // every filePath currently sitting in externalTextures, via collectRootLocalImageBounds(). Used
+  // by enforceFullBudget for two consecutive decisions: (1) whether each path intersects the
+  // viewport (visibility protection) and (2) how far the off-viewport paths sit from the viewport
+  // center (eviction priority). tgfx caches each layer's bounds after the first evaluation, so
+  // repeated invocations across frames are O(1). Paths whose layers all return empty bounds are
+  // absent from the result.
   std::unordered_map<std::string, tgfx::Rect> computeFullPathBounds() const;
+
+  // Walks the runtime layer tree once (rootComposition() + getChildren() recursion) and, for every
+  // runtime layer whose source node references an image through an ImagePattern fill/stroke,
+  // records that layer's root-local bounds under each referenced filePath. Replaces the former
+  // PAGScene::getImageBounds() by matching image references on the source node's contents directly
+  // and inverting the display transform via rootLocalBounds(). The result feeds both
+  // computeFullPathBounds() (LRU eviction scoring) and getImageBounds() (JS binding). Returns an
+  // empty map when the scene is not built or the effective zoom is non-positive.
+  std::unordered_map<std::string, std::vector<tgfx::Rect>> collectRootLocalImageBounds() const;
+
+  // Returns the given runtime layer's bounds in the root composition's local coordinate space.
+  // PAGScene only exposes getGlobalBounds (surface space = root-local * zoom + offset), so this
+  // inverts that uniform-scale-plus-translate transform to recover the root-local rect. Returns an
+  // empty rect when the scene is missing, the layer is null, the effective zoom is non-positive, or
+  // the surface bounds are empty.
+  tgfx::Rect rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) const;
 
   // Attempts to free at least neededBytes from the thumbnail cache by evicting entries in
   // hash-map iteration order until the requested amount is freed (or the cache is empty).
@@ -640,8 +688,8 @@ class PAGXView {
   int canvasHeight = 0;
   FontConfig fontConfig = {};
 
-  // Background state from the PAGX document
-  bool backgroundVisible = false;
+  // Background color resolved from the PAGX document (bg-color / bg-alpha), or opaque white by
+  // default. Routed to the scene via PAGDisplayOptions::setBackgroundColor() in buildLayers().
   tgfx::Color backgroundTGFXColor = DefaultBackgroundColor();
 
   // Performance monitoring

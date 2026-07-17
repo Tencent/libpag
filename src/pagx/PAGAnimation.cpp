@@ -16,10 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGTimeline.h"
+#include "pagx/PAGAnimation.h"
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -28,16 +29,12 @@
 
 namespace pagx {
 
-static constexpr int64_t MICROS_PER_SECOND = 1'000'000;
-
 // Returns the animation duration in microseconds. Returns 0 for invalid animations.
 static int64_t DurationMicros(const Animation* animation) {
   if (animation == nullptr || animation->frameRate <= 0.0f || animation->duration <= 0) {
     return 0;
   }
-  return static_cast<int64_t>(static_cast<double>(animation->duration) *
-                              static_cast<double>(MICROS_PER_SECOND) /
-                              static_cast<double>(animation->frameRate));
+  return FramesToUs(animation->duration, animation->frameRate);
 }
 
 // Evaluates the given animation at the given microsecond time and writes the results into the
@@ -58,12 +55,12 @@ static void ApplyResolved(
   }
 }
 
-PAGTimeline::PAGTimeline(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
-                         std::weak_ptr<PAGScene> owner)
+PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
+                           std::weak_ptr<PAGScene> owner)
     : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
-void PAGTimeline::resolveTargets() {
+void PAGAnimation::resolveTargets() {
   resolved = true;
   if (animation == nullptr || contextDoc == nullptr) {
     return;
@@ -88,46 +85,58 @@ void PAGTimeline::resolveTargets() {
   }
 }
 
-const std::string& PAGTimeline::getId() const {
+const std::string& PAGAnimation::getId() const {
   static const std::string EMPTY;
   return (!owner.expired() && animation != nullptr) ? animation->id : EMPTY;
 }
 
-int64_t PAGTimeline::duration() const {
+int64_t PAGAnimation::duration() const {
   return owner.expired() ? 0 : DurationMicros(animation);
 }
 
-float PAGTimeline::frameRate() const {
+float PAGAnimation::frameRate() const {
   return (!owner.expired() && animation != nullptr) ? animation->frameRate : 0.0f;
 }
 
-void PAGTimeline::play() {
-  playing = true;
-}
-
-void PAGTimeline::pause() {
-  playing = false;
-}
-
-void PAGTimeline::stop() {
-  playing = false;
-  currentTimeUs = 0;
-}
-
-bool PAGTimeline::isPlaying() const {
-  return playing;
-}
-
-void PAGTimeline::setCurrentTime(int64_t microseconds) {
+void PAGAnimation::setCurrentTime(int64_t microseconds) {
   currentTimeUs = std::max<int64_t>(0, microseconds);
 }
 
-int64_t PAGTimeline::currentTime() const {
+int64_t PAGAnimation::currentTime() const {
   return currentTimeUs;
 }
 
-bool PAGTimeline::advance(int64_t deltaMicroseconds) {
-  if (owner.expired() || !playing || deltaMicroseconds == 0 || animation == nullptr) {
+// Maps an absolute time to a valid playback position according to the loop mode. Once clamps to
+// [0, duration]; Loop wraps modulo duration; PingPong mirrors over a period of 2 * duration. Pure:
+// has no side effect on playback state.
+static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
+  if (duration <= 0) {
+    return time;
+  }
+  switch (loop) {
+    case LoopMode::Once:
+      return std::clamp<int64_t>(time, 0, duration);
+    case LoopMode::Loop: {
+      auto pos = time % duration;
+      if (pos < 0) {
+        pos += duration;
+      }
+      return pos;
+    }
+    case LoopMode::PingPong: {
+      auto period = duration * 2;
+      auto pos = time % period;
+      if (pos < 0) {
+        pos += period;
+      }
+      return pos < duration ? pos : period - pos;
+    }
+  }
+  return time;
+}
+
+bool PAGAnimation::advance(int64_t deltaMicroseconds) {
+  if (owner.expired() || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
   }
   auto duration = DurationMicros(animation);
@@ -144,38 +153,11 @@ bool PAGTimeline::advance(int64_t deltaMicroseconds) {
   } else {
     next = currentTimeUs + deltaMicroseconds;
   }
-  switch (animation->loop) {
-    case LoopMode::Once:
-      if (next >= duration) {
-        next = duration;
-        playing = false;
-      } else if (next < 0) {
-        next = 0;
-        playing = false;
-      }
-      break;
-    case LoopMode::Loop: {
-      next = next % duration;
-      if (next < 0) {
-        next += duration;
-      }
-      break;
-    }
-    case LoopMode::PingPong: {
-      auto period = duration * 2;
-      auto pos = next % period;
-      if (pos < 0) {
-        pos += period;
-      }
-      next = pos < duration ? pos : period - pos;
-      break;
-    }
-  }
-  currentTimeUs = next;
+  currentTimeUs = WrapTime(next, duration, animation->loop);
   return currentTimeUs != previous;
 }
 
-void PAGTimeline::apply(float mix) {
+void PAGAnimation::apply(float mix) {
   if (owner.expired() || animation == nullptr) {
     return;
   }
@@ -198,12 +180,6 @@ void PAGTimeline::apply(float mix) {
     resolveTargets();
   }
   ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
-}
-
-bool PAGTimeline::advanceAndApply(int64_t deltaMicroseconds, float mix) {
-  bool changed = advance(deltaMicroseconds);
-  apply(mix);
-  return changed;
 }
 
 }  // namespace pagx

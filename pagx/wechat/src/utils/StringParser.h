@@ -37,7 +37,7 @@ inline int ParseHexDigit(char ch) {
 }
 
 inline tgfx::Color DefaultBackgroundColor() {
-  return tgfx::Color::FromRGBA(245, 245, 245);
+  return tgfx::Color::FromRGBA(255, 255, 255);
 }
 
 inline tgfx::Color ParseHexColor(const std::string& hex) {

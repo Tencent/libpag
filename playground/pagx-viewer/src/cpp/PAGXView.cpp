@@ -28,7 +28,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "utils/ImagePatternMatrixCalculator.h"
 
 using namespace emscripten;
 
@@ -143,11 +142,6 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
-  // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
-  // them to absolute coordinates to ensure correct rendering.
-  ResolveAllImagePatternMatrices(document.get());
-  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
@@ -320,6 +314,14 @@ void PAGXView::draw() {
   if (tgfxSurface == nullptr) {
     return;
   }
+  // Dirty gate: skip the Record()/submit pass on idle frames. advanceTimelines() above already
+  // refreshed the scene's content-changed flag, so hasContentChanged() reflects the latest state
+  // (a running animation or in-progress tile refinement keeps it true). presentImmediately forces a
+  // render after loads/resizes/zoom/background changes; lastRecording must still be flushed when
+  // present, otherwise the double-buffered frame it holds would be dropped.
+  if (!presentImmediately && lastRecording == nullptr && !scene->hasContentChanged()) {
+    return;
+  }
   if (useCustomBackgroundColor) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   } else {
@@ -330,15 +332,19 @@ void PAGXView::draw() {
   if (context != nullptr) {
     auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
+      // Force the freshest frame on screen right now. Drop whatever frame is still parked in
+      // lastRecording so the deferred (older) content cannot resurface one frame later.
       presentImmediately = false;
       lastRecording = nullptr;
       if (recording) {
         context->submit(std::move(recording));
       }
-    } else if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      lastRecording = std::move(recording);
     } else {
+      // Double buffer: park this frame's recording and submit the one deferred from the previous
+      // frame, giving the GPU an extra frame to finish. When the scene content is unchanged,
+      // Record() returns null; swapping that null into lastRecording lets the dirty gate resume
+      // skipping idle frames once the last deferred frame has been flushed out.
+      std::swap(lastRecording, recording);
       if (recording) {
         context->submit(std::move(recording));
       }
