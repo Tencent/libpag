@@ -25,6 +25,33 @@ namespace pag {
 
 static const int TIMEOUT_US = 1000;
 
+// Method ID for android.view.Surface.release(). Lazily resolved on the first
+// call to ReleaseJavaSurface.
+static jmethodID Surface_release = nullptr;
+
+static void ReleaseJavaSurface(JNIEnv* env, jobject surface) {
+  if (env == nullptr || surface == nullptr) {
+    return;
+  }
+  if (Surface_release == nullptr) {
+    auto surfaceClass = env->FindClass("android/view/Surface");
+    if (surfaceClass == nullptr) {
+      env->ExceptionClear();
+      return;
+    }
+    Surface_release = env->GetMethodID(surfaceClass, "release", "()V");
+    env->DeleteLocalRef(surfaceClass);
+    if (Surface_release == nullptr) {
+      env->ExceptionClear();
+      return;
+    }
+  }
+  env->CallVoidMethod(surface, Surface_release);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
+}
+
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   isValid = initDecoder(format);
 }
@@ -130,7 +157,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
-  auto surface = imageReader->getInputSurface();
+  auto surface = imageReader->createInputSurface();
   if (surface == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
@@ -139,6 +166,15 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   }
 
   nativeWindow = ANativeWindow_fromSurface(env, surface);
+  // Release the Java Surface immediately after acquiring the ANativeWindow.
+  // ANativeWindow_fromSurface takes its own strong reference on the underlying
+  // native android::Surface (tag = ANativeWindow_acquire), so the native window
+  // stays valid for as long as we keep this HardwareDecoder alive. Doing the
+  // release here (before AMediaCodec_configure) is safe because no other
+  // component has taken a reference to this Java Surface yet, so there is no
+  // race with framework teardown paths that could otherwise crash later.
+  ReleaseJavaSurface(env, surface);
+  env->DeleteLocalRef(surface);
 
   media_status_t status;
   status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
