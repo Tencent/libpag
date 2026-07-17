@@ -82,6 +82,7 @@ void ProgressModel::addFinishedStepsInternal(uint64_t value) {
   if (finishedSteps >= totalSteps) {
     finishedSteps = totalSteps;
   }
+  QApplication::processEvents();
   Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
