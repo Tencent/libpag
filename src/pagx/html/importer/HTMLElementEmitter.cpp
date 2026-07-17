@@ -288,9 +288,10 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   layer->contents.push_back(fill);
 
   // The fold collapses the wrapper + inner `<img>` into a single layer. The wrapper's own
-  // `data-*` were already forwarded when its layer attributes were applied; forward the inner
-  // `<img>`'s too so image-carried custom data (e.g. `data-id`) is not lost to the fold.
-  _layerBuilder->forwardDataAttributes(layer, img);
+  // `data-*` were already forwarded onto the layer when its attributes were applied; forward the
+  // inner `<img>`'s onto its backing `Image` resource so image-carried custom data (e.g.
+  // `data-id`) is not lost to the fold.
+  _layerBuilder->forwardDataAttributes(imageNode, img);
 
   _idAllocator->assign(layer, element);
   return true;
@@ -304,6 +305,9 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     auto layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
+    // An SVG `<img>` rides an import directive with no backing `Image` resource, so its `data-*`
+    // stay on the layer (applyLayerAttributes skips `<img>` forwarding).
+    _layerBuilder->forwardDataAttributes(layer, element);
     layer->importDirective.source = resolveImageSource(src);
     layer->importDirective.format = "svg";
     _idAllocator->assign(layer, element);
@@ -338,6 +342,11 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
+
+  // Forward the `<img>`'s `data-*` onto its backing `Image` resource rather than the layer, so the
+  // custom data travels with the image itself. applyLayerAttributes deliberately skips `<img>`.
+  _layerBuilder->forwardDataAttributes(imageNode, element);
+
   _idAllocator->assign(layer, element);
   return layer;
 }

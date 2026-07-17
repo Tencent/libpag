@@ -34,6 +34,7 @@ class HTMLDiagnosticSink;
 class HTMLInlineSvgEmitter;
 class HTMLValueParser;
 class Layer;
+class Node;
 class PAGXDocument;
 
 /**
@@ -80,11 +81,12 @@ class HTMLLayerBuilder {
   void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                             const HTMLBoxAttributes& box);
 
-  /** Copies the element's `data-*` attributes into `layer->customData` (invalid keys are warned
-   *  and dropped). Split out from `applyLayerAttributes` so the folded-image path — which reuses a
-   *  parent layer and skips the rest of the layer-attribute chain — can still forward the inner
-   *  `<img>`'s custom data. */
-  void forwardDataAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element);
+  /** Copies the element's `data-*` attributes into `node->customData` (invalid keys are warned
+   *  and dropped). Takes a `Node*` rather than a `Layer*` so `<img>` custom data can be forwarded
+   *  onto the backing `Image` resource instead of the layer. Split out from `applyLayerAttributes`
+   *  so the folded-image path — which reuses a parent layer and skips the rest of the
+   *  layer-attribute chain — can still forward the inner `<img>`'s custom data. */
+  void forwardDataAttributes(Node* node, const std::shared_ptr<DOMNode>& element);
 
   /** Builds a `Fill` chain whose colour is a single solid `color`. */
   Fill* buildSolidFill(const Color& color);
